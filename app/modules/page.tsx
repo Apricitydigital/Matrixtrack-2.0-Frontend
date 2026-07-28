@@ -1,0 +1,63 @@
+'use client';
+
+import Link from "next/link";
+import { Protected } from "@components/Guards";
+import { useAuth } from "@hooks/useAuth";
+import { moduleLabel } from "@lib/labels";
+import { canonicalizeModules, moduleEntryPath, CANONICAL_MODULE_KEYS } from "@utils/modules";
+
+export default function ModulesLanding() {
+  const { user } = useAuth();
+
+  let modules = canonicalizeModules(user?.modules || []);
+  if (user?.roles?.includes("HMS_SUPER_ADMIN")) {
+    // Ensure Super Admin sees all modules
+    const existingKeys = new Set(modules.map(m => m.key));
+    CANONICAL_MODULE_KEYS.forEach(key => {
+      if (!existingKeys.has(key)) {
+        modules.push({ key, name: key } as any);
+      }
+    });
+  }
+
+  const deduped = modules.sort((a, b) => {
+    if (a.key === "TOILET") return -1;
+    if (b.key === "TOILET") return 1;
+    return 0;
+  });
+  const hasQc = user?.roles?.includes("QC");
+
+  return (
+    <Protected>
+      <div className="page">
+        <h1>Modules</h1>
+        {deduped.length === 0 ? (
+          <div className="card">
+            <p className="muted">You are not assigned to any modules yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-2">
+            {deduped.map((m) => (
+              <div className="card card-hover" key={m.key}>
+                <h3>{moduleLabel(m.key, m.name)}</h3>
+                <p className="muted">Access records and tasks for this module.</p>
+                <Link className="btn btn-primary btn-sm" href={moduleEntryPath(user || null, m.key)}>
+                  Open
+                </Link>
+              </div>
+            ))}
+            {hasQc && (
+              <div className="card card-hover">
+                <h3>Employees</h3>
+                <p className="muted">View employees assigned to your modules.</p>
+                <Link className="btn btn-secondary btn-sm" href="/employees">
+                  View
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Protected>
+  );
+}
