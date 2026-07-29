@@ -380,15 +380,15 @@ export const ToiletApi = {
 
   // Assignments
   listEmployees: () => EmployeesApi.list("toilet"),
-  bulkAssignToilets: (employeeId: string, toiletIds: string[], category: string) =>
+  bulkAssignToilets: (supervisorId: string, toiletIds: string[], category: string) =>
     apiFetch("/modules/toilet/assignments/bulk", {
       method: "POST",
-      body: JSON.stringify({ employeeId, toiletIds, category })
+      body: JSON.stringify({ supervisorId, toiletIds, category })
     }),
-  unassignToilet: (employeeId: string, toiletId: string) =>
+  unassignToilet: (supervisorId: string, toiletId: string) =>
     apiFetch("/modules/toilet/assignments/remove", {
       method: "POST",
-      body: JSON.stringify({ employeeId, toiletId })
+      body: JSON.stringify({ supervisorId, toiletId })
     })
 };
 

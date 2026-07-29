@@ -25,7 +25,7 @@ export default function StaffTab() {
             ]);
 
             const zoneMap = new Map(zonesRes.nodes.map((z: any) => [z.id, z.name]));
-            const rawEmployees = empRes.employees || [];
+            const rawEmployees = (empRes.employees || []).filter((emp: any) => emp.role === "SUPERVISOR");
 
             // Map assignments count
             const enriched = rawEmployees.map((emp: any) => {

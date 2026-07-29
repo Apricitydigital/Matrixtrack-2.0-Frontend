@@ -8,6 +8,7 @@ export default function ReportsTab() {
     const [reports, setReports] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [reportsError, setReportsError] = useState('');
     const [dateFilter, setDateFilter] = useState('today');
     const [customDate, setCustomDate] = useState('');
 
@@ -18,6 +19,7 @@ export default function ReportsTab() {
     const loadReports = async () => {
         setLoading(true);
         setError('');
+        setReportsError('');
         try {
             const params: any = {};
             if (dateFilter === 'custom' && customDate) {
@@ -25,16 +27,21 @@ export default function ReportsTab() {
             }
             const statsRes = await ToiletApi.getDashboardStats(params);
             setStats(statsRes);
-
-            // Fetch recent inspections for the table
-            const inspectionsRes = await ToiletApi.listInspections({ pageSize: 10 });
-            setReports(inspectionsRes.inspections || []);
         } catch (err) {
             if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
                 setError('Not authorized for Cleanliness of Toilets module.');
             } else {
                 setError('Failed to load dashboard data.');
             }
+        }
+
+        try {
+            const inspectionsRes = await ToiletApi.listInspections({ pageSize: 10 });
+            setReports(inspectionsRes.inspections || []);
+        } catch (err: any) {
+            console.error('Failed to load recent toilet inspections', err);
+            setReports([]);
+            setReportsError(err instanceof ApiError ? err.message : 'Failed to load recent inspections.');
         } finally {
             setLoading(false);
         }
@@ -110,10 +117,10 @@ export default function ReportsTab() {
                     )}
 
                     <div className="stats-compact-grid mt-4">
-                        <StatCard label="TOTAL INFRASTRUCTURE" value={stats.totalToilets} sub="Verified Assets" color="#6366f1" />
+                        <StatCard label="TOTAL INFRASTRUCTURE" value={stats.totalToilets} sub="Registered assets" color="#6366f1" />
                         <StatCard label="STAFF ON DUTY" value={stats.onDutyEmployees} sub="Active Personnel" color="#f59e0b" />
-                        <StatCard label="TOTAL APPROVED" value={stats.approvedInspections} sub="Compliant records" color="#059669" />
-                        <StatCard label="PENDING VERIFICATION" value={stats.pendingReview} sub="QC Queue" color="#d97706" />
+                        <StatCard label="TOTAL APPROVED" value={stats.approvedToilets ?? stats.approvedInspections} sub="Approved assets" color="#059669" />
+                        <StatCard label="PENDING VERIFICATION" value={stats.pendingToilets ?? stats.pendingReview} sub="Pending assets" color="#d97706" />
                     </div>
                 </div>
             ) : (
@@ -158,6 +165,7 @@ export default function ReportsTab() {
 
             {loading && <div className="loading-state"><p>Syncing dashboard...</p></div>}
             {error && <div className="alert error">{error}</div>}
+            {!error && reportsError && <div className="alert error">{reportsError}</div>}
 
             {!loading && !error && (
                 <div className="card compact-card">

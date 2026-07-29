@@ -53,7 +53,7 @@ export default function AllToiletsTab() {
             ]);
             setToilets(toi.toilets || []);
             setZones(z.nodes || []);
-            setEmployees(emp.employees || []);
+            setEmployees((emp.employees || []).filter((item: any) => item.role === "SUPERVISOR"));
         } catch (err) {
             console.error(err);
         } finally {
@@ -86,14 +86,18 @@ export default function AllToiletsTab() {
 
     const handleQuickAssign = async (supervisorId: string) => {
         if (!toiletToAssign) return;
+        if (toiletToAssign.status !== 'APPROVED') {
+            alert('Only approved toilets can be assigned');
+            return;
+        }
         setAssigningLoading(true);
         try {
             await ToiletApi.bulkAssignToilets(supervisorId, [toiletToAssign.id], toiletToAssign.type);
             setShowAssignModal(false);
             setToiletToAssign(null);
             await loadData();
-        } catch (err) {
-            alert("Assignment failed");
+        } catch (err: any) {
+            alert(err?.message || "Assignment failed");
         } finally {
             setAssigningLoading(false);
         }
@@ -249,7 +253,9 @@ export default function AllToiletsTab() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredToilets.map((toilet) => (
+                        {filteredToilets.map((toilet) => {
+                            const currentOwner = toilet.assignments?.[0]?.supervisor?.name;
+                            return (
                             <tr key={toilet.id} style={{ transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                                 <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc' }}>
                                     <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>{toilet.name}</div>
@@ -269,20 +275,26 @@ export default function AllToiletsTab() {
                                     <span style={{ padding: '6px 14px', borderRadius: 10, fontSize: 10, fontWeight: 900, backgroundColor: toilet.status === 'APPROVED' ? '#ecfdf5' : '#fffbeb', color: toilet.status === 'APPROVED' ? '#059669' : '#d97706', textTransform: 'uppercase' }}>{toilet.status}</span>
                                 </td>
                                 <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc', textAlign: 'right' }}>
-                                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                        {isAdmin && (
-                                            <button
-                                                onClick={() => { setToiletToAssign(toilet); setShowAssignModal(true); }}
-                                                style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#1e293b', transition: 'all 0.2s' }}
-                                                onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
-                                                onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
-                                            >Assign Staff</button>
-                                        )}
-                                        <button onClick={() => setSelectedToilet(toilet)} style={{ backgroundColor: '#1e293b', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>Profile</button>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                                        {currentOwner ? (
+                                            <div style={{ fontSize: 11, fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '6px 10px', borderRadius: 10 }}>Assigned: {currentOwner}</div>
+                                        ) : null}
+                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                            {isAdmin && toilet.status === 'APPROVED' && (
+                                                <button
+                                                    onClick={() => { setToiletToAssign(toilet); setShowAssignModal(true); }}
+                                                    style={{ backgroundColor: currentOwner ? '#f8fafc' : '#ffffff', border: '1px solid #e2e8f0', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#1e293b', transition: 'all 0.2s' }}
+                                                    onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                                                    onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+                                                >{currentOwner ? 'Reassign Staff' : 'Assign Staff'}</button>
+                                            )}
+                                            <button onClick={() => setSelectedToilet(toilet)} style={{ backgroundColor: '#1e293b', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>Profile</button>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                        );
+                        })}
                     </tbody>
                 </table>
             </div>

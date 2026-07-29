@@ -32,7 +32,7 @@ export default function AssignmentsTab() {
                 ToiletApi.listAllToilets(),
                 ToiletApi.getZones()
             ]);
-            setEmployees(emp.employees || []);
+            setEmployees((emp.employees || []).filter((item: any) => item.role === "SUPERVISOR"));
             setToilets(toi.toilets || []);
             setZones(z.nodes || []);
         } catch (err) {
@@ -86,7 +86,7 @@ export default function AssignmentsTab() {
             setSelectedToilets([]);
             await loadData();
         } catch (err: any) {
-            alert(err.message || "Assignment failed");
+            alert(err?.message || "Assignment failed");
         } finally {
             setAssigning(false);
         }
