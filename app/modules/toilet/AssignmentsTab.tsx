@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ToiletApi } from "@lib/apiClient";
 
 export default function AssignmentsTab() {
-    const [employees, setEmployees] = useState<any[]>([]);
+    const [supervisors, setEmployees] = useState<any[]>([]);
     const [toilets, setToilets] = useState<any[]>([]);
     const [selectedEmployee, setSelectedEmployee] = useState("");
     const [selectedToilets, setSelectedToilets] = useState<string[]>([]);
@@ -93,28 +93,28 @@ export default function AssignmentsTab() {
     };
 
 
-    const employeeCounts = toilets.reduce((acc, t) => {
+    const supervisorCounts = toilets.reduce((acc, t) => {
         t.assignments?.forEach((a: any) => {
-            acc[a.employeeId] = (acc[a.employeeId] || 0) + 1;
+            acc[a.supervisorId] = (acc[a.supervisorId] || 0) + 1;
         });
         return acc;
     }, {} as Record<string, number>);
 
-    const filteredEmployees = employees.filter(e =>
+    const filteredEmployees = supervisors.filter(e =>
         e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
         (e.phone && e.phone.includes(empSearch))
     );
 
     const filteredToilets = toilets.filter(t => {
-        const isAlreadyAssignedToSelected = t.assignments?.some((a: any) => a.employeeId === selectedEmployee);
+        const isAlreadyAssignedToSelected = t.assignments?.some((a: any) => a.supervisorId === selectedEmployee);
         if (isAlreadyAssignedToSelected) return false;
         const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesWard = !selectedWard || t.wardId === selectedWard || t.ward?.parentId === selectedWard;
         return matchesSearch && matchesWard;
     });
 
-    const selectedEmpObj = employees.find(e => e.id === selectedEmployee);
-    const assignedToilets = toilets.filter(t => t.assignments?.some((a: any) => a.employeeId === selectedEmployee));
+    const selectedEmpObj = supervisors.find(e => e.id === selectedEmployee);
+    const assignedToilets = toilets.filter(t => t.assignments?.some((a: any) => a.supervisorId === selectedEmployee));
 
     if (loading) return (
         <div style={{ display: 'flex', height: '60vh', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
@@ -208,7 +208,7 @@ export default function AssignmentsTab() {
                                 backgroundColor: selectedEmployee === emp.id ? 'rgba(255,255,255,0.1)' : '#f1f5f9',
                                 fontSize: 11, fontWeight: 700, color: selectedEmployee === emp.id ? '#ffffff' : '#475569'
                             }}>
-                                {employeeCounts[emp.id] || 0}
+                                {supervisorCounts[emp.id] || 0}
                             </div>
                         </div>
                     ))}
@@ -282,7 +282,7 @@ export default function AssignmentsTab() {
                                         <tbody>
                                             {filteredToilets.length > 0 ? filteredToilets.map(t => {
                                                 const isSelected = selectedToilets.includes(t.id);
-                                                const currentOwner = t.assignments?.[0]?.employee?.name;
+                                                const currentOwner = t.assignments?.[0]?.supervisor?.name;
                                                 return (
                                                     <tr key={t.id} onClick={() => toggleToilet(t.id)} style={{ borderBottom: '1px solid #f8fafc', cursor: 'pointer', backgroundColor: isSelected ? '#f8fafc' : 'transparent' }}>
                                                         <td style={{ textAlign: 'center' }}>
@@ -382,3 +382,4 @@ export default function AssignmentsTab() {
         </div>
     );
 }
+

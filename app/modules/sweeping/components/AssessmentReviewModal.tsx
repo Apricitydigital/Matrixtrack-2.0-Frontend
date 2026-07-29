@@ -178,7 +178,7 @@ export default function AssessmentReviewModal({ record, onClose, onRefresh }: { 
                         <div>
                             <div style={{ fontSize: '12px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Review Decision</div>
                             <textarea
-                                placeholder="Add remarks or feedback for the employee..."
+                                placeholder="Add remarks or feedback for the supervisor..."
                                 value={remarks}
                                 onChange={(e) => setRemarks(e.target.value)}
                                 style={{
@@ -285,3 +285,4 @@ export default function AssessmentReviewModal({ record, onClose, onRefresh }: { 
         </div>
     );
 }
+

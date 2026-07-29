@@ -17,7 +17,7 @@ type Request = {
   createdAt: string;
 };
 
-const ROLE_OPTIONS: Array<"EMPLOYEE" | "QC" | "ACTION_OFFICER"> = ["EMPLOYEE", "QC", "ACTION_OFFICER"];
+const ROLE_OPTIONS: Array<"SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER"> = ["SUPERVISOR", "EMPLOYEE", "QC", "ACTION_OFFICER"];
 
 export default function RegistrationRequestsPage() {
   const { user } = useAuth();
@@ -28,7 +28,7 @@ export default function RegistrationRequestsPage() {
   const [error, setError] = useState("");
   const [modal, setModal] = useState<{
     requestId: string;
-    role: "EMPLOYEE" | "QC" | "ACTION_OFFICER" | "";
+    role: "SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER" | "";
     moduleIds: Set<string>;
   } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -416,3 +416,4 @@ export default function RegistrationRequestsPage() {
     </RoleGuard>
   );
 }
+

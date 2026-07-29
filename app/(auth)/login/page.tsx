@@ -3,14 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, AuthApi } from "@lib/apiClient";
-import { setAuthCookie, decodeToken } from "@lib/auth";
 import { useAuth } from "@hooks/useAuth";
 import { getPostLoginRedirect } from "@utils/modules";
 import { Eye, EyeOff, ShieldCheck, ArrowRight, Building2 } from "lucide-react";
 
 export default function LoginPage() {
     const router = useRouter();
-    const { setUser } = useAuth();
+    const { setAuthenticatedUser } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
@@ -23,10 +22,8 @@ export default function LoginPage() {
         setError("");
         try {
             const { token, user: authUser } = await AuthApi.login({ email, password });
-            setAuthCookie(token);
-            const decoded = decodeToken(token, authUser);
-            setUser(decoded);
-            router.replace(getPostLoginRedirect(decoded));
+            setAuthenticatedUser(token, authUser);
+            router.replace(getPostLoginRedirect(authUser));
         } catch (err) {
             if (err instanceof ApiError && err.status === 401) {
                 setError("Invalid email or password. Please try again.");

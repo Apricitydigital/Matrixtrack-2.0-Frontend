@@ -16,7 +16,7 @@ export default function AllToiletsTab() {
     // Assignment Modal State
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [toiletToAssign, setToiletToAssign] = useState<any>(null);
-    const [employees, setEmployees] = useState<any[]>([]);
+    const [supervisors, setEmployees] = useState<any[]>([]);
     const [assigningLoading, setAssigningLoading] = useState(false);
 
     // Search & Filter states
@@ -84,11 +84,11 @@ export default function AllToiletsTab() {
         setFilteredToilets(filtered);
     };
 
-    const handleQuickAssign = async (employeeId: string) => {
+    const handleQuickAssign = async (supervisorId: string) => {
         if (!toiletToAssign) return;
         setAssigningLoading(true);
         try {
-            await ToiletApi.bulkAssignToilets(employeeId, [toiletToAssign.id], toiletToAssign.type);
+            await ToiletApi.bulkAssignToilets(supervisorId, [toiletToAssign.id], toiletToAssign.type);
             setShowAssignModal(false);
             setToiletToAssign(null);
             await loadData();
@@ -174,8 +174,8 @@ export default function AllToiletsTab() {
                             <div key={a.id} style={{ padding: '16px 20px', backgroundColor: 'white', borderRadius: 20, marginBottom: 12, border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', alignItems: 'center', gap: 14 }}>
                                 <div style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>👤</div>
                                 <div>
-                                    <div style={{ fontWeight: 800, fontSize: 14, color: '#1e293b' }}>{a.employee.name}</div>
-                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{a.employee.email}</div>
+                                    <div style={{ fontWeight: 800, fontSize: 14, color: '#1e293b' }}>{a.supervisor.name}</div>
+                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{a.supervisor.email}</div>
                                 </div>
                             </div>
                         ))}
@@ -296,7 +296,7 @@ export default function AllToiletsTab() {
                         <p style={{ margin: '8px 0 24px 0', fontSize: 14, color: '#64748b', fontWeight: 500 }}>Delegate responsibility for <strong>{toiletToAssign?.name}</strong></p>
 
                         <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '4px' }}>
-                            {employees.map(emp => (
+                            {supervisors.map(emp => (
                                 <div
                                     key={emp.id}
                                     onClick={() => handleQuickAssign(emp.id)}
@@ -327,3 +327,4 @@ export default function AllToiletsTab() {
         </div>
     );
 }
+

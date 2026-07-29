@@ -36,7 +36,7 @@ export default function TaskforceModulePage() {
 
   return (
     <Protected>
-      <ModuleGuard module="TASKFORCE" roles={["EMPLOYEE", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
+      <ModuleGuard module="TASKFORCE" roles={["SUPERVISOR", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
         <div className="card">
           <h2>Taskforce Module</h2>
           <p>Manage and track city-scoped cases with activities and assignments.</p>
@@ -51,3 +51,4 @@ export default function TaskforceModulePage() {
     </Protected>
   );
 }
+

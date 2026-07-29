@@ -1,7 +1,8 @@
 import { Role } from "../types/auth";
 
 export const ROLE_LABELS: Record<Role | string, string> = {
-  EMPLOYEE: "Taskforce Member",
+  EMPLOYEE: "Employee",
+  SUPERVISOR: "Supervisor",
   COMMISSIONER: "ULB Official",
   QC: "Quality Controller",
   CITY_ADMIN: "City Admin",

@@ -3,6 +3,7 @@ export type Role =
   | "CITY_ADMIN"
   | "COMMISSIONER"
   | "ACTION_OFFICER"
+  | "SUPERVISOR"
   | "EMPLOYEE"
   | "QC"
   | "ULB_OFFICER";
@@ -15,8 +16,11 @@ export interface ModuleAssignment {
   key: ModuleKey;
   name?: string;
   label?: string;
+  cityId?: string;
   canWrite: boolean;
   roles?: Role[];
+  zoneIds: string[];
+  wardIds: string[];
 }
 
 export interface AuthUser {
@@ -25,7 +29,7 @@ export interface AuthUser {
   email?: string;
   cityId?: string;
   cityName?: string;
-  roles: Role[]; // city-level roles
+  roles: Role[];
   roleLabels?: string[];
   modules: ModuleAssignment[];
   token?: string;

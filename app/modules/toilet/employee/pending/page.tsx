@@ -45,10 +45,10 @@ export default function ToiletPendingPage() {
 
     return (
         <Protected>
-            <ModuleGuard module="TOILET" roles={["EMPLOYEE", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
+            <ModuleGuard module="TOILET" roles={["SUPERVISOR", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
                 <div className="content">
                     <header className="mb-6">
-                        <Link href="/modules/toilet/employee" className="text-sm font-bold text-gray-500 hover:text-gray-800 mb-2 block">
+                        <Link href="/modules/toilet/supervisor" className="text-sm font-bold text-gray-500 hover:text-gray-800 mb-2 block">
                             ← Back to Workspace
                         </Link>
                         <p className="eyebrow">Cleanliness of Toilets</p>
@@ -87,3 +87,4 @@ export default function ToiletPendingPage() {
         </Protected>
     );
 }
+

@@ -117,7 +117,7 @@ export default function ReportsTab() {
                     </div>
                 </div>
             ) : (
-                <div className="employee-dashboard">
+                <div className="supervisor-dashboard">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                         <div className="tab-filters">
                             <FilterTabs
@@ -181,7 +181,7 @@ export default function ReportsTab() {
                                 {reports.length > 0 ? reports.slice(0, 10).map((report) => (
                                     <tr key={report.id}>
                                         <td className="font-bold">{report.toilet?.name || '---'}</td>
-                                        <td>{report.employee?.name || '---'}</td>
+                                        <td>{report.supervisor?.name || '---'}</td>
                                         <td className="muted text-xs">
                                             {new Date(report.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} • {new Date(report.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                         </td>
@@ -320,3 +320,4 @@ function StatusBadge({ status }: { status: string }) {
         </span>
     );
 }
+

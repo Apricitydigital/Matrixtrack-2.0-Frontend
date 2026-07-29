@@ -59,7 +59,7 @@ export default function TaskforceAssignedPage() {
 
   return (
     <Protected>
-      <ModuleGuard module="TASKFORCE" roles={["EMPLOYEE"]}>
+      <ModuleGuard module="TASKFORCE" roles={["SUPERVISOR"]}>
         <div className="page">
           <h1>Assigned Feeder Points</h1>
           {error && <div className="alert error">{error}</div>}
@@ -107,3 +107,4 @@ export default function TaskforceAssignedPage() {
     </Protected>
   );
 }
+

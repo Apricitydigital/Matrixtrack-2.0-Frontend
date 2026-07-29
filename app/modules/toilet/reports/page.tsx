@@ -31,7 +31,7 @@ export default function ToiletReportsPage() {
   }, []);
 
   return (
-    <ModuleGuard module="TOILET" roles={["EMPLOYEE", "QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
+    <ModuleGuard module="TOILET" roles={["SUPERVISOR", "QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
       <div className="card">
         <h3>Toilet Summary</h3>
         {loading && <p>Loading...</p>}
@@ -53,3 +53,4 @@ export default function ToiletReportsPage() {
     </ModuleGuard>
   );
 }
+

@@ -1,31 +1,51 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from "react";
-import { ApiError, CityApi } from "@lib/apiClient";
-import { Edit2, X, Loader2, Activity, Shield, Building2, Globe, Users, Target, ChevronRight, PlusCircle, UserPlus, Send } from "lucide-react";
 import Link from "next/link";
+import { Activity, Building2, Edit2, Globe, Loader2, PlusCircle, Send, Shield, Target, Trash2, UserPlus, Users, X } from "lucide-react";
+import { ApiError, CityApi } from "@lib/apiClient";
+import { useToast } from "@components/ui/ToastProvider";
+import type { CityAdminInfo, CityMasterNode, CityRow, MasterNode } from "../../types/api";
 
-interface CityAdminInfo {
-  name: string;
-  email: string;
-}
-
-interface CityRow {
-  id: string;
-  name: string;
+type CityCreateInput = {
+  stateId: string;
+  divisionId: string;
+  districtId: string;
+  cityMasterId: string;
   code: string;
-  ulbCode?: string;
-  enabled: boolean;
-  cityAdmin: CityAdminInfo | null;
-}
+  ulbCode: string;
+};
+
+type CityUpdateInput = {
+  stateId?: string;
+  divisionId?: string;
+  districtId?: string;
+  cityMasterId?: string;
+  name?: string;
+  code: string;
+  ulbCode: string;
+  adminName?: string;
+  adminEmail?: string;
+};
 
 export default function HmsDashboardPage() {
+  const { showToast } = useToast();
   const [cities, setCities] = useState<CityRow[]>([]);
+  const [states, setStates] = useState<MasterNode[]>([]);
+  const [divisions, setDivisions] = useState<MasterNode[]>([]);
+  const [districts, setDistricts] = useState<MasterNode[]>([]);
+  const [masterCities, setMasterCities] = useState<CityMasterNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [masterLoading, setMasterLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingCity, setEditingCity] = useState<CityRow | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<{ cityId: string; cityName: string; admin: CityAdminInfo } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ cityId: string; userId: string; adminName: string } | null>(null);
 
-  const [cityName, setCityName] = useState("");
+  const [stateId, setStateId] = useState("");
+  const [divisionId, setDivisionId] = useState("");
+  const [districtId, setDistrictId] = useState("");
+  const [cityMasterId, setCityMasterId] = useState("");
   const [cityCode, setCityCode] = useState("");
   const [cityUlbCode, setCityUlbCode] = useState("");
   const [cityStatus, setCityStatus] = useState("");
@@ -41,32 +61,163 @@ export default function HmsDashboardPage() {
       setLoading(true);
       setError(null);
       const cityRes = await CityApi.list();
-      setCities((cityRes as any).cities ?? cityRes);
-    } catch (err: any) {
-      const message = err instanceof ApiError ? err.message : "Failed to load data";
-      setError(message);
+      setCities(cityRes.cities);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
   };
 
+  const loadStates = async () => {
+    try {
+      setMasterLoading(true);
+      const res = await CityApi.listStates();
+      setStates(res.states);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to load states");
+    } finally {
+      setMasterLoading(false);
+    }
+  };
+
   useEffect(() => {
     refresh();
+    loadStates();
   }, []);
+
+  useEffect(() => {
+    if (!stateId) {
+      setDivisions([]);
+      setDivisionId("");
+      setDistricts([]);
+      setDistrictId("");
+      setMasterCities([]);
+      setCityMasterId("");
+      return;
+    }
+
+    let active = true;
+    setMasterLoading(true);
+    CityApi.listDivisions(stateId)
+      .then((res) => {
+        if (!active) return;
+        setDivisions(res.divisions);
+        setDivisionId("");
+        setDistricts([]);
+        setDistrictId("");
+        setMasterCities([]);
+        setCityMasterId("");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err instanceof ApiError ? err.message : "Failed to load divisions");
+      })
+      .finally(() => {
+        if (active) setMasterLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stateId]);
+
+  useEffect(() => {
+    if (!stateId || !divisionId) {
+      setDistricts([]);
+      setDistrictId("");
+      setMasterCities([]);
+      setCityMasterId("");
+      return;
+    }
+
+    let active = true;
+    setMasterLoading(true);
+    CityApi.listDistricts(stateId, divisionId)
+      .then((res) => {
+        if (!active) return;
+        setDistricts(res.districts);
+        setDistrictId("");
+        setMasterCities([]);
+        setCityMasterId("");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err instanceof ApiError ? err.message : "Failed to load districts");
+      })
+      .finally(() => {
+        if (active) setMasterLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stateId, divisionId]);
+
+  useEffect(() => {
+    if (!districtId) {
+      setMasterCities([]);
+      setCityMasterId("");
+      return;
+    }
+
+    let active = true;
+    setMasterLoading(true);
+    CityApi.listCities(districtId)
+      .then((res) => {
+        if (!active) return;
+        setMasterCities(res.cities);
+        setCityMasterId("");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err instanceof ApiError ? err.message : "Failed to load cities");
+      })
+      .finally(() => {
+        if (active) setMasterLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [districtId]);
+
+  useEffect(() => {
+    const selectedCity = masterCities.find((city) => city.id === cityMasterId);
+    if (!selectedCity) return;
+    if (!cityCode) setCityCode(selectedCity.code.toLowerCase());
+    if (!cityUlbCode) setCityUlbCode(selectedCity.code.toLowerCase());
+  }, [cityMasterId, masterCities, cityCode, cityUlbCode]);
 
   const handleCreateCity = async (e: React.FormEvent) => {
     e.preventDefault();
     setCityStatus("Creating...");
     try {
-      await CityApi.create({ name: cityName, code: cityCode, ulbCode: cityUlbCode || cityCode });
+      const payload: CityCreateInput = {
+        stateId,
+        divisionId,
+        districtId,
+        cityMasterId,
+        code: cityCode,
+        ulbCode: cityUlbCode || cityCode
+      };
+      await CityApi.create(payload);
       setCityStatus("City created.");
-      setCityName("");
+      showToast({ title: "City created", description: "New city cluster deployed successfully.", tone: "success" });
+      setStateId("");
+      setDivisionId("");
+      setDistrictId("");
+      setCityMasterId("");
+      setDivisions([]);
+      setDistricts([]);
+      setMasterCities([]);
       setCityCode("");
       setCityUlbCode("");
       await refresh();
-    } catch (err: any) {
+    } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to create city.";
       setCityStatus(message);
+      showToast({ title: "City creation failed", description: message, tone: "error" });
     }
   };
 
@@ -75,17 +226,61 @@ export default function HmsDashboardPage() {
       await CityApi.setEnabled(cityId, enabled);
       setCities((prev) => prev.map((c) => (c.id === cityId ? { ...c, enabled } : c)));
     } catch (err) {
-      alert("Failed to toggle city: " + (err instanceof ApiError ? err.message : ""));
+      showToast({
+        title: "City status update failed",
+        description: err instanceof ApiError ? err.message : "Failed to toggle city.",
+        tone: "error"
+      });
     }
   };
 
-  const handleUpdateCity = async (cityId: string, data: { name: string; code: string; ulbCode: string; adminName?: string; adminEmail?: string }) => {
+  const handleUpdateCity = async (cityId: string, data: CityUpdateInput) => {
     try {
       await CityApi.update(cityId, data);
       await refresh();
       setEditingCity(null);
-    } catch (err: any) {
-      alert(err instanceof ApiError ? err.message : "Failed to update city");
+      showToast({ title: "City updated", description: "Cluster details saved.", tone: "success" });
+    } catch (err) {
+      showToast({
+        title: "City update failed",
+        description: err instanceof ApiError ? err.message : "Failed to update city.",
+        tone: "error"
+      });
+    }
+  };
+
+  const handleUpdateAdmin = async (cityId: string, userId: string, data: { name?: string; email?: string; password?: string }) => {
+    try {
+      await CityApi.updateCityAdmin(cityId, userId, data);
+      await refresh();
+      setEditingAdmin(null);
+      showToast({ title: "Admin updated", description: "City admin details saved.", tone: "success" });
+    } catch (err) {
+      showToast({
+        title: "Admin update failed",
+        description: err instanceof ApiError ? err.message : "Failed to update city admin.",
+        tone: "error"
+      });
+    }
+  };
+
+  const handleDeleteAdmin = (cityId: string, userId: string, adminName: string) => {
+    setDeleteTarget({ cityId, userId, adminName });
+  };
+
+  const confirmDeleteAdmin = async () => {
+    if (!deleteTarget) return;
+    try {
+      await CityApi.removeCityAdmin(deleteTarget.cityId, deleteTarget.userId);
+      await refresh();
+      showToast({ title: "Admin removed", description: `${deleteTarget.adminName} was removed from the city.`, tone: "success" });
+      setDeleteTarget(null);
+    } catch (err) {
+      showToast({
+        title: "Admin deletion failed",
+        description: err instanceof ApiError ? err.message : "Failed to delete city admin.",
+        tone: "error"
+      });
     }
   };
 
@@ -99,70 +294,52 @@ export default function HmsDashboardPage() {
         name: adminName
       });
       setAdminStatus("City admin created.");
+      showToast({ title: "Admin created", description: "City administrator provisioned successfully.", tone: "success" });
       setAdminName("");
       setAdminEmail("");
       setAdminPassword("");
       await refresh();
-    } catch (err: any) {
+    } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to create city admin.";
       setAdminStatus(message);
+      showToast({ title: "Admin creation failed", description: message, tone: "error" });
     }
   };
 
   const totalCities = cities.length;
-  const activeCities = cities.filter(c => c.enabled).length;
-  const managedCities = cities.filter(c => c.cityAdmin).length;
-  const totalUlbs = new Set(cities.map(c => c.ulbCode).filter(Boolean)).size;
+  const activeCities = cities.filter((c) => c.enabled).length;
+  const managedCities = cities.filter((c) => (c.cityAdmins?.length ?? 0) > 0).length;
+  const totalUlbs = new Set(cities.map((c) => c.ulbCode).filter(Boolean)).size;
 
   return (
     <div className="page" style={{ background: '#f8fafc', minHeight: '100vh', padding: 0 }}>
-      <style>{`
-        .da-card { transition: all 0.2s ease; }
-        .da-card:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,0.08) !important; }
-        .hero-banner { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); position: relative; overflow: hidden; }
-        .glass-stat { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(8px); }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-      `}</style>
-
-      {/* ── Premium Hero Banner ── */}
-      <div className="hero-banner" style={{ padding: '40px 48px 32px' }}>
-        <div style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, borderRadius: '50%', background: 'rgba(59,130,246,0.1)', pointerEvents: 'none' }} />
-
-        <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', padding: '40px 48px 32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
           <div>
-            <div className="breadcrumb" style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 12, fontSize: 12, fontWeight: 600 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Shield size={12} /> HMS / SUPER ADMIN</span>
-            </div>
-            <h1 style={{ fontSize: 32, fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.02em' }}>
-              Infrastructure Control
-            </h1>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 8, maxWidth: 500 }}>
-              Global oversight of municipal deployments, city-level administration, and system-wide module provisioning.
+            <div style={{ color: 'rgba(255,255,255,0.6)', marginBottom: 12, fontSize: 12, fontWeight: 700 }}>HMS / SUPER ADMIN</div>
+            <h1 style={{ fontSize: 32, fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.02em' }}>Infrastructure Control</h1>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 8, maxWidth: 640 }}>
+              State to city onboarding now runs on hierarchical master data. Select state, division, district, then city.
             </p>
           </div>
-
-          <button onClick={refresh} disabled={loading} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 20px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Activity size={14} className={loading ? "animate-spin" : ""} />
-            {loading ? "Syncing..." : "Refresh Cluster"}
+          <button onClick={refresh} disabled={loading} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Activity size={14} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Syncing...' : 'Refresh'}
           </button>
         </div>
 
-        {/* ── Global Stats Row ── */}
-        <div style={{ display: 'flex', gap: 20, marginTop: 32, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 20, marginTop: 28, flexWrap: 'wrap' }}>
           {[
             { label: 'Total Cities', value: totalCities, icon: <Globe size={16} /> },
             { label: 'Active Sites', value: activeCities, icon: <Activity size={16} /> },
             { label: 'Managed Admins', value: managedCities, icon: <Users size={16} /> },
-            { label: 'Unique ULBs', value: totalUlbs, icon: <Target size={16} /> },
-          ].map((s, i) => (
-            <div key={i} className="glass-stat" style={{ padding: '16px 24px', borderRadius: 14, minWidth: 160, display: 'flex', alignItems: 'center', gap: 14, color: '#fff' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {s.icon}
-              </div>
+            { label: 'Unique ULBs', value: totalUlbs, icon: <Target size={16} /> }
+          ].map((item) => (
+            <div key={item.label} style={{ padding: '16px 20px', borderRadius: 14, minWidth: 170, display: 'flex', alignItems: 'center', gap: 14, color: '#fff', background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.14)' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.icon}</div>
               <div>
-                <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1 }}>{item.value}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: 700, textTransform: 'uppercase', marginTop: 4 }}>{item.label}</div>
               </div>
             </div>
           ))}
@@ -172,280 +349,357 @@ export default function HmsDashboardPage() {
       <div style={{ padding: '32px 48px' }}>
         {error && <div className="alert error" style={{ marginBottom: 24, borderRadius: 12 }}>{error}</div>}
 
-        {loading ? (
-          <div className="skeleton" style={{ height: 120, borderRadius: 16 }} />
-        ) : (
-          <>
-            {/* City Overview Table */}
-            <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)', marginBottom: 32 }}>
-              <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>System Mapping</div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Provisioned Cities</h3>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', background: '#f8fafc', padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    {cities.length} Total Clusters
-                  </div>
-                </div>
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, overflow: 'hidden', marginBottom: 32 }}>
+          <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>System Mapping</div>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Provisioned Cities</h3>
+            </div>
+            <Link href="/hms/cities/new" style={{ fontSize: 12, fontWeight: 800, color: '#2563eb' }}>Open focused create page</Link>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                <tr>
+                  <th style={thStyle}>City</th>
+                  <th style={thStyle}>Hierarchy</th>
+                  <th style={thStyle}>Identity</th>
+                  <th style={thStyle}>Admin</th>
+                  <th style={thStyle}>Status</th>
+                  <th style={{ ...thStyle, textAlign: 'right' }}>Control</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cities.map((city) => (
+                  <tr key={city.id} style={{ borderBottom: '1px solid #f8fafc' }}>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 12, background: city.enabled ? '#eff6ff' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: city.enabled ? '#2563eb' : '#94a3b8' }}>
+                          <Building2 size={20} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{city.name}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>ID: {city.id.slice(0, 8)}...</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span style={pillStyle}>{city.state?.name || 'No state'}</span>
+                        <span style={pillStyle}>{city.division?.name || 'No division'}</span>
+                        <span style={pillStyle}>{city.district?.name || 'No district'}</span>
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span style={pillStyle}>CODE: {city.code}</span>
+                        <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>ULB: {city.ulbCode || '—'}</span>
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      {(city.cityAdmins?.length ?? 0) > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {(city.cityAdmins ?? []).map((admin) => (
+                            <div key={admin.id || admin.email} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{admin.name}</div>
+                                <div style={{ fontSize: 11, color: '#64748b' }}>{admin.email}</div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button type="button" onClick={() => setEditingAdmin({ cityId: city.id, cityName: city.name, admin })} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #dbeafe', background: '#eff6ff', color: '#2563eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Edit2 size={14} />
+                                </button>
+                                <button type="button" onClick={() => handleDeleteAdmin(city.id, admin.id || '', admin.name)} disabled={!admin.id} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #fee2e2', background: '#fef2f2', color: '#dc2626', cursor: admin.id ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: admin.id ? 1 : 0.5 }}>
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : city.cityAdmin ? (
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{city.cityAdmin.name}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{city.cityAdmin.email}</div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>No active administrator</div>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <button onClick={() => handleToggleCity(city.id, !city.enabled)} style={{ border: `1px solid ${city.enabled ? '#10b981' : '#cbd5e1'}`, background: city.enabled ? '#ecfdf5' : '#f8fafc', color: city.enabled ? '#065f46' : '#64748b', padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                        {city.enabled ? 'LIVE' : 'DORMANT'}
+                      </button>
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <button onClick={() => setEditingCity(city)} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer' }}>
+                        <Edit2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!cities.length && !loading && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#94a3b8' }}>No cities provisioned yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 32 }}>
+          <div style={cardStyle}>
+            <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <PlusCircle size={22} />
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                    <tr>
-                      <th style={{ padding: '16px 32px', textAlign: 'left', fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>City Details</th>
-                      <th style={{ padding: '16px 32px', textAlign: 'left', fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Identity Codes</th>
-                      <th style={{ padding: '16px 32px', textAlign: 'left', fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Administrative Lead</th>
-                      <th style={{ padding: '16px 32px', textAlign: 'left', fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operational Status</th>
-                      <th style={{ padding: '16px 32px', textAlign: 'right', fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Control</th>
-                    </tr>
-                  </thead>
-                  <tbody style={{ background: 'white' }}>
-                    {cities.map((city) => (
-                      <tr key={city.id} className="da-row" style={{ borderBottom: '1px solid #f8fafc', transition: 'background 0.2s' }}>
-                        <td style={{ padding: '20px 32px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                            <div style={{ width: 40, height: 40, borderRadius: 12, background: city.enabled ? '#eff6ff' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: city.enabled ? '#2563eb' : '#94a3b8' }}>
-                              <Building2 size={20} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{city.name}</div>
-                              <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>ID: {city.id.slice(0, 8)}...</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: '20px 32px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: 4, width: 'fit-content' }}>CODE: {city.code}</span>
-                            <span style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>ULB: {city.ulbCode || "—"}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '20px 32px' }}>
-                          {city.cityAdmin ? (
-                            <div>
-                              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{city.cityAdmin.name}</div>
-                              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{city.cityAdmin.email}</div>
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', fontWeight: 500 }}>No active administrator</div>
-                          )}
-                        </td>
-                        <td style={{ padding: '20px 32px' }}>
-                          <label
-                            onClick={(e) => {
-                              e.preventDefault();
-                              handleToggleCity(city.id, !city.enabled);
-                            }}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 10,
-                              cursor: 'pointer',
-                              background: city.enabled ? '#ecfdf5' : '#f1f5f9',
-                              padding: '6px 14px',
-                              borderRadius: 10,
-                              border: `1px solid ${city.enabled ? '#10b981' : '#e2e8f0'}`,
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: city.enabled ? '#10b981' : '#94a3b8' }} />
-                            <span style={{ fontSize: 12, fontWeight: 800, color: city.enabled ? '#065f46' : '#64748b' }}>
-                              {city.enabled ? "LIVE" : "DORMANT"}
-                            </span>
-                          </label>
-                        </td>
-                        <td style={{ padding: '20px 32px', textAlign: 'right' }}>
-                          <button
-                            onClick={() => setEditingCity(city)}
-                            style={{
-                              width: 36, height: 36,
-                              borderRadius: 10,
-                              border: '1px solid #e2e8f0',
-                              background: '#fff',
-                              color: '#475569',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f8fafc';
-                              e.currentTarget.style.borderColor = '#2563eb';
-                              e.currentTarget.style.color = '#2563eb';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#fff';
-                              e.currentTarget.style.borderColor = '#e2e8f0';
-                              e.currentTarget.style.color = '#475569';
-                            }}
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {cities.length === 0 && (
-                      <tr>
-                        <td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
-                          <Globe size={48} style={{ opacity: 0.1, marginBottom: 16 }} />
-                          <div style={{ fontSize: 16, fontWeight: 700 }}>No cities provisioned yet</div>
-                          <p style={{ fontSize: 12, marginTop: 4 }}>Deploy your first municipal cluster below.</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Onboard New City</h3>
+                <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>State ? Division ? District ? City</p>
               </div>
             </div>
 
-            {/* Creation Forms */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 32 }}>
-              {/* Create City */}
-              <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: 32, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <PlusCircle size={22} />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Onboard New City</h3>
-                    <p style={{ margin: 0, fontSize: 13, color: '#64748b', fontWeight: 500 }}>Deploy a new municipal cluster.</p>
-                  </div>
-                </div>
-                <form onSubmit={handleCreateCity} className="form" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cluster Name</label>
-                    <input className="input" style={{ background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' }} value={cityName} onChange={(e) => setCityName(e.target.value)} placeholder="e.g. Indore" required />
-                  </div>
+            <form onSubmit={handleCreateCity} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <SelectField label="State" value={stateId} onChange={setStateId} options={states} placeholder={masterLoading ? 'Loading states...' : 'Select state'} required />
+              <SelectField label="Division" value={divisionId} onChange={setDivisionId} options={divisions} placeholder={stateId ? (masterLoading ? 'Loading divisions...' : 'Select division') : 'Select state first'} disabled={!stateId} required />
+              <SelectField label="District" value={districtId} onChange={setDistrictId} options={districts} placeholder={divisionId ? (masterLoading ? 'Loading districts...' : 'Select district') : 'Select division first'} disabled={!divisionId} required />
+              <SelectField label="City" value={cityMasterId} onChange={setCityMasterId} options={masterCities} placeholder={districtId ? (masterLoading ? 'Loading cities...' : 'Select city') : 'Select district first'} disabled={!districtId} required />
+              <InputField label="System Code" value={cityCode} onChange={setCityCode} placeholder="e.g. indore" required />
+              <InputField label="ULB Identifier" value={cityUlbCode} onChange={setCityUlbCode} placeholder="e.g. idr01" />
+              <button type="submit" style={{ marginTop: 8, width: '100%', borderRadius: 12, height: 48, fontWeight: 800, fontSize: 15, background: '#1e3a8a', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <Send size={16} /> Deploy City Cluster
+              </button>
+              {cityStatus && <div style={{ fontSize: 12, color: cityStatus.toLowerCase().includes('fail') ? '#dc2626' : '#2563eb', textAlign: 'center', fontWeight: 600 }}>{cityStatus}</div>}
+            </form>
+          </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>System Code</label>
-                    <input className="input" style={{ background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' }} value={cityCode} onChange={(e) => setCityCode(e.target.value)} placeholder="e.g. indore" required />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ULB Identifier</label>
-                    <input
-                      className="input"
-                      style={{ background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' }}
-                      value={cityUlbCode}
-                      onChange={(e) => setCityUlbCode(e.target.value)}
-                      placeholder="Enter ULB code (e.g. idr01)"
-                    />
-                  </div>
-
-                  <button className="btn btn-primary" style={{ marginTop: 12, width: '100%', borderRadius: 12, height: 48, fontWeight: 800, fontSize: 15, background: '#1e3a8a', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }} type="submit">
-                    <Send size={16} /> Deploy City Cluster
-                  </button>
-                  {cityStatus && <div style={{ fontSize: 12, color: cityStatus.includes("Error") ? '#dc2626' : '#2563eb', textAlign: 'center', fontWeight: 600 }}>{cityStatus}</div>}
-                </form>
+          <div style={cardStyle}>
+            <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <UserPlus size={22} />
               </div>
-
-              {/* Create Admin */}
-              <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: 32, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-                <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <UserPlus size={22} />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Provision City Admin</h3>
-                    <p style={{ margin: 0, fontSize: 13, color: '#64748b', fontWeight: 500 }}>Delegating control to local authorities.</p>
-                  </div>
-                </div>
-                <form onSubmit={handleCreateAdmin} className="form" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Target Cluster</label>
-                    <select
-                      className="input"
-                      style={{ background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' }}
-                      value={adminCityId}
-                      onChange={(e) => setAdminCityId(e.target.value)}
-                      required
-                    >
-                      <option value="">Select city cluster...</option>
-                      {cities.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Full Name</label>
-                    <input
-                      className="input"
-                      style={{ background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' }}
-                      value={adminName}
-                      onChange={(e) => setAdminName(e.target.value)}
-                      placeholder="Administrator Name"
-                      required
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Provisioning Email</label>
-                    <input
-                      className="input"
-                      style={{ background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' }}
-                      type="email"
-                      value={adminEmail}
-                      onChange={(e) => setAdminEmail(e.target.value)}
-                      placeholder="admin@city.local"
-                      required
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Secure Password</label>
-                    <input
-                      className="input"
-                      style={{ background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' }}
-                      type="password"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-
-                  <button className="btn btn-primary" style={{ marginTop: 12, width: '100%', borderRadius: 12, height: 48, fontWeight: 800, fontSize: 15, background: '#1e3a8a', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }} type="submit">
-                    <Shield size={16} /> Provision Admin
-                  </button>
-                  {adminStatus && <div style={{ fontSize: 12, color: adminStatus.includes("Error") ? '#dc2626' : '#2563eb', textAlign: 'center', fontWeight: 600 }}>{adminStatus}</div>}
-                </form>
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Provision City Admin</h3>
+                <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Delegating control to local authorities.</p>
               </div>
             </div>
-          </>
-        )}
+
+            <form onSubmit={handleCreateAdmin} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={labelStyle}>Target Cluster</label>
+                <select style={inputStyle} value={adminCityId} onChange={(e) => setAdminCityId(e.target.value)} required>
+                  <option value="">Select city cluster...</option>
+                  {cities.map((city) => (
+                    <option key={city.id} value={city.id}>{city.name} ({city.code})</option>
+                  ))}
+                </select>
+              </div>
+              <InputField label="Full Name" value={adminName} onChange={setAdminName} placeholder="Administrator Name" required />
+              <InputField label="Provisioning Email" value={adminEmail} onChange={setAdminEmail} placeholder="admin@city.local" required type="email" />
+              <InputField label="Secure Password" value={adminPassword} onChange={setAdminPassword} placeholder="••••••••" required type="password" />
+              <button type="submit" style={{ marginTop: 8, width: '100%', borderRadius: 12, height: 48, fontWeight: 800, fontSize: 15, background: '#1e3a8a', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <Shield size={16} /> Provision Admin
+              </button>
+              {adminStatus && <div style={{ fontSize: 12, color: adminStatus.toLowerCase().includes('fail') ? '#dc2626' : '#2563eb', textAlign: 'center', fontWeight: 600 }}>{adminStatus}</div>}
+            </form>
+          </div>
+        </div>
       </div>
 
-      {editingCity && (
-        <EditCityModal
-          city={editingCity}
-          onClose={() => setEditingCity(null)}
-          onSave={handleUpdateCity}
+      {editingCity && <EditCityModal city={editingCity} states={states} onClose={() => setEditingCity(null)} onSave={handleUpdateCity} />}
+      {deleteTarget && (
+        <DeleteAdminConfirmModal
+          adminName={deleteTarget.adminName}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDeleteAdmin}
+        />
+      )}
+      {editingAdmin && editingAdmin.admin.id && (
+        <EditCityAdminModal
+          cityId={editingAdmin.cityId}
+          cityName={editingAdmin.cityName}
+          admin={editingAdmin.admin}
+          onClose={() => setEditingAdmin(null)}
+          onSave={handleUpdateAdmin}
         />
       )}
     </div>
   );
 }
 
-function EditCityModal({ city, onClose, onSave }: { city: CityRow; onClose: () => void; onSave: (id: string, data: any) => Promise<void> }) {
-  const [name, setName] = useState(city.name);
-  const [code, setCode] = useState(city.code);
-  const [ulbCode, setUlbCode] = useState(city.ulbCode || "");
-  const [adminName, setAdminName] = useState(city.cityAdmin?.name || "");
-  const [adminEmail, setAdminEmail] = useState(city.cityAdmin?.email || "");
+function EditCityAdminModal({ cityId, cityName, admin, onClose, onSave }: { cityId: string; cityName: string; admin: CityAdminInfo; onClose: () => void; onSave: (cityId: string, userId: string, data: { name?: string; email?: string; password?: string }) => Promise<void> }) {
+  const [name, setName] = useState(admin.name);
+  const [email, setEmail] = useState(admin.email);
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await onSave(city.id, {
+      await onSave(cityId, admin.id || '', {
         name,
+        email,
+        ...(password ? { password } : {})
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+      <div style={{ width: '90%', maxWidth: 460, overflow: 'hidden', background: '#fff', borderRadius: 24, boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}>
+        <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Edit City Admin</h3>
+            <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginTop: 2 }}>{cityName}</div>
+          </div>
+          <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', padding: 8, borderRadius: 10 }}>
+            <X size={20} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <InputField label="Admin Name" value={name} onChange={setName} placeholder="e.g. Jane Doe" required compact />
+          <InputField label="Admin Email" value={email} onChange={setEmail} placeholder="e.g. admin@city.local" type="email" required compact />
+          <InputField label="New Password" value={password} onChange={setPassword} placeholder="Leave blank to keep same" type="password" compact />
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <button type="button" onClick={onClose} style={{ flex: 1, background: '#f1f5f9', border: 'none', color: '#475569', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer' }} disabled={loading}>Discard</button>
+            <button type="submit" style={{ flex: 1, background: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} disabled={loading}>
+              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Save Admin'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditCityModal({ city, states, onClose, onSave }: { city: CityRow; states: MasterNode[]; onClose: () => void; onSave: (id: string, data: CityUpdateInput) => Promise<void> }) {
+  const [stateId, setStateId] = useState(city.state?.id || '');
+  const [divisionId, setDivisionId] = useState(city.division?.id || '');
+  const [districtId, setDistrictId] = useState(city.district?.id || '');
+  const [cityMasterId, setCityMasterId] = useState('');
+  const [divisions, setDivisions] = useState<MasterNode[]>([]);
+  const [districts, setDistricts] = useState<MasterNode[]>([]);
+  const [masterCities, setMasterCities] = useState<CityMasterNode[]>([]);
+  const [code, setCode] = useState(city.code);
+  const [ulbCode, setUlbCode] = useState(city.ulbCode || '');
+  const [adminName, setAdminName] = useState(city.cityAdmin?.name || '');
+  const [adminEmail, setAdminEmail] = useState(city.cityAdmin?.email || '');
+  const [loading, setLoading] = useState(false);
+  const [loadingMasters, setLoadingMasters] = useState(false);
+
+  useEffect(() => {
+    if (!stateId) {
+      setDivisions([]);
+      setDivisionId('');
+      setDistricts([]);
+      setDistrictId('');
+      setMasterCities([]);
+      setCityMasterId('');
+      return;
+    }
+
+    let active = true;
+    setLoadingMasters(true);
+    CityApi.listDivisions(stateId)
+      .then((res) => {
+        if (!active) return;
+        const nextDivisions = res.divisions;
+        setDivisions(nextDivisions);
+        setDivisionId((current) => (nextDivisions.some((item: MasterNode) => item.id === current) ? current : ''));
+      })
+      .catch(() => {
+        if (!active) return;
+        setDivisions([]);
+        setDivisionId('');
+      })
+      .finally(() => {
+        if (active) setLoadingMasters(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stateId]);
+
+  useEffect(() => {
+    if (!stateId || !divisionId) {
+      setDistricts([]);
+      setDistrictId('');
+      setMasterCities([]);
+      setCityMasterId('');
+      return;
+    }
+
+    let active = true;
+    setLoadingMasters(true);
+    CityApi.listDistricts(stateId, divisionId)
+      .then((res) => {
+        if (!active) return;
+        const nextDistricts = res.districts;
+        setDistricts(nextDistricts);
+        setDistrictId((current) => (nextDistricts.some((item: MasterNode) => item.id === current) ? current : ''));
+      })
+      .catch(() => {
+        if (!active) return;
+        setDistricts([]);
+        setDistrictId('');
+      })
+      .finally(() => {
+        if (active) setLoadingMasters(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stateId, divisionId]);
+
+  useEffect(() => {
+    if (!districtId) {
+      setMasterCities([]);
+      setCityMasterId('');
+      return;
+    }
+
+    let active = true;
+    setLoadingMasters(true);
+    CityApi.listCities(districtId)
+      .then((res) => {
+        if (!active) return;
+        const nextCities = res.cities;
+        setMasterCities(nextCities);
+        setCityMasterId((current) => {
+          if (nextCities.some((item: CityMasterNode) => item.id === current)) return current;
+          const matched = nextCities.find((item: CityMasterNode) => item.name.toLowerCase() === city.name.toLowerCase());
+          return matched?.id || '';
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setMasterCities([]);
+        setCityMasterId('');
+      })
+      .finally(() => {
+        if (active) setLoadingMasters(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [districtId, city.name]);
+
+  const selectedMasterCity = masterCities.find((item) => item.id === cityMasterId) || null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onSave(city.id, {
+        ...(stateId && divisionId && districtId && cityMasterId ? { stateId, divisionId, districtId, cityMasterId } : {}),
+        ...(selectedMasterCity ? { name: selectedMasterCity.name } : { name: city.name }),
         code,
         ulbCode,
         adminName,
@@ -457,112 +711,31 @@ function EditCityModal({ city, onClose, onSave }: { city: CityRow; onClose: () =
   };
 
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-      backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)',
-      display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-    }}>
-      <div className="da-card" style={{
-        width: '90%', maxWidth: '450px', padding: 0, overflow: 'hidden', background: '#fff', borderRadius: 24,
-        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)'
-      }}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+      <div style={{ width: '90%', maxWidth: 560, overflow: 'hidden', background: '#fff', borderRadius: 24, boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}>
         <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Modify Cluster</h3>
-            <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginTop: 2 }}>Edit City & Admin Details</div>
+            <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', marginTop: 2 }}>{city.state?.name || 'No state'} / {city.division?.name || 'No division'} / {city.district?.name || 'No district'}</div>
           </div>
-          <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', padding: 8, borderRadius: 10 }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+          <button onClick={onClose} style={{ border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', padding: 8, borderRadius: 10 }}>
             <X size={20} />
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="form" style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>City Name</label>
-              <input
-                className="input"
-                style={{ background: '#f8fafc', height: 40, borderRadius: 8, border: '1px solid #e2e8f0', padding: '0 12px' }}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Pune"
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>City Code</label>
-              <input
-                className="input"
-                style={{ background: '#f8fafc', height: 40, borderRadius: 8, border: '1px solid #e2e8f0', padding: '0 12px' }}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="e.g. pune"
-                required
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>ULB Code</label>
-            <input
-              className="input"
-              style={{ background: '#f8fafc', height: 40, borderRadius: 8, border: '1px solid #e2e8f0', padding: '0 12px' }}
-              value={ulbCode}
-              onChange={(e) => setUlbCode(e.target.value)}
-              placeholder="e.g. pn01"
-              required
-            />
-          </div>
-
-          <div style={{ borderTop: '1px solid #f1f5f9', margin: '4px 0', paddingTop: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <Shield size={14} color="#2563eb" />
-              <span style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Administrative Data</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>ADMIN NAME</label>
-                <input
-                  className="input"
-                  style={{ background: '#f8fafc', height: 40, borderRadius: 8, border: '1px solid #e2e8f0', padding: '0 12px' }}
-                  value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
-                  placeholder="e.g. John Doe"
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>ADMIN EMAIL</label>
-                <input
-                  className="input"
-                  style={{ background: '#f8fafc', height: 40, borderRadius: 8, border: '1px solid #e2e8f0', padding: '0 12px' }}
-                  type="email"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  placeholder="e.g. admin@city.local"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ flex: 1, background: '#f1f5f9', border: 'none', color: '#475569', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer' }}
-              disabled={loading}
-            >
-              Discard
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ flex: 1, background: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-              disabled={loading}
-            >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : "Commit Changes"}
+        <form onSubmit={handleSubmit} style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <SelectField label="State" value={stateId} onChange={setStateId} options={states} placeholder={loadingMasters ? 'Loading states...' : 'Select state'} compact />
+          <SelectField label="Division" value={divisionId} onChange={setDivisionId} options={divisions} placeholder={stateId ? (loadingMasters ? 'Loading divisions...' : 'Select division') : 'Select state first'} disabled={!stateId} compact />
+          <SelectField label="District" value={districtId} onChange={setDistrictId} options={districts} placeholder={divisionId ? (loadingMasters ? 'Loading districts...' : 'Select district') : 'Select division first'} disabled={!divisionId} compact />
+          <SelectField label="City" value={cityMasterId} onChange={setCityMasterId} options={masterCities} placeholder={districtId ? (loadingMasters ? 'Loading cities...' : 'Select city') : 'Select district first'} disabled={!districtId} compact />
+          <InputField label="City Name" value={selectedMasterCity?.name || city.name} onChange={() => {}} placeholder="Selected from hierarchy" required compact readOnly />
+          <InputField label="City Code" value={code} onChange={setCode} placeholder="e.g. indore" required compact />
+          <InputField label="ULB Code" value={ulbCode} onChange={setUlbCode} placeholder="e.g. idr01" required compact />
+          <InputField label="Admin Name" value={adminName} onChange={setAdminName} placeholder="e.g. Jane Doe" compact />
+          <InputField label="Admin Email" value={adminEmail} onChange={setAdminEmail} placeholder="e.g. admin@city.local" type="email" compact />
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <button type="button" onClick={onClose} style={{ flex: 1, background: '#f1f5f9', border: 'none', color: '#475569', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer' }} disabled={loading}>Discard</button>
+            <button type="submit" style={{ flex: 1, background: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} disabled={loading}>
+              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Commit Changes'}
             </button>
           </div>
         </form>
@@ -570,3 +743,68 @@ function EditCityModal({ city, onClose, onSave }: { city: CityRow; onClose: () =
     </div>
   );
 }
+
+function DeleteAdminConfirmModal({ adminName, onCancel, onConfirm }: { adminName: string; onCancel: () => void; onConfirm: () => Promise<void> }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      await onConfirm();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+      <div style={{ width: '90%', maxWidth: 420, overflow: 'hidden', background: '#fff', borderRadius: 24, boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}>
+        <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', background: '#fef2f2' }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#7f1d1d' }}>Delete City Admin</h3>
+          <div style={{ fontSize: 13, color: '#991b1b', marginTop: 6 }}>Remove {adminName} from this city cluster?</div>
+        </div>
+        <div style={{ padding: 32 }}>
+          <p style={{ margin: 0, fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
+            This action removes the administrator mapping immediately. If the user has no other assignments, the account will also be deleted.
+          </p>
+          <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+            <button type="button" onClick={onCancel} style={{ flex: 1, background: '#f1f5f9', border: 'none', color: '#475569', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer' }} disabled={loading}>Cancel</button>
+            <button type="button" onClick={handleConfirm} style={{ flex: 1, background: '#b91c1c', color: '#fff', border: 'none', fontWeight: 800, height: 44, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} disabled={loading}>
+              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Delete Admin'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options, placeholder, required, disabled, compact = false }: { label: string; value: string; onChange: (value: string) => void; options: MasterNode[]; placeholder: string; required?: boolean; disabled?: boolean; compact?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <label style={labelStyle}>{label}</label>
+      <select style={{ ...inputStyle, height: compact ? 40 : 44 }} value={value} onChange={(e) => onChange(e.target.value)} required={required} disabled={disabled}>
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>{option.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function InputField({ label, value, onChange, placeholder, required, type = 'text', compact = false, readOnly = false }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; required?: boolean; type?: string; compact?: boolean; readOnly?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 6 : 8 }}>
+      <label style={labelStyle}>{label}</label>
+      <input style={{ ...inputStyle, height: compact ? 40 : 44, ...(readOnly ? { color: '#0f172a', background: '#f8fafc' } : {}) }} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} required={required} type={type} readOnly={readOnly} />
+    </div>
+  );
+}
+
+const thStyle: React.CSSProperties = { padding: '16px 24px', textAlign: 'left', fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' };
+const tdStyle: React.CSSProperties = { padding: '20px 24px' };
+const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 20, padding: 32, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' };
+const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' };
+const inputStyle: React.CSSProperties = { background: '#f8fafc', height: 44, borderRadius: 10, border: '1px solid #e2e8f0', padding: '0 14px' };
+const pillStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: '#475569', background: '#f8fafc', padding: '4px 8px', borderRadius: 8, width: 'fit-content' };

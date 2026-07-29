@@ -78,18 +78,18 @@ export default function WardManagementPage() {
       await apiFetch(`/city/geo/${id}`, { method: "PATCH", body: JSON.stringify({ name: editName, parentId: editZoneId }) });
       setEditingId(null);
       await loadData();
-    } catch { alert("Failed to update ward"); }
+    } catch (err) { alert(err instanceof ApiError ? err.message : "Failed to update ward"); }
     finally { setUpdatingId(null); }
   };
 
   const deleteWard = async (id: string) => {
     if (isReadOnly) return;
-    if (!confirm("Are you sure you want to delete this ward?")) return;
+    if (!confirm("Are you sure you want to delete this ward and all areas/beats under it?")) return;
     setDeletingId(id);
     try {
       await apiFetch(`/city/geo/${id}`, { method: "DELETE" });
       await loadData();
-    } catch { alert("Failed to delete ward"); }
+    } catch (err) { alert(err instanceof ApiError ? err.message : "Failed to delete ward"); }
     finally { setDeletingId(null); }
   };
 
