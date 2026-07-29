@@ -74,7 +74,9 @@ export default function Sidebar() {
     ];
   } else {
     // Strictly render modules from auth token; no role-based injection
-    links = [];
+    links = [
+      { label: "Portal Home", href: "/portal-home", icon: <Layout size={18} /> }
+    ];
     if (!user.roles.includes("COMMISSIONER" as Role) && !user.roles.includes("CITY_ADMIN" as Role)) {
       links.push({ label: "Home", href: "/", icon: <Home size={18} /> });
     }

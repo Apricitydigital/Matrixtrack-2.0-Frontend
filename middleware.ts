@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/_next", "/api", "/static", "/favicon.ico"];
-const PROTECTED_PREFIXES = ["/hms", "/city", "/municipal", "/modules"];
+const PROTECTED_PREFIXES = ["/hms", "/city", "/municipal", "/modules", "/portal-home", "/dashboard", "/ward-ranking"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

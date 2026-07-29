@@ -177,7 +177,7 @@ export default function RegisterPage() {
                             </div>
                             <div className="field">
                                 <label className="premium-label"><UserPlus size={14} /> Full Name</label>
-                                <input className="premium-input-v2" placeholder="John Doe" value={form.name} onChange={(e) => update("name", e.target.value)} required />
+                                <input className="premium-input-v2" placeholder="Rohit Raj" value={form.name} onChange={(e) => update("name", e.target.value)} required />
                             </div>
                         </div>
 

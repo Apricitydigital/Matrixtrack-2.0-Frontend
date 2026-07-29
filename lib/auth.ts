@@ -12,6 +12,8 @@ function setBrowserCookie(token: string) {
 export function setAuthCookie(token: string) {
   if (typeof window !== "undefined") {
     setBrowserCookie(token);
+    localStorage.setItem("token", token);
+    localStorage.setItem("swachh_token", token);
     return;
   }
   // Server-side render fallback
@@ -27,6 +29,9 @@ export function setAuthCookie(token: string) {
 export function clearAuthCookie() {
   if (typeof window !== "undefined") {
     document.cookie = `${AUTH_COOKIE}=; Max-Age=0; path=/`;
+    localStorage.removeItem("token");
+    localStorage.removeItem("swachh_token");
+    localStorage.removeItem("user");
     return;
   }
   const { cookies } = require("next/headers");
@@ -39,10 +44,19 @@ export function getTokenFromCookies(): string | undefined {
       .split(";")
       .map((c) => c.trim())
       .find((c) => c.startsWith(`${AUTH_COOKIE}=`));
-    return match?.split("=")?.[1];
+    const cookieToken = match?.split("=")?.[1];
+    if (cookieToken) return cookieToken;
+
+    // Fallback to localStorage
+    const localToken = localStorage.getItem("token") || localStorage.getItem("swachh_token");
+    if (localToken && localToken !== "matrix_track_session_token") return localToken;
   }
-  const { cookies } = require("next/headers");
-  return cookies().get(AUTH_COOKIE)?.value;
+  try {
+    const { cookies } = require("next/headers");
+    return cookies().get(AUTH_COOKIE)?.value;
+  } catch (e) {
+    return undefined;
+  }
 }
 
 // NOTE: In production, validate the JWT signature with the backend's public key/secret.
