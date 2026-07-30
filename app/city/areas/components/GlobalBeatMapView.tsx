@@ -17,33 +17,78 @@ function FitAllBounds({ beats, selectedBeatId }: { beats: any[], selectedBeatId?
     const map = useMap();
 
     useEffect(() => {
-        if (selectedBeatId) {
-            const beat = beats.find(b => b.id === selectedBeatId);
-            if (beat?.geometry) {
-                const layer = L.geoJSON(beat.geometry);
-                map.flyToBounds(layer.getBounds(), { padding: [100, 100], duration: 1.5 });
-            }
-            return;
-        }
+        if (!map) return;
 
-        if (beats.length > 0 && map) {
-            const group = new L.FeatureGroup();
+        map.invalidateSize();
 
-            beats.forEach(beat => {
-                if (beat.geometry) {
-                    try {
-                        const layer = L.geoJSON(beat.geometry);
-                        group.addLayer(layer);
-                    } catch (e) {
-                        console.error("Invalid geometry for beat", beat.id);
+        const timer = setTimeout(() => {
+            if (selectedBeatId) {
+                const beat = beats.find(b => b.id === selectedBeatId);
+                const group = new L.FeatureGroup();
+
+                let geom = beat?.geometry;
+                if (typeof geom === "string") {
+                    try { geom = JSON.parse(geom); } catch {}
+                }
+                if (geom) {
+                    try { group.addLayer(L.geoJSON(geom)); } catch {}
+                }
+                if (beat?.segments && Array.isArray(beat.segments)) {
+                    beat.segments.forEach((seg: any) => {
+                        let segGeom = seg.geometry;
+                        if (typeof segGeom === "string") {
+                            try { segGeom = JSON.parse(segGeom); } catch {}
+                        }
+                        if (segGeom) {
+                            try { group.addLayer(L.geoJSON(segGeom)); } catch {}
+                        }
+                    });
+                }
+
+                if (group.getLayers().length > 0) {
+                    const bounds = group.getBounds();
+                    if (bounds.isValid()) {
+                        map.flyToBounds(bounds, { padding: [80, 80], duration: 1.2 });
                     }
                 }
-            });
-
-            if (group.getLayers().length > 0) {
-                map.fitBounds(group.getBounds(), { padding: [50, 50] });
+                return;
             }
-        }
+
+            if (beats && beats.length > 0) {
+                const group = new L.FeatureGroup();
+
+                beats.forEach(beat => {
+                    let geom = beat.geometry;
+                    if (typeof geom === "string") {
+                        try { geom = JSON.parse(geom); } catch {}
+                    }
+                    if (geom) {
+                        try { group.addLayer(L.geoJSON(geom)); } catch (e) {}
+                    }
+
+                    if (beat.segments && Array.isArray(beat.segments)) {
+                        beat.segments.forEach((seg: any) => {
+                            let segGeom = seg.geometry;
+                            if (typeof segGeom === "string") {
+                                try { segGeom = JSON.parse(segGeom); } catch {}
+                            }
+                            if (segGeom) {
+                                try { group.addLayer(L.geoJSON(segGeom)); } catch (e) {}
+                            }
+                        });
+                    }
+                });
+
+                if (group.getLayers().length > 0) {
+                    const bounds = group.getBounds();
+                    if (bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                }
+            }
+        }, 100);
+
+        return () => clearTimeout(timer);
     }, [beats, map, selectedBeatId]);
 
     return null;
@@ -53,7 +98,9 @@ export default function GlobalBeatMapView({ beats }: { beats: any[] }) {
     const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
     const [selectedBeatId, setSelectedBeatId] = useState<string | null>(null);
 
-    const beatsWithGeom = useMemo(() => beats.filter(b => b.geometry), [beats]);
+    const beatsWithGeom = useMemo(() => {
+        return beats.filter(b => b.geometry || (b.segments && b.segments.some((s: any) => s.geometry)));
+    }, [beats]);
 
     return (
         <div className="card" style={{ padding: 0, overflow: "hidden", height: "750px", position: "relative", borderRadius: "24px", border: "1px solid #e2e8f0", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)" }}>

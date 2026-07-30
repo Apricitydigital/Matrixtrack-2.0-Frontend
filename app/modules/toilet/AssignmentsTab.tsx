@@ -27,16 +27,31 @@ export default function AssignmentsTab() {
 
     const loadData = async () => {
         try {
-            const [emp, toi, z] = await Promise.all([
+            const [empRes, toiletRes, zoneRes] = await Promise.allSettled([
                 ToiletApi.listEmployees(),
                 ToiletApi.listAllToilets(),
                 ToiletApi.getZones()
             ]);
-            setEmployees((emp.employees || []).filter((item: any) => item.role === "SUPERVISOR"));
-            setToilets(toi.toilets || []);
-            setZones(z.nodes || []);
-        } catch (err) {
-            console.error(err);
+
+            if (empRes.status === 'fulfilled') {
+                setEmployees((empRes.value.employees || []).filter((item: any) => item.role === "SUPERVISOR"));
+            } else {
+                console.error('Failed to load employees', empRes.reason);
+                setEmployees([]);
+            }
+
+            if (toiletRes.status === 'fulfilled') {
+                setToilets(toiletRes.value.toilets || []);
+            } else {
+                console.error('Failed to load toilets', toiletRes.reason);
+            }
+
+            if (zoneRes.status === 'fulfilled') {
+                setZones(zoneRes.value.nodes || []);
+            } else {
+                console.error('Failed to load zones', zoneRes.reason);
+                setZones([]);
+            }
         } finally {
             setLoading(false);
         }
@@ -94,8 +109,9 @@ export default function AssignmentsTab() {
 
 
     const supervisorCounts = toilets.reduce((acc, t) => {
-        t.assignments?.forEach((a: any) => {
-            acc[a.supervisorId] = (acc[a.supervisorId] || 0) + 1;
+        const assignedIds = Array.isArray(t.assignedEmployeeIds) ? t.assignedEmployeeIds : [];
+        assignedIds.forEach((id: string) => {
+            acc[id] = (acc[id] || 0) + 1;
         });
         return acc;
     }, {} as Record<string, number>);
@@ -106,7 +122,8 @@ export default function AssignmentsTab() {
     );
 
     const filteredToilets = toilets.filter(t => {
-        const isAlreadyAssignedToSelected = t.assignments?.some((a: any) => a.supervisorId === selectedEmployee);
+        const assignedIds = Array.isArray(t.assignedEmployeeIds) ? t.assignedEmployeeIds : [];
+        const isAlreadyAssignedToSelected = assignedIds.includes(selectedEmployee);
         if (isAlreadyAssignedToSelected) return false;
         const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesWard = !selectedWard || t.wardId === selectedWard || t.ward?.parentId === selectedWard;
@@ -114,7 +131,10 @@ export default function AssignmentsTab() {
     });
 
     const selectedEmpObj = supervisors.find(e => e.id === selectedEmployee);
-    const assignedToilets = toilets.filter(t => t.assignments?.some((a: any) => a.supervisorId === selectedEmployee));
+    const assignedToilets = toilets.filter(t => {
+        const assignedIds = Array.isArray(t.assignedEmployeeIds) ? t.assignedEmployeeIds : [];
+        return assignedIds.includes(selectedEmployee);
+    });
 
     if (loading) return (
         <div style={{ display: 'flex', height: '60vh', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
@@ -182,7 +202,11 @@ export default function AssignmentsTab() {
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-                    {filteredEmployees.map(emp => (
+                    {filteredEmployees.length === 0 ? (
+                        <div style={{ padding: '20px 12px', color: '#64748b', fontSize: 13, textAlign: 'center' }}>
+                            No toilet supervisors found for this city.
+                        </div>
+                    ) : filteredEmployees.map(emp => (
                         <div
                             key={emp.id}
                             onClick={() => { setSelectedEmployee(emp.id); setSelectedToilets([]); }}

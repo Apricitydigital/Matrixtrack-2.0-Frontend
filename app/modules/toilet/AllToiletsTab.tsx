@@ -46,16 +46,30 @@ export default function AllToiletsTab() {
 
     const loadData = async () => {
         try {
-            const [toi, z, emp] = await Promise.all([
+            const [toiRes, zoneRes, employeeRes] = await Promise.allSettled([
                 ToiletApi.listAllToilets(),
                 ToiletApi.getZones(),
                 ToiletApi.listEmployees()
             ]);
-            setToilets(toi.toilets || []);
-            setZones(z.nodes || []);
-            setEmployees((emp.employees || []).filter((item: any) => item.role === "SUPERVISOR"));
-        } catch (err) {
-            console.error(err);
+
+            if (toiRes.status === 'fulfilled') {
+                setToilets(toiRes.value.toilets || []);
+            } else {
+                console.error('Failed to load toilets', toiRes.reason);
+            }
+
+            if (zoneRes.status === 'fulfilled') {
+                setZones(zoneRes.value.nodes || []);
+            } else {
+                console.error('Failed to load zones', zoneRes.reason);
+            }
+
+            if (employeeRes.status === 'fulfilled') {
+                setEmployees((employeeRes.value.employees || []).filter((item: any) => item.role === "SUPERVISOR"));
+            } else {
+                console.error('Failed to load employees', employeeRes.reason);
+                setEmployees([]);
+            }
         } finally {
             setLoading(false);
         }

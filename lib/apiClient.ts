@@ -1,4 +1,5 @@
 import { getStoredToken } from "@lib/auth";
+import { clearPersistedAccessToken, clearPersistedUserSnapshot } from "@lib/session";
 import type { ModuleName } from "../types/auth";
 import type { ApiSuccess, AuthLoginResponse, AuthMeResponse, CityListResponse, CityMasterNode, MasterNode } from "../types/api";
 
@@ -9,6 +10,29 @@ export class ApiError extends Error {
   constructor(status: number, message: string) {
     super(message);
     this.status = status;
+  }
+}
+
+function parseErrorMessage(raw: string, fallback: string) {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.error === "string") return parsed.error;
+  } catch {}
+  return raw;
+}
+
+function handleUnauthorized(path: string, message: string) {
+  if (typeof window === "undefined") return;
+  if (path === "/auth/login" || path === "/auth/logout") return;
+  const normalized = message.toLowerCase();
+  const isExpired = normalized.includes("expired token") || normalized.includes("invalid or expired token") || normalized.includes("missing authorization header");
+  if (!isExpired) return;
+  clearPersistedAccessToken();
+  clearPersistedUserSnapshot();
+  const currentPath = window.location.pathname || "";
+  if (!currentPath.startsWith("/login")) {
+    window.location.replace("/login?reason=session-expired");
   }
 }
 
@@ -35,7 +59,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   });
 
   if (!res.ok) {
-    const message = await res.text();
+    const rawMessage = await res.text();
+    const message = parseErrorMessage(rawMessage, res.statusText);
+    if (res.status === 401) {
+      handleUnauthorized(path, message);
+    }
     throw new ApiError(res.status, message || res.statusText);
   }
 
@@ -188,10 +216,16 @@ export const AreaBeatApi = {
   remove: (id: string) => apiFetch<{ success: boolean }>(`/city/areas/${id}`, { method: "DELETE" }),
   listPotentialAssignees: (id: string, role?: string) =>
     apiFetch<any[]>(`/city/areas/${id}/potential-assignees${role ? `?role=${role}` : ""}`),
-  assign: (id: string, userId: string | null, segmentId?: string | null, segmentIds?: string[]) =>
+  assign: (
+    id: string,
+    userId: string | null,
+    segmentId?: string | null,
+    segmentIds?: string[],
+    targetRole?: "SUPERVISOR" | "EMPLOYEE"
+  ) =>
     apiFetch(`/city/areas/${id}/assign`, {
       method: "POST",
-      body: JSON.stringify({ userId, segmentId, segmentIds })
+      body: JSON.stringify({ userId, segmentId, segmentIds, targetRole })
     })
 };
 
@@ -379,7 +413,7 @@ export const ToiletApi = {
   getWardsByZone: (zoneId: string) => apiFetch<{ nodes: any[] }>(`/city/geo?level=WARD&parentId=${zoneId}`),
 
   // Assignments
-  listEmployees: () => EmployeesApi.list("toilet"),
+  listEmployees: () => apiFetch<{ employees: any[] }>("/modules/toilet/staff"),
   bulkAssignToilets: (supervisorId: string, toiletIds: string[], category: string) =>
     apiFetch("/modules/toilet/assignments/bulk", {
       method: "POST",
@@ -425,7 +459,7 @@ export const ModuleRecordsApi = {
 export const RegistrationApi = {
   listRequests: () =>
     apiFetch<{
-      requests: { id: string; name: string; email: string; phone: string; aadhaar: string; status: string; createdAt: string }[];
+      requests: { id: string; name: string; email: string; phone: string; aadhaar: string; status: string; createdAt: string; requestedRole?: "SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER" }[];
     }>("/city/registration-requests"),
   approve: (id: string, body: { role: "SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER"; moduleKeys: string[] }) =>
     apiFetch<{ success: boolean }>(`/city/registration-requests/${id}/approve`, {
@@ -440,20 +474,28 @@ export const RegistrationApi = {
 };
 
 export const EmployeesApi = {
-  list: (moduleKey?: string) =>
-    apiFetch<{
-      employees: {
-        id: string;
-        name: string;
-        email: string;
-        phone?: string;
-        role: string;
-        modules: { id: string; key: string; name: string; canWrite: boolean }[];
-        zones: string[];
-        wards: string[];
-        createdAt: string;
-      }[];
-    }>(moduleKey ? `/city/employees?moduleKey=${encodeURIComponent(moduleKey)}` : "/city/employees")
+  list: async (moduleKey?: string) => {
+    const res = await CityUserApi.list();
+    const normalizedModuleKey = moduleKey?.trim().toUpperCase();
+    const employees = (res.users || [])
+      .filter((user) =>
+        normalizedModuleKey
+          ? (user.modules || []).some((module) => module.key?.toUpperCase() === normalizedModuleKey)
+          : true
+      )
+      .map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        modules: user.modules || [],
+        zones: user.zoneIds || [],
+        wards: user.wardIds || [],
+        createdAt: user.createdAt
+      }));
+
+    return { employees };
+  }
 };
 
 export const TwinbinApi = {

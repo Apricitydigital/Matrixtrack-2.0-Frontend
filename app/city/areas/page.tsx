@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import BeatForm from "./components/BeatForm";
 import AreaForm from "./components/AreaForm";
 import BeatTable from "./components/BeatTable";
@@ -26,6 +27,7 @@ export default function AreasPage() {
   const [editingBeat, setEditingBeat] = useState<any | null>(null);
   const [inspectingBeat, setInspectingBeat] = useState<any | null>(null);
   const [assigningBeat, setAssigningBeat] = useState<any | null>(null);
+  const [deployingBeat, setDeployingBeat] = useState<any | null>(null);
   const [geoVersion, setGeoVersion] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
@@ -136,14 +138,23 @@ export default function AreasPage() {
                 )}
               </div>
               {!isReadOnly && (
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="btn btn-primary"
-                  style={{ height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, padding: "0 24px" }}
-                >
-                  <Plus size={18} />
-                  Create Area & Beat
-                </button>
+                <>
+                  <Link
+                    href="/city/areas/employee-assignments"
+                    style={{ height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, padding: "0 20px", backgroundColor: "white", border: "1px solid #e2e8f0", color: "#0f172a", textDecoration: "none" }}
+                  >
+                    <ShieldCheck size={18} />
+                    Employee Deployment
+                  </Link>
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="btn btn-primary"
+                    style={{ height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, padding: "0 24px" }}
+                  >
+                    <Plus size={18} />
+                    Create Area & Beat
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -154,7 +165,7 @@ export default function AreasPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
               {[
                 { label: "Total Beats", count: stats.total, icon: Target, color: "#2563eb", bg: "#eff6ff", border: "#dbeafe" },
-                { label: "QC Assigned", count: stats.withQC, icon: ShieldCheck, color: "#059669", bg: "#f0fdf4", border: "#dcfce7" },
+                { label: "Supervisors Assigned", count: stats.withQC, icon: ShieldCheck, color: "#059669", bg: "#f0fdf4", border: "#dcfce7" },
                 { label: "Field Active", count: stats.withField, icon: Activity, color: "#dc2626", bg: "#fef2f2", border: "#fee2e2" },
               ].map((s, i) => (
                 <div key={i} style={{
@@ -267,6 +278,9 @@ export default function AreasPage() {
                   onEdit={setEditingBeat}
                   onViewData={setInspectingBeat}
                   onAssign={setAssigningBeat}
+                  onAssignEmployees={setDeployingBeat}
+                  onViewUser={(beat) => setDeployingBeat(beat)}
+                  assignmentActionLabel="Assign Supervisor"
                   isReadOnly={isReadOnly}
                 />
               )}
@@ -303,7 +317,17 @@ export default function AreasPage() {
         {assigningBeat && (
           <AssignBeatModal
             beat={assigningBeat}
+            mode="SUPERVISOR"
             onClose={() => setAssigningBeat(null)}
+            onSuccess={loadBeats}
+          />
+        )}
+
+        {deployingBeat && (
+          <AssignBeatModal
+            beat={deployingBeat}
+            mode="EMPLOYEE"
+            onClose={() => setDeployingBeat(null)}
             onSuccess={loadBeats}
           />
         )}
@@ -321,3 +345,4 @@ export default function AreasPage() {
     </RoleGuard >
   );
 }
+
