@@ -35,7 +35,7 @@ import {
   Fingerprint,
   User as UserIcon
 } from 'lucide-react';
-import UnifiedExecutiveDashboard from '@components/dashboard/UnifiedExecutiveDashboard';
+import UnifiedExecutiveDashboard from '@modules/taskforce/components/dashboard/UnifiedExecutiveDashboard';
 
 interface RoadmapModuleInfo {
   title: string;
@@ -164,6 +164,33 @@ export default function PortalHomePage() {
     : isCityAdmin
     ? '/city'
     : getRoleDashboardRedirect(user || null);
+
+  // Granular Workspace Access Checks based on Single SSO Token
+  const hasTaskforceAccess =
+    isSuperAdmin ||
+    isCityAdmin ||
+    !user ||
+    user?.modules?.some((m) =>
+      ['TASKFORCE', 'LITTERBINS', 'SWEEPING', 'TOILET'].includes((m.key || m.name || '').toUpperCase())
+    );
+
+  const hasSwachhAccess =
+    isSuperAdmin ||
+    isCityAdmin ||
+    !user ||
+    user?.modules?.some((m) =>
+      ['SWACHH_RANKING', 'SWACHH', 'WARD_RANKING'].includes((m.key || m.name || '').toUpperCase())
+    );
+
+  const hasWorkforceAccess =
+    isSuperAdmin ||
+    isCityAdmin ||
+    !user ||
+    user?.modules?.some((m) =>
+      ['WORKFORCE_MONITORING', 'WORKFORCE', 'MATRIXTRACK_WORKFORCE', 'ATTENDANCE'].includes(
+        (m.key || m.name || '').toUpperCase()
+      )
+    );
 
   // Dynamic Greeting based on time of day
   const getGreeting = () => {
@@ -661,6 +688,10 @@ export default function PortalHomePage() {
                   </div>
                 )}
 
+                <Link href="/admin-management" className="btn-logout-sleek" style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8', textDecoration: 'none' }}>
+                  <ShieldCheck size={14} /> Admin Access Manager
+                </Link>
+
                 <button onClick={handleLogout} className="btn-logout-sleek" title="Sign out of portal">
                   <LogOut size={14} /> Logout
                 </button>
@@ -687,7 +718,11 @@ export default function PortalHomePage() {
 
           <div className="active-workspaces-grid">
             {/* HERO CARD 1: Taskforce */}
-            <div className="hero-workspace-card">
+            <div 
+              className="hero-workspace-card"
+              onClick={() => router.push(workspaceUrl || '/city')}
+              style={{ cursor: 'pointer' }}
+            >
               <div>
                 <div className="hero-card-header">
                   <div className="hero-icon-box">
@@ -712,16 +747,23 @@ export default function PortalHomePage() {
               </div>
 
               <div>
-                <Link href={workspaceUrl} style={{ textDecoration: 'none' }}>
-                  <button className="btn-launch-hero">
-                    Launch Taskforce Workspace <ArrowRight size={18} />
-                  </button>
+                <Link 
+                  href={workspaceUrl || '/city'} 
+                  className="btn-launch-hero" 
+                  style={{ textDecoration: 'none' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Launch Taskforce Workspace <ArrowRight size={18} />
                 </Link>
               </div>
             </div>
 
             {/* HERO CARD 2: Swachh Ward Ranking */}
-            <div className="hero-workspace-card" style={{ borderColor: '#7c3aed', boxShadow: '0 10px 30px -5px rgba(124, 58, 237, 0.12)' }}>
+            <div 
+              className="hero-workspace-card" 
+              onClick={() => router.push('/ward-ranking')}
+              style={{ borderColor: '#7c3aed', boxShadow: '0 10px 30px -5px rgba(124, 58, 237, 0.12)', cursor: 'pointer' }}
+            >
               <div>
                 <div className="hero-card-header">
                   <div className="hero-icon-box" style={{ background: 'linear-gradient(135deg, #f5f3ff, #ddd6fe)', borderColor: '#c4b5fd', color: '#7c3aed' }}>
@@ -745,10 +787,53 @@ export default function PortalHomePage() {
               </div>
 
               <div>
-                <Link href="/ward-ranking" style={{ textDecoration: 'none' }}>
-                  <button className="btn-launch-hero" style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)', boxShadow: '0 8px 24px rgba(124, 58, 237, 0.38)' }}>
-                    Launch Swachh Sync Workspace <ArrowRight size={18} />
-                  </button>
+                <Link 
+                  href="/ward-ranking" 
+                  className="btn-launch-hero" 
+                  style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)', boxShadow: '0 8px 24px rgba(124, 58, 237, 0.38)', textDecoration: 'none' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Launch Swachh Sync Workspace <ArrowRight size={18} />
+                </Link>
+              </div>
+            </div>
+
+            {/* HERO CARD 3: Workforce Monitoring */}
+            <div 
+              className="hero-workspace-card" 
+              onClick={() => router.push('/workforce-monitoring')}
+              style={{ borderColor: '#0284c7', boxShadow: '0 10px 30px -5px rgba(2, 132, 199, 0.12)', cursor: 'pointer' }}
+            >
+              <div>
+                <div className="hero-card-header">
+                  <div className="hero-icon-box" style={{ background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)', borderColor: '#7dd3fc', color: '#0284c7' }}>
+                    <Users size={32} />
+                  </div>
+                  <span className="hero-live-tag" style={{ background: '#e0f2fe', color: '#0284c7', borderColor: '#7dd3fc' }}>
+                    <span className="pulse-dot" style={{ width: 6, height: 6, background: '#0284c7' }} /> Active & Live
+                  </span>
+                </div>
+                <h3 className="hero-card-title">Workforce Monitoring</h3>
+                <div className="hero-card-sub" style={{ color: '#0284c7' }}>Matrix Track Attendance Suite</div>
+                <div className="hero-card-desc">
+                  Biometric facial verification & GPS geo-fenced live attendance tracking suite for municipal sanitation workers & supervisors.
+                </div>
+
+                <div className="hero-tags-row">
+                  <span className="feature-pill">Facial Recognition AI</span>
+                  <span className="feature-pill">GPS Telemetry & Geofencing</span>
+                  <span className="feature-pill">Supervisor Self-Punch Audit</span>
+                </div>
+              </div>
+
+              <div>
+                <Link 
+                  href="/workforce-monitoring" 
+                  className="btn-launch-hero" 
+                  style={{ background: 'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)', boxShadow: '0 8px 24px rgba(2, 132, 199, 0.38)', textDecoration: 'none' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Launch Workforce Workspace <ArrowRight size={18} />
                 </Link>
               </div>
             </div>
@@ -761,17 +846,6 @@ export default function PortalHomePage() {
             </div>
 
             <div className="roadmap-items">
-              <button onClick={() => setActiveModalKey('workforce')} className="roadmap-item-btn">
-                <Users size={18} style={{ color: '#2563eb' }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Workforce Monitoring</div>
-                  <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 600 }}>Matrix Track GPS & Facial Attendance</div>
-                </div>
-                <span style={{ fontSize: 10, fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: 8, border: '1px solid #bfdbfe' }}>
-                  View Specifications &rarr;
-                </span>
-              </button>
-
               <button onClick={() => setActiveModalKey('mrf')} className="roadmap-item-btn">
                 <TrendingUp size={18} style={{ color: '#7c3aed' }} />
                 <div>

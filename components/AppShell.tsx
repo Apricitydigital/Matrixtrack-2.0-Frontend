@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import Sidebar from "@components/ui/Sidebar";
 import { Topbar } from "@components/ui/Topbar";
 
-const AUTH_PATHS = ["/", "/login", "/register", "/portal-home", "/ward-ranking"];
+const AUTH_PATHS = ["/", "/login", "/register", "/portal-home", "/ward-ranking", "/workforce-monitoring", "/admin-management"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();

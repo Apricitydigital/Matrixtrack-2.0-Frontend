@@ -1,7 +1,12 @@
 export type Role =
   | "HMS_SUPER_ADMIN"
+  | "SUPER_ADMIN"
+  | "DIVISION_ADMIN"
   | "CITY_ADMIN"
+  | "ZONE_ADMIN"
+  | "WARD_ADMIN"
   | "COMMISSIONER"
+  | "SUPERVISOR"
   | "ACTION_OFFICER"
   | "EMPLOYEE"
   | "QC"
