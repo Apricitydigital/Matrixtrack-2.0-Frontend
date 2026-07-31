@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, ChevronDown, LogOut, Search, Settings, User as UserIcon } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 import { roleLabel } from "@lib/labels";
+import { RefreshButton } from "./RefreshButton";
 
 export function Topbar() {
   const { user, logout, loading } = useAuth();
@@ -54,6 +55,9 @@ export function Topbar() {
           <div className="text-sm font-medium text-slate-400">Loading...</div>
         ) : user ? (
           <>
+            {/* Reusable Refresh Button */}
+            <RefreshButton label="Sync" />
+
             {/* Notifications */}
             <button className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition-colors duration-200 hover:bg-slate-50 hover:text-slate-700">
               <Bell size={18} />

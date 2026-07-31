@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -26,6 +26,7 @@ import {
   Shield,
   Target,
   Trash2,
+  UserCog,
   UserPlus,
   Users,
   Zap,
@@ -730,16 +731,12 @@ export default function HmsDashboardPage() {
             return (
               <article
                 key={kpi.label}
-                style={{
-                  animationDelay: `${index * 50}ms`,
-                }}
                 className="
             group relative flex min-h-[162px] flex-col overflow-hidden
             rounded-[18px] border border-slate-200/85 bg-white
-            px-3.5 pb-3 pt-3.5 opacity-0
+            px-3.5 pb-3 pt-3.5 opacity-100
             shadow-[0_12px_30px_-24px_rgba(15,23,42,0.65)]
             transition-all duration-300
-            [animation-fill-mode:forwards] animate-slide-up
             hover:-translate-y-0.5 hover:border-blue-200
             hover:shadow-[0_18px_38px_-25px_rgba(37,99,235,0.35)]
           "
@@ -1261,7 +1258,7 @@ export default function HmsDashboardPage() {
                   style={{
                     animationDelay: `${index * 55}ms`,
                   }}
-                  className="group flex items-center gap-3 rounded-[16px] border border-transparent px-3 py-3 opacity-0 transition-all duration-200 [animation-fill-mode:forwards] animate-slide-up hover:border-slate-200 hover:bg-slate-50/80"
+                  className="group flex items-center gap-3 rounded-[16px] border border-transparent px-3 py-3 opacity-100 transition-all duration-200 hover:border-slate-200 hover:bg-slate-50/80"
                 >
                   <span
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] ${notification.tone === "success"
@@ -1794,53 +1791,28 @@ export default function HmsDashboardPage() {
                               </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setEditingAdmin({
-                                    cityId: city.id,
-                                    cityName: city.name,
-                                    admin,
-                                  })
-                                }
-                                aria-label={`Edit ${admin.name}`}
-                                title="Edit administrator"
-                                className="
-                                  flex h-8 w-8 items-center justify-center
-                                  rounded-[9px] border border-slate-200
-                                  bg-white text-slate-500 transition
-                                  hover:border-blue-200 hover:bg-blue-50
-                                  hover:text-blue-600
-                                "
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              {/* Initial avatar — no profile image */}
+                              <span
+                                className={`
+                                  flex h-9 w-9 shrink-0 items-center
+                                  justify-center rounded-full
+                                  text-[11px] font-black
+                                  ${avatarTone}
+                                `}
                               >
-                                <Edit2 size={13} />
-                              </button>
+                                {initials}
+                              </span>
 
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteAdmin(
-                                    city.id,
-                                    admin.id || "",
-                                    admin.name
-                                  )
-                                }
-                                disabled={!admin.id}
-                                aria-label={`Delete ${admin.name}`}
-                                title="Delete administrator"
-                                className="
-                                  flex h-8 w-8 items-center justify-center
-                                  rounded-[9px] border border-slate-200
-                                  bg-white text-slate-400 transition
-                                  hover:border-rose-200 hover:bg-rose-50
-                                  hover:text-rose-600
-                                  disabled:cursor-not-allowed
-                                  disabled:opacity-40
-                                "
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-extrabold text-slate-800">
+                                  {admin.name}
+                                </div>
+
+                                <div className="mt-0.5 truncate text-xs text-slate-400">
+                                  {admin.email}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         );
@@ -1904,21 +1876,71 @@ export default function HmsDashboardPage() {
 
                 {/* Control */}
                 <td className="px-5 py-4 pr-7 align-middle">
-                  <button
-                    type="button"
-                    onClick={() => setEditingCity(city)}
-                    aria-label={`Edit ${city.name}`}
-                    title="Edit city"
-                    className="
-                      flex h-9 w-9 items-center justify-center
-                      rounded-[9px] border border-slate-200
-                      bg-white text-slate-600 transition
-                      hover:border-blue-200 hover:bg-blue-50
-                      hover:text-blue-600
-                    "
-                  >
-                    <Edit2 size={15} />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingCity(city)}
+                      aria-label={`Edit city ${city.name}`}
+                      title="Edit City Configuration"
+                      className="
+                        flex h-8 w-8 items-center justify-center
+                        rounded-[9px] border border-slate-200
+                        bg-white text-slate-600 transition
+                        hover:border-blue-200 hover:bg-blue-50
+                        hover:text-blue-600
+                      "
+                    >
+                      <Edit2 size={14} />
+                    </button>
+
+                    {admins.length > 0 && admins[0].id && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditingAdmin({
+                              cityId: city.id,
+                              cityName: city.name,
+                              admin: admins[0],
+                            })
+                          }
+                          aria-label={`Edit Admin ${admins[0].name}`}
+                          title="Edit City Administrator"
+                          className="
+                            flex h-8 w-8 items-center justify-center
+                            rounded-[9px] border border-slate-200
+                            bg-white text-slate-500 transition
+                            hover:border-amber-200 hover:bg-amber-50
+                            hover:text-amber-600
+                          "
+                        >
+                          <UserCog size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDeleteAdmin(
+                              city.id,
+                              admins[0].id || "",
+                              admins[0].name
+                            )
+                          }
+                          aria-label={`Delete Admin ${admins[0].name}`}
+                          title="Remove City Administrator"
+                          className="
+                            flex h-8 w-8 items-center justify-center
+                            rounded-[9px] border border-slate-200
+                            bg-white text-slate-400 transition
+                            hover:border-rose-200 hover:bg-rose-50
+                            hover:text-rose-600
+                          "
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             );

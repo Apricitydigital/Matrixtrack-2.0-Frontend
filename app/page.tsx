@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@hooks/useAuth';
+import { getPostLoginRedirect } from '@utils/modules';
 import { Shield, Sparkles } from 'lucide-react';
 
 export default function LandingPage() {
@@ -29,7 +30,7 @@ export default function LandingPage() {
       } else {
         clearInterval(interval);
         setTimeout(() => {
-          router.replace(user ? '/portal-home' : '/login');
+          router.replace(user ? getPostLoginRedirect(user) : '/login');
         }, 300);
       }
     }, 400);
@@ -38,7 +39,7 @@ export default function LandingPage() {
   }, [user, router]);
 
   const handleSkipSplash = () => {
-    router.replace(user ? '/portal-home' : '/login');
+    router.replace(user ? getPostLoginRedirect(user) : '/login');
   };
 
   return (

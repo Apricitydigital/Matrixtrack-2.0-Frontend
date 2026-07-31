@@ -114,5 +114,6 @@ export function getRoleDashboardRedirect(user: AuthUser | null) {
 
 export function getPostLoginRedirect(user: AuthUser | null) {
   if (!user) return "/login";
-  return "/portal-home";
+  return getRoleDashboardRedirect(user);
 }
+
