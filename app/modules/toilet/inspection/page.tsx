@@ -113,7 +113,7 @@ export default function InspectionListPage() {
                         ) : inspections.length > 0 ? inspections.map((report) => (
                             <tr key={report.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                 <td style={{ padding: '16px 24px', fontWeight: 800, color: '#1e293b' }}>{report.toilet?.name || '---'}</td>
-                                <td style={{ padding: '16px 24px', fontSize: 14, color: '#334155' }}>{report.employee?.name || '---'}</td>
+                                <td style={{ padding: '16px 24px', fontSize: 14, color: '#334155' }}>{report.supervisor?.name || '---'}</td>
                                 <td style={{ padding: '16px 24px', fontSize: 13, color: '#64748b' }}>
                                     {new Date(report.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}<br />
                                     <span style={{ fontSize: 11 }}>{new Date(report.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -200,3 +200,4 @@ function StatusBadge({ status }: { status: string }) {
         </span>
     );
 }
+

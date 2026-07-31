@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
+import { WorkspaceLoading } from '@components/ui/WorkspaceLoading';
 import './index.css';
 import './App.css';
 import Navbar from './components/Navbar';
@@ -147,19 +150,29 @@ export default function WorkforcePortalContainer() {
 
   if (!mounted) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14 }}>
-        Loading Matrix Track Attendance Portal...
-      </div>
+      <WorkspaceLoading
+        title="Workforce Monitoring Workspace"
+        subtitle="Loading field employee management, attendance & professional leave records..."
+      />
     );
   }
 
   return (
-    <MemoryRouter>
-      <AuthProvider>
-        <SearchProvider>
-          <WorkforceContent />
-        </SearchProvider>
-      </AuthProvider>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <AuthProvider>
+          <SearchProvider>
+            <Suspense fallback={
+              <WorkspaceLoading
+                title="Workforce Monitoring Workspace"
+                subtitle="Loading field employee management, attendance & professional leave records..."
+              />
+            }>
+              <WorkforceContent />
+            </Suspense>
+          </SearchProvider>
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }

@@ -53,7 +53,7 @@ export default function ToiletFormsPage() {
   };
 
   return (
-    <ModuleGuard module="TOILET" roles={["EMPLOYEE", "QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
+    <ModuleGuard module="TOILET" roles={["SUPERVISOR", "QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
       <div className="grid grid-2">
         <div className="card">
           <h3>Create Toilet Form</h3>
@@ -98,3 +98,4 @@ export default function ToiletFormsPage() {
     </ModuleGuard>
   );
 }
+

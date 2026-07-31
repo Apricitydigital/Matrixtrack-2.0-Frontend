@@ -10,3 +10,4 @@ export default function ModulesLayout({ children }: { children: React.ReactNode 
     </Protected>
   );
 }
+

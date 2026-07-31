@@ -12,7 +12,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { setUser, setAuthenticatedUser } = useAuth();
   
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -87,9 +87,11 @@ export default function LoginPage() {
       const { token, user: authUser } = await AuthApi.login({ email, password });
       setAuthCookie(token);
       const decoded = decodeToken(token, authUser);
-      setUser(decoded);
-      router.replace(getPostLoginRedirect(decoded));
+      const finalUser = decoded || (authUser as any);
+      setAuthenticatedUser(token, finalUser);
+      router.replace(getPostLoginRedirect(finalUser));
     } catch (err) {
+      console.error("Login Error:", err);
       if (err instanceof ApiError && err.status === 401) {
         setError("Invalid email or password. Please try again.");
       } else if (err instanceof ApiError) {

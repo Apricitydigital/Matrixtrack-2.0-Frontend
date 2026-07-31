@@ -144,7 +144,7 @@ export default function ApprovalsTab() {
     };
 
     const getSubmittedBy = (req: any) => {
-        return isRegistration(req) ? req.requestedBy?.name : req.employee?.name;
+        return isRegistration(req) ? req.requestedBy?.name : req.supervisor?.name;
     };
 
     return (
@@ -405,3 +405,4 @@ function StatusBadge({ status }: { status: string }) {
         </span>
     );
 }
+

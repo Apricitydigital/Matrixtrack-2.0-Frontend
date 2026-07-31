@@ -43,7 +43,7 @@ export default function TwinbinMyRequestsPage() {
 
   return (
     <Protected>
-      <ModuleGuard module="LITTERBINS" roles={["EMPLOYEE"]}>
+      <ModuleGuard module="LITTERBINS" roles={["SUPERVISOR"]}>
         <div className="content">
           <header className="mb-6">
             <p className="eyebrow">Litter Bins</p>
@@ -82,3 +82,4 @@ export default function TwinbinMyRequestsPage() {
     </Protected>
   );
 }
+

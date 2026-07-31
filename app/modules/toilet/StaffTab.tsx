@@ -6,7 +6,7 @@ import { useAuth } from '@hooks/useAuth';
 
 export default function StaffTab() {
     const { user } = useAuth();
-    const [employees, setEmployees] = useState<any[]>([]);
+    const [supervisors, setEmployees] = useState<any[]>([]);
     const [toilets, setToilets] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -18,22 +18,29 @@ export default function StaffTab() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [empRes, toiletRes, zonesRes] = await Promise.all([
+            setError('');
+            const [empRes, toiletRes, zonesRes] = await Promise.allSettled([
                 ToiletApi.listEmployees(),
                 ToiletApi.listAllToilets(),
                 ToiletApi.getZones()
             ]);
 
-            const zoneMap = new Map(zonesRes.nodes.map((z: any) => [z.id, z.name]));
-            const rawEmployees = empRes.employees || [];
+            const employees = empRes.status === 'fulfilled' ? (empRes.value.employees || []) : [];
+            const toilets = toiletRes.status === 'fulfilled' ? (toiletRes.value.toilets || []) : [];
+            const zones = zonesRes.status === 'fulfilled' ? (zonesRes.value.nodes || []) : [];
 
-            // Map assignments count
+            if (empRes.status !== 'fulfilled') console.error('Failed to load employees', empRes.reason);
+            if (toiletRes.status !== 'fulfilled') console.error('Failed to load toilets', toiletRes.reason);
+            if (zonesRes.status !== 'fulfilled') console.error('Failed to load zones', zonesRes.reason);
+
+            const zoneMap = new Map(zones.map((z: any) => [z.id, z.name]));
+            const rawEmployees = employees.filter((emp: any) => emp.role === "SUPERVISOR");
+
             const enriched = rawEmployees.map((emp: any) => {
-                const assigned = (toiletRes.toilets || []).filter((t: any) =>
+                const assigned = toilets.filter((t: any) =>
                     t.assignedEmployeeIds && t.assignedEmployeeIds.includes(emp.id)
                 );
 
-                // Map zone names if available
                 const zoneNames = (emp.zones || []).map((zId: string) => zoneMap.get(zId) || zId).join(', ');
 
                 return {
@@ -45,6 +52,10 @@ export default function StaffTab() {
             });
 
             setEmployees(enriched);
+            setToilets(toilets);
+            if (empRes.status !== 'fulfilled' && toiletRes.status !== 'fulfilled') {
+                setError('Failed to load staff list');
+            }
         } catch (err: any) {
             console.error(err);
             setError('Failed to load staff list');
@@ -76,12 +87,12 @@ export default function StaffTab() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {employees.length === 0 ? (
+                        {supervisors.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="py-8 text-center text-slate-400">No staff found for this module.</td>
                             </tr>
                         ) : (
-                            employees.map((emp) => (
+                            supervisors.map((emp) => (
                                 <tr key={emp.id} className="group hover:bg-slate-50 transition-colors">
                                     <td className="py-4 px-4">
                                         <div className="font-bold text-slate-800">{emp.name}</div>
@@ -113,8 +124,9 @@ export default function StaffTab() {
             </div>
 
             <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-500">
-                <strong>Note for QC:</strong> This list shows all employees with access to the Toilet Module in your jurisdiction.
+                <strong>Note for QC:</strong> This list shows all supervisors with access to the Toilet Module in your jurisdiction.
             </div>
         </div>
     );
 }
+

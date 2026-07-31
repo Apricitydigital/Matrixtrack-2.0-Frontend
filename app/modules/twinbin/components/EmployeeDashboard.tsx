@@ -165,3 +165,4 @@ function Badge({ status }: { status: string }) {
 
   return <span className={`badge ${style}`}>{status.replace(/_/g, " ")}</span>;
 }
+

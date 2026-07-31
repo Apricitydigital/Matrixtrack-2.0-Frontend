@@ -142,7 +142,7 @@ export default function RegisterPage() {
                         Join the movement for smarter, cleaner cities.
                     </h2>
                     <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 16, lineHeight: 1.6, maxWidth: 360 }}>
-                        Submit your application to become part of the HMS network. Your request will be reviewed by city administrators.
+                        Submit your supervisor application to become part of the HMS network. Your request will be reviewed by city administrators.
                     </p>
                 </div>
 
@@ -250,9 +250,12 @@ export default function RegisterPage() {
                         </button>
                     </form>
 
-                    <p style={{ marginTop: 24, textAlign: "center", color: "#64748b", fontSize: 14 }}>
-                        Already have an account? <a href="/login" style={{ color: "#1e3a8a", fontWeight: 700, textDecoration: "none" }}>Sign In</a>
-                    </p>
+                    <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                        <a href="/register/employee" style={{ color: "#0f766e", fontWeight: 700, textDecoration: "none" }}>Register As Employee</a>
+                        <p style={{ margin: 0, textAlign: "center", color: "#64748b", fontSize: 14 }}>
+                            Already have an account? <a href="/login" style={{ color: "#1e3a8a", fontWeight: 700, textDecoration: "none" }}>Sign In</a>
+                        </p>
+                    </div>
                 </div>
             </div>
 

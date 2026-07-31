@@ -22,7 +22,7 @@ type TaskforceRecord = {
 export default function TaskforceQCDashboard() {
     const { user: authUser } = useAuth();
 
-    const [viewTab, setViewTab] = useState<'dashboard' | 'verification' | 'employees'>('dashboard');
+    const [viewTab, setViewTab] = useState<'dashboard' | 'verification' | 'supervisors'>('dashboard');
     const [records, setRecords] = useState<TaskforceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -30,14 +30,14 @@ export default function TaskforceQCDashboard() {
     const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'ASSIGNED'>('PENDING');
     const [stats, setStats] = useState<{ pending: number; approved: number; rejected: number; actionRequired: number; total: number; assigned: number } | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
-    const [employees, setEmployees] = useState<any[]>([]);
+    const [supervisors, setEmployees] = useState<any[]>([]);
     const [assignSelection, setAssignSelection] = useState<Record<string, string>>({});
     const [selectedRecord, setSelectedRecord] = useState<TaskforceRecord | null>(null);
 
     // Employee Tab State
     const [empSearch, setEmpSearch] = useState("");
     const [empPage, setEmpPage] = useState(1);
-    const [empLimit] = useState(10); // Rows per page for employees
+    const [empLimit] = useState(10); // Rows per page for supervisors
 
     const [scope, setScope] = useState<{
         zones: string[];
@@ -59,7 +59,7 @@ export default function TaskforceQCDashboard() {
     }, [activeTab]);
 
     useEffect(() => {
-        if (viewTab !== 'employees') {
+        if (viewTab !== 'supervisors') {
             loadData();
         } else {
             loadEmployeesOnce();
@@ -113,15 +113,15 @@ export default function TaskforceQCDashboard() {
     }
 
     async function loadEmployeesOnce() {
-        if (employees.length > 0) return;
+        if (supervisors.length > 0) return;
         setLoading(true);
         try {
             const empRes = await EmployeesApi.list("TASKFORCE");
             setEmployees(empRes.employees || []);
         } catch (empErr) {
-            console.error("Failed to load employees", empErr);
+            console.error("Failed to load supervisors", empErr);
         } finally {
-            if (viewTab === 'employees') setLoading(false);
+            if (viewTab === 'supervisors') setLoading(false);
         }
     }
 
@@ -213,10 +213,10 @@ export default function TaskforceQCDashboard() {
         }
     }
 
-    async function handleAssign(record: TaskforceRecord, employeeId?: string) {
-        const targetId = employeeId || assignSelection[record.id] || employees[0]?.id;
+    async function handleAssign(record: TaskforceRecord, supervisorId?: string) {
+        const targetId = supervisorId || assignSelection[record.id] || supervisors[0]?.id;
         if (!targetId) {
-            alert("Select an employee to assign");
+            alert("Select an supervisor to assign");
             return;
         }
         setActionLoading(record.id);
@@ -232,14 +232,14 @@ export default function TaskforceQCDashboard() {
 
     // --- Employee Table Logic ---
     const filteredEmployees = useMemo(() => {
-        if (!empSearch) return employees;
+        if (!empSearch) return supervisors;
         const lower = empSearch.toLowerCase();
-        return employees.filter(e =>
+        return supervisors.filter(e =>
             e.name?.toLowerCase().includes(lower) ||
             e.email?.toLowerCase().includes(lower) ||
             e.phone?.includes(lower)
         );
-    }, [employees, empSearch]);
+    }, [supervisors, empSearch]);
 
     const paginatedEmployees = useMemo(() => {
         const start = (empPage - 1) * empLimit;
@@ -319,7 +319,7 @@ export default function TaskforceQCDashboard() {
             onApprove={() => handleAction(r, 'APPROVE')}
             onReject={() => handleAction(r, 'REJECT')}
             onAssign={(empId) => handleAssign(r, empId)}
-            assignOptions={employees}
+            assignOptions={supervisors}
             assignValue={assignSelection[r.id] || ""}
             onAssignChange={(val) => setAssignSelection(prev => ({ ...prev, [r.id]: val }))}
             loading={actionLoading === r.id}
@@ -358,8 +358,8 @@ export default function TaskforceQCDashboard() {
                             Verification
                         </button>
                         <button
-                            className={`btn ${viewTab === 'employees' ? 'btn-primary' : 'btn-outline'}`}
-                            onClick={() => setViewTab('employees')}
+                            className={`btn ${viewTab === 'supervisors' ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => setViewTab('supervisors')}
                         >
                             Employees
                         </button>
@@ -367,7 +367,7 @@ export default function TaskforceQCDashboard() {
                     </div>
                 </div>
 
-                {viewTab !== 'employees' && (
+                {viewTab !== 'supervisors' && (
                     <div className="stats-row">
                         <StatsCard label="Pending Review" value={derivedStats.pending || 0} sub="Feeder Points" color="#d97706" />
                         <StatsCard label="Approved" value={derivedStats.approved || 0} sub="Feeder Points" color="#16a34a" />
@@ -378,13 +378,13 @@ export default function TaskforceQCDashboard() {
                 )}
             </section>
 
-            {viewTab === 'employees' ? (
+            {viewTab === 'supervisors' ? (
                 <section className="card card-spacious">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-bold">Assigned Employees</h2>
                         <input
                             type="text"
-                            placeholder="Search employees..."
+                            placeholder="Search supervisors..."
                             className="input input-sm input-bordered w-64"
                             value={empSearch}
                             onChange={(e) => setEmpSearch(e.target.value)}
@@ -408,7 +408,7 @@ export default function TaskforceQCDashboard() {
                                     </thead>
                                     <tbody>
                                         {paginatedEmployees.length === 0 ? (
-                                            <tr><td colSpan={5} className="text-center p-4 muted">No employees found.</td></tr>
+                                            <tr><td colSpan={5} className="text-center p-4 muted">No supervisors found.</td></tr>
                                         ) : (
                                             paginatedEmployees.map((e) => (
                                                 <tr key={e.id} className="hover">
@@ -551,7 +551,7 @@ export default function TaskforceQCDashboard() {
                         onApprove={() => handleAction(selectedRecord, 'APPROVE')}
                         onReject={() => handleAction(selectedRecord, 'REJECT')}
                         onAssign={(empId) => handleAssign(selectedRecord, empId)}
-                        assignOptions={employees}
+                        assignOptions={supervisors}
                         assignValue={assignSelection[selectedRecord.id] || ""}
                         onAssignChange={(val) => setAssignSelection(prev => ({ ...prev, [selectedRecord.id]: val }))}
                         loading={actionLoading === selectedRecord.id}
@@ -586,3 +586,4 @@ function mapFeederPoint(p: any): TaskforceRecord {
         assignedEmployeeIds: p.assignedEmployeeIds || []
     };
 }
+

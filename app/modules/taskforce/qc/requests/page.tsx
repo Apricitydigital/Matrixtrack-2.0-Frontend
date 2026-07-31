@@ -30,7 +30,7 @@ export default function TaskforceQcRequestsPage() {
   const [actionStatus, setActionStatus] = useState("");
   const [actionError, setActionError] = useState("");
   const [assignees, setAssignees] = useState<string>("");
-  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [supervisors, setEmployees] = useState<{ id: string; name: string }[]>([]);
 
   const active = useMemo(() => requests.find((r) => r.id === activeId) || null, [requests, activeId]);
 
@@ -163,11 +163,11 @@ export default function TaskforceQcRequestsPage() {
                   ) : null}
 
                   <div style={{ marginTop: 12 }}>
-                    <label>Assign employees (comma separated IDs)</label>
+                    <label>Assign supervisors (comma separated IDs)</label>
                     <input className="input" value={assignees} onChange={(e) => setAssignees(e.target.value)} />
-                    {employees.length > 0 && (
+                    {supervisors.length > 0 && (
                       <div className="muted" style={{ marginTop: 4 }}>
-                        Known IDs: {employees.slice(0, 5).map((e) => e.id).join(", ")} ...
+                        Known IDs: {supervisors.slice(0, 5).map((e) => e.id).join(", ")} ...
                       </div>
                     )}
                   </div>
@@ -208,3 +208,4 @@ function Field({ label, value }: { label: string; value?: string }) {
     </div>
   );
 }
+

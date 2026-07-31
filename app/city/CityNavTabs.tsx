@@ -2,26 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { LayoutDashboard, Map, MapPin, Target, Users, Package } from "lucide-react";
-import { getTokenFromCookies, decodeToken } from "@lib/auth";
+import { useAuth } from "@hooks/useAuth";
 
 export default function CityNavTabs() {
     const pathname = usePathname();
+    const { user } = useAuth();
 
-
-    const [isAdmin, setIsAdmin] = useState(true);
-
-    useEffect(() => {
-        const token = getTokenFromCookies();
-        const user = decodeToken(token);
-        // COMMISSIONER and ULB_OFFICER should see all tabs (read-only)
-        // HMS_SUPER_ADMIN also sees all
-        const isReadOnlyRole = user?.roles.some((r: string) => ["COMMISSIONER", "ULB_OFFICER"].includes(r));
-        if (isReadOnlyRole) {
-            setIsAdmin(true); // Treat as admin for "Master" visibility
-        }
-    }, []);
+    const isAdmin = useMemo(() => {
+        if (!user) return false;
+        return user.roles.some((role) => ["CITY_ADMIN", "COMMISSIONER", "ULB_OFFICER", "HMS_SUPER_ADMIN"].includes(role));
+    }, [user]);
 
     const tabs = [
         { name: "Dashboard", href: "/city", icon: <LayoutDashboard size={16} /> },

@@ -16,7 +16,7 @@ export default function AllToiletsTab() {
     // Assignment Modal State
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [toiletToAssign, setToiletToAssign] = useState<any>(null);
-    const [employees, setEmployees] = useState<any[]>([]);
+    const [supervisors, setEmployees] = useState<any[]>([]);
     const [assigningLoading, setAssigningLoading] = useState(false);
 
     // Search & Filter states
@@ -46,16 +46,30 @@ export default function AllToiletsTab() {
 
     const loadData = async () => {
         try {
-            const [toi, z, emp] = await Promise.all([
+            const [toiRes, zoneRes, employeeRes] = await Promise.allSettled([
                 ToiletApi.listAllToilets(),
                 ToiletApi.getZones(),
                 ToiletApi.listEmployees()
             ]);
-            setToilets(toi.toilets || []);
-            setZones(z.nodes || []);
-            setEmployees(emp.employees || []);
-        } catch (err) {
-            console.error(err);
+
+            if (toiRes.status === 'fulfilled') {
+                setToilets(toiRes.value.toilets || []);
+            } else {
+                console.error('Failed to load toilets', toiRes.reason);
+            }
+
+            if (zoneRes.status === 'fulfilled') {
+                setZones(zoneRes.value.nodes || []);
+            } else {
+                console.error('Failed to load zones', zoneRes.reason);
+            }
+
+            if (employeeRes.status === 'fulfilled') {
+                setEmployees((employeeRes.value.employees || []).filter((item: any) => item.role === "SUPERVISOR"));
+            } else {
+                console.error('Failed to load employees', employeeRes.reason);
+                setEmployees([]);
+            }
         } finally {
             setLoading(false);
         }
@@ -84,16 +98,20 @@ export default function AllToiletsTab() {
         setFilteredToilets(filtered);
     };
 
-    const handleQuickAssign = async (employeeId: string) => {
+    const handleQuickAssign = async (supervisorId: string) => {
         if (!toiletToAssign) return;
+        if (toiletToAssign.status !== 'APPROVED') {
+            alert('Only approved toilets can be assigned');
+            return;
+        }
         setAssigningLoading(true);
         try {
-            await ToiletApi.bulkAssignToilets(employeeId, [toiletToAssign.id], toiletToAssign.type);
+            await ToiletApi.bulkAssignToilets(supervisorId, [toiletToAssign.id], toiletToAssign.type);
             setShowAssignModal(false);
             setToiletToAssign(null);
             await loadData();
-        } catch (err) {
-            alert("Assignment failed");
+        } catch (err: any) {
+            alert(err?.message || "Assignment failed");
         } finally {
             setAssigningLoading(false);
         }
@@ -174,8 +192,8 @@ export default function AllToiletsTab() {
                             <div key={a.id} style={{ padding: '16px 20px', backgroundColor: 'white', borderRadius: 20, marginBottom: 12, border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', alignItems: 'center', gap: 14 }}>
                                 <div style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>👤</div>
                                 <div>
-                                    <div style={{ fontWeight: 800, fontSize: 14, color: '#1e293b' }}>{a.employee.name}</div>
-                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{a.employee.email}</div>
+                                    <div style={{ fontWeight: 800, fontSize: 14, color: '#1e293b' }}>{a.supervisor.name}</div>
+                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{a.supervisor.email}</div>
                                 </div>
                             </div>
                         ))}
@@ -249,7 +267,9 @@ export default function AllToiletsTab() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredToilets.map((toilet) => (
+                        {filteredToilets.map((toilet) => {
+                            const currentOwner = toilet.assignments?.[0]?.supervisor?.name;
+                            return (
                             <tr key={toilet.id} style={{ transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                                 <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc' }}>
                                     <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>{toilet.name}</div>
@@ -269,20 +289,26 @@ export default function AllToiletsTab() {
                                     <span style={{ padding: '6px 14px', borderRadius: 10, fontSize: 10, fontWeight: 900, backgroundColor: toilet.status === 'APPROVED' ? '#ecfdf5' : '#fffbeb', color: toilet.status === 'APPROVED' ? '#059669' : '#d97706', textTransform: 'uppercase' }}>{toilet.status}</span>
                                 </td>
                                 <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc', textAlign: 'right' }}>
-                                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                        {isAdmin && (
-                                            <button
-                                                onClick={() => { setToiletToAssign(toilet); setShowAssignModal(true); }}
-                                                style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#1e293b', transition: 'all 0.2s' }}
-                                                onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
-                                                onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
-                                            >Assign Staff</button>
-                                        )}
-                                        <button onClick={() => setSelectedToilet(toilet)} style={{ backgroundColor: '#1e293b', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>Profile</button>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                                        {currentOwner ? (
+                                            <div style={{ fontSize: 11, fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '6px 10px', borderRadius: 10 }}>Assigned: {currentOwner}</div>
+                                        ) : null}
+                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                            {isAdmin && toilet.status === 'APPROVED' && (
+                                                <button
+                                                    onClick={() => { setToiletToAssign(toilet); setShowAssignModal(true); }}
+                                                    style={{ backgroundColor: currentOwner ? '#f8fafc' : '#ffffff', border: '1px solid #e2e8f0', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#1e293b', transition: 'all 0.2s' }}
+                                                    onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                                                    onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
+                                                >{currentOwner ? 'Reassign Staff' : 'Assign Staff'}</button>
+                                            )}
+                                            <button onClick={() => setSelectedToilet(toilet)} style={{ backgroundColor: '#1e293b', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>Profile</button>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                        );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -296,7 +322,7 @@ export default function AllToiletsTab() {
                         <p style={{ margin: '8px 0 24px 0', fontSize: 14, color: '#64748b', fontWeight: 500 }}>Delegate responsibility for <strong>{toiletToAssign?.name}</strong></p>
 
                         <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '4px' }}>
-                            {employees.map(emp => (
+                            {supervisors.map(emp => (
                                 <div
                                     key={emp.id}
                                     onClick={() => handleQuickAssign(emp.id)}
@@ -327,3 +353,4 @@ export default function AllToiletsTab() {
         </div>
     );
 }
+

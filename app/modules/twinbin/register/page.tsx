@@ -151,7 +151,7 @@ export default function TwinbinRegisterPage() {
 
   return (
     <Protected>
-      <ModuleGuard module="LITTERBINS" roles={["EMPLOYEE"]}>
+      <ModuleGuard module="LITTERBINS" roles={["SUPERVISOR"]}>
         <div className="content">
           <header className="mb-6">
             <p className="eyebrow">Module · Litter Bins</p>
@@ -314,3 +314,4 @@ export default function TwinbinRegisterPage() {
     </Protected>
   );
 }
+

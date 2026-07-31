@@ -28,22 +28,55 @@ const Popup = dynamic<PopupProps>(
 );
 
 // Helper component to fit bounds
-function FitBounds({ geometry }: { geometry: any }) {
+function FitBounds({ beat }: { beat: any }) {
     const { useMap } = require("react-leaflet");
     const map = useMap();
     useEffect(() => {
-        if (geometry && map) {
-            const L = require("leaflet");
-            const geoLayer = L.geoJSON(geometry);
-            map.fitBounds(geoLayer.getBounds(), { padding: [50, 50] });
-        }
-    }, [geometry, map]);
+        if (!map || !beat) return;
+        const L = require("leaflet");
+
+        map.invalidateSize();
+
+        const timer = setTimeout(() => {
+            const group = new L.FeatureGroup();
+
+            let geom = beat.geometry;
+            if (typeof geom === "string") {
+                try { geom = JSON.parse(geom); } catch {}
+            }
+            if (geom) {
+                try { group.addLayer(L.geoJSON(geom)); } catch {}
+            }
+
+            if (beat.segments && Array.isArray(beat.segments)) {
+                beat.segments.forEach((seg: any) => {
+                    let segGeom = seg.geometry;
+                    if (typeof segGeom === "string") {
+                        try { segGeom = JSON.parse(segGeom); } catch {}
+                    }
+                    if (segGeom) {
+                        try { group.addLayer(L.geoJSON(segGeom)); } catch {}
+                    }
+                });
+            }
+
+            if (group.getLayers().length > 0) {
+                const bounds = group.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            }
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, [beat, map]);
     return null;
 }
 
 export interface BeatMapViewProps {
     beat: any;
     filterUserId?: string | null;
+    assignmentMode?: "SUPERVISOR" | "EMPLOYEE";
     onClose: () => void;
     onEdit?: (beat: any) => void;
     onRefresh?: () => void;
@@ -113,7 +146,7 @@ function ZoomHandler() {
     return null;
 }
 
-export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRefresh }: BeatMapViewProps) {
+export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPERVISOR", onClose, onEdit, onRefresh }: BeatMapViewProps) {
     const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
     const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
     const [selectedFeature, setSelectedFeature] = useState<any | null>(null);
@@ -121,10 +154,16 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
     const [searchQuery, setSearchQuery] = useState("");
     const [showAssignModal, setShowAssignModal] = useState(false);
 
+    const toggleSegmentSelection = (segmentId: string) => {
+        setSelectedSegmentIds((prev) =>
+            prev.includes(segmentId) ? prev.filter((id) => id !== segmentId) : [...prev, segmentId]
+        );
+    };
+
     useEffect(() => {
         if (filterUserId && beat.segments) {
             const userSegments = beat.segments
-                .filter((s: any) => s.assignedToId === filterUserId)
+                .filter((s: any) => s.employeeAssignedToId === filterUserId || s.supervisorAssignedToId === filterUserId)
                 .map((s: any) => s.id);
             setSelectedSegmentIds(userSegments);
         }
@@ -143,9 +182,13 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                         index: i,
                         isSegment: true,
                         name: seg.name || `Beat ${i + 1}`,
-                        assignedToName: seg.assignedToName || beat.assignedToName,
-                        assignedToId: seg.assignedToId || beat.assignedToId,
-                        isUnassigned: !seg.assignedToId && !beat.assignedToId
+                        assignedToName: seg.employeeAssignedToName || seg.supervisorAssignedToName || beat.assignedToName,
+                        assignedToId: seg.employeeAssignedToId || seg.supervisorAssignedToId || beat.assignedToId,
+                        supervisorAssignedToName: seg.supervisorAssignedToName || beat.assignedToName,
+                        supervisorAssignedToId: seg.supervisorAssignedToId || beat.assignedToId,
+                        employeeAssignedToName: seg.employeeAssignedToName || null,
+                        employeeAssignedToId: seg.employeeAssignedToId || null,
+                        isUnassigned: assignmentMode === "SUPERVISOR" ? !(seg.supervisorAssignedToId || beat.assignedToId) : !seg.employeeAssignedToId
                     }
                 }))
             };
@@ -185,7 +228,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
 
         process(geom);
         return { type: "FeatureCollection", features };
-    }, [beat.geometry, beat.segments, beat.assignedToName, beat.assignedToId]);
+    }, [assignmentMode, beat.geometry, beat.segments, beat.assignedToName, beat.assignedToId]);
 
     const features = explodedGeoJSON?.features || [];
     // QC users primarily care about LineStrings for assignment
@@ -229,7 +272,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                 {beat.beatName}
                             </h3>
                             <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: "2px" }}>
-                                {beat.zoneName} • {beat.wardName} • {beat.areaName}
+                                {[beat.zoneName, beat.wardName, beat.areaName].filter(Boolean).join(" | ")}
                             </div>
                         </div>
                     </div>
@@ -307,7 +350,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                     marginBottom: "12px"
                                 }}
                             >
-                                {selectedSegmentIds.length > 0 ? `Assign ${selectedSegmentIds.length} Beats` : "Manage Assignment"}
+                                {selectedSegmentIds.length > 0 ? `${assignmentMode === "EMPLOYEE" ? "Deploy" : "Assign"} ${selectedSegmentIds.length} Segments` : (assignmentMode === "EMPLOYEE" ? "Deploy Employees" : "Assign Supervisor")}
                             </button>
 
                             {onEdit && (
@@ -353,7 +396,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                 return (
                                     <div
                                         key={i}
-                                        onClick={() => setSelectedFeature(f)}
+                                        onClick={() => { setSelectedFeature(f); if (f.properties?.isSegment) toggleSegmentSelection(f.properties.id); }}
                                         onMouseEnter={() => setHoveredFeature(featureId)}
                                         onMouseLeave={() => setHoveredFeature(null)}
                                         style={{
@@ -388,8 +431,8 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                                     {f.properties?.name || `Feature #${i + 1}`}
                                                 </div>
                                                 <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                                    <span style={{ padding: "2px 6px", backgroundColor: "#f1f5f9", borderRadius: "4px" }}>{f.geometry?.type}</span>
-                                                    • <span>{f.geometry?.type === "Point" ? "Marker" : "Path"}</span>
+                                                    <span style={{ padding: "2px 6px", backgroundColor: "#f1f5f9", borderRadius: "4px" }}>{f.geometry?.type === "LineString" ? "Segment" : f.geometry?.type}</span>
+                                                    <span>{f.geometry?.type === "Point" ? "Marker" : "Street path"}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -441,12 +484,12 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                     const isUnassigned = props?.isUnassigned;
 
                                     return {
-                                        color: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#94a3b8" : color),
-                                        weight: (isHovered || isSelected || isSelectedOnMap) ? 7 : (isUnassigned ? 2 : 4),
+                                        color: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#f59e0b" : color),
+                                        weight: (isHovered || isSelected || isSelectedOnMap) ? 7 : (isUnassigned ? 4 : 4),
                                         fillOpacity: (isHovered || isSelected || isSelectedOnMap) ? 0.6 : 0.25,
-                                        fillColor: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#cbd5e1" : color),
-                                        opacity: isSelectedOnMap ? 1 : (isUnassigned ? 0.4 : 1),
-                                        dashArray: isSelectedOnMap ? "" : (isUnassigned ? "5, 5" : (isHovered ? "5, 5" : ""))
+                                        fillColor: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#fbbf24" : color),
+                                        opacity: isSelectedOnMap ? 1 : (isUnassigned ? 0.95 : 1),
+                                        dashArray: isSelectedOnMap ? "" : (isUnassigned ? "8, 6" : (isHovered ? "5, 5" : ""))
                                     };
                                 }}
                                 pointToLayer={(feature: any, latlng: any) => {
@@ -468,7 +511,9 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                     const props = feature?.properties;
                                     const name = props?.name || (props?.isSegment ? `Beat ${props.index + 1}` : "Unnamed");
                                     const color = getFeatureColor(feature);
-                                    const assignedToName = props?.assignedToName || 'Unassigned';
+                                    const supervisorName = props?.supervisorAssignedToName || beat.assignedToName || "Unassigned";
+                                    const employeeName = props?.employeeAssignedToName || "Unassigned";
+                                    const assignedToName = assignmentMode === "EMPLOYEE" ? employeeName : supervisorName;
                                     const isUnassigned = props?.isUnassigned;
 
                                     if (layer && typeof layer.on === "function") {
@@ -479,27 +524,23 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                                 const L = require("leaflet");
                                                 L.DomEvent.stopPropagation(e);
                                                 setSelectedFeature(feature);
-                                                // Support selection for assignment if it's a segment
                                                 if (props?.isSegment) {
-                                                    setSelectedSegmentIds(prev =>
-                                                        prev.includes(props.id) ? prev.filter(id => id !== props.id) : [...prev, props.id]
-                                                    );
+                                                    toggleSegmentSelection(props.id);
                                                 }
                                             }
                                         });
                                     }
 
                                     if (layer && typeof layer.bindPopup === "function") {
-                                        const isQC = props?.assignedToId === beat.assignedToId && beat.assignedToId;
-                                        const roleColor = isQC ? '#6366f1' : '#db2777';
-                                        const roleLabel = isQC ? "Quality Controller" : "Taskforce Member";
-                                        const avatarBg = isQC ? 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' : 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)';
+                                        const popupRoleColor = assignmentMode === "EMPLOYEE" ? "#db2777" : "#6366f1";
+                                        const popupRoleLabel = assignmentMode === "EMPLOYEE" ? "Employee" : "Supervisor";
+                                        const avatarBg = assignmentMode === "EMPLOYEE" ? "linear-gradient(135deg, #ec4899 0%, #be185d 100%)" : "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)";
 
                                         layer.bindPopup(`
                                             <div style="font-family: 'Inter', sans-serif; padding: 16px; min-width: 260px;">
                                                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${isUnassigned ? '#94a3b8' : '#10b981'}; box-shadow: 0 0 10px ${isUnassigned ? '#f1f5f9' : 'rgba(16, 185, 129, 0.4)'}"></div>
+                                                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${isUnassigned ? '#f59e0b' : '#10b981'}; box-shadow: 0 0 10px ${isUnassigned ? 'rgba(245, 158, 11, 0.35)' : 'rgba(16, 185, 129, 0.4)'}"></div>
                                                         <div style="font-weight: 800; color: #1e293b; font-size: 16px;">${name}</div>
                                                     </div>
                                                     ${props?.isSegment ? `<span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:6px; font-size:10px; font-weight: 700;">Beat ${props.index + 1}</span>` : ''}
@@ -511,15 +552,15 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                                 </div>
 
                                                 <div style="background: #f8fafc; padding: 14px; border-radius: 16px; border: 1px solid #f1f5f9;">
-                                                    <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; letter-spacing: 0.05em;">Assigned Person</div>
+                                                    <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; letter-spacing: 0.05em;">Current Assignment</div>
                                                     <div style="display: flex; align-items: center; gap: 12px;">
                                                         <div style="width: 36px; height: 36px; border-radius: 10px; background: ${isUnassigned ? '#cbd5e1' : avatarBg}; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; box-shadow: ${isUnassigned ? 'none' : '0 4px 10px rgba(0,0,0,0.1)'}">
                                                             ${(assignedToName || 'U')[0]}
                                                         </div>
                                                         <div style="display: flex; flex-direction: column;">
                                                             <div style="font-weight: 700; color: #1e293b; font-size: 14px; line-height: 1.2;">${assignedToName}</div>
-                                                            <div style="font-size: 11px; color: ${isUnassigned ? '#94a3b8' : roleColor}; font-weight: 700;">
-                                                                ${isUnassigned ? "Pending Assignment" : roleLabel}
+                                                            <div style="font-size: 11px; color: ${isUnassigned ? '#94a3b8' : popupRoleColor}; font-weight: 700;">
+                                                                ${isUnassigned ? "Pending Assignment" : popupRoleLabel}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -530,9 +571,66 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                 }}
                             />
                             <MapController targetFeature={selectedFeature} />
-                            <FitBounds geometry={beat.geometry} />
+                            <FitBounds beat={beat} />
                             <ZoomHandler />
                         </MapContainer>
+
+                        {selectedFeature && (() => {
+                            const props = selectedFeature.properties || {};
+                            const selectedName = props.name || (props.isSegment ? `Beat Segment ${(props.index ?? 0) + 1}` : "Selected feature");
+                            const supervisorName = props.supervisorAssignedToName || beat.assignedToName || "Unassigned";
+                            const employeeName = props.employeeAssignedToName || "Unassigned";
+                            const isSegment = !!props.isSegment;
+                            const segmentSelected = isSegment && selectedSegmentIds.includes(props.id);
+                            return (
+                                <div style={{
+                                    position: "absolute", top: "28px", left: "50%", transform: "translateX(-50%)",
+                                    width: "340px", backgroundColor: "white", borderRadius: "24px", padding: "20px",
+                                    boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.22)", border: "1px solid #e2e8f0", zIndex: 1000
+                                }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
+                                        <div>
+                                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#1e293b" }}>{selectedName}</div>
+                                            <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                                                <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 800 }}>Z - {beat.zoneName}</span>
+                                                <span style={{ background: "#f0fdf4", color: "#166534", padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 800 }}>W - {beat.wardName}</span>
+                                            </div>
+                                        </div>
+                                        {isSegment && (
+                                            <button
+                                                onClick={() => toggleSegmentSelection(props.id)}
+                                                style={{
+                                                    border: segmentSelected ? "none" : "1px solid #cbd5e1",
+                                                    backgroundColor: segmentSelected ? "#2563eb" : "white",
+                                                    color: segmentSelected ? "white" : "#334155",
+                                                    borderRadius: "12px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize: "0.75rem"
+                                                }}
+                                            >
+                                                {segmentSelected ? "Selected" : "Select Segment"}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div style={{ marginTop: "16px", display: "grid", gap: "12px" }}>
+                                        <div style={{ background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: "16px", padding: "14px" }}>
+                                            <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Supervisor</div>
+                                            <div style={{ fontWeight: 700, color: "#1e293b" }}>{supervisorName}</div>
+                                        </div>
+                                        <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: "16px", padding: "14px" }}>
+                                            <div style={{ fontSize: "10px", color: "#9d174d", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Employee</div>
+                                            <div style={{ fontWeight: 700, color: "#831843" }}>{employeeName}</div>
+                                        </div>
+                                    </div>
+                                    {isSegment && (
+                                        <button
+                                            onClick={() => setShowAssignModal(true)}
+                                            style={{ marginTop: "16px", width: "100%", padding: "12px 14px", borderRadius: "14px", border: "none", backgroundColor: "#0f172a", color: "white", fontWeight: 700, cursor: "pointer" }}
+                                        >
+                                            {assignmentMode === "EMPLOYEE" ? "Assign Beat Segment" : "Assign Supervisor Segment"}
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Float HUD */}
                         <div style={{
@@ -559,6 +657,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
             {showAssignModal && (
                 <AssignBeatModal
                     beat={beat}
+                    mode={assignmentMode}
                     initialSelectedSegmentIds={selectedSegmentIds}
                     onClose={() => setShowAssignModal(false)}
                     onSuccess={() => {
@@ -582,3 +681,4 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
         </div>
     );
 }
+

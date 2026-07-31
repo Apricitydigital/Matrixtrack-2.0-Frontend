@@ -237,3 +237,4 @@ const styles = `
 function StyleInjector() {
   return <style dangerouslySetInnerHTML={{ __html: styles }} />;
 }
+
