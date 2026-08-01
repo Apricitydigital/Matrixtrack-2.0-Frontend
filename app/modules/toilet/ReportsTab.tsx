@@ -11,10 +11,11 @@ export default function ReportsTab() {
     const [reportsError, setReportsError] = useState('');
     const [dateFilter, setDateFilter] = useState('today');
     const [customDate, setCustomDate] = useState('');
+    const [statusTab, setStatusTab] = useState('');
 
     useEffect(() => {
         loadReports();
-    }, [dateFilter, customDate]);
+    }, [dateFilter, customDate, statusTab]);
 
     const loadReports = async () => {
         setLoading(true);
@@ -36,7 +37,7 @@ export default function ReportsTab() {
         }
 
         try {
-            const inspectionsRes = await ToiletApi.listInspections({ pageSize: 10 });
+            const inspectionsRes = await ToiletApi.listInspections({ pageSize: 10, status: statusTab || undefined });
             setReports(inspectionsRes.inspections || []);
         } catch (err: any) {
             console.error('Failed to load recent toilet inspections', err);
@@ -169,8 +170,37 @@ export default function ReportsTab() {
 
             {!loading && !error && (
                 <div className="card compact-card">
-                    <div className="card-header-flex">
-                        <h3 className="section-title">Latest Cleanliness Inspections</h3>
+                    <div className="card-header-flex" style={{ flexWrap: 'wrap', gap: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                            <h3 className="section-title">Latest Cleanliness Inspections</h3>
+                            <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 10 }}>
+                                {[
+                                    { id: '', label: 'ALL' },
+                                    { id: 'SUBMITTED', label: 'PENDING' },
+                                    { id: 'APPROVED', label: 'APPROVED' },
+                                    { id: 'REJECTED', label: 'REJECTED' },
+                                    { id: 'ACTION_REQUIRED', label: 'ACTION REQ' }
+                                ].map((t) => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setStatusTab(t.id)}
+                                        style={{
+                                            padding: '4px 10px',
+                                            borderRadius: 8,
+                                            border: 'none',
+                                            fontSize: 10,
+                                            fontWeight: 800,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            background: statusTab === t.id ? '#3b82f6' : 'transparent',
+                                            color: statusTab === t.id ? '#ffffff' : '#64748b'
+                                        }}
+                                    >
+                                        {t.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <Link href="/modules/toilet/inspection" className="text-link text-sm font-bold">View All →</Link>
                     </div>
 
