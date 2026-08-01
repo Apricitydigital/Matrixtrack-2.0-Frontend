@@ -125,10 +125,9 @@ function WorkforceContent() {
       />
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 pl-64">
         <Navbar
-          isSidebarOpen={isSidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
+          toggleSidebar={() =>
+            setSidebarOpen((previous) => !previous)
+          }
         />
         <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">
           {renderView()}

@@ -329,7 +329,9 @@ const Profile = () => {
                 bio: response.data.bio || ''
             });
             if (response.data.profileImage) {
-                setPreviewImage(`${import.meta.env.VITE_API_BASE_URL}${response.data.profileImage}`);
+                setPreviewImage(
+                    `${process.env.NEXT_PUBLIC_SWACHH_API_URL || ""}${response.data.profileImage}`
+                );
             }
         } catch (err) {
             console.error('Failed to fetch profile', err);
@@ -343,26 +345,26 @@ const Profile = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canEditProfile) return;
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!canEditProfile) return;
 
-    if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
 
-        // ⭐ 5MB validation
-        if (file.size > 5 * 1024 * 1024) {
-            setMessage({
-                type: "error",
-                text: "Image size must be less than 5MB"
-            });
-            return;
+            // ⭐ 5MB validation
+            if (file.size > 5 * 1024 * 1024) {
+                setMessage({
+                    type: "error",
+                    text: "Image size must be less than 5MB"
+                });
+                return;
+            }
+
+            setSelectedFile(file);
+            setPreviewImage(URL.createObjectURL(file));
+            setMessage({ type: "", text: "" });
         }
-
-        setSelectedFile(file);
-        setPreviewImage(URL.createObjectURL(file));
-        setMessage({ type: "", text: "" });
-    }
-};
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -372,7 +374,7 @@ const Profile = () => {
         }
         setSaving(true);
         setMessage({ type: '', text: '' });
-  
+
 
         try {
             const token = localStorage.getItem('token');
@@ -387,7 +389,7 @@ const Profile = () => {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
             });
             setImageVersion(Date.now());
-setSelectedFile(null);
+            setSelectedFile(null);
 
             const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
             const updatedUser = { ...currentUser, ...response.data };
@@ -413,7 +415,7 @@ setSelectedFile(null);
     return (
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '1rem' }}>
             <div className="card shadow-premium" style={{ padding: 'clamp(1.5rem, 5vw, 3rem)', border: 'none', borderRadius: '24px' }}>
-                
+
                 {/* Header */}
                 <div style={{ marginBottom: '2.5rem' }}>
                     <h1 style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
@@ -439,53 +441,53 @@ setSelectedFile(null);
                                 boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
                             }}>
                                 {previewImage ? (
-<img
- src={
-  previewImage?.startsWith("blob:")
-    ? previewImage
-    : previewImage + "?v=" + imageVersion
-}
-  alt="Profile"
-  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-/>                                ) : (
+                                    <img
+                                        src={
+                                            previewImage?.startsWith("blob:")
+                                                ? previewImage
+                                                : previewImage + "?v=" + imageVersion
+                                        }
+                                        alt="Profile"
+                                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    />) : (
                                     <UserIcon size={44} color="var(--primary)" />
                                 )}
                             </div>
                             <label
-  style={{
-    position: "absolute",
-    bottom: "-10px",
-    right: "-10px",
-    width: "38px",
-    height: "38px",
-    borderRadius: "12px",
-    backgroundColor: "var(--swachh-green)",
-    color: "white",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: canEditProfile ? "pointer" : "not-allowed",
-    border: "3px solid white",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
-    opacity: canEditProfile ? 1 : 0.6
-  }}
->
-  <Camera size={18} />
+                                style={{
+                                    position: "absolute",
+                                    bottom: "-10px",
+                                    right: "-10px",
+                                    width: "38px",
+                                    height: "38px",
+                                    borderRadius: "12px",
+                                    backgroundColor: "var(--swachh-green)",
+                                    color: "white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: canEditProfile ? "pointer" : "not-allowed",
+                                    border: "3px solid white",
+                                    boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
+                                    opacity: canEditProfile ? 1 : 0.6
+                                }}
+                            >
+                                <Camera size={18} />
 
-  <input
-    type="file"
-    aria-label="Upload profile photo"
-    accept="image/*"
-    onChange={handleFileChange}
-    disabled={!canEditProfile}
-    style={{
-      position: "absolute",
-      inset: 0,
-      opacity: 0,
-      cursor: "pointer"
-    }}
-  />
-</label>
+                                <input
+                                    type="file"
+                                    aria-label="Upload profile photo"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    disabled={!canEditProfile}
+                                    style={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        opacity: 0,
+                                        cursor: "pointer"
+                                    }}
+                                />
+                            </label>
                         </div>
                         <div>
                             <h4 style={{ fontWeight: 800, marginBottom: '0.25rem' }}>Profile Photo</h4>
@@ -507,7 +509,7 @@ setSelectedFile(null);
                                 onChange={handleInputChange}
                                 style={{ padding: '1rem', borderRadius: '12px', fontSize: '1rem', fontWeight: 600 }}
                                 required
-                            disabled={!canEditProfile}
+                                disabled={!canEditProfile}
                             />
                         </div>
                         <div className="form-group">
@@ -522,7 +524,7 @@ setSelectedFile(null);
                                 onChange={handleInputChange}
                                 style={{ padding: '1rem', borderRadius: '12px', fontSize: '1rem', fontWeight: 600 }}
                                 required
-                            disabled={!canEditProfile}
+                                disabled={!canEditProfile}
                             />
                         </div>
                         <div className="form-group">
@@ -537,7 +539,7 @@ setSelectedFile(null);
                                 onChange={handleInputChange}
                                 style={{ padding: '1rem', borderRadius: '12px', fontSize: '1rem', fontWeight: 600 }}
                                 required
-                            disabled={!canEditProfile}
+                                disabled={!canEditProfile}
                             />
                         </div>
                         <div className="form-group">

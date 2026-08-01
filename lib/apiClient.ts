@@ -41,6 +41,78 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return res.json();
 }
 
+export type UnifiedPortalKey =
+  | "TASKFORCE_20"
+  | "MATRIX_TRACK"
+  | "WARD_RANKING";
+
+export type UnifiedTaskforceModuleKey =
+  | "TASKFORCE"
+  | "SWEEPING"
+  | "LITTERBINS"
+  | "TOILET";
+
+export type UnifiedRegistrationRole =
+  | "SUPERVISOR"
+  | "EMPLOYEE"
+  | "QC"
+  | "ACTION_OFFICER";
+
+export interface UnifiedLoginResponse {
+  success: boolean;
+
+  user: {
+    id?: string;
+    name?: string;
+    email: string;
+    applications?: any[];
+    [key: string]: any;
+  };
+
+  applications: any[];
+
+  tokens: {
+    taskforce?: string | null;
+    matrixTrack?: string | null;
+    wardRanking?: string | null;
+  };
+
+  taskforce?: {
+    user?: any;
+    modules?: any[];
+    redirectTo?: string | null;
+  } | null;
+
+  matrixTrack?: {
+    user?: any;
+    message?: string;
+  } | null;
+
+  wardRanking?: {
+    user?: any;
+    message?: string;
+    redirectTo?: string | null;
+  } | null;
+
+  redirectTo: string;
+}
+
+export interface UnifiedRegistrationRequest {
+  name: string;
+  phone: string;
+  aadhaar: string;
+  email: string;
+  password: string;
+
+  cityId: string;
+  zoneId: string;
+  wardId: string;
+
+  requestedRole: UnifiedRegistrationRole;
+  requestedPortals: UnifiedPortalKey[];
+  taskforceModules: UnifiedTaskforceModuleKey[];
+}
+
 export const AuthApi = {
   login: async (body: { email: string; password: string; cityId?: string }) =>
     apiFetch<{ token: string; user: any; redirectTo: string }>("/auth/login", {
@@ -62,6 +134,37 @@ export const AuthApi = {
       method: "POST",
       body: JSON.stringify(body)
     }),
+  unifiedLogin: async (body: {
+    email: string;
+    password: string;
+    cityId?: string;
+  }) =>
+    apiFetch<UnifiedLoginResponse>(
+      "/auth/unified-login",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
+
+  unifiedRegisterRequest: (
+    body: UnifiedRegistrationRequest
+  ) =>
+    apiFetch<{
+      success: boolean;
+      message: string;
+      requestId?: string;
+      status?: string;
+      requestedRole?: string;
+      requestedPortals?: string[];
+      taskforceModules?: string[];
+    }>(
+      "/auth/request-unified-registration",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
   logout: async () => apiFetch<{ success: boolean }>("/auth/logout", { method: "POST" }),
   getMe: async () => apiFetch<{ user: any }>("/auth/me")
 };

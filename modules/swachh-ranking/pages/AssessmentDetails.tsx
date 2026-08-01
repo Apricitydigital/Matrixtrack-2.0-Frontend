@@ -12,11 +12,18 @@ const resolveImageUrl = (src?: string) => {
         return trimmed;
     }
 
-    const mediaBase = import.meta.env.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '');
-    const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '');
-    const fallback = import.meta.env.DEV
-        ? 'http://localhost:5000'
-        : (typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '');
+    const mediaBase =
+        process.env.NEXT_PUBLIC_SWACHH_MEDIA_URL?.replace(/\/+$/, "");
+
+    const apiBase =
+        process.env.NEXT_PUBLIC_SWACHH_API_URL?.replace(/\/+$/, "");
+
+    const fallback =
+        process.env.NODE_ENV !== "production"
+            ? "http://localhost:5000"
+            : typeof window !== "undefined"
+                ? window.location.origin.replace(/\/+$/, "")
+                : "";
 
     const base = mediaBase || apiBase || fallback;
     const needsSlash = trimmed.startsWith('/') ? '' : '/';
@@ -24,7 +31,9 @@ const resolveImageUrl = (src?: string) => {
 };
 
 const AssessmentDetails = () => {
-    const { assessmentId } = useParams<{ assessmentId: string }>();
+    const { assessmentId } = useParams() as {
+        assessmentId: string;
+    };
     const navigate = useNavigate();
     const [assessment, setAssessment] = useState<any>(null);
     const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -375,51 +384,51 @@ const AssessmentDetails = () => {
                                                 const statusColors: Record<string, { bg: string; color: string }> = {
                                                     approved: { bg: '#dcfce7', color: '#16a34a' },
                                                     rejected: { bg: '#fee2e2', color: '#dc2626' },
-                                                    edited:   { bg: '#fef3c7', color: '#d97706' },
-                                                    pending:  { bg: '#f3f4f6', color: '#6b7280' }
+                                                    edited: { bg: '#fef3c7', color: '#d97706' },
+                                                    pending: { bg: '#f3f4f6', color: '#6b7280' }
                                                 };
                                                 const sc = statusColors[response.qcStatus || 'pending'];
                                                 return (
-                                                <tr key={`${response.questionId}-${idx}`}>
-                                                    <td style={{ fontWeight: 700 }}>{response.questionText || response.text}</td>
-                                                    <td style={{ fontWeight: 800 }}>{response.obtainedMarks}</td>
-                                                    <td style={{ fontWeight: 800, color: hasQc ? '#1d4ed8' : 'var(--text-muted)' }}>
-                                                        {hasQc ? (response.qcScore ?? response.obtainedMarks) : '—'}
-                                                    </td>
-                                                    <td style={{ fontWeight: 700, color: diff === null ? 'var(--text-muted)' : diff < 0 ? '#dc2626' : diff > 0 ? '#16a34a' : 'var(--text-muted)' }}>
-                                                        {diff === null ? '—' : diff === 0 ? '0' : `${diff > 0 ? '+' : ''}${diff}`}
-                                                    </td>
-                                                    <td>
-                                                        <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.6rem', borderRadius: '99px', background: sc.bg, color: sc.color }}>
-                                                            {response.qcStatus || 'Pending'}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ fontSize: '0.85rem', fontStyle: response.qcRemark ? 'italic' : 'normal', color: 'var(--text-muted)' }}>
-                                                        {response.qcRemark || '—'}
-                                                    </td>
-                                                    <td style={{ fontSize: '0.8rem' }}>{response.qcReviewedByName || '—'}</td>
-                                                    <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                                                        {response.qcReviewedAt ? new Date(response.qcReviewedAt).toLocaleString() : '—'}
-                                                    </td>
-                                                    <td>
-                                                    {Array.isArray(response.images) && response.images.length > 0 ? (
-                                                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                                            {response.images.map((img: string, index: number) => {
-                                                                const resolved = resolveImageUrl(img);
-                                                                if (!resolved) return null;
-                                                                return (
-                                                                    <a key={index} href={resolved} target="_blank" rel="noreferrer"
-                                                                        style={{ width: '60px', height: '60px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-                                                                        <img src={resolved} alt={`Q${idx + 1} img ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                                    </a>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ) : (
-                                                        <span style={{ color: 'var(--text-muted)' }}>—</span>
-                                                    )}
-                                                    </td>
-                                                </tr>
+                                                    <tr key={`${response.questionId}-${idx}`}>
+                                                        <td style={{ fontWeight: 700 }}>{response.questionText || response.text}</td>
+                                                        <td style={{ fontWeight: 800 }}>{response.obtainedMarks}</td>
+                                                        <td style={{ fontWeight: 800, color: hasQc ? '#1d4ed8' : 'var(--text-muted)' }}>
+                                                            {hasQc ? (response.qcScore ?? response.obtainedMarks) : '—'}
+                                                        </td>
+                                                        <td style={{ fontWeight: 700, color: diff === null ? 'var(--text-muted)' : diff < 0 ? '#dc2626' : diff > 0 ? '#16a34a' : 'var(--text-muted)' }}>
+                                                            {diff === null ? '—' : diff === 0 ? '0' : `${diff > 0 ? '+' : ''}${diff}`}
+                                                        </td>
+                                                        <td>
+                                                            <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.6rem', borderRadius: '99px', background: sc.bg, color: sc.color }}>
+                                                                {response.qcStatus || 'Pending'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ fontSize: '0.85rem', fontStyle: response.qcRemark ? 'italic' : 'normal', color: 'var(--text-muted)' }}>
+                                                            {response.qcRemark || '—'}
+                                                        </td>
+                                                        <td style={{ fontSize: '0.8rem' }}>{response.qcReviewedByName || '—'}</td>
+                                                        <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                                                            {response.qcReviewedAt ? new Date(response.qcReviewedAt).toLocaleString() : '—'}
+                                                        </td>
+                                                        <td>
+                                                            {Array.isArray(response.images) && response.images.length > 0 ? (
+                                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                                    {response.images.map((img: string, index: number) => {
+                                                                        const resolved = resolveImageUrl(img);
+                                                                        if (!resolved) return null;
+                                                                        return (
+                                                                            <a key={index} href={resolved} target="_blank" rel="noreferrer"
+                                                                                style={{ width: '60px', height: '60px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+                                                                                <img src={resolved} alt={`Q${idx + 1} img ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                            </a>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            ) : (
+                                                                <span style={{ color: 'var(--text-muted)' }}>—</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
                                                 );
                                             })}
                                         </tbody>
@@ -500,7 +509,8 @@ const AssessmentDetails = () => {
                                             {auditLogs.map((log: any) => (
                                                 <tr key={log.id}>
                                                     <td>
-                                                        <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.15rem 0.5rem', borderRadius: '6px',
+                                                        <span style={{
+                                                            fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.15rem 0.5rem', borderRadius: '6px',
                                                             background: log.action === 'approve_question' ? '#dcfce7' : log.action === 'reject_question' ? '#fee2e2' : log.action === 'edit_score' ? '#fef3c7' : '#f3f4f6',
                                                             color: log.action === 'approve_question' ? '#16a34a' : log.action === 'reject_question' ? '#dc2626' : log.action === 'edit_score' ? '#d97706' : '#6b7280'
                                                         }}>
