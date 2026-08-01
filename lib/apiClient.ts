@@ -61,6 +61,20 @@ export type UnifiedRegistrationRole =
 export interface UnifiedLoginResponse {
   success: boolean;
 
+  requiresOtp?: boolean;
+
+  provider?: "MATRIX_TRACK";
+
+  email?: string;
+
+  message?: string;
+
+  pendingOtp?: {
+    provider: "MATRIX_TRACK";
+    email: string;
+    message: string;
+  } | null;
+
   user: {
     id?: string;
     name?: string;
@@ -94,7 +108,7 @@ export interface UnifiedLoginResponse {
     redirectTo?: string | null;
   } | null;
 
-  redirectTo: string;
+  redirectTo: string | null;
 }
 
 export interface UnifiedRegistrationRequest {
@@ -145,6 +159,18 @@ export const AuthApi = {
         method: "POST",
         body: JSON.stringify(body),
       }
+    ),
+
+  unifiedVerifyMatrixTrackOtp: async (body: {
+    email: string;
+    otp: string;
+  }) =>
+    apiFetch<UnifiedLoginResponse>(
+      "/auth/unified-login/verify-matrixtrack-otp",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
     ),
 
   unifiedRegisterRequest: (
