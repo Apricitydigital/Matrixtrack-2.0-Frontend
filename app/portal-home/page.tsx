@@ -9,6 +9,7 @@ import { roleLabel } from '@lib/labels';
 import { getRoleDashboardRedirect } from '@utils/modules';
 import { HmsApi, CityApi } from '@lib/apiClient';
 import swachhApi from '@lib/swachhApiClient';
+import { setAuthCookie } from '@lib/auth';
 import {
   ShieldCheck,
   Building2,
@@ -46,6 +47,33 @@ interface RoadmapModuleInfo {
   description: string;
   plannedFeatures: string[];
   techStack: string[];
+}
+
+interface UnifiedApplicationAccess {
+  key?: string;
+  portalKey?: string;
+  applicationKey?: string;
+  isActive?: boolean;
+  role?: string;
+}
+
+interface UnifiedPortalSession {
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    roles?: string[];
+    [key: string]: unknown;
+  };
+
+  applications?: UnifiedApplicationAccess[];
+
+  tokens?: {
+    taskforce?: string | null;
+    matrixTrack?: string | null;
+    wardRanking?: string | null;
+  };
 }
 
 const ROADMAP_MODULES: Record<string, RoadmapModuleInfo> = {
@@ -88,38 +116,18 @@ export default function PortalHomePage() {
   const router = useRouter();
   const [clockStr, setClockStr] = useState<string>('');
   const [activeModalKey, setActiveModalKey] = useState<string | null>(null);
+  const [unifiedSession, setUnifiedSession] =
+    useState<UnifiedPortalSession | null>(null);
 
+  const [sessionChecked, setSessionChecked] =
+    useState(false);
   // Real Dynamic Stats from API
   const [liveTaskforceCount, setLiveTaskforceCount] = useState<number>(0);
   const [liveQCCount, setLiveQCCount] = useState<number>(0);
   const [liveSwachhParticipants, setLiveSwachhParticipants] = useState<number>(0);
 
   // Fetch Live Real API Data
-  useEffect(() => {
-    async function fetchLiveCounts() {
-      try {
-        const isSuper = Boolean(user?.roles?.includes('HMS_SUPER_ADMIN'));
-        const statsRes = isSuper ? await HmsApi.getGlobalStats() : await CityApi.getStats();
-        if (statsRes?.stats) {
-          setLiveTaskforceCount(statsRes.stats.taskforceMembers || 0);
-          setLiveQCCount(statsRes.stats.qualityControllers || 0);
-        }
-      } catch (e) {
-        // Fallback
-      }
 
-      try {
-        const swachhRes = await swachhApi.get('/admin/stats');
-        if (swachhRes?.data) {
-          setLiveSwachhParticipants(swachhRes.data.totalParticipants || 0);
-        }
-      } catch (e) {
-        // Fallback
-      }
-    }
-
-    fetchLiveCounts();
-  }, [user]);
 
   // Clock Ticker
   useEffect(() => {
@@ -142,9 +150,32 @@ export default function PortalHomePage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    try {
+      const rawSession = localStorage.getItem(
+        'unified_auth_session'
+      );
+
+      if (rawSession) {
+        const parsedSession = JSON.parse(
+          rawSession
+        ) as UnifiedPortalSession;
+
+        setUnifiedSession(parsedSession);
+      }
+    } catch {
+      localStorage.removeItem(
+        'unified_auth_session'
+      );
+    } finally {
+      setSessionChecked(true);
+    }
+  }, []);
+
+
+
   const handleLogout = async () => {
     await logout();
-    router.replace('/login');
   };
 
   // Determine Role & City Context
@@ -162,35 +193,262 @@ export default function PortalHomePage() {
   const workspaceUrl = isSuperAdmin
     ? '/city'
     : isCityAdmin
-    ? '/city'
-    : getRoleDashboardRedirect(user || null);
+      ? '/city'
+      : getRoleDashboardRedirect(user || null);
 
   // Granular Workspace Access Checks based on Single SSO Token
-  const hasTaskforceAccess =
-    isSuperAdmin ||
-    isCityAdmin ||
-    !user ||
-    user?.modules?.some((m) =>
-      ['TASKFORCE', 'LITTERBINS', 'SWEEPING', 'TOILET'].includes((m.key || m.name || '').toUpperCase())
-    );
+  // Normalize unified application keys
+  const unifiedApplicationKeys = new Set(
+    (unifiedSession?.applications || [])
+      .filter(
+        (application) =>
+          application.isActive !== false
+      )
+      .map((application) =>
+        String(
+          application.key ||
+          application.portalKey ||
+          application.applicationKey ||
+          ''
+        ).toUpperCase()
+      )
+      .filter(Boolean)
+  );
 
-  const hasSwachhAccess =
-    isSuperAdmin ||
-    isCityAdmin ||
-    !user ||
-    user?.modules?.some((m) =>
-      ['SWACHH_RANKING', 'SWACHH', 'WARD_RANKING'].includes((m.key || m.name || '').toUpperCase())
-    );
+  const isUnifiedLogin = Boolean(unifiedSession);
 
-  const hasWorkforceAccess =
+  // Existing native Taskforce access
+  const hasNativeTaskforceAccess =
     isSuperAdmin ||
     isCityAdmin ||
-    !user ||
-    user?.modules?.some((m) =>
-      ['WORKFORCE_MONITORING', 'WORKFORCE', 'MATRIXTRACK_WORKFORCE', 'ATTENDANCE'].includes(
-        (m.key || m.name || '').toUpperCase()
+    Boolean(
+      user?.modules?.some((module) =>
+        [
+          'TASKFORCE',
+          'LITTERBINS',
+          'SWEEPING',
+          'TOILET',
+        ].includes(
+          String(
+            module.key || module.name || ''
+          ).toUpperCase()
+        )
       )
     );
+
+  // Unified portal access
+  const hasUnifiedTaskforceAccess =
+    unifiedApplicationKeys.has('TASKFORCE_20') ||
+    unifiedApplicationKeys.has(
+      'PORTAL_TASKFORCE_20'
+    ) ||
+    Boolean(unifiedSession?.tokens?.taskforce);
+
+  const hasUnifiedWardRankingAccess =
+    unifiedApplicationKeys.has('WARD_RANKING') ||
+    unifiedApplicationKeys.has(
+      'PORTAL_WARD_RANKING'
+    ) ||
+    Boolean(unifiedSession?.tokens?.wardRanking);
+
+  const hasUnifiedMatrixTrackAccess =
+    unifiedApplicationKeys.has('MATRIX_TRACK') ||
+    unifiedApplicationKeys.has(
+      'PORTAL_MATRIX_TRACK'
+    ) ||
+    Boolean(unifiedSession?.tokens?.matrixTrack);
+
+  // Final card visibility
+  const hasTaskforceAccess = isUnifiedLogin
+    ? hasUnifiedTaskforceAccess
+    : hasNativeTaskforceAccess;
+
+  const hasSwachhAccess = isUnifiedLogin
+    ? hasUnifiedWardRankingAccess
+    : isSuperAdmin ||
+    isCityAdmin ||
+    Boolean(
+      user?.modules?.some((module) =>
+        [
+          'SWACHH_RANKING',
+          'SWACHH',
+          'WARD_RANKING',
+        ].includes(
+          String(
+            module.key || module.name || ''
+          ).toUpperCase()
+        )
+      )
+    );
+
+  const hasWorkforceAccess = isUnifiedLogin
+    ? hasUnifiedMatrixTrackAccess
+    : isSuperAdmin ||
+    isCityAdmin ||
+    Boolean(
+      user?.modules?.some((module) =>
+        [
+          'WORKFORCE_MONITORING',
+          'WORKFORCE',
+          'MATRIXTRACK_WORKFORCE',
+          'ATTENDANCE',
+        ].includes(
+          String(
+            module.key || module.name || ''
+          ).toUpperCase()
+        )
+      )
+    );
+
+  const openTaskforceWorkspace = () => {
+    const taskforceToken =
+      unifiedSession?.tokens?.taskforce ||
+      localStorage.getItem(
+        'taskforce_access_token'
+      );
+
+    if (isUnifiedLogin) {
+      if (!taskforceToken) {
+        return;
+      }
+
+      localStorage.setItem(
+        'taskforce_access_token',
+        taskforceToken
+      );
+
+      localStorage.setItem(
+        'active_unified_application',
+        'TASKFORCE_20'
+      );
+
+      // Taskforce uses the native HMS authentication cookie
+      setAuthCookie(taskforceToken);
+
+      window.location.assign(
+        workspaceUrl || '/city'
+      );
+
+      return;
+    }
+
+    router.push(workspaceUrl || '/city');
+  };
+
+  useEffect(() => {
+    if (!sessionChecked) return;
+
+    async function fetchLiveCounts() {
+      if (hasTaskforceAccess) {
+        try {
+          const isSuper = Boolean(
+            user?.roles?.includes(
+              'HMS_SUPER_ADMIN'
+            )
+          );
+
+          const statsRes = isSuper
+            ? await HmsApi.getGlobalStats()
+            : await CityApi.getStats();
+
+          if (statsRes?.stats) {
+            setLiveTaskforceCount(
+              statsRes.stats.taskforceMembers || 0
+            );
+
+            setLiveQCCount(
+              statsRes.stats.qualityControllers ||
+              0
+            );
+          }
+        } catch {
+          // Keep fallback values
+        }
+      }
+
+      if (hasSwachhAccess) {
+        try {
+          const swachhRes =
+            await swachhApi.get('/admin/stats');
+
+          if (swachhRes?.data) {
+            setLiveSwachhParticipants(
+              swachhRes.data.totalParticipants ||
+              0
+            );
+          }
+        } catch {
+          // Keep fallback values
+        }
+      }
+    }
+
+    fetchLiveCounts();
+  }, [
+    user,
+    sessionChecked,
+    hasTaskforceAccess,
+    hasSwachhAccess,
+  ]);
+
+  const openWardRankingWorkspace = () => {
+    const wardRankingToken =
+      unifiedSession?.tokens?.wardRanking ||
+      localStorage.getItem(
+        'ward_ranking_access_token'
+      );
+
+    if (isUnifiedLogin && !wardRankingToken) {
+      return;
+    }
+
+    if (wardRankingToken) {
+      localStorage.setItem(
+        'ward_ranking_access_token',
+        wardRankingToken
+      );
+
+      localStorage.setItem(
+        'swachh_token',
+        wardRankingToken
+      );
+    }
+
+    localStorage.setItem(
+      'active_unified_application',
+      'WARD_RANKING'
+    );
+
+    window.location.assign('/ward-ranking');
+  };
+
+  const openMatrixTrackWorkspace = () => {
+    const matrixTrackToken =
+      unifiedSession?.tokens?.matrixTrack ||
+      localStorage.getItem(
+        'matrixtrack_access_token'
+      );
+
+    if (isUnifiedLogin && !matrixTrackToken) {
+      return;
+    }
+
+    if (matrixTrackToken) {
+      localStorage.setItem(
+        'matrixtrack_access_token',
+        matrixTrackToken
+      );
+    }
+
+    localStorage.setItem(
+      'active_unified_application',
+      'MATRIX_TRACK'
+    );
+
+    window.location.assign(
+      '/workforce-monitoring'
+    );
+  };
 
   // Dynamic Greeting based on time of day
   const getGreeting = () => {
@@ -201,6 +459,23 @@ export default function PortalHomePage() {
   };
 
   const activeModalData = activeModalKey ? ROADMAP_MODULES[activeModalKey] : null;
+
+  if (!sessionChecked) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 800,
+          color: '#1e3a8a',
+        }}
+      >
+        Loading your authorized workspaces...
+      </div>
+    );
+  }
 
   return (
     <Protected>
@@ -718,126 +993,164 @@ export default function PortalHomePage() {
 
           <div className="active-workspaces-grid">
             {/* HERO CARD 1: Taskforce */}
-            <div 
-              className="hero-workspace-card"
-              onClick={() => router.push(workspaceUrl || '/city')}
-              style={{ cursor: 'pointer' }}
-            >
-              <div>
-                <div className="hero-card-header">
-                  <div className="hero-icon-box">
-                    <ShieldCheck size={32} />
+            {hasTaskforceAccess && (
+              <div
+                className="hero-workspace-card"
+                onClick={openTaskforceWorkspace}
+                style={{ cursor: 'pointer' }}
+              >
+                <div>
+                  <div className="hero-card-header">
+                    <div className="hero-icon-box">
+                      <ShieldCheck size={32} />
+                    </div>
+                    <span className="hero-live-tag">
+                      <span className="pulse-dot" style={{ width: 6, height: 6 }} /> Active & Live
+                    </span>
                   </div>
-                  <span className="hero-live-tag">
-                    <span className="pulse-dot" style={{ width: 6, height: 6 }} /> Active & Live
-                  </span>
-                </div>
-                <h3 className="hero-card-title">Taskforce</h3>
-                <div className="hero-card-sub">4-Module Combined Performance Monitoring Suite</div>
-                <div className="hero-card-desc">
-                  Next-gen urban sanitation suite driving automated monitoring across Beat Sweeping, Smart Litterbins, Vulnerable Spot (GVP/CTU) Transformation, and Community Toilet (CT/PT) Cleanliness.
+                  <h3 className="hero-card-title">Taskforce</h3>
+                  <div className="hero-card-sub">4-Module Combined Performance Monitoring Suite</div>
+                  <div className="hero-card-desc">
+                    Next-gen urban sanitation suite driving automated monitoring across Beat Sweeping, Smart Litterbins, Vulnerable Spot (GVP/CTU) Transformation, and Community Toilet (CT/PT) Cleanliness.
+                  </div>
+
+                  <div className="hero-tags-row">
+                    <span className="feature-pill">Sweeping (Beat)</span>
+                    <span className="feature-pill">GVP/CTU Spot Transformation</span>
+                    <span className="feature-pill">Litterbin Collection</span>
+                    <span className="feature-pill">Cleanliness of Toilet (CT/PT)</span>
+                  </div>
                 </div>
 
-                <div className="hero-tags-row">
-                  <span className="feature-pill">Sweeping (Beat)</span>
-                  <span className="feature-pill">GVP/CTU Spot Transformation</span>
-                  <span className="feature-pill">Litterbin Collection</span>
-                  <span className="feature-pill">Cleanliness of Toilet (CT/PT)</span>
+                <div>
+                  <button
+                    type="button"
+                    className="btn-launch-hero"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openTaskforceWorkspace();
+                    }}
+                  >
+                    Launch Taskforce Workspace
+                    <ArrowRight size={18} />
+                  </button>
                 </div>
               </div>
-
-              <div>
-                <Link 
-                  href={workspaceUrl || '/city'} 
-                  className="btn-launch-hero" 
-                  style={{ textDecoration: 'none' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Launch Taskforce Workspace <ArrowRight size={18} />
-                </Link>
-              </div>
-            </div>
+            )}
 
             {/* HERO CARD 2: Swachh Ward Ranking */}
-            <div 
-              className="hero-workspace-card" 
-              onClick={() => router.push('/ward-ranking')}
-              style={{ borderColor: '#7c3aed', boxShadow: '0 10px 30px -5px rgba(124, 58, 237, 0.12)', cursor: 'pointer' }}
-            >
-              <div>
-                <div className="hero-card-header">
-                  <div className="hero-icon-box" style={{ background: 'linear-gradient(135deg, #f5f3ff, #ddd6fe)', borderColor: '#c4b5fd', color: '#7c3aed' }}>
-                    <Award size={32} />
+            {hasSwachhAccess && (
+              <div
+                className="hero-workspace-card"
+                onClick={openWardRankingWorkspace}
+                style={{
+                  borderColor: '#7c3aed',
+                  boxShadow:
+                    '0 10px 30px -5px rgba(124, 58, 237, 0.12)',
+                  cursor: 'pointer',
+                }}
+              >
+                <div>
+                  <div className="hero-card-header">
+                    <div className="hero-icon-box" style={{ background: 'linear-gradient(135deg, #f5f3ff, #ddd6fe)', borderColor: '#c4b5fd', color: '#7c3aed' }}>
+                      <Award size={32} />
+                    </div>
+                    <span className="hero-live-tag" style={{ background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}>
+                      <span className="pulse-dot" style={{ width: 6, height: 6, background: '#7c3aed' }} /> Active & Live
+                    </span>
                   </div>
-                  <span className="hero-live-tag" style={{ background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}>
-                    <span className="pulse-dot" style={{ width: 6, height: 6, background: '#7c3aed' }} /> Active & Live
-                  </span>
-                </div>
-                <h3 className="hero-card-title">Swachh Ward Ranking System</h3>
-                <div className="hero-card-sub" style={{ color: '#7c3aed' }}>Swachh Sync Platform</div>
-                <div className="hero-card-desc">
-                  Ward-ranking & self-assessment platform for citizens, educational institutions, hospitals, commercial markets, and QC scorecards.
+                  <h3 className="hero-card-title">Swachh Ward Ranking System</h3>
+                  <div className="hero-card-sub" style={{ color: '#7c3aed' }}>Swachh Sync Platform</div>
+                  <div className="hero-card-desc">
+                    Ward-ranking & self-assessment platform for citizens, educational institutions, hospitals, commercial markets, and QC scorecards.
+                  </div>
+
+                  <div className="hero-tags-row">
+                    <span className="feature-pill">Citizen & Institutional Self-Assessment</span>
+                    <span className="feature-pill">8 Categories Evaluation</span>
+                    <span className="feature-pill">QC Audit & Scorecard Ranking</span>
+                  </div>
                 </div>
 
-                <div className="hero-tags-row">
-                  <span className="feature-pill">Citizen & Institutional Self-Assessment</span>
-                  <span className="feature-pill">8 Categories Evaluation</span>
-                  <span className="feature-pill">QC Audit & Scorecard Ranking</span>
+                <div>
+                  <button
+                    type="button"
+                    className="btn-launch-hero"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)',
+                      boxShadow:
+                        '0 8px 24px rgba(124, 58, 237, 0.38)',
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openWardRankingWorkspace();
+                    }}
+                  >
+                    Launch Swachh Sync Workspace
+                    <ArrowRight size={18} />
+                  </button>
                 </div>
               </div>
-
-              <div>
-                <Link 
-                  href="/ward-ranking" 
-                  className="btn-launch-hero" 
-                  style={{ background: 'linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)', boxShadow: '0 8px 24px rgba(124, 58, 237, 0.38)', textDecoration: 'none' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Launch Swachh Sync Workspace <ArrowRight size={18} />
-                </Link>
-              </div>
-            </div>
+            )}
 
             {/* HERO CARD 3: Workforce Monitoring */}
-            <div 
-              className="hero-workspace-card" 
-              onClick={() => router.push('/workforce-monitoring')}
-              style={{ borderColor: '#0284c7', boxShadow: '0 10px 30px -5px rgba(2, 132, 199, 0.12)', cursor: 'pointer' }}
-            >
-              <div>
-                <div className="hero-card-header">
-                  <div className="hero-icon-box" style={{ background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)', borderColor: '#7dd3fc', color: '#0284c7' }}>
-                    <Users size={32} />
+            {hasWorkforceAccess && (
+              <div
+                className="hero-workspace-card"
+                onClick={openMatrixTrackWorkspace}
+                style={{
+                  borderColor: '#0284c7',
+                  boxShadow:
+                    '0 10px 30px -5px rgba(2, 132, 199, 0.12)',
+                  cursor: 'pointer',
+                }}
+              >
+                <div>
+                  <div className="hero-card-header">
+                    <div className="hero-icon-box" style={{ background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)', borderColor: '#7dd3fc', color: '#0284c7' }}>
+                      <Users size={32} />
+                    </div>
+                    <span className="hero-live-tag" style={{ background: '#e0f2fe', color: '#0284c7', borderColor: '#7dd3fc' }}>
+                      <span className="pulse-dot" style={{ width: 6, height: 6, background: '#0284c7' }} /> Active & Live
+                    </span>
                   </div>
-                  <span className="hero-live-tag" style={{ background: '#e0f2fe', color: '#0284c7', borderColor: '#7dd3fc' }}>
-                    <span className="pulse-dot" style={{ width: 6, height: 6, background: '#0284c7' }} /> Active & Live
-                  </span>
-                </div>
-                <h3 className="hero-card-title">Workforce Monitoring</h3>
-                <div className="hero-card-sub" style={{ color: '#0284c7' }}>Matrix Track Attendance Suite</div>
-                <div className="hero-card-desc">
-                  Biometric facial verification & GPS geo-fenced live attendance tracking suite for municipal sanitation workers & supervisors.
+                  <h3 className="hero-card-title">Workforce Monitoring</h3>
+                  <div className="hero-card-sub" style={{ color: '#0284c7' }}>Matrix Track Attendance Suite</div>
+                  <div className="hero-card-desc">
+                    Biometric facial verification & GPS geo-fenced live attendance tracking suite for municipal sanitation workers & supervisors.
+                  </div>
+
+                  <div className="hero-tags-row">
+                    <span className="feature-pill">Facial Recognition AI</span>
+                    <span className="feature-pill">GPS Telemetry & Geofencing</span>
+                    <span className="feature-pill">Supervisor Self-Punch Audit</span>
+                  </div>
                 </div>
 
-                <div className="hero-tags-row">
-                  <span className="feature-pill">Facial Recognition AI</span>
-                  <span className="feature-pill">GPS Telemetry & Geofencing</span>
-                  <span className="feature-pill">Supervisor Self-Punch Audit</span>
+                <div>
+                  <button
+                    type="button"
+                    className="btn-launch-hero"
+                    style={{
+                      background:
+                        'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)',
+                      boxShadow:
+                        '0 8px 24px rgba(2, 132, 199, 0.38)',
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openMatrixTrackWorkspace();
+                    }}
+                  >
+                    Launch Workforce Workspace
+                    <ArrowRight size={18} />
+                  </button>
                 </div>
               </div>
-
-              <div>
-                <Link 
-                  href="/workforce-monitoring" 
-                  className="btn-launch-hero" 
-                  style={{ background: 'linear-gradient(135deg, #0369a1 0%, #0284c7 100%)', boxShadow: '0 8px 24px rgba(2, 132, 199, 0.38)', textDecoration: 'none' }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Launch Workforce Workspace <ArrowRight size={18} />
-                </Link>
-              </div>
-            </div>
+            )}
           </div>
+
 
           {/* COMPACT ROADMAP BAR FOR COMING SOON MODULES */}
           <div className="roadmap-bar">

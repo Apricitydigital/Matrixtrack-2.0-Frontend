@@ -4,13 +4,28 @@ import { usePathname } from "next/navigation";
 import Sidebar from "@components/ui/Sidebar";
 import { Topbar } from "@components/ui/Topbar";
 
-const AUTH_PATHS = ["/", "/login", "/register", "/portal-home", "/ward-ranking", "/workforce-monitoring", "/admin-management"];
+const STANDALONE_PATHS = [
+    "/",
+    "/login",
+    "/register",
+    "/unified-login",
+    "/create-account",
+    "/applications",
+    "/portal-home",
+    "/ward-ranking",
+    "/workforce-monitoring",
+    "/admin-management",
+];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const isAuthPage = AUTH_PATHS.includes(pathname);
+    const isStandalonePage = STANDALONE_PATHS.some(
+        (path) =>
+            pathname === path ||
+            pathname.startsWith(`${path}/`),
+    );
 
-    if (isAuthPage) {
+    if (isStandalonePage) {
         return <>{children}</>;
     }
 

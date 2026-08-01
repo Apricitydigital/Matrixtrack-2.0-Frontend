@@ -9,7 +9,7 @@ import { roleLabel } from "@lib/labels";
 interface AuthContextValue {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
 }
 
@@ -20,12 +20,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getTokenFromCookies();
-    const decoded = decodeToken(token);
-    if (decoded) {
-      decoded.roleLabels = decoded.roles?.map((r: string) => roleLabel(r));
+    let resolvedUser: AuthUser | null = null;
+
+    // Existing Taskforce authentication
+    const taskforceCookieToken = getTokenFromCookies();
+
+    if (taskforceCookieToken) {
+      resolvedUser = decodeToken(taskforceCookieToken);
     }
-    setUser(decoded);
+
+    // Unified-login fallback
+    if (
+      !resolvedUser &&
+      typeof window !== "undefined"
+    ) {
+      try {
+        const rawSession = localStorage.getItem(
+          "unified_auth_session",
+        );
+
+        if (rawSession) {
+          const unifiedSession = JSON.parse(rawSession);
+
+          const taskforceToken =
+            unifiedSession?.tokens?.taskforce ||
+            localStorage.getItem(
+              "taskforce_access_token",
+            );
+
+          if (taskforceToken) {
+            resolvedUser = decodeToken(
+              taskforceToken,
+              unifiedSession?.user,
+            );
+          }
+
+          // MatrixTrack/Ward Ranking users may not have
+          // a Taskforce token, but still need portal-home access.
+          if (!resolvedUser && unifiedSession?.user) {
+            const sessionUser = unifiedSession.user;
+
+            const rawRoles = Array.isArray(
+              sessionUser.roles,
+            )
+              ? sessionUser.roles
+              : sessionUser.role
+                ? [sessionUser.role]
+                : [];
+
+            const roles = rawRoles.map(
+              (role: unknown) =>
+                String(role).toUpperCase(),
+            );
+
+            resolvedUser = {
+              ...sessionUser,
+              roles,
+              roleLabels: roles.map((role: string) =>
+                roleLabel(role),
+              ),
+            } as AuthUser;
+          }
+        }
+      } catch {
+        localStorage.removeItem(
+          "unified_auth_session",
+        );
+      }
+    }
+
+    if (resolvedUser) {
+      resolvedUser.roleLabels =
+        resolvedUser.roles?.map((role: string) =>
+          roleLabel(role),
+        );
+    }
+
+    setUser(resolvedUser);
     setLoading(false);
   }, []);
 
@@ -33,10 +104,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await AuthApi.logout();
     } catch {
-      // ignore logout errors; proceed to clear client state
+      // Server logout fail hone par bhi local session clear hogi
     }
+
     clearAuthCookie();
+
+    if (typeof window !== "undefined") {
+      [
+        "unified_auth_session",
+        "active_unified_application",
+        "taskforce_access_token",
+        "matrixtrack_access_token",
+        "ward_ranking_access_token",
+        "swachh_token",
+        "token",
+      ].forEach((key) => {
+        localStorage.removeItem(key);
+      });
+
+      document.cookie =
+        "unified_session=; Path=/; Max-Age=0; SameSite=Lax";
+
+      document.cookie =
+        "hms_access_token=; Path=/; Max-Age=0; SameSite=Lax";
+    }
+
     setUser(null);
+
+    if (typeof window !== "undefined") {
+      window.location.replace("/unified-login");
+    }
   };
 
   const value = useMemo(() => ({ user, setUser, logout, loading }), [user, loading]);

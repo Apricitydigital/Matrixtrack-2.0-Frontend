@@ -2,18 +2,20 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, AuthApi, PublicGeoApi } from "@lib/apiClient";
-import { setAuthCookie, decodeToken } from "@lib/auth";
-import { useAuth } from "@hooks/useAuth";
-import { getPostLoginRedirect } from "@utils/modules";
+import {
+  ApiError,
+  AuthApi,
+  PublicGeoApi,
+  type UnifiedLoginResponse,
+} from "@lib/apiClient";
 import {
   Eye, EyeOff, ShieldCheck, ArrowRight, Building2, Globe, X, Lock, Users, Sparkles, UserPlus, LogIn, Hash, Mail, Phone, MapPin, CheckCircle2
 } from "lucide-react";
+import { setAuthCookie } from "@lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser } = useAuth();
-  
+
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -24,6 +26,12 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const [otp, setOtp] = useState("");
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpEmail, setOtpEmail] = useState("");
+  const [pendingLogin, setPendingLogin] =
+    useState<UnifiedLoginResponse | null>(null);
 
   // 100% Exact Original Register Form States
   const [regForm, setRegForm] = useState({
@@ -45,7 +53,7 @@ export default function LoginPage() {
 
   // Fetch Cities on load for registration
   useEffect(() => {
-    PublicGeoApi.cities().then((res) => setCities(res.cities || [])).catch(() => {});
+    PublicGeoApi.cities().then((res) => setCities(res.cities || [])).catch(() => { });
   }, []);
 
   const handleCityChange = async (cityId: string) => {
@@ -75,27 +83,262 @@ export default function LoginPage() {
     }
   };
 
-  const updateRegForm = (key: keyof typeof regForm, value: string) => {
+  const updateRegForm = (
+    key: keyof typeof regForm,
+    value: string,
+  ) => {
     setRegForm((f) => ({ ...f, [key]: value }));
   };
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const mergeApplications = (
+    first: any[] = [],
+    second: any[] = [],
+  ) => {
+    const applicationMap = new Map<string, any>();
+
+    [...first, ...second].forEach(
+      (application) => {
+        const applicationKey =
+          application?.key ||
+          application?.portalKey ||
+          application?.applicationKey;
+
+        if (!applicationKey) return;
+
+        applicationMap.set(applicationKey, {
+          ...(applicationMap.get(applicationKey) ||
+            {}),
+          ...application,
+          key: applicationKey,
+        });
+      },
+    );
+
+    return Array.from(applicationMap.values());
+  };
+
+  const saveUnifiedSession = (
+    response: UnifiedLoginResponse,
+  ) => {
+    if (typeof window === "undefined") return;
+
+    const {
+      taskforce = null,
+      matrixTrack = null,
+      wardRanking = null,
+    } = response.tokens || {};
+
+    if (taskforce) {
+      localStorage.setItem(
+        "taskforce_access_token",
+        taskforce,
+      );
+    } else {
+      localStorage.removeItem("taskforce_access_token");
+    }
+
+    if (matrixTrack) {
+      localStorage.setItem(
+        "matrixtrack_access_token",
+        matrixTrack,
+      );
+    } else {
+      localStorage.removeItem("matrixtrack_access_token");
+    }
+
+    if (wardRanking) {
+      localStorage.setItem(
+        "ward_ranking_access_token",
+        wardRanking,
+      );
+    } else {
+      localStorage.removeItem("ward_ranking_access_token");
+    }
+
+    localStorage.setItem(
+      "unified_auth_session",
+      JSON.stringify({
+        user: response.user,
+        applications: response.applications,
+        tokens: response.tokens,
+      }),
+    );
+
+    const secureCookie =
+      window.location.protocol === "https:"
+        ? "; Secure"
+        : "";
+
+    document.cookie =
+      `unified_session=1; Path=/; Max-Age=28800; SameSite=Lax${secureCookie}`;
+  };
+
+  const completeUnifiedLogin = (
+    response: UnifiedLoginResponse,
+  ) => {
+    saveUnifiedSession(response);
+
+    // Full reload lets AuthProvider read the newly saved
+    // cookie and unified session before guards execute.
+    window.location.assign("/portal-home");
+  };
+
+  const resetOtpStep = () => {
+    setOtp("");
+    setOtpStep(false);
+    setOtpEmail("");
+    setPendingLogin(null);
+    setError("");
+  };
+
+  const handleLoginSubmit = async (
+    e: React.FormEvent,
+  ) => {
     e.preventDefault();
+
     setLoading(true);
     setError("");
+
     try {
-      const { token, user: authUser } = await AuthApi.login({ email, password });
-      setAuthCookie(token);
-      const decoded = decodeToken(token, authUser);
-      setUser(decoded);
-      router.replace(getPostLoginRedirect(decoded));
+      const normalizedEmail =
+        email.trim().toLowerCase();
+
+      const response = await AuthApi.unifiedLogin({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (response.requiresOtp) {
+        setPendingLogin(response);
+
+        setOtpEmail(
+          response.pendingOtp?.email ||
+          response.email ||
+          normalizedEmail,
+        );
+
+        setOtp("");
+        setOtpStep(true);
+        return;
+      }
+
+      if (!response.success) {
+        setError(
+          response.message ||
+          "Unable to complete login.",
+        );
+        return;
+      }
+
+      completeUnifiedLogin(response);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setError("Invalid email or password. Please try again.");
+      if (
+        err instanceof ApiError &&
+        err.status === 401
+      ) {
+        setError(
+          "Invalid email or password. Please try again.",
+        );
       } else if (err instanceof ApiError) {
-        setError(err.message || "An error occurred. Please try again.");
+        setError(
+          err.message ||
+          "An error occurred. Please try again.",
+        );
       } else {
-        setError("Login failed. Please check your connection.");
+        setError(
+          "Login failed. Please check your connection.",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpSubmit = async (
+    e: React.FormEvent,
+  ) => {
+    e.preventDefault();
+
+    const normalizedOtp = otp.replace(/\D/g, "");
+
+    if (normalizedOtp.length !== 6) {
+      setError("Enter the valid 6-digit OTP.");
+      return;
+    }
+
+    if (!otpEmail) {
+      setError(
+        "OTP email is missing. Please return to login.",
+      );
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const otpResponse =
+        await AuthApi.unifiedVerifyMatrixTrackOtp({
+          email: otpEmail,
+          otp: normalizedOtp,
+        });
+
+      const mergedApplications =
+        mergeApplications(
+          pendingLogin?.applications || [],
+          otpResponse.applications || [],
+        );
+
+      const mergedResponse: UnifiedLoginResponse = {
+        ...otpResponse,
+
+        success: true,
+
+        user: {
+          ...(pendingLogin?.user || {}),
+          ...(otpResponse.user || {}),
+          email:
+            otpResponse.user?.email ||
+            pendingLogin?.user?.email ||
+            otpEmail,
+          applications: mergedApplications,
+        },
+
+        applications: mergedApplications,
+
+        tokens: {
+          taskforce:
+            pendingLogin?.tokens?.taskforce ||
+            otpResponse.tokens?.taskforce ||
+            null,
+
+          matrixTrack:
+            otpResponse.tokens?.matrixTrack ||
+            pendingLogin?.tokens?.matrixTrack ||
+            null,
+
+          wardRanking:
+            pendingLogin?.tokens?.wardRanking ||
+            otpResponse.tokens?.wardRanking ||
+            null,
+        },
+
+        requiresOtp: false,
+        pendingOtp: null,
+        redirectTo: "/portal-home",
+      };
+
+      completeUnifiedLogin(mergedResponse);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(
+          err.message ||
+          "OTP verification failed.",
+        );
+      } else {
+        setError(
+          "OTP verification failed. Please try again.",
+        );
       }
     } finally {
       setLoading(false);
@@ -458,43 +701,127 @@ export default function LoginPage() {
                     </p>
                   </div>
 
-                  <form onSubmit={handleLoginSubmit}>
-                    <div style={{ marginBottom: 18 }}>
-                      <label className="drawer-label"><Mail size={14} style={{ color: "#2563eb" }} /> Email Address</label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@gov.in"
-                        required
-                        className="drawer-input-v4"
-                      />
-                    </div>
+                  <form
+                    onSubmit={
+                      otpStep
+                        ? handleOtpSubmit
+                        : handleLoginSubmit
+                    }
+                  >
 
-                    <div style={{ marginBottom: 20 }}>
-                      <label className="drawer-label"><Lock size={14} style={{ color: "#2563eb" }} /> Password</label>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                          className="drawer-input-v4"
-                          style={{ paddingRight: 44 }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
+                    {!otpStep && (
+                      <>
+                        <div style={{ marginBottom: 18 }}>
+                          <label className="drawer-label"><Mail size={14} style={{ color: "#2563eb" }} /> Email Address</label>
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="you@gov.in"
+                            required
+                            className="drawer-input-v4"
+                          />
+                        </div>
+
+                        <div style={{ marginBottom: 20 }}>
+                          <label className="drawer-label"><Lock size={14} style={{ color: "#2563eb" }} /> Password</label>
+                          <div style={{ position: "relative" }}>
+                            <input
+                              type={showPassword ? "text" : "password"}
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="••••••••"
+                              required
+                              className="drawer-input-v4"
+                              style={{ paddingRight: 44 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              style={{
+                                position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                                background: "none", border: "none", color: "#94a3b8", cursor: "pointer"
+                              }}
+                            >
+                              {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {otpStep && (
+                      <div style={{ marginBottom: 18 }}>
+                        <div
                           style={{
-                            position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-                            background: "none", border: "none", color: "#94a3b8", cursor: "pointer"
+                            padding: "13px 14px",
+                            marginBottom: 18,
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 12,
+                            background: "#eff6ff",
+                            color: "#1e40af",
+                            fontSize: 13,
+                            lineHeight: 1.5,
                           }}
                         >
-                          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                          A verification code has been sent to{" "}
+                          <strong>{otpEmail}</strong>. Enter the
+                          6-digit OTP to complete MatrixTrack login.
+                        </div>
+
+                        <label className="drawer-label">
+                          <Lock
+                            size={14}
+                            style={{ color: "#2563eb" }}
+                          />
+                          Verification Code
+                        </label>
+
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          maxLength={6}
+                          value={otp}
+                          onChange={(e) =>
+                            setOtp(
+                              e.target.value
+                                .replace(/\D/g, "")
+                                .slice(0, 6),
+                            )
+                          }
+                          placeholder="Enter 6-digit OTP"
+                          required
+                          className="drawer-input-v4"
+                          style={{
+                            textAlign: "center",
+                            letterSpacing: "0.35em",
+                            fontSize: 19,
+                            fontWeight: 800,
+                          }}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={resetOtpStep}
+                          disabled={loading}
+                          style={{
+                            marginTop: 12,
+                            padding: 0,
+                            border: "none",
+                            background: "transparent",
+                            color: "#2563eb",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: loading
+                              ? "not-allowed"
+                              : "pointer",
+                          }}
+                        >
+                          Back to email and password
                         </button>
                       </div>
-                    </div>
+                    )}
 
                     {error && (
                       <div style={{ marginBottom: 18, padding: "10px 12px", background: "#fef2f2", border: "1px solid #fecdd3", borderRadius: 8, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>
@@ -508,7 +835,13 @@ export default function LoginPage() {
                       className="btn-submit-v4"
                     >
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" }}>
-                        <span>{loading ? "Signing In…" : "Sign In"}</span>
+                        <span>{loading
+                          ? otpStep
+                            ? "Verifying OTP..."
+                            : "Signing In..."
+                          : otpStep
+                            ? "Verify OTP & Continue"
+                            : "Sign In"}</span>
                         <ArrowRight size={17} />
                       </div>
                     </button>
@@ -737,7 +1070,8 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 }

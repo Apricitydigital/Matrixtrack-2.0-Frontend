@@ -1,17 +1,14 @@
 'use client';
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@hooks/useAuth";
 import { roleLabel } from "@lib/labels";
 
 export function Topbar() {
   const { user, logout, loading } = useAuth();
-  const router = useRouter();
 
   const handleLogout = async () => {
     await logout();
-    router.replace("/login");
   };
 
   const displayRole = user?.roles?.length ? roleLabel(user.roles[0]) : "";
@@ -37,7 +34,7 @@ export function Topbar() {
             </button>
           </>
         ) : (
-          <Link className="btn btn-secondary btn-sm" href="/login">
+          <Link className="btn btn-secondary btn-sm" href="/unified-login">
             Login
           </Link>
         )}

@@ -109,7 +109,6 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace("/login");
   };
 
   return (
@@ -506,7 +505,7 @@ export default function Sidebar() {
           </button>
         )}
         {!loading && !user && (
-          <Link className="btn btn-secondary btn-sm w-full" href="/login">
+          <Link className="btn btn-secondary btn-sm w-full" href="/unified-login">
             Login
           </Link>
         )}
