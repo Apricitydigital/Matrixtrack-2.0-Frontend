@@ -56,7 +56,7 @@ export function middleware(req: NextRequest) {
 
   const token = req.cookies.get("hms_access_token")?.value;
   if (!token) {
-    const loginUrl = new URL("/login", req.url);
+    const loginUrl = new URL("/unified-login", req.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }

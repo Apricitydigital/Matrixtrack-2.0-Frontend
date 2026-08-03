@@ -113,16 +113,17 @@ export interface UnifiedLoginResponse {
 
 export interface UnifiedRegistrationRequest {
   name: string;
+  email: string;
   phone: string;
   aadhaar: string;
-  email: string;
   password: string;
 
   cityId: string;
-  zoneId: string;
-  wardId: string;
+  zoneId?: string;
+  wardId?: string;
 
   requestedRole: UnifiedRegistrationRole;
+
   requestedPortals: UnifiedPortalKey[];
   taskforceModules: UnifiedTaskforceModuleKey[];
 }

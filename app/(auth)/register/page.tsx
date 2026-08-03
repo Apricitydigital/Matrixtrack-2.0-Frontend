@@ -251,7 +251,7 @@ export default function RegisterPage() {
                     </form>
 
                     <p style={{ marginTop: 24, textAlign: "center", color: "#64748b", fontSize: 14 }}>
-                        Already have an account? <a href="/login" style={{ color: "#1e3a8a", fontWeight: 700, textDecoration: "none" }}>Sign In</a>
+                        Already have an account? <a href="/unified-login" style={{ color: "#1e3a8a", fontWeight: 700, textDecoration: "none" }}>Sign In</a>
                     </p>
                 </div>
             </div>

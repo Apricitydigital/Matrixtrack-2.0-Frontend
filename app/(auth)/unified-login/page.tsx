@@ -7,9 +7,14 @@ import {
   AuthApi,
   PublicGeoApi,
   type UnifiedLoginResponse,
+  type UnifiedPortalKey,
+  type UnifiedTaskforceModuleKey,
+  type UnifiedRegistrationRole,
 } from "@lib/apiClient";
 import {
-  Eye, EyeOff, ShieldCheck, ArrowRight, Building2, Globe, X, Lock, Users, Sparkles, UserPlus, LogIn, Hash, Mail, Phone, MapPin, CheckCircle2
+  Eye, EyeOff, ShieldCheck, ArrowRight, Building2, Globe, X, Lock, Users, Sparkles, UserPlus, LogIn, Hash, Mail, Phone, MapPin, CheckCircle2,
+  Layers,
+  Check
 } from "lucide-react";
 import { setAuthCookie } from "@lib/auth";
 
@@ -46,6 +51,17 @@ export default function LoginPage() {
     wardId: ""
   });
   const [regStatus, setRegStatus] = useState("");
+
+  const [requestedRole, setRequestedRole] =
+    useState<UnifiedRegistrationRole | "">("");
+
+  const [selectedPortals, setSelectedPortals] =
+    useState<UnifiedPortalKey[]>([]);
+
+  const [
+    selectedTaskforceModules,
+    setSelectedTaskforceModules,
+  ] = useState<UnifiedTaskforceModuleKey[]>([]);
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
   const [zones, setZones] = useState<{ id: string; name: string }[]>([]);
   const [wards, setWards] = useState<{ id: string; name: string }[]>([]);
@@ -88,6 +104,38 @@ export default function LoginPage() {
     value: string,
   ) => {
     setRegForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const togglePortal = (
+    portal: UnifiedPortalKey,
+  ) => {
+    setSelectedPortals((current) => {
+      const isSelected = current.includes(portal);
+
+      if (isSelected) {
+        if (portal === "TASKFORCE_20") {
+          setSelectedTaskforceModules([]);
+        }
+
+        return current.filter(
+          (item) => item !== portal,
+        );
+      }
+
+      return [...current, portal];
+    });
+  };
+
+  const toggleTaskforceModule = (
+    moduleKey: UnifiedTaskforceModuleKey,
+  ) => {
+    setSelectedTaskforceModules((current) =>
+      current.includes(moduleKey)
+        ? current.filter(
+          (item) => item !== moduleKey,
+        )
+        : [...current, moduleKey],
+    );
   };
 
   const mergeApplications = (
@@ -254,6 +302,8 @@ export default function LoginPage() {
     }
   };
 
+
+
   const handleOtpSubmit = async (
     e: React.FormEvent,
   ) => {
@@ -345,19 +395,84 @@ export default function LoginPage() {
     }
   };
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (
+    e: React.FormEvent,
+  ) => {
     e.preventDefault();
+
     setLoading(true);
     setError("");
     setRegStatus("");
+
     try {
-      if (!regForm.cityId || !regForm.zoneId || !regForm.wardId) {
-        setError("City, Zone, and Ward are required");
-        setLoading(false);
+      if (
+        !regForm.cityId ||
+        !regForm.zoneId ||
+        !regForm.wardId
+      ) {
+        setError(
+          "City, Zone, and Ward are required.",
+        );
         return;
       }
-      await AuthApi.registerRequest(regForm);
-      setRegStatus("Registration request sent to City Admin. You will be notified once approved.");
+
+      if (!requestedRole) {
+        setError(
+          "Please select the role you are requesting.",
+        );
+        return;
+      }
+
+      if (selectedPortals.length === 0) {
+        setError(
+          "Please select at least one application.",
+        );
+        return;
+      }
+
+      if (
+        selectedPortals.includes("TASKFORCE_20") &&
+        selectedTaskforceModules.length === 0
+      ) {
+        setError(
+          "Please select at least one Taskforce module.",
+        );
+        return;
+      }
+
+
+      await AuthApi.unifiedRegisterRequest({
+
+        name: regForm.name.trim(),
+        email: regForm.email
+          .trim()
+          .toLowerCase(),
+        phone: regForm.phone.trim(),
+
+        // Keep the exact Aadhaar field required by
+        // UnifiedRegistrationRequest in apiClient.ts
+        aadhaar: regForm.aadharNumber.trim(),
+
+        password: regForm.password,
+        cityId: regForm.cityId,
+        zoneId: regForm.zoneId,
+        wardId: regForm.wardId,
+
+        requestedRole,
+
+        requestedPortals: selectedPortals,
+
+        taskforceModules: selectedPortals.includes(
+          "TASKFORCE_20",
+        )
+          ? selectedTaskforceModules
+          : [],
+      });
+
+      setRegStatus(
+        "Registration request submitted successfully. Your selected role and application access will be reviewed by the City Admin.",
+      );
+
       setRegForm({
         ulbCode: "",
         name: "",
@@ -367,15 +482,24 @@ export default function LoginPage() {
         password: "",
         cityId: "",
         zoneId: "",
-        wardId: ""
+        wardId: "",
       });
+
+      setRequestedRole("");
+      setSelectedPortals([]);
+      setSelectedTaskforceModules([]);
       setZones([]);
       setWards([]);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message || "Failed to submit request");
+        setError(
+          err.message ||
+          "Failed to submit registration request.",
+        );
       } else {
-        setError("Failed to submit request");
+        setError(
+          "Failed to submit registration request.",
+        );
       }
     } finally {
       setLoading(false);
@@ -985,6 +1109,247 @@ export default function LoginPage() {
                       </select>
                     </div>
 
+                    {/* 6. Requested Role */}
+                    <div style={{ marginBottom: 16 }}>
+                      <label className="drawer-label">
+                        <ShieldCheck
+                          size={14}
+                          style={{ color: "#2563eb" }}
+                        />
+                        Requested Role
+                      </label>
+
+                      <select
+                        className="drawer-input-v4"
+                        value={requestedRole}
+                        onChange={(e) =>
+                          setRequestedRole(
+                            e.target.value as UnifiedRegistrationRole,
+                          )
+                        }
+                        required
+                      >
+                        <option value="">Select Role</option>
+
+                        <option value="SUPERVISOR">
+                          Supervisor
+                        </option>
+
+                        <option value="EMPLOYEE">
+                          Employee
+                        </option>
+
+                        <option value="QC">
+                          Quality Controller
+                        </option>
+
+                        <option value="ACTION_OFFICER">
+                          Action Officer
+                        </option>
+                      </select>
+                    </div>
+
+                    {/* 7. Required Application Access */}
+                    <div style={{ marginBottom: 18 }}>
+                      <label className="drawer-label">
+                        <Layers
+                          size={14}
+                          style={{ color: "#2563eb" }}
+                        />
+                        Required Application Access
+                      </label>
+
+                      <div
+                        style={{
+                          display: "grid",
+                          gap: 10,
+                          marginTop: 8,
+                        }}
+                      >
+                        {[
+                          {
+                            key: "TASKFORCE_20",
+                            title: "Taskforce 20",
+                            description:
+                              "Sanitation operations and performance monitoring",
+                          },
+                          {
+                            key: "MATRIX_TRACK",
+                            title: "MatrixTrack",
+                            description:
+                              "Workforce attendance and geo-tracking",
+                          },
+                          {
+                            key: "WARD_RANKING",
+                            title: "Ward Ranking",
+                            description:
+                              "Ward assessment, ranking and QC scorecards",
+                          },
+                        ].map((portal) => {
+                          const portalKey =
+                            portal.key as UnifiedPortalKey;
+
+                          const selected =
+                            selectedPortals.includes(portalKey);
+
+                          return (
+                            <button
+                              key={portal.key}
+                              type="button"
+                              onClick={() => togglePortal(portalKey)}
+                              style={{
+                                width: "100%",
+                                padding: "13px 14px",
+                                borderRadius: 12,
+                                border: selected
+                                  ? "1.5px solid #2563eb"
+                                  : "1.5px solid #cbd5e1",
+                                background: selected
+                                  ? "#eff6ff"
+                                  : "#ffffff",
+                                textAlign: "left",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                              }}
+                            >
+                              <div>
+                                <div
+                                  style={{
+                                    color: "#0f172a",
+                                    fontSize: 13.5,
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  {portal.title}
+                                </div>
+
+                                <div
+                                  style={{
+                                    color: "#64748b",
+                                    fontSize: 11.5,
+                                    marginTop: 3,
+                                  }}
+                                >
+                                  {portal.description}
+                                </div>
+                              </div>
+
+                              <div
+                                style={{
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: 7,
+                                  display: "grid",
+                                  placeItems: "center",
+                                  background: selected
+                                    ? "#2563eb"
+                                    : "#f8fafc",
+                                  border: selected
+                                    ? "1px solid #2563eb"
+                                    : "1px solid #cbd5e1",
+                                  color: "#ffffff",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {selected && <Check size={14} />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 8. Taskforce Module Access */}
+                    {selectedPortals.includes("TASKFORCE_20") && (
+                      <div
+                        style={{
+                          marginBottom: 18,
+                          padding: 14,
+                          borderRadius: 12,
+                          border: "1px solid #bfdbfe",
+                          background: "#f8fbff",
+                        }}
+                      >
+                        <label className="drawer-label">
+                          <ShieldCheck
+                            size={14}
+                            style={{ color: "#2563eb" }}
+                          />
+                          Select Taskforce Modules
+                        </label>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(2, minmax(0, 1fr))",
+                            gap: 9,
+                            marginTop: 10,
+                          }}
+                        >
+                          {[
+                            {
+                              key: "TASKFORCE",
+                              label: "Taskforce",
+                            },
+                            {
+                              key: "SWEEPING",
+                              label: "Sweeping",
+                            },
+                            {
+                              key: "LITTERBINS",
+                              label: "Litter Bins",
+                            },
+                            {
+                              key: "TOILET",
+                              label: "Toilet",
+                            },
+                          ].map((module) => {
+                            const moduleKey =
+                              module.key as UnifiedTaskforceModuleKey;
+
+                            const selected =
+                              selectedTaskforceModules.includes(
+                                moduleKey,
+                              );
+
+                            return (
+                              <button
+                                key={module.key}
+                                type="button"
+                                onClick={() =>
+                                  toggleTaskforceModule(moduleKey)
+                                }
+                                style={{
+                                  minHeight: 44,
+                                  padding: "9px 10px",
+                                  borderRadius: 10,
+                                  border: selected
+                                    ? "1.5px solid #2563eb"
+                                    : "1px solid #cbd5e1",
+                                  background: selected
+                                    ? "#dbeafe"
+                                    : "#ffffff",
+                                  color: selected
+                                    ? "#1d4ed8"
+                                    : "#334155",
+                                  fontSize: 12,
+                                  fontWeight: 800,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {selected ? "✓ " : ""}
+                                {module.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* 6. Email */}
                     <div style={{ marginBottom: 16 }}>
                       <label className="drawer-label"><Mail size={14} style={{ color: "#2563eb" }} /> Email Address</label>
@@ -1056,7 +1421,11 @@ export default function LoginPage() {
                       className="btn-submit-v4"
                     >
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%" }}>
-                        <span>{loading ? "Submitting Request..." : "Submit Access Request"}</span>
+                        <span>
+                          {loading
+                            ? "Submitting Request..."
+                            : "Request Unified Access"}
+                        </span>
                         <ArrowRight size={17} />
                       </div>
                     </button>

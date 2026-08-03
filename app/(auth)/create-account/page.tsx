@@ -314,16 +314,29 @@ export default function CreateAccountPage() {
         try {
             const response = await AuthApi.unifiedRegisterRequest({
                 name: form.name.trim(),
-                phone: normalizedPhone,
-                aadhaar: normalizedAadhaar,
-                email: form.email.trim().toLowerCase(),
+
+                email: form.email
+                    .trim()
+                    .toLowerCase(),
+
+                phone: form.phone.trim(),
+
+                aadhaar: form.aadhaar.trim(),
+
                 password: form.password,
+
                 cityId: form.cityId,
                 zoneId: form.zoneId,
                 wardId: form.wardId,
+
                 requestedRole: form.requestedRole,
+
                 requestedPortals,
-                taskforceModules: hasTaskforceAccess
+
+                taskforceModules: requestedPortals.includes(
+                    "TASKFORCE_20",
+                )
+
                     ? taskforceModules
                     : [],
             });
@@ -785,7 +798,7 @@ export default function CreateAccountPage() {
 
                     <p className="login-link">
                         Already have an account?{" "}
-                        <Link href="/login">Sign in</Link>
+                        <Link href="/unified-login">Sign in</Link>
                     </p>
                 </div>
             </section>
