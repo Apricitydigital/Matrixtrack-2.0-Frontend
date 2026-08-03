@@ -8,7 +8,7 @@ import {
   Map, Target, Activity, Database, AlertCircle, CheckCircle,
   MapPin, ArrowRight, RefreshCw, Building2, ChevronRight, Zap, TrendingUp, BarChart3, Bell
 } from "lucide-react";
-import { getTokenFromCookies, decodeToken } from "@lib/auth";
+import { useAuth } from "@hooks/useAuth";
 
 // ── Pure SVG Donut Chart ──────────────────────────────────────────────────────
 function Donut({ data, size = 110, stroke = 18 }: { data: { v: number; color: string }[]; size?: number; stroke?: number }) {
@@ -36,6 +36,7 @@ function Donut({ data, size = 110, stroke = 18 }: { data: { v: number; color: st
 }
 
 export default function CityDashboardPage() {
+  const { user } = useAuth();
   const [cityName, setCityName] = useState<string | null>(null);
   const [ulbCode, setUlbCode] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
@@ -71,7 +72,6 @@ export default function CityDashboardPage() {
   const [toiletDashStats, setToiletDashStats] = useState<any>(null);
   const [qcLeaderboard, setQcLeaderboard] = useState<{ name: string; inspections: number }[]>([]);
 
-  const user = decodeToken(getTokenFromCookies());
   const isReadOnlyView = user?.roles?.some(r => ["COMMISSIONER", "ULB_OFFICER"].includes(r));
   const isCityAdmin = user?.roles?.some(r => ["CITY_ADMIN", "HMS_SUPER_ADMIN"].includes(r));
 

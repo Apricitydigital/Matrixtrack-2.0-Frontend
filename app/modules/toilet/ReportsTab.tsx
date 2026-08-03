@@ -8,16 +8,19 @@ export default function ReportsTab() {
     const [reports, setReports] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [reportsError, setReportsError] = useState('');
     const [dateFilter, setDateFilter] = useState('today');
     const [customDate, setCustomDate] = useState('');
+    const [statusTab, setStatusTab] = useState('');
 
     useEffect(() => {
         loadReports();
-    }, [dateFilter, customDate]);
+    }, [dateFilter, customDate, statusTab]);
 
     const loadReports = async () => {
         setLoading(true);
         setError('');
+        setReportsError('');
         try {
             const params: any = {};
             if (dateFilter === 'custom' && customDate) {
@@ -25,16 +28,21 @@ export default function ReportsTab() {
             }
             const statsRes = await ToiletApi.getDashboardStats(params);
             setStats(statsRes);
-
-            // Fetch recent inspections for the table
-            const inspectionsRes = await ToiletApi.listInspections({ pageSize: 10 });
-            setReports(inspectionsRes.inspections || []);
         } catch (err) {
             if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
                 setError('Not authorized for Cleanliness of Toilets module.');
             } else {
                 setError('Failed to load dashboard data.');
             }
+        }
+
+        try {
+            const inspectionsRes = await ToiletApi.listInspections({ pageSize: 10, status: statusTab || undefined });
+            setReports(inspectionsRes.inspections || []);
+        } catch (err: any) {
+            console.error('Failed to load recent toilet inspections', err);
+            setReports([]);
+            setReportsError(err instanceof ApiError ? err.message : 'Failed to load recent inspections.');
         } finally {
             setLoading(false);
         }
@@ -110,14 +118,14 @@ export default function ReportsTab() {
                     )}
 
                     <div className="stats-compact-grid mt-4">
-                        <StatCard label="TOTAL INFRASTRUCTURE" value={stats.totalToilets} sub="Verified Assets" color="#6366f1" />
+                        <StatCard label="TOTAL INFRASTRUCTURE" value={stats.totalToilets} sub="Registered assets" color="#6366f1" />
                         <StatCard label="STAFF ON DUTY" value={stats.onDutyEmployees} sub="Active Personnel" color="#f59e0b" />
-                        <StatCard label="TOTAL APPROVED" value={stats.approvedInspections} sub="Compliant records" color="#059669" />
-                        <StatCard label="PENDING VERIFICATION" value={stats.pendingReview} sub="QC Queue" color="#d97706" />
+                        <StatCard label="TOTAL APPROVED" value={stats.approvedToilets ?? stats.approvedInspections} sub="Approved assets" color="#059669" />
+                        <StatCard label="PENDING VERIFICATION" value={stats.pendingToilets ?? stats.pendingReview} sub="Pending assets" color="#d97706" />
                     </div>
                 </div>
             ) : (
-                <div className="employee-dashboard">
+                <div className="supervisor-dashboard">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                         <div className="tab-filters">
                             <FilterTabs
@@ -158,11 +166,41 @@ export default function ReportsTab() {
 
             {loading && <div className="loading-state"><p>Syncing dashboard...</p></div>}
             {error && <div className="alert error">{error}</div>}
+            {!error && reportsError && <div className="alert error">{reportsError}</div>}
 
             {!loading && !error && (
                 <div className="card compact-card">
-                    <div className="card-header-flex">
-                        <h3 className="section-title">Latest Cleanliness Inspections</h3>
+                    <div className="card-header-flex" style={{ flexWrap: 'wrap', gap: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                            <h3 className="section-title">Latest Cleanliness Inspections</h3>
+                            <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 10 }}>
+                                {[
+                                    { id: '', label: 'ALL' },
+                                    { id: 'SUBMITTED', label: 'PENDING' },
+                                    { id: 'APPROVED', label: 'APPROVED' },
+                                    { id: 'REJECTED', label: 'REJECTED' },
+                                    { id: 'ACTION_REQUIRED', label: 'ACTION REQ' }
+                                ].map((t) => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setStatusTab(t.id)}
+                                        style={{
+                                            padding: '4px 10px',
+                                            borderRadius: 8,
+                                            border: 'none',
+                                            fontSize: 10,
+                                            fontWeight: 800,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s',
+                                            background: statusTab === t.id ? '#3b82f6' : 'transparent',
+                                            color: statusTab === t.id ? '#ffffff' : '#64748b'
+                                        }}
+                                    >
+                                        {t.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <Link href="/modules/toilet/inspection" className="text-link text-sm font-bold">View All →</Link>
                     </div>
 
@@ -181,7 +219,7 @@ export default function ReportsTab() {
                                 {reports.length > 0 ? reports.slice(0, 10).map((report) => (
                                     <tr key={report.id}>
                                         <td className="font-bold">{report.toilet?.name || '---'}</td>
-                                        <td>{report.employee?.name || '---'}</td>
+                                        <td>{report.supervisor?.name || '---'}</td>
                                         <td className="muted text-xs">
                                             {new Date(report.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} • {new Date(report.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                                         </td>
@@ -320,3 +358,4 @@ function StatusBadge({ status }: { status: string }) {
         </span>
     );
 }
+

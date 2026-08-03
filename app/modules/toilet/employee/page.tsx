@@ -23,9 +23,10 @@ export default function ToiletEmployeePage() {
 
     return (
         <Protected>
-            <ModuleGuard module="TOILET" roles={["EMPLOYEE", "CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER"]}>
+            <ModuleGuard module="TOILET" roles={["SUPERVISOR", "CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER"]}>
                 <EmployeeDashboard />
             </ModuleGuard>
         </Protected>
     );
 }
+

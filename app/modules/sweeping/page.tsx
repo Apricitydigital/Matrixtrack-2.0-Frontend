@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Protected, ModuleGuard } from "@components/Guards";
@@ -21,6 +21,7 @@ export default function SweepingModulePage() {
     const [editingBeat, setEditingBeat] = useState<any | null>(null);
     const [inspectingBeat, setInspectingBeat] = useState<any | null>(null);
     const [assigningBeat, setAssigningBeat] = useState<any | null>(null);
+  const [deployingBeat, setDeployingBeat] = useState<any | null>(null);
     const [filteredUserId, setFilteredUserId] = useState<string | null>(null);
 
     const [viewMode, setViewMode] = useState<"table" | "map">("table");
@@ -85,7 +86,7 @@ export default function SweepingModulePage() {
                     <div style={{ marginBottom: "32px", display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "space-between", alignItems: "flex-end" }}>
                         <div>
                             <p className="eyebrow" style={{ textTransform: 'uppercase', fontSize: '10px', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>
-                                Module · Sweeping & Sanitation
+                                Module Â· Sweeping & Sanitation
                             </p>
                             <h1 style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "12px" }}>
                                 {(isQC || isAO) ? "My Assigned Beats" : "Beat Management"}
@@ -267,6 +268,7 @@ export default function SweepingModulePage() {
                                         onEdit={setEditingBeat}
                                         onViewData={setInspectingBeat}
                                         onAssign={setAssigningBeat}
+                  onAssignEmployees={setDeployingBeat}
                                         onViewUser={handleViewUser}
                                         isQC={isQC || isAO}
                                         isAO={isAO}
@@ -414,9 +416,22 @@ export default function SweepingModulePage() {
                     {assigningBeat && (
                         <AssignBeatModal
                             beat={assigningBeat}
+                            mode="SUPERVISOR"
                             onClose={() => setAssigningBeat(null)}
                             onSuccess={() => {
                                 setAssigningBeat(null);
+                                loadBeats();
+                            }}
+                        />
+                    )}
+
+                    {deployingBeat && (
+                        <AssignBeatModal
+                            beat={deployingBeat}
+                            mode="EMPLOYEE"
+                            onClose={() => setDeployingBeat(null)}
+                            onSuccess={() => {
+                                setDeployingBeat(null);
                                 loadBeats();
                             }}
                         />
@@ -432,3 +447,5 @@ export default function SweepingModulePage() {
         </Protected >
     );
 }
+
+

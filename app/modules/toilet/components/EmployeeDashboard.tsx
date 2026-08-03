@@ -74,13 +74,13 @@ export default function ToiletEmployeeDashboard() {
                         <ActionCard
                             title="Assigned Toilets"
                             desc="View details and report inspections."
-                            href="/modules/toilet/employee/assigned"
+                            href="/modules/toilet/supervisor/assigned"
                             primary
                         />
                         <ActionCard
                             title="Validation Queue"
                             desc="Track status of pending assets."
-                            href="/modules/toilet/employee/pending"
+                            href="/modules/toilet/supervisor/pending"
                         />
                     </div>
                 </section>
@@ -88,7 +88,7 @@ export default function ToiletEmployeeDashboard() {
                 <section>
                     <div className="flex justify-between items-center mb-4">
                         <h2>Assigned Work</h2>
-                        <Link className="btn btn-sm btn-ghost" href="/modules/toilet/employee/assigned">
+                        <Link className="btn btn-sm btn-ghost" href="/modules/toilet/supervisor/assigned">
                             View All {" >"}
                         </Link>
                     </div>
@@ -171,3 +171,4 @@ function Badge({ status }: { status: string }) {
 
     return <span className={`badge ${style}`}>{status.replace(/_/g, " ")}</span>;
 }
+

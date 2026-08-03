@@ -22,7 +22,7 @@ export default function LitterbinsEmployeePage() {
 
   return (
     <Protected>
-      <ModuleGuard module="LITTERBINS" roles={["EMPLOYEE", "CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER"]}>
+      <ModuleGuard module="LITTERBINS" roles={["SUPERVISOR", "CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER"]}>
         <EmployeeDashboard />
       </ModuleGuard>
     </Protected>

@@ -16,7 +16,7 @@ export default function TwinbinPage() {
 
   return (
     <Protected>
-      <ModuleGuard module="LITTERBINS" roles={["EMPLOYEE", "CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER", "QC"]}>
+      <ModuleGuard module="LITTERBINS" roles={["SUPERVISOR", "CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER", "QC"]}>
         {isActionOfficer ? (
           <div className="card">
             <h3>Unauthorized for this module</h3>
@@ -33,3 +33,4 @@ export default function TwinbinPage() {
     </Protected>
   );
 }
+

@@ -6,6 +6,7 @@ import { useAuth } from "@hooks/useAuth";
 
 import { RoleGuard } from "@components/Guards";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { roleLabel } from "@lib/labels";
 
 type Request = {
   id: string;
@@ -15,9 +16,10 @@ type Request = {
   aadhaar: string;
   status: string;
   createdAt: string;
+  requestedRole?: "SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER";
 };
 
-const ROLE_OPTIONS: Array<"EMPLOYEE" | "QC" | "ACTION_OFFICER"> = ["EMPLOYEE", "QC", "ACTION_OFFICER"];
+const ROLE_OPTIONS: Array<"SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER"> = ["SUPERVISOR", "EMPLOYEE", "QC", "ACTION_OFFICER"];
 
 export default function RegistrationRequestsPage() {
   const { user } = useAuth();
@@ -28,7 +30,7 @@ export default function RegistrationRequestsPage() {
   const [error, setError] = useState("");
   const [modal, setModal] = useState<{
     requestId: string;
-    role: "EMPLOYEE" | "QC" | "ACTION_OFFICER" | "";
+    role: "SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER" | "";
     moduleIds: Set<string>;
   } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -55,7 +57,7 @@ export default function RegistrationRequestsPage() {
   const openModal = (req: Request) =>
     setModal({
       requestId: req.id,
-      role: "",
+      role: req.requestedRole || "",
       moduleIds: new Set<string>()
     });
 
@@ -218,6 +220,7 @@ export default function RegistrationRequestsPage() {
                 <thead style={{ backgroundColor: "#fafbfc", borderBottom: "1px solid #f1f5f9" }}>
                   <tr>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Applicant</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Requested For</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Contact</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Identification</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Timeline</th>
@@ -228,7 +231,7 @@ export default function RegistrationRequestsPage() {
                 <tbody>
                   {filteredRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: "80px 24px", textAlign: "center" }}>
+                      <td colSpan={7} style={{ padding: "80px 24px", textAlign: "center" }}>
                         <div style={{ color: "#64748b", fontWeight: 600 }}>No requests found in this category</div>
                       </td>
                     </tr>
@@ -238,6 +241,21 @@ export default function RegistrationRequestsPage() {
                         <td style={{ padding: "20px 32px" }}>
                           <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "0.95rem" }}>{r.name}</div>
                           <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "2px" }}>{r.email}</div>
+                        </td>
+                        <td style={{ padding: "20px 32px" }}>
+                          <span style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "6px 12px",
+                            borderRadius: "999px",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            backgroundColor: r.requestedRole === "EMPLOYEE" ? "#ecfeff" : "#eef2ff",
+                            color: r.requestedRole === "EMPLOYEE" ? "#0f766e" : "#3730a3",
+                            border: r.requestedRole === "EMPLOYEE" ? "1px solid #a5f3fc" : "1px solid #c7d2fe"
+                          }}>
+                            {roleLabel(r.requestedRole || "SUPERVISOR")}
+                          </span>
                         </td>
                         <td style={{ padding: "20px 32px" }}>
                           <div style={{ fontSize: "0.875rem", color: "#334155", fontWeight: 600 }}>{r.phone}</div>
@@ -416,3 +434,4 @@ export default function RegistrationRequestsPage() {
     </RoleGuard>
   );
 }
+

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Search, Plus, Minus, FileText, X, Navigation, UserPlus, Edit2 } from "lucide-react";
+import { MapPin, Search, Plus, Minus, FileText, X, Navigation, UserPlus, Edit2, User, Users, Filter, CheckCircle2 } from "lucide-react";
 import AssignBeatModal from "./AssignBeatModal";
 
 // Dynamic imports for Leaflet
@@ -28,22 +28,92 @@ const Popup = dynamic<PopupProps>(
 );
 
 // Helper component to fit bounds
-function FitBounds({ geometry }: { geometry: any }) {
+function FitBounds({ beat }: { beat: any }) {
     const { useMap } = require("react-leaflet");
     const map = useMap();
     useEffect(() => {
-        if (geometry && map) {
-            const L = require("leaflet");
-            const geoLayer = L.geoJSON(geometry);
-            map.fitBounds(geoLayer.getBounds(), { padding: [50, 50] });
+        if (!map || !beat) return;
+        const L = require("leaflet");
+
+        map.invalidateSize();
+
+        const timer = setTimeout(() => {
+            const group = new L.FeatureGroup();
+
+            let geom = beat.geometry;
+            if (typeof geom === "string") {
+                try { geom = JSON.parse(geom); } catch {}
+            }
+            if (geom) {
+                try { group.addLayer(L.geoJSON(geom)); } catch {}
+            }
+
+            if (beat.segments && Array.isArray(beat.segments)) {
+                beat.segments.forEach((seg: any) => {
+                    let segGeom = seg.geometry;
+                    if (typeof segGeom === "string") {
+                        try { segGeom = JSON.parse(segGeom); } catch {}
+                    }
+                    if (segGeom) {
+                        try { group.addLayer(L.geoJSON(segGeom)); } catch {}
+                    }
+                });
+            }
+
+            if (group.getLayers().length > 0) {
+                const bounds = group.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            }
+        }, 100);
+
+        return () => clearTimeout(timer);
+    }, [beat, map]);
+    return null;
+}
+
+// Helper component to fit supervisor bounds when supervisor filter is selected
+function FitSupervisorBounds({ beat, selectedSupervisorId }: { beat: any; selectedSupervisorId: string | null }) {
+    const { useMap } = require("react-leaflet");
+    const map = useMap();
+
+    useEffect(() => {
+        if (!map || !selectedSupervisorId) return;
+        const L = require("leaflet");
+
+        const group = new L.FeatureGroup();
+
+        if (beat.segments && Array.isArray(beat.segments)) {
+            beat.segments.forEach((seg: any) => {
+                const supId = seg.supervisorAssignedToId || seg.assignedToId || beat.assignedToId;
+                if (supId === selectedSupervisorId) {
+                    let segGeom = seg.geometry;
+                    if (typeof segGeom === "string") {
+                        try { segGeom = JSON.parse(segGeom); } catch {}
+                    }
+                    if (segGeom) {
+                        try { group.addLayer(L.geoJSON(segGeom)); } catch {}
+                    }
+                }
+            });
         }
-    }, [geometry, map]);
+
+        if (group.getLayers().length > 0) {
+            const bounds = group.getBounds();
+            if (bounds.isValid()) {
+                map.flyToBounds(bounds, { padding: [80, 80], duration: 0.8 });
+            }
+        }
+    }, [beat, selectedSupervisorId, map]);
+
     return null;
 }
 
 export interface BeatMapViewProps {
     beat: any;
     filterUserId?: string | null;
+    assignmentMode?: "SUPERVISOR" | "EMPLOYEE";
     onClose: () => void;
     onEdit?: (beat: any) => void;
     onRefresh?: () => void;
@@ -113,22 +183,90 @@ function ZoomHandler() {
     return null;
 }
 
-export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRefresh }: BeatMapViewProps) {
+export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPERVISOR", onClose, onEdit, onRefresh }: BeatMapViewProps) {
     const [mapType, setMapType] = useState<"streets" | "satellite">("streets");
     const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
     const [selectedFeature, setSelectedFeature] = useState<any | null>(null);
     const [selectedSegmentIds, setSelectedSegmentIds] = useState<string[]>([]);
+    const [selectedSupervisorId, setSelectedSupervisorId] = useState<string | null>(filterUserId || null);
     const [searchQuery, setSearchQuery] = useState("");
     const [showAssignModal, setShowAssignModal] = useState(false);
+
+
+    const toggleSegmentSelection = (segmentId: string) => {
+        setSelectedSegmentIds((prev) =>
+            prev.includes(segmentId) ? prev.filter((id) => id !== segmentId) : [...prev, segmentId]
+        );
+    };
 
     useEffect(() => {
         if (filterUserId && beat.segments) {
             const userSegments = beat.segments
-                .filter((s: any) => s.assignedToId === filterUserId)
+                .filter((s: any) => s.employeeAssignedToId === filterUserId || s.supervisorAssignedToId === filterUserId)
                 .map((s: any) => s.id);
             setSelectedSegmentIds(userSegments);
+            setSelectedSupervisorId(filterUserId);
         }
     }, [filterUserId, beat.segments]);
+
+    // Extract unique supervisors assigned to beats / segments in this view
+    const availableSupervisors = React.useMemo(() => {
+        const map = new Map<string, { id: string; name: string; count: number }>();
+
+        if (beat.assignedToId && beat.assignedToName) {
+            map.set(beat.assignedToId, {
+                id: beat.assignedToId,
+                name: beat.assignedToName,
+                count: 0
+            });
+        }
+
+        if (beat.supervisorsSummary && Array.isArray(beat.supervisorsSummary)) {
+            beat.supervisorsSummary.forEach((sup: any) => {
+                if (sup.id && sup.name) {
+                    map.set(sup.id, {
+                        id: sup.id,
+                        name: sup.name,
+                        count: 0
+                    });
+                }
+            });
+        }
+
+        if (beat.segments && Array.isArray(beat.segments) && beat.segments.length > 0) {
+            beat.segments.forEach((seg: any) => {
+                const supId = seg.supervisorAssignedToId || beat.assignedToId;
+                const supName = seg.supervisorAssignedToName || beat.assignedToName;
+                if (supId && supName) {
+                    const existing = map.get(supId);
+                    if (existing) {
+                        existing.count += 1;
+                    } else {
+                        map.set(supId, { id: supId, name: supName, count: 1 });
+                    }
+                }
+            });
+        } else if (beat.assignedToId && beat.assignedToName) {
+            const existing = map.get(beat.assignedToId);
+            if (existing) {
+                existing.count = 1;
+            } else {
+                map.set(beat.assignedToId, { id: beat.assignedToId, name: beat.assignedToName, count: 1 });
+            }
+        }
+
+        return Array.from(map.values()).filter(s => s.count > 0);
+    }, [beat]);
+
+    const activeSupervisor = React.useMemo(() => {
+        if (!selectedSupervisorId) return null;
+        const found = availableSupervisors.find(s => s.id === selectedSupervisorId);
+        if (found) return found;
+        if (beat.assignedToId === selectedSupervisorId && beat.assignedToName) {
+            return { id: beat.assignedToId, name: beat.assignedToName, count: 0 };
+        }
+        return { id: selectedSupervisorId, name: "Selected Supervisor", count: 0 };
+    }, [selectedSupervisorId, availableSupervisors, beat]);
 
     const explodedGeoJSON = React.useMemo(() => {
         // Option 1: Use backend-provided segments (best for assignment)
@@ -143,9 +281,13 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                         index: i,
                         isSegment: true,
                         name: seg.name || `Beat ${i + 1}`,
-                        assignedToName: seg.assignedToName || beat.assignedToName,
-                        assignedToId: seg.assignedToId || beat.assignedToId,
-                        isUnassigned: !seg.assignedToId && !beat.assignedToId
+                        assignedToName: seg.employeeAssignedToName || seg.supervisorAssignedToName || beat.assignedToName,
+                        assignedToId: seg.employeeAssignedToId || seg.supervisorAssignedToId || beat.assignedToId,
+                        supervisorAssignedToName: seg.supervisorAssignedToName || beat.assignedToName,
+                        supervisorAssignedToId: seg.supervisorAssignedToId || beat.assignedToId,
+                        employeeAssignedToName: seg.employeeAssignedToName || null,
+                        employeeAssignedToId: seg.employeeAssignedToId || null,
+                        isUnassigned: assignmentMode === "SUPERVISOR" ? !(seg.supervisorAssignedToId || beat.assignedToId) : !seg.employeeAssignedToId
                     }
                 }))
             };
@@ -175,29 +317,40 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                         properties: { ...props, isSegment: true, id: `${props.id || props.name || 'mline'}-${idx}` }
                     });
                 });
+            } else if (g.type === "Polygon") {
+                features.push({
+                    type: "Feature", geometry: g,
+                    properties: { ...props, isSegment: true, id: props.id || props.name || `poly-${features.length}` }
+                });
+            } else if (g.type === "MultiPolygon") {
+                g.coordinates.forEach((coords: any, idx: number) => {
+                    features.push({
+                        type: "Feature", geometry: { type: "Polygon", coordinates: coords },
+                        properties: { ...props, isSegment: true, id: `${props.id || props.name || 'mpoly'}-${idx}` }
+                    });
+                });
             } else if (g.type === "GeometryCollection") {
                 g.geometries.forEach((geom: any) => process(geom, props));
             } else {
-                // Points, Polygons, etc. - still keep them for visual context but maybe not marked as segments
+                // Points, etc. - still keep them for visual context but maybe not marked as segments
                 features.push({ type: "Feature", geometry: g, properties: { ...props, isSegment: false } });
             }
         };
 
         process(geom);
         return { type: "FeatureCollection", features };
-    }, [beat.geometry, beat.segments, beat.assignedToName, beat.assignedToId]);
+    }, [assignmentMode, beat.geometry, beat.segments, beat.assignedToName, beat.assignedToId]);
 
     const features = explodedGeoJSON?.features || [];
-    // QC users primarily care about LineStrings for assignment
     const filteredFeatures = features.filter((f: any) => {
         const matchesSearch = (f.properties?.name || f.properties?.index || "").toString().toLowerCase().includes(searchQuery.toLowerCase());
-        const isLine = f.geometry?.type === "LineString" || f.geometry?.type === "MultiLineString";
-        return matchesSearch && isLine;
+        const isSupported = f.geometry?.type === "LineString" || f.geometry?.type === "MultiLineString" || f.geometry?.type === "Polygon" || f.geometry?.type === "MultiPolygon";
+        return matchesSearch && isSupported;
     });
 
-    // handling zoom in func map controller 
+    // handling zoom in func map controller
     const handleZoomIn = () => window.dispatchEvent(new CustomEvent("map-zoom-in"));
-    // handling zoom out func map controller 
+    // handling zoom out func map controller
     const handleZoomOut = () => window.dispatchEvent(new CustomEvent("map-zoom-out"));
 
     return (
@@ -229,12 +382,60 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                 {beat.beatName}
                             </h3>
                             <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: "2px" }}>
-                                {beat.zoneName} • {beat.wardName} • {beat.areaName}
+                                {[beat.zoneName, beat.wardName, beat.areaName].filter(Boolean).join(" | ")}
                             </div>
                         </div>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                        {/* Supervisor Wise Filter Dropdown */}
+                        <div style={{
+                            display: "flex", alignItems: "center", gap: "8px",
+                            backgroundColor: selectedSupervisorId ? "#eff6ff" : "#f1f5f9",
+                            padding: "6px 14px", borderRadius: "14px",
+                            border: selectedSupervisorId ? "1.5px solid #3b82f6" : "1px solid #e2e8f0",
+                            transition: "all 0.2s",
+                            boxShadow: selectedSupervisorId ? "0 4px 12px rgba(37, 99, 235, 0.15)" : "none"
+                        }}>
+                            <User size={16} color={selectedSupervisorId ? "#2563eb" : "#64748b"} />
+                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: selectedSupervisorId ? "#1e40af" : "#475569", whiteSpace: "nowrap" }}>
+                                Supervisor:
+                            </span>
+                            <select
+                                value={selectedSupervisorId || ""}
+                                onChange={(e) => setSelectedSupervisorId(e.target.value || null)}
+                                style={{
+                                    padding: "5px 10px", borderRadius: "10px", border: "1px solid #cbd5e1",
+                                    backgroundColor: "white", color: selectedSupervisorId ? "#1d4ed8" : "#0f172a",
+                                    fontWeight: 700, fontSize: "0.75rem", cursor: "pointer", outline: "none"
+                                }}
+                            >
+                                <option value="">All Supervisors ({availableSupervisors.reduce((acc, s) => acc + s.count, 0)})</option>
+                                {availableSupervisors.map(sup => (
+                                    <option key={sup.id} value={sup.id}>
+                                        {sup.name} ({sup.count} beat{sup.count === 1 ? '' : 's'})
+                                    </option>
+                                ))}
+                            </select>
+                            {selectedSupervisorId && (
+                                <button
+                                    onClick={() => setSelectedSupervisorId(null)}
+                                    style={{
+                                        border: "none", backgroundColor: "#ef4444", color: "white",
+                                        borderRadius: "50%", width: "22px", height: "22px",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        cursor: "pointer", flexShrink: 0, transition: "transform 0.2s, background-color 0.2s",
+                                        boxShadow: "0 2px 4px rgba(239, 68, 68, 0.3)"
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                    title="Clear Supervisor Filter"
+                                >
+                                    <X size={13} strokeWidth={2.5} />
+                                </button>
+                            )}
+                        </div>
+
                         <div style={{ display: "flex", backgroundColor: "#f1f5f9", padding: "4px", borderRadius: "14px", border: "1px solid #e2e8f0" }}>
                             {(["streets", "satellite"] as const).map(type => (
                                 <button
@@ -307,7 +508,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                     marginBottom: "12px"
                                 }}
                             >
-                                {selectedSegmentIds.length > 0 ? `Assign ${selectedSegmentIds.length} Beats` : "Manage Assignment"}
+                                {selectedSegmentIds.length > 0 ? `${assignmentMode === "EMPLOYEE" ? "Deploy" : "Assign"} ${selectedSegmentIds.length} Segments` : (assignmentMode === "EMPLOYEE" ? "Deploy Employees" : "Assign Supervisor")}
                             </button>
 
                             {onEdit && (
@@ -342,18 +543,25 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                 </button>
                             )}
 
-                            <div style={{ padding: "0 8px 12px", fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>
-                                Found {filteredFeatures.length} Results
+                            <div style={{ padding: "0 8px 12px", fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span>Found {filteredFeatures.length} Results</span>
+                                {activeSupervisor && (
+                                    <span style={{ color: "#2563eb", fontWeight: 800 }}>
+                                        {activeSupervisor.name}
+                                    </span>
+                                )}
                             </div>
                             {filteredFeatures.map((f: any, i: number) => {
                                 const featureId = f.properties?.name || `feat-${i}`;
                                 const color = getFeatureColor(f);
                                 const isActive = selectedFeature?.properties?.name === featureId;
+                                const segSupId = f.properties?.supervisorAssignedToId || f.properties?.assignedToId || beat.assignedToId;
+                                const isSupMatch = selectedSupervisorId ? segSupId === selectedSupervisorId : true;
 
                                 return (
                                     <div
                                         key={i}
-                                        onClick={() => setSelectedFeature(f)}
+                                        onClick={() => { setSelectedFeature(f); if (f.properties?.isSegment) toggleSegmentSelection(f.properties.id); }}
                                         onMouseEnter={() => setHoveredFeature(featureId)}
                                         onMouseLeave={() => setHoveredFeature(null)}
                                         style={{
@@ -361,11 +569,12 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                             borderRadius: "18px",
                                             marginBottom: "10px",
                                             cursor: "pointer",
-                                            backgroundColor: isActive ? "#eff6ff" : (hoveredFeature === featureId ? "#f8fafc" : "transparent"),
+                                            backgroundColor: isActive ? "#eff6ff" : (selectedSupervisorId && isSupMatch ? "#f0f9ff" : (hoveredFeature === featureId ? "#f8fafc" : "transparent")),
                                             border: "2px solid",
-                                            borderColor: f.properties?.isSegment && selectedSegmentIds.includes(f.properties.id) ? "#2563eb" : (isActive ? "#3b82f6" : "transparent"),
+                                            borderColor: f.properties?.isSegment && selectedSegmentIds.includes(f.properties.id) ? "#2563eb" : (selectedSupervisorId && isSupMatch ? "#3b82f6" : (isActive ? "#3b82f6" : "transparent")),
+                                            opacity: selectedSupervisorId && !isSupMatch ? 0.45 : 1,
                                             transition: "all 0.2s",
-                                            boxShadow: isActive ? "0 4px 12px rgba(59, 130, 246, 0.15)" : "none",
+                                            boxShadow: isActive || (selectedSupervisorId && isSupMatch) ? "0 4px 12px rgba(59, 130, 246, 0.15)" : "none",
                                             position: "relative"
                                         }}
                                     >
@@ -377,19 +586,23 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                         <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
                                             <div style={{
                                                 width: "40px", height: "40px", borderRadius: "12px",
-                                                backgroundColor: `${color}15`, color: color,
+                                                backgroundColor: selectedSupervisorId && isSupMatch ? "#dbeafe" : `${color}15`,
+                                                color: selectedSupervisorId && isSupMatch ? "#2563eb" : color,
                                                 display: "flex", alignItems: "center", justifyContent: "center",
                                                 flexShrink: 0
                                             }}>
                                                 {f.geometry?.type === "Point" ? <MapPin size={20} /> : <FileText size={20} />}
                                             </div>
                                             <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: "0.935rem", fontWeight: 700, color: "#0f172a" }}>
-                                                    {f.properties?.name || `Feature #${i + 1}`}
+                                                <div style={{ fontSize: "0.935rem", fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                                    <span>{f.properties?.name || `Feature #${i + 1}`}</span>
+                                                    {selectedSupervisorId && isSupMatch && (
+                                                        <span style={{ fontSize: "10px", backgroundColor: "#2563eb", color: "white", padding: "2px 6px", borderRadius: "4px", fontWeight: 800 }}>Assigned</span>
+                                                    )}
                                                 </div>
                                                 <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                                    <span style={{ padding: "2px 6px", backgroundColor: "#f1f5f9", borderRadius: "4px" }}>{f.geometry?.type}</span>
-                                                    • <span>{f.geometry?.type === "Point" ? "Marker" : "Path"}</span>
+                                                    <span style={{ padding: "2px 6px", backgroundColor: "#f1f5f9", borderRadius: "4px" }}>{f.geometry?.type === "LineString" ? "Segment" : f.geometry?.type}</span>
+                                                    <span>{f.properties?.supervisorAssignedToName || beat.assignedToName || "Street path"}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -401,7 +614,40 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
 
                     {/* Premium Map Canvas */}
                     <div style={{ flex: 1, position: "relative" }}>
+                        {activeSupervisor && (
+                            <div style={{
+                                position: "absolute", top: "20px", left: "50%", transform: "translateX(-50%)",
+                                backgroundColor: "rgba(15, 23, 42, 0.92)", backdropFilter: "blur(12px)",
+                                color: "white", padding: "8px 16px 8px 20px", borderRadius: "999px",
+                                boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.5)",
+                                display: "flex", alignItems: "center", gap: "12px", zIndex: 1000,
+                                border: "1px solid rgba(255, 255, 255, 0.15)",
+                                maxWidth: "90%"
+                            }}>
+                                <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#3b82f6", boxShadow: "0 0 10px #3b82f6", flexShrink: 0, animation: "pulse 2s infinite" }} />
+                                <span style={{ fontSize: "0.85rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    Highlighting beats for <strong style={{ color: "#60a5fa" }}>{activeSupervisor.name}</strong> ({activeSupervisor.count} Beat{activeSupervisor.count === 1 ? '' : 's'})
+                                </span>
+                                <button
+                                    onClick={() => setSelectedSupervisorId(null)}
+                                    style={{
+                                        backgroundColor: "#ef4444", border: "none", color: "white",
+                                        borderRadius: "50%", width: "24px", height: "24px", display: "flex",
+                                        alignItems: "center", justifyContent: "center", cursor: "pointer",
+                                        flexShrink: 0, transition: "transform 0.2s, background-color 0.2s",
+                                        boxShadow: "0 2px 6px rgba(239, 68, 68, 0.4)"
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                    title="Clear Supervisor Filter"
+                                >
+                                    <X size={14} strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        )}
+
                         <MapContainer
+                            key={beat?.id || "beat-map"}
                             center={[20.5937, 78.9629] as LatLngExpression}
                             zoom={5}
                             zoomControl={false}
@@ -429,7 +675,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                             )}
 
                             <GeoJSON
-                                key={`${mapType}-${hoveredFeature}-${searchQuery}-${JSON.stringify(explodedGeoJSON)}`}
+                                key={`${mapType}-${hoveredFeature}-${searchQuery}-${selectedSupervisorId}-${JSON.stringify(explodedGeoJSON)}`}
                                 data={explodedGeoJSON as any}
                                 style={(feature: any) => {
                                     const props = feature?.properties;
@@ -439,14 +685,38 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                     const isSelected = selectedFeature?.properties?.name === featureId || selectedFeature?.properties?.id === props?.id;
                                     const isSelectedOnMap = props?.isSegment && selectedSegmentIds.includes(props.id);
                                     const isUnassigned = props?.isUnassigned;
+                                    const segSupervisorId = props?.supervisorAssignedToId || props?.assignedToId || beat.assignedToId;
+
+                                    if (selectedSupervisorId) {
+                                        const isMatchedSup = segSupervisorId === selectedSupervisorId;
+                                        if (isMatchedSup) {
+                                            return {
+                                                color: "#2563eb",
+                                                weight: (isHovered || isSelected) ? 10 : 8,
+                                                fillOpacity: 0.85,
+                                                fillColor: "#3b82f6",
+                                                opacity: 1,
+                                                dashArray: ""
+                                            };
+                                        } else {
+                                            return {
+                                                color: "#94a3b8",
+                                                weight: 2,
+                                                fillOpacity: 0.05,
+                                                fillColor: "#cbd5e1",
+                                                opacity: 0.18,
+                                                dashArray: "4, 6"
+                                            };
+                                        }
+                                    }
 
                                     return {
-                                        color: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#94a3b8" : color),
-                                        weight: (isHovered || isSelected || isSelectedOnMap) ? 7 : (isUnassigned ? 2 : 4),
+                                        color: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#f59e0b" : color),
+                                        weight: (isHovered || isSelected || isSelectedOnMap) ? 7 : (isUnassigned ? 4 : 4),
                                         fillOpacity: (isHovered || isSelected || isSelectedOnMap) ? 0.6 : 0.25,
-                                        fillColor: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#cbd5e1" : color),
-                                        opacity: isSelectedOnMap ? 1 : (isUnassigned ? 0.4 : 1),
-                                        dashArray: isSelectedOnMap ? "" : (isUnassigned ? "5, 5" : (isHovered ? "5, 5" : ""))
+                                        fillColor: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#fbbf24" : color),
+                                        opacity: isSelectedOnMap ? 1 : (isUnassigned ? 0.95 : 1),
+                                        dashArray: isSelectedOnMap ? "" : (isUnassigned ? "8, 6" : (isHovered ? "5, 5" : ""))
                                     };
                                 }}
                                 pointToLayer={(feature: any, latlng: any) => {
@@ -468,7 +738,9 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                     const props = feature?.properties;
                                     const name = props?.name || (props?.isSegment ? `Beat ${props.index + 1}` : "Unnamed");
                                     const color = getFeatureColor(feature);
-                                    const assignedToName = props?.assignedToName || 'Unassigned';
+                                    const supervisorName = props?.supervisorAssignedToName || beat.assignedToName || "Unassigned";
+                                    const employeeName = props?.employeeAssignedToName || "Unassigned";
+                                    const assignedToName = assignmentMode === "EMPLOYEE" ? employeeName : supervisorName;
                                     const isUnassigned = props?.isUnassigned;
 
                                     if (layer && typeof layer.on === "function") {
@@ -479,27 +751,23 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                                 const L = require("leaflet");
                                                 L.DomEvent.stopPropagation(e);
                                                 setSelectedFeature(feature);
-                                                // Support selection for assignment if it's a segment
                                                 if (props?.isSegment) {
-                                                    setSelectedSegmentIds(prev =>
-                                                        prev.includes(props.id) ? prev.filter(id => id !== props.id) : [...prev, props.id]
-                                                    );
+                                                    toggleSegmentSelection(props.id);
                                                 }
                                             }
                                         });
                                     }
 
                                     if (layer && typeof layer.bindPopup === "function") {
-                                        const isQC = props?.assignedToId === beat.assignedToId && beat.assignedToId;
-                                        const roleColor = isQC ? '#6366f1' : '#db2777';
-                                        const roleLabel = isQC ? "Quality Controller" : "Taskforce Member";
-                                        const avatarBg = isQC ? 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)' : 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)';
+                                        const popupRoleColor = assignmentMode === "EMPLOYEE" ? "#db2777" : "#6366f1";
+                                        const popupRoleLabel = assignmentMode === "EMPLOYEE" ? "Employee" : "Supervisor";
+                                        const avatarBg = assignmentMode === "EMPLOYEE" ? "linear-gradient(135deg, #ec4899 0%, #be185d 100%)" : "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)";
 
                                         layer.bindPopup(`
                                             <div style="font-family: 'Inter', sans-serif; padding: 16px; min-width: 260px;">
                                                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
                                                     <div style="display: flex; align-items: center; gap: 8px;">
-                                                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${isUnassigned ? '#94a3b8' : '#10b981'}; box-shadow: 0 0 10px ${isUnassigned ? '#f1f5f9' : 'rgba(16, 185, 129, 0.4)'}"></div>
+                                                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${isUnassigned ? '#f59e0b' : '#10b981'}; box-shadow: 0 0 10px ${isUnassigned ? 'rgba(245, 158, 11, 0.35)' : 'rgba(16, 185, 129, 0.4)'}"></div>
                                                         <div style="font-weight: 800; color: #1e293b; font-size: 16px;">${name}</div>
                                                     </div>
                                                     ${props?.isSegment ? `<span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:6px; font-size:10px; font-weight: 700;">Beat ${props.index + 1}</span>` : ''}
@@ -511,15 +779,15 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                                 </div>
 
                                                 <div style="background: #f8fafc; padding: 14px; border-radius: 16px; border: 1px solid #f1f5f9;">
-                                                    <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; letter-spacing: 0.05em;">Assigned Person</div>
+                                                    <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; letter-spacing: 0.05em;">Current Assignment</div>
                                                     <div style="display: flex; align-items: center; gap: 12px;">
                                                         <div style="width: 36px; height: 36px; border-radius: 10px; background: ${isUnassigned ? '#cbd5e1' : avatarBg}; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; box-shadow: ${isUnassigned ? 'none' : '0 4px 10px rgba(0,0,0,0.1)'}">
                                                             ${(assignedToName || 'U')[0]}
                                                         </div>
                                                         <div style="display: flex; flex-direction: column;">
                                                             <div style="font-weight: 700; color: #1e293b; font-size: 14px; line-height: 1.2;">${assignedToName}</div>
-                                                            <div style="font-size: 11px; color: ${isUnassigned ? '#94a3b8' : roleColor}; font-weight: 700;">
-                                                                ${isUnassigned ? "Pending Assignment" : roleLabel}
+                                                            <div style="font-size: 11px; color: ${isUnassigned ? '#94a3b8' : popupRoleColor}; font-weight: 700;">
+                                                                ${isUnassigned ? "Pending Assignment" : popupRoleLabel}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -530,9 +798,90 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
                                 }}
                             />
                             <MapController targetFeature={selectedFeature} />
-                            <FitBounds geometry={beat.geometry} />
+                            <FitBounds beat={beat} />
+                            <FitSupervisorBounds beat={beat} selectedSupervisorId={selectedSupervisorId} />
                             <ZoomHandler />
                         </MapContainer>
+
+                        {selectedFeature && (() => {
+                            const props = selectedFeature.properties || {};
+                            const selectedName = props.name || (props.isSegment ? `Beat Segment ${(props.index ?? 0) + 1}` : "Selected feature");
+                            const supervisorName = props.supervisorAssignedToName || beat.assignedToName || "Unassigned";
+                            const employeeName = props.employeeAssignedToName || "Unassigned";
+                            const isSegment = !!props.isSegment;
+                            const segmentSelected = isSegment && selectedSegmentIds.includes(props.id);
+                            return (
+                                <div style={{
+                                    position: "absolute", top: "28px", left: "50%", transform: "translateX(-50%)",
+                                    width: "340px", backgroundColor: "white", borderRadius: "24px", padding: "20px",
+                                    boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.22)", border: "1px solid #e2e8f0", zIndex: 1000
+                                }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#1e293b" }}>{selectedName}</div>
+                                            <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                                                <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 800 }}>Z - {beat.zoneName}</span>
+                                                <span style={{ background: "#f0fdf4", color: "#166534", padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 800 }}>W - {beat.wardName}</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            {isSegment && (
+                                                <button
+                                                    onClick={() => toggleSegmentSelection(props.id)}
+                                                    style={{
+                                                        border: segmentSelected ? "none" : "1px solid #cbd5e1",
+                                                        backgroundColor: segmentSelected ? "#2563eb" : "white",
+                                                        color: segmentSelected ? "white" : "#334155",
+                                                        borderRadius: "12px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize: "0.75rem"
+                                                    }}
+                                                >
+                                                    {segmentSelected ? "Selected" : "Select Segment"}
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => setSelectedFeature(null)}
+                                                style={{
+                                                    width: "32px", height: "32px", borderRadius: "10px",
+                                                    backgroundColor: "#f1f5f9", color: "#64748b",
+                                                    border: "none", cursor: "pointer",
+                                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                                    transition: "all 0.2s", flexShrink: 0
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.backgroundColor = "#fef2f2";
+                                                    e.currentTarget.style.color = "#ef4444";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.backgroundColor = "#f1f5f9";
+                                                    e.currentTarget.style.color = "#64748b";
+                                                }}
+                                                title="Close Details"
+                                            >
+                                                <X size={18} strokeWidth={2.5} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div style={{ marginTop: "16px", display: "grid", gap: "12px" }}>
+                                        <div style={{ background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: "16px", padding: "14px" }}>
+                                            <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Supervisor</div>
+                                            <div style={{ fontWeight: 700, color: "#1e293b" }}>{supervisorName}</div>
+                                        </div>
+                                        <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: "16px", padding: "14px" }}>
+                                            <div style={{ fontSize: "10px", color: "#9d174d", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Employee</div>
+                                            <div style={{ fontWeight: 700, color: "#831843" }}>{employeeName}</div>
+                                        </div>
+                                    </div>
+                                    {isSegment && (
+                                        <button
+                                            onClick={() => setShowAssignModal(true)}
+                                            style={{ marginTop: "16px", width: "100%", padding: "12px 14px", borderRadius: "14px", border: "none", backgroundColor: "#0f172a", color: "white", fontWeight: 700, cursor: "pointer" }}
+                                        >
+                                            {assignmentMode === "EMPLOYEE" ? "Assign Beat Segment" : "Assign Supervisor Segment"}
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Float HUD */}
                         <div style={{
@@ -559,6 +908,7 @@ export default function BeatMapView({ beat, filterUserId, onClose, onEdit, onRef
             {showAssignModal && (
                 <AssignBeatModal
                     beat={beat}
+                    mode={assignmentMode}
                     initialSelectedSegmentIds={selectedSegmentIds}
                     onClose={() => setShowAssignModal(false)}
                     onSuccess={() => {

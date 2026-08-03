@@ -1,125 +1,266 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { clearAuthCookie, decodeToken, getTokenFromCookies, setAuthCookie } from "@lib/auth";
-import { AuthApi } from "@lib/apiClient";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+} from "react";
+import {
+  getStoredToken,
+  normalizeAuthUser
+} from "@lib/auth";
+import {
+  ApiError,
+  AuthApi
+} from "@lib/apiClient";
 import type { AuthUser } from "../types/auth";
 import { roleLabel } from "@lib/labels";
+import {
+  clearPersistedAccessToken,
+  clearPersistedUserSnapshot,
+  getPersistedUserSnapshot,
+  persistAccessToken,
+  persistUserSnapshot
+} from "@lib/session";
 
 interface AuthContextValue {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
+  setAuthenticatedUser: (
+    token: string,
+    user: AuthUser | null
+  ) => void;
+  hydrateUser: () => Promise<void>;
   logout: () => Promise<void>;
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AuthContext = createContext<
+  AuthContextValue | undefined
+>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+function getUnifiedSessionUser(): AuthUser | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawSession = localStorage.getItem(
+      "unified_auth_session"
+    );
+
+    if (!rawSession) {
+      return null;
+    }
+
+    const unifiedSession = JSON.parse(rawSession);
+    const sessionUser = unifiedSession?.user;
+
+    if (!sessionUser) {
+      return null;
+    }
+
+    const normalizedUser = normalizeAuthUser(
+      sessionUser as AuthUser
+    );
+
+    if (normalizedUser) {
+      normalizedUser.roleLabels =
+        normalizedUser.roles.map((role) =>
+          roleLabel(role)
+        );
+
+      return normalizedUser;
+    }
+
+    const rawRoles = Array.isArray(
+      sessionUser.roles
+    )
+      ? sessionUser.roles
+      : sessionUser.role
+        ? [sessionUser.role]
+        : [];
+
+    const roles = rawRoles.map(
+      (role: unknown) =>
+        String(role).toUpperCase()
+    );
+
+    return {
+      ...sessionUser,
+      roles,
+      roleLabels: roles.map((role: string) =>
+        roleLabel(role)
+      )
+    } as AuthUser;
+  } catch {
+    localStorage.removeItem(
+      "unified_auth_session"
+    );
+
+    return null;
+  }
+}
+
+export function AuthProvider({
+  children
+}: {
+  children: React.ReactNode;
+}) {
+  const [user, setUser] =
+    useState<AuthUser | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const applyUser = (
+    nextUser: AuthUser | null,
+    persist = true
+  ) => {
+    if (!nextUser) {
+      setUser(null);
+
+      if (persist) {
+        clearPersistedUserSnapshot();
+      }
+
+      return;
+    }
+
+    const normalized =
+      normalizeAuthUser(nextUser);
+
+    if (!normalized) {
+      setUser(null);
+
+      if (persist) {
+        clearPersistedUserSnapshot();
+      }
+
+      return;
+    }
+
+    normalized.roleLabels =
+      normalized.roles.map((role) =>
+        roleLabel(role)
+      );
+
+    setUser(normalized);
+
+    if (persist) {
+      persistUserSnapshot(normalized);
+    }
+  };
+
+  const clearSession = () => {
+    clearPersistedAccessToken();
+    clearPersistedUserSnapshot();
+    setUser(null);
+  };
+
+  const hydrateUser = async () => {
+    const token = getStoredToken();
+
+    const snapshot =
+      getPersistedUserSnapshot<AuthUser>();
+
+    const unifiedUser =
+      getUnifiedSessionUser();
+
+    /*
+     * Unified users may have access only to
+     * MatrixTrack or Ward Ranking and therefore
+     * may not have a Taskforce access token.
+     */
+    if (!token) {
+      if (unifiedUser) {
+        applyUser(unifiedUser);
+      } else {
+        clearSession();
+      }
+
+      setLoading(false);
+      return;
+    }
+
+    if (snapshot) {
+      applyUser(snapshot, false);
+    } else if (unifiedUser) {
+      applyUser(unifiedUser, false);
+    }
+
+    try {
+      const response =
+        await AuthApi.getMe();
+
+      applyUser(
+        response.user as AuthUser
+      );
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        (
+          error.status === 401 ||
+          error.status === 403
+        )
+      ) {
+        /*
+         * Taskforce session may be invalid while
+         * another unified portal session is valid.
+         */
+        if (unifiedUser) {
+          clearPersistedAccessToken();
+          applyUser(unifiedUser);
+        } else {
+          clearSession();
+        }
+      } else if (
+        !snapshot &&
+        !unifiedUser
+      ) {
+        /*
+         * Preserve the token during temporary
+         * backend or development server failures.
+         */
+        setUser(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let resolvedUser: AuthUser | null = null;
-
-    // Existing Taskforce authentication
-    const taskforceCookieToken = getTokenFromCookies();
-
-    if (taskforceCookieToken) {
-      resolvedUser = decodeToken(taskforceCookieToken);
-    }
-
-    // Unified-login fallback
-    if (
-      !resolvedUser &&
-      typeof window !== "undefined"
-    ) {
-      try {
-        const rawSession = localStorage.getItem(
-          "unified_auth_session",
-        );
-
-        if (rawSession) {
-          const unifiedSession = JSON.parse(rawSession);
-
-          const taskforceToken =
-            unifiedSession?.tokens?.taskforce ||
-            localStorage.getItem(
-              "taskforce_access_token",
-            );
-
-          if (taskforceToken) {
-            resolvedUser = decodeToken(
-              taskforceToken,
-              unifiedSession?.user,
-            );
-          }
-
-          // MatrixTrack/Ward Ranking users may not have
-          // a Taskforce token, but still need portal-home access.
-          if (!resolvedUser && unifiedSession?.user) {
-            const sessionUser = unifiedSession.user;
-
-            const rawRoles = Array.isArray(
-              sessionUser.roles,
-            )
-              ? sessionUser.roles
-              : sessionUser.role
-                ? [sessionUser.role]
-                : [];
-
-            const roles = rawRoles.map(
-              (role: unknown) =>
-                String(role).toUpperCase(),
-            );
-
-            resolvedUser = {
-              ...sessionUser,
-              roles,
-              roleLabels: roles.map((role: string) =>
-                roleLabel(role),
-              ),
-            } as AuthUser;
-          }
-        }
-      } catch {
-        localStorage.removeItem(
-          "unified_auth_session",
-        );
-      }
-    }
-
-    if (resolvedUser) {
-      resolvedUser.roleLabels =
-        resolvedUser.roles?.map((role: string) =>
-          roleLabel(role),
-        );
-    }
-
-    setUser(resolvedUser);
-    setLoading(false);
+    void hydrateUser();
   }, []);
 
   const logout = async () => {
     try {
       await AuthApi.logout();
     } catch {
-      // Server logout fail hone par bhi local session clear hogi
+      /*
+       * Local sessions must still be cleared even
+       * when the backend logout request fails.
+       */
     }
 
-    clearAuthCookie();
+    clearSession();
 
     if (typeof window !== "undefined") {
-      [
+      const unifiedStorageKeys = [
         "unified_auth_session",
         "active_unified_application",
         "taskforce_access_token",
         "matrixtrack_access_token",
         "ward_ranking_access_token",
         "swachh_token",
-        "token",
-      ].forEach((key) => {
+        "token"
+      ];
+
+      unifiedStorageKeys.forEach((key) => {
         localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
       });
 
       document.cookie =
@@ -127,21 +268,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       document.cookie =
         "hms_access_token=; Path=/; Max-Age=0; SameSite=Lax";
-    }
 
-    setUser(null);
-
-    if (typeof window !== "undefined") {
-      window.location.replace("/unified-login");
+      window.location.replace(
+        "/unified-login"
+      );
     }
   };
 
-  const value = useMemo(() => ({ user, setUser, logout, loading }), [user, loading]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const setAuthenticatedUser = (
+    token: string,
+    nextUser: AuthUser | null
+  ) => {
+    persistAccessToken(token);
+    applyUser(nextUser);
+  };
+
+  const value = useMemo(
+    () => ({
+      user,
+      setUser: (
+        nextUser: AuthUser | null
+      ) => applyUser(nextUser),
+      setAuthenticatedUser,
+      hydrateUser,
+      logout,
+      loading
+    }),
+    [user, loading]
+  );
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
+  const context =
+    useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      "useAuth must be used within AuthProvider"
+    );
+  }
+
+  return context;
 }

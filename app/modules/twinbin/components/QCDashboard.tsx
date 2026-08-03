@@ -27,8 +27,8 @@ export default function QCDashboard() {
     // Modal States
     const [viewRecord, setViewRecord] = useState<any | null>(null);
     const [assignRecord, setAssignRecord] = useState<any | null>(null);
-    const [employees, setEmployees] = useState<any[]>([]);
-    const [employeesLoading, setEmployeesLoading] = useState(false);
+    const [supervisors, setEmployees] = useState<any[]>([]);
+    const [supervisorsLoading, setEmployeesLoading] = useState(false);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
     const [showEmployees, setShowEmployees] = useState(false);
 
@@ -103,13 +103,13 @@ export default function QCDashboard() {
     }
 
     async function loadEmployees() {
-        if (employees.length > 0) return;
+        if (supervisors.length > 0) return;
         setEmployeesLoading(true);
         try {
             const res = await EmployeesApi.list("LITTERBINS");
             setEmployees(res.employees || []);
         } catch (err) {
-            alert("Failed to load employees");
+            alert("Failed to load supervisors");
         } finally {
             setEmployeesLoading(false);
         }
@@ -188,17 +188,17 @@ export default function QCDashboard() {
         loadEmployees();
     }
 
-    // Filter employees for the selected bin's zone/ward
+    // Filter supervisors for the selected bin's zone/ward
     const eligibleEmployees = useMemo(() => {
         if (!assignRecord) return [];
-        return employees.filter(e => {
+        return supervisors.filter(e => {
             if (assignRecord.zoneName) {
                 // EmployeesApi returns zone names in 'zones' array
                 if (!e.zones?.includes(assignRecord.zoneName)) return false;
             }
             return true;
         });
-    }, [employees, assignRecord]);
+    }, [supervisors, assignRecord]);
 
 
     function getRecordLabel(type: string) {
@@ -516,8 +516,8 @@ export default function QCDashboard() {
                             Assigning bin at <b>{assignRecord.areaName}</b> ({assignRecord.zoneName})
                         </p>
 
-                        {employeesLoading ? (
-                            <div className="py-4 text-center">Loading employees...</div>
+                        {supervisorsLoading ? (
+                            <div className="py-4 text-center">Loading supervisors...</div>
                         ) : (
                             <div className="form-control w-full">
                                 <label className="label">
@@ -528,7 +528,7 @@ export default function QCDashboard() {
                                     value={selectedEmployeeId}
                                     onChange={(e) => setSelectedEmployeeId(e.target.value)}
                                 >
-                                    <option value="" disabled>Choose an employee...</option>
+                                    <option value="" disabled>Choose an supervisor...</option>
                                     {eligibleEmployees.map(e => (
                                         <option key={e.id} value={e.id}>
                                             {e.name} ({e.email})
@@ -537,7 +537,7 @@ export default function QCDashboard() {
                                 </select>
                                 <label className="label">
                                     <span className="label-text-alt text-warning">
-                                        Only showing employees with LITTERBINS access.
+                                        Only showing supervisors with LITTERBINS access.
                                     </span>
                                 </label>
                             </div>
@@ -567,10 +567,10 @@ export default function QCDashboard() {
                             </button>
                         </div>
 
-                        {employeesLoading ? (
-                            <div className="py-6 text-center">Loading employees...</div>
-                        ) : employees.length === 0 ? (
-                            <div className="muted text-sm">No employees found for this module.</div>
+                        {supervisorsLoading ? (
+                            <div className="py-6 text-center">Loading supervisors...</div>
+                        ) : supervisors.length === 0 ? (
+                            <div className="muted text-sm">No supervisors found for this module.</div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="table table-sm">
@@ -582,7 +582,7 @@ export default function QCDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {employees.map((e) => (
+                                        {supervisors.map((e) => (
                                             <tr key={e.id}>
                                                 <td>{e.name}</td>
                                                 <td>{e.email}</td>
@@ -635,3 +635,4 @@ function StatusBadge({ status }: { status: string }) {
         </span>
     );
 }
+

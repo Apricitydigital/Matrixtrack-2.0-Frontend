@@ -30,7 +30,7 @@ export default function QCDashboard() {
     const [toDate, setToDate] = useState<string>("");
 
     // Employee Assignment
-    const [employees, setEmployees] = useState<{ id: string; name: string; email: string }[]>([]);
+    const [supervisors, setEmployees] = useState<{ id: string; name: string; email: string }[]>([]);
     const [assignModalOpen, setAssignModalOpen] = useState(false);
     const [assignRecord, setAssignRecord] = useState<RecordItem | null>(null);
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
@@ -42,16 +42,16 @@ export default function QCDashboard() {
 
     async function loadEmployees() {
         try {
-            // Assuming Twinbin module employees. 
+            // Assuming Twinbin module supervisors.
             // If generic, might need to list all or filter by module.
             // Using "twinbin" (lowercase) or "LITTERBINS" depending on how backend expects it.
             // Backend usually expects normalized key. Let's try "LITTERBINS" first or check what other calls use.
-            // router.ts uses "LITTERBINS". 
+            // router.ts uses "LITTERBINS".
             // Using "twinbin" (lowercase) to match the records call and likely backend canonical key
             const res = await apiFetch<{ employees: any[] }>("/city/employees?moduleKey=twinbin");
             setEmployees(res.employees || []);
         } catch (err) {
-            console.error("Failed to load employees", err);
+            console.error("Failed to load supervisors", err);
         }
     }
     async function loadRecords() {
@@ -341,7 +341,7 @@ export default function QCDashboard() {
             {/* Assign Modal */}
             {assignModalOpen && (
                 <AssignModal
-                    employees={employees}
+                    supervisors={supervisors}
                     record={assignRecord}
                     onClose={() => setAssignModalOpen(false)}
                     onAssign={(empId) => {
@@ -355,8 +355,8 @@ export default function QCDashboard() {
     );
 }
 
-function AssignModal({ employees, record, onClose, onAssign, loading }: {
-    employees: { id: string; name: string; email: string; zones?: string[]; wards?: string[] }[];
+function AssignModal({ supervisors, record, onClose, onAssign, loading }: {
+    supervisors: { id: string; name: string; email: string; zones?: string[]; wards?: string[] }[];
     record: RecordItem | null;
     onClose: () => void;
     onAssign: (id: string) => void;
@@ -367,16 +367,16 @@ function AssignModal({ employees, record, onClose, onAssign, loading }: {
         if (!record) return [];
         const rZone = record.zoneName;
 
-        return employees.filter(e => {
+        return supervisors.filter(e => {
             return rZone && e.zones?.includes(rZone);
         });
-    }, [employees, record]);
+    }, [supervisors, record]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white p-6 rounded-lg shadow-xl w-96">
                 <h3 className="text-lg font-bold mb-4">Assign Bin</h3>
-                <p className="mb-4 text-sm">Select an employee to assign this bin to. This will also approve the request.</p>
+                <p className="mb-4 text-sm">Select an supervisor to assign this bin to. This will also approve the request.</p>
 
                 <div className="form-control w-full mb-4">
                     <label className="label">
@@ -396,7 +396,7 @@ function AssignModal({ employees, record, onClose, onAssign, loading }: {
                     </select>
                     {displayedEmployees.length === 0 && (
                         <div className="text-xs text-error mt-1">
-                            No employees found in this zone.
+                            No supervisors found in this zone.
                         </div>
                     )}
                 </div>

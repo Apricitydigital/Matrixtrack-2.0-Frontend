@@ -1,5 +1,7 @@
-import { getTokenFromCookies } from "@lib/auth";
+import { getStoredToken } from "@lib/auth";
+import { clearPersistedAccessToken, clearPersistedUserSnapshot } from "@lib/session";
 import type { ModuleName } from "../types/auth";
+import type { ApiSuccess, AuthLoginResponse, AuthMeResponse, CityListResponse, CityMasterNode, MasterNode } from "../types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 
@@ -11,11 +13,34 @@ export class ApiError extends Error {
   }
 }
 
+function parseErrorMessage(raw: string, fallback: string) {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.error === "string") return parsed.error;
+  } catch { }
+  return raw;
+}
+
+function handleUnauthorized(path: string, message: string) {
+  if (typeof window === "undefined") return;
+  if (path === "/auth/login" || path === "/auth/logout") return;
+  const normalized = message.toLowerCase();
+  const isExpired = normalized.includes("expired token") || normalized.includes("invalid or expired token") || normalized.includes("missing authorization header");
+  if (!isExpired) return;
+  clearPersistedAccessToken();
+  clearPersistedUserSnapshot();
+  const currentPath = window.location.pathname || "";
+  if (!currentPath.startsWith("/login")) {
+    window.location.replace("/login?reason=session-expired");
+  }
+}
+
 async function buildHeaders(initHeaders?: HeadersInit, isFormData?: boolean) {
-  const token = getTokenFromCookies();
-  const headers: any = {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...initHeaders
+    ...Object.fromEntries(new Headers(initHeaders).entries())
   };
   if (!isFormData) {
     headers["Content-Type"] = "application/json";
@@ -34,7 +59,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   });
 
   if (!res.ok) {
-    const message = await res.text();
+    const rawMessage = await res.text();
+    const message = parseErrorMessage(rawMessage, res.statusText);
+    if (res.status === 401) {
+      handleUnauthorized(path, message);
+    }
     throw new ApiError(res.status, message || res.statusText);
   }
 
@@ -130,7 +159,7 @@ export interface UnifiedRegistrationRequest {
 
 export const AuthApi = {
   login: async (body: { email: string; password: string; cityId?: string }) =>
-    apiFetch<{ token: string; user: any; redirectTo: string }>("/auth/login", {
+    apiFetch<AuthLoginResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(body)
     }),
@@ -171,7 +200,7 @@ export const AuthApi = {
       {
         method: "POST",
         body: JSON.stringify(body),
-      },
+      }
     ),
 
   unifiedRegisterRequest: (
@@ -192,15 +221,53 @@ export const AuthApi = {
         body: JSON.stringify(body),
       }
     ),
-  logout: async () => apiFetch<{ success: boolean }>("/auth/logout", { method: "POST" }),
-  getMe: async () => apiFetch<{ user: any }>("/auth/me")
+
+  registerEmployeeRequest: (body: {
+    ulbCode: string;
+    name: string;
+    email: string;
+    phone: string;
+    aadharNumber: string;
+    password: string;
+    zoneId: string;
+    wardId: string;
+    cityId?: string;
+  }) =>
+    apiFetch<{
+      success: boolean;
+      message: string;
+    }>("/auth/register-employee-request", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  logout: async () =>
+    apiFetch<ApiSuccess>("/auth/logout", {
+      method: "POST",
+    }),
+
+  getMe: async () =>
+    apiFetch<AuthMeResponse>("/auth/me"),
 };
 
 export const CityApi = {
-  list: () => apiFetch<{ cities: { id: string; name: string }[] }>("/hms/cities"),
-  create: (body: { name: string; code: string; ulbCode: string }) =>
+  list: () => apiFetch<CityListResponse>("/hms/cities"),
+  listStates: () => apiFetch<{ states: MasterNode[] }>("/hms/locations/states"),
+  listDivisions: (stateId: string) =>
+    apiFetch<{ divisions: (MasterNode & { stateId: string })[] }>(
+      `/hms/locations/divisions?stateId=${encodeURIComponent(stateId)}`
+    ),
+  listDistricts: (stateId: string, divisionId: string) =>
+    apiFetch<{ districts: (MasterNode & { stateId: string; divisionId: string })[] }>(
+      `/hms/locations/districts?stateId=${encodeURIComponent(stateId)}&divisionId=${encodeURIComponent(divisionId)}`
+    ),
+  listCities: (districtId: string) =>
+    apiFetch<{ cities: CityMasterNode[] }>(
+      `/hms/locations/cities?districtId=${encodeURIComponent(districtId)}`
+    ),
+  create: (body: { stateId: string; divisionId: string; districtId: string; cityMasterId: string; code: string; ulbCode: string }) =>
     apiFetch("/hms/cities", { method: "POST", body: JSON.stringify(body) }),
-  update: (cityId: string, body: { name?: string; code?: string; ulbCode?: string; enabled?: boolean; adminName?: string; adminEmail?: string }) =>
+  update: (cityId: string, body: { stateId?: string; divisionId?: string; districtId?: string; cityMasterId?: string; name?: string; code?: string; ulbCode?: string; enabled?: boolean; adminName?: string; adminEmail?: string }) =>
     apiFetch(`/hms/cities/${cityId}`, { method: "PATCH", body: JSON.stringify(body) }),
   setEnabled: (cityId: string, enabled: boolean) =>
     CityApi.update(cityId, { enabled }),
@@ -213,6 +280,15 @@ export const CityApi = {
     apiFetch(`/hms/cities/${cityId}/admins`, {
       method: "POST",
       body: JSON.stringify({ ...body, cityId })
+    }),
+  updateCityAdmin: (cityId: string, userId: string, body: { email?: string; password?: string; name?: string }) =>
+    apiFetch(`/hms/cities/${cityId}/admins/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body)
+    }),
+  removeCityAdmin: (cityId: string, userId: string) =>
+    apiFetch(`/hms/cities/${cityId}/admins/${userId}`, {
+      method: "DELETE"
     }),
   getStats: (params?: { startDate?: string; endDate?: string }) => {
     const sp = new URLSearchParams();
@@ -227,7 +303,7 @@ export const CityApi = {
         ulbOfficials: number;
         actionOfficers: number;
         cityAdmins: number;
-      }
+      };
     }>(`/city/stats${query}`);
   }
 };
@@ -246,11 +322,10 @@ export const HmsApi = {
         ulbOfficials: number;
         actionOfficers: number;
         cityAdmins: number;
-      }
+      };
     }>(`/hms/stats${query}`);
   }
 };
-
 export const ModuleApi = {
   list: () => apiFetch<{ modules: { id: string; name: string }[] }>("/hms/modules")
 };
@@ -281,10 +356,16 @@ export const AreaBeatApi = {
   remove: (id: string) => apiFetch<{ success: boolean }>(`/city/areas/${id}`, { method: "DELETE" }),
   listPotentialAssignees: (id: string, role?: string) =>
     apiFetch<any[]>(`/city/areas/${id}/potential-assignees${role ? `?role=${role}` : ""}`),
-  assign: (id: string, userId: string | null, segmentId?: string | null, segmentIds?: string[]) =>
+  assign: (
+    id: string,
+    userId: string | null,
+    segmentId?: string | null,
+    segmentIds?: string[],
+    targetRole?: "SUPERVISOR" | "EMPLOYEE"
+  ) =>
     apiFetch(`/city/areas/${id}/assign`, {
       method: "POST",
-      body: JSON.stringify({ userId, segmentId, segmentIds })
+      body: JSON.stringify({ userId, segmentId, segmentIds, targetRole })
     })
 };
 
@@ -472,16 +553,16 @@ export const ToiletApi = {
   getWardsByZone: (zoneId: string) => apiFetch<{ nodes: any[] }>(`/city/geo?level=WARD&parentId=${zoneId}`),
 
   // Assignments
-  listEmployees: () => EmployeesApi.list("toilet"),
-  bulkAssignToilets: (employeeId: string, toiletIds: string[], category: string) =>
+  listEmployees: () => apiFetch<{ employees: any[] }>("/modules/toilet/staff"),
+  bulkAssignToilets: (supervisorId: string, toiletIds: string[], category: string) =>
     apiFetch("/modules/toilet/assignments/bulk", {
       method: "POST",
-      body: JSON.stringify({ employeeId, toiletIds, category })
+      body: JSON.stringify({ supervisorId, toiletIds, category })
     }),
-  unassignToilet: (employeeId: string, toiletId: string) =>
+  unassignToilet: (supervisorId: string, toiletId: string) =>
     apiFetch("/modules/toilet/assignments/remove", {
       method: "POST",
-      body: JSON.stringify({ employeeId, toiletId })
+      body: JSON.stringify({ supervisorId, toiletId })
     })
 };
 
@@ -518,9 +599,9 @@ export const ModuleRecordsApi = {
 export const RegistrationApi = {
   listRequests: () =>
     apiFetch<{
-      requests: { id: string; name: string; email: string; phone: string; aadhaar: string; status: string; createdAt: string }[];
+      requests: { id: string; name: string; email: string; phone: string; aadhaar: string; status: string; createdAt: string; requestedRole?: "SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER" }[];
     }>("/city/registration-requests"),
-  approve: (id: string, body: { role: "EMPLOYEE" | "QC" | "ACTION_OFFICER"; moduleKeys: string[] }) =>
+  approve: (id: string, body: { role: "SUPERVISOR" | "EMPLOYEE" | "QC" | "ACTION_OFFICER"; moduleKeys: string[] }) =>
     apiFetch<{ success: boolean }>(`/city/registration-requests/${id}/approve`, {
       method: "POST",
       body: JSON.stringify(body)
@@ -533,20 +614,28 @@ export const RegistrationApi = {
 };
 
 export const EmployeesApi = {
-  list: (moduleKey?: string) =>
-    apiFetch<{
-      employees: {
-        id: string;
-        name: string;
-        email: string;
-        phone?: string;
-        role: string;
-        modules: { id: string; key: string; name: string; canWrite: boolean }[];
-        zones: string[];
-        wards: string[];
-        createdAt: string;
-      }[];
-    }>(moduleKey ? `/city/employees?moduleKey=${encodeURIComponent(moduleKey)}` : "/city/employees")
+  list: async (moduleKey?: string) => {
+    const res = await CityUserApi.list();
+    const normalizedModuleKey = moduleKey?.trim().toUpperCase();
+    const employees = (res.users || [])
+      .filter((user) =>
+        normalizedModuleKey
+          ? (user.modules || []).some((module) => module.key?.toUpperCase() === normalizedModuleKey)
+          : true
+      )
+      .map((user) => ({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        modules: user.modules || [],
+        zones: user.zoneIds || [],
+        wards: user.wardIds || [],
+        createdAt: user.createdAt
+      }));
+
+    return { employees };
+  }
 };
 
 export const TwinbinApi = {
@@ -642,3 +731,9 @@ export const TwinbinApi = {
       body: JSON.stringify(body || {})
     })
 };
+
+
+
+
+
+

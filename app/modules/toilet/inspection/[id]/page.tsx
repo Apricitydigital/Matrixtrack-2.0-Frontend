@@ -127,7 +127,7 @@ export default function InspectionDetailPage() {
                                 <p className="text-slate-400 text-sm font-bold">Current Status: <span className="text-indigo-400 uppercase tracking-wider">{inspection.status.replace('_', ' ')}</span></p>
                             </div>
                             <div className="flex flex-wrap gap-3">
-                                {(inspection.status === 'SUBMITTED') && (user.roles.includes('QC') || user.roles.includes('CITY_ADMIN') || user.roles.includes('HMS_SUPER_ADMIN')) && (
+                                {(inspection.status === 'SUBMITTED') && user.roles.includes('QC') && (
                                     <>
                                         <button
                                             disabled={submitting}
@@ -153,7 +153,14 @@ export default function InspectionDetailPage() {
                                     </>
                                 )}
 
-                                {(inspection.status === 'ACTION_REQUIRED') && (user.roles.includes('ACTION_OFFICER') || user.roles.includes('CITY_ADMIN') || user.roles.includes('HMS_SUPER_ADMIN')) && (
+                                {(inspection.status === 'SUBMITTED') && !user.roles.includes('QC') && (
+                                    <div className="bg-white/10 px-6 py-3 rounded-2xl border border-white/10 flex items-center gap-2">
+                                        <span className="text-amber-400">ℹ️</span>
+                                        <p className="text-slate-300 font-bold text-sm">Read-Only View • Audit decisions reserved for Quality Control (QC)</p>
+                                    </div>
+                                )}
+
+                                {(inspection.status === 'ACTION_REQUIRED') && user.roles.includes('ACTION_OFFICER') && (
                                     <>
                                         <button
                                             disabled={submitting}
@@ -170,6 +177,13 @@ export default function InspectionDetailPage() {
                                             REJECT PERMANENTLY
                                         </button>
                                     </>
+                                )}
+
+                                {(inspection.status === 'ACTION_REQUIRED') && !user.roles.includes('ACTION_OFFICER') && !user.roles.includes('QC') && (
+                                    <div className="bg-white/10 px-6 py-3 rounded-2xl border border-white/10 flex items-center gap-2">
+                                        <span className="text-amber-400">ℹ️</span>
+                                        <p className="text-slate-300 font-bold text-sm">Action Required • Under resolution by Action Officer</p>
+                                    </div>
                                 )}
 
                                 {(inspection.status === 'APPROVED' || inspection.status === 'REJECTED') && (

@@ -101,7 +101,7 @@ type ActionButtonsProps = {
   onApprove?: () => void;
   onReject?: () => void;
   onActionRequired?: () => void;
-  onAssign?: (employeeId?: string) => void;
+  onAssign?: (supervisorId?: string) => void;
   assignOptions?: { id: string; name?: string; email?: string }[];
   assignValue?: string;
   onAssignChange?: (val: string) => void;

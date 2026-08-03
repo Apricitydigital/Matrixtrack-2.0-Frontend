@@ -424,7 +424,7 @@ export default function TaskforceTasksPage() {
 
   // STANDARD VIEW (Original)
   return (
-    <ModuleGuard module="TASKFORCE" roles={["EMPLOYEE", "ACTION_OFFICER", "QC", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
+    <ModuleGuard module="TASKFORCE" roles={["SUPERVISOR", "ACTION_OFFICER", "QC", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
       <div className="content">
         <section className="card card-spacious mb-6">
           <div className="section-header">
@@ -672,3 +672,4 @@ function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
+

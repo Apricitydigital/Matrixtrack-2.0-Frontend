@@ -33,7 +33,7 @@ export default function EmployeeSweepingPage() {
 
     return (
         <Protected>
-            <ModuleGuard module="SWEEPING" roles={["EMPLOYEE"]}>
+            <ModuleGuard module="SWEEPING" roles={["SUPERVISOR"]}>
                 <div className="page" style={{ padding: "32px", backgroundColor: "#f8fafc", minHeight: "100vh" }}>
                     <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
                         {/* Header */}
@@ -144,3 +144,4 @@ export default function EmployeeSweepingPage() {
         </Protected>
     );
 }
+

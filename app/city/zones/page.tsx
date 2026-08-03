@@ -85,7 +85,7 @@ export default function ZoneManagementPage() {
       setEditingId(null);
       await loadZones();
     } catch (err) {
-      alert("Failed to update zone");
+      alert(err instanceof ApiError ? err.message : "Failed to update zone");
     } finally {
       setUpdatingId(null);
     }
@@ -93,13 +93,13 @@ export default function ZoneManagementPage() {
 
   const deleteZone = async (id: string) => {
     if (isReadOnly) return;
-    if (!confirm("Are you sure? This will delete all wards under this zone!")) return;
+    if (!confirm("Are you sure? This will delete this zone and all wards, areas, and beats under it.")) return;
     setDeletingId(id);
     try {
       await apiFetch(`/city/geo/${id}`, { method: "DELETE" });
       await loadZones();
     } catch (err) {
-      alert("Failed to delete zone");
+      alert(err instanceof ApiError ? err.message : "Failed to delete zone");
     } finally {
       setDeletingId(null);
     }
