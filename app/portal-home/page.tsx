@@ -1178,6 +1178,12 @@ export default function PortalHomePage() {
             userRoles={user?.roles || []}
             userCityName={cityName || 'Indore'}
             workspaceUrl={workspaceUrl}
+            enableTaskforceData={
+              hasTaskforceAccess
+            }
+            enableWardRankingData={
+              hasSwachhAccess
+            }
           />
 
           {/* Footer */}
