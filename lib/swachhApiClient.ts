@@ -26,39 +26,53 @@ swachhApi.interceptors.request.use((config) => {
     config.url = `/api${separator}${config.url}`;
   }
 
-  // Multi-source Auth Token extraction (Cookies -> localStorage user -> localStorage token)
-  let token: string | undefined = undefined;
+  // Ward Ranking token must be selected before Taskforce fallbacks.
+  let token: string | undefined;
 
   if (typeof window !== "undefined") {
-    // 1. Try MatrixTrack 2.0 SSO Cookie Token
-    token = getTokenFromCookies();
+    // 1. Unified Ward Ranking token
+    token =
+      localStorage.getItem(
+        "ward_ranking_access_token"
+      ) || undefined;
 
-    // 2. Fallback to localStorage user JSON
+    // 2. Preserve existing standalone/legacy cookie flow
     if (!token) {
-      const userJson = localStorage.getItem("user");
+      token = getTokenFromCookies();
+    }
+
+    // 3. Preserve existing user snapshot fallback
+    if (!token) {
+      const userJson =
+        localStorage.getItem("user");
+
       if (userJson) {
         try {
           const parsed = JSON.parse(userJson);
-          if (parsed.token) {
+
+          if (
+            parsed &&
+            typeof parsed.token === "string"
+          ) {
             token = parsed.token;
           }
-        } catch (e) {
-          // Ignore JSON parse error
+        } catch {
+          // Ignore malformed legacy user data.
         }
       }
     }
 
-    // 3. Fallback to direct localStorage token string
+    // 4. Preserve existing legacy token keys
     if (!token) {
-      const rawToken = localStorage.getItem("token") || localStorage.getItem("swachh_token");
-      if (rawToken) {
-        token = rawToken;
-      }
+      token =
+        localStorage.getItem("swachh_token") ||
+        localStorage.getItem("token") ||
+        undefined;
     }
 
-    // Attach Authorization header
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers.Authorization =
+        `Bearer ${token}`;
     }
   }
 

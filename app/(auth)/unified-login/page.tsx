@@ -17,6 +17,7 @@ import {
   Check
 } from "lucide-react";
 import { setAuthCookie } from "@lib/auth";
+import { persistAccessToken } from "@lib/session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -181,8 +182,16 @@ export default function LoginPage() {
         "taskforce_access_token",
         taskforce,
       );
+
+      // Token used by apiFetch() for Authorization header
+      persistAccessToken(taskforce);
+
+      // Preserve existing Taskforce cookie/localStorage compatibility
+      setAuthCookie(taskforce);
     } else {
-      localStorage.removeItem("taskforce_access_token");
+      localStorage.removeItem(
+        "taskforce_access_token"
+      );
     }
 
     if (matrixTrack) {

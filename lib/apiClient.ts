@@ -4,6 +4,13 @@ import type { ModuleName } from "../types/auth";
 import type { ApiSuccess, AuthLoginResponse, AuthMeResponse, CityListResponse, CityMasterNode, MasterNode } from "../types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+let logoutInProgress = false;
+
+export function setLogoutInProgress(
+  value: boolean
+) {
+  logoutInProgress = value;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -22,17 +29,106 @@ function parseErrorMessage(raw: string, fallback: string) {
   return raw;
 }
 
-function handleUnauthorized(path: string, message: string) {
-  if (typeof window === "undefined") return;
-  if (path === "/auth/login" || path === "/auth/logout") return;
-  const normalized = message.toLowerCase();
-  const isExpired = normalized.includes("expired token") || normalized.includes("invalid or expired token") || normalized.includes("missing authorization header");
-  if (!isExpired) return;
+function handleUnauthorized(
+  path: string,
+  message: string
+) {
+  if (typeof window === "undefined") {
+    return;
+    console.error("[AUTH_401_TRACE]", {
+      path,
+      message,
+      currentPath: window.location.pathname,
+      unifiedSessionPresent: Boolean(
+        localStorage.getItem("unified_auth_session")
+      ),
+      taskforceTokenPresent: Boolean(
+        localStorage.getItem("taskforce_access_token")
+      ),
+      matrixtrackTokenPresent: Boolean(
+        localStorage.getItem("matrixtrack_access_token")
+      ),
+      wardRankingTokenPresent: Boolean(
+        localStorage.getItem("ward_ranking_access_token")
+      ),
+      genericTokenPresent: Boolean(
+        localStorage.getItem("token")
+      ),
+      unifiedCookiePresent:
+        document.cookie.includes("unified_session="),
+      hmsCookiePresent:
+        document.cookie.includes("hms_access_token="),
+    });
+  }
+  /*
+ * Logout ke dauran mounted dashboard ki pending
+ * requests 401 de sakti hain. Unhe session expiry
+ * nahi maana jayega.
+ */
+  if (logoutInProgress) {
+    return;
+  }
+
+  const cleanPath = path.split("?")[0];
+
+  /*
+   * Login, OTP and registration failures should be
+   * displayed inside their forms. They are not an
+   * existing-session expiry.
+   */
+  const isAuthenticationRequest =
+    cleanPath === "/auth/login" ||
+    cleanPath === "/auth/logout" ||
+    cleanPath === "/auth/register-request" ||
+    cleanPath === "/auth/register-employee-request" ||
+    cleanPath === "/auth/request-unified-registration" ||
+    cleanPath === "/auth/unified-login" ||
+    cleanPath.startsWith(
+      "/auth/unified-login/"
+    );
+
+  if (isAuthenticationRequest) {
+    return;
+  }
+
+  const normalizedMessage =
+    message.toLowerCase();
+
+  const isExpiredSession =
+    normalizedMessage.includes(
+      "expired token"
+    ) ||
+    normalizedMessage.includes(
+      "invalid or expired token"
+    ) ||
+    normalizedMessage.includes(
+      "missing authorization header"
+    );
+
+  if (!isExpiredSession) {
+    return;
+  }
+
   clearPersistedAccessToken();
   clearPersistedUserSnapshot();
-  const currentPath = window.location.pathname || "";
-  if (!currentPath.startsWith("/login")) {
-    window.location.replace("/login?reason=session-expired");
+
+  const currentPath =
+    window.location.pathname || "";
+
+  const isAuthenticationPage =
+    currentPath.startsWith("/login") ||
+    currentPath.startsWith(
+      "/unified-login"
+    ) ||
+    currentPath.startsWith(
+      "/create-account"
+    ) ||
+    currentPath.startsWith("/register");
+
+  if (!isAuthenticationPage) {
+    window.location.replace(
+      "/unified-login?reason=session-expired"
+    );
   }
 }
 

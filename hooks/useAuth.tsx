@@ -13,7 +13,8 @@ import {
 } from "@lib/auth";
 import {
   ApiError,
-  AuthApi
+  AuthApi,
+  setLogoutInProgress
 } from "@lib/apiClient";
 import type { AuthUser } from "../types/auth";
 import { roleLabel } from "@lib/labels";
@@ -236,6 +237,7 @@ export function AuthProvider({
   }, []);
 
   const logout = async () => {
+    setLogoutInProgress(true);
     try {
       await AuthApi.logout();
     } catch {
