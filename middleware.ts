@@ -10,15 +10,20 @@ const PUBLIC_PATHS = [
   "/static",
   "/favicon.ico",
 ];
+
 const PROTECTED_PREFIXES = [
   "/hms",
   "/city",
   "/municipal",
   "/modules",
   "/dashboard",
-  "/ward-ranking",
 ];
-const UNIFIED_PREFIXES = ["/portal-home"];
+
+const UNIFIED_PREFIXES = [
+  "/portal-home",
+  "/ward-ranking",
+  "/workforce-monitoring",
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
