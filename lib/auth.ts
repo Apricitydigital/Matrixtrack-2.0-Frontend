@@ -172,6 +172,93 @@ export function normalizeAuthUser(
   };
 }
 
+function decodeJwtPayload(
+  token: string
+): Record<string, unknown> | null {
+  const segments = token.split(".");
+
+  if (segments.length < 2) {
+    return null;
+  }
+
+  const base64 = segments[1]
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  const paddedBase64 = base64.padEnd(
+    Math.ceil(base64.length / 4) * 4,
+    "="
+  );
+
+  const decodedJson = decodeURIComponent(
+    Array.from(atob(paddedBase64))
+      .map(
+        (character) =>
+          `%${character
+            .charCodeAt(0)
+            .toString(16)
+            .padStart(2, "0")}`
+      )
+      .join("")
+  );
+
+  return JSON.parse(
+    decodedJson
+  ) as Record<string, unknown>;
+}
+
+export function decodeToken(
+  token: string,
+  fallbackUser?: (
+    Partial<AuthUser> & {
+      role?: string | Role;
+    }
+  ) | null
+): AuthUser | null {
+  try {
+    const payload =
+      decodeJwtPayload(token);
+
+    const resolvedId =
+      payload?.id ??
+      payload?.sub ??
+      fallbackUser?.id;
+
+    const resolvedUser = {
+      ...(fallbackUser || {}),
+      ...(payload || {}),
+
+      id: resolvedId
+        ? String(resolvedId)
+        : "",
+
+      roles: Array.isArray(
+        payload?.roles
+      )
+        ? payload.roles
+        : fallbackUser?.roles,
+
+      modules: Array.isArray(
+        payload?.modules
+      )
+        ? payload.modules
+        : fallbackUser?.modules,
+
+      token
+    };
+
+    return normalizeAuthUser(
+      resolvedUser as Partial<AuthUser> & {
+        role?: string | Role;
+      }
+    );
+  } catch {
+    return normalizeAuthUser(
+      fallbackUser || null
+    );
+  }
+}
+
 export function getStoredToken(): string | undefined {
   return getPersistedAccessToken() || undefined;
 }
