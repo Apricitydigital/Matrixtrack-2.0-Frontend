@@ -81,26 +81,32 @@ export default function LoginPage() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setLoading(true);
+    console.log("[Login] Submitting credentials for:", email);
     try {
-      const { token, user: authUser } = await AuthApi.login({ email, password });
-      setAuthCookie(token);
-      const decoded = decodeToken(token, authUser);
-      const finalUser = decoded || (authUser as any);
-      setAuthenticatedUser(token, finalUser);
-      router.replace(getPostLoginRedirect(finalUser));
-    } catch (err) {
-      console.error("Login Error:", err);
+      const res = await AuthApi.login({ email, password });
+      console.log("[Login] Success response:", res);
+      setAuthCookie(res.token);
+      const decoded = decodeToken(res.token, res.user);
+      const finalUser = decoded || (res.user as any);
+      setAuthenticatedUser(res.token, finalUser);
+      console.log("[Login] Navigating to /portal-home...");
+      if (typeof window !== "undefined") {
+        window.location.href = "/portal-home";
+      } else {
+        router.replace("/portal-home");
+      }
+    } catch (err: any) {
+      console.error("[Login] Error caught:", err);
+      setLoading(false);
       if (err instanceof ApiError && err.status === 401) {
         setError("Invalid email or password. Please try again.");
       } else if (err instanceof ApiError) {
         setError(err.message || "An error occurred. Please try again.");
       } else {
-        setError("Login failed. Please check your connection.");
+        setError(err?.message || "Login failed. Please check backend connection.");
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -422,7 +428,7 @@ export default function LoginPage() {
                 display: "flex", background: "#f1f5f9", padding: 4, borderRadius: 12, marginBottom: 24, border: "1px solid #e2e8f0"
               }}>
                 <button
-                  onClick={() => { setAuthMode('login'); setError(""); setRegStatus(""); }}
+                  onClick={() => { setAuthMode('login'); setError(""); setRegStatus(""); setLoading(false); }}
                   style={{
                     flex: 1, padding: "10px", borderRadius: 9, border: "none",
                     background: authMode === 'login' ? "#ffffff" : "transparent",
@@ -436,7 +442,7 @@ export default function LoginPage() {
                 </button>
 
                 <button
-                  onClick={() => { setAuthMode('register'); setError(""); setRegStatus(""); }}
+                  onClick={() => { setAuthMode('register'); setError(""); setRegStatus(""); setLoading(false); }}
                   style={{
                     flex: 1, padding: "10px", borderRadius: 9, border: "none",
                     background: authMode === 'register' ? "#ffffff" : "transparent",

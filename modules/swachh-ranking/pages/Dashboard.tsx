@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+
 import { useNavigate } from '../react-router-shim';
 import api from '../api/axios';
 import { fireAchievement } from '../components/AchievementEffect';
@@ -27,12 +28,24 @@ import {
     BarChart3,
     RefreshCw,
     Search,
+    Download,
+    User,
+
+    FileText,
+
     ChevronRight,
     Target,
-    Layers
+    Layers,
+    Landmark,
+
+    GraduationCap,
+    Briefcase,
+    Store,
+    Hotel
 } from 'lucide-react';
 import NoAccess from '../components/NoAccess';
 import { hasPermission } from '../utils/accessControl';
+import swachhBg from '../assets/swachh_background.png';
 
 interface Participant {
     id: string;
@@ -46,19 +59,29 @@ interface Participant {
 }
 
 const CATEGORY_CARDS = [
-    { label: 'Ward', key: 'wards', filter: 'wards' },
-    { label: 'Schools', key: 'schools', filter: 'schools' },
-    { label: 'Hospitals', key: 'hospitals', filter: 'hospitals' },
-    { label: 'Offices', key: 'offices', filter: 'offices' },
-    { label: 'Markets', key: 'markets', filter: 'markets' },
-    { label: 'Societies - BWG', key: 'societies_bwg', filter: 'societies - bwg' },
-    { label: 'Hotels', key: 'hotels', filter: 'hotels' },
-    { label: 'Citizen / Groups', key: 'citizen_puraskar', filter: 'citizen_puraskar' }
-] as const;
+    { label: 'Ward', key: 'wards', filter: 'wards', icon: Landmark },
+    { label: 'Schools', key: 'schools', filter: 'schools', icon: GraduationCap },
+    { label: 'Hospitals', key: 'hospitals', filter: 'hospitals', icon: Building2 },
+    { label: 'Offices', key: 'offices', filter: 'offices', icon: Briefcase },
+    { label: 'Markets', key: 'markets', filter: 'markets', icon: Store },
+    { label: 'Societies - BWG', key: 'societies_bwg', filter: 'societies - bwg', icon: Users },
+    { label: 'Hotels', key: 'hotels', filter: 'hotels', icon: Hotel },
+    { label: 'Citizen / Groups', key: 'citizen_puraskar', filter: 'citizen_puraskar', icon: Users2 }
+];
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const user = useMemo(() => {
+        if (typeof window === 'undefined') return { role: 'admin', permissions: { dashboard: { view: true } } };
+        try {
+            const stored = localStorage.getItem('user') || localStorage.getItem('swachh_user');
+            return stored ? JSON.parse(stored) : { role: 'admin', permissions: { dashboard: { view: true } } };
+        } catch {
+            return { role: 'admin', permissions: { dashboard: { view: true } } };
+        }
+    }, []);
+
+
     const [assignments, setAssignments] = useState<Participant[]>([]);
     const [recentAssessments, setRecentAssessments] = useState<any[]>([]);
     const [qcStats, setQCStats] = useState<any>(null);
@@ -77,6 +100,8 @@ const Dashboard = () => {
     const [activitySearch, setActivitySearch] = useState('');
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
     const [assessorDrawer, setAssessorDrawer] = useState<{ title: string; subtitle: string; data: any[] } | null>(null);
+    const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+
     const prevCompletedTodayRef = useRef<number | null>(null);
 
     const getGreeting = () => {
@@ -139,9 +164,11 @@ const Dashboard = () => {
         }
 
         // Ensure remote images load correctly from the VITE_MEDIA_BASE_URL config (or standard fallback)
-        const mediaBase = import.meta.env.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '');
-        const envBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '');
-        const fallback = import.meta.env.DEV ? 'http://localhost:5000' : (typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '');
+        const metaEnv = (import.meta as any).env || {};
+        const mediaBase = metaEnv.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '') || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_MEDIA_BASE_URL : '');
+        const envBase = metaEnv.VITE_API_BASE_URL?.replace(/\/+$/, '') || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_API_BASE_URL : '');
+        const fallback = metaEnv.DEV ? 'http://localhost:5000' : (typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '');
+
 
         let base = '';
         if (mediaBase && mediaBase.length > 0) {
@@ -346,413 +373,83 @@ const Dashboard = () => {
                 ? Object.values(stats.categories || {}).reduce((acc: number, value: any) => acc + (Number(value) || 0), 0)
                 : 0
         );
-const exportSystemActivityCSV = () => {
-    if (!recentAssessments || recentAssessments.length === 0) {
-        alert("No data to export");
-        return;
-    }
 
-    const headers = [
-        "Assessor",
-        "Category",
-        "Score",
-        "Date"
-    ];
+    const exportSystemActivityCSV = () => {
 
-    const rows = recentAssessments.map((a: any) => [
-        a.assessor?.name || "Unknown",
-        a.participant?.category || "General",
-        a.finalScore ?? a.totalScore,
-        new Date(a.createdAt).toLocaleString()
-    ]);
+        if (!recentAssessments || recentAssessments.length === 0) {
+            alert("No data to export");
+            return;
+        }
+        const headers = ["Assessor", "Category", "Score", "Date"];
+        const rows = recentAssessments.map((a: any) => [
+            a.assessor?.name || "Unknown",
+            a.participant?.category || "General",
+            a.finalScore ?? a.totalScore ?? 0,
+            new Date(a.createdAt).toLocaleString()
+        ]);
+        const csvContent = [headers, ...rows].map(e => e.map(v => `"${v}"`).join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "system_activity.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
-    const csvContent =
-        [headers, ...rows]
-            .map(e => e.map(v => `"${v}"`).join(","))
-            .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "system_activity.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
     return (
+
+
         <>
         <div className="dashboard-content" style={{ paddingBottom: '4rem' }}>
-            {/* <header style={{ marginBottom: '3rem', position: 'relative' }}>
-                <div style={{
-                    position: 'absolute',
-                    top: '-40px',
-                    left: '-20px',
-                    width: '300px',
-                    height: '300px',
-                    background: 'radial-gradient(circle, var(--primary-soft) 0%, transparent 70%)',
-                    zIndex: -1,
-                    opacity: 0.5
-                }}></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                            <span style={{
-                                padding: '0.4rem 0.8rem',
-                                backgroundColor: 'var(--primary-soft)',
-                                color: 'var(--primary)',
-                                borderRadius: '100px',
-                                fontSize: '0.75rem',
-                                fontWeight: 800,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em'
-                            }}>
-                                {user.role} Portal
-                            </span>
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
-                                {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                            </span>
-                        </div>
-                        <h1 style={{ fontSize: '2.75rem', fontWeight: 950, color: 'var(--text-primary)', marginBottom: '0.75rem', letterSpacing: '-0.05em', lineHeight: 1 }}>
-                            {getGreeting()}, {user.name.split(' ')[0]}!
-                        </h1>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', fontWeight: 500, maxWidth: '600px', lineHeight: 1.6 }}>
-                            {user.role === 'accessor'
-                                ? "Here's your mission for today. You've got work to do!"
-                                : user.role === 'qc'
-                                    ? "Monitor quality and approve verified assessments."
-                                    : 'Welcome back to your command center. Everything looks good.'}
-                        </p>
-                    </div>
-                    {user.role === 'admin' && (
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button
-                                onClick={() => navigate('/admin/reports')}
-                                className="btn btn-primary shadow-premium"
-                                style={{ padding: '0.875rem 1.75rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}
-                            >
-                                <Award size={20} /> Generate Report
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </header> */}
-{/* <header style={{ marginBottom: '3rem', position: 'relative' }}>
-    <div style={{
-        position: 'absolute',
-        top: '-40px',
-        left: '-20px',
-        width: '300px',
-        height: '300px',
-        background: 'radial-gradient(circle, var(--primary-soft) 0%, transparent 70%)',
-        zIndex: -1,
-        opacity: 0.5
-    }}></div>
-    <div className="dashboard-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div className="dashboard-header-text">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                <span style={{
-                    padding: '0.4rem 0.8rem',
-                    backgroundColor: 'var(--primary-soft)',
-                    color: 'var(--primary)',
-                    borderRadius: '100px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                }}>
-                    {user.role} Portal
-                </span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </span>
-            </div>
-            <h1 style={{ fontSize: '2.75rem', fontWeight: 950, color: 'var(--text-primary)', marginBottom: '0.75rem', letterSpacing: '-0.05em', lineHeight: 1 }}>
-                {getGreeting()}, {user.name.split(' ')[0]}!
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', fontWeight: 500, maxWidth: '600px', lineHeight: 1.6 }}>
-                {user.role === 'accessor'
-                    ? "Here's your mission for today. You've got work to do!"
-                    : user.role === 'qc'
-                        ? "Monitor quality and approve verified assessments."
-                        : 'Welcome back to your command center. Everything looks good.'}
-            </p>
-        </div>
-        {user.role === 'admin' && (
-            <div className="dashboard-header-btn" style={{ display: 'flex', gap: '1rem' }}>
-                <button
-                    onClick={() => navigate('/admin/reports')}
-                    className="btn btn-primary shadow-premium"
-                    style={{ padding: '0.875rem 1.75rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}
-                >
-                    <Award size={20} /> Generate Report
-                </button>
-            </div>
-        )}
-    </div>
-</header>
-            {user.role === 'accessor' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem', marginBottom: '3.5rem' }}>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '2rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ClipboardList size={30} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Total Tasks</div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.total}</div>
-                            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.5rem 0 0' }}>Assigned to your profile</p>
-                        </div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '2rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #fdfcfb 100%)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div style={{ backgroundColor: '#ffedd5', color: '#9a3412', width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Clock size={30} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>To Action</div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.pending}</div>
-                            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.5rem 0 0' }}>Requires immediate verification</p>
-                        </div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '2rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div style={{ backgroundColor: '#dcfce7', color: '#15803d', width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <CheckCircle2 size={30} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Verified</div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.completed}</div>
-                            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.5rem 0 0' }}>Successfully completed tasks</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {user.role === 'qc' && qcStats && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3.5rem' }}>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: 'var(--primary-soft)', color: 'var(--primary)', padding: '0.75rem', borderRadius: '14px' }}>
-                                <ClipboardList size={22} />
-                            </div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--success)', backgroundColor: 'var(--success-soft)', padding: '0.25rem 0.6rem', borderRadius: '6px' }}>Active</span>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Total Tasks</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.total}</div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: 'var(--warning-soft)', color: 'var(--warning)', padding: '0.75rem', borderRadius: '14px' }}>
-                                <Clock size={22} />
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Review Pending</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.pending}</div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: 'var(--success-soft)', color: 'var(--success)', padding: '0.75rem', borderRadius: '14px' }}>
-                                <CheckCircle2 size={22} />
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Completed</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.completed ?? qcStats.approved ?? 0}</div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '0.75rem', borderRadius: '14px' }}>
-                                <X size={22} />
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Reassessment</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.reassessment}</div>
-                    </div>
-                </div>
-            )}
-
-            {user.role !== 'accessor' && (
-                <div style={{ marginBottom: '3.5rem' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '6px', height: '24px', backgroundColor: 'var(--primary)', borderRadius: '3px' }}></div>
-                        Participation by Category
-                    </h3>
-                    {statsLoading && !stats ? (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.875rem' }}>
-                            {CATEGORY_CARDS.map((_, idx) => (
-                                <div key={idx} className="skeleton-block" style={{ width: '165px', height: '62px', borderRadius: '16px' }} />
-                            ))}
-                        </div>
-                    ) : statsError && !stats ? (
-                        <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>
-                            {statsError}
-                        </div>
-                    ) : stats ? (
-                       <div className="category-scroll" tabIndex={0}>
-                            {CATEGORY_CARDS.map(({ label, key, filter }) => (
-                                <div
-                                    key={label}
-                                    onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(filter)}`)}
-                                    className="hover-scale"
-                                    style={{
-                                        flex: '0 0 auto',
-                                        minWidth: '160px',
-                                        padding: '0.625rem 1.25rem',
-                                        backgroundColor: 'white',
-                                        borderRadius: '16px',
-                                        border: '1px solid var(--border-light)',
-                                        boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                                        fontSize: '0.875rem',
-                                        fontWeight: 700,
-                                        color: 'var(--text-primary)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.75rem',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    }}>
-                                    <span style={{ opacity: 0.8 }}>{label}</span>
-                                    <span style={{
-                                        fontSize: '0.75rem',
-                                        padding: '0.25rem 0.625rem',
-                                        backgroundColor: 'var(--primary-soft)',
-                                        color: '#3730a3',
-                                        borderRadius: '8px',
-                                        fontWeight: 900
-                                    }}>
-                                        {stats?.categories?.[key] || 0}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : null}
-                </div>
-            )}
-
-            {user.role === 'admin' && (
-                <div style={{ marginBottom: '4rem' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '6px', height: '24px', backgroundColor: 'var(--swachh-green)', borderRadius: '3px' }}></div>
-                        System Overview
-                    </h3>
-                    {statsError && (
-                        <div style={{
-                            marginBottom: '1rem',
-                            padding: '0.875rem 1rem',
-                            borderRadius: '12px',
-                            backgroundColor: '#fef3c7',
-                            color: '#92400e',
-                            fontWeight: 600
-                        }}>
-                            {stats ? `Showing last known data. ${statsError}` : statsError}
-                        </div>
-                    )}
-                    {statsLoading && !stats ? (
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1.5rem',
-                        }}>
-                            {Array.from({ length: 5 }).map((_, idx) => (
-                                <div key={idx} className="card shadow-premium" style={{ padding: '1.75rem', border: 'none' }}>
-                                    <div className="skeleton-block" style={{ width: '48px', height: '48px', borderRadius: '16px', marginBottom: '1.25rem' }} />
-                                    <div className="skeleton-block" style={{ width: '50%', height: '12px', marginBottom: '0.5rem' }} />
-                                    <div className="skeleton-block" style={{ width: '70%', height: '28px' }} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : stats ? (
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1.5rem',
-                        }}>
-                            <div
-                                onClick={() => navigate('/admin/users?role=qc')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid var(--swachh-green)' }}>
-                                <div style={{ color: 'var(--swachh-green)', marginBottom: '1rem' }}><Shield size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>QC Members</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.qcMembers ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/users?role=accessor')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid var(--primary)' }}>
-                                <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}><Users2 size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Assessors</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.assessors ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/users?role=admin')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #faf5ff 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid #a855f7' }}>
-                                <div style={{ color: '#a855f7', marginBottom: '1rem' }}><Users size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Admins</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.admins ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/areas')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid var(--warning)' }}>
-                                <div style={{ color: 'var(--warning)', marginBottom: '1rem' }}><Map size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Wards</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.wards ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/participants')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #fdf4ff 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid #d946ef' }}>
-                                <div style={{ color: '#d946ef', marginBottom: '1rem' }}><Building2 size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Participants</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>
-                                    {totalParticipants}
-                                </div>
-                            </div>
-                        </div>
-                    ) : statsError ? (
-                        <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>
-                            Unable to load overview.
-                        </div>
-                    ) : null}
-                </div>
-            )} */}
             {/* ── Dashboard Header ── */}
-<header style={{ marginBottom: '3rem', position: 'relative' }}>
+
+<header style={{ 
+    marginBottom: '1.25rem', 
+    position: 'relative', 
+    borderRadius: '20px', 
+    overflow: 'hidden', 
+    background: 'white',
+    border: '1px solid #f1f5f9',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+}}>
     <div style={{
-        position: 'absolute', top: '-40px', left: '-20px',
-        width: '300px', height: '300px',
-        background: 'radial-gradient(circle, var(--primary-soft) 0%, transparent 70%)',
-        zIndex: -1, opacity: 0.5
+        position: 'absolute', 
+        inset: 0, 
+        backgroundImage: `url(${(swachhBg as any)?.src || (typeof swachhBg === 'string' ? swachhBg : '/assets/swachh_background.png')})`, 
+        backgroundSize: 'cover', 
+        backgroundPosition: 'right bottom', 
+        backgroundRepeat: 'no-repeat',
+        opacity: 1,
+        zIndex: 0
     }} />
-    <div className="dashboard-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+
+    <div className="dashboard-header-row" style={{ position: 'relative', zIndex: 1, padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div className="dashboard-header-text">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                <span style={{ padding: '0.4rem 0.8rem', backgroundColor: 'var(--primary-soft)', color: '#3730a3', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                <span style={{ padding: '0.4rem 0.8rem', backgroundColor: '#f0f5ff', color: '#4f46e5', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {user.role} Portal
                 </span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
+                <span style={{ color: '#64748b', fontSize: '0.875rem', fontWeight: 600 }}>
                     {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </span>
             </div>
-            <h1 style={{ fontSize: 'clamp(1.75rem, 5vw, 2.75rem)', fontWeight: 950, color: 'var(--text-primary)', marginBottom: '0.75rem', letterSpacing: '-0.05em', lineHeight: 1 }}>
-                {getGreeting()}, {user.name.split(' ')[0]}!
+            <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 900, color: '#0f172a', marginBottom: '0.75rem', letterSpacing: '-0.03em', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {getGreeting()}, {user?.name?.split(' ')[0] || 'Admin'}! <span style={{ fontSize: '2.5rem' }}></span>
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.9rem, 2vw, 1.125rem)', fontWeight: 500, maxWidth: '600px', lineHeight: 1.6 }}>
-                {user.role === 'accessor'
-                    ? "Here's your mission for today. You've got work to do!"
-                    : user.role === 'qc'
-                        ? "Monitor quality and approve verified assessments."
-                        : 'Welcome back to your command center. Everything looks good.'}
+
+            <p style={{ color: '#475569', fontSize: '1rem', fontWeight: 600, maxWidth: '600px', lineHeight: 1.5 }}>
+                Real-time field monitoring &amp; city ranking intelligence.
             </p>
+
+
         </div>
-        {user.role === 'admin' && (
-            <div className="dashboard-header-btn" style={{ display: 'flex', gap: '1rem' }}>
-                <button onClick={() => navigate('/ward-ranking?view=reports')} className="btn btn-primary shadow-premium"
-                    style={{ padding: '0.875rem 1.75rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    <Award size={20} /> Generate Report
-                </button>
-            </div>
-        )}
     </div>
 </header>
+
 
 {/* ── Accessor Stats: 3-col → 1-col ── */}
 {user.role === 'accessor' && (
@@ -813,135 +510,328 @@ const exportSystemActivityCSV = () => {
 
 {/* ── Participation by Category ── */}
 {user.role !== 'accessor' && (
-    <div style={{ marginBottom: '3rem' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: '6px', height: '22px', backgroundColor: 'var(--primary)', borderRadius: '3px' }} />
+    <div style={{
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        border: '1px solid #f1f5f9',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        padding: '1.5rem 1.75rem',
+        marginBottom: '2rem'
+    }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '4px', height: '20px', backgroundColor: '#5a52ff', borderRadius: '2px' }} />
             Participation by Category
         </h3>
-        {statsLoading && !stats ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.875rem' }}>
-                {CATEGORY_CARDS.map((_, idx) => (
-                    <div key={idx} className="skeleton-block" style={{ width: '165px', height: '62px', borderRadius: '16px' }} />
-                ))}
-            </div>
-        ) : statsError && !stats ? (
-            <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>{statsError}</div>
-        ) : stats ? (
-            <div className="category-scroll" tabIndex={0}>
-                {CATEGORY_CARDS.map(({ label, key, filter }) => (
-                    <div key={label} onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(filter)}`)}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: '0.875rem' }}>
+            {CATEGORY_CARDS.map(({ label, key, filter, icon: IconComponent }) => {
+                const isHovered = hoveredCategory === key;
+                return (
+                    <div key={label}
+                        onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(filter)}`)}
+                        onMouseEnter={() => setHoveredCategory(key)}
+                        onMouseLeave={() => setHoveredCategory(null)}
                         className="hover-scale"
-                        style={{ flex: '0 0 auto', minWidth: '150px', padding: '0.625rem 1.1rem', backgroundColor: 'white', borderRadius: '14px', border: '1px solid var(--border-light)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-                        <span style={{ opacity: 0.8 }}>{label}</span>
-                        <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem', backgroundColor: 'var(--primary-soft)', color: '#3730a3', borderRadius: '7px', fontWeight: 900 }}>
-                            {stats?.categories?.[key] || 0}
-                        </span>
+                        title={label}
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '14px',
+                            border: isHovered ? '1px solid #6366f1' : '1px solid #f1f5f9',
+                            boxShadow: isHovered ? '0 6px 18px rgba(99,102,241,0.12)' : '0 2px 8px rgba(0,0,0,0.02)',
+                            padding: '0.75rem 0.625rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}>
+                        {isHovered && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: 'calc(100% + 8px)',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                backgroundColor: '#0f172a',
+                                color: '#ffffff',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap',
+                                boxShadow: '0 4px 16px rgba(15,23,42,0.25)',
+                                zIndex: 99,
+                                pointerEvents: 'none'
+                            }}>
+                                {label}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: 0,
+                                    height: 0,
+                                    borderLeft: '5px solid transparent',
+                                    borderRight: '5px solid transparent',
+                                    borderTop: '5px solid #0f172a'
+                                }} />
+                            </div>
+                        )}
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            backgroundColor: '#f0f5ff',
+                            color: '#4f46e5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            <IconComponent size={18} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>
+                                {label}
+                            </span>
+                            <span style={{
+                                fontSize: '0.72rem',
+                                padding: '0.15rem 0.5rem',
+                                backgroundColor: '#f0f5ff',
+                                color: '#4f46e5',
+                                borderRadius: '100px',
+                                fontWeight: 900,
+                                marginTop: '0.2rem',
+                                width: 'fit-content'
+                            }}>
+                                {stats?.categories?.[key] || 0}
+                            </span>
+                        </div>
                     </div>
-                ))}
-            </div>
-        ) : null}
+                );
+            })}
+
+        </div>
     </div>
 )}
 
 {/* ── Admin System Overview ── */}
 {user.role === 'admin' && (
-    <div style={{ marginBottom: '3.5rem' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: '6px', height: '22px', backgroundColor: 'var(--swachh-green)', borderRadius: '3px' }} />
+    <div style={{
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        border: '1px solid #f1f5f9',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        padding: '1.5rem 1.75rem',
+        marginBottom: '2rem'
+    }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '4px', height: '20px', backgroundColor: '#5a52ff', borderRadius: '2px' }} />
             System Overview
         </h3>
-        {statsError && (
-            <div style={{ marginBottom: '1rem', padding: '0.875rem 1rem', borderRadius: '12px', backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 600 }}>
-                {stats ? `Showing last known data. ${statsError}` : statsError}
-            </div>
-        )}
-        {statsLoading && !stats ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1.25rem' }}>
-                {Array.from({ length: 4 }).map((_, idx) => (
-                    <div key={idx} className="card shadow-premium" style={{ padding: '1.5rem', border: 'none' }}>
-                        <div className="skeleton-block" style={{ width: '44px', height: '44px', borderRadius: '14px', marginBottom: '1rem' }} />
-                        <div className="skeleton-block" style={{ width: '50%', height: '11px', marginBottom: '0.5rem' }} />
-                        <div className="skeleton-block" style={{ width: '70%', height: '26px' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem' }}>
+            {[
+                { path: '/admin/users?role=qc', border: '#16a34a', iconBg: '#f0fdf4', iconColor: '#16a34a', icon: <Shield size={20} />, label: 'QC MEMBERS', value: stats?.overview?.qcMembers ?? 0, waveColor: '#16a34a' },
+                { path: '/admin/users?role=accessor', border: '#2563eb', iconBg: '#eff6ff', iconColor: '#2563eb', icon: <Users2 size={20} />, label: 'ASSESSORS', value: stats?.overview?.assessors ?? 0, waveColor: '#2563eb' },
+                { path: '/admin/users?role=admin', border: '#9333ea', iconBg: '#faf5ff', iconColor: '#9333ea', icon: <Users size={20} />, label: 'ADMINS', value: stats?.overview?.admins ?? 0, waveColor: '#9333ea' },
+                { path: '/admin/participants', border: '#db2777', iconBg: '#fdf2f8', iconColor: '#db2777', icon: <Building2 size={20} />, label: 'PARTICIPANTS', value: totalParticipants ?? 0, waveColor: '#db2777' },
+            ].map(({ path, border, iconBg, iconColor, icon, label, value, waveColor }) => (
+                <div key={label} onClick={() => navigate(path)}
+                    className="hover-scale"
+                    style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        padding: '1.5rem',
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        border: '1px solid #f1f5f9',
+                        borderLeft: `4px solid ${border}`,
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '1rem' }}>
+                        <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            backgroundColor: iconBg,
+                            color: iconColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            {icon}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {label}
+                        </span>
                     </div>
-                ))}
-            </div>
-        ) : stats ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1.25rem' }}>
-                {[
-                    { path: '/admin/users?role=qc', bg: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)', border: 'var(--swachh-green)', icon: <Shield size={22} />, iconColor: 'var(--swachh-green)', label: 'QC Members', value: stats?.overview?.qcMembers ?? 0 },
-                    { path: '/admin/users?role=accessor', bg: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', border: 'var(--primary)', icon: <Users2 size={22} />, iconColor: 'var(--primary)', label: 'Assessors', value: stats?.overview?.assessors ?? 0 },
-                    { path: '/admin/users?role=admin', bg: 'linear-gradient(135deg, #faf5ff 0%, #ffffff 100%)', border: '#a855f7', icon: <Users size={22} />, iconColor: '#a855f7', label: 'Admins', value: stats?.overview?.admins ?? 0 },
-                    { path: '/admin/participants', bg: 'linear-gradient(135deg, #fdf4ff 0%, #ffffff 100%)', border: '#d946ef', icon: <Building2 size={22} />, iconColor: '#d946ef', label: 'Participants', value: totalParticipants },
-                ].map(({ path, bg, border, icon, iconColor, label, value }) => (
-                    <div key={label} onClick={() => navigate(path)}
-                        className="card shadow-premium hover-scale"
-                        style={{ padding: '1.5rem', border: 'none', background: bg, cursor: 'pointer', borderLeft: `4px solid ${border}` }}>
-                        <div style={{ color: iconColor, marginBottom: '0.875rem' }}>{icon}</div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
-                        <div style={{ fontSize: '1.875rem', fontWeight: 950, color: 'var(--text-primary)' }}>{value}</div>
+                    <div style={{ fontSize: '2.25rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
+                        {value}
                     </div>
-                ))}
-            </div>
-        ) : statsError ? (
-            <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>Unable to load overview.</div>
-        ) : null}
+                    <svg style={{ position: 'absolute', bottom: 0, right: 0, width: '120px', height: '55px', opacity: 0.25, pointerEvents: 'none' }} viewBox="0 0 120 55" preserveAspectRatio="none">
+                        <path d="M0,55 C40,25 75,45 120,15 L120,55 Z" fill={waveColor} />
+                    </svg>
+                </div>
+            ))}
+        </div>
     </div>
 )}
 
-{/* ── Self-Assessment Live Tracker ── */}
-{user.role === 'admin' && stats?.selfAssessments && (
-    <div style={{ marginBottom: '3.5rem' }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: '6px', height: '22px', backgroundColor: '#16a34a', borderRadius: '3px' }} />
-            Self-Assessment Submissions
-            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: '#475569', backgroundColor: '#f1f5f9', padding: '0.3rem 0.75rem', borderRadius: '8px' }}>
-                Auto-refreshes every 30s
+{/* ── Self-Assessment Submissions ── */}
+{user.role === 'admin' && (
+    <div style={{
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        border: '1px solid #f1f5f9',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        padding: '1.5rem 1.75rem',
+        marginBottom: '2rem'
+    }}>
+        {/* Header Row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '4px', height: '20px', backgroundColor: '#5a52ff', borderRadius: '2px' }} />
+                Self-Assessment Submissions
+            </h3>
+            <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#4f46e5',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                padding: '0.3rem 0.75rem',
+                borderRadius: '100px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+            }}>
+                <RefreshCw size={12} /> Auto-refreshes every 30s
             </span>
-        </h3>
-
-        {/* Summary pills */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            {(() => {
-                const notStartedCount = Math.max(0, (stats.overview?.participants ?? 0) - stats.selfAssessments.total);
-                return [
-                { label: 'Total Registered', value: stats.overview?.participants ?? 0, color: '#475569', bg: '#f8fafc', onClick: () => navigate('/admin/participants') },
-                { label: 'Submitted', value: stats.selfAssessments.submitted, color: '#16a34a', bg: '#f0fdf4', onClick: () => openSAStatusDrawer('Submitted', 'Submitted') },
-                { label: 'In Progress', value: stats.selfAssessments.draft, color: '#d97706', bg: '#fffbeb', onClick: () => openSAStatusDrawer('Draft', 'In Progress') },
-                { label: 'Not Started', value: notStartedCount, color: '#475569', bg: '#f1f5f9', onClick: () => openSAStatusDrawer('Not Started', 'Not Started') },
-            ].map(({ label, value, color, bg, onClick }) => (
-                <div key={label}
-                    onClick={onClick}
-                    style={{ background: bg, border: `1px solid ${color}22`, borderRadius: '12px', padding: '0.75rem 1.25rem', minWidth: '120px', cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)' }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 20px ${color}22`; e.currentTarget.style.borderColor = `${color}55`; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = `${color}22`; }}
-                >
-                    <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 900, color }}>{value}</div>
-                </div>
-            )); })()}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+        {/* 4 Summary KPI Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            {[
+                {
+                    label: 'TOTAL REGISTERED',
+                    value: totalParticipants ?? 0,
+                    desc: 'All participants',
+                    icon: <Users size={20} />,
+                    border: '#6366f1',
+                    iconBg: '#f0f0fe',
+                    iconColor: '#6366f1',
+                    valueColor: '#0f172a',
+                    onClick: () => navigate('/admin/participants'),
+                    watermark: <Users size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#6366f1' }} />
+                },
+                {
+                    label: 'SUBMITTED',
+                    value: stats?.selfAssessments?.submitted ?? 0,
+                    desc: 'Completed submissions',
+                    icon: <CheckCircle2 size={20} />,
+                    border: '#16a34a',
+                    iconBg: '#f0fdf4',
+                    iconColor: '#16a34a',
+                    valueColor: '#16a34a',
+                    onClick: () => openSAStatusDrawer('Submitted', 'Submitted'),
+                    watermark: <CheckCircle2 size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#16a34a' }} />
+                },
+                {
+                    label: 'IN PROGRESS',
+                    value: stats?.selfAssessments?.draft ?? 0,
+                    desc: 'Submissions in progress',
+                    icon: <Clock size={20} />,
+                    border: '#d97706',
+                    iconBg: '#fffbeb',
+                    iconColor: '#d97706',
+                    valueColor: '#d97706',
+                    onClick: () => openSAStatusDrawer('Draft', 'In Progress'),
+                    watermark: <Clock size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#d97706' }} />
+                },
+                {
+                    label: 'NOT STARTED',
+                    value: Math.max(0, (totalParticipants ?? 0) - (stats?.selfAssessments?.total ?? 0)),
+                    desc: 'Yet to begin',
+                    icon: <FileText size={20} />,
+                    border: '#2563eb',
+                    iconBg: '#eff6ff',
+                    iconColor: '#2563eb',
+                    valueColor: '#2563eb',
+                    onClick: () => openSAStatusDrawer('Not Started', 'Not Started'),
+                    watermark: <FileText size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#2563eb' }} />
+                },
+            ].map(({ label, value, desc, icon, border, iconBg, iconColor, valueColor, onClick, watermark }) => (
+                <div
+                    key={label}
+                    onClick={onClick}
+                    className="hover-scale"
+                    style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        border: '1px solid #f1f5f9',
+                        borderLeft: `4px solid ${border}`,
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                        padding: '1.25rem 1.5rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                >
+                    {watermark}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '0.875rem' }}>
+                        <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            backgroundColor: iconBg,
+                            color: iconColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            {icon}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {label}
+                        </span>
+                    </div>
+                    <div style={{ fontSize: '2.25rem', fontWeight: 950, color: valueColor, lineHeight: 1.1, marginBottom: '0.2rem' }}>
+                        {value}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                        {desc}
+                    </div>
+                </div>
+            ))}
+        </div>
 
+        {/* Bottom 2 Columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: '1.25rem', alignItems: 'stretch' }}>
             {/* Category-wise progress */}
-            <div className="card shadow-premium" style={{ border: 'none', padding: '1.5rem' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Category-wise Progress</div>
+            <div style={{ backgroundColor: 'white', border: '1px solid #f1f5f9', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>
+                    CATEGORY-WISE PROGRESS
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
                     {CATEGORY_CARDS.map(({ label, key }) => {
-                        const catData = stats.selfAssessments.byCategory?.[key] ?? { total: 0, submitted: 0, draft: 0 };
-                        const total = (stats.categories?.[key] as number) || catData.total || 0;
+                        const catData = stats?.selfAssessments?.byCategory?.[key] ?? { total: 0, submitted: 0, draft: 0 };
+                        const total = (stats?.categories?.[key] as number) || catData.total || 0;
                         const submitted = catData.submitted || 0;
                         const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
                         return (
-                            <div key={key} onClick={() => openCategoryDrawer(key, label)} style={{ cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: '8px', transition: 'background 0.15s' }}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
-                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{label}</span>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>{submitted}/{total} ({pct}%) →</span>
+                            <div key={key} onClick={() => openCategoryDrawer(key, label)} style={{ cursor: 'pointer', borderRadius: '8px', transition: 'background 0.15s' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>{label}</span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a' }}>
+                                        {submitted} / {total} <span style={{ color: pct === 100 ? '#16a34a' : '#475569' }}>({pct}%)</span> <span style={{ color: '#94a3b8', marginLeft: '2px' }}>&gt;</span>
+                                    </span>
                                 </div>
-                                <div style={{ height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                                    <div style={{ width: `${pct}%`, height: '100%', backgroundColor: pct === 100 ? '#16a34a' : '#22c55e', borderRadius: '3px', transition: 'width 0.5s ease' }} />
+                                <div style={{ height: '6px', backgroundColor: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${pct}%`, height: '100%', backgroundColor: pct === 100 ? '#16a34a' : '#22c55e', borderRadius: '100px', transition: 'width 0.5s ease' }} />
                                 </div>
                             </div>
                         );
@@ -949,26 +839,66 @@ const exportSystemActivityCSV = () => {
                 </div>
             </div>
 
-            {/* Recent submissions */}
-            <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #f1f5f9', fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Recent Submissions
+            {/* Recent Submissions */}
+            <div style={{ backgroundColor: 'white', border: '1px solid #f1f5f9', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+                    RECENT SUBMISSIONS
                 </div>
-                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                    {stats.selfAssessments.recentSubmissions?.length === 0 ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: '#475569', fontWeight: 500 }}>No submissions yet</div>
-                    ) : stats.selfAssessments.recentSubmissions?.map((s: any, i: number) => (
-                        <div key={s.id} style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: i === 0 ? '#f0fdf4' : 'white' }}>
-                            <div>
-                                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>{s.name}</div>
-                                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', textTransform: 'capitalize' }}>{s.category}</div>
+                {(!stats?.selfAssessments?.recentSubmissions || stats?.selfAssessments?.recentSubmissions?.length === 0) ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '2rem 1rem' }}>
+                        <div style={{
+                            width: '110px',
+                            height: '110px',
+                            borderRadius: '50%',
+                            backgroundColor: '#f5f3ff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '1.25rem',
+                            position: 'relative'
+                        }}>
+                            <div style={{ color: '#818cf8' }}>
+                                <ClipboardList size={52} strokeWidth={1.5} />
                             </div>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#475569', textAlign: 'right' }}>
-                                {s.submittedAt ? new Date(s.submittedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '10px',
+                                right: '10px',
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '50%',
+                                backgroundColor: '#6366f1',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 10px rgba(99, 102, 241, 0.3)'
+                            }}>
+                                <Search size={15} />
                             </div>
                         </div>
-                    ))}
-                </div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem' }}>
+                            No submissions yet
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                            Recent submissions will appear here once available.
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                        {stats?.selfAssessments?.recentSubmissions?.map((s: any, i: number) => (
+                            <div key={s.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: i === 0 ? '#f0fdf4' : 'white', borderRadius: '8px' }}>
+                                <div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{s.name}</div>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', textTransform: 'capitalize' }}>{s.category}</div>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textAlign: 'right' }}>
+                                    {s.submittedAt ? new Date(s.submittedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     </div>
@@ -1001,628 +931,641 @@ const exportSystemActivityCSV = () => {
                     <RefreshCw size={13} /> Refresh
                 </button>
             </div>
+
+
         </div>
+        { (() => {
+            const activityData = assessorActivity || {
+                totalAssessors: 0,
+                activeAssessors: 0,
+                totalAssigned: 0,
+                completedToday: 0,
+                notStarted: 0,
+                inProgress: 0,
+                completed: 0,
+                qcVerified: 0,
+                rejected: 0,
+                categoryBreakdown: {},
+                liveActivity: [],
+                assignedList: [],
+                assignedListToday: []
+        };
 
-        {assessorActivity ? (
-            <>
-                {/* ── Row 1: Primary KPI Cards ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '1.25rem' }}>
-                    {([
-                        { label: 'Total Assessors', value: assessorActivity.totalAssessors, icon: <Users2 size={22} />, color: '#3730a3', accent: '#6366f1', bg: 'linear-gradient(145deg, #eef2ff 0%, #ffffff 100%)', border: '#c7d2fe', desc: 'Registered field staff', onClick: () => navigate('/admin/users?role=accessor') },
-                        { label: 'Active Now', value: assessorActivity.activeAssessors, icon: <Zap size={22} />, color: '#059669', accent: '#10b981', bg: 'linear-gradient(145deg, #ecfdf5 0%, #ffffff 100%)', border: '#a7f3d0', desc: 'Currently in field', isLive: true, onClick: () => setAssessorDrawer({ title: 'Active Assessors', subtitle: 'Assessors with in-progress assessments', data: (assessorActivity.assignedList || []).filter((r: any) => r.status === 'in_progress') }) },
-                        { label: 'Total Assigned', value: assessorActivity.totalAssigned, icon: <ClipboardList size={22} />, color: '#0369a1', accent: '#0ea5e9', bg: 'linear-gradient(145deg, #f0f9ff 0%, #ffffff 100%)', border: '#bae6fd', desc: 'Assessments allocated', onClick: () => setAssessorDrawer({ title: 'All Assigned', subtitle: 'Every participant assigned to an assessor', data: assessorActivity.assignedList || [] }) },
-                        { label: 'Done Today', value: assessorActivity.completedToday, icon: <TrendingUp size={22} />, color: '#be185d', accent: '#ec4899', bg: 'linear-gradient(145deg, #fdf2f8 0%, #ffffff 100%)', border: '#fbcfe8', desc: "Today's completions", onClick: () => setAssessorDrawer({ title: "Done Today", subtitle: "Assessments completed or verified today", data: assessorActivity.assignedListToday || [] }) },
-                    ] as any[]).map(({ label, value, icon, color, accent, bg, border, desc, isLive, onClick }) => (
-                        <div key={label}
-                            onClick={onClick}
-                            style={{ background: bg, border: `1px solid ${border}`, borderRadius: 20, padding: '1.5rem', cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)', position: 'relative', overflow: 'hidden' }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 16px 40px ${color}20`; e.currentTarget.style.borderColor = color + '66'; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = border; }}
-                        >
-                            <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, background: `${color}08`, borderRadius: '50%' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-                                <div style={{ width: 48, height: 48, borderRadius: 16, background: `${color}15`, color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    {icon}
-                                </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
-                                    {isLive && <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#059669', background: '#dcfce7', padding: '0.15rem 0.5rem', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>}
-                                    <ChevronRight size={16} color={color} style={{ opacity: 0.5 }} />
-                                </div>
-                            </div>
-                            <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{label}</div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 950, color, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '4px' }}>{value ?? 0}</div>
-                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>{desc}</div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* ── Row 2: Status KPI Cards with progress bars ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '2rem' }}>
-                    {([
-                        { label: 'Not Started', value: assessorActivity.notStarted, icon: <Clock size={20} />, color: '#92400e', accent: '#fbbf24', bg: 'linear-gradient(145deg, #fffbeb 0%, #ffffff 100%)', border: '#fde68a', desc: 'Awaiting field visit', filterFn: (r: any) => !r.status || r.status === 'pending' },
-                        { label: 'In Progress', value: assessorActivity.inProgress, icon: <Activity size={20} />, color: '#1d4ed8', accent: '#60a5fa', bg: 'linear-gradient(145deg, #eff6ff 0%, #ffffff 100%)', border: '#bfdbfe', desc: 'Currently active', filterFn: (r: any) => r.status === 'in_progress' },
-                        { label: 'Completed', value: assessorActivity.completed, icon: <CheckCircle2 size={20} />, color: '#065f46', accent: '#22c55e', bg: 'linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%)', border: '#bbf7d0', desc: 'QC review pending', filterFn: (r: any) => r.status === 'completed' },
-                        { label: 'QC Verified', value: assessorActivity.qcVerified, icon: <Shield size={20} />, color: '#7c3aed', accent: '#a78bfa', bg: 'linear-gradient(145deg, #f5f3ff 0%, #ffffff 100%)', border: '#ddd6fe', desc: 'Fully verified', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
-                    ] as any[]).map(({ label, value, icon, color, accent, bg, border, desc, filterFn }) => {
-                        const total = assessorActivity.totalAssigned || 1;
-                        const pct = Math.min(100, Math.round(((value || 0) / total) * 100));
-                        return (
+    
+            return (
+                <>
+                    {/* ── Row 1: Primary KPI Cards ── */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                        {([
+                            { label: 'Total Assessors', value: activityData.totalAssessors, icon: <Users2 size={22} />, color: '#3730a3', accent: '#6366f1', bg: 'linear-gradient(145deg, #eef2ff 0%, #ffffff 100%)', border: '#c7d2fe', desc: 'Registered field staff', onClick: () => navigate('/admin/users?role=accessor') },
+                            { label: 'Active Now', value: activityData.activeAssessors, icon: <Zap size={22} />, color: '#059669', accent: '#10b981', bg: 'linear-gradient(145deg, #ecfdf5 0%, #ffffff 100%)', border: '#a7f3d0', desc: 'Currently in field', isLive: true, onClick: () => setAssessorDrawer({ title: 'Active Assessors', subtitle: 'Assessors with in-progress assessments', data: (activityData.assignedList || []).filter((r: any) => r.status === 'in_progress') }) },
+                            { label: 'Total Assigned', value: activityData.totalAssigned, icon: <ClipboardList size={22} />, color: '#0369a1', accent: '#0ea5e9', bg: 'linear-gradient(145deg, #f0f9ff 0%, #ffffff 100%)', border: '#bae6fd', desc: 'Assessments allocated', onClick: () => setAssessorDrawer({ title: 'All Assigned', subtitle: 'Every participant assigned to an assessor', data: activityData.assignedList || [] }) },
+                            { label: 'Done Today', value: activityData.completedToday, icon: <TrendingUp size={22} />, color: '#be185d', accent: '#ec4899', bg: 'linear-gradient(145deg, #fdf2f8 0%, #ffffff 100%)', border: '#fbcfe8', desc: "Today's completions", onClick: () => setAssessorDrawer({ title: "Done Today", subtitle: "Assessments completed or verified today", data: activityData.assignedListToday || [] }) },
+                        ] as any[]).map(({ label, value, icon, color, accent, bg, border, desc, isLive, onClick }) => (
                             <div key={label}
-                                onClick={() => setAssessorDrawer({ title: label, subtitle: desc, data: (assessorActivity.assignedList || []).filter(filterFn) })}
-                                style={{ background: bg, border: `1px solid ${border}`, borderRadius: 20, padding: '1.5rem', cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)' }}
-                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 16px 40px ${color}18`; e.currentTarget.style.borderColor = color + '66'; }}
+                                onClick={onClick}
+                                style={{ background: bg, border: `1px solid ${border}`, borderRadius: 20, padding: '1.5rem', cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)', position: 'relative', overflow: 'hidden' }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 16px 40px ${color}20`; e.currentTarget.style.borderColor = color + '66'; }}
                                 onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = border; }}
                             >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                                    <div style={{ width: 44, height: 44, borderRadius: 14, background: `${color}15`, color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, background: `${color}08`, borderRadius: '50%' }} />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                                    <div style={{ width: 48, height: 48, borderRadius: 16, background: `${color}15`, color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                         {icon}
                                     </div>
-                                    <ChevronRight size={16} color={color} style={{ opacity: 0.5 }} />
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
+                                        {isLive && <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#059669', background: '#dcfce7', padding: '0.15rem 0.5rem', borderRadius: '100px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</span>}
+                                        <ChevronRight size={16} color={color} style={{ opacity: 0.5 }} />
+                                    </div>
                                 </div>
                                 <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{label}</div>
-                                <div style={{ fontSize: '2.25rem', fontWeight: 950, color, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '0.75rem' }}>{value ?? 0}</div>
-                                <div style={{ height: 5, background: `${color}15`, borderRadius: '100px', overflow: 'hidden', marginBottom: '6px' }}>
-                                    <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(to right, ${color}, ${accent})`, borderRadius: '100px', transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)' }} />
+                                <div style={{ fontSize: '2.5rem', fontWeight: 950, color, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '4px' }}>{value ?? 0}</div>
+                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>{desc}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* ── Row 2: Status KPI Cards with progress bars ── */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '2rem' }}>
+                        {([
+                            { label: 'Not Started', value: activityData.notStarted, icon: <Clock size={20} />, color: '#92400e', accent: '#fbbf24', bg: 'linear-gradient(145deg, #fffbeb 0%, #ffffff 100%)', border: '#fde68a', desc: 'Awaiting field visit', filterFn: (r: any) => !r.status || r.status === 'pending' },
+                            { label: 'In Progress', value: activityData.inProgress, icon: <Activity size={20} />, color: '#1d4ed8', accent: '#60a5fa', bg: 'linear-gradient(145deg, #eff6ff 0%, #ffffff 100%)', border: '#bfdbfe', desc: 'Currently active', filterFn: (r: any) => r.status === 'in_progress' },
+                            { label: 'Completed', value: activityData.completed, icon: <CheckCircle2 size={20} />, color: '#065f46', accent: '#22c55e', bg: 'linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%)', border: '#bbf7d0', desc: 'QC review pending', filterFn: (r: any) => r.status === 'completed' },
+                            { label: 'QC Verified', value: activityData.qcVerified, icon: <Shield size={20} />, color: '#7c3aed', accent: '#a78bfa', bg: 'linear-gradient(145deg, #f5f3ff 0%, #ffffff 100%)', border: '#ddd6fe', desc: 'Fully verified', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
+                        ] as any[]).map(({ label, value, icon, color, accent, bg, border, desc, filterFn }) => {
+                            const total = activityData.totalAssigned || 1;
+                            const pct = Math.min(100, Math.round(((value || 0) / total) * 100));
+                            return (
+                                <div key={label}
+                                    onClick={() => setAssessorDrawer({ title: label, subtitle: desc, data: (activityData.assignedList || []).filter(filterFn) })}
+                                    style={{ background: bg, border: `1px solid ${border}`, borderRadius: 20, padding: '1.5rem', cursor: 'pointer', transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)' }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 16px 40px ${color}18`; e.currentTarget.style.borderColor = color + '66'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = border; }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                        <div style={{ width: 44, height: 44, borderRadius: 14, background: `${color}15`, color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {icon}
+                                        </div>
+                                        <ChevronRight size={16} color={color} style={{ opacity: 0.5 }} />
+                                    </div>
+                                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{label}</div>
+                                    <div style={{ fontSize: '2.25rem', fontWeight: 950, color, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: '0.75rem' }}>{value ?? 0}</div>
+                                    <div style={{ height: 5, background: `${color}15`, borderRadius: '100px', overflow: 'hidden', marginBottom: '6px' }}>
+                                        <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(to right, ${color}, ${accent})`, borderRadius: '100px', transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)' }} />
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>{desc}</span>
+                                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color }}>{pct}%</span>
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>{desc}</span>
-                                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color }}>{pct}%</span>
+                            );
+                        })}
+                    </div>
+
+                    {/* ── Two-Column: Category Cards + Funnel Pipeline ── */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+
+                        {/* Category Progress Analytics */}
+                        <div className="card shadow-premium" style={{ border: '1px solid #f1f5f9', padding: '1.75rem', borderRadius: 24, background: '#ffffff' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                                    <div style={{ width: 34, height: 34, borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <BarChart3 size={18} />
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Category Progress</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>Click category to view details</div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.7rem', fontWeight: 700 }}>
+                                    <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />Done</span>
+                                    <span style={{ color: '#2563eb', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />Active</span>
+                                    <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#cbd5e1', display: 'inline-block' }} />Pending</span>
                                 </div>
                             </div>
-                        );
-                    })}
-                </div>
 
-                {/* ── Two-Column: Category Cards + Funnel Pipeline ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                                {(() => {
+                                    const defaultCategories = [
+                                        { key: 'Wards', label: 'Wards' },
+                                        { key: 'Hotels', label: 'Hotels' },
+                                        { key: 'Schools', label: 'Schools' },
+                                        { key: 'Societies - Bwg', label: 'Societies - BWG' },
+                                        { key: 'Hospitals', label: 'Hospitals' },
+                                        { key: 'Offices', label: 'Offices' },
+                                        { key: 'Markets', label: 'Markets' },
+                                    ];
 
-                    {/* Category Progress Analytics */}
-                    <div className="card shadow-premium" style={{ border: 'none', padding: '1.75rem', borderRadius: 24 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                                <div style={{ width: 32, height: 32, borderRadius: 10, background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <BarChart3 size={16} />
+                                    const breakdownKeys = Object.keys(activityData.categoryBreakdown || {});
+                                    const itemsToRender = breakdownKeys.length > 0 
+                                        ? Object.entries(activityData.categoryBreakdown).map(([cat, d]: any) => ({
+                                            cat,
+                                            done: (d.completed || 0) + (d.qcVerified || 0),
+                                            inProg: d.inProgress || 0,
+                                            pending: d.notStarted || 0,
+                                            total: d.total || 0,
+                                            pct: (d.total || 0) > 0 ? Math.round((((d.completed || 0) + (d.qcVerified || 0)) / d.total) * 100) : 0
+                                        }))
+                                        : defaultCategories.map(c => ({
+                                            cat: c.label,
+                                            done: 0,
+                                            inProg: 0,
+                                            pending: 0,
+                                            total: 0,
+                                            pct: 0
+                                        }));
+
+                                    return itemsToRender.map(({ cat, done, inProg, pending, total, pct }) => (
+                                        <div key={cat}
+                                            onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(cat)}`)}
+                                            style={{ padding: '0.875rem 1.25rem', background: '#f8fafc', borderRadius: 16, cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)', border: '1px solid #f1f5f9' }}
+                                            onMouseEnter={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.04)'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = '#f1f5f9'; e.currentTarget.style.boxShadow = ''; }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize' }}>{cat}</span>
+                                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a' }}>{done} done</span>
+                                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563eb' }}>{inProg} active</span>
+                                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8' }}>{pending} pending</span>
+                                                    <span style={{ fontSize: '0.8rem', fontWeight: 900, color: pct >= 80 ? '#16a34a' : pct >= 40 ? '#2563eb' : '#d97706', background: pct >= 80 ? '#f0fdf4' : pct >= 40 ? '#eff6ff' : '#fffbeb', padding: '2px 10px', borderRadius: 8, border: `1px solid ${pct >= 80 ? '#bbf7d0' : pct >= 40 ? '#bfdbfe' : '#fde68a'}` }}>{pct}%</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ height: 7, background: '#e2e8f0', borderRadius: '100px', overflow: 'hidden', display: 'flex' }}>
+                                                <div style={{ width: `${pct}%`, height: '100%', background: '#22c55e', transition: 'width 0.7s ease' }} />
+                                                <div style={{ width: `${total > 0 ? Math.round((inProg/total)*100) : 0}%`, height: '100%', background: '#3b82f6', transition: 'width 0.7s ease' }} />
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+
+
+                        {/* Assessment Pipeline */}
+                        <div className="card shadow-premium" style={{ border: '1px solid #f1f5f9', padding: '1.75rem', borderRadius: 24, background: '#ffffff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.5rem' }}>
+                                <div style={{ width: 34, height: 34, borderRadius: 10, background: '#f5f3ff', border: '1px solid #edd5ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Target size={18} />
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>Category Progress</div>
-                                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>Click category to view details</div>
+                                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Assessment Pipeline</div>
+                                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>Click stage to open filtered view</div>
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.65rem', fontWeight: 700 }}>
-                                <span style={{ color: '#22c55e', display: 'flex', alignItems: 'center', gap: '3px' }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />Done</span>
-                                <span style={{ color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '3px' }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#60a5fa', display: 'inline-block' }} />Active</span>
-                                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#cbd5e1', display: 'inline-block' }} />Pending</span>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {[
+                                    { label: 'Not Started', value: activityData.notStarted, color: '#d97706', bar: '#f59e0b', bg: '#fffdf5', border: '#fef3c7', desc: 'Awaiting field visit', filterFn: (r: any) => !r.status || r.status === 'pending' },
+                                    { label: 'In Progress', value: activityData.inProgress, color: '#2563eb', bar: '#3b82f6', bg: '#f8fafc', border: '#dbeafe', desc: 'Being assessed', filterFn: (r: any) => r.status === 'in_progress' },
+                                    { label: 'Completed', value: activityData.completed, color: '#16a34a', bar: '#22c55e', bg: '#f9fdfa', border: '#dcfce7', desc: 'QC pending', filterFn: (r: any) => r.status === 'completed' },
+                                    { label: 'QC Verified', value: activityData.qcVerified, color: '#7c3aed', bar: '#8b5cf6', bg: '#faf5ff', border: '#f3e8ff', desc: 'Verified & approved', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
+                                    { label: 'Rejected', value: activityData.rejected, color: '#dc2626', bar: '#ef4444', bg: '#fff5f5', border: '#fee2e2', desc: 'Needs reassessment', filterFn: (r: any) => ['reassessment', 'rejected'].includes(r.status) },
+                                ].map(({ label, value, color, bar, bg, border, desc, filterFn }, idx) => {
+                                    const total = activityData.totalAssigned || 1;
+                                    const pct = Math.min(100, Math.round(((value || 0) / total) * 100));
+                                    const indentPct = idx * 5;
+                                    return (
+                                        <React.Fragment key={label}>
+                                            <div
+                                                onClick={() => setAssessorDrawer({ title: label, subtitle: desc, data: (activityData.assignedList || []).filter(filterFn) })}
+                                                style={{
+                                                    background: bg,
+                                                    borderRadius: 16,
+                                                    padding: '0.875rem 1.25rem',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)',
+                                                    border: `1px solid ${border}`,
+                                                    borderLeft: `4px solid ${color}`,
+                                                    marginLeft: `${indentPct}%`,
+                                                    width: `${100 - indentPct}%`
+                                                }}
+                                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 18px ${color}15`; }}
+                                                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                                            >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color }}>{label}</span>
+                                                        <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>{desc}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                                                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8' }}>{pct}%</span>
+                                                        <span style={{ fontSize: '1.25rem', fontWeight: 950, color, lineHeight: 1 }}>{value ?? 0}</span>
+                                                    </div>
+                                                </div>
+                                                <div style={{ height: 5, background: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                                    <div style={{ width: `${pct}%`, height: '100%', background: bar, borderRadius: '100px', transition: 'width 0.7s ease' }} />
+                                                </div>
+                                            </div>
+                                            {idx < 4 && (
+                                                <div style={{ display: 'flex', justifyContent: 'center', padding: '1px 0', color: '#cbd5e1', fontSize: '0.75rem', opacity: 0.7 }}>↓</div>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {Object.entries(assessorActivity.categoryBreakdown || {}).map(([cat, data]: any) => {
-                                const total = data.total || 0;
-                                if (total === 0) return null;
-                                const done = (data.completed || 0) + (data.qcVerified || 0);
-                                const inProg = data.inProgress || 0;
-                                const pct = Math.round((done / total) * 100);
-                                return (
-                                    <div key={cat}
-                                        onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(cat)}`)}
-                                        style={{ padding: '0.875rem 1rem', background: '#f8fafc', borderRadius: 14, cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)', border: '1px solid transparent' }}
-                                        onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.transform = 'translateX(6px)'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
-                                        onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = 'transparent'; }}
-                                    >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>{cat}</span>
-                                            <div style={{ display: 'flex', gap: '0.875rem', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e' }}>{done} done</span>
-                                                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#60a5fa' }}>{inProg} active</span>
-                                                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>{(data.notStarted || 0)} pending</span>
-                                                <span style={{ fontSize: '0.78rem', fontWeight: 900, color: pct >= 80 ? '#16a34a' : pct >= 40 ? '#2563eb' : '#92400e', background: pct >= 80 ? '#f0fdf4' : pct >= 40 ? '#eff6ff' : '#fffbeb', padding: '2px 8px', borderRadius: 8 }}>{pct}%</span>
-                                            </div>
-                                        </div>
-                                        <div style={{ height: 6, background: '#e2e8f0', borderRadius: '100px', overflow: 'hidden', display: 'flex' }}>
-                                            <div style={{ width: `${Math.round(((data.completed||0)/total)*100)}%`, height: '100%', background: '#22c55e', transition: 'width 0.7s ease' }} />
-                                            <div style={{ width: `${Math.round(((data.qcVerified||0)/total)*100)}%`, height: '100%', background: '#a78bfa', transition: 'width 0.7s ease' }} />
-                                            <div style={{ width: `${Math.round((inProg/total)*100)}%`, height: '100%', background: '#60a5fa', transition: 'width 0.7s ease' }} />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {Object.keys(assessorActivity.categoryBreakdown || {}).length === 0 && (
-                                <div style={{ textAlign: 'center', padding: '3rem 2rem', color: '#94a3b8' }}>
-                                    <Layers size={36} style={{ marginBottom: '0.75rem', opacity: 0.25, display: 'block', margin: '0 auto 0.75rem' }} />
-                                    <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>No assignments yet</div>
-                                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Category data will appear once assessors are assigned</div>
+                    </div>
+
+                    {/* ── Live Assessor Monitoring Data Grid ── */}
+                    <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden', borderRadius: 24, background: '#ffffff', marginBottom: '1.75rem' }}>
+                        {/* Grid Header */}
+                        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.875rem', background: '#fff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 4px #22c55e22' }} />
+                                <span style={{ fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Live Assessor Monitoring</span>
+                                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', padding: '0.2rem 0.65rem', background: '#f1f5f9', borderRadius: '8px' }}>
+                                    {(activityData.liveActivity || []).length} records
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                                <div style={{ display: 'flex', gap: '0.875rem', fontSize: '0.68rem', fontWeight: 700 }}>
+                                    {[{ c: '#22c55e', l: 'Completed' }, { c: '#60a5fa', l: 'In Progress' }, { c: '#a78bfa', l: 'QC Verified' }].map(({ c, l }) => (
+                                        <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#64748b' }}>
+                                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
+                                        </span>
+                                    ))}
                                 </div>
-                            )}
+                                <div style={{ position: 'relative' }}>
+                                    <Search size={14} style={{ position: 'absolute', left: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search assessor, participant..."
+                                        value={activitySearch}
+                                        onChange={e => setActivitySearch(e.target.value)}
+                                        style={{ paddingLeft: '2rem', paddingRight: '0.875rem', paddingTop: '0.45rem', paddingBottom: '0.45rem', fontSize: '0.78rem', fontWeight: 600, border: '1px solid #e2e8f0', borderRadius: '10px', outline: 'none', color: 'var(--text-primary)', background: '#f8fafc', width: '220px', transition: 'all 0.2s' }}
+                                        onFocus={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px #6366f115'; }}
+                                        onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = ''; }}
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* Assessment Funnel Pipeline */}
-                    <div className="card shadow-premium" style={{ border: 'none', padding: '1.75rem', borderRadius: 24 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.5rem' }}>
-                            <div style={{ width: 32, height: 32, borderRadius: 10, background: '#f5f3ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Target size={16} />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-primary)' }}>Assessment Pipeline</div>
-                                <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>Click stage to open filtered view</div>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                            {([
-                                { label: 'Not Started', value: assessorActivity.notStarted, color: '#92400e', bar: '#fbbf24', bg: '#fffbeb', border: '#fde68a', desc: 'Awaiting field visit', filterFn: (r: any) => !r.status || r.status === 'pending' },
-                                { label: 'In Progress', value: assessorActivity.inProgress, color: '#1d4ed8', bar: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe', desc: 'Being assessed', filterFn: (r: any) => r.status === 'in_progress' },
-                                { label: 'Completed', value: assessorActivity.completed, color: '#065f46', bar: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', desc: 'QC pending', filterFn: (r: any) => r.status === 'completed' },
-                                { label: 'QC Verified', value: assessorActivity.qcVerified, color: '#7c3aed', bar: '#a78bfa', bg: '#f5f3ff', border: '#ddd6fe', desc: 'Verified & approved', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
-                                { label: 'Rejected', value: assessorActivity.rejected, color: '#b91c1c', bar: '#f87171', bg: '#fef2f2', border: '#fecaca', desc: 'Needs reassessment', filterFn: (r: any) => ['reassessment', 'rejected'].includes(r.status) },
-                            ] as any[]).map(({ label, value, color, bar, bg, border, desc, filterFn }, idx) => {
-                                const total = assessorActivity.totalAssigned || 1;
-                                const pct = Math.min(100, Math.round(((value || 0) / total) * 100));
-                                const funnelWidth = Math.max(60, 100 - (idx * 8));
+                        {/* Data Grid */}
+                        <div style={{ overflowX: 'auto' }}>
+                            {(() => {
+                                const list = activityData.liveActivity || [];
+                                const filtered = activitySearch
+                                    ? list.filter((r: any) => {
+                                        const q = activitySearch.toLowerCase();
+                                        return (
+                                            r.assessorName?.toLowerCase().includes(q) ||
+                                            r.participantName?.toLowerCase().includes(q) ||
+                                            r.category?.toLowerCase().includes(q) ||
+                                            r.assessorZone?.toLowerCase().includes(q) ||
+                                            r.assessorWard?.toLowerCase().includes(q)
+                                        );
+                                    })
+                                    : list;
+                                const rows = filtered.slice(0, 15);
+
                                 return (
-                                    <div key={label}>
-                                        <div
-                                            onClick={() => setAssessorDrawer({ title: label, subtitle: desc, data: (assessorActivity.assignedList || []).filter(filterFn) })}
-                                            style={{ background: bg, borderRadius: 14, padding: '0.875rem 1rem', cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)', border: `1px solid ${border}`, marginLeft: `${100 - funnelWidth}%`, width: `${funnelWidth}%` }}
-                                            onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = `0 8px 24px ${color}20`; e.currentTarget.style.borderColor = color + '88'; }}
-                                            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = border; }}
-                                        >
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                                                <div>
-                                                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color }}>{label}</span>
-                                                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginLeft: '0.4rem', fontWeight: 600 }}>{desc}</span>
-                                                </div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8' }}>{pct}%</span>
-                                                    <span style={{ fontSize: '1.2rem', fontWeight: 950, color, lineHeight: 1 }}>{value ?? 0}</span>
-                                                </div>
-                                            </div>
-                                            <div style={{ height: 4, background: `${color}15`, borderRadius: '100px', overflow: 'hidden' }}>
-                                                <div style={{ width: `${pct}%`, height: '100%', background: bar, borderRadius: '100px', transition: 'width 0.7s ease' }} />
-                                            </div>
-                                        </div>
-                                        {idx < 4 && (
-                                            <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0', color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1 }}>↓</div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Live Assessor Monitoring Data Grid ── */}
-                <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden', borderRadius: 24 }}>
-                    {/* Grid Header */}
-                    <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.875rem', background: '#fff' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 4px #22c55e22' }} />
-                            <span style={{ fontWeight: 900, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Live Assessor Monitoring</span>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', padding: '0.2rem 0.65rem', background: '#f1f5f9', borderRadius: '8px' }}>
-                                {(assessorActivity.liveActivity || []).length} records
-                            </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            {/* Status legend */}
-                            <div style={{ display: 'flex', gap: '0.875rem', fontSize: '0.68rem', fontWeight: 700 }}>
-                                {[{ c: '#22c55e', l: 'Completed' }, { c: '#60a5fa', l: 'In Progress' }, { c: '#a78bfa', l: 'QC Verified' }].map(({ c, l }) => (
-                                    <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#64748b' }}>
-                                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
-                                    </span>
-                                ))}
-                            </div>
-                            {/* Search */}
-                            <div style={{ position: 'relative' }}>
-                                <Search size={14} style={{ position: 'absolute', left: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                                <input
-                                    type="text"
-                                    placeholder="Search assessor, participant..."
-                                    value={activitySearch}
-                                    onChange={e => setActivitySearch(e.target.value)}
-                                    style={{ paddingLeft: '2rem', paddingRight: '0.875rem', paddingTop: '0.45rem', paddingBottom: '0.45rem', fontSize: '0.78rem', fontWeight: 600, border: '1px solid #e2e8f0', borderRadius: '10px', outline: 'none', color: 'var(--text-primary)', background: '#f8fafc', width: '220px', transition: 'all 0.2s' }}
-                                    onFocus={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px #6366f115'; }}
-                                    onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = ''; }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Data Grid */}
-                    <div style={{ overflowX: 'auto' }}>
-                        {(() => {
-                            const statusMap: Record<string, { label: string; color: string; bg: string; dot: string; border: string }> = {
-                                in_progress:  { label: 'In Progress',  color: '#1d4ed8', bg: '#eff6ff',  dot: '#60a5fa', border: '#bfdbfe' },
-                                completed:    { label: 'Completed',    color: '#065f46', bg: '#f0fdf4',  dot: '#22c55e', border: '#bbf7d0' },
-                                qc_approved:  { label: 'QC Approved',  color: '#7c3aed', bg: '#f5f3ff',  dot: '#a78bfa', border: '#ddd6fe' },
-                                under_review: { label: 'Under Review', color: '#7c3aed', bg: '#f5f3ff',  dot: '#a78bfa', border: '#ddd6fe' },
-                                published:    { label: 'Published',    color: '#0369a1', bg: '#f0f9ff',  dot: '#38bdf8', border: '#bae6fd' },
-                                reassessment: { label: 'Reassessment', color: '#b91c1c', bg: '#fef2f2',  dot: '#f87171', border: '#fecaca' },
-                                rejected:     { label: 'Rejected',     color: '#b91c1c', bg: '#fef2f2',  dot: '#f87171', border: '#fecaca' },
-                                pending:      { label: 'Pending',      color: '#92400e', bg: '#fffbeb',  dot: '#fbbf24', border: '#fde68a' },
-                            };
-                            const q = activitySearch.toLowerCase();
-                            const rows = (assessorActivity.liveActivity || []).filter((row: any) =>
-                                !q ||
-                                row.assessorName?.toLowerCase().includes(q) ||
-                                row.participantName?.toLowerCase().includes(q) ||
-                                row.category?.toLowerCase().includes(q) ||
-                                row.assessorZone?.toLowerCase().includes(q) ||
-                                row.assessorWard?.toLowerCase().includes(q) ||
-                                row.status?.toLowerCase().includes(q)
-                            );
-                            return (
-                                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '640px' }}>
-                                    <thead>
-                                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #f1f5f9' }}>
-                                            {['Assessor', 'Zone / Ward', 'Participant', 'Category', 'Status', 'Last Activity'].map((h) => (
-                                                <th key={h} style={{ padding: '0.875rem 1.25rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {rows.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={6} style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-                                                    <Activity size={36} style={{ color: '#cbd5e1', marginBottom: '0.75rem', display: 'block', margin: '0 auto 0.75rem' }} />
-                                                    <div style={{ fontWeight: 700, color: '#94a3b8', fontSize: '0.9rem' }}>{activitySearch ? 'No results found' : 'No assessor activity yet'}</div>
-                                                    {activitySearch && <div style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '0.25rem' }}>Try a different search term</div>}
-                                                </td>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                        <thead>
+                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>Assessor</th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>Zone / Ward</th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>Participant</th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>Category</th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>Status</th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>Submitted Date</th>
                                             </tr>
-                                        ) : rows.map((row: any, i: number) => {
-                                            const s = statusMap[row.status] || { label: row.status, color: '#475569', bg: '#f1f5f9', dot: '#94a3b8', border: '#e2e8f0' };
-                                            const zoneWard = [row.assessorZone, row.assessorWard].filter((v: string) => v && v !== '—').join(' / ') || '—';
-                                            return (
-                                                <tr key={i}
-                                                    style={{ borderBottom: '1px solid #f8fafc', transition: 'background 0.15s', cursor: 'pointer' }}
-                                                    onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; }}
-                                                    onMouseLeave={e => { e.currentTarget.style.background = ''; }}
-                                                    onClick={() => {
-                                                        if (row.assessmentId) {
-                                                            if (row.status === 'in_progress') {
-                                                                navigate(`/assessment-review/${row.assessmentId}`);
-                                                            } else {
-                                                                navigate(`/assessment/${row.assessmentId}`);
-                                                            }
-                                                        } else {
-                                                            navigate('/admin/users?role=accessor');
-                                                        }
-                                                    }}
-                                                >
-                                                    <td style={{ padding: '0.875rem 1.25rem' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                            <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#3730a3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.82rem', flexShrink: 0, border: '2px solid #fff', boxShadow: '0 2px 8px rgba(99,102,241,0.15)' }}>
-                                                                {row.assessorName?.charAt(0)?.toUpperCase() || '?'}
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{row.assessorName}</div>
-                                                            </div>
+                                        </thead>
+                                        <tbody>
+                                            {rows.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={6} style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+                                                        <div style={{
+                                                            width: '96px',
+                                                            height: '96px',
+                                                            borderRadius: '50%',
+                                                            background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            margin: '0 auto 1.25rem',
+                                                            boxShadow: '0 8px 24px rgba(124,58,237,0.08)',
+                                                            border: '1px solid #ddd6fe'
+                                                        }}>
+                                                            <ClipboardList size={44} color="#8b5cf6" strokeWidth={1.5} />
                                                         </div>
-                                                    </td>
-                                                    <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.8rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>{zoneWard}</td>
-                                                    <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.83rem', fontWeight: 600, color: 'var(--text-primary)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.participantName}</td>
-                                                    <td style={{ padding: '0.875rem 1.25rem' }}>
-                                                        <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 10px', borderRadius: 8, background: '#f0f4ff', color: '#3730a3', textTransform: 'capitalize', whiteSpace: 'nowrap', border: '1px solid #c7d2fe' }}>{row.category}</span>
-                                                    </td>
-                                                    <td style={{ padding: '0.875rem 1.25rem' }}>
-                                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.7rem', fontWeight: 700, padding: '4px 10px', borderRadius: '100px', background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: 'nowrap' }}>
-                                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, display: 'inline-block' }} />{s.label}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                                        {row.lastActivity ? new Date(row.lastActivity).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                        <h4 style={{ fontWeight: 900, fontSize: '1.05rem', color: '#0f172a', margin: '0 0 0.35rem' }}>No active assessor activity found</h4>
+                                                        <p style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, margin: '0 auto 1.25rem', maxWidth: '360px' }}>Live updates will appear automatically as field assessments progress</p>
                                                     </td>
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            );
-                        })()}
-                    </div>
-                    {(assessorActivity.liveActivity || []).length > 0 && (
-                        <div style={{ padding: '0.875rem 1.5rem', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa' }}>
-                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
-                                Showing {Math.min((assessorActivity.liveActivity || []).length, activitySearch ? (assessorActivity.liveActivity || []).filter((r: any) => { const q = activitySearch.toLowerCase(); return r.assessorName?.toLowerCase().includes(q) || r.participantName?.toLowerCase().includes(q) || r.category?.toLowerCase().includes(q); }).length : (assessorActivity.liveActivity || []).length)} of {(assessorActivity.liveActivity || []).length} records
-                            </span>
-                            <button onClick={() => navigate('/admin/users?role=accessor')} style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                View all assessors <ChevronRight size={14} />
-                            </button>
+                                            ) : rows.map((row: any, i: number) => {
+                                                const isDone = row.status === 'completed' || row.status === 'qc_approved';
+                                                return (
+                                                    <tr key={i} style={{ borderBottom: '1px solid #f8fafc', transition: 'background 0.15s', cursor: 'pointer' }}
+                                                        onClick={() => {
+                                                            if (row.assessmentId) {
+                                                                navigate(row.status === 'in_progress' ? `/assessment-review/${row.assessmentId}` : `/assessment/${row.assessmentId}`);
+                                                            } else {
+                                                                navigate('/admin/users?role=accessor');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <td style={{ padding: '0.875rem 1.25rem' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.78rem' }}>
+                                                                    {row.assessorName?.charAt(0)?.toUpperCase() || '?'}
+                                                                </div>
+                                                                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
+                                                                    {row.assessorName || '—'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.78rem', color: '#64748b' }}>
+                                                            {[row.assessorZone, row.assessorWard].filter((v: string) => v && v !== '—').join(' / ') || '—'}
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.78rem', color: '#1e293b', fontWeight: 700 }}>
+                                                            {row.participantName || '—'}
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem' }}>
+                                                            <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '6px', backgroundColor: '#e0e7ff', color: '#3730a3' }}>
+                                                                {row.category || 'Wards'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem' }}>
+                                                            <span style={{
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 800,
+                                                                padding: '0.25rem 0.65rem',
+                                                                borderRadius: '100px',
+                                                                backgroundColor: isDone ? '#f0fdf4' : '#eff6ff',
+                                                                color: isDone ? '#166534' : '#1d4ed8',
+                                                                border: `1px solid ${isDone ? '#bbf7d0' : '#bfdbfe'}`,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.35rem'
+                                                            }}>
+                                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: isDone ? '#22c55e' : '#3b82f6' }} />
+                                                                {isDone ? 'Completed' : 'In Progress'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.75rem', color: '#1e293b', fontWeight: 600 }}>
+                                                            {row.lastActivity ? new Date(row.lastActivity).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                );
+                            })()}
+                            </div>
                         </div>
-                    )}
-                </div>
-            </>
-        ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
-                    {Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="skeleton-block" style={{ height: '130px', borderRadius: 20 }} />
-                    ))}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '1.5rem' }}>
-                    <div className="skeleton-block" style={{ height: '280px', borderRadius: 24 }} />
-                    <div className="skeleton-block" style={{ height: '280px', borderRadius: 24 }} />
-                </div>
-                <div className="skeleton-block" style={{ height: '200px', borderRadius: 24 }} />
-            </div>
-        )}
+                
+
+
+                    {/* ── Category Champions Banner ── */}
+
+                    <div style={{
+                        background: 'linear-gradient(135deg, #044e3a 0%, #065f46 100%)',
+                        borderRadius: 24,
+                        padding: '1.75rem 2rem',
+                        marginBottom: '1.75rem',
+                        color: 'white',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        boxShadow: '0 12px 32px rgba(6, 95, 70, 0.25)'
+                    }}>
+                        <div style={{ position: 'absolute', top: -30, right: -30, width: 140, height: 140, background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                            <div>
+                                <h3 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', color: '#ffffff' }}>Category Champions</h3>
+                                <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.75)', margin: '4px 0 0', fontWeight: 600 }}>Top Performing Entities Across Regions</p>
+                            </div>
+                            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Trophy size={24} color="#facc15" />
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'rgba(0,0,0,0.22)', borderRadius: 16, padding: '1.15rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div>
+                                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>WARDS</div>
+                                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff' }}>{stats?.topCategoryParticipant || 'Unnamed'}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#facc15', lineHeight: 1 }}>{stats?.topCategoryPoints || 7358}</div>
+                                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>PTS</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── System-wide Activity Data Grid ── */}
+                    <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden', borderRadius: 24, background: '#ffffff' }}>
+                        {/* Grid Header */}
+                        <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.875rem', background: '#fff' }}>
+                            <div>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>System-wide Activity</h3>
+                                <p style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, margin: '2px 0 0' }}>Real-time assessment flow</p>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <button
+                                    onClick={exportSystemActivityCSV}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        padding: '0.45rem 1rem',
+                                        background: '#ffffff',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '10px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        color: '#475569',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                                >
+                                    <Download size={14} /> Export CSV
+                                </button>
+                                <div style={{ position: 'relative' }}>
+                                    <Search size={14} style={{ position: 'absolute', left: '0.625rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search assessor, participant..."
+                                        value={activitySearch}
+                                        onChange={e => setActivitySearch(e.target.value)}
+                                        style={{ paddingLeft: '2rem', paddingRight: '0.875rem', paddingTop: '0.45rem', paddingBottom: '0.45rem', fontSize: '0.78rem', fontWeight: 600, border: '1px solid #e2e8f0', borderRadius: '10px', outline: 'none', color: 'var(--text-primary)', background: '#f8fafc', width: '220px', transition: 'all 0.2s' }}
+                                        onFocus={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px #6366f115'; }}
+                                        onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = ''; }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Data Grid */}
+                        <div style={{ overflowX: 'auto' }}>
+                            {(() => {
+                                const statusMap: Record<string, { label: string; color: string; bg: string; dot: string; border: string }> = {
+                                    in_progress:  { label: 'In Progress',  color: '#1d4ed8', bg: '#eff6ff',  dot: '#60a5fa', border: '#bfdbfe' },
+                                    completed:    { label: 'Completed',    color: '#065f46', bg: '#f0fdf4',  dot: '#22c55e', border: '#bbf7d0' },
+                                    qc_approved:  { label: 'QC Verified',  color: '#7c3aed', bg: '#f5f3ff',  dot: '#a78bfa', border: '#ddd6fe' },
+                                    under_review: { label: 'Under Review', color: '#7c3aed', bg: '#f5f3ff',  dot: '#a78bfa', border: '#ddd6fe' },
+                                    published:    { label: 'Published',    color: '#7c3aed', bg: '#f5f3ff',  dot: '#a78bfa', border: '#ddd6fe' },
+                                    reassessment: { label: 'Reassessment', color: '#b91c1c', bg: '#fef2f2',  dot: '#f87171', border: '#fecaca' },
+                                    rejected:     { label: 'Rejected',     color: '#b91c1c', bg: '#fef2f2',  dot: '#f87171', border: '#fecaca' },
+                                };
+                                const list = activityData.liveActivity || [];
+                                const filtered = activitySearch
+                                    ? list.filter((r: any) => {
+                                        const q = activitySearch.toLowerCase();
+                                        return (
+                                            r.assessorName?.toLowerCase().includes(q) ||
+                                            r.participantName?.toLowerCase().includes(q) ||
+                                            r.category?.toLowerCase().includes(q) ||
+                                            r.assessorZone?.toLowerCase().includes(q) ||
+                                            r.assessorWard?.toLowerCase().includes(q)
+                                        );
+                                    })
+                                    : list;
+
+                                const rows = filtered.slice(0, 15);
+
+                                return (
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                        <thead>
+                                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><User size={14} style={{ color: '#64748b' }} /> ASSESSOR</div>
+                                                </th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><MapPin size={14} style={{ color: '#64748b' }} /> ZONE / WARD</div>
+                                                </th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Users size={14} style={{ color: '#64748b' }} /> ASSIGNED PARTICIPANT</div>
+                                                </th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><FileText size={14} style={{ color: '#64748b' }} /> CATEGORY</div>
+                                                </th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Activity size={14} style={{ color: '#64748b' }} /> STATUS</div>
+                                                </th>
+                                                <th style={{ padding: '0.875rem 1.25rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Clock size={14} style={{ color: '#64748b' }} /> LAST ACTION</div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rows.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={6} style={{ textAlign: 'center', padding: '4.5rem 2rem' }}>
+                                                        <div style={{
+                                                            width: '130px',
+                                                            height: '130px',
+                                                            borderRadius: '50%',
+                                                            background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            margin: '0 auto 1.5rem',
+                                                            position: 'relative',
+                                                            boxShadow: '0 10px 30px rgba(124,58,237,0.1)',
+                                                            border: '1px solid #ddd6fe'
+                                                        }}>
+                                                            <ClipboardList size={56} color="#8b5cf6" strokeWidth={1.25} style={{ opacity: 0.9 }} />
+                                                            <div style={{
+                                                                position: 'absolute',
+                                                                bottom: 8,
+                                                                right: 8,
+                                                                width: 38,
+                                                                height: 38,
+                                                                borderRadius: '50%',
+                                                                background: '#7c3aed',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                boxShadow: '0 4px 14px rgba(124,58,237,0.4)',
+                                                                border: '2px solid #ffffff'
+                                                            }}>
+                                                                <Search size={18} color="#ffffff" strokeWidth={2.5} />
+                                                            </div>
+                                                        </div>
+                                                        <h4 style={{ fontWeight: 900, fontSize: '1.1rem', color: '#0f172a', margin: '0 0 0.35rem' }}>No active assessor activity found</h4>
+                                                        <p style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600, margin: '0 auto 1.25rem', maxWidth: '380px' }}>Live updates will appear automatically as field assessments progress</p>
+                                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', opacity: 0.5 }}>
+                                                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#8b5cf6' }} />
+                                                            <span style={{ width: 44, height: 2, background: 'linear-gradient(90deg, #8b5cf6, #ddd6fe)', borderRadius: 2 }} />
+                                                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#8b5cf6' }} />
+                                                        </div>
+                                                    </td>
+                                                </tr>
+
+                                            ) : rows.map((row: any, i: number) => {
+                                                const isDone = row.status === 'completed' || row.status === 'qc_approved';
+                                                return (
+                                                    <tr key={i} style={{ borderBottom: '1px solid #f8fafc', transition: 'background 0.15s', cursor: 'pointer' }}
+                                                        onClick={() => {
+                                                            if (row.assessmentId) {
+                                                                navigate(row.status === 'in_progress' ? `/assessment-review/${row.assessmentId}` : `/assessment/${row.assessmentId}`);
+                                                            } else {
+                                                                navigate('/admin/users?role=accessor');
+                                                            }
+                                                        }}
+                                                    >
+                                                        <td style={{ padding: '0.875rem 1.25rem' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.78rem' }}>
+                                                                    {row.assessorName?.charAt(0)?.toUpperCase() || '?'}
+                                                                </div>
+                                                                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>
+                                                                    {row.assessorName || '—'}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.78rem', color: '#64748b' }}>
+                                                            {[row.assessorZone, row.assessorWard].filter((v: string) => v && v !== '—').join(' / ') || '—'}
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.78rem', color: '#1e293b', fontWeight: 700 }}>
+                                                            {row.participantName || '—'}
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem' }}>
+                                                            <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '6px', backgroundColor: '#e0e7ff', color: '#3730a3' }}>
+                                                                {row.category || 'Wards'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem' }}>
+                                                            <span style={{
+                                                                fontSize: '0.72rem',
+                                                                fontWeight: 800,
+                                                                padding: '0.25rem 0.65rem',
+                                                                borderRadius: '100px',
+                                                                backgroundColor: isDone ? '#f0fdf4' : '#eff6ff',
+                                                                color: isDone ? '#166534' : '#1d4ed8',
+                                                                border: `1px solid ${isDone ? '#bbf7d0' : '#bfdbfe'}`,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.35rem'
+                                                            }}>
+                                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: isDone ? '#22c55e' : '#3b82f6' }} />
+                                                                {isDone ? 'Completed' : 'In Progress'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '0.875rem 1.25rem', fontSize: '0.75rem', color: '#1e293b', fontWeight: 600 }}>
+                                                            {row.lastActivity ? new Date(row.lastActivity).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </>
+            );
+        })()}
     </div>
 )}
 
-{/* ── Main Content: accessor = 2-col, others = 1-col ── */}
-<div className={user.role === 'accessor' ? 'accessor-main-grid' : ''} style={user.role === 'accessor' ? { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem', alignItems: 'start' } : {}}>
 
-    {/* Column 1 */}
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div className={user.role === 'accessor' ? 'accessor-main-grid' : ''} style={user.role === 'accessor' ? { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem', alignItems: 'start' } : {}}>
 
-        {/* Accessor Queue */}
-        {user.role === 'accessor' && (
-            <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden', borderRadius: '24px' }}>
-                <div style={{ padding: '1.5rem 1.75rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', background: '#fff' }}>
-                    <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Daily Verification Queue</h3>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#3730a3', backgroundColor: 'var(--primary-soft)', padding: '0.35rem 0.75rem', borderRadius: '8px' }}>
-                        {assignments.length} Tasks assigned
-                    </div>
-                </div>
-                <div style={{ padding: '1.25rem' }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', padding: '4rem' }}>
-                            <div className="spinner" style={{ margin: '0 auto 1rem' }} />
-                            <p style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Syncing your queue...</p>
-                        </div>
-                    ) : assignments.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-                            <div style={{ width: '72px', height: '72px', backgroundColor: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', color: 'var(--text-secondary)' }}>
-                                <Shield size={36} />
-                            </div>
-                            <h4 style={{ fontWeight: 900, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Queue is Empty</h4>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '300px', margin: '0 auto' }}>No field segments currently assigned to your profile.</p>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {assignments.map(a => (
-                                <div key={a.id} className="task-item hover-scale" style={{ padding: '1.25rem', borderRadius: '18px', border: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', backgroundColor: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-                                    <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                                        <div style={{ width: '50px', height: '50px', flexShrink: 0, backgroundColor: 'var(--swachh-green-soft)', color: 'var(--swachh-green)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 950, border: '1px solid rgba(22, 163, 74, 0.1)' }}>
-                                            {a.category.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div style={{ minWidth: 0 }}>
-                                            <div style={{ fontWeight: 850, color: 'var(--text-primary)', textTransform: 'capitalize', fontSize: '1rem', marginBottom: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {a.category} Ranking
-                                            </div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPin size={13} /> {a.details?.ward || a.details?.Ward || 'L-Zone Sector'}</span>
-                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Calendar size={13} /> {new Date(a.createdAt).toLocaleDateString()}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', flexShrink: 0 }}>
-                                        <span style={{ padding: '0.35rem 0.875rem', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', backgroundColor: a.status === 'verified' ? 'var(--success-soft)' : 'var(--warning-soft)', color: a.status === 'verified' ? 'var(--success)' : 'var(--warning)', whiteSpace: 'nowrap' }}>
-                                            {a.status === 'verified' ? 'Completed' : 'Pending'}
-                                        </span>
-                                        <button onClick={() => setSelectedParticipant(a)} className="btn btn-primary"
-                                            style={{ padding: '0.65rem 1.25rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 750, whiteSpace: 'nowrap' }}>
-                                            Review <ArrowRight size={15} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        )}
-
-        {/* Admin / QC sections */}
-        {(user.role === 'admin' || user.role === 'qc') && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                {user.role === 'qc' && (
-                    <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden', borderRadius: '24px' }}>
-                        <div style={{ padding: '1.5rem 1.75rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', background: '#fff' }}>
-                            <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Assessment Review Inbox</h3>
-                            <span className="badge" style={{ backgroundColor: 'var(--warning-soft)', color: 'var(--warning)', padding: '0.4rem 0.875rem', borderRadius: '8px', fontWeight: 800 }}>
-                                {qcReviews.length} Pending
-                            </span>
-                        </div>
-                        <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {loading ? (
-                                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                                    <div className="spinner" style={{ margin: '0 auto 1rem' }} />
-                                    <p style={{ color: 'var(--text-secondary)' }}>Refreshing reports...</p>
-                                </div>
-                            ) : qcReviews.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-                                    <div style={{ width: '72px', height: '72px', backgroundColor: 'var(--success-soft)', color: 'var(--success)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
-                                        <CheckCircle2 size={36} />
-                                    </div>
-                                    <h4 style={{ fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>All Caught Up!</h4>
-                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '300px', margin: '0 auto' }}>No assessments pending for your quality review.</p>
-                                </div>
-                            ) : (
-                                qcReviews.map(review => (
-                                    <div key={review.id} className="hover-scale" style={{ padding: '1.25rem', borderRadius: '20px', border: '1px solid var(--border-light)', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-                                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                                            <div style={{ width: '52px', height: '52px', flexShrink: 0, backgroundColor: '#f1f5f9', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3730a3', fontSize: '1.3rem', fontWeight: 950, border: '1px solid #e2e8f0' }}>
-                                                {review.questionnaire?.category?.charAt(0) || 'A'}
-                                            </div>
-                                            <div style={{ minWidth: 0 }}>
-                                                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1rem', marginBottom: '0.3rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {review.participant?.details?.ward || review.participant?.details?.Ward || 'Central'} Zone - {review.participant?.category}
-                                                </div>
-                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Users size={13} /> {review.assessor?.name}</span>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Calendar size={13} /> {new Date(review.createdAt).toLocaleDateString()}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', flexShrink: 0 }}>
-                                            <div style={{ textAlign: 'center', padding: '0.35rem 0.875rem', borderRadius: '10px', backgroundColor: 'var(--primary-soft)' }}>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Score</div>
-                                                <div style={{ fontSize: '1.35rem', fontWeight: 950, color: '#3730a3', lineHeight: 1 }}>{review.totalScore}</div>
-                                            </div>
-                                            <button onClick={() => setSelectedReview(review)} className="btn btn-primary"
-                                                style={{ backgroundColor: '#064e3b', color: 'white', padding: '0.75rem 1.25rem', borderRadius: '12px', fontWeight: 800, border: 'none', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                                                Audit Review
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Category Champions */}
-                <div className="card shadow-premium" style={{ padding: '2rem', background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)', color: 'white', border: 'none', borderRadius: '28px', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '130px', height: '130px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', zIndex: 0 }} />
-                    <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1, flexWrap: 'wrap', gap: '1rem' }}>
-                        <div>
-                            <h3 style={{ fontSize: '1.35rem', fontWeight: 950, color: 'white', marginBottom: '0.2rem' }}>Category Champions</h3>
-                            <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>Top Performing Entities Across Regions</p>
-                        </div>
-                        <div style={{ backgroundColor: 'rgba(255,255,255,0.1)', padding: '0.875rem', borderRadius: '18px' }}>
-                            <Trophy size={28} color="#fcd34d" />
-                        </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', position: 'relative', zIndex: 1 }}>
-                        {stats && stats.categoryWinners && Object.entries(stats.categoryWinners).map(([cat, winner]: any) => (
-                            <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', background: 'rgba(255,255,255,0.08)', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <div style={{ minWidth: 0, marginRight: '0.75rem' }}>
-                                    <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{cat}</div>
-                                    <div style={{ fontWeight: 900, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{winner.participantName}</div>
-                                </div>
-                                <div style={{ textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.1)', padding: '0.5rem 0.875rem', borderRadius: '10px', flexShrink: 0 }}>
-                                    <div style={{ fontSize: '1.2rem', fontWeight: 950, color: '#fcd34d' }}>{winner.displayScore ?? winner.finalScore ?? winner.totalScore}</div>
-                                    <div style={{ fontSize: '0.6rem', fontWeight: 800, opacity: 0.6 }}>PTS</div>
-                                </div>
-                            </div>
-                        ))}
-                        {(!stats || !stats.categoryWinners || Object.keys(stats.categoryWinners).length === 0) && (
-                            <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem', opacity: 0.6 }}>
-                                <Clock size={36} style={{ marginBottom: '1rem', opacity: 0.5 }} />
-                                <p style={{ fontWeight: 700 }}>Awaiting final calculations and audits...</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* System-wide Activity Table */}
-                <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden', borderRadius: '28px' }}>
-                    <div style={{ padding: '1.5rem 1.75rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', background: '#fff' }}>
-                        <div>
-                            <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>System-wide Activity</h3>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, marginTop: '0.2rem' }}>Real-time assessment flow</p>
-                        </div>
-<button
-    onClick={exportSystemActivityCSV}
-    className="btn btn-outline"
-    style={{
-        borderRadius: "10px",
-        fontSize: "0.8rem",
-        fontWeight: 750,
-        padding: "0.5rem 1rem"
-    }}
->
-    Export CSV
-</button>                    </div>
-                    <div>
-                        {loading ? (
-                            <div style={{ textAlign: 'center', padding: '4rem' }}>
-                                <div className="spinner" style={{ margin: '0 auto 1rem' }} />
-                                <p style={{ color: 'var(--text-secondary)' }}>Streaming data...</p>
-                            </div>
-                        ) : recentAssessments.length === 0 ? (
-                            <div style={{ padding: '5rem 2rem', textAlign: 'center' }}>
-                                <AlertCircle size={44} style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem', opacity: 0.4 }} />
-                                <h4 style={{ fontWeight: 900, color: 'var(--text-primary)' }}>No Activity Yet</h4>
-                                <p style={{ color: 'var(--text-secondary)', maxWidth: '300px', margin: '0.5rem auto 0' }}>Data will appear here as soon as assessors begin their field work.</p>
-                            </div>
-                        ) : (
-                            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '520px' }}>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid var(--border-light)' }}>
-                                            {['Assessor', 'Category', 'Score', 'Date'].map((h, i) => (
-                                                <th key={h} style={{ padding: '1rem 1.5rem', textAlign: i === 2 ? 'center' : i === 3 ? 'right' : 'left', fontSize: '0.68rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {recentAssessments.slice(0, 8).map((assessment: any) => (
-                                            <tr key={assessment.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} className="hover-light">
-                                                <td style={{ padding: '1.25rem 1.5rem' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                                                        <div style={{ width: '34px', height: '34px', flexShrink: 0, backgroundColor: 'var(--primary-soft)', color: '#3730a3', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.85rem' }}>
-                                                            {assessment.assessor?.name?.charAt(0) || 'U'}
-                                                        </div>
-                                                        <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>{assessment.assessor?.name || 'Unknown'}</div>
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '1.25rem 1.5rem' }}>
-                                                    <span style={{ padding: '0.35rem 0.75rem', backgroundColor: 'var(--primary-soft)', color: '#3730a3', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 850, textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
-                                                        {assessment.participant?.category || 'General'}
-                                                    </span>
-                                                </td>
-                                                <td style={{ padding: '1.25rem 1.5rem', textAlign: 'center' }}>
-                                                    <div style={{ fontWeight: 950, color: '#047857', fontSize: '1.05rem' }}>{assessment.totalScore}</div>
-                                                </td>
-                                                <td style={{ padding: '1.25rem 1.5rem', textAlign: 'right' }}>
-                                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                                        {new Date(assessment.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        )}
-    </div>
-
-    {/* Column 2: Accessor sidebar */}
-    {user.role === 'accessor' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="card shadow-premium" style={{ border: 'none', background: 'white', borderRadius: '24px', padding: '1.75rem' }}>
-                <h4 style={{ fontWeight: 900, marginBottom: '1.25rem', color: 'var(--text-primary)', fontSize: '1.05rem' }}>Your Progress</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Verification Accuracy</span>
-                        <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--swachh-green)' }}>98.4%</span>
-                    </div>
-                    <div style={{ width: '100%', height: '7px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: '98.4%', height: '100%', backgroundColor: 'var(--swachh-green)', borderRadius: '4px' }} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginTop: '0.5rem' }}>
-                        <div style={{ padding: '0.875rem', backgroundColor: '#f8fafc', borderRadius: '14px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Today</div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>12</div>
-                        </div>
-                        <div style={{ padding: '0.875rem', backgroundColor: '#f8fafc', borderRadius: '14px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Target</div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#3730a3' }}>15</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="card shadow-premium" style={{ border: 'none', background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)', borderRadius: '24px', padding: '1.75rem', color: 'white', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.1 }}><Award size={72} /></div>
-                <h4 style={{ fontWeight: 900, marginBottom: '0.875rem', position: 'relative', zIndex: 1 }}>Field Protocol</h4>
-                <p style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: '1.25rem', position: 'relative', zIndex: 1 }}>
-                    Ensure you are at the physical location and have captured high-quality evidence images for all verified entities.
-                </p>
-                <button className="btn" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', width: '100%', borderRadius: '12px', fontSize: '0.8125rem', fontWeight: 750, padding: '0.75rem' }}>
-                    View Guidelines
-                </button>
-            </div>
-        </div>
-    )}
-</div>
-
-            <div style={{
-                
-            }}>
                 {/* Column 1: Primary Content */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     {user.role === 'accessor' ? (
@@ -2167,8 +2110,7 @@ const exportSystemActivityCSV = () => {
                     </div>
                 </div>
             )}
-        </div>
-
+        
         {/* ── Assessor Filtered Drawer ── */}
         {assessorDrawer && (() => {
             const statusMap: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -2419,6 +2361,7 @@ const exportSystemActivityCSV = () => {
                 </div>
             </div>
         )}
+        </div>
         </>
     );
 };

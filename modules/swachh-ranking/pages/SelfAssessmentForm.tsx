@@ -99,7 +99,7 @@ function resolveImageUrl(src?: string): string {
     if (!src) return '';
     const t = src.trim();
     if (/^(https?:|data:|blob:)/i.test(t)) return t;
-    const mediaBase = (import.meta.env.VITE_MEDIA_BASE_URL || '').replace(/\/+$/, '');
+    const mediaBase = (((import.meta as any).env?.VITE_MEDIA_BASE_URL || '') as string).replace(/\/+$/, '');
     const base = mediaBase || apiBaseUrl;
     return `${base}${t.startsWith('/') ? '' : '/'}${t}`;
 }

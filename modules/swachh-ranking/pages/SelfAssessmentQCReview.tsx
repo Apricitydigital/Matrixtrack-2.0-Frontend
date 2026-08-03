@@ -419,7 +419,7 @@ function resolveImageUrl(src?: string): string {
     if (/^https?:/i.test(trimmed)) {
         url = trimmed;
     } else {
-        const mediaBase = (import.meta.env.VITE_MEDIA_BASE_URL || '').replace(/\/+$/, '');
+        const mediaBase = (((import.meta as any).env?.VITE_MEDIA_BASE_URL || '') as string).replace(/\/+$/, '');
         const base = mediaBase || apiBaseUrl;
         const sep = trimmed.startsWith('/') ? '' : '/';
         url = `${base}${sep}${trimmed}`;
@@ -683,8 +683,8 @@ const SelfAssessmentQCReview = () => {
         setBulkDownloading(true);
         try {
             let pmcB64 = '', swachhB64 = '';
-            try { pmcB64    = await toBase64(pmcLogoSrc);    } catch { /* skip */ }
-            try { swachhB64 = await toBase64(swachhLogoSrc); } catch { /* skip */ }
+            try { pmcB64    = await toBase64(typeof pmcLogoSrc === 'string' ? pmcLogoSrc : (pmcLogoSrc as any)?.src || '');    } catch { /* skip */ }
+            try { swachhB64 = await toBase64(typeof swachhLogoSrc === 'string' ? swachhLogoSrc : (swachhLogoSrc as any)?.src || ''); } catch { /* skip */ }
 
             const details: DetailData[] = [];
             for (const id of ids) {
@@ -711,8 +711,8 @@ const SelfAssessmentQCReview = () => {
     const exportListPDF = async () => {
         let pmcB64    = '';
         let swachhB64 = '';
-        try { pmcB64    = await toBase64(pmcLogoSrc);   } catch { /* skip */ }
-        try { swachhB64 = await toBase64(swachhLogoSrc); } catch { /* skip */ }
+        try { pmcB64    = await toBase64(typeof pmcLogoSrc === 'string' ? pmcLogoSrc : (pmcLogoSrc as any)?.src || '');   } catch { /* skip */ }
+        try { swachhB64 = await toBase64(typeof swachhLogoSrc === 'string' ? swachhLogoSrc : (swachhLogoSrc as any)?.src || ''); } catch { /* skip */ }
 
         const NAVY_C  = [30, 58, 138]  as [number, number, number];
         const WHITE_C = [255, 255, 255] as [number, number, number];
@@ -813,8 +813,8 @@ const SelfAssessmentQCReview = () => {
 
     const exportDetailPDF = async (detail: DetailData) => {
         let pmcB64 = '', swachhB64 = '';
-        try { pmcB64    = await toBase64(pmcLogoSrc);    } catch { /* skip */ }
-        try { swachhB64 = await toBase64(swachhLogoSrc); } catch { /* skip */ }
+        try { pmcB64    = await toBase64(typeof pmcLogoSrc === 'string' ? pmcLogoSrc : (pmcLogoSrc as any)?.src || '');    } catch { /* skip */ }
+        try { swachhB64 = await toBase64(typeof swachhLogoSrc === 'string' ? swachhLogoSrc : (swachhLogoSrc as any)?.src || ''); } catch { /* skip */ }
         const doc = new jsPDF({ unit: 'mm', format: 'a4' });
         buildWardPagesInDoc(doc, detail, pmcB64, swachhB64, 0);
         addPdfFooters(doc);

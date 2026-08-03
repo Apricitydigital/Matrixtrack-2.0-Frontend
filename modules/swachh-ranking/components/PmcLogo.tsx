@@ -28,6 +28,7 @@ const getActiveCity = (): { name: string; hindi: string; code: string } => {
 const PmcLogo = ({ size = 56, showText = true, direction = 'row' }: PmcLogoProps) => {
     const isRow = direction === 'row';
     const cityInfo = getActiveCity();
+    const logoSrc = (pmcLogo as any)?.src || pmcLogo;
 
     return (
         <div
@@ -40,7 +41,7 @@ const PmcLogo = ({ size = 56, showText = true, direction = 'row' }: PmcLogoProps
             }}
         >
             <img
-                src={pmcLogo}
+                src={logoSrc}
                 alt={`${cityInfo.name} Municipal Corporation logo`}
                 style={{
                     width: size,
@@ -50,10 +51,10 @@ const PmcLogo = ({ size = 56, showText = true, direction = 'row' }: PmcLogoProps
             />
             {showText && (
                 <div className="pmc-logo-text" style={{ lineHeight: 1.2 }}>
-                    <span style={{ display: 'block', fontWeight: 800, color: '#f59e0b', fontSize: 12 }}>
+                    <span style={{ display: 'block', fontWeight: 800, color: '#d97706', fontSize: 12 }}>
                         {cityInfo.hindi}
                     </span>
-                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>
+                    <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
                         {cityInfo.name} Municipal Corporation
                     </span>
                 </div>

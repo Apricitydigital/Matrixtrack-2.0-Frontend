@@ -31,8 +31,10 @@ export function hasModuleAccess(user: AuthUser | null, module: ModuleName) {
 
 export function canWriteModule(user: AuthUser | null, module: ModuleName) {
   if (!user) return false;
-  if (user.roles.includes("HMS_SUPER_ADMIN") || user.roles.includes("CITY_ADMIN")) return true;
+  if (user.roles.includes("HMS_SUPER_ADMIN")) return true;
   const assignment = getModuleAssignment(user, module);
+  if (!assignment) return false;
+  if (user.roles.includes("CITY_ADMIN")) return true;
   return Boolean(assignment?.canWrite);
 }
 

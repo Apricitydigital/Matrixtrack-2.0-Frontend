@@ -96,9 +96,9 @@ const [rowsPerPage, setRowsPerPage] = useState(10);
         }
 
         // Ensure remote images load correctly from the VITE_MEDIA_BASE_URL config (or standard fallback)
-        const mediaBase = import.meta.env.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '');
-        const envBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '');
-        const devFallback = import.meta.env.DEV ? 'http://localhost:5000' : '';
+        const mediaBase = (import.meta as any).env?.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '');
+        const envBase = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '');
+        const devFallback = (import.meta as any).env?.DEV ? 'http://localhost:5000' : '';
 
         let base = '';
         if (mediaBase && mediaBase.length > 0) {

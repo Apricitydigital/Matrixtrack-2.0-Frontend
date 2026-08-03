@@ -11,7 +11,7 @@ const SupportPolicy = () => {
                 </div>
                 <div className="header-actions">
                     <Link to="/" aria-label="Swachh Pune home" className="header-logo-link">
-                        <img src={SwachhParvLogo} alt="Swachh Pune Sankalp 2026" className="header-logo" />
+                        <img src={typeof SwachhParvLogo === 'string' ? SwachhParvLogo : (SwachhParvLogo as any)?.src || (SwachhParvLogo as any)} alt="Swachh Pune Sankalp 2026" className="header-logo" />
                     </Link>
                     <Link to="/login" className="portal-link">Portal Login</Link>
                 </div>

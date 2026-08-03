@@ -28,9 +28,9 @@ const resolveImageUrl = (src?: string) => {
         return trimmed;
     }
 
-    const mediaBase = import.meta.env.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '');
-    const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '');
-    const fallback = import.meta.env.DEV
+    const mediaBase = (import.meta as any).env?.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '');
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '');
+    const fallback = (import.meta as any).env?.DEV
         ? 'http://localhost:5000'
         : (typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '');
 
@@ -40,7 +40,7 @@ const resolveImageUrl = (src?: string) => {
 };
 
 const AssessmentReview = () => {
-    const { assessmentId } = useParams<{ assessmentId: string }>();
+    const { assessmentId } = useParams() as { assessmentId?: string };
     const navigate = useNavigate();
     const [assessment, setAssessment] = useState<any>(null);
     const [loading, setLoading] = useState(true);

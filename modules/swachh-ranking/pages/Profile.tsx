@@ -329,7 +329,8 @@ const Profile = () => {
                 bio: response.data.bio || ''
             });
             if (response.data.profileImage) {
-                setPreviewImage(`${import.meta.env.VITE_API_BASE_URL}${response.data.profileImage}`);
+                const apiBase = ((import.meta as any).env?.VITE_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000') as string;
+                setPreviewImage(`${apiBase.replace(/\/+$/, '')}${response.data.profileImage}`);
             }
         } catch (err) {
             console.error('Failed to fetch profile', err);

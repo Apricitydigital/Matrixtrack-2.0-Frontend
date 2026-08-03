@@ -120,8 +120,10 @@ const Sidebar = ({ mobileOpen = false, onClose }: SidebarProps) => {
         })
     })).filter(group => group.items.length > 0);
 
+    const currentUrl = (location.pathname || '/ward-ranking') + (location.search || '');
+
     return (
-        <aside className={`sidebar ${mobileOpen ? 'sidebar--mobile-open' : ''}`}>
+        <aside className={`sidebar ${mobileOpen ? 'sidebar--mobile-open' : ''}`} style={{ backgroundColor: '#ffffff', borderRight: '1px solid #f1f5f9', boxShadow: '2px 0 16px rgba(0,0,0,0.02)' }}>
             {/* Mobile close button */}
             <button
                 className="sidebar-close-btn"
@@ -132,10 +134,10 @@ const Sidebar = ({ mobileOpen = false, onClose }: SidebarProps) => {
                     position: 'absolute',
                     top: '1rem',
                     right: '1rem',
-                    background: 'rgba(255,255,255,0.08)',
+                    background: '#f1f5f9',
                     border: 'none',
                     cursor: 'pointer',
-                    color: 'rgba(226,232,240,0.8)',
+                    color: '#64748b',
                     padding: '6px',
                     borderRadius: '8px',
                     zIndex: 10,
@@ -144,25 +146,37 @@ const Sidebar = ({ mobileOpen = false, onClose }: SidebarProps) => {
                 <X size={18} />
             </button>
 
-            <div className="sidebar-header">
-                <PmcLogo size={72} direction="column" />
+            <div className="sidebar-header" style={{ padding: '1.25rem 1.5rem 0.5rem', textAlign: 'center' }}>
+                <PmcLogo size={60} direction="column" />
             </div>
 
             <nav className="sidebar-nav" style={{ gap: 0, paddingTop: '0.25rem' }}>
                 {navGroups.map((group, groupIdx) => (
                     <div key={group.label}>
-                        <div className="nav-section-label" style={{ marginTop: groupIdx > 0 ? '0.5rem' : 0 }}>
+                        <div className="nav-section-label" style={{ marginTop: groupIdx > 0 ? '0.5rem' : 0, color: '#475569', fontWeight: 800, letterSpacing: '0.06em' }}>
                             {group.label}
                         </div>
                         {group.items.map(item => {
-                            const isActive = location.pathname === item.path;
+                            const isActive = item.path === '/ward-ranking'
+                                ? (currentUrl === '/ward-ranking' || currentUrl === '/ward-ranking?view=dashboard')
+                                : currentUrl === item.path;
                             return (
                                 <Link
                                     key={item.path}
                                     to={item.path}
                                     onClick={onClose}
                                     className={`nav-item ${isActive ? 'active' : ''}`}
-                                    style={!isActive ? { color: 'rgba(148,163,184,0.85)' } : undefined}
+                                    style={isActive ? {
+                                        backgroundColor: '#5a52ff',
+                                        color: '#ffffff',
+                                        fontWeight: 800,
+                                        boxShadow: '0 4px 14px rgba(90, 82, 255, 0.25)',
+                                        borderRadius: '12px'
+                                    } : {
+                                        color: '#1e293b',
+                                        fontWeight: 700,
+                                        borderRadius: '12px'
+                                    }}
                                 >
                                     {item.icon}
                                     <span>{item.name}</span>
@@ -173,7 +187,7 @@ const Sidebar = ({ mobileOpen = false, onClose }: SidebarProps) => {
                 ))}
             </nav>
 
-            <div className="sidebar-footer">
+            <div className="sidebar-footer" style={{ borderTop: '1px solid #e2e8f0' }}>
                 <Link
                     to="/dashboard"
                     className="user-info"
@@ -184,19 +198,19 @@ const Sidebar = ({ mobileOpen = false, onClose }: SidebarProps) => {
                         transition: 'all 0.2s ease',
                         padding: '8px',
                         borderRadius: '12px',
-                        margin: '0 -8px'
+                        margin: '0 -8px 0.75rem -8px'
                     }}
                 >
-                    <div className="user-avatar">
+                    <div className="user-avatar" style={{ background: 'linear-gradient(135deg, #5a52ff 0%, #4338ca 100%)', color: 'white' }}>
                         {user.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="user-details">
-                        <span className="user-name" style={{ color: 'rgba(226,232,240,0.95)' }}>{user.name}</span>
-                        <span className="user-role" style={{ color: 'rgba(148,163,184,0.7)' }}>{user.role} Member</span>
+                        <span className="user-name" style={{ color: '#0f172a', fontWeight: 900 }}>{user.name}</span>
+                        <span className="user-role" style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 700, textTransform: 'capitalize' }}>{user.role} Member</span>
                     </div>
                 </Link>
-                <button onClick={handleLogout} className="logout-btn">
-                    <LogOut size={18} />
+                <button onClick={handleLogout} className="logout-btn" style={{ background: '#f8fafc', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem', transition: 'all 0.2s ease' }}>
+                    <LogOut size={16} color="#ef4444" />
                     <span>Sign Out</span>
                 </button>
             </div>

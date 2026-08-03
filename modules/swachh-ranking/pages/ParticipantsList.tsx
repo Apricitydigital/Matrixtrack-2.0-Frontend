@@ -261,9 +261,11 @@ const exportFullDetailPDF = () => {
 
 const doc = new jsPDF("landscape");
 
-doc.addFileToVFS("NotoSans-Regular.ttf", font);
-doc.addFont("NotoSans-Regular.ttf", "Noto", "normal");
-doc.setFont("Noto");
+if (typeof (window as any).font !== "undefined") {
+    doc.addFileToVFS("NotoSans-Regular.ttf", (window as any).font);
+    doc.addFont("NotoSans-Regular.ttf", "Noto", "normal");
+    doc.setFont("Noto");
+}
     // ⭐ dynamic columns collect karenge
     const dynamicKeys = new Set<string>();
 

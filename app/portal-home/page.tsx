@@ -165,32 +165,23 @@ export default function PortalHomePage() {
     ? '/city'
     : getRoleDashboardRedirect(user || null);
 
-  // Granular Workspace Access Checks based on Single SSO Token
+  // Granular Workspace Access Checks based on Assigned User Modules in Token/Snapshot
+  const userModuleKeys = (user?.modules || []).map((m) => (m.key || m.name || "").toUpperCase());
+  const hasExplicitModules = userModuleKeys.length > 0;
+
   const hasTaskforceAccess =
     isSuperAdmin ||
-    isCityAdmin ||
-    !user ||
-    user?.modules?.some((m) =>
-      ['TASKFORCE', 'LITTERBINS', 'SWEEPING', 'TOILET'].includes((m.key || m.name || '').toUpperCase())
-    );
+    (hasExplicitModules
+      ? userModuleKeys.some((k) => ["TASKFORCE", "LITTERBINS", "SWEEPING", "TOILET"].includes(k))
+      : isCityAdmin);
 
   const hasSwachhAccess =
     isSuperAdmin ||
-    isCityAdmin ||
-    !user ||
-    user?.modules?.some((m) =>
-      ['SWACHH_RANKING', 'SWACHH', 'WARD_RANKING'].includes((m.key || m.name || '').toUpperCase())
-    );
+    userModuleKeys.some((k) => ["SWACHH_RANKING", "SWACHH", "WARD_RANKING"].includes(k));
 
   const hasWorkforceAccess =
     isSuperAdmin ||
-    isCityAdmin ||
-    !user ||
-    user?.modules?.some((m) =>
-      ['WORKFORCE_MONITORING', 'WORKFORCE', 'MATRIXTRACK_WORKFORCE', 'ATTENDANCE'].includes(
-        (m.key || m.name || '').toUpperCase()
-      )
-    );
+    userModuleKeys.some((k) => ["WORKFORCE_MONITORING", "WORKFORCE", "MATRIXTRACK_WORKFORCE", "ATTENDANCE"].includes(k));
 
   // Dynamic Greeting based on time of day
   const getGreeting = () => {
