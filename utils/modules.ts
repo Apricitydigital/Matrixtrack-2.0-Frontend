@@ -78,7 +78,7 @@ export function moduleEntryPath(user: AuthUser | null, key: CanonicalModuleKey) 
   return moduleEmployeePath(key);
 }
 
-export function getPostLoginRedirect(user: AuthUser | null) {
+export function getRoleDashboardRedirect(user: AuthUser | null) {
   if (!user) return "/login";
   if (user.roles.includes("HMS_SUPER_ADMIN" as Role)) return "/hms";
 
@@ -97,7 +97,6 @@ export function getPostLoginRedirect(user: AuthUser | null) {
   if (!modules.length) return "/modules";
 
   if (user.roles.includes("QC" as Role)) {
-    // Prioritize Cleanliness of Toilets for QC
     if (modules.some(m => m.key === 'TOILET' && (m.roles || []).includes('QC'))) {
       return moduleQcPath('TOILET');
     }
@@ -111,4 +110,9 @@ export function getPostLoginRedirect(user: AuthUser | null) {
 
   const employeeModule = modules[0];
   return moduleEmployeePath(employeeModule.key);
+}
+
+export function getPostLoginRedirect(user: AuthUser | null) {
+  if (!user) return "/login";
+  return "/portal-home";
 }

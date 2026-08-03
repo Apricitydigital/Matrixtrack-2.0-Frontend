@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { X, Check, Loader2, Search, AlertCircle, Layers } from "lucide-react";
@@ -228,4 +228,3 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
         </div>
     );
 }
-

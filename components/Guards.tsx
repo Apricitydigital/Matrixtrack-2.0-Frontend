@@ -13,7 +13,7 @@ export function Protected({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/login");
+      router.replace("/unified-login");
     }
   }, [loading, user, router]);
 
@@ -30,7 +30,9 @@ export function RoleGuard({ roles, children }: { roles: Role[]; children: React.
       <div style={{ padding: 24 }}>
         <h3>Access denied</h3>
         <p>You do not have permission to view this area.</p>
-        <Link href="/login">Return to login</Link>
+        <Link href="/unified-login">
+          Return to unified login
+        </Link>
       </div>
     );
   }
@@ -65,7 +67,9 @@ export function ModuleGuard({
       <div style={{ padding: 24 }}>
         <h3>Access denied</h3>
         <p>You do not have permission to view this area.</p>
-        <Link href="/login">Return to login</Link>
+        <Link href="/unified-login">
+          Return to unified login
+        </Link>
       </div>
     );
   }
@@ -79,3 +83,4 @@ export function ModuleGuard({
   }
   return <>{children}</>;
 }
+

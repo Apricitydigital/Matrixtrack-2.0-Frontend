@@ -18,7 +18,7 @@ function parseErrorMessage(raw: string, fallback: string) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.error === "string") return parsed.error;
-  } catch {}
+  } catch { }
   return raw;
 }
 
@@ -70,6 +70,93 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return res.json();
 }
 
+export type UnifiedPortalKey =
+  | "TASKFORCE_20"
+  | "MATRIX_TRACK"
+  | "WARD_RANKING";
+
+export type UnifiedTaskforceModuleKey =
+  | "TASKFORCE"
+  | "SWEEPING"
+  | "LITTERBINS"
+  | "TOILET";
+
+export type UnifiedRegistrationRole =
+  | "SUPERVISOR"
+  | "EMPLOYEE"
+  | "QC"
+  | "ACTION_OFFICER";
+
+export interface UnifiedLoginResponse {
+  success: boolean;
+
+  requiresOtp?: boolean;
+
+  provider?: "MATRIX_TRACK";
+
+  email?: string;
+
+  message?: string;
+
+  pendingOtp?: {
+    provider: "MATRIX_TRACK";
+    email: string;
+    message: string;
+  } | null;
+
+  user: {
+    id?: string;
+    name?: string;
+    email: string;
+    applications?: any[];
+    [key: string]: any;
+  };
+
+  applications: any[];
+
+  tokens: {
+    taskforce?: string | null;
+    matrixTrack?: string | null;
+    wardRanking?: string | null;
+  };
+
+  taskforce?: {
+    user?: any;
+    modules?: any[];
+    redirectTo?: string | null;
+  } | null;
+
+  matrixTrack?: {
+    user?: any;
+    message?: string;
+  } | null;
+
+  wardRanking?: {
+    user?: any;
+    message?: string;
+    redirectTo?: string | null;
+  } | null;
+
+  redirectTo: string | null;
+}
+
+export interface UnifiedRegistrationRequest {
+  name: string;
+  email: string;
+  phone: string;
+  aadhaar: string;
+  password: string;
+
+  cityId: string;
+  zoneId?: string;
+  wardId?: string;
+
+  requestedRole: UnifiedRegistrationRole;
+
+  requestedPortals: UnifiedPortalKey[];
+  taskforceModules: UnifiedTaskforceModuleKey[];
+}
+
 export const AuthApi = {
   login: async (body: { email: string; password: string; cityId?: string }) =>
     apiFetch<AuthLoginResponse>("/auth/login", {
@@ -91,6 +178,50 @@ export const AuthApi = {
       method: "POST",
       body: JSON.stringify(body)
     }),
+  unifiedLogin: async (body: {
+    email: string;
+    password: string;
+    cityId?: string;
+  }) =>
+    apiFetch<UnifiedLoginResponse>(
+      "/auth/unified-login",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
+
+  unifiedVerifyMatrixTrackOtp: async (body: {
+    email: string;
+    otp: string;
+  }) =>
+    apiFetch<UnifiedLoginResponse>(
+      "/auth/unified-login/verify-matrixtrack-otp",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
+
+  unifiedRegisterRequest: (
+    body: UnifiedRegistrationRequest
+  ) =>
+    apiFetch<{
+      success: boolean;
+      message: string;
+      requestId?: string;
+      status?: string;
+      requestedRole?: string;
+      requestedPortals?: string[];
+      taskforceModules?: string[];
+    }>(
+      "/auth/request-unified-registration",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
+
   registerEmployeeRequest: (body: {
     ulbCode: string;
     name: string;
@@ -102,12 +233,21 @@ export const AuthApi = {
     wardId: string;
     cityId?: string;
   }) =>
-    apiFetch<{ success: boolean; message: string }>("/auth/register-employee-request", {
+    apiFetch<{
+      success: boolean;
+      message: string;
+    }>("/auth/register-employee-request", {
       method: "POST",
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     }),
-  logout: async () => apiFetch<ApiSuccess>("/auth/logout", { method: "POST" }),
-  getMe: async () => apiFetch<AuthMeResponse>("/auth/me")
+
+  logout: async () =>
+    apiFetch<ApiSuccess>("/auth/logout", {
+      method: "POST",
+    }),
+
+  getMe: async () =>
+    apiFetch<AuthMeResponse>("/auth/me"),
 };
 
 export const CityApi = {
