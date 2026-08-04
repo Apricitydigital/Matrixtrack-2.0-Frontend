@@ -5,7 +5,7 @@ import { CheckCircle, ArrowLeft, Camera, X, ChevronLeft, ChevronRight, Save } fr
 
 const BATCH_SIZE = 10;
 const UPLOAD_TIMEOUT_MS = 45_000;
-const SAVE_TIMEOUT_MS   = 20_000;
+const SAVE_TIMEOUT_MS = 20_000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -99,7 +99,9 @@ function resolveImageUrl(src?: string): string {
     if (!src) return '';
     const t = src.trim();
     if (/^(https?:|data:|blob:)/i.test(t)) return t;
-    const mediaBase = (((import.meta as any).env?.VITE_MEDIA_BASE_URL || '') as string).replace(/\/+$/, '');
+    const mediaBase = (
+        process.env.NEXT_PUBLIC_SWACHH_MEDIA_URL || ""
+    ).replace(/\/+$/, "");
     const base = mediaBase || apiBaseUrl;
     return `${base}${t.startsWith('/') ? '' : '/'}${t}`;
 }
@@ -150,14 +152,14 @@ const SelfAssessmentForm = () => {
     }
 
     const { participant, questions } = state;
-    const totalPages    = Math.ceil(questions.length / BATCH_SIZE);
-    const isLastPage    = currentPage === totalPages - 1;
-    const pageStart     = currentPage * BATCH_SIZE;
-    const pageEnd       = Math.min(pageStart + BATCH_SIZE, questions.length);
+    const totalPages = Math.ceil(questions.length / BATCH_SIZE);
+    const isLastPage = currentPage === totalPages - 1;
+    const pageStart = currentPage * BATCH_SIZE;
+    const pageEnd = Math.min(pageStart + BATCH_SIZE, questions.length);
     const pageQuestions = questions.slice(pageStart, pageEnd);
-    const savedQCount   = Math.min(savedBatchCount * BATCH_SIZE, questions.length);
-    const progressPct   = questions.length > 0 ? Math.round((savedQCount / questions.length) * 100) : 0;
-    const anyUploading  = Object.values(uploading).some(Boolean);
+    const savedQCount = Math.min(savedBatchCount * BATCH_SIZE, questions.length);
+    const progressPct = questions.length > 0 ? Math.round((savedQCount / questions.length) * 100) : 0;
+    const anyUploading = Object.values(uploading).some(Boolean);
 
     const detailEntries = Object.entries(participant.details || {}).filter(
         ([, v]) => v !== null && v !== undefined && String(v).trim() !== ''
@@ -459,8 +461,8 @@ const SelfAssessmentForm = () => {
     const saveButtonLabel = saving
         ? 'Saving… (retrying if needed)'
         : anyUploading
-        ? 'Waiting for uploads…'
-        : <><Save size={16} /> Save & Continue <ChevronRight size={18} /></>;
+            ? 'Waiting for uploads…'
+            : <><Save size={16} /> Save & Continue <ChevronRight size={18} /></>;
 
     return (
         <div style={{ minHeight: '100vh', background: '#f0f4f0' }}>
@@ -670,9 +672,9 @@ interface QuestionCardProps {
 
 const QuestionCard = ({ question, index, answer, uploading, hasError, yesNo, onYesNo, onIncrement, onDecrement, onFileChange, onRemoveImage }: QuestionCardProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const score     = answer.score;
+    const score = answer.score;
     const imageUrls = answer.imageUrls;
-    const canAdd    = question.imageCount > 0 && imageUrls.length < question.imageCount;
+    const canAdd = question.imageCount > 0 && imageUrls.length < question.imageCount;
 
     return (
         <div style={{

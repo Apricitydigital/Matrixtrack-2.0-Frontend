@@ -10,4 +10,3 @@ export default function Module3Page() {
     </ModuleGuard>
   );
 }
-

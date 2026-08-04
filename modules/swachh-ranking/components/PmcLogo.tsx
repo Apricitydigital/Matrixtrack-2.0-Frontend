@@ -21,7 +21,7 @@ const getActiveCity = (): { name: string; hindi: string; code: string } => {
             else if (upper.includes('GWALIOR')) hindi = 'ग्वालियर नगर निगम';
             return { name, hindi, code: `${upper[0]}MC` };
         }
-    } catch (e) {}
+    } catch (e) { }
     return { name: 'Indore', hindi: 'इन्दौर नगर निगम', code: 'IMC' };
 };
 

@@ -1,32 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronDown, LogOut, Search, Settings, User as UserIcon } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState
+} from "react";
+import {
+  Bell,
+  ChevronDown,
+  LogOut,
+  Search,
+  Settings,
+  User as UserIcon
+} from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 import { roleLabel } from "@lib/labels";
 import { RefreshButton } from "./RefreshButton";
 
 export function Topbar() {
   const { user, logout, loading } = useAuth();
-  const router = useRouter();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  const menuRef =
+    useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+    function onClick(event: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(
+          event.target as Node
+        )
+      ) {
         setMenuOpen(false);
       }
     }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+
+    document.addEventListener(
+      "mousedown",
+      onClick
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        onClick
+      );
+    };
   }, []);
 
   const handleLogout = async () => {
     await logout();
-    router.replace("/login");
   };
 
   const displayRole = user?.roles?.length ? roleLabel(user.roles[0]) : "";
@@ -111,7 +138,7 @@ export function Topbar() {
           </>
         ) : (
           <Link
-            href="/login"
+            href="/unified-login"
             className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Login

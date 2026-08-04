@@ -16,30 +16,30 @@ import pmcLogoSrc from '../assets/pmc-logo.png';
 import swachhLogoSrc from '../assets/swachh-parv-logo.png';
 
 async function toBase64(url: string): Promise<string> {
-    const res  = await fetch(url);
+    const res = await fetch(url);
     const blob = await res.blob();
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror  = reject;
+        reader.onerror = reject;
         reader.readAsDataURL(blob);
     });
 }
 
 // ─── Shared PDF colour palette ──────────────────────────────────────────────
 const PDF_C = {
-    NAVY:  [30,  58,  138] as [number,number,number],
-    BLUE:  [37,  99,  235] as [number,number,number],
-    LGREY: [241, 245, 249] as [number,number,number],
-    MGREY: [226, 232, 240] as [number,number,number],
-    WHITE: [255, 255, 255] as [number,number,number],
-    GREEN: [22,  163,  74] as [number,number,number],
-    AMBER: [217, 119,   6] as [number,number,number],
-    RED:   [220,  38,  38] as [number,number,number],
-    TEXT:  [15,  23,  42]  as [number,number,number],
-    MUTED: [71,  85, 105]  as [number,number,number],
-    PURP:  [124,  58, 237] as [number,number,number],
-    STEEL: [51,  65,  85]  as [number,number,number],
+    NAVY: [30, 58, 138] as [number, number, number],
+    BLUE: [37, 99, 235] as [number, number, number],
+    LGREY: [241, 245, 249] as [number, number, number],
+    MGREY: [226, 232, 240] as [number, number, number],
+    WHITE: [255, 255, 255] as [number, number, number],
+    GREEN: [22, 163, 74] as [number, number, number],
+    AMBER: [217, 119, 6] as [number, number, number],
+    RED: [220, 38, 38] as [number, number, number],
+    TEXT: [15, 23, 42] as [number, number, number],
+    MUTED: [71, 85, 105] as [number, number, number],
+    PURP: [124, 58, 237] as [number, number, number],
+    STEEL: [51, 65, 85] as [number, number, number],
 };
 
 // ─── Draws one ward's full report into `doc` (adds a page break before if wardIndex > 0) ──
@@ -53,7 +53,7 @@ function buildWardPagesInDoc(
     const { NAVY, BLUE, LGREY, MGREY, WHITE, GREEN, AMBER, RED, TEXT, MUTED, PURP, STEEL } = PDF_C;
     const { selfAssessment, questions } = detail;
     const participant = selfAssessment.participant;
-    const answers     = selfAssessment.answers || {};
+    const answers = selfAssessment.answers || {};
 
     if (wardIndex > 0) doc.addPage();
 
@@ -75,16 +75,16 @@ function buildWardPagesInDoc(
     };
 
     // ── Computed totals ────────────────────────────────────────────────────
-    const qcDone     = !!selfAssessment.qcReviewComplete;
-    const totalMax   = questions.reduce((s, q) => s + q.marks, 0);
-    const totalSelf  = questions.reduce((s, q) => s + (answers[q.id]?.score ?? 0), 0);
-    const totalQc    = qcDone ? questions.reduce((s, q) => s + (typeof answers[q.id]?.qcScore === 'number' ? answers[q.id]!.qcScore! : (answers[q.id]?.score ?? 0)), 0) : null;
+    const qcDone = !!selfAssessment.qcReviewComplete;
+    const totalMax = questions.reduce((s, q) => s + q.marks, 0);
+    const totalSelf = questions.reduce((s, q) => s + (answers[q.id]?.score ?? 0), 0);
+    const totalQc = qcDone ? questions.reduce((s, q) => s + (typeof answers[q.id]?.qcScore === 'number' ? answers[q.id]!.qcScore! : (answers[q.id]?.score ?? 0)), 0) : null;
     const finalScore = qcDone ? (typeof selfAssessment.qcTotalScore === 'number' ? selfAssessment.qcTotalScore : (totalQc ?? 0)) : null;
-    const pctFinal   = qcDone && finalScore !== null && totalMax > 0 ? ((finalScore / totalMax) * 100).toFixed(1) : null;
-    const approvedN  = qcDone ? questions.filter(q => answers[q.id]?.qcStatus === 'approved').length : 0;
-    const rejectedN  = qcDone ? questions.filter(q => answers[q.id]?.qcStatus === 'rejected').length : 0;
-    const editedN    = qcDone ? questions.filter(q => answers[q.id]?.qcStatus === 'edited').length : 0;
-    const pendingN   = qcDone
+    const pctFinal = qcDone && finalScore !== null && totalMax > 0 ? ((finalScore / totalMax) * 100).toFixed(1) : null;
+    const approvedN = qcDone ? questions.filter(q => answers[q.id]?.qcStatus === 'approved').length : 0;
+    const rejectedN = qcDone ? questions.filter(q => answers[q.id]?.qcStatus === 'rejected').length : 0;
+    const editedN = qcDone ? questions.filter(q => answers[q.id]?.qcStatus === 'edited').length : 0;
+    const pendingN = qcDone
         ? questions.filter(q => !answers[q.id]?.qcStatus || answers[q.id]?.qcStatus === 'pending').length
         : questions.length;
 
@@ -100,7 +100,7 @@ function buildWardPagesInDoc(
     // ── HEADER BANNER ──────────────────────────────────────────────────────
     doc.setFillColor(...NAVY);
     doc.rect(0, cy, PW, BANNER_H, 'F');
-    if (pmcB64)    doc.addImage(pmcB64,    'PNG', ML,           (BANNER_H - 22) / 2, 22, 22);
+    if (pmcB64) doc.addImage(pmcB64, 'PNG', ML, (BANNER_H - 22) / 2, 22, 22);
     if (swachhB64) doc.addImage(swachhB64, 'PNG', PW - MR - 22, (BANNER_H - 22) / 2, 22, 22);
 
     doc.setFont('helvetica', 'bold');
@@ -128,20 +128,20 @@ function buildWardPagesInDoc(
     const det = participant.details || {};
     const infoFields: [string, string][] = [
         ['Name / Ward', getParticipantName(det)],
-        ['Category',    participant.category],
-        ['Mobile',      participant.mobileNumber],
-        ['Ward No.',    det.wardNumber  || det.ward_number  || '—'],
-        ['Zone No.',    det.zoneNumber  || det.zone_number  || '—'],
-        ['Officer',     det.officerName || det.officer_name || '—'],
-        ['Submitted',   new Date(selfAssessment.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })],
-        ['Status',      STATUS_META[selfAssessment.status]?.label || selfAssessment.status],
+        ['Category', participant.category],
+        ['Mobile', participant.mobileNumber],
+        ['Ward No.', det.wardNumber || det.ward_number || '—'],
+        ['Zone No.', det.zoneNumber || det.zone_number || '—'],
+        ['Officer', det.officerName || det.officer_name || '—'],
+        ['Submitted', new Date(selfAssessment.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })],
+        ['Status', STATUS_META[selfAssessment.status]?.label || selfAssessment.status],
     ];
     const colW = CW / 4;
     infoFields.forEach(([label, value], i) => {
         const col = i % 4, row = Math.floor(i / 4);
         const x = ML + col * colW + 4, y2 = cy + 5 + row * 10;
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7);   doc.setTextColor(...MUTED); doc.text(label.toUpperCase(), x, y2);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...TEXT);  doc.text(String(value || '—').substring(0, 30), x, y2 + 4);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...MUTED); doc.text(label.toUpperCase(), x, y2);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...TEXT); doc.text(String(value || '—').substring(0, 30), x, y2 + 4);
     });
 
     cy = BANNER_H + 2 + 22 + 2;
@@ -150,20 +150,22 @@ function buildWardPagesInDoc(
     cy = sectionHeading('1. Score Summary', cy + 4);
     const cardW = CW / 3, cardH = 16;
     [
-        { label: 'Self Assessment Score', value: totalSelf,                                     color: BLUE  },
-        { label: 'QC Score',              value: totalQc !== null ? totalQc : '—',              color: PURP  },
-        { label: 'Final Score',           value: finalScore !== null ? finalScore : '—',        color: GREEN },
-        { label: 'Total Max Marks',       value: totalMax,                                      color: NAVY  },
-        { label: 'Total Questions',       value: questions.length,                              color: MUTED },
-        { label: 'Overall %',             value: pctFinal !== null ? `${pctFinal}%` : '—',
-          color: pctFinal !== null ? ((finalScore! / (totalMax || 1)) >= 0.75 ? GREEN : (finalScore! / (totalMax || 1)) >= 0.5 ? BLUE : AMBER) : MUTED },
+        { label: 'Self Assessment Score', value: totalSelf, color: BLUE },
+        { label: 'QC Score', value: totalQc !== null ? totalQc : '—', color: PURP },
+        { label: 'Final Score', value: finalScore !== null ? finalScore : '—', color: GREEN },
+        { label: 'Total Max Marks', value: totalMax, color: NAVY },
+        { label: 'Total Questions', value: questions.length, color: MUTED },
+        {
+            label: 'Overall %', value: pctFinal !== null ? `${pctFinal}%` : '—',
+            color: pctFinal !== null ? ((finalScore! / (totalMax || 1)) >= 0.75 ? GREEN : (finalScore! / (totalMax || 1)) >= 0.5 ? BLUE : AMBER) : MUTED
+        },
     ].forEach((card, i) => {
         const col = i % 3, row = Math.floor(i / 3);
         const x = ML + col * cardW, y2 = cy + row * (cardH + 2);
         doc.setFillColor(...WHITE); doc.setDrawColor(...MGREY);
         doc.roundedRect(x + 1, y2 + 1, cardW - 2, cardH - 2, 1.5, 1.5, 'FD');
         doc.setFillColor(...card.color); doc.rect(x + 1, y2 + 1, 3, cardH - 2, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7);   doc.setTextColor(...MUTED); doc.text(card.label.toUpperCase(), x + 7, y2 + 5.5);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...MUTED); doc.text(card.label.toUpperCase(), x + 7, y2 + 5.5);
         doc.setFontSize(13); doc.setTextColor(...card.color); doc.text(String(card.value), x + 7, y2 + 12);
     });
     cy += 2 * (cardH + 2) + 4;
@@ -176,10 +178,10 @@ function buildWardPagesInDoc(
     const sw = CW / 4;
     ([
         { label: 'Approved', count: approvedN, color: GREEN },
-        { label: 'Rejected', count: rejectedN, color: RED   },
-        { label: 'Rescored',  count: editedN,   color: AMBER },
-        { label: 'Pending',  count: pendingN,  color: MUTED },
-    ] as { label: string; count: number; color: [number,number,number] }[]).forEach(({ label, count, color }, i) => {
+        { label: 'Rejected', count: rejectedN, color: RED },
+        { label: 'Rescored', count: editedN, color: AMBER },
+        { label: 'Pending', count: pendingN, color: MUTED },
+    ] as { label: string; count: number; color: [number, number, number] }[]).forEach(({ label, count, color }, i) => {
         const x = ML + i * sw + sw / 2;
         doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...color); doc.text(String(count), x, cy + 9, { align: 'center' });
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MUTED); doc.text(label.toUpperCase(), x, cy + 16, { align: 'center' });
@@ -257,15 +259,15 @@ function buildWardPagesInDoc(
     autoTable(doc, {
         startY: cy + 2,
         body: [
-            ['Self Assessment Score', String(totalSelf),                                          `${totalMax > 0 ? ((totalSelf / totalMax) * 100).toFixed(1) : 0}%`],
-            ['QC Score',             totalQc !== null ? String(totalQc) : '—',                   totalQc !== null && totalMax > 0 ? `${((totalQc / totalMax) * 100).toFixed(1)}%` : '—'],
-            ['Final Score',          finalScore !== null ? String(finalScore) : '—',             pctFinal !== null ? `${pctFinal}%` : '—'],
-            ['Total Max Marks',      String(totalMax),                                            '—'],
-            ['Total Questions',      String(questions.length),                                    '—'],
-            ['Questions Approved',   String(approvedN),                                           qcDone && questions.length > 0 ? `${((approvedN / questions.length) * 100).toFixed(1)}%` : '—'],
-            ['Questions Rejected',   String(rejectedN),                                           qcDone && questions.length > 0 ? `${((rejectedN / questions.length) * 100).toFixed(1)}%` : '—'],
-            ['Questions Rescored',    String(editedN),                                             qcDone && questions.length > 0 ? `${((editedN   / questions.length) * 100).toFixed(1)}%` : '—'],
-            ['Questions Pending',    String(pendingN),                                            questions.length > 0 ? `${((pendingN / questions.length) * 100).toFixed(1)}%` : '—'],
+            ['Self Assessment Score', String(totalSelf), `${totalMax > 0 ? ((totalSelf / totalMax) * 100).toFixed(1) : 0}%`],
+            ['QC Score', totalQc !== null ? String(totalQc) : '—', totalQc !== null && totalMax > 0 ? `${((totalQc / totalMax) * 100).toFixed(1)}%` : '—'],
+            ['Final Score', finalScore !== null ? String(finalScore) : '—', pctFinal !== null ? `${pctFinal}%` : '—'],
+            ['Total Max Marks', String(totalMax), '—'],
+            ['Total Questions', String(questions.length), '—'],
+            ['Questions Approved', String(approvedN), qcDone && questions.length > 0 ? `${((approvedN / questions.length) * 100).toFixed(1)}%` : '—'],
+            ['Questions Rejected', String(rejectedN), qcDone && questions.length > 0 ? `${((rejectedN / questions.length) * 100).toFixed(1)}%` : '—'],
+            ['Questions Rescored', String(editedN), qcDone && questions.length > 0 ? `${((editedN / questions.length) * 100).toFixed(1)}%` : '—'],
+            ['Questions Pending', String(pendingN), questions.length > 0 ? `${((pendingN / questions.length) * 100).toFixed(1)}%` : '—'],
         ],
         styles: { fontSize: 8.5, cellPadding: 3.5, textColor: TEXT },
         alternateRowStyles: { fillColor: LGREY },
@@ -347,27 +349,27 @@ interface QcQReview {
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-    navy:       '#1E3A8A',
-    blue:       '#2563EB',
-    blueLight:  '#EFF6FF',
-    blueMid:    '#DBEAFE',
-    success:    '#16A34A',
-    successBg:  '#F0FDF4',
-    successBd:  '#BBF7D0',
-    amber:      '#D97706',
-    amberBg:    '#FFFBEB',
-    amberBd:    '#FDE68A',
-    danger:     '#DC2626',
-    dangerBg:   '#FEF2F2',
-    dangerBd:   '#FECACA',
-    white:      '#FFFFFF',
-    bg:         '#F8FAFC',
-    border:     '#E2E8F0',
-    borderMid:  '#CBD5E1',
-    text:       '#0F172A',
-    textSub:    '#475569',
-    textMute:   '#94A3B8',
-    surface:    '#F1F5F9',
+    navy: '#1E3A8A',
+    blue: '#2563EB',
+    blueLight: '#EFF6FF',
+    blueMid: '#DBEAFE',
+    success: '#16A34A',
+    successBg: '#F0FDF4',
+    successBd: '#BBF7D0',
+    amber: '#D97706',
+    amberBg: '#FFFBEB',
+    amberBd: '#FDE68A',
+    danger: '#DC2626',
+    dangerBg: '#FEF2F2',
+    dangerBd: '#FECACA',
+    white: '#FFFFFF',
+    bg: '#F8FAFC',
+    border: '#E2E8F0',
+    borderMid: '#CBD5E1',
+    text: '#0F172A',
+    textSub: '#475569',
+    textMute: '#94A3B8',
+    surface: '#F1F5F9',
 };
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
@@ -395,10 +397,10 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string; bo
 };
 
 const QC_STYLE: Record<string, { borderColor: string; bgColor: string; accentBg: string; accentColor: string; label: string }> = {
-    pending:  { borderColor: C.border,   bgColor: C.white,      accentBg: C.surface,     accentColor: C.textMute,  label: 'Pending' },
-    approved: { borderColor: C.success,  bgColor: C.successBg,  accentBg: C.successBd,   accentColor: C.success,   label: 'Approved' },
-    rejected: { borderColor: C.danger,   bgColor: C.dangerBg,   accentBg: C.dangerBd,    accentColor: C.danger,    label: 'Rejected' },
-    edited:   { borderColor: C.amber,    bgColor: C.amberBg,    accentBg: C.amberBd,     accentColor: C.amber,     label: 'Score Rescored' },
+    pending: { borderColor: C.border, bgColor: C.white, accentBg: C.surface, accentColor: C.textMute, label: 'Pending' },
+    approved: { borderColor: C.success, bgColor: C.successBg, accentBg: C.successBd, accentColor: C.success, label: 'Approved' },
+    rejected: { borderColor: C.danger, bgColor: C.dangerBg, accentBg: C.dangerBd, accentColor: C.danger, label: 'Rejected' },
+    edited: { borderColor: C.amber, bgColor: C.amberBg, accentBg: C.amberBd, accentColor: C.amber, label: 'Score Rescored' },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -419,7 +421,9 @@ function resolveImageUrl(src?: string): string {
     if (/^https?:/i.test(trimmed)) {
         url = trimmed;
     } else {
-        const mediaBase = (((import.meta as any).env?.VITE_MEDIA_BASE_URL || '') as string).replace(/\/+$/, '');
+        const mediaBase = (
+            process.env.NEXT_PUBLIC_SWACHH_MEDIA_URL || ""
+        ).replace(/\/+$/, "");
         const base = mediaBase || apiBaseUrl;
         const sep = trimmed.startsWith('/') ? '' : '/';
         url = `${base}${sep}${trimmed}`;
@@ -509,25 +513,25 @@ const SelfAssessmentQCReview = () => {
     const location = useLocation();
     const initialTab = (new URLSearchParams(location.search).get('tab') as TabFilter) || 'Submitted';
 
-    const [assessments, setAssessments]   = useState<SelfAssessment[]>([]);
-    const [loading, setLoading]           = useState(true);
+    const [assessments, setAssessments] = useState<SelfAssessment[]>([]);
+    const [loading, setLoading] = useState(true);
     const [allQuestionnaires, setAllQuestionnaires] = useState<QuestionnaireData[]>([]);
     const [expandedIndicator, setExpandedIndicator] = useState<string | null>(null);
-    const [selectedIds, setSelectedIds]             = useState<Set<string>>(new Set());
-    const [bulkDownloading, setBulkDownloading]     = useState(false);
-    const [activeTab, setActiveTab]       = useState<TabFilter>(initialTab);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkDownloading, setBulkDownloading] = useState(false);
+    const [activeTab, setActiveTab] = useState<TabFilter>(initialTab);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [rejectTarget, setRejectTarget] = useState<SelfAssessment | null>(null);
     const [rejectRemark, setRejectRemark] = useState('');
-    const [rejectError, setRejectError]   = useState('');
-    const [viewDetail, setViewDetail]     = useState<DetailData | null>(null);
-    const [viewLoading, setViewLoading]   = useState(false);
-    const [searchQuery, setSearchQuery]   = useState('');
-    const [sortOrder, setSortOrder]       = useState<'none' | 'high'>('none');
-    const [qcReviews, setQcReviews]       = useState<Record<string, QcQReview>>({});
-    const [qcSaving, setQcSaving]         = useState(false);
+    const [rejectError, setRejectError] = useState('');
+    const [viewDetail, setViewDetail] = useState<DetailData | null>(null);
+    const [viewLoading, setViewLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortOrder, setSortOrder] = useState<'none' | 'high'>('none');
+    const [qcReviews, setQcReviews] = useState<Record<string, QcQReview>>({});
+    const [qcSaving, setQcSaving] = useState(false);
     const [lightboxImages, setLightboxImages] = useState<string[]>([]);
-    const [lightboxIndex, setLightboxIndex]   = useState(-1);
+    const [lightboxIndex, setLightboxIndex] = useState(-1);
     const [collapsedIndicators, setCollapsedIndicators] = useState<Set<string>>(new Set());
 
     const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -555,7 +559,7 @@ const SelfAssessmentQCReview = () => {
     useEffect(() => {
         api.get('/questionnaire', { headers: authHeaders() })
             .then(res => setAllQuestionnaires(res.data || []))
-            .catch(() => {});
+            .catch(() => { });
     }, []);
 
     useEffect(() => {
@@ -563,7 +567,7 @@ const SelfAssessmentQCReview = () => {
         const len = lightboxImages.length;
         const handler = (e: KeyboardEvent) => {
             if (e.key === 'Escape') setLightboxIndex(-1);
-            else if (e.key === 'ArrowLeft')  setLightboxIndex(i => (i - 1 + len) % len);
+            else if (e.key === 'ArrowLeft') setLightboxIndex(i => (i - 1 + len) % len);
             else if (e.key === 'ArrowRight') setLightboxIndex(i => (i + 1) % len);
         };
         window.addEventListener('keydown', handler);
@@ -602,7 +606,7 @@ const SelfAssessmentQCReview = () => {
         setViewDetail(null);
         setQcReviews({});
         try {
-            const res  = await api.get(`/self-assessment/qc/${a.id}/detail`, { headers: authHeaders() });
+            const res = await api.get(`/self-assessment/qc/${a.id}/detail`, { headers: authHeaders() });
             const data: DetailData = res.data;
             setViewDetail(data);
             const init: Record<string, QcQReview> = {};
@@ -611,7 +615,7 @@ const SelfAssessmentQCReview = () => {
                 const ans = answers[q.id];
                 init[q.id] = {
                     qcStatus: (ans?.qcStatus as QcQReview['qcStatus']) || 'pending',
-                    qcScore:  typeof ans?.qcScore === 'number' ? ans.qcScore : (ans?.score ?? 0),
+                    qcScore: typeof ans?.qcScore === 'number' ? ans.qcScore : (ans?.score ?? 0),
                     qcRemark: ans?.qcRemark || '',
                 };
             });
@@ -709,29 +713,29 @@ const SelfAssessmentQCReview = () => {
     // ── Exports ────────────────────────────────────────────────────────────────
 
     const exportListPDF = async () => {
-        let pmcB64    = '';
+        let pmcB64 = '';
         let swachhB64 = '';
         try { pmcB64    = await toBase64(typeof pmcLogoSrc === 'string' ? pmcLogoSrc : (pmcLogoSrc as any)?.src || '');   } catch { /* skip */ }
         try { swachhB64 = await toBase64(typeof swachhLogoSrc === 'string' ? swachhLogoSrc : (swachhLogoSrc as any)?.src || ''); } catch { /* skip */ }
 
-        const NAVY_C  = [30, 58, 138]  as [number, number, number];
+        const NAVY_C = [30, 58, 138] as [number, number, number];
         const WHITE_C = [255, 255, 255] as [number, number, number];
         const MUTED_C = [180, 200, 255] as [number, number, number];
-        const TEXT_C  = [15, 23, 42]   as [number, number, number];
+        const TEXT_C = [15, 23, 42] as [number, number, number];
         const LGREY_C = [241, 245, 249] as [number, number, number];
 
-        const doc  = new jsPDF({ unit: 'mm', format: 'a4' });
-        const PW   = 210;
-        const ML   = 14;
-        const MR   = 14;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const PW = 210;
+        const ML = 14;
+        const MR = 14;
         const BANNER_H = 30;
 
         // Banner
         doc.setFillColor(...NAVY_C);
         doc.rect(0, 0, PW, BANNER_H, 'F');
 
-        if (pmcB64)    doc.addImage(pmcB64,    'PNG', ML,              (BANNER_H - 20) / 2, 20, 20);
-        if (swachhB64) doc.addImage(swachhB64, 'PNG', PW - MR - 20,   (BANNER_H - 20) / 2, 20, 20);
+        if (pmcB64) doc.addImage(pmcB64, 'PNG', ML, (BANNER_H - 20) / 2, 20, 20);
+        if (swachhB64) doc.addImage(swachhB64, 'PNG', PW - MR - 20, (BANNER_H - 20) / 2, 20, 20);
 
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
@@ -768,7 +772,7 @@ const SelfAssessmentQCReview = () => {
             headStyles: { fillColor: NAVY_C, textColor: WHITE_C, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: LGREY_C },
             columnStyles: {
-                0: { cellWidth: 8,  halign: 'center' },
+                0: { cellWidth: 8, halign: 'center' },
                 1: { cellWidth: 50 },
                 2: { cellWidth: 28 },
                 3: { cellWidth: 26, font: 'courier' },
@@ -831,16 +835,16 @@ const SelfAssessmentQCReview = () => {
 
     const counts = {
         Submitted: assessments.filter(a => a.status === 'Submitted').length,
-        Approved:  assessments.filter(a => a.status === 'Approved').length,
-        Rejected:  assessments.filter(a => a.status === 'Rejected').length,
-        all:       assessments.length,
+        Approved: assessments.filter(a => a.status === 'Approved').length,
+        Rejected: assessments.filter(a => a.status === 'Rejected').length,
+        all: assessments.length,
     };
 
-    const approvedScores  = assessments.filter(a => a.status === 'Approved' && typeof a.qcTotalScore === 'number');
-    const avgScore        = approvedScores.length > 0
+    const approvedScores = assessments.filter(a => a.status === 'Approved' && typeof a.qcTotalScore === 'number');
+    const avgScore = approvedScores.length > 0
         ? Math.round(approvedScores.reduce((s, a) => s + (a.qcTotalScore ?? 0), 0) / approvedScores.length)
         : null;
-    const topScore        = approvedScores.length > 0
+    const topScore = approvedScores.length > 0
         ? Math.max(...approvedScores.map(a => a.qcTotalScore ?? 0))
         : null;
 
@@ -853,13 +857,13 @@ const SelfAssessmentQCReview = () => {
                 a.participant.mobileNumber.includes(q) ||
                 a.participant.category.toLowerCase().includes(q)
             );
-          })
+        })
         : tabFiltered;
     const filtered = sortOrder === 'high'
         ? [...searchFiltered].sort((a, b) => getScore(b) - getScore(a))
         : searchFiltered;
 
-    const isAllSelected   = filtered.length > 0 && filtered.every(a => selectedIds.has(a.id));
+    const isAllSelected = filtered.length > 0 && filtered.every(a => selectedIds.has(a.id));
     const isIndeterminate = !isAllSelected && filtered.some(a => selectedIds.has(a.id));
     const toggleSelectAll = () =>
         setSelectedIds(isAllSelected ? new Set() : new Set(filtered.map(a => a.id)));
@@ -898,17 +902,17 @@ const SelfAssessmentQCReview = () => {
 
     // ── Row color coding ───────────────────────────────────────────────────────
 
-    const allScores   = filtered.map(getScore).filter(s => s > 0);
-    const maxS        = allScores.length ? Math.max(...allScores) : 0;
-    const minS        = allScores.length ? Math.min(...allScores) : 0;
-    const scoreRange  = maxS - minS || 1;
+    const allScores = filtered.map(getScore).filter(s => s > 0);
+    const maxS = allScores.length ? Math.max(...allScores) : 0;
+    const minS = allScores.length ? Math.min(...allScores) : 0;
+    const scoreRange = maxS - minS || 1;
 
     const getRowStyle = (a: SelfAssessment) => {
         const s = getScore(a);
         if (s === 0) return { bg: C.white, accent: C.border };
         const pct = (s - minS) / scoreRange;
         if (pct >= 0.75) return { bg: '#F0FDF4', accent: C.success };
-        if (pct >= 0.5)  return { bg: '#EFF6FF', accent: C.blue };
+        if (pct >= 0.5) return { bg: '#EFF6FF', accent: C.blue };
         if (pct >= 0.25) return { bg: '#FFFBEB', accent: C.amber };
         return { bg: '#FEF2F2', accent: C.danger };
     };
@@ -1105,10 +1109,10 @@ const SelfAssessmentQCReview = () => {
                 {/* Pill tabs */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {([
-                        { key: 'all',       label: 'All',           count: counts.all },
-                        { key: 'Submitted', label: 'Pending Review',count: counts.Submitted },
-                        { key: 'Approved',  label: 'Approved',      count: counts.Approved },
-                        { key: 'Rejected',  label: 'Rejected',      count: counts.Rejected },
+                        { key: 'all', label: 'All', count: counts.all },
+                        { key: 'Submitted', label: 'Pending Review', count: counts.Submitted },
+                        { key: 'Approved', label: 'Approved', count: counts.Approved },
+                        { key: 'Rejected', label: 'Rejected', count: counts.Rejected },
                     ] as { key: TabFilter; label: string; count: number }[]).map(tab => (
                         <button
                             key={tab.key}
@@ -1236,7 +1240,7 @@ const SelfAssessmentQCReview = () => {
                             </thead>
                             <tbody>
                                 {filtered.map((a, rowIdx) => {
-                                    const isPending  = a.status === 'Submitted';
+                                    const isPending = a.status === 'Submitted';
                                     const isSelected = selectedIds.has(a.id);
                                     const { bg, accent } = getRowStyle(a);
                                     const rowBg = isSelected ? C.blueLight : bg;
@@ -1396,9 +1400,9 @@ const SelfAssessmentQCReview = () => {
                             <span style={{ fontSize: '0.68rem', fontWeight: 600, color: C.textMute, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score:</span>
                             {[
                                 { color: C.success, label: 'High' },
-                                { color: C.blue,    label: 'Above avg' },
-                                { color: C.amber,   label: 'Below avg' },
-                                { color: C.danger,  label: 'Low' },
+                                { color: C.blue, label: 'Above avg' },
+                                { color: C.amber, label: 'Below avg' },
+                                { color: C.danger, label: 'Low' },
                             ].map(l => (
                                 <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                     <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color }} />
@@ -1488,14 +1492,14 @@ const SelfAssessmentQCReview = () => {
 
                                 {/* Rows */}
                                 {selected.wards.map((w, idx) => {
-                                    const isGold   = idx === 0;
+                                    const isGold = idx === 0;
                                     const isSilver = idx === 1;
                                     const isBronze = idx === 2;
-                                    const medalBg  = isGold ? '#F59E0B' : isSilver ? '#94A3B8' : isBronze ? '#CD7C41' : C.surface;
+                                    const medalBg = isGold ? '#F59E0B' : isSilver ? '#94A3B8' : isBronze ? '#CD7C41' : C.surface;
                                     const medalClr = idx < 3 ? '#fff' : C.textMute;
-                                    const rowBg    = isGold ? '#FFFBEB' : isSilver ? '#F8FAFC' : C.white;
+                                    const rowBg = isGold ? '#FFFBEB' : isSilver ? '#F8FAFC' : C.white;
                                     const maxScore = selected.wards[0]?.score || 1;
-                                    const barPct   = Math.round((w.score / maxScore) * 100);
+                                    const barPct = Math.round((w.score / maxScore) * 100);
 
                                     return (
                                         <div
@@ -1776,20 +1780,20 @@ const SelfAssessmentQCReview = () => {
                                 <p style={{ color: C.textMute, fontSize: '0.875rem', fontWeight: 500 }}>Loading assessment details…</p>
                             </div>
                         ) : viewDetail ? (() => {
-                            const answers      = viewDetail.selfAssessment.answers || {};
+                            const answers = viewDetail.selfAssessment.answers || {};
                             const totalSubmitted = viewDetail.questions.reduce((s, q) => s + (answers[q.id]?.score ?? 0), 0);
-                            const maxScore     = viewDetail.questions.reduce((s, q) => s + q.marks, 0);
-                            const qcTot        = computeSaQcTotal();
-                            const approvedN    = viewDetail.questions.filter(q => qcReviews[q.id]?.qcStatus === 'approved').length;
-                            const rejectedN    = viewDetail.questions.filter(q => qcReviews[q.id]?.qcStatus === 'rejected').length;
-                            const editedN      = viewDetail.questions.filter(q => qcReviews[q.id]?.qcStatus === 'edited').length;
-                            const pendingN     = viewDetail.questions.length - approvedN - rejectedN - editedN;
-                            const reviewedN    = approvedN + rejectedN + editedN;
-                            const isQcActive   = currentUser.role === 'qc' && !viewDetail.selfAssessment.qcReviewComplete;
+                            const maxScore = viewDetail.questions.reduce((s, q) => s + q.marks, 0);
+                            const qcTot = computeSaQcTotal();
+                            const approvedN = viewDetail.questions.filter(q => qcReviews[q.id]?.qcStatus === 'approved').length;
+                            const rejectedN = viewDetail.questions.filter(q => qcReviews[q.id]?.qcStatus === 'rejected').length;
+                            const editedN = viewDetail.questions.filter(q => qcReviews[q.id]?.qcStatus === 'edited').length;
+                            const pendingN = viewDetail.questions.length - approvedN - rejectedN - editedN;
+                            const reviewedN = approvedN + rejectedN + editedN;
+                            const isQcActive = currentUser.role === 'qc' && !viewDetail.selfAssessment.qcReviewComplete;
                             const pctSubmitted = maxScore > 0 ? Math.round(totalSubmitted / maxScore * 100) : 0;
-                            const pctQc        = maxScore > 0 ? Math.round(qcTot / maxScore * 100) : 0;
-                            const pctReviewed  = viewDetail.questions.length > 0 ? Math.round(reviewedN / viewDetail.questions.length * 100) : 0;
-                            const participant  = viewDetail.selfAssessment.participant;
+                            const pctQc = maxScore > 0 ? Math.round(qcTot / maxScore * 100) : 0;
+                            const pctReviewed = viewDetail.questions.length > 0 ? Math.round(reviewedN / viewDetail.questions.length * 100) : 0;
+                            const participant = viewDetail.selfAssessment.participant;
 
                             return (
                                 <>
@@ -1858,9 +1862,9 @@ const SelfAssessmentQCReview = () => {
                                     }}>
                                         {[
                                             { label: 'Self Assessment Score', value: totalSubmitted, sub: `/ ${maxScore}`, pct: pctSubmitted, color: C.blue },
-                                            { label: 'QC Score',              value: qcTot,          sub: `/ ${maxScore}`, pct: pctQc,        color: '#7C3AED' },
-                                            { label: 'Total Marks',           value: maxScore,       sub: `${viewDetail.questions.length} questions`, pct: null, color: C.textMute },
-                                            { label: 'Questions Reviewed',    value: `${reviewedN}/${viewDetail.questions.length}`, sub: `${pctReviewed}% complete`, pct: pctReviewed, color: C.success },
+                                            { label: 'QC Score', value: qcTot, sub: `/ ${maxScore}`, pct: pctQc, color: '#7C3AED' },
+                                            { label: 'Total Marks', value: maxScore, sub: `${viewDetail.questions.length} questions`, pct: null, color: C.textMute },
+                                            { label: 'Questions Reviewed', value: `${reviewedN}/${viewDetail.questions.length}`, sub: `${pctReviewed}% complete`, pct: pctReviewed, color: C.success },
                                         ].map((kpi, i, arr) => (
                                             <div key={i} style={{
                                                 flex: '1 0 0', minWidth: 0,
@@ -1951,9 +1955,9 @@ const SelfAssessmentQCReview = () => {
                                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, marginBottom: 16 }}>
                                                             {groups.map(g => {
                                                                 const selfObt = g.questions.reduce((s, q) => s + (answers[q.id]?.score ?? 0), 0);
-                                                                const maxObt  = g.questions.reduce((s, q) => s + q.marks, 0);
-                                                                const pct     = maxObt > 0 ? Math.round(selfObt / maxObt * 100) : 0;
-                                                                const color   = indColor(pct);
+                                                                const maxObt = g.questions.reduce((s, q) => s + q.marks, 0);
+                                                                const pct = maxObt > 0 ? Math.round(selfObt / maxObt * 100) : 0;
+                                                                const color = indColor(pct);
                                                                 const reviewedCount = g.questions.filter(q => qcReviews[q.id]?.qcStatus !== 'pending').length;
                                                                 return (
                                                                     <div key={g.indicator} style={{ background: C.white, border: `1px solid ${C.border}`, borderTop: `3px solid ${color}`, borderRadius: 8, padding: '10px 12px' }}>
@@ -1980,10 +1984,10 @@ const SelfAssessmentQCReview = () => {
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                             {groups.map(g => {
                                                                 const selfObt = g.questions.reduce((s, q) => s + (answers[q.id]?.score ?? 0), 0);
-                                                                const maxObt  = g.questions.reduce((s, q) => s + q.marks, 0);
-                                                                const pct     = maxObt > 0 ? Math.round(selfObt / maxObt * 100) : 0;
-                                                                const color   = indColor(pct);
-                                                                const isOpen  = !collapsedIndicators.has(g.indicator);
+                                                                const maxObt = g.questions.reduce((s, q) => s + q.marks, 0);
+                                                                const pct = maxObt > 0 ? Math.round(selfObt / maxObt * 100) : 0;
+                                                                const color = indColor(pct);
+                                                                const isOpen = !collapsedIndicators.has(g.indicator);
                                                                 const allRevd = g.questions.every(q => qcReviews[q.id]?.qcStatus !== 'pending');
 
                                                                 const toggleIndicator = () => setCollapsedIndicators(prev => {
@@ -2043,7 +2047,7 @@ const SelfAssessmentQCReview = () => {
                                                                                     const globalIdx = viewDetail.questions.indexOf(q);
                                                                                     const ans = answers[q.id];
                                                                                     const rev = qcReviews[q.id] || { qcStatus: 'pending' as const, qcScore: ans?.score ?? 0, qcRemark: '' };
-                                                                                    const cs  = QC_STYLE[rev.qcStatus] || QC_STYLE.pending;
+                                                                                    const cs = QC_STYLE[rev.qcStatus] || QC_STYLE.pending;
                                                                                     const submittedScore = ans?.score ?? 0;
                                                                                     const diff = rev.qcStatus !== 'pending' ? rev.qcScore - submittedScore : 0;
                                                                                     const resolvedImages = (ans?.imageUrls || []).map(resolveImageUrl).filter(Boolean);
@@ -2107,7 +2111,7 @@ const SelfAssessmentQCReview = () => {
                                                                                                 }}>
                                                                                                     {rev.qcStatus === 'approved' && <Check size={9} />}
                                                                                                     {rev.qcStatus === 'rejected' && <X size={9} />}
-                                                                                                    {rev.qcStatus === 'edited'   && <Edit3 size={9} />}
+                                                                                                    {rev.qcStatus === 'edited' && <Edit3 size={9} />}
                                                                                                     {cs.label}
                                                                                                 </span>
                                                                                             )}
@@ -2148,8 +2152,8 @@ const SelfAssessmentQCReview = () => {
                                                                                                     <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                                                                                                         {[
                                                                                                             { status: 'approved' as const, score: submittedScore, label: 'Approve', icon: <ThumbsUp size={11} />, activeColor: C.success, activeBg: C.successBg },
-                                                                                                            { status: 'rejected' as const, score: 0,              label: 'Reject',  icon: <ThumbsDown size={11} />, activeColor: C.danger,  activeBg: C.dangerBg },
-                                                                                                            { status: 'edited'   as const, score: rev.qcScore,    label: 'Rescore', icon: <Edit3 size={11} />, activeColor: C.amber, activeBg: C.amberBg },
+                                                                                                            { status: 'rejected' as const, score: 0, label: 'Reject', icon: <ThumbsDown size={11} />, activeColor: C.danger, activeBg: C.dangerBg },
+                                                                                                            { status: 'edited' as const, score: rev.qcScore, label: 'Rescore', icon: <Edit3 size={11} />, activeColor: C.amber, activeBg: C.amberBg },
                                                                                                         ].map(btn => (
                                                                                                             <button
                                                                                                                 key={btn.status}
@@ -2272,8 +2276,8 @@ const SelfAssessmentQCReview = () => {
                                                 {[
                                                     { label: 'Approved', count: approvedN, color: C.success },
                                                     { label: 'Rejected', count: rejectedN, color: C.danger },
-                                                    { label: 'Rescored',  count: editedN,   color: C.amber },
-                                                    { label: 'Pending',  count: pendingN,  color: C.textMute },
+                                                    { label: 'Rescored', count: editedN, color: C.amber },
+                                                    { label: 'Pending', count: pendingN, color: C.textMute },
                                                 ].map(s => (
                                                     <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: `1px solid ${C.border}` }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

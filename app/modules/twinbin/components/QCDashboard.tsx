@@ -296,6 +296,7 @@ export default function QCDashboard() {
                                 <th className="p-3">Type</th>
                                 <th className="p-3">Location</th>
                                 <th className="p-3">Zone / Ward</th>
+                                <th className="p-3">Assigned Staff</th>
                                 <th className="p-3">Status</th>
                                 <th className="p-3">Date</th>
                                 <th className="p-3 text-right">Actions</th>
@@ -309,6 +310,7 @@ export default function QCDashboard() {
                                         <td className="p-3"><div className="h-4 bg-base-200 rounded w-20 animate-pulse"></div></td>
                                         <td className="p-3"><div className="h-4 bg-base-200 rounded w-32 animate-pulse mb-1"></div><div className="h-3 bg-base-200 rounded w-24 animate-pulse"></div></td>
                                         <td className="p-3"><div className="h-4 bg-base-200 rounded w-20 animate-pulse"></div></td>
+                                        <td className="p-3"><div className="h-4 bg-base-200 rounded w-24 animate-pulse"></div></td>
                                         <td className="p-3"><div className="h-4 bg-base-200 rounded w-16 animate-pulse"></div></td>
                                         <td className="p-3"><div className="h-4 bg-base-200 rounded w-24 animate-pulse"></div></td>
                                         <td className="p-3"></td>
@@ -331,6 +333,19 @@ export default function QCDashboard() {
                                             <td className="p-3">
                                                 <div className="text-xs">{r.zoneName || "—"}</div>
                                                 <div className="text-xs muted">{r.wardName || "—"}</div>
+                                            </td>
+                                            <td className="p-3">
+                                                {r.assignedEmployees && r.assignedEmployees.length > 0 ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        {r.assignedEmployees.map((emp: any) => (
+                                                            <span key={emp.id} className={`text-xs px-2 py-0.5 rounded font-semibold border ${emp.role === 'SUPERVISOR' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                                👤 {emp.name} ({emp.role ? emp.role.replace('_', ' ') : 'Staff'})
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs muted italic">Unassigned</span>
+                                                )}
                                             </td>
                                             <td className="p-3">
                                                 <StatusBadge status={r.status} />
@@ -366,16 +381,13 @@ export default function QCDashboard() {
                                                         </>
                                                     )}
 
-                                                    {r.status === 'APPROVED' && r.type === 'BIN_REGISTRATION' && (
-                                                        <div className="tooltip tooltip-left" data-tip={!assignmentCheck.allowed ? assignmentCheck.reason : "Assign Employee"}>
-                                                            <button
-                                                                className="btn btn-xs btn-primary"
-                                                                disabled={!assignmentCheck.allowed}
-                                                                onClick={() => openAssignModal(r)}
-                                                            >
-                                                                Assign
-                                                            </button>
-                                                        </div>
+                                                    {r.type === 'BIN_REGISTRATION' && (
+                                                        <button
+                                                            className="btn btn-xs btn-primary"
+                                                            onClick={() => openAssignModal(r)}
+                                                        >
+                                                            {r.assignedEmployees && r.assignedEmployees.length > 0 ? "Reassign" : "Assign Staff"}
+                                                        </button>
                                                     )}
                                                 </div>
                                             </td>

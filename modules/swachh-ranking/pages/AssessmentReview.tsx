@@ -28,19 +28,33 @@ const resolveImageUrl = (src?: string) => {
         return trimmed;
     }
 
-    const mediaBase = (import.meta as any).env?.VITE_MEDIA_BASE_URL?.replace(/\/+$/, '');
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL?.replace(/\/+$/, '');
-    const fallback = (import.meta as any).env?.DEV
-        ? 'http://localhost:5000'
-        : (typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '');
+    const mediaBase =
+        process.env.NEXT_PUBLIC_SWACHH_MEDIA_URL?.replace(
+            /\/+$/,
+            ""
+        );
 
+    const apiBase =
+        process.env.NEXT_PUBLIC_SWACHH_API_URL?.replace(
+            /\/+$/,
+            ""
+        );
+
+    const fallback =
+        process.env.NODE_ENV !== "production"
+            ? "http://localhost:5000"
+            : typeof window !== "undefined"
+                ? window.location.origin.replace(/\/+$/, "")
+                : "";
     const base = mediaBase || apiBase || fallback;
     const needsSlash = trimmed.startsWith('/') ? '' : '/';
     return `${base}${needsSlash}${trimmed}`;
 };
 
 const AssessmentReview = () => {
-    const { assessmentId } = useParams() as { assessmentId?: string };
+    const { assessmentId } = useParams() as {
+        assessmentId?: string;
+    };
     const navigate = useNavigate();
     const [assessment, setAssessment] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -170,7 +184,7 @@ const AssessmentReview = () => {
                 </div>
             ) : assessment && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '2rem', alignItems: 'start' }}>
-                    
+
                     {/* Left Column: Questionnaire responses */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         <div style={{
@@ -347,8 +361,8 @@ const AssessmentReview = () => {
                                                                     color: 'white',
                                                                     transition: 'opacity 0.2s'
                                                                 }}
-                                                                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
-                                                                onMouseLeave={e => { e.currentTarget.style.opacity = '0'; }}
+                                                                    onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+                                                                    onMouseLeave={e => { e.currentTarget.style.opacity = '0'; }}
                                                                 >
                                                                     <Maximize2 size={18} />
                                                                 </div>

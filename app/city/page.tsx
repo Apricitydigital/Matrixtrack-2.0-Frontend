@@ -261,7 +261,7 @@ export default function CityDashboardPage() {
 
         // Build QC leaderboard from toilet inspections
         try {
-          const inspRes = await ToiletApi.listInspections({ pageSize: 500 });
+          const inspRes = await ToiletApi.listInspections({ pageSize: 50 });
           const inspections = inspRes?.inspections || [];
           const qcMap: Record<string, { name: string; count: number }> = {};
           inspections.forEach((insp: any) => {

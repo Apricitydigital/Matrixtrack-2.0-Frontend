@@ -21,11 +21,41 @@ export default function ReportsTab() {
         setLoading(true);
         setError('');
         setReportsError('');
+
+        let startDate: string | undefined;
+        let endDate: string | undefined;
+
+        const now = new Date();
+        if (dateFilter === 'today') {
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+            startDate = start.toISOString();
+            endDate = end.toISOString();
+        } else if (dateFilter === 'week') {
+            const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+            startDate = start.toISOString();
+            endDate = end.toISOString();
+        } else if (dateFilter === 'month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+            startDate = start.toISOString();
+            endDate = end.toISOString();
+        } else if (dateFilter === 'custom' && customDate) {
+            const [year, month, day] = customDate.split('-').map(Number);
+            if (year && month && day) {
+                const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+                const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+                startDate = start.toISOString();
+                endDate = end.toISOString();
+            }
+        }
+
         try {
             const params: any = {};
-            if (dateFilter === 'custom' && customDate) {
-                params.startDate = customDate;
-            }
+            if (startDate) params.startDate = startDate;
+            if (endDate) params.endDate = endDate;
             const statsRes = await ToiletApi.getDashboardStats(params);
             setStats(statsRes);
         } catch (err) {
@@ -37,7 +67,12 @@ export default function ReportsTab() {
         }
 
         try {
-            const inspectionsRes = await ToiletApi.listInspections({ pageSize: 10, status: statusTab || undefined });
+            const inspectionsRes = await ToiletApi.listInspections({
+                pageSize: 10,
+                status: statusTab || undefined,
+                startDate,
+                endDate
+            });
             setReports(inspectionsRes.inspections || []);
         } catch (err: any) {
             console.error('Failed to load recent toilet inspections', err);

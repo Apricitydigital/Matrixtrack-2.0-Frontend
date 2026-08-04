@@ -241,9 +241,23 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                     }}>
                         {user.profileImage ? (
                             <img
-                                src={`${(((import.meta as any).env?.VITE_MEDIA_BASE_URL || (import.meta as any).env?.VITE_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000') as string).replace(/\/+$/, '')}${user.profileImage}?v=${imageVersion}`}
+                                src={`${(
+                                    process.env.NEXT_PUBLIC_SWACHH_MEDIA_URL ||
+                                    process.env.NEXT_PUBLIC_SWACHH_API_URL ||
+                                    (
+                                        process.env.NODE_ENV !== "production"
+                                            ? "http://localhost:5000"
+                                            : typeof window !== "undefined"
+                                                ? window.location.origin
+                                                : ""
+                                    )
+                                ).replace(/\/+$/, "")}${user.profileImage}?v=${imageVersion}`}
                                 alt="Avatar"
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                }}
                             />
                         ) : (
                             user.name.charAt(0).toUpperCase()

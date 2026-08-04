@@ -32,6 +32,8 @@ interface UnifiedExecutiveDashboardProps {
   userRoles?: string[];
   userCityName?: string;
   workspaceUrl: string;
+  enableTaskforceData?: boolean;
+  enableWardRankingData?: boolean;
 }
 
 export default function UnifiedExecutiveDashboard({
@@ -39,10 +41,12 @@ export default function UnifiedExecutiveDashboard({
   userRoles = [],
   userCityName = 'Indore',
   workspaceUrl,
+  enableTaskforceData = true,
+  enableWardRankingData = true,
 }: UnifiedExecutiveDashboardProps) {
   const [selectedCityKey, setSelectedCityKey] = useState<string>(isSuperAdmin ? 'ALL' : 'INDORE');
   const [activeTab, setActiveTab] = useState<'all' | 'taskforce' | 'swachh'>('all');
-  
+
   // Real Taskforce 20 API State (with fallback rich metrics)
   const [taskforceStats, setTaskforceStats] = useState<{
     taskforceMembers: number;
@@ -117,64 +121,85 @@ export default function UnifiedExecutiveDashboard({
       setLastSyncTime(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
       // 1. Taskforce 20 Stats
-      try {
-        if (isSuperAdmin && selectedCityKey === 'ALL') {
-          const res = await HmsApi.getGlobalStats();
-          if (res?.stats) {
-            setTaskforceStats(prev => ({
-              ...prev,
-              taskforceMembers: res.stats.taskforceMembers || prev.taskforceMembers,
-              qualityControllers: res.stats.qualityControllers || prev.qualityControllers,
-              actionOfficers: res.stats.actionOfficers || prev.actionOfficers,
-              ulbOfficials: res.stats.ulbOfficials || prev.ulbOfficials,
-              cityAdmins: res.stats.cityAdmins || prev.cityAdmins,
-              totalModules: res.stats.totalModules || prev.totalModules,
-            }));
+      if (enableTaskforceData) {
+        try {
+          if (isSuperAdmin && selectedCityKey === 'ALL') {
+            const res = await HmsApi.getGlobalStats();
+            if (res?.stats) {
+              setTaskforceStats(prev => ({
+                ...prev,
+                taskforceMembers: res.stats.taskforceMembers || prev.taskforceMembers,
+                qualityControllers: res.stats.qualityControllers || prev.qualityControllers,
+                actionOfficers: res.stats.actionOfficers || prev.actionOfficers,
+                ulbOfficials: res.stats.ulbOfficials || prev.ulbOfficials,
+                cityAdmins: res.stats.cityAdmins || prev.cityAdmins,
+                totalModules: res.stats.totalModules || prev.totalModules,
+              }));
+            }
+          } else {
+            const res = await CityApi.getStats();
+            if (res?.stats) {
+              setTaskforceStats(prev => ({
+                ...prev,
+                taskforceMembers: res.stats.taskforceMembers || prev.taskforceMembers,
+                qualityControllers: res.stats.qualityControllers || prev.qualityControllers,
+                actionOfficers: res.stats.actionOfficers || prev.actionOfficers,
+                ulbOfficials: res.stats.ulbOfficials || prev.ulbOfficials,
+                cityAdmins: res.stats.cityAdmins || prev.cityAdmins,
+                totalModules: res.stats.totalModules || prev.totalModules,
+              }));
+            }
           }
-        } else {
-          const res = await CityApi.getStats();
-          if (res?.stats) {
-            setTaskforceStats(prev => ({
-              ...prev,
-              taskforceMembers: res.stats.taskforceMembers || prev.taskforceMembers,
-              qualityControllers: res.stats.qualityControllers || prev.qualityControllers,
-              actionOfficers: res.stats.actionOfficers || prev.actionOfficers,
-              ulbOfficials: res.stats.ulbOfficials || prev.ulbOfficials,
-              cityAdmins: res.stats.cityAdmins || prev.cityAdmins,
-              totalModules: res.stats.totalModules || prev.totalModules,
-            }));
-          }
+        } catch (err) {
+          console.warn('Taskforce API stats warning:', err);
         }
-      } catch (err) {
-        console.warn('Taskforce API stats warning:', err);
       }
 
       // 2. Swachh Ward Ranking Stats
-      try {
-        const res = await swachhApi.get('/admin/stats');
-        if (res?.data && res.data.totalParticipants > 0) {
-          setSwachhStats({
-            totalParticipants: res.data.totalParticipants,
-            totalAssessments: res.data.totalAssessments,
-            qcApproved: res.data.qcApproved,
-            underReview: res.data.underReview,
-            reassessment: res.data.reassessment,
-            categoryCounts: res.data.categoryCounts || swachhStats.categoryCounts,
-          });
+      if (enableWardRankingData) {
+        try {
+          const res =
+            await swachhApi.get('/admin/stats');
+
+          if (
+            res?.data &&
+            res.data.totalParticipants > 0
+          ) {
+            setSwachhStats({
+              totalParticipants:
+                res.data.totalParticipants,
+              totalAssessments:
+                res.data.totalAssessments,
+              qcApproved:
+                res.data.qcApproved,
+              underReview:
+                res.data.underReview,
+              reassessment:
+                res.data.reassessment,
+              categoryCounts:
+                res.data.categoryCounts ||
+                swachhStats.categoryCounts,
+            });
+          }
+        } catch {
+          // Keep rich defaults for demo
         }
-      } catch (err) {
-        // Keep rich defaults for demo
-      } finally {
-        setLoading(false);
       }
+
+      setLoading(false);
     }
 
     loadRealData();
-  }, [isSuperAdmin, selectedCityKey]);
+  }, [
+    isSuperAdmin,
+    selectedCityKey,
+    enableTaskforceData,
+    enableWardRankingData,
+  ]);
 
   return (
     <div style={{ marginTop: 36, fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      
+
       {/* ─── 1. REAL-TIME SYSTEM ALERTS TICKER (CRITICAL & OPERATIONAL NOTIFICATIONS) ─── */}
       <div style={{
         background: '#ffffff',
@@ -345,7 +370,7 @@ export default function UnifiedExecutiveDashboard({
 
       {/* ─── 5. VISUAL CHARTS GRID (4 VISUALIZERS) ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 24, marginBottom: 32 }}>
-        
+
         {/* Chart 1: Line Trend */}
         <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: 20, padding: 24, boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
@@ -433,7 +458,7 @@ export default function UnifiedExecutiveDashboard({
 
       {/* ─── 6. LIVE AUDIT ACTIVITY FEED & EXECUTIVE ACTIONS PANEL ─── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 24, marginBottom: 32 }}>
-        
+
         {/* Activity Stream */}
         <div style={{ background: '#ffffff', border: '1.5px solid #e2e8f0', borderRadius: 20, padding: 24, boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>

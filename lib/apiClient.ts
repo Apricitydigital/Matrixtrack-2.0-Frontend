@@ -4,6 +4,13 @@ import type { ModuleName } from "../types/auth";
 import type { ApiSuccess, AuthLoginResponse, AuthMeResponse, CityListResponse, CityMasterNode, MasterNode } from "../types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+let logoutInProgress = false;
+
+export function setLogoutInProgress(
+  value: boolean
+) {
+  logoutInProgress = value;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -18,21 +25,110 @@ function parseErrorMessage(raw: string, fallback: string) {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.error === "string") return parsed.error;
-  } catch {}
+  } catch { }
   return raw;
 }
 
-function handleUnauthorized(path: string, message: string) {
-  if (typeof window === "undefined") return;
-  if (path === "/auth/login" || path === "/auth/logout") return;
-  const normalized = message.toLowerCase();
-  const isExpired = normalized.includes("expired token") || normalized.includes("invalid or expired token") || normalized.includes("missing authorization header");
-  if (!isExpired) return;
+function handleUnauthorized(
+  path: string,
+  message: string
+) {
+  if (typeof window === "undefined") {
+    return;
+    console.error("[AUTH_401_TRACE]", {
+      path,
+      message,
+      currentPath: window.location.pathname,
+      unifiedSessionPresent: Boolean(
+        localStorage.getItem("unified_auth_session")
+      ),
+      taskforceTokenPresent: Boolean(
+        localStorage.getItem("taskforce_access_token")
+      ),
+      matrixtrackTokenPresent: Boolean(
+        localStorage.getItem("matrixtrack_access_token")
+      ),
+      wardRankingTokenPresent: Boolean(
+        localStorage.getItem("ward_ranking_access_token")
+      ),
+      genericTokenPresent: Boolean(
+        localStorage.getItem("token")
+      ),
+      unifiedCookiePresent:
+        document.cookie.includes("unified_session="),
+      hmsCookiePresent:
+        document.cookie.includes("hms_access_token="),
+    });
+  }
+  /*
+ * Logout ke dauran mounted dashboard ki pending
+ * requests 401 de sakti hain. Unhe session expiry
+ * nahi maana jayega.
+ */
+  if (logoutInProgress) {
+    return;
+  }
+
+  const cleanPath = path.split("?")[0];
+
+  /*
+   * Login, OTP and registration failures should be
+   * displayed inside their forms. They are not an
+   * existing-session expiry.
+   */
+  const isAuthenticationRequest =
+    cleanPath === "/auth/login" ||
+    cleanPath === "/auth/logout" ||
+    cleanPath === "/auth/register-request" ||
+    cleanPath === "/auth/register-employee-request" ||
+    cleanPath === "/auth/request-unified-registration" ||
+    cleanPath === "/auth/unified-login" ||
+    cleanPath.startsWith(
+      "/auth/unified-login/"
+    );
+
+  if (isAuthenticationRequest) {
+    return;
+  }
+
+  const normalizedMessage =
+    message.toLowerCase();
+
+  const isExpiredSession =
+    normalizedMessage.includes(
+      "expired token"
+    ) ||
+    normalizedMessage.includes(
+      "invalid or expired token"
+    ) ||
+    normalizedMessage.includes(
+      "missing authorization header"
+    );
+
+  if (!isExpiredSession) {
+    return;
+  }
+
   clearPersistedAccessToken();
   clearPersistedUserSnapshot();
-  const currentPath = window.location.pathname || "";
-  if (!currentPath.startsWith("/login")) {
-    window.location.replace("/login?reason=session-expired");
+
+  const currentPath =
+    window.location.pathname || "";
+
+  const isAuthenticationPage =
+    currentPath.startsWith("/login") ||
+    currentPath.startsWith(
+      "/unified-login"
+    ) ||
+    currentPath.startsWith(
+      "/create-account"
+    ) ||
+    currentPath.startsWith("/register");
+
+  if (!isAuthenticationPage) {
+    window.location.replace(
+      "/unified-login?reason=session-expired"
+    );
   }
 }
 
@@ -78,6 +174,93 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return res.json();
 }
 
+export type UnifiedPortalKey =
+  | "TASKFORCE_20"
+  | "MATRIX_TRACK"
+  | "WARD_RANKING";
+
+export type UnifiedTaskforceModuleKey =
+  | "TASKFORCE"
+  | "SWEEPING"
+  | "LITTERBINS"
+  | "TOILET";
+
+export type UnifiedRegistrationRole =
+  | "SUPERVISOR"
+  | "EMPLOYEE"
+  | "QC"
+  | "ACTION_OFFICER";
+
+export interface UnifiedLoginResponse {
+  success: boolean;
+
+  requiresOtp?: boolean;
+
+  provider?: "MATRIX_TRACK";
+
+  email?: string;
+
+  message?: string;
+
+  pendingOtp?: {
+    provider: "MATRIX_TRACK";
+    email: string;
+    message: string;
+  } | null;
+
+  user: {
+    id?: string;
+    name?: string;
+    email: string;
+    applications?: any[];
+    [key: string]: any;
+  };
+
+  applications: any[];
+
+  tokens: {
+    taskforce?: string | null;
+    matrixTrack?: string | null;
+    wardRanking?: string | null;
+  };
+
+  taskforce?: {
+    user?: any;
+    modules?: any[];
+    redirectTo?: string | null;
+  } | null;
+
+  matrixTrack?: {
+    user?: any;
+    message?: string;
+  } | null;
+
+  wardRanking?: {
+    user?: any;
+    message?: string;
+    redirectTo?: string | null;
+  } | null;
+
+  redirectTo: string | null;
+}
+
+export interface UnifiedRegistrationRequest {
+  name: string;
+  email: string;
+  phone: string;
+  aadhaar: string;
+  password: string;
+
+  cityId: string;
+  zoneId?: string;
+  wardId?: string;
+
+  requestedRole: UnifiedRegistrationRole;
+
+  requestedPortals: UnifiedPortalKey[];
+  taskforceModules: UnifiedTaskforceModuleKey[];
+}
+
 export const AuthApi = {
   login: async (body: { email: string; password: string; cityId?: string }) =>
     apiFetch<AuthLoginResponse>("/auth/login", {
@@ -99,6 +282,50 @@ export const AuthApi = {
       method: "POST",
       body: JSON.stringify(body)
     }),
+  unifiedLogin: async (body: {
+    email: string;
+    password: string;
+    cityId?: string;
+  }) =>
+    apiFetch<UnifiedLoginResponse>(
+      "/auth/unified-login",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
+
+  unifiedVerifyMatrixTrackOtp: async (body: {
+    email: string;
+    otp: string;
+  }) =>
+    apiFetch<UnifiedLoginResponse>(
+      "/auth/unified-login/verify-matrixtrack-otp",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
+
+  unifiedRegisterRequest: (
+    body: UnifiedRegistrationRequest
+  ) =>
+    apiFetch<{
+      success: boolean;
+      message: string;
+      requestId?: string;
+      status?: string;
+      requestedRole?: string;
+      requestedPortals?: string[];
+      taskforceModules?: string[];
+    }>(
+      "/auth/request-unified-registration",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    ),
+
   registerEmployeeRequest: (body: {
     ulbCode: string;
     name: string;
@@ -110,12 +337,86 @@ export const AuthApi = {
     wardId: string;
     cityId?: string;
   }) =>
-    apiFetch<{ success: boolean; message: string }>("/auth/register-employee-request", {
+    apiFetch<{
+      success: boolean;
+      message: string;
+    }>("/auth/register-employee-request", {
       method: "POST",
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     }),
-  logout: async () => apiFetch<ApiSuccess>("/auth/logout", { method: "POST" }),
-  getMe: async () => apiFetch<AuthMeResponse>("/auth/me")
+
+  logout: async () =>
+    apiFetch<ApiSuccess>("/auth/logout", {
+      method: "POST",
+    }),
+
+  getMe: async () =>
+    apiFetch<AuthMeResponse>("/auth/me"),
+};
+
+export interface IntegratedRegistrationPayload {
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  aadharNumber?: string;
+  cityId?: string;
+  zoneId?: string;
+  wardId?: string;
+  targetSystems: Array<"TASKFORCE_20" | "SWACHH_RANKING">;
+  taskforceConfig?: {
+    role?: string;
+    moduleKeys?: string[];
+  };
+  swachhConfig?: {
+    role?: "accessor" | "qc" | "admin";
+    accessorType?: "hms" | "pmc" | "janwani";
+    ward?: string;
+    zone?: string;
+  };
+}
+
+export const CommonRegistrationApi = {
+  register: (body: IntegratedRegistrationPayload) =>
+    apiFetch<{
+      success: boolean;
+      email: string;
+      userId?: string;
+      swachhUserId?: string;
+      taskforceCreated: boolean;
+      swachhCreated: boolean;
+      message: string;
+    }>("/common-registration/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  bulkImport: (employees: IntegratedRegistrationPayload[]) =>
+    apiFetch<{
+      success: boolean;
+      total: number;
+      successCount: number;
+      failCount: number;
+      results: Array<{
+        success: boolean;
+        email: string;
+        message: string;
+        taskforceCreated: boolean;
+        swachhCreated: boolean;
+      }>;
+    }>("/common-registration/bulk-import", {
+      method: "POST",
+      body: JSON.stringify({ employees }),
+    }),
+
+  getConfig: () =>
+    apiFetch<{
+      cities: { id: string; name: string; code: string }[];
+      modules: { key: string; name: string }[];
+      taskforceRoles: { key: string; label: string }[];
+      swachhRoles: { key: string; label: string }[];
+      swachhAccessorTypes: { key: string; label: string }[];
+    }>("/common-registration/config"),
 };
 
 export const CityApi = {
@@ -401,12 +702,14 @@ export const ToiletApi = {
     }),
 
   // Operational
-  listInspections: (params?: { status?: string; employeeId?: string; page?: number; pageSize?: number }) => {
+  listInspections: (params?: { status?: string; employeeId?: string; page?: number; pageSize?: number; startDate?: string; endDate?: string }) => {
     const sp = new URLSearchParams();
     if (params?.status) sp.append('status', params.status);
     if (params?.employeeId) sp.append('employeeId', params.employeeId);
     if (params?.page) sp.append('page', params.page.toString());
     if (params?.pageSize) sp.append('pageSize', params.pageSize.toString());
+    if (params?.startDate) sp.append('startDate', params.startDate);
+    if (params?.endDate) sp.append('endDate', params.endDate);
     const query = sp.toString() ? `?${sp.toString()}` : "";
     return apiFetch<{ inspections: any[]; total: number; page: number; pageSize: number }>(`/modules/toilet/inspections${query}`);
   },

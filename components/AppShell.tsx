@@ -6,18 +6,41 @@ import { Menu, X } from "lucide-react";
 import Sidebar from "@components/ui/Sidebar";
 import { Topbar } from "@components/ui/Topbar";
 
-const AUTH_PATHS = ["/", "/login", "/register", "/portal-home", "/ward-ranking", "/workforce-monitoring", "/admin-management"];
+const STANDALONE_PATHS = [
+  "/",
+  "/login",
+  "/register",
+  "/unified-login",
+  "/create-account",
+  "/applications",
+  "/portal-home",
+  "/ward-ranking",
+  "/workforce-monitoring",
+  "/admin-management",
+];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
-  const isAuthPage = AUTH_PATHS.includes(pathname);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const [drawerOpen, setDrawerOpen] =
+    useState(false);
+
+  const isStandalonePage =
+    STANDALONE_PATHS.some(
+      (path) =>
+        pathname === path ||
+        pathname.startsWith(`${path}/`),
+    );
 
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
 
-  if (isAuthPage) {
+  if (isStandalonePage) {
     return <>{children}</>;
   }
 
@@ -28,26 +51,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div
-        className={`fixed inset-0 z-50 lg:hidden ${drawerOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+        className={`fixed inset-0 z-50 lg:hidden ${drawerOpen
+            ? "pointer-events-auto"
+            : "pointer-events-none"
+          }`}
       >
         <div
           onClick={() => setDrawerOpen(false)}
-          className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${
-            drawerOpen ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen
+              ? "opacity-100"
+              : "opacity-0"
+            }`}
         />
+
         <div
-          className={`absolute left-0 top-0 h-full shadow-2xl transition-transform duration-300 ease-out-expo ${
-            drawerOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`absolute left-0 top-0 h-full shadow-2xl transition-transform duration-300 ease-out ${drawerOpen
+              ? "translate-x-0"
+              : "-translate-x-full"
+            }`}
         >
           <div className="relative h-full">
             <button
-              onClick={() => setDrawerOpen(false)}
+              type="button"
+              onClick={() =>
+                setDrawerOpen(false)
+              }
               className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-slate-500 shadow-sm"
+              aria-label="Close navigation"
             >
               <X size={16} />
             </button>
+
             <Sidebar />
           </div>
         </div>
@@ -56,19 +90,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen flex-1 flex-col overflow-hidden">
         <div className="flex shrink-0 items-center gap-3 border-b border-slate-100 bg-white px-4 py-3 lg:hidden">
           <button
-            onClick={() => setDrawerOpen(true)}
+            type="button"
+            onClick={() =>
+              setDrawerOpen(true)
+            }
             className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-50"
+            aria-label="Open navigation"
           >
             <Menu size={20} />
           </button>
-          <span className="text-sm font-bold text-slate-800">Taskforce 20</span>
+
+          <span className="text-sm font-bold text-slate-800">
+            Taskforce 20
+          </span>
         </div>
 
         <div className="shrink-0">
           <Topbar />
         </div>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
       </div>
     </div>
   );

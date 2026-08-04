@@ -152,17 +152,17 @@ const LandingPage = () => {
         { id: 5, activity: 'Assessment', date: 'May to September (Every Month)' },
     ];
 
-const categories = [
-    { type: 'Ward Ranking', marks: 6500 },
-    { type: 'School Ranking', marks: 250 },
-    { type: 'Hotel Ranking', marks: 100 },
-    { type: 'Societies (BWG) Ranking', marks: 200 },
-];
+    const categories = [
+        { type: 'Ward Ranking', marks: 6500 },
+        { type: 'School Ranking', marks: 250 },
+        { type: 'Hotel Ranking', marks: 100 },
+        { type: 'Societies (BWG) Ranking', marks: 200 },
+    ];
 
-const getPrimaryContactForRole = () => {
-    switch (role) {
-        case 'offices':
-            return officeDetails.inchargeContact;
+    const getPrimaryContactForRole = () => {
+        switch (role) {
+            case 'offices':
+                return officeDetails.inchargeContact;
             case 'societies - bwg':
                 return societyDetails.chairmanContact;
             case 'hospitals':
@@ -405,35 +405,35 @@ const getPrimaryContactForRole = () => {
                 </div>
             </nav> */}
             <nav className="main-navbar">
-    <div className="nav-left">
-        <PmcLogo size={72} />
-    </div>
+                <div className="nav-left">
+                    <PmcLogo size={72} />
+                </div>
 
-    <div className="header-actions">
-        <Link
-            to="/"
-            aria-label="Swachh Pune home"
-            className="header-logo-link"
-        >
-            <img
-                src={typeof SwachhParvLogo === 'string' ? SwachhParvLogo : (SwachhParvLogo as any)?.src || (SwachhParvLogo as any)}
-                alt="Swachh Pune Sankalp 2026"
-                className="header-logo"
-            />
-        </Link>
+                <div className="header-actions">
+                    <Link
+                        to="/"
+                        aria-label="Swachh Pune home"
+                        className="header-logo-link"
+                    >
+                        <img
+                            src={typeof SwachhParvLogo === 'string' ? SwachhParvLogo : (SwachhParvLogo as any)?.src || (SwachhParvLogo as any)}
+                            alt="Swachh Pune Sankalp 2026"
+                            className="header-logo"
+                        />
+                    </Link>
 
-        <Link to="/login" className="portal-link">
-            Portal Login
-        </Link>
+                    <Link to="/login" className="portal-link">
+                        Portal Login
+                    </Link>
 
-        <button
-            onClick={() => { setShowModal(true); setStep(1); }}
-            className="participate-btn"
-        >
-            Participate Now
-        </button>
-    </div>
-</nav>
+                    <button
+                        onClick={() => { setShowModal(true); setStep(1); }}
+                        className="participate-btn"
+                    >
+                        Participate Now
+                    </button>
+                </div>
+            </nav>
             {/* Hero Section */}
             <section className="hero-intro">
                 <div className="hero-intro__inner">
@@ -752,11 +752,11 @@ const getPrimaryContactForRole = () => {
                                         Your submission has been recorded successfully. Our assessment team will be in touch soon.
                                     </p>
                                     <button
-                                            onClick={() => {
-                                                setShowModal(false);
-                                                setStep(1);
-                                                setRole('');
-                                            }}
+                                        onClick={() => {
+                                            setShowModal(false);
+                                            setStep(1);
+                                            setRole('');
+                                        }}
                                         className="btn btn-primary"
                                         style={{
                                             width: '100%',

@@ -177,7 +177,7 @@ export default function RegisterPage() {
                             </div>
                             <div className="field">
                                 <label className="premium-label"><UserPlus size={14} /> Full Name</label>
-                                <input className="premium-input-v2" placeholder="Rohit Raj" value={form.name} onChange={(e) => update("name", e.target.value)} required />
+                                <input className="premium-input-v2" placeholder="John Doe" value={form.name} onChange={(e) => update("name", e.target.value)} required />
                             </div>
                         </div>
 
@@ -251,7 +251,7 @@ export default function RegisterPage() {
                     </form>
 
                     <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                        <a href="/register/employee" style={{ color: "#0f766e", fontWeight: 700, textDecoration: "none" }}>Register As Employee</a>
+                        <a href="/common-registration" style={{ color: "#0f766e", fontWeight: 700, textDecoration: "none" }}>Register As Employee (Taskforce + Swachh)</a>
                         <p style={{ margin: 0, textAlign: "center", color: "#64748b", fontSize: 14 }}>
                             Already have an account? <a href="/login" style={{ color: "#1e3a8a", fontWeight: 700, textDecoration: "none" }}>Sign In</a>
                         </p>
