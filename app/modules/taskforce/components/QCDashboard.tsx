@@ -27,8 +27,8 @@ export default function TaskforceQCDashboard() {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [limit] = useState(20);
-    const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'ASSIGNED'>('PENDING');
-    const [stats, setStats] = useState<{ pending: number; approved: number; rejected: number; actionRequired: number; total: number; assigned: number } | null>(null);
+    const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ACTION_REQUIRED'>('PENDING');
+    const [stats, setStats] = useState<{ pending: number; approved: number; rejected: number; actionRequired: number; total: number } | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [supervisors, setEmployees] = useState<any[]>([]);
     const [assignSelection, setAssignSelection] = useState<Record<string, string>>({});
@@ -131,32 +131,46 @@ export default function TaskforceQCDashboard() {
             const { zoneIds, wardIds } = await resolveScope();
             await loadEmployeesOnce();
 
-            // Fetch all buckets once for accurate KPI counts
-            const [pendingRes, approvedRes, assignedRes] = await Promise.all([
-                TaskforceApi.pendingFeederPoints(),
-                TaskforceApi.approvedFeederPoints(false),
-                TaskforceApi.approvedFeederPoints(true)
-            ]);
+            // Fetch tab-specific records AND always fetch full stats from DAILY_REPORTS
+            // (DAILY_REPORTS tab returns stats across ALL statuses for this QC's scope)
+            let allReports: TaskforceRecord[] = [];
 
-            const pending = (pendingRes.feederPoints || []).map(mapFeederPoint);
-            const approved = (approvedRes.feederPoints || []).map(mapFeederPoint);
-            const assigned = (assignedRes.feederPoints || []).map(mapFeederPoint);
+            const mapReport = (r: any): TaskforceRecord => ({
+                id: r.id,
+                type: 'FEEDER_REPORT' as const,
+                status: r.status,
+                areaName: r.feederPoint?.areaName || r.areaName,
+                locationName: r.feederPoint?.feederPointName || r.feederPoint?.locationDescription,
+                zoneId: r.feederPoint?.zoneId || r.zoneId,
+                wardId: r.feederPoint?.wardId || r.wardId,
+                zoneName: r.feederPoint?.zoneName || r.zoneName,
+                wardName: r.feederPoint?.wardName || r.wardName,
+                createdAt: r.createdAt,
+                assignedEmployeeIds: []
+            });
 
-            const kpi = {
-                pending: pending.length,
-                approved: approved.length,
-                assigned: assigned.length,
-                rejected: 0,
-                actionRequired: 0,
-                total: pending.length + approved.length + assigned.length
-            };
-            setStats(kpi);
+            if (activeTab === 'PENDING') {
+                // Use dedicated /reports/pending for most reliable pending list
+                const [pendingRes, statsRes] = await Promise.all([
+                    TaskforceApi.pendingReports(),
+                    TaskforceApi.getRecords({ page: 1, limit: 1, tab: 'DAILY_REPORTS' })
+                ]);
+                allReports = (pendingRes.reports || []).map(mapReport);
+                if (statsRes.stats) setStats(statsRes.stats);
+            } else {
+                // For other tabs use getRecords, but also fetch DAILY_REPORTS stats for accurate counts
+                const [reportsRes, statsRes] = await Promise.all([
+                    TaskforceApi.getRecords({ page: 1, limit: 200, tab: activeTab }),
+                    TaskforceApi.getRecords({ page: 1, limit: 1, tab: 'DAILY_REPORTS' })
+                ]);
+                allReports = (reportsRes.data || [])
+                    .filter((r: any) => r.type === 'FEEDER_REPORT' || !r.type)
+                    .map(mapReport);
+                if (statsRes.stats) setStats(statsRes.stats);
+            }
 
-            let dataset: TaskforceRecord[] = pending;
-            if (activeTab === 'APPROVED') dataset = approved;
-            if (activeTab === 'ASSIGNED') dataset = assigned;
-
-            const filteredByScope = dataset.filter((r) => {
+            // QC scope filter (frontend guard — backend also enforces scope)
+            const filteredByScope = allReports.filter((r) => {
                 const matchZone = zoneIds.length ? zoneIds.includes(r.zoneId || "") : true;
                 const matchWard = wardIds.length ? wardIds.includes(r.wardId || "") : true;
                 return matchZone && matchWard;
@@ -179,32 +193,42 @@ export default function TaskforceQCDashboard() {
         if (stats) return stats;
         const counts = records.reduce(
             (acc, r) => {
-                if (r.status === 'ASSIGNED') acc.assigned++;
-                else if (r.status === 'APPROVED') acc.approved++;
+                if (r.status === 'APPROVED') acc.approved++;
                 else if (r.status === 'REJECTED') acc.rejected++;
+                else if (r.status === 'ACTION_REQUIRED') acc.actionRequired++;
                 else acc.pending++;
                 return acc;
             },
-            { pending: 0, approved: 0, rejected: 0, assigned: 0 }
+            { pending: 0, approved: 0, rejected: 0, actionRequired: 0 }
         );
-        const total = counts.pending + counts.approved + counts.rejected + counts.assigned;
-        return { ...counts, actionRequired: 0, total };
+        const total = counts.pending + counts.approved + counts.rejected + counts.actionRequired;
+        return { ...counts, total };
     }, [stats, records]);
 
-    async function handleAction(record: TaskforceRecord, action: 'APPROVE' | 'REJECT') {
-        if (!confirm(`Are you sure you want to ${action.toLowerCase()} this item?`)) return;
+    const [qcRemarkText, setQcRemarkText] = useState("");
+
+    async function handleAction(record: TaskforceRecord, action: 'APPROVE' | 'REJECT' | 'ACTION_REQUIRED', remarkOverride?: string) {
+        const remark = remarkOverride !== undefined ? remarkOverride : qcRemarkText;
+        if (action !== 'APPROVE' && !remark.trim()) {
+            alert(`Please enter a remark to mark as ${action.replace('_', ' ').toLowerCase()}.`);
+            return;
+        }
+        if (!confirm(`Are you sure you want to ${action.replace('_', ' ').toLowerCase()} this item?`)) return;
+
+        // QC only handles daily monitoring reports (FEEDER_REPORT).
+        // Register Feeder (FEEDER_POINT) approvals are handled by City Admin only.
+        if (record.type !== 'FEEDER_REPORT') {
+            alert("QC can only review daily monitoring reports. Register Feeder approvals are handled by City Admin.");
+            return;
+        }
 
         setActionLoading(record.id);
         try {
-            if (record.type === 'FEEDER_POINT') {
-                if (action === 'APPROVE') await TaskforceApi.approveRequest(record.id, { status: "APPROVED" });
-                else await TaskforceApi.rejectRequest(record.id);
-            } else if (record.type === 'FEEDER_REPORT') {
-                if (action === 'APPROVE') await TaskforceApi.approveReport(record.id);
-                else await TaskforceApi.rejectReport(record.id);
-            } else {
-                alert("Unsupported record type for Taskforce QC.");
-            }
+            if (action === 'APPROVE') await TaskforceApi.approveReport(record.id, { remark });
+            else if (action === 'REJECT') await TaskforceApi.rejectReport(record.id, { remark, reason: remark });
+            else await TaskforceApi.actionRequiredReport(record.id, { remark, qcRemark: remark });
+            setSelectedRecord(null);
+            setQcRemarkText("");
             await loadData();
         } catch (err) {
             alert("Action failed: " + (err instanceof ApiError ? err.message : "Unknown error"));
@@ -290,6 +314,7 @@ export default function TaskforceQCDashboard() {
 
     const displayRows = useMemo(() => {
         if (viewTab === 'verification') {
+            // In verification view, show only reports awaiting QC action
             return records.filter(r => r.status === 'PENDING_QC' || r.status === 'PENDING' || r.status === 'SUBMITTED');
         }
         return records;
@@ -318,6 +343,7 @@ export default function TaskforceQCDashboard() {
             onView={() => setSelectedRecord(r)}
             onApprove={() => handleAction(r, 'APPROVE')}
             onReject={() => handleAction(r, 'REJECT')}
+            onActionRequired={() => setSelectedRecord(r)}
             onAssign={(empId) => handleAssign(r, empId)}
             assignOptions={supervisors}
             assignValue={assignSelection[r.id] || ""}
@@ -369,11 +395,11 @@ export default function TaskforceQCDashboard() {
 
                 {viewTab !== 'supervisors' && (
                     <div className="stats-row">
-                        <StatsCard label="Pending Review" value={derivedStats.pending || 0} sub="Feeder Points" color="#d97706" />
-                        <StatsCard label="Approved" value={derivedStats.approved || 0} sub="Feeder Points" color="#16a34a" />
-                        <StatsCard label="Rejected" value={derivedStats.rejected || 0} sub="Feeder Points" color="#ef4444" />
-                        <StatsCard label="Assigned" value={derivedStats.assigned || 0} sub="Eliminated Feeder Point" color="#6366f1" />
-                        <StatsCard label="Total In Scope" value={derivedStats.total || 0} sub="Partially Eliminated" color="#0f172a" />
+                        <StatsCard label="Pending Review" value={derivedStats.pending || 0} sub="Daily Reports" color="#d97706" />
+                        <StatsCard label="Approved" value={derivedStats.approved || 0} sub="Daily Reports" color="#16a34a" />
+                        <StatsCard label="Action Required" value={(derivedStats as any).actionRequired || 0} sub="Sent to AO" color="#f59e0b" />
+                        <StatsCard label="Rejected" value={derivedStats.rejected || 0} sub="Daily Reports" color="#ef4444" />
+                        <StatsCard label="Total In Scope" value={derivedStats.total || 0} sub="All Reports" color="#0f172a" />
                     </div>
                 )}
             </section>
@@ -477,17 +503,18 @@ export default function TaskforceQCDashboard() {
                 <section className="card card-spacious">
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <h2 className="text-lg">Records Review</h2>
-                            <p className="muted text-sm mb-0">Feeder points and reports within your scope.</p>
+                            <h2 className="text-lg">Daily Reports Review</h2>
+                            <p className="muted text-sm mb-0">Daily monitoring reports within your QC scope. Register Feeder approvals are handled by City Admin.</p>
                         </div>
                         <FilterTabs
                             tabs={[
                                 { id: 'PENDING', label: 'Pending' },
                                 { id: 'APPROVED', label: 'Approved' },
-                                { id: 'ASSIGNED', label: 'Assigned' }
+                                { id: 'REJECTED', label: 'Rejected' },
+                                { id: 'ACTION_REQUIRED', label: 'Action Req.' }
                             ]}
                             activeTab={activeTab}
-                            onChange={(id) => setActiveTab(id)}
+                            onChange={(id) => setActiveTab(id as any)}
                         />
                     </div>
 
@@ -523,40 +550,90 @@ export default function TaskforceQCDashboard() {
                 </section>
             )}
 
-            {viewTab === 'verification' && selectedRecord && (
-                <section className="card mt-6" style={{ borderLeft: '4px solid #1d4ed8' }}>
-                    <div className="flex justify-between items-start mb-3">
-                        <div>
-                            <p className="muted text-xs">Selected Record</p>
-                            <h3 className="text-lg font-semibold mb-1">
-                                {selectedRecord.type === 'FEEDER_POINT' ? 'Feeder Point' : 'Feeder Report'}
-                            </h3>
-                            <p className="muted text-sm mb-0">{selectedRecord.areaName || selectedRecord.locationName || '—'}</p>
+            {selectedRecord && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                }}>
+                    <div style={{
+                        backgroundColor: 'white', borderRadius: 16,
+                        width: '90%', maxWidth: 680, maxHeight: '90vh',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        overflow: 'hidden', display: 'flex', flexDirection: 'column'
+                    }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+                            <div>
+                                <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>
+                                    Daily Monitoring Report
+                                </span>
+                                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                                    {selectedRecord.areaName || selectedRecord.locationName || 'Report'}
+                                </h3>
+                            </div>
+                            <button onClick={() => { setSelectedRecord(null); setQcRemarkText(""); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: '#94a3b8' }}>✕</button>
                         </div>
-                        <button className="btn btn-sm" onClick={() => setSelectedRecord(null)}>×</button>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                        <InfoItem label="Zone" value={selectedRecord.zoneName || '—'} />
-                        <InfoItem label="Ward" value={selectedRecord.wardName || '—'} />
-                        <InfoItem label="Status" value={<StatusBadge status={selectedRecord.status} />} />
-                        <InfoItem
-                            label="Submitted"
-                            value={`${new Date(selectedRecord.createdAt).toLocaleDateString()} ${new Date(selectedRecord.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-                        />
-                    </div>
+                        <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, background: '#f1f5f9', padding: 16, borderRadius: 10, marginBottom: 20 }}>
+                                <InfoItem label="Zone / Ward" value={`${selectedRecord.zoneName || '—'} / ${selectedRecord.wardName || '—'}`} />
+                                <InfoItem label="Status" value={<StatusBadge status={selectedRecord.status} />} />
+                                <InfoItem label="Submitted At" value={`${new Date(selectedRecord.createdAt).toLocaleDateString()} ${new Date(selectedRecord.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`} />
+                                <InfoItem label="Record ID" value={<span style={{ fontFamily: 'monospace', fontSize: 12 }}>{selectedRecord.id.slice(0, 12)}...</span>} />
+                            </div>
 
-                    <ActionButtons
-                        status={selectedRecord.status}
-                        onApprove={() => handleAction(selectedRecord, 'APPROVE')}
-                        onReject={() => handleAction(selectedRecord, 'REJECT')}
-                        onAssign={(empId) => handleAssign(selectedRecord, empId)}
-                        assignOptions={supervisors}
-                        assignValue={assignSelection[selectedRecord.id] || ""}
-                        onAssignChange={(val) => setAssignSelection(prev => ({ ...prev, [selectedRecord.id]: val }))}
-                        loading={actionLoading === selectedRecord.id}
-                    />
-                </section>
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                                    QC Review Remark / Reason
+                                </label>
+                                <textarea
+                                    style={{
+                                        width: '100%', height: 80, padding: 12, borderRadius: 8,
+                                        border: '1px solid #cbd5e1', fontSize: 13, outline: 'none'
+                                    }}
+                                    value={qcRemarkText}
+                                    onChange={(e) => setQcRemarkText(e.target.value)}
+                                    placeholder="Enter review remarks (Mandatory for Reject or Action Required)..."
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                            <button
+                                className="btn btn-ghost"
+                                onClick={() => { setSelectedRecord(null); setQcRemarkText(""); }}
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                className="btn btn-success"
+                                disabled={actionLoading === selectedRecord.id}
+                                onClick={() => handleAction(selectedRecord, 'APPROVE')}
+                            >
+                                ✓ Accept / Approve
+                            </button>
+
+                            <button
+                                className="btn btn-warning"
+                                disabled={actionLoading === selectedRecord.id}
+                                onClick={() => handleAction(selectedRecord, 'ACTION_REQUIRED')}
+                                style={{ background: '#f59e0b', color: 'white', border: 'none' }}
+                            >
+                                ⚠️ Action Required
+                            </button>
+
+                            <button
+                                className="btn btn-error"
+                                disabled={actionLoading === selectedRecord.id}
+                                onClick={() => handleAction(selectedRecord, 'REJECT')}
+                                style={{ background: '#ef4444', color: 'white', border: 'none' }}
+                            >
+                                ✕ Reject
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
@@ -571,19 +648,6 @@ function InfoItem({ label, value }: { label: string; value: ReactNode }) {
     );
 }
 
-function mapFeederPoint(p: any): TaskforceRecord {
-    return {
-        id: p.id,
-        type: 'FEEDER_POINT',
-        status: p.status,
-        areaName: p.areaName,
-        locationName: p.feederPointName || p.locationDescription,
-        zoneId: p.zoneId,
-        wardId: p.wardId,
-        zoneName: p.zoneName,
-        wardName: p.wardName,
-        createdAt: p.updatedAt || p.createdAt,
-        assignedEmployeeIds: p.assignedEmployeeIds || []
-    };
-}
+// Note: mapFeederPoint removed — QC Dashboard only handles FEEDER_REPORT records.
+// FEEDER_POINT registrations are handled by City Admin (tasks/page.tsx).
 

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { ModuleGuard } from "@components/Guards";
-import { TaskforceApi, ApiError, CityApi } from "@lib/apiClient";
+import { TaskforceApi, ApiError, CityApi, EmployeesApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
+import AssignmentsTab from "../AssignmentsTab";
 
 type Case = {
   id: string;
@@ -16,10 +17,22 @@ type Case = {
 
 export default function TaskforceTasksPage() {
   const [cases, setCases] = useState<Case[]>([]);
-  const [records, setRecords] = useState<any[]>([]); // New records state
+  const [records, setRecords] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Tabbed view state for City Admin Dashboard
+  const [activeTab, setActiveTab] = useState<'REGISTRATIONS' | 'REPORTS' | 'FEEDER_POINTS' | 'CASES' | 'ASSIGNMENTS'>('REGISTRATIONS');
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [pendingReports, setPendingReports] = useState<any[]>([]);
+  const [allFeederPoints, setAllFeederPoints] = useState<any[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Assignment state
+  const [supervisors, setSupervisors] = useState<{ id: string; name: string; email: string; role?: string }[]>([]);
+  const [assignSelection, setAssignSelection] = useState<Record<string, string>>({});
+  const [assignModal, setAssignModal] = useState<{ fp: any } | null>(null);
 
   // City Filter State
   const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
@@ -34,7 +47,11 @@ export default function TaskforceTasksPage() {
     actionTaken: 0,
     systemPerformance: 0,
     eliminated: 0,
-    inProgress: 0
+    inProgress: 0,
+    pendingRequests: 0,
+    assignedPoints: 0,
+    unassignedPoints: 0,
+    registeredStaff: 0
   });
 
   const [title, setTitle] = useState("");
@@ -44,12 +61,10 @@ export default function TaskforceTasksPage() {
   const [saving, setSaving] = useState(false);
 
   const [activityByCase, setActivityByCase] = useState<Record<string, string>>({});
-  const [assigneeByCase, setAssigneeByCase] = useState<Record<string, string>>({});
   const [updatingCaseId, setUpdatingCaseId] = useState<string | null>(null);
 
   const loadCases = async () => {
     try {
-      setLoading(true);
       const data = await TaskforceApi.listCases(selectedCity);
       setCases(data.cases || []);
       setError("");
@@ -59,14 +74,10 @@ export default function TaskforceTasksPage() {
       } else {
         setError("Failed to load tasks.");
       }
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Determine role for UI switching
   const { user } = useAuth();
-
   const isSuperAdmin = user?.roles?.includes("HMS_SUPER_ADMIN");
   const isCityAdmin = user?.roles?.includes("CITY_ADMIN") || isSuperAdmin;
 
@@ -79,7 +90,6 @@ export default function TaskforceTasksPage() {
           setSelectedCity(cities[0].id);
         }
       } else if (user?.cityId) {
-        // For regular City Admin, auto-select their city
         setCities([{ id: user.cityId, name: user.cityName || "My City" }]);
         setSelectedCity(user.cityId);
       }
@@ -88,43 +98,67 @@ export default function TaskforceTasksPage() {
     }
   };
 
-  const loadMetrics = async () => {
-    if (!selectedCity) return;
+  const loadAdminData = async () => {
     try {
-      // Fetch stats using getRecords which returns detailed stats
-      const { stats, data } = await TaskforceApi.getRecords({ cityId: selectedCity });
-      setRecords(data || []); // Store the records
+      setLoading(true);
 
-      // Calculate derived metrics
-      // "Action Taken" - assume this includes any actioned items (approved + rejected + action required resolved?)
-      // For now, let's assume it's approved + rejected
-      const actionTaken = (stats.approved || 0) + (stats.rejected || 0);
+      // Use feederRequests() which returns ALL feeder points for City Admin in one call
+      // This is the most reliable endpoint — no extra role guards
+      const [allFpRes, repRes, recRes, empRes] = await Promise.all([
+        TaskforceApi.feederRequests().catch((err) => {
+          console.error('[loadAdminData] feederRequests() failed:', err);
+          return { feederPoints: [] };
+        }),
+        TaskforceApi.pendingReports().catch((err) => {
+          console.error('[loadAdminData] pendingReports() failed:', err);
+          return { reports: [] };
+        }),
+        TaskforceApi.getRecords({ cityId: selectedCity, tab: 'PENDING', limit: 1 }).catch((err) => {
+          console.error('[loadAdminData] getRecords() failed:', err);
+          return { stats: {}, data: [] };
+        }),
+        EmployeesApi.list('TASKFORCE').catch((err) => {
+          console.error('[loadAdminData] EmployeesApi.list() failed:', err);
+          return { employees: [] };
+        })
+      ]);
 
-      // "System Performance" - example calculation: approved / total * 100
-      const total = stats.total || 1; // avoid div by zero
-      const performance = Math.round(((stats.approved || 0) / total) * 100);
+      setSupervisors((empRes.employees || []).map((e: any) => ({ id: e.id, name: e.name, email: e.email || '', role: e.role || '' })));
 
-      // "Eliminated Feeder Points" - assume these are the approved ones (cleared)
-      const eliminated = stats.approved || 0;
+      const allFPs: any[] = allFpRes.feederPoints || [];
+      const reports: any[] = repRes.reports || [];
+      const stats = (recRes as any).stats || {};
 
-      // "In Progress" - surveys running on ground, calculated based on eliminated feeder points
-      // User said: "calculated based on eliminated feeder points". 
-      // Maybe Total - Eliminated? Or Pending?
-      // Let's use Pending for "In Progress" as it represents active work not yet approved/eliminated.
-      const inProgress = stats.pending || 0;
+      // Split feeder points by status
+      const pendingFPs = allFPs.filter((fp: any) => fp.status === 'PENDING_QC');
+      const approvedUnassigned = allFPs.filter((fp: any) => fp.status === 'APPROVED' && (!fp.assignedEmployeeIds || fp.assignedEmployeeIds.length === 0));
+      const approvedAssigned = allFPs.filter((fp: any) => fp.status === 'APPROVED' && fp.assignedEmployeeIds && fp.assignedEmployeeIds.length > 0);
+
+      console.log('[loadAdminData] allFPs:', allFPs.length, '| pending:', pendingFPs.length, '| approvedUnassigned:', approvedUnassigned.length, '| approvedAssigned:', approvedAssigned.length);
+
+      setPendingRequests(pendingFPs);
+      setPendingReports(reports);
+      setAllFeederPoints(allFPs);
+      setRecords((recRes as any).data || []);
 
       setMetrics({
-        total: stats.total || 0,
+        total: allFPs.length,
+        pendingRequests: pendingFPs.length,
+        assignedPoints: approvedAssigned.length,
+        unassignedPoints: approvedUnassigned.length,
         approved: stats.approved || 0,
         rejected: stats.rejected || 0,
         actionRequired: stats.actionRequired || 0,
-        actionTaken,
-        systemPerformance: performance,
-        eliminated,
-        inProgress
+        actionTaken: 0,
+        systemPerformance: 0,
+        eliminated: 0,
+        inProgress: 0,
+        registeredStaff: (empRes.employees || []).length
       });
     } catch (err) {
-      console.error("Failed to load metrics", err);
+      console.error('[loadAdminData] Unexpected error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -134,10 +168,94 @@ export default function TaskforceTasksPage() {
 
   useEffect(() => {
     if (selectedCity) {
-      loadCases(); // original logic
-      loadMetrics(); // new metrics
+      loadCases();
+      loadAdminData();
     }
   }, [selectedCity]);
+
+  const handleApproveRequest = async (id: string) => {
+    if (!confirm("Approve this CTU/GVP feeder point registration request?")) return;
+    setActionLoading(id);
+    try {
+      await TaskforceApi.approveRequest(id, { status: "APPROVED" });
+      await loadAdminData();
+    } catch (err: any) {
+      alert("Approve failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectRequest = async (id: string) => {
+    if (!confirm("Reject this CTU/GVP feeder point registration request?")) return;
+    setActionLoading(id);
+    try {
+      await TaskforceApi.rejectRequest(id);
+      await loadAdminData();
+    } catch (err: any) {
+      alert("Reject failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApproveReport = async (id: string) => {
+    if (!confirm("Approve this daily monitoring inspection report?")) return;
+    setActionLoading(id);
+    try {
+      await TaskforceApi.approveReport(id);
+      await loadAdminData();
+    } catch (err: any) {
+      alert("Approve report failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectReport = async (id: string) => {
+    if (!confirm("Reject this daily monitoring inspection report?")) return;
+    setActionLoading(id);
+    try {
+      await TaskforceApi.rejectReport(id);
+      await loadAdminData();
+    } catch (err: any) {
+      alert("Reject report failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleActionRequiredReport = async (id: string) => {
+    if (!confirm("Flag this report as Action Required?")) return;
+    setActionLoading(id);
+    try {
+      await TaskforceApi.actionRequiredReport(id);
+      await loadAdminData();
+    } catch (err: any) {
+      alert("Action required failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+
+  const handleAssignFeeder = async () => {
+    if (!assignModal) return;
+    const employeeId = assignSelection[assignModal.fp.id];
+    if (!employeeId) { alert('Please select a Taskforce member to assign.'); return; }
+    if (!confirm('Assign this Taskforce member to the feeder point?')) return;
+    setActionLoading(assignModal.fp.id);
+    try {
+      await TaskforceApi.assignFeederPoint(assignModal.fp.id, employeeId);
+      setAssignSelection(prev => ({ ...prev, [assignModal.fp.id]: '' }));
+      setAssignModal(null);
+      await loadAdminData();
+    } catch (err: any) {
+      alert('Assign failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const createCase = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,93 +306,111 @@ export default function TaskforceTasksPage() {
     }
   };
 
-
-  // Premium Dashboard for City Admin
   if (isCityAdmin) {
-
-
-
-
     return (
       <ModuleGuard module="TASKFORCE" roles={["CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
         <div style={{ animation: 'fadeIn 0.5s ease-out', paddingBottom: 40 }}>
           <style jsx>{`
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                .stats-compact-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 16px;
-                }
-                .section-divider {
-                    height: 1px;
-                    background: #e2e8f0;
-                }
-                .card-header-flex {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 20px;
-                }
-                .section-title {
-                    font-size: 16px;
-                    font-weight: 800;
-                    margin: 0;
-                    color: #0f172a;
-                }
-                .compact-card {
-                    padding: 24px;
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 12px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                }
-                .modern-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .modern-table th {
-                    text-align: left;
-                    font-size: 11px;
-                    color: #64748b;
-                    padding: 12px 16px;
-                    border-bottom: 2px solid #f1f5f9;
-                    font-weight: 800;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-                .modern-table td {
-                    padding: 16px 16px;
-                    font-size: 14px;
-                    border-bottom: 1px solid #f1f5f9;
-                    vertical-align: middle;
-                }
-                .tab-btn {
-                    padding: 6px 16px;
-                    border-radius: 8px;
-                    font-size: 13px;
-                    font-weight: 700;
-                    background: transparent;
-                    color: #64748b;
-                    border: none;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                .tab-btn:hover {
-                    color: #0f172a;
-                    background: #f1f5f9;
-                }
-                .tab-btn.active {
-                    background: #eff6ff;
-                    color: #2563eb;
-                    box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
-                }
-            `}</style>
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            .card-header-flex {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 20px;
+            }
+            .section-title {
+              font-size: 16px;
+              font-weight: 800;
+              margin: 0;
+              color: #0f172a;
+            }
+            .compact-card {
+              padding: 24px;
+              background: white;
+              border: 1px solid #e2e8f0;
+              border-radius: 12px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+            .modern-table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .modern-table th {
+              text-align: left;
+              font-size: 11px;
+              color: #64748b;
+              padding: 12px 16px;
+              border-bottom: 2px solid #f1f5f9;
+              font-weight: 800;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+            .modern-table td {
+              padding: 14px 16px;
+              font-size: 13px;
+              border-bottom: 1px solid #f1f5f9;
+              vertical-align: middle;
+            }
+            .tab-btn {
+              padding: 8px 16px;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 700;
+              background: transparent;
+              color: #64748b;
+              border: none;
+              cursor: pointer;
+              transition: all 0.2s;
+            }
+            .tab-btn:hover {
+              color: #0f172a;
+              background: #f1f5f9;
+            }
+            .tab-btn.active {
+              background: #eff6ff;
+              color: #2563eb;
+              box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+            }
+            .btn-action-approve {
+              background: #10b981;
+              color: white;
+              border: none;
+              padding: 6px 12px;
+              border-radius: 6px;
+              font-size: 12px;
+              font-weight: 700;
+              cursor: pointer;
+            }
+            .btn-action-approve:hover { background: #059669; }
+            .btn-action-reject {
+              background: #ef4444;
+              color: white;
+              border: none;
+              padding: 6px 12px;
+              border-radius: 6px;
+              font-size: 12px;
+              font-weight: 700;
+              cursor: pointer;
+            }
+            .btn-action-reject:hover { background: #dc2626; }
+            .btn-action-warn {
+              background: #f59e0b;
+              color: white;
+              border: none;
+              padding: 6px 12px;
+              border-radius: 6px;
+              font-size: 12px;
+              font-weight: 700;
+              cursor: pointer;
+            }
+            .btn-action-warn:hover { background: #d97706; }
+          `}</style>
 
           <header style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <p style={{ fontSize: 13, textTransform: 'uppercase', color: '#64748b', fontWeight: 600, letterSpacing: '0.05em', marginBottom: 8 }}>Module · CTU / GVP Transformation</p>
-              <h1 style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>Task Management</h1>
-              <p style={{ color: '#64748b', marginTop: 8 }}>Track transformation tasks, assignments, and resolution status.</p>
+              <h1 style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>Task & Monitoring Management</h1>
+              <p style={{ color: '#64748b', marginTop: 8 }}>Track CTU/GVP feeder points, daily monitoring reports, and registration requests.</p>
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               {isSuperAdmin ? (
@@ -317,68 +453,357 @@ export default function TaskforceTasksPage() {
                   {cities.find(c => c.id === selectedCity)?.name || user?.cityName || "My City"}
                 </div>
               )}
-
-              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} style={{ borderRadius: 8, fontWeight: 700 }}>
-                + New Task
-              </button>
             </div>
           </header>
 
-          {/* New Expanded Metrics Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-            <StatCard label="Total Feeder Points" value={metrics.total} sub="Identified Points" color="#3b82f6" />
-            <StatCard label="In Progress" value={metrics.inProgress} sub="Surveys Running" color="#8b5cf6" />
-            <StatCard label="Action Required" value={metrics.actionRequired} sub="Needs Attention" color="#f59e0b" />
-            <StatCard label="QC Approved Reports" value={metrics.approved} sub="Verified Clean" color="#10b981" />
+            <StatCard label="Total Feeder Points" value={metrics.total || 0} sub="Identified Points" color="#3b82f6" />
+            <StatCard label="Pending Requests" value={pendingRequests.length} sub="Registration Queue" color="#8b5cf6" />
+            <StatCard label="Assigned Points" value={metrics.assignedPoints || 0} sub="Active Field Coverage" color="#6366f1" />
+            <StatCard label="Unassigned Points" value={metrics.unassignedPoints || 0} sub="Awaiting Assignment" color="#0ea5e9" />
 
-            <StatCard label="QC Rejected Reports" value={metrics.rejected} sub="Issues Found" color="#ef4444" />
-            <StatCard label="Action Taken" value={metrics.actionTaken} sub="Resolved Items" color="#0ea5e9" />
-            <StatCard label="Eliminated Points" value={metrics.eliminated} sub="Permanent Fix" color="#6366f1" />
-            <StatCard label="System Performance" value={`${metrics.systemPerformance}%`} sub="Efficiency Score" color="#f43f5e" />
+            <StatCard label="QC Approved Reports" value={metrics.approved || 0} sub="Verified Clean" color="#10b981" />
+            <StatCard label="Action Required" value={metrics.actionRequired || 0} sub="Needs Attention" color="#f59e0b" />
+            <StatCard label="QC Rejected Reports" value={metrics.rejected || 0} sub="Issues Found" color="#ef4444" />
+            <StatCard label="Registered Staff" value={metrics.registeredStaff || 0} sub="Active Taskforce" color="#84cc16" />
           </div>
 
           <div className="compact-card">
-            <div className="card-header-flex">
-              <h2 className="section-title">Recent Feeder Points</h2>
+            <div className="card-header-flex" style={{ flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
+              <h2 className="section-title">CTU / GVP Dashboard</h2>
+              <div style={{ display: 'flex', gap: 8, background: '#f8fafc', padding: 4, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                <button className={`tab-btn ${activeTab === 'REGISTRATIONS' ? 'active' : ''}`} onClick={() => setActiveTab('REGISTRATIONS')}>
+                  Registration Requests ({pendingRequests.length})
+                </button>
+                <button className={`tab-btn ${activeTab === 'REPORTS' ? 'active' : ''}`} onClick={() => setActiveTab('REPORTS')}>
+                  Daily Inspection Reports ({pendingReports.length})
+                </button>
+                <button className={`tab-btn ${activeTab === 'FEEDER_POINTS' ? 'active' : ''}`} onClick={() => setActiveTab('FEEDER_POINTS')}>
+                  All Feeder Points ({allFeederPoints.length})
+                </button>
+                <button className={`tab-btn ${activeTab === 'ASSIGNMENTS' ? 'active' : ''}`} onClick={() => setActiveTab('ASSIGNMENTS')}>
+                  Staff Assignments
+                </button>
+              </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th>Point ID</th>
-                    <th>Location</th>
-                    <th>Status</th>
-                    <th>Update Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{r.name || r.id}</div>
-                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, fontFamily: 'monospace' }}>{r.id.slice(0, 8)}...</div>
-                      </td>
-                      <td>
-                        {r.geoNodeId || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Unknown</span>}
-                      </td>
-                      <td>
-                        <StatusBadge status={r.status} />
-                      </td>
-                      <td style={{ color: '#64748b', fontSize: 13 }}>
-                        {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : '-'}
-                      </td>
+            {activeTab === 'REGISTRATIONS' && (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Feeder Point Name</th>
+                      <th>Area / Location</th>
+                      <th>Zone / Ward</th>
+                      <th>Requested By</th>
+                      <th>Households / Vehicle</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
-                  ))}
-                  {records.length === 0 && (
-                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>No records found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {pendingRequests.map((r) => (
+                      <tr key={r.id}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{r.feederPointName || r.areaName || r.id}</div>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, fontFamily: 'monospace' }}>{r.id.slice(0, 8)}...</div>
+                        </td>
+                        <td>
+                          <div>{r.areaName || r.locationDescription || 'N/A'}</div>
+                          {r.landmark && <div style={{ fontSize: 12, color: '#64748b' }}>Near: {r.landmark}</div>}
+                        </td>
+                        <td>
+                          <div>{r.zoneName || 'Zone N/A'}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{r.wardName || 'Ward N/A'}</div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{r.requestedBy?.name || 'Taskforce Member'}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{r.requestedBy?.email || '-'}</div>
+                        </td>
+                        <td>
+                          <div>{r.householdsCount ?? 0} households</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{r.vehicleType || 'HANDCART'}</div>
+                        </td>
+                        <td>
+                          <StatusBadge status={r.status} />
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <button className="btn-action-approve" disabled={actionLoading === r.id} onClick={() => handleApproveRequest(r.id)}>
+                              {actionLoading === r.id ? "..." : "Approve"}
+                            </button>
+                            <button className="btn-action-reject" disabled={actionLoading === r.id} onClick={() => handleRejectRequest(r.id)}>
+                              {actionLoading === r.id ? "..." : "Reject"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {pendingRequests.length === 0 && (
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>No pending CTU/GVP registration requests</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeTab === 'REPORTS' && (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Feeder Point</th>
+                      <th>Submitted By</th>
+                      <th>Location Description</th>
+                      <th>Distance</th>
+                      <th>Status</th>
+                      <th>Submitted Date</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingReports.map((rep) => (
+                      <tr key={rep.id}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{rep.feederPoint?.feederPointName || rep.feederPoint?.areaName || rep.feederPointId}</div>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, fontFamily: 'monospace' }}>Report #{rep.id.slice(0, 8)}...</div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{rep.submittedBy?.name || 'Taskforce Inspector'}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{rep.submittedBy?.email || '-'}</div>
+                        </td>
+                        <td>{rep.feederPoint?.locationDescription || rep.feederPoint?.areaName || 'N/A'}</td>
+                        <td>{rep.distanceMeters ? `${Math.round(rep.distanceMeters)} m` : '-'}</td>
+                        <td>
+                          <StatusBadge status={rep.status} />
+                        </td>
+                        <td style={{ color: '#64748b', fontSize: 13 }}>
+                          {rep.createdAt ? new Date(rep.createdAt).toLocaleString() : '-'}
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button className="btn-action-approve" disabled={actionLoading === rep.id} onClick={() => handleApproveReport(rep.id)}>
+                              {actionLoading === rep.id ? "..." : "Approve"}
+                            </button>
+                            <button className="btn-action-warn" disabled={actionLoading === rep.id} onClick={() => handleActionRequiredReport(rep.id)}>
+                              Action Req
+                            </button>
+                            <button className="btn-action-reject" disabled={actionLoading === rep.id} onClick={() => handleRejectReport(rep.id)}>
+                              Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {pendingReports.length === 0 && (
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>No pending daily monitoring inspection reports</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeTab === 'FEEDER_POINTS' && (
+              <div style={{ overflowX: 'auto' }}>
+                {supervisors.length === 0 && (
+                  <div style={{ padding: '8px 16px', marginBottom: 12, background: '#fef9c3', border: '1px solid #fde047', borderRadius: 8, fontSize: 12, color: '#854d0e' }}>
+                    ⚠️ No Taskforce supervisors found. Register supervisors first to enable assignment.
+                  </div>
+                )}
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Point Name / ID</th>
+                      <th>Area Name</th>
+                      <th>Zone / Ward</th>
+                      <th>Requested By</th>
+                      <th>Assigned Member</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allFeederPoints.map((fp) => {
+                      const assignedMember = (fp.assignedEmployeeIds?.length ?? 0) > 0
+                        ? supervisors.find((s: any) => fp.assignedEmployeeIds.includes(s.id))
+                        : null;
+                      const displayStatus = (fp.assignedEmployeeIds?.length ?? 0) > 0 && fp.status === 'APPROVED' ? 'ASSIGNED' : fp.status;
+                      return (
+                        <tr key={fp.id}>
+                          <td>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{fp.feederPointName || fp.areaName || fp.id}</div>
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, fontFamily: 'monospace' }}>{fp.id.slice(0, 8)}...</div>
+                          </td>
+                          <td>{fp.areaName || fp.locationDescription || '-'}</td>
+                          <td>
+                            <div>{fp.zoneName || 'Zone N/A'}</div>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>{fp.wardName || 'Ward N/A'}</div>
+                          </td>
+                          <td><div>{fp.requestedBy?.name || '-'}</div></td>
+                          <td>
+                            {assignedMember ? (
+                              <div>
+                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{assignedMember.name}</div>
+                                <div style={{ fontSize: 11, color: '#64748b' }}>{assignedMember.email}</div>
+                              </div>
+                            ) : (fp.assignedEmployeeIds?.length ?? 0) > 0 ? (
+                              <span style={{ fontSize: 12, color: '#64748b' }}>{fp.assignedEmployeeIds.length} assigned</span>
+                            ) : (
+                              <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Not assigned</span>
+                            )}
+                          </td>
+                          <td><StatusBadge status={displayStatus} /></td>
+                          <td style={{ textAlign: 'right' }}>
+                            {fp.status === 'APPROVED' ? (
+                              <button
+                                className="btn-action-approve"
+                                onClick={() => { setAssignModal({ fp }); setAssignSelection(prev => ({ ...prev, [fp.id]: '' })); }}
+                                style={{ whiteSpace: 'nowrap', fontSize: 12 }}
+                              >
+                                {(fp.assignedEmployeeIds?.length ?? 0) > 0 ? '🔄 Reassign' : '+ Assign'}
+                              </button>
+                            ) : fp.status === 'PENDING_QC' ? (
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                <button className="btn-action-approve" disabled={actionLoading === fp.id} onClick={() => handleApproveRequest(fp.id)} style={{ fontSize: 12 }}>
+                                  {actionLoading === fp.id ? '...' : 'Approve'}
+                                </button>
+                                <button className="btn-action-reject" disabled={actionLoading === fp.id} onClick={() => handleRejectRequest(fp.id)} style={{ fontSize: 12 }}>
+                                  {actionLoading === fp.id ? '...' : 'Reject'}
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {allFeederPoints.length === 0 && (
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>No feeder points found. Approved points will appear here.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeTab === 'CASES' && (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Task Title</th>
+                      <th>Status</th>
+                      <th>Assignee</th>
+                      <th>Geo Node</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cases.map((c) => (
+                      <tr key={c.id}>
+                        <td>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.title}</div>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, fontFamily: 'monospace' }}>{c.id.slice(0, 8)}...</div>
+                        </td>
+                        <td>
+                          <StatusBadge status={c.status} />
+                        </td>
+                        <td>{c.assignedTo || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Unassigned</span>}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{c.geoNodeId || '-'}</td>
+                        <td>
+                          <select
+                            value={c.status}
+                            onChange={(e) => updateStatus(c.id, e.target.value)}
+                            disabled={updatingCaseId === c.id}
+                            style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 12 }}
+                          >
+                            <option value="OPEN">OPEN</option>
+                            <option value="IN_PROGRESS">IN_PROGRESS</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                    {cases.length === 0 && (
+                      <tr><td colSpan={5} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>No tasks found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeTab === 'ASSIGNMENTS' && (
+              <AssignmentsTab />
+            )}
           </div>
 
-          {/* Reuse existing modal logic */}
+          {assignModal && (
+            <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setAssignModal(null)}>
+              <div className="modal" style={{ maxWidth: 460 }}>
+                <div className="modal-header mb-4">
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                    {(assignModal.fp.assignedEmployeeIds?.length ?? 0) > 0 ? '🔄 Reassign Taskforce Member' : '+ Assign Taskforce Member'}
+                  </h3>
+                  <button className="btn btn-ghost btn-sm" type="button" onClick={() => setAssignModal(null)}>✕</button>
+                </div>
+                <div style={{ display: 'grid', gap: 16, padding: '0 0 8px' }}>
+                  <div style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 16px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 15, marginBottom: 4 }}>
+                      {assignModal.fp.feederPointName || assignModal.fp.areaName}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>
+                      {assignModal.fp.zoneName || 'Zone N/A'} → {assignModal.fp.wardName || 'Ward N/A'}
+                    </div>
+                  </div>
+
+                  {(assignModal.fp.assignedEmployeeIds?.length ?? 0) > 0 && (() => {
+                    const curr = supervisors.find((s: any) => assignModal.fp.assignedEmployeeIds.includes(s.id));
+                    return curr ? (
+                      <div style={{ background: '#eff6ff', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                        Currently assigned: <strong>{curr.name}</strong> ({curr.email})
+                      </div>
+                    ) : null;
+                  })()}
+
+                  <div className="form-field">
+                    <label style={{ fontWeight: 600, fontSize: 13, color: '#374151', display: 'block', marginBottom: 6 }}>
+                      Select Taskforce Member *
+                    </label>
+                    {supervisors.length === 0 ? (
+                      <div style={{ color: '#dc2626', fontSize: 13 }}>No supervisors registered in TASKFORCE module.</div>
+                    ) : (
+                      <select
+                        className="input"
+                        value={assignSelection[assignModal.fp.id] || ''}
+                        onChange={(e) => setAssignSelection(prev => ({ ...prev, [assignModal.fp.id]: e.target.value }))}
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">-- Select a member --</option>
+                        {supervisors.map((s: any) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} {s.email ? `(${s.email})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+                    <button className="btn btn-ghost" onClick={() => setAssignModal(null)}>Cancel</button>
+                    <button
+                      className="btn btn-primary"
+                      disabled={!assignSelection[assignModal.fp.id] || actionLoading === assignModal.fp.id}
+                      onClick={handleAssignFeeder}
+                      style={{ opacity: (!assignSelection[assignModal.fp.id] || actionLoading === assignModal.fp.id) ? 0.6 : 1 }}
+                    >
+                      {actionLoading === assignModal.fp.id ? 'Assigning...' : 'Confirm Assignment'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showCreateModal && (
             <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && setShowCreateModal(false)}>
               <div className="modal" style={{ maxWidth: 500 }}>
@@ -403,9 +828,7 @@ export default function TaskforceTasksPage() {
                       </div>
                     </div>
                   </div>
-
                   {createStatus && <div className="text-sm mt-4 text-center opacity-70" style={{ color: createStatus.includes('Failed') ? 'var(--danger)' : 'var(--success)' }}>{createStatus}</div>}
-
                   <div className="modal-footer mt-6" style={{ justifyContent: 'flex-end' }}>
                     <button className="btn btn-secondary" type="button" onClick={() => setShowCreateModal(false)}>Cancel</button>
                     <button className="btn btn-primary" type="submit" disabled={saving}>
@@ -416,13 +839,11 @@ export default function TaskforceTasksPage() {
               </div>
             </div>
           )}
-
         </div>
       </ModuleGuard>
     )
   }
 
-  // STANDARD VIEW (Original)
   return (
     <ModuleGuard module="TASKFORCE" roles={["SUPERVISOR", "ACTION_OFFICER", "QC", "CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
       <div className="content">
@@ -432,11 +853,6 @@ export default function TaskforceTasksPage() {
               <p className="eyebrow">Module • CTU / GVP Transformation</p>
               <h1 className="text-2xl font-bold mb-1">Task Management</h1>
               <p className="muted text-sm">Create and track transformation tasks and activities.</p>
-            </div>
-            <div className="section-actions">
-              <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-                + New Task
-              </button>
             </div>
           </div>
         </section>
@@ -469,7 +885,6 @@ export default function TaskforceTasksPage() {
                     <th>Status</th>
                     <th>Assignee</th>
                     <th>Geo Node</th>
-                    <th>Latest Activity</th>
                     <th className="text-right">Actions</th>
                   </tr>
                 </thead>
@@ -481,30 +896,12 @@ export default function TaskforceTasksPage() {
                         <div className="text-xs muted font-mono mt-1 opacity-70">{c.id.slice(0, 8)}...</div>
                       </td>
                       <td>
-                        <span className={`badge ${c.status === 'COMPLETED' ? 'badge-success' :
-                          c.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-warning'
-                          } badge-sm font-bold`}>
-                          {c.status.replace(/_/g, ' ')}
-                        </span>
+                        <StatusBadge status={c.status} />
                       </td>
                       <td className="text-sm">
-                        {c.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-base-300 flex items-center justify-center text-xs font-bold">
-                              {c.assignedTo.charAt(0).toUpperCase()}
-                            </div>
-                            <span>{c.assignedTo}</span>
-                          </div>
-                        ) : <span className="muted italic">Unassigned</span>}
+                        {c.assignedTo || <span className="muted italic">Unassigned</span>}
                       </td>
                       <td className="text-sm font-mono text-xs">{c.geoNodeId || "—"}</td>
-                      <td className="text-sm muted">
-                        {c.activities && c.activities.length > 0 ? (
-                          <span>
-                            {c.activities[0].action} <span className="text-xs opacity-70">• {new Date(c.activities[0].createdAt).toLocaleDateString()}</span>
-                          </span>
-                        ) : "No activity"}
-                      </td>
                       <td className="text-right">
                         <div className="dropdown dropdown-end">
                           <button tabIndex={0} className="btn btn-ghost btn-xs">Options ▼</button>
@@ -609,42 +1006,44 @@ export default function TaskforceTasksPage() {
 
 function StatCard({ label, value, sub, color }: any) {
   return (
-    <div className="stat-card-compact" style={{ borderLeft: `6px solid ${color}`, position: 'relative', overflow: 'hidden', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', borderLeftWidth: 6, borderLeftColor: color }}>
+    <div className="stat-card-compact" style={{ borderLeft: `6px solid ${color}`, position: 'relative', overflow: 'hidden', background: 'white', borderRadius: 10, border: '1px solid #e2e8f0', borderLeftWidth: 6, borderLeftColor: color }}>
       <div className="stat-label">{label}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div className="stat-value" style={{ color: '#1e293b' }}>{value}</div>
+        <div className="stat-value" style={{ color: '#0f172a' }}>{value}</div>
       </div>
       <div className="stat-sub">{sub}</div>
       <style jsx>{`
-                .stat-card-compact {
-                    padding: 16px 20px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                }
-                .stat-card-compact:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
-                }
-                .stat-label {
-                    font-size: 10px;
-                    font-weight: 900;
-                    color: #94a3b8;
-                    letter-spacing: 0.1em;
-                    text-transform: uppercase;
-                }
-                .stat-value {
-                    font-size: 28px;
-                    font-weight: 900;
-                    letter-spacing: -0.02em;
-                }
-                .stat-sub {
-                    font-size: 12px;
-                    color: #64748b;
-                    font-weight: 500;
-                }
-            `}</style>
+        .stat-card-compact {
+          padding: 16px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card-compact:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
+        }
+        .stat-label {
+          font-size: 11px;
+          font-weight: 700;
+          color: #64748b;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+          line-height: 1.3;
+        }
+        .stat-value {
+          font-size: 26px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+        }
+        .stat-sub {
+          font-size: 12px;
+          color: #94a3b8;
+          font-weight: 500;
+        }
+      `}</style>
     </div>
   );
 }
@@ -652,7 +1051,12 @@ function StatCard({ label, value, sub, color }: any) {
 function StatusBadge({ status }: { status: string }) {
   const config: any = {
     'COMPLETED': { bg: '#dcfce7', text: '#166534' },
+    'APPROVED': { bg: '#dcfce7', text: '#166534' },
     'IN_PROGRESS': { bg: '#fef3c7', text: '#b45309' },
+    'PENDING_QC': { bg: '#fef3c7', text: '#b45309' },
+    'SUBMITTED': { bg: '#e0f2fe', text: '#0369a1' },
+    'ACTION_REQUIRED': { bg: '#fff7ed', text: '#c2410c' },
+    'REJECTED': { bg: '#fee2e2', text: '#991b1b' },
     'OPEN': { bg: '#fee2e2', text: '#991b1b' },
   };
   const s = config[status] || { bg: '#f1f5f9', text: '#475569' };

@@ -35,30 +35,6 @@ function handleUnauthorized(
 ) {
   if (typeof window === "undefined") {
     return;
-    console.error("[AUTH_401_TRACE]", {
-      path,
-      message,
-      currentPath: window.location.pathname,
-      unifiedSessionPresent: Boolean(
-        localStorage.getItem("unified_auth_session")
-      ),
-      taskforceTokenPresent: Boolean(
-        localStorage.getItem("taskforce_access_token")
-      ),
-      matrixtrackTokenPresent: Boolean(
-        localStorage.getItem("matrixtrack_access_token")
-      ),
-      wardRankingTokenPresent: Boolean(
-        localStorage.getItem("ward_ranking_access_token")
-      ),
-      genericTokenPresent: Boolean(
-        localStorage.getItem("token")
-      ),
-      unifiedCookiePresent:
-        document.cookie.includes("unified_session="),
-      hmsCookiePresent:
-        document.cookie.includes("hms_access_token="),
-    });
   }
   /*
  * Logout ke dauran mounted dashboard ki pending
@@ -562,12 +538,14 @@ export const TaskforceApi = {
       body: JSON.stringify({ employeeId })
     }),
   pendingReports: () => apiFetch<{ reports: any[] }>("/modules/taskforce/reports/pending"),
-  approveReport: (id: string) => apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/approve`, { method: "POST" }),
-  rejectReport: (id: string) => apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/reject`, { method: "POST" }),
-  actionRequiredReport: (id: string) =>
-    apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/action-required`, { method: "POST" }),
+  approveReport: (id: string, body?: { remark?: string }) =>
+    apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/approve`, { method: "POST", body: JSON.stringify(body || {}) }),
+  rejectReport: (id: string, body?: { remark?: string; reason?: string }) =>
+    apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/reject`, { method: "POST", body: JSON.stringify(body || {}) }),
+  actionRequiredReport: (id: string, body?: { remark?: string; qcRemark?: string }) =>
+    apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/action-required`, { method: "POST", body: JSON.stringify(body || {}) }),
   actionOfficerPending: () => apiFetch<{ reports: any[] }>("/modules/taskforce/action-officer/pending"),
-  actionOfficerSubmit: (id: string, body?: { actionNote?: string }) =>
+  actionOfficerSubmit: (id: string, body?: { actionNote?: string; evidenceUrl?: string; status?: string }) =>
     apiFetch<{ report: any }>(`/modules/taskforce/action-officer/${id}/submit`, {
       method: "POST",
       body: JSON.stringify(body || {})
@@ -584,6 +562,16 @@ export const TaskforceApi = {
       stats: { pending: number; approved: number; rejected: number; actionRequired: number; total: number };
     }>(`/modules/taskforce/records?${params.toString()}`);
   },
+  bulkAssignFeederPoints: (supervisorId: string, feederPointIds: string[]) =>
+    apiFetch("/modules/taskforce/assignments/bulk", {
+      method: "POST",
+      body: JSON.stringify({ supervisorId, feederPointIds })
+    }),
+  unassignFeederPoint: (supervisorId: string, feederPointId: string) =>
+    apiFetch("/modules/taskforce/assignments/remove", {
+      method: "POST",
+      body: JSON.stringify({ supervisorId, feederPointId })
+    }),
   myTasks: () => apiFetch<{ feederPoints: any[] }>("/modules/taskforce/feeder-points/assigned")
 };
 

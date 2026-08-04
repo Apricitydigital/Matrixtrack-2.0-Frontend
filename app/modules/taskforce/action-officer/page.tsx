@@ -28,6 +28,8 @@ export default function TaskforceActionOfficerPage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [returnedCount, setReturnedCount] = useState(0);
 
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+
   const load = async () => {
     setLoading(true);
     setError("");
@@ -49,11 +51,16 @@ export default function TaskforceActionOfficerPage() {
     if (!active) return;
     setSubmitLoading(true);
     try {
-      await TaskforceApi.actionOfficerSubmit(active.id, { actionNote: actionNote.trim() || undefined });
+      await TaskforceApi.actionOfficerSubmit(active.id, {
+        actionNote: actionNote.trim() || undefined,
+        evidenceUrl: evidenceUrl.trim() || undefined,
+        status: "PENDING_QC"
+      });
       setReports((prev) => prev.filter((r) => r.id !== active.id));
       setReturnedCount((c) => c + 1);
       setActive(null);
       setActionNote("");
+      setEvidenceUrl("");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to submit response");
     } finally {
@@ -243,9 +250,15 @@ export default function TaskforceActionOfficerPage() {
                 <button onClick={() => { setActive(null); setActionNote(""); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8' }}>✕</button>
               </div>
 
-              <div style={{ padding: 32 }}>
-                <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: 12, marginBottom: 24 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ padding: 24, overflowY: 'auto', maxHeight: '75vh' }}>
+                {((active as any).qcRemark || (active as any).payload?.qcRemark) && (
+                  <div style={{ backgroundColor: '#fef3c7', border: '1px solid #fde047', color: '#92400e', padding: 14, borderRadius: 10, marginBottom: 20, fontSize: 13 }}>
+                    <strong>⚠️ QC Flag Remark:</strong> {(active as any).qcRemark || (active as any).payload?.qcRemark}
+                  </div>
+                )}
+
+                <div style={{ backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, marginBottom: 20 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <Field label="Area Name" value={active.feederPoint?.areaName || active.feederPoint?.feederPointName} />
                     <Field label="Location Desc" value={active.feederPoint?.locationDescription} />
                     <Field label="Zone" value={active.feederPoint?.zoneId} />
@@ -253,14 +266,30 @@ export default function TaskforceActionOfficerPage() {
                   </div>
                 </div>
 
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                    Resolution Evidence Photo (Photo URL / Upload)
+                  </label>
+                  <input
+                    type="text"
+                    style={{
+                      width: '100%', padding: 10, borderRadius: 8,
+                      border: '1px solid #cbd5e1', fontSize: 13, outline: 'none'
+                    }}
+                    value={evidenceUrl}
+                    onChange={(e) => setEvidenceUrl(e.target.value)}
+                    placeholder="Paste resolution photo URL or upload evidence..."
+                  />
+                </div>
+
                 <div>
-                  <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
-                    Action Remarks <span style={{ opacity: 0.5, fontWeight: 400 }}>(Optional)</span>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                    Resolution Action Remarks *
                   </label>
                   <textarea
                     style={{
-                      width: '100%', height: 100, padding: 12, borderRadius: 8,
-                      border: '1px solid #cbd5e1', fontSize: 14, outline: 'none'
+                      width: '100%', height: 90, padding: 12, borderRadius: 8,
+                      border: '1px solid #cbd5e1', fontSize: 13, outline: 'none'
                     }}
                     value={actionNote}
                     onChange={(e) => setActionNote(e.target.value)}
@@ -268,15 +297,15 @@ export default function TaskforceActionOfficerPage() {
                   />
                 </div>
 
-                <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                  <button className="btn btn-ghost" onClick={() => { setActive(null); setActionNote(""); }}>Cancel</button>
+                <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                  <button className="btn btn-ghost" onClick={() => { setActive(null); setActionNote(""); setEvidenceUrl(""); }}>Cancel</button>
                   <button
                     className="btn btn-primary"
                     disabled={submitLoading}
                     onClick={handleSubmit}
                     style={{ opacity: submitLoading ? 0.7 : 1 }}
                   >
-                    {submitLoading ? "Submitting..." : "Submit to QC"}
+                    {submitLoading ? "Submitting..." : "✓ Resolve & Submit to QC"}
                   </button>
                 </div>
               </div>
