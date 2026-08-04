@@ -11,6 +11,7 @@ import type { Role } from "../../types/auth";
 import {
   Home,
   Users,
+  UserPlus,
   ChevronDown,
   Shield,
   Sparkles,
@@ -285,6 +286,11 @@ export default function Sidebar() {
         label: "Employees",
         href: "/employees",
         icon: <Users size={18} />,
+      });
+      links.push({
+        label: "Integrated Registration",
+        href: "/common-registration",
+        icon: <UserPlus size={18} />,
       });
     }
   }

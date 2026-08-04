@@ -346,6 +346,71 @@ export const AuthApi = {
     apiFetch<AuthMeResponse>("/auth/me"),
 };
 
+export interface IntegratedRegistrationPayload {
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  aadharNumber?: string;
+  cityId?: string;
+  zoneId?: string;
+  wardId?: string;
+  targetSystems: Array<"TASKFORCE_20" | "SWACHH_RANKING">;
+  taskforceConfig?: {
+    role?: string;
+    moduleKeys?: string[];
+  };
+  swachhConfig?: {
+    role?: "accessor" | "qc" | "admin";
+    accessorType?: "hms" | "pmc" | "janwani";
+    ward?: string;
+    zone?: string;
+  };
+}
+
+export const CommonRegistrationApi = {
+  register: (body: IntegratedRegistrationPayload) =>
+    apiFetch<{
+      success: boolean;
+      email: string;
+      userId?: string;
+      swachhUserId?: string;
+      taskforceCreated: boolean;
+      swachhCreated: boolean;
+      message: string;
+    }>("/common-registration/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  bulkImport: (employees: IntegratedRegistrationPayload[]) =>
+    apiFetch<{
+      success: boolean;
+      total: number;
+      successCount: number;
+      failCount: number;
+      results: Array<{
+        success: boolean;
+        email: string;
+        message: string;
+        taskforceCreated: boolean;
+        swachhCreated: boolean;
+      }>;
+    }>("/common-registration/bulk-import", {
+      method: "POST",
+      body: JSON.stringify({ employees }),
+    }),
+
+  getConfig: () =>
+    apiFetch<{
+      cities: { id: string; name: string; code: string }[];
+      modules: { key: string; name: string }[];
+      taskforceRoles: { key: string; label: string }[];
+      swachhRoles: { key: string; label: string }[];
+      swachhAccessorTypes: { key: string; label: string }[];
+    }>("/common-registration/config"),
+};
+
 export const CityApi = {
   list: () => apiFetch<CityListResponse>("/hms/cities"),
   listStates: () => apiFetch<{ states: MasterNode[] }>("/hms/locations/states"),
