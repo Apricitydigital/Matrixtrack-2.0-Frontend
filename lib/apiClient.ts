@@ -393,12 +393,14 @@ export const ToiletApi = {
     }),
 
   // Operational
-  listInspections: (params?: { status?: string; employeeId?: string; page?: number; pageSize?: number }) => {
+  listInspections: (params?: { status?: string; employeeId?: string; page?: number; pageSize?: number; startDate?: string; endDate?: string }) => {
     const sp = new URLSearchParams();
     if (params?.status) sp.append('status', params.status);
     if (params?.employeeId) sp.append('employeeId', params.employeeId);
     if (params?.page) sp.append('page', params.page.toString());
     if (params?.pageSize) sp.append('pageSize', params.pageSize.toString());
+    if (params?.startDate) sp.append('startDate', params.startDate);
+    if (params?.endDate) sp.append('endDate', params.endDate);
     const query = sp.toString() ? `?${sp.toString()}` : "";
     return apiFetch<{ inspections: any[]; total: number; page: number; pageSize: number }>(`/modules/toilet/inspections${query}`);
   },

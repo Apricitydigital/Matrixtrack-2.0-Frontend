@@ -36,7 +36,7 @@ type EditableUser = {
   wardIds: Set<string>;
 };
 
-const allowedRoles: Role[] = ["COMMISSIONER", "ACTION_OFFICER", "QC", "EMPLOYEE"];
+const allowedRoles: Role[] = ["COMMISSIONER", "ACTION_OFFICER", "QC", "SUPERVISOR", "EMPLOYEE"];
 const enforceRoleWriteRules = (
   role: Role,
   modules: Record<string, { canWrite: boolean; zoneIds?: string[]; wardIds?: string[] }>
@@ -851,7 +851,7 @@ function CityUsersPage() {
 
 
               <div style={{ display: "flex", backgroundColor: "#f1f5f9", padding: "4px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                {["ALL", "QC", "ACTION_OFFICER", "COMMISSIONER", "CITY_ADMIN", "EMPLOYEE"].map((t) => (
+                {["ALL", "QC", "ACTION_OFFICER", "COMMISSIONER", "CITY_ADMIN", "SUPERVISOR", "EMPLOYEE"].map((t) => (
                   <button
                     key={t}
                     onClick={() => setActiveTab(t as any)}
@@ -978,6 +978,7 @@ function UserRow({
       case 'ACTION_OFFICER': return { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa', label: 'Action Officer' };
       case 'COMMISSIONER': return { bg: '#faf5ff', color: '#7e22ce', border: '#e9d5ff', label: 'Commissioner' };
       case 'CITY_ADMIN': return { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0', label: 'City Admin' };
+      case 'SUPERVISOR': return { bg: '#e0f2fe', color: '#0369a1', border: '#bae6fd', label: 'Supervisor' };
       default: return { bg: '#f1f5f9', color: '#475569', border: '#e2e8f0', label: 'Field Employee' };
     }
   };
