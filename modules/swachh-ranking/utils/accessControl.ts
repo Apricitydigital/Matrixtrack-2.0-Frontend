@@ -28,6 +28,20 @@ export const hasPermission = (
     moduleKey: ModuleKey,
     requirement: 'view' | 'write' = 'view'
 ) => {
+    if (typeof window !== 'undefined') {
+        try {
+            const u = JSON.parse(localStorage.getItem('user') || 'null');
+            if (u && Array.isArray(u.modules) && u.modules.length > 0) {
+                const hasSwachh = u.modules.some((m: any) =>
+                    ['SWACHH_RANKING', 'SWACHH', 'WARD_RANKING', 'SWEEPING'].includes((m.key || m.name || '').toUpperCase())
+                );
+                if (!hasSwachh && !u.roles?.includes('HMS_SUPER_ADMIN')) {
+                    return false;
+                }
+            }
+        } catch (e) {}
+    }
+
     if (!permissionMap) return true;
     const requiredLevel = requirement === 'write' ? 'write' : 'view';
     const current = permissionMap[moduleKey] ?? 'write';

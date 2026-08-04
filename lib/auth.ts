@@ -124,7 +124,6 @@ export function getTokenFromCookies():
 
 // In production, JWT verification remains
 // the responsibility of the backend.
-
 function normalizeKey(key?: string) {
   return (key || "")
     .trim()
@@ -262,3 +261,4 @@ export function decodeToken(
 export function getStoredToken(): string | undefined {
   return getPersistedAccessToken() || undefined;
 }
+

@@ -228,6 +228,10 @@ export default function PortalHomePage() {
           'LITTERBINS',
           'SWEEPING',
           'TOILET',
+          'WORKFORCE_MONITORING',
+          'WORKFORCE',
+          'MATRIXTRACK_WORKFORCE',
+          'ATTENDANCE',
         ].includes(
           String(
             module.key || module.name || ''
@@ -962,6 +966,10 @@ export default function PortalHomePage() {
                     </div>
                   </div>
                 )}
+
+                <Link href="/common-registration" className="btn-logout-sleek" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', borderColor: '#2563eb', color: '#ffffff', textDecoration: 'none', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}>
+                  <UserCheck2 size={14} /> Integrated Registration
+                </Link>
 
                 <Link href="/admin-management" className="btn-logout-sleek" style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8', textDecoration: 'none' }}>
                   <ShieldCheck size={14} /> Admin Access Manager

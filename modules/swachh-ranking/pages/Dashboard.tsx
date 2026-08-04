@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+
 import { useNavigate } from '../react-router-shim';
 import api from '../api/axios';
 import { fireAchievement } from '../components/AchievementEffect';
@@ -27,12 +28,24 @@ import {
     BarChart3,
     RefreshCw,
     Search,
+    Download,
+    User,
+
+    FileText,
+
     ChevronRight,
     Target,
-    Layers
+    Layers,
+    Landmark,
+
+    GraduationCap,
+    Briefcase,
+    Store,
+    Hotel
 } from 'lucide-react';
 import NoAccess from '../components/NoAccess';
 import { hasPermission } from '../utils/accessControl';
+import swachhBg from '../assets/swachh_background.png';
 
 interface Participant {
     id: string;
@@ -46,19 +59,29 @@ interface Participant {
 }
 
 const CATEGORY_CARDS = [
-    { label: 'Ward', key: 'wards', filter: 'wards' },
-    { label: 'Schools', key: 'schools', filter: 'schools' },
-    { label: 'Hospitals', key: 'hospitals', filter: 'hospitals' },
-    { label: 'Offices', key: 'offices', filter: 'offices' },
-    { label: 'Markets', key: 'markets', filter: 'markets' },
-    { label: 'Societies - BWG', key: 'societies_bwg', filter: 'societies - bwg' },
-    { label: 'Hotels', key: 'hotels', filter: 'hotels' },
-    { label: 'Citizen / Groups', key: 'citizen_puraskar', filter: 'citizen_puraskar' }
-] as const;
+    { label: 'Ward', key: 'wards', filter: 'wards', icon: Landmark },
+    { label: 'Schools', key: 'schools', filter: 'schools', icon: GraduationCap },
+    { label: 'Hospitals', key: 'hospitals', filter: 'hospitals', icon: Building2 },
+    { label: 'Offices', key: 'offices', filter: 'offices', icon: Briefcase },
+    { label: 'Markets', key: 'markets', filter: 'markets', icon: Store },
+    { label: 'Societies - BWG', key: 'societies_bwg', filter: 'societies - bwg', icon: Users },
+    { label: 'Hotels', key: 'hotels', filter: 'hotels', icon: Hotel },
+    { label: 'Citizen / Groups', key: 'citizen_puraskar', filter: 'citizen_puraskar', icon: Users2 }
+];
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    const user = useMemo(() => {
+        if (typeof window === 'undefined') return { role: 'admin', permissions: { dashboard: { view: true } } };
+        try {
+            const stored = localStorage.getItem('user') || localStorage.getItem('swachh_user');
+            return stored ? JSON.parse(stored) : { role: 'admin', permissions: { dashboard: { view: true } } };
+        } catch {
+            return { role: 'admin', permissions: { dashboard: { view: true } } };
+        }
+    }, []);
+
+
     const [assignments, setAssignments] = useState<Participant[]>([]);
     const [recentAssessments, setRecentAssessments] = useState<any[]>([]);
     const [qcStats, setQCStats] = useState<any>(null);
@@ -77,6 +100,8 @@ const Dashboard = () => {
     const [activitySearch, setActivitySearch] = useState('');
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
     const [assessorDrawer, setAssessorDrawer] = useState<{ title: string; subtitle: string; data: any[] } | null>(null);
+    const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+
     const prevCompletedTodayRef = useRef<number | null>(null);
 
     const getGreeting = () => {
@@ -138,7 +163,6 @@ const Dashboard = () => {
             return trimmed;
         }
 
-        // Ensure remote images load correctly from the VITE_MEDIA_BASE_URL config (or standard fallback)
         const mediaBase =
             process.env.NEXT_PUBLIC_SWACHH_MEDIA_URL?.replace(/\/+$/, "");
 
@@ -370,7 +394,7 @@ const Dashboard = () => {
         const rows = recentAssessments.map((a: any) => [
             a.assessor?.name || "Unknown",
             a.participant?.category || "General",
-            a.finalScore ?? a.totalScore,
+            a.finalScore ?? a.totalScore ?? 0,
             new Date(a.createdAt).toLocaleString()
         ]);
 
@@ -390,598 +414,531 @@ const Dashboard = () => {
         document.body.removeChild(link);
     };
     return (
+
+
         <>
-            <div className="dashboard-content" style={{ paddingBottom: '4rem' }}>
-                {/* <header style={{ marginBottom: '3rem', position: 'relative' }}>
-                <div style={{
-                    position: 'absolute',
-                    top: '-40px',
-                    left: '-20px',
-                    width: '300px',
-                    height: '300px',
-                    background: 'radial-gradient(circle, var(--primary-soft) 0%, transparent 70%)',
-                    zIndex: -1,
-                    opacity: 0.5
-                }}></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                            <span style={{
-                                padding: '0.4rem 0.8rem',
-                                backgroundColor: 'var(--primary-soft)',
-                                color: 'var(--primary)',
-                                borderRadius: '100px',
-                                fontSize: '0.75rem',
-                                fontWeight: 800,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em'
-                            }}>
-                                {user.role} Portal
-                            </span>
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
-                                {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                            </span>
-                        </div>
-                        <h1 style={{ fontSize: '2.75rem', fontWeight: 950, color: 'var(--text-primary)', marginBottom: '0.75rem', letterSpacing: '-0.05em', lineHeight: 1 }}>
-                            {getGreeting()}, {user.name.split(' ')[0]}!
-                        </h1>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', fontWeight: 500, maxWidth: '600px', lineHeight: 1.6 }}>
-                            {user.role === 'accessor'
-                                ? "Here's your mission for today. You've got work to do!"
-                                : user.role === 'qc'
-                                    ? "Monitor quality and approve verified assessments."
-                                    : 'Welcome back to your command center. Everything looks good.'}
-                        </p>
-                    </div>
-                    {user.role === 'admin' && (
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button
-                                onClick={() => navigate('/admin/reports')}
-                                className="btn btn-primary shadow-premium"
-                                style={{ padding: '0.875rem 1.75rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}
-                            >
-                                <Award size={20} /> Generate Report
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </header> */}
-                {/* <header style={{ marginBottom: '3rem', position: 'relative' }}>
+        <div className="dashboard-content" style={{ paddingBottom: '4rem' }}>
+            {/* ── Dashboard Header ── */}
+
+<header style={{ 
+    marginBottom: '1.25rem', 
+    position: 'relative', 
+    borderRadius: '20px', 
+    overflow: 'hidden', 
+    background: 'white',
+    border: '1px solid #f1f5f9',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+}}>
     <div style={{
-        position: 'absolute',
-        top: '-40px',
-        left: '-20px',
-        width: '300px',
-        height: '300px',
-        background: 'radial-gradient(circle, var(--primary-soft) 0%, transparent 70%)',
-        zIndex: -1,
-        opacity: 0.5
-    }}></div>
-    <div className="dashboard-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        position: 'absolute', 
+        inset: 0, 
+        backgroundImage: `url(${(swachhBg as any)?.src || (typeof swachhBg === 'string' ? swachhBg : '/assets/swachh_background.png')})`, 
+        backgroundSize: 'cover', 
+        backgroundPosition: 'right bottom', 
+        backgroundRepeat: 'no-repeat',
+        opacity: 1,
+        zIndex: 0
+    }} />
+
+    <div className="dashboard-header-row" style={{ position: 'relative', zIndex: 1, padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div className="dashboard-header-text">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                <span style={{
-                    padding: '0.4rem 0.8rem',
-                    backgroundColor: 'var(--primary-soft)',
-                    color: 'var(--primary)',
-                    borderRadius: '100px',
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                }}>
+
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                <span style={{ padding: '0.4rem 0.8rem', backgroundColor: '#f0f5ff', color: '#4f46e5', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {user.role} Portal
                 </span>
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
+                <span style={{ color: '#64748b', fontSize: '0.875rem', fontWeight: 600 }}>
                     {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </span>
             </div>
-            <h1 style={{ fontSize: '2.75rem', fontWeight: 950, color: 'var(--text-primary)', marginBottom: '0.75rem', letterSpacing: '-0.05em', lineHeight: 1 }}>
-                {getGreeting()}, {user.name.split(' ')[0]}!
+            <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 900, color: '#0f172a', marginBottom: '0.75rem', letterSpacing: '-0.03em', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {getGreeting()}, {user?.name?.split(' ')[0] || 'Admin'}! <span style={{ fontSize: '2.5rem' }}></span>
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem', fontWeight: 500, maxWidth: '600px', lineHeight: 1.6 }}>
-                {user.role === 'accessor'
-                    ? "Here's your mission for today. You've got work to do!"
-                    : user.role === 'qc'
-                        ? "Monitor quality and approve verified assessments."
-                        : 'Welcome back to your command center. Everything looks good.'}
+
+            <p style={{ color: '#475569', fontSize: '1rem', fontWeight: 600, maxWidth: '600px', lineHeight: 1.5 }}>
+                Real-time field monitoring &amp; city ranking intelligence.
             </p>
+
+
         </div>
-        {user.role === 'admin' && (
-            <div className="dashboard-header-btn" style={{ display: 'flex', gap: '1rem' }}>
-                <button
-                    onClick={() => navigate('/admin/reports')}
-                    className="btn btn-primary shadow-premium"
-                    style={{ padding: '0.875rem 1.75rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}
-                >
-                    <Award size={20} /> Generate Report
-                </button>
-            </div>
-        )}
     </div>
 </header>
-            {user.role === 'accessor' && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem', marginBottom: '3.5rem' }}>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '2rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ClipboardList size={30} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Total Tasks</div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.total}</div>
-                            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.5rem 0 0' }}>Assigned to your profile</p>
-                        </div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '2rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #fdfcfb 100%)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div style={{ backgroundColor: '#ffedd5', color: '#9a3412', width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Clock size={30} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>To Action</div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.pending}</div>
-                            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.5rem 0 0' }}>Requires immediate verification</p>
-                        </div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '2rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div style={{ backgroundColor: '#dcfce7', color: '#15803d', width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <CheckCircle2 size={30} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Verified</div>
-                            <div style={{ fontSize: '2.5rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.completed}</div>
-                            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.5rem 0 0' }}>Successfully completed tasks</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {user.role === 'qc' && qcStats && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3.5rem' }}>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: 'var(--primary-soft)', color: 'var(--primary)', padding: '0.75rem', borderRadius: '14px' }}>
-                                <ClipboardList size={22} />
-                            </div>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--success)', backgroundColor: 'var(--success-soft)', padding: '0.25rem 0.6rem', borderRadius: '6px' }}>Active</span>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Total Tasks</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.total}</div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: 'var(--warning-soft)', color: 'var(--warning)', padding: '0.75rem', borderRadius: '14px' }}>
-                                <Clock size={22} />
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Review Pending</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.pending}</div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: 'var(--success-soft)', color: 'var(--success)', padding: '0.75rem', borderRadius: '14px' }}>
-                                <CheckCircle2 size={22} />
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Completed</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.completed ?? qcStats.approved ?? 0}</div>
-                    </div>
-                    <div className="card shadow-premium hover-scale" style={{ padding: '1.5rem', border: 'none', background: '#fff' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                            <div style={{ backgroundColor: '#fee2e2', color: '#ef4444', padding: '0.75rem', borderRadius: '14px' }}>
-                                <X size={22} />
-                            </div>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Reassessment</div>
-                        <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{qcStats.reassessment}</div>
-                    </div>
-                </div>
-            )}
 
-            {user.role !== 'accessor' && (
-                <div style={{ marginBottom: '3.5rem' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '6px', height: '24px', backgroundColor: 'var(--primary)', borderRadius: '3px' }}></div>
-                        Participation by Category
-                    </h3>
-                    {statsLoading && !stats ? (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.875rem' }}>
-                            {CATEGORY_CARDS.map((_, idx) => (
-                                <div key={idx} className="skeleton-block" style={{ width: '165px', height: '62px', borderRadius: '16px' }} />
-                            ))}
-                        </div>
-                    ) : statsError && !stats ? (
-                        <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>
-                            {statsError}
-                        </div>
-                    ) : stats ? (
-                       <div className="category-scroll" tabIndex={0}>
-                            {CATEGORY_CARDS.map(({ label, key, filter }) => (
-                                <div
-                                    key={label}
-                                    onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(filter)}`)}
-                                    className="hover-scale"
-                                    style={{
-                                        flex: '0 0 auto',
-                                        minWidth: '160px',
-                                        padding: '0.625rem 1.25rem',
-                                        backgroundColor: 'white',
-                                        borderRadius: '16px',
-                                        border: '1px solid var(--border-light)',
-                                        boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                                        fontSize: '0.875rem',
-                                        fontWeight: 700,
-                                        color: 'var(--text-primary)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.75rem',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    }}>
-                                    <span style={{ opacity: 0.8 }}>{label}</span>
-                                    <span style={{
-                                        fontSize: '0.75rem',
-                                        padding: '0.25rem 0.625rem',
-                                        backgroundColor: 'var(--primary-soft)',
-                                        color: '#3730a3',
-                                        borderRadius: '8px',
-                                        fontWeight: 900
-                                    }}>
-                                        {stats?.categories?.[key] || 0}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : null}
-                </div>
-            )}
 
-            {user.role === 'admin' && (
-                <div style={{ marginBottom: '4rem' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '6px', height: '24px', backgroundColor: 'var(--swachh-green)', borderRadius: '3px' }}></div>
-                        System Overview
-                    </h3>
-                    {statsError && (
-                        <div style={{
-                            marginBottom: '1rem',
-                            padding: '0.875rem 1rem',
-                            borderRadius: '12px',
-                            backgroundColor: '#fef3c7',
-                            color: '#92400e',
-                            fontWeight: 600
-                        }}>
-                            {stats ? `Showing last known data. ${statsError}` : statsError}
-                        </div>
-                    )}
-                    {statsLoading && !stats ? (
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1.5rem',
-                        }}>
-                            {Array.from({ length: 5 }).map((_, idx) => (
-                                <div key={idx} className="card shadow-premium" style={{ padding: '1.75rem', border: 'none' }}>
-                                    <div className="skeleton-block" style={{ width: '48px', height: '48px', borderRadius: '16px', marginBottom: '1.25rem' }} />
-                                    <div className="skeleton-block" style={{ width: '50%', height: '12px', marginBottom: '0.5rem' }} />
-                                    <div className="skeleton-block" style={{ width: '70%', height: '28px' }} />
-                                </div>
-                            ))}
-                        </div>
-                    ) : stats ? (
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: '1.5rem',
-                        }}>
-                            <div
-                                onClick={() => navigate('/admin/users?role=qc')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid var(--swachh-green)' }}>
-                                <div style={{ color: 'var(--swachh-green)', marginBottom: '1rem' }}><Shield size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>QC Members</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.qcMembers ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/users?role=accessor')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid var(--primary)' }}>
-                                <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}><Users2 size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Assessors</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.assessors ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/users?role=admin')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #faf5ff 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid #a855f7' }}>
-                                <div style={{ color: '#a855f7', marginBottom: '1rem' }}><Users size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Admins</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.admins ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/areas')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid var(--warning)' }}>
-                                <div style={{ color: 'var(--warning)', marginBottom: '1rem' }}><Map size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Wards</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>{stats?.overview?.wards ?? 0}</div>
-                            </div>
-                            <div
-                                onClick={() => navigate('/admin/participants')}
-                                className="card shadow-premium hover-scale"
-                                style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #fdf4ff 0%, #ffffff 100%)', cursor: 'pointer', borderLeft: '4px solid #d946ef' }}>
-                                <div style={{ color: '#d946ef', marginBottom: '1rem' }}><Building2 size={24} /></div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>Participants</div>
-                                <div style={{ fontSize: '2rem', fontWeight: 950, color: 'var(--text-primary)' }}>
-                                    {totalParticipants}
-                                </div>
-                            </div>
-                        </div>
-                    ) : statsError ? (
-                        <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>
-                            Unable to load overview.
-                        </div>
-                    ) : null}
+{/* ── Accessor Stats: 3-col → 1-col ── */}
+{user.role === 'accessor' && (
+    <div className="accessor-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
+        <div className="card shadow-premium hover-scale" style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ClipboardList size={26} />
+            </div>
+            <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>Total Tasks</div>
+                <div style={{ fontSize: '2.25rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.total}</div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.4rem 0 0' }}>Assigned to your profile</p>
+            </div>
+        </div>
+        <div className="card shadow-premium hover-scale" style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #fdfcfb 100%)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ backgroundColor: '#ffedd5', color: '#9a3412', width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={26} />
+            </div>
+            <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>To Action</div>
+                <div style={{ fontSize: '2.25rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.pending}</div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.4rem 0 0' }}>Requires immediate verification</p>
+            </div>
+        </div>
+        <div className="card shadow-premium hover-scale" style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ backgroundColor: '#dcfce7', color: '#15803d', width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle2 size={26} />
+            </div>
+            <div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>Verified</div>
+                <div style={{ fontSize: '2.25rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.completed}</div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.4rem 0 0' }}>Successfully completed tasks</p>
+            </div>
+        </div>
+    </div>
+)}
+
+{/* ── QC Stats: 4-col → 2-col → 1-col ── */}
+{user.role === 'qc' && qcStats && (
+    <div className="qc-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '3rem' }}>
+        {[
+            { icon: <ClipboardList size={22} />, bg: 'var(--primary-soft)', color: 'var(--primary)', label: 'Total Tasks', value: qcStats.total, badge: <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--success)', backgroundColor: 'var(--success-soft)', padding: '0.2rem 0.5rem', borderRadius: '6px' }}>Active</span> },
+            { icon: <Clock size={22} />, bg: 'var(--warning-soft)', color: 'var(--warning)', label: 'Review Pending', value: qcStats.pending },
+            { icon: <CheckCircle2 size={22} />, bg: 'var(--success-soft)', color: 'var(--success)', label: 'Completed', value: qcStats.completed ?? qcStats.approved ?? 0 },
+            { icon: <X size={22} />, bg: '#fee2e2', color: '#ef4444', label: 'Reassessment', value: qcStats.reassessment },
+        ].map(({ icon, bg, color, label, value, badge }) => (
+            <div key={label} className="card shadow-premium hover-scale" style={{ padding: '1.25rem', border: 'none', background: '#fff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                    <div style={{ backgroundColor: bg, color, padding: '0.65rem', borderRadius: '12px' }}>{icon}</div>
+                    {badge}
                 </div>
-            )} */}
-                {/* ── Dashboard Header ── */}
-                <header style={{ marginBottom: '3rem', position: 'relative' }}>
-                    <div style={{
-                        position: 'absolute', top: '-40px', left: '-20px',
-                        width: '300px', height: '300px',
-                        background: 'radial-gradient(circle, var(--primary-soft) 0%, transparent 70%)',
-                        zIndex: -1, opacity: 0.5
-                    }} />
-                    <div className="dashboard-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div className="dashboard-header-text">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-                                <span style={{ padding: '0.4rem 0.8rem', backgroundColor: 'var(--primary-soft)', color: '#3730a3', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    {user.role} Portal
-                                </span>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', fontWeight: 600 }}>
-                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                </span>
-                            </div>
-                            <h1 style={{ fontSize: 'clamp(1.75rem, 5vw, 2.75rem)', fontWeight: 950, color: 'var(--text-primary)', marginBottom: '0.75rem', letterSpacing: '-0.05em', lineHeight: 1 }}>
-                                {getGreeting()}, {user.name.split(' ')[0]}!
-                            </h1>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.9rem, 2vw, 1.125rem)', fontWeight: 500, maxWidth: '600px', lineHeight: 1.6 }}>
-                                {user.role === 'accessor'
-                                    ? "Here's your mission for today. You've got work to do!"
-                                    : user.role === 'qc'
-                                        ? "Monitor quality and approve verified assessments."
-                                        : 'Welcome back to your command center. Everything looks good.'}
-                            </p>
-                        </div>
-                        {user.role === 'admin' && (
-                            <div className="dashboard-header-btn" style={{ display: 'flex', gap: '1rem' }}>
-                                <button onClick={() => navigate('/ward-ranking?view=reports')} className="btn btn-primary shadow-premium"
-                                    style={{ padding: '0.875rem 1.75rem', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                    <Award size={20} /> Generate Report
-                                </button>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>{label}</div>
+                <div style={{ fontSize: '1.875rem', fontWeight: 950, color: 'var(--text-primary)' }}>{value}</div>
+            </div>
+        ))}
+    </div>
+)}
+
+{/* ── Participation by Category ── */}
+{user.role !== 'accessor' && (
+    <div style={{
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        border: '1px solid #f1f5f9',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        padding: '1.5rem 1.75rem',
+        marginBottom: '2rem'
+    }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '4px', height: '20px', backgroundColor: '#5a52ff', borderRadius: '2px' }} />
+            Participation by Category
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(125px, 1fr))', gap: '0.875rem' }}>
+            {CATEGORY_CARDS.map(({ label, key, filter, icon: IconComponent }) => {
+                const isHovered = hoveredCategory === key;
+                return (
+                    <div key={label}
+                        onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(filter)}`)}
+                        onMouseEnter={() => setHoveredCategory(key)}
+                        onMouseLeave={() => setHoveredCategory(null)}
+                        className="hover-scale"
+                        title={label}
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '14px',
+                            border: isHovered ? '1px solid #6366f1' : '1px solid #f1f5f9',
+                            boxShadow: isHovered ? '0 6px 18px rgba(99,102,241,0.12)' : '0 2px 8px rgba(0,0,0,0.02)',
+                            padding: '0.75rem 0.625rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.625rem',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}>
+                        {isHovered && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: 'calc(100% + 8px)',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                backgroundColor: '#0f172a',
+                                color: '#ffffff',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                whiteSpace: 'nowrap',
+                                boxShadow: '0 4px 16px rgba(15,23,42,0.25)',
+                                zIndex: 99,
+                                pointerEvents: 'none'
+                            }}>
+                                {label}
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: 0,
+                                    height: 0,
+                                    borderLeft: '5px solid transparent',
+                                    borderRight: '5px solid transparent',
+                                    borderTop: '5px solid #0f172a'
+                                }} />
                             </div>
                         )}
-                    </div>
-                </header>
-
-                {/* ── Accessor Stats: 3-col → 1-col ── */}
-                {user.role === 'accessor' && (
-                    <div className="accessor-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
-                        <div className="card shadow-premium hover-scale" style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div style={{ backgroundColor: '#e0e7ff', color: '#4338ca', width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <ClipboardList size={26} />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>Total Tasks</div>
-                                <div style={{ fontSize: '2.25rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.total}</div>
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.4rem 0 0' }}>Assigned to your profile</p>
-                            </div>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            backgroundColor: '#f0f5ff',
+                            color: '#4f46e5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            <IconComponent size={18} />
                         </div>
-                        <div className="card shadow-premium hover-scale" style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #fdfcfb 100%)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div style={{ backgroundColor: '#ffedd5', color: '#9a3412', width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Clock size={26} />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>To Action</div>
-                                <div style={{ fontSize: '2.25rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.pending}</div>
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.4rem 0 0' }}>Requires immediate verification</p>
-                            </div>
-                        </div>
-                        <div className="card shadow-premium hover-scale" style={{ padding: '1.75rem', border: 'none', background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <div style={{ backgroundColor: '#dcfce7', color: '#15803d', width: '52px', height: '52px', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <CheckCircle2 size={26} />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>Verified</div>
-                                <div style={{ fontSize: '2.25rem', fontWeight: 950, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{accessorStats.completed}</div>
-                                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, margin: '0.4rem 0 0' }}>Successfully completed tasks</p>
-                            </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>
+                                {label}
+                            </span>
+                            <span style={{
+                                fontSize: '0.72rem',
+                                padding: '0.15rem 0.5rem',
+                                backgroundColor: '#f0f5ff',
+                                color: '#4f46e5',
+                                borderRadius: '100px',
+                                fontWeight: 900,
+                                marginTop: '0.2rem',
+                                width: 'fit-content'
+                            }}>
+                                {stats?.categories?.[key] || 0}
+                            </span>
                         </div>
                     </div>
-                )}
+                );
+            })}
 
-                {/* ── QC Stats: 4-col → 2-col → 1-col ── */}
-                {user.role === 'qc' && qcStats && (
-                    <div className="qc-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem', marginBottom: '3rem' }}>
-                        {[
-                            { icon: <ClipboardList size={22} />, bg: 'var(--primary-soft)', color: 'var(--primary)', label: 'Total Tasks', value: qcStats.total, badge: <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--success)', backgroundColor: 'var(--success-soft)', padding: '0.2rem 0.5rem', borderRadius: '6px' }}>Active</span> },
-                            { icon: <Clock size={22} />, bg: 'var(--warning-soft)', color: 'var(--warning)', label: 'Review Pending', value: qcStats.pending },
-                            { icon: <CheckCircle2 size={22} />, bg: 'var(--success-soft)', color: 'var(--success)', label: 'Completed', value: qcStats.completed ?? qcStats.approved ?? 0 },
-                            { icon: <X size={22} />, bg: '#fee2e2', color: '#ef4444', label: 'Reassessment', value: qcStats.reassessment },
-                        ].map(({ icon, bg, color, label, value, badge }) => (
-                            <div key={label} className="card shadow-premium hover-scale" style={{ padding: '1.25rem', border: 'none', background: '#fff' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
-                                    <div style={{ backgroundColor: bg, color, padding: '0.65rem', borderRadius: '12px' }}>{icon}</div>
-                                    {badge}
+        </div>
+    </div>
+)}
+
+{/* ── Admin System Overview ── */}
+{user.role === 'admin' && (
+    <div style={{
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        border: '1px solid #f1f5f9',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        padding: '1.5rem 1.75rem',
+        marginBottom: '2rem'
+    }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: '4px', height: '20px', backgroundColor: '#5a52ff', borderRadius: '2px' }} />
+            System Overview
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem' }}>
+            {[
+                { path: '/admin/users?role=qc', border: '#16a34a', iconBg: '#f0fdf4', iconColor: '#16a34a', icon: <Shield size={20} />, label: 'QC MEMBERS', value: stats?.overview?.qcMembers ?? 0, waveColor: '#16a34a' },
+                { path: '/admin/users?role=accessor', border: '#2563eb', iconBg: '#eff6ff', iconColor: '#2563eb', icon: <Users2 size={20} />, label: 'ASSESSORS', value: stats?.overview?.assessors ?? 0, waveColor: '#2563eb' },
+                { path: '/admin/users?role=admin', border: '#9333ea', iconBg: '#faf5ff', iconColor: '#9333ea', icon: <Users size={20} />, label: 'ADMINS', value: stats?.overview?.admins ?? 0, waveColor: '#9333ea' },
+                { path: '/admin/participants', border: '#db2777', iconBg: '#fdf2f8', iconColor: '#db2777', icon: <Building2 size={20} />, label: 'PARTICIPANTS', value: totalParticipants ?? 0, waveColor: '#db2777' },
+            ].map(({ path, border, iconBg, iconColor, icon, label, value, waveColor }) => (
+                <div key={label} onClick={() => navigate(path)}
+                    className="hover-scale"
+                    style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        padding: '1.5rem',
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        border: '1px solid #f1f5f9',
+                        borderLeft: `4px solid ${border}`,
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '1rem' }}>
+                        <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            backgroundColor: iconBg,
+                            color: iconColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            {icon}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {label}
+                        </span>
+                    </div>
+                    <div style={{ fontSize: '2.25rem', fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>
+                        {value}
+                    </div>
+                    <svg style={{ position: 'absolute', bottom: 0, right: 0, width: '120px', height: '55px', opacity: 0.25, pointerEvents: 'none' }} viewBox="0 0 120 55" preserveAspectRatio="none">
+                        <path d="M0,55 C40,25 75,45 120,15 L120,55 Z" fill={waveColor} />
+                    </svg>
+                </div>
+            ))}
+        </div>
+    </div>
+)}
+
+{/* ── Self-Assessment Submissions ── */}
+{user.role === 'admin' && (
+    <div style={{
+        backgroundColor: 'white',
+        borderRadius: '20px',
+        border: '1px solid #f1f5f9',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        padding: '1.5rem 1.75rem',
+        marginBottom: '2rem'
+    }}>
+        {/* Header Row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '4px', height: '20px', backgroundColor: '#5a52ff', borderRadius: '2px' }} />
+                Self-Assessment Submissions
+            </h3>
+            <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#4f46e5',
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                padding: '0.3rem 0.75rem',
+                borderRadius: '100px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+            }}>
+                <RefreshCw size={12} /> Auto-refreshes every 30s
+            </span>
+        </div>
+
+        {/* 4 Summary KPI Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            {[
+                {
+                    label: 'TOTAL REGISTERED',
+                    value: totalParticipants ?? 0,
+                    desc: 'All participants',
+                    icon: <Users size={20} />,
+                    border: '#6366f1',
+                    iconBg: '#f0f0fe',
+                    iconColor: '#6366f1',
+                    valueColor: '#0f172a',
+                    onClick: () => navigate('/admin/participants'),
+                    watermark: <Users size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#6366f1' }} />
+                },
+                {
+                    label: 'SUBMITTED',
+                    value: stats?.selfAssessments?.submitted ?? 0,
+                    desc: 'Completed submissions',
+                    icon: <CheckCircle2 size={20} />,
+                    border: '#16a34a',
+                    iconBg: '#f0fdf4',
+                    iconColor: '#16a34a',
+                    valueColor: '#16a34a',
+                    onClick: () => openSAStatusDrawer('Submitted', 'Submitted'),
+                    watermark: <CheckCircle2 size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#16a34a' }} />
+                },
+                {
+                    label: 'IN PROGRESS',
+                    value: stats?.selfAssessments?.draft ?? 0,
+                    desc: 'Submissions in progress',
+                    icon: <Clock size={20} />,
+                    border: '#d97706',
+                    iconBg: '#fffbeb',
+                    iconColor: '#d97706',
+                    valueColor: '#d97706',
+                    onClick: () => openSAStatusDrawer('Draft', 'In Progress'),
+                    watermark: <Clock size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#d97706' }} />
+                },
+                {
+                    label: 'NOT STARTED',
+                    value: Math.max(0, (totalParticipants ?? 0) - (stats?.selfAssessments?.total ?? 0)),
+                    desc: 'Yet to begin',
+                    icon: <FileText size={20} />,
+                    border: '#2563eb',
+                    iconBg: '#eff6ff',
+                    iconColor: '#2563eb',
+                    valueColor: '#2563eb',
+                    onClick: () => openSAStatusDrawer('Not Started', 'Not Started'),
+                    watermark: <FileText size={56} style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.05, color: '#2563eb' }} />
+                },
+            ].map(({ label, value, desc, icon, border, iconBg, iconColor, valueColor, onClick, watermark }) => (
+                <div
+                    key={label}
+                    onClick={onClick}
+                    className="hover-scale"
+                    style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        border: '1px solid #f1f5f9',
+                        borderLeft: `4px solid ${border}`,
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                        padding: '1.25rem 1.5rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                >
+                    {watermark}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '0.875rem' }}>
+                        <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            backgroundColor: iconBg,
+                            color: iconColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                        }}>
+                            {icon}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {label}
+                        </span>
+                    </div>
+                    <div style={{ fontSize: '2.25rem', fontWeight: 950, color: valueColor, lineHeight: 1.1, marginBottom: '0.2rem' }}>
+                        {value}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                        {desc}
+                    </div>
+                </div>
+            ))}
+        </div>
+
+        {/* Bottom 2 Columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: '1.25rem', alignItems: 'stretch' }}>
+            {/* Category-wise progress */}
+            <div style={{ backgroundColor: 'white', border: '1px solid #f1f5f9', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.25rem' }}>
+                    CATEGORY-WISE PROGRESS
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+                    {CATEGORY_CARDS.map(({ label, key }) => {
+                        const catData = stats?.selfAssessments?.byCategory?.[key] ?? { total: 0, submitted: 0, draft: 0 };
+                        const total = (stats?.categories?.[key] as number) || catData.total || 0;
+                        const submitted = catData.submitted || 0;
+                        const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
+                        return (
+                            <div key={key} onClick={() => openCategoryDrawer(key, label)} style={{ cursor: 'pointer', borderRadius: '8px', transition: 'background 0.15s' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>{label}</span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a' }}>
+                                        {submitted} / {total} <span style={{ color: pct === 100 ? '#16a34a' : '#475569' }}>({pct}%)</span> <span style={{ color: '#94a3b8', marginLeft: '2px' }}>&gt;</span>
+                                    </span>
                                 </div>
-                                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>{label}</div>
-                                <div style={{ fontSize: '1.875rem', fontWeight: 950, color: 'var(--text-primary)' }}>{value}</div>
+                                <div style={{ height: '6px', backgroundColor: '#f1f5f9', borderRadius: '100px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${pct}%`, height: '100%', backgroundColor: pct === 100 ? '#16a34a' : '#22c55e', borderRadius: '100px', transition: 'width 0.5s ease' }} />
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Recent Submissions */}
+            <div style={{ backgroundColor: 'white', border: '1px solid #f1f5f9', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+                    RECENT SUBMISSIONS
+                </div>
+                {(!stats?.selfAssessments?.recentSubmissions || stats?.selfAssessments?.recentSubmissions?.length === 0) ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '2rem 1rem' }}>
+                        <div style={{
+                            width: '110px',
+                            height: '110px',
+                            borderRadius: '50%',
+                            backgroundColor: '#f5f3ff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: '1.25rem',
+                            position: 'relative'
+                        }}>
+                            <div style={{ color: '#818cf8' }}>
+                                <ClipboardList size={52} strokeWidth={1.5} />
+                            </div>
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '10px',
+                                right: '10px',
+                                width: '30px',
+                                height: '30px',
+                                borderRadius: '50%',
+                                backgroundColor: '#6366f1',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 10px rgba(99, 102, 241, 0.3)'
+                            }}>
+                                <Search size={15} />
+                            </div>
+                        </div>
+                        <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem' }}>
+                            No submissions yet
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                            Recent submissions will appear here once available.
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                        {stats?.selfAssessments?.recentSubmissions?.map((s: any, i: number) => (
+                            <div key={s.id} style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: i === 0 ? '#f0fdf4' : 'white', borderRadius: '8px' }}>
+                                <div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{s.name}</div>
+                                    <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', textTransform: 'capitalize' }}>{s.category}</div>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textAlign: 'right' }}>
+                                    {s.submittedAt ? new Date(s.submittedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                </div>
                             </div>
                         ))}
                     </div>
                 )}
+            </div>
+        </div>
+    </div>
+)}
 
-                {/* ── Participation by Category ── */}
-                {user.role !== 'accessor' && (
-                    <div style={{ marginBottom: '3rem' }}>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ width: '6px', height: '22px', backgroundColor: 'var(--primary)', borderRadius: '3px' }} />
-                            Participation by Category
-                        </h3>
-                        {statsLoading && !stats ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.875rem' }}>
-                                {CATEGORY_CARDS.map((_, idx) => (
-                                    <div key={idx} className="skeleton-block" style={{ width: '165px', height: '62px', borderRadius: '16px' }} />
-                                ))}
-                            </div>
-                        ) : statsError && !stats ? (
-                            <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>{statsError}</div>
-                        ) : stats ? (
-                            <div className="category-scroll" tabIndex={0}>
-                                {CATEGORY_CARDS.map(({ label, key, filter }) => (
-                                    <div key={label} onClick={() => navigate(`/admin/participants?category=${encodeURIComponent(filter)}`)}
-                                        className="hover-scale"
-                                        style={{ flex: '0 0 auto', minWidth: '150px', padding: '0.625rem 1.1rem', backgroundColor: 'white', borderRadius: '14px', border: '1px solid var(--border-light)', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-                                        <span style={{ opacity: 0.8 }}>{label}</span>
-                                        <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem', backgroundColor: 'var(--primary-soft)', color: '#3730a3', borderRadius: '7px', fontWeight: 900 }}>
-                                            {stats?.categories?.[key] || 0}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : null}
-                    </div>
-                )}
 
-                {/* ── Admin System Overview ── */}
-                {user.role === 'admin' && (
-                    <div style={{ marginBottom: '3.5rem' }}>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ width: '6px', height: '22px', backgroundColor: 'var(--swachh-green)', borderRadius: '3px' }} />
-                            System Overview
-                        </h3>
-                        {statsError && (
-                            <div style={{ marginBottom: '1rem', padding: '0.875rem 1rem', borderRadius: '12px', backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 600 }}>
-                                {stats ? `Showing last known data. ${statsError}` : statsError}
-                            </div>
-                        )}
-                        {statsLoading && !stats ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1.25rem' }}>
-                                {Array.from({ length: 4 }).map((_, idx) => (
-                                    <div key={idx} className="card shadow-premium" style={{ padding: '1.5rem', border: 'none' }}>
-                                        <div className="skeleton-block" style={{ width: '44px', height: '44px', borderRadius: '14px', marginBottom: '1rem' }} />
-                                        <div className="skeleton-block" style={{ width: '50%', height: '11px', marginBottom: '0.5rem' }} />
-                                        <div className="skeleton-block" style={{ width: '70%', height: '26px' }} />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : stats ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1.25rem' }}>
-                                {[
-                                    { path: '/admin/users?role=qc', bg: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)', border: 'var(--swachh-green)', icon: <Shield size={22} />, iconColor: 'var(--swachh-green)', label: 'QC Members', value: stats?.overview?.qcMembers ?? 0 },
-                                    { path: '/admin/users?role=accessor', bg: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', border: 'var(--primary)', icon: <Users2 size={22} />, iconColor: 'var(--primary)', label: 'Assessors', value: stats?.overview?.assessors ?? 0 },
-                                    { path: '/admin/users?role=admin', bg: 'linear-gradient(135deg, #faf5ff 0%, #ffffff 100%)', border: '#a855f7', icon: <Users size={22} />, iconColor: '#a855f7', label: 'Admins', value: stats?.overview?.admins ?? 0 },
-                                    { path: '/admin/participants', bg: 'linear-gradient(135deg, #fdf4ff 0%, #ffffff 100%)', border: '#d946ef', icon: <Building2 size={22} />, iconColor: '#d946ef', label: 'Participants', value: totalParticipants },
-                                ].map(({ path, bg, border, icon, iconColor, label, value }) => (
-                                    <div key={label} onClick={() => navigate(path)}
-                                        className="card shadow-premium hover-scale"
-                                        style={{ padding: '1.5rem', border: 'none', background: bg, cursor: 'pointer', borderLeft: `4px solid ${border}` }}>
-                                        <div style={{ color: iconColor, marginBottom: '0.875rem' }}>{icon}</div>
-                                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
-                                        <div style={{ fontSize: '1.875rem', fontWeight: 950, color: 'var(--text-primary)' }}>{value}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : statsError ? (
-                            <div style={{ padding: '1rem', borderRadius: '12px', backgroundColor: '#fee2e2', color: '#b91c1c' }}>Unable to load overview.</div>
-                        ) : null}
-                    </div>
-                )}
 
-                {/* ── Self-Assessment Live Tracker ── */}
-                {user.role === 'admin' && stats?.selfAssessments && (
-                    <div style={{ marginBottom: '3.5rem' }}>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <div style={{ width: '6px', height: '22px', backgroundColor: '#16a34a', borderRadius: '3px' }} />
-                            Self-Assessment Submissions
-                            <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 700, color: '#475569', backgroundColor: '#f1f5f9', padding: '0.3rem 0.75rem', borderRadius: '8px' }}>
-                                Auto-refreshes every 30s
-                            </span>
-                        </h3>
 
-                        {/* Summary pills */}
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                            {(() => {
-                                const notStartedCount = Math.max(0, (stats.overview?.participants ?? 0) - stats.selfAssessments.total);
-                                return [
-                                    { label: 'Total Registered', value: stats.overview?.participants ?? 0, color: '#475569', bg: '#f8fafc', onClick: () => navigate('/admin/participants') },
-                                    { label: 'Submitted', value: stats.selfAssessments.submitted, color: '#16a34a', bg: '#f0fdf4', onClick: () => openSAStatusDrawer('Submitted', 'Submitted') },
-                                    { label: 'In Progress', value: stats.selfAssessments.draft, color: '#d97706', bg: '#fffbeb', onClick: () => openSAStatusDrawer('Draft', 'In Progress') },
-                                    { label: 'Not Started', value: notStartedCount, color: '#475569', bg: '#f1f5f9', onClick: () => openSAStatusDrawer('Not Started', 'Not Started') },
-                                ].map(({ label, value, color, bg, onClick }) => (
-                                    <div key={label}
-                                        onClick={onClick}
-                                        style={{ background: bg, border: `1px solid ${color}22`, borderRadius: '12px', padding: '0.75rem 1.25rem', minWidth: '120px', cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)' }}
-                                        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 20px ${color}22`; e.currentTarget.style.borderColor = `${color}55`; }}
-                                        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = `${color}22`; }}
-                                    >
-                                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-                                        <div style={{ fontSize: '1.75rem', fontWeight: 900, color }}>{value}</div>
-                                    </div>
-                                ));
-                            })()}
-                        </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
 
-                            {/* Category-wise progress */}
-                            <div className="card shadow-premium" style={{ border: 'none', padding: '1.5rem' }}>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Category-wise Progress</div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-                                    {CATEGORY_CARDS.map(({ label, key }) => {
-                                        const catData = stats.selfAssessments.byCategory?.[key] ?? { total: 0, submitted: 0, draft: 0 };
-                                        const total = (stats.categories?.[key] as number) || catData.total || 0;
-                                        const submitted = catData.submitted || 0;
-                                        const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
-                                        return (
-                                            <div key={key} onClick={() => openCategoryDrawer(key, label)} style={{ cursor: 'pointer', padding: '0.5rem 0.75rem', borderRadius: '8px', transition: 'background 0.15s' }}
-                                                onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
-                                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{label}</span>
-                                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>{submitted}/{total} ({pct}%) →</span>
-                                                </div>
-                                                <div style={{ height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                                                    <div style={{ width: `${pct}%`, height: '100%', backgroundColor: pct === 100 ? '#16a34a' : '#22c55e', borderRadius: '3px', transition: 'width 0.5s ease' }} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
 
-                            {/* Recent submissions */}
-                            <div className="card shadow-premium" style={{ border: 'none', padding: 0, overflow: 'hidden' }}>
-                                <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #f1f5f9', fontWeight: 800, fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Recent Submissions
-                                </div>
-                                <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                                    {stats.selfAssessments.recentSubmissions?.length === 0 ? (
-                                        <div style={{ padding: '2rem', textAlign: 'center', color: '#475569', fontWeight: 500 }}>No submissions yet</div>
-                                    ) : stats.selfAssessments.recentSubmissions?.map((s: any, i: number) => (
-                                        <div key={s.id} style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid #f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: i === 0 ? '#f0fdf4' : 'white' }}>
-                                            <div>
-                                                <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>{s.name}</div>
-                                                <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#475569', textTransform: 'capitalize' }}>{s.category}</div>
-                                            </div>
-                                            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#475569', textAlign: 'right' }}>
-                                                {s.submittedAt ? new Date(s.submittedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                 {/* ── Assessor Analytics — Premium Enterprise Dashboard ── */}
                 {user.role === 'admin' && (
@@ -1629,258 +1586,7 @@ const Dashboard = () => {
                     )}
                 </div>
 
-                <div style={{
 
-                }}>
-                    {/* Column 1: Primary Content */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                        {user.role === 'accessor' ? (
-                            <div className="card shadow-premium" style={{ border: 'none', padding: '0', overflow: 'hidden', borderRadius: '24px' }}>
-                                <div style={{ padding: '1.75rem 2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
-                                    <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Daily Verification Queue</h3>
-                                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#3730a3', backgroundColor: 'var(--primary-soft)', padding: '0.4rem 0.8rem', borderRadius: '8px' }}>
-                                        {assignments.length} Tasks assigned
-                                    </div>
-                                </div>
-
-                                <div style={{ padding: '1.5rem' }}>
-                                    {loading ? (
-                                        <div style={{ textAlign: 'center', padding: '4rem' }}>
-                                            <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
-                                            <p style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Syncing your queue...</p>
-                                        </div>
-                                    ) : assignments.length === 0 ? (
-                                        <div style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-                                            <div style={{ width: '80px', height: '80px', backgroundColor: '#f8fafc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: 'var(--text-secondary)' }}>
-                                                <Shield size={40} />
-                                            </div>
-                                            <h4 style={{ fontWeight: 900, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Queue is Empty</h4>
-                                            <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', maxWidth: '300px', margin: '0 auto' }}>No field segments currently assigned to your profile.</p>
-                                        </div>
-                                    ) : (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                                            {assignments.map(a => (
-                                                <div key={a.id} className="task-item hover-scale" style={{
-                                                    padding: '1.5rem',
-                                                    borderRadius: '20px',
-                                                    border: '1px solid var(--border-light)',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    backgroundColor: 'white',
-                                                    boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                                                }}>
-                                                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                                                        <div style={{
-                                                            width: '56px',
-                                                            height: '56px',
-                                                            backgroundColor: 'var(--swachh-green-soft)',
-                                                            color: 'var(--swachh-green)',
-                                                            borderRadius: '16px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            fontSize: '1.25rem',
-                                                            fontWeight: 950,
-                                                            border: '1px solid rgba(22, 163, 74, 0.1)'
-                                                        }}>
-                                                            {a.category.charAt(0).toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontWeight: 850, color: 'var(--text-primary)', textTransform: 'capitalize', fontSize: '1.1rem', marginBottom: '0.35rem' }}>
-                                                                {a.category} Ranking
-                                                            </div>
-                                                            <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><MapPin size={14} className="text-primary" /> {a.details?.ward || a.details?.Ward || 'L-Zone Sector'}</span>
-                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Calendar size={14} /> Assigned {new Date(a.createdAt).toLocaleDateString()}</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                                                        <div style={{ textAlign: 'right' }}>
-                                                            <span style={{
-                                                                display: 'inline-block',
-                                                                padding: '0.4rem 1rem',
-                                                                borderRadius: '100px',
-                                                                fontSize: '0.7rem',
-                                                                fontWeight: 800,
-                                                                textTransform: 'uppercase',
-                                                                letterSpacing: '0.05em',
-                                                                backgroundColor: a.status === 'verified' ? 'var(--success-soft)' : 'var(--warning-soft)',
-                                                                color: a.status === 'verified' ? 'var(--success)' : 'var(--warning)'
-                                                            }}>
-                                                                {a.status === 'verified' ? 'Completed' : 'Awaiting Action'}
-                                                            </span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setSelectedParticipant(a)}
-                                                            className="btn btn-primary"
-                                                            style={{
-                                                                padding: '0.75rem 1.5rem',
-                                                                borderRadius: '14px',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '0.625rem',
-                                                                fontSize: '0.875rem',
-                                                                fontWeight: 750,
-                                                                boxShadow: '0 4px 12px var(--primary-soft)'
-                                                            }}
-                                                        >
-                                                            Review Details <ArrowRight size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {/* Report sections for Admin and QC */}
-                        {(user.role === 'admin' || user.role === 'qc') && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                                {user.role === 'qc' && (
-                                    <div className="card shadow-premium" style={{ border: 'none', padding: '0', overflow: 'hidden', borderRadius: '24px' }}>
-                                        <div style={{ padding: '1.75rem 2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
-                                            <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Assessment Review Inbox</h3>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                                <span className="badge" style={{ backgroundColor: 'var(--warning-soft)', color: 'var(--warning)', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 800 }}>
-                                                    {qcReviews.length} Pending
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                                            {loading ? (
-                                                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                                                    <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
-                                                    <p style={{ color: 'var(--text-secondary)' }}>Refreshing reports...</p>
-                                                </div>
-                                            ) : qcReviews.length === 0 ? (
-                                                <div style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-                                                    <div style={{ width: '80px', height: '80px', backgroundColor: 'var(--success-soft)', color: 'var(--success)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-                                                        <CheckCircle2 size={40} />
-                                                    </div>
-                                                    <h4 style={{ fontWeight: 900, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>All Caught Up!</h4>
-                                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', maxWidth: '300px', margin: '0 auto' }}>No assessments pending for your quality review right now.</p>
-                                                </div>
-                                            ) : (
-                                                qcReviews.map(review => (
-                                                    <div key={review.id} className="hover-scale" style={{
-                                                        padding: '1.5rem',
-                                                        borderRadius: '24px',
-                                                        border: '1px solid var(--border-light)',
-                                                        backgroundColor: 'white',
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center',
-                                                        boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                                                    }}>
-                                                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                                                            <div style={{
-                                                                width: '60px',
-                                                                height: '60px',
-                                                                backgroundColor: '#f1f5f9',
-                                                                borderRadius: '18px',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                color: '#3730a3',
-                                                                fontSize: '1.4rem',
-                                                                fontWeight: 950,
-                                                                border: '1px solid #e2e8f0'
-                                                            }}>
-                                                                {review.questionnaire?.category?.charAt(0) || 'A'}
-                                                            </div>
-                                                            <div>
-                                                                <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.15rem', marginBottom: '0.35rem' }}>
-                                                                    {review.participant?.details?.ward || review.participant?.details?.Ward || 'Central'} Zone - {review.participant?.category}
-                                                                </div>
-                                                                <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                                        <Users size={14} className="text-primary" /> Assessor: {review.assessor?.name}
-                                                                    </span>
-                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                                        <Calendar size={14} /> Submitted {new Date(review.createdAt).toLocaleDateString()}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                                                            <div style={{ textAlign: 'right', paddingRight: '1.5rem', borderRight: '1.5px solid var(--border-light)' }}>
-                                                                <div style={{ fontSize: '0.65rem', fontWeight: 900, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Score</div>
-                                                                <div style={{ fontSize: '1.5rem', fontWeight: 950, color: '#3730a3', lineHeight: 1 }}>{review.totalScore}</div>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => setSelectedReview(review)}
-                                                                className="btn btn-primary"
-                                                                style={{
-                                                                    backgroundColor: '#064e3b',
-                                                                    color: 'white',
-                                                                    padding: '0.875rem 1.75rem',
-                                                                    borderRadius: '14px',
-                                                                    fontWeight: 800,
-                                                                    border: 'none',
-                                                                    boxShadow: '0 6px 15px rgba(6, 78, 59, 0.15)',
-                                                                    fontSize: '0.875rem'
-                                                                }}
-                                                            >
-                                                                Audit Review
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Column 2: Secondary Content (For Accessor Sidebar) */}
-                    {user.role === 'accessor' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                            <div className="card shadow-premium" style={{ border: 'none', background: 'white', borderRadius: '24px', padding: '2rem' }}>
-                                <h4 style={{ fontWeight: 900, marginBottom: '1.5rem', color: 'var(--text-primary)', fontSize: '1.1rem' }}>Your Progress</h4>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Verification Accuracy</span>
-                                        <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--swachh-green)' }}>98.4%</span>
-                                    </div>
-                                    <div style={{ width: '100%', height: '8px', backgroundColor: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                                        <div style={{ width: '98.4%', height: '100%', backgroundColor: 'var(--swachh-green)', borderRadius: '4px' }}></div>
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
-                                        <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Today</div>
-                                            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>12</div>
-                                        </div>
-                                        <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Target</div>
-                                            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#3730a3' }}>15</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="card shadow-premium" style={{ border: 'none', background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)', borderRadius: '24px', padding: '2rem', color: 'white', position: 'relative', overflow: 'hidden' }}>
-                                <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.1 }}><Award size={80} /></div>
-                                <h4 style={{ fontWeight: 900, marginBottom: '1rem', position: 'relative', zIndex: 1 }}>Field Protocol</h4>
-                                <p style={{ fontSize: '0.8125rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: '1.5rem', position: 'relative', zIndex: 1 }}>
-                                    Ensure you are at the physical location and have captured high-quality evidence images for all verified entities.
-                                </p>
-                                <button className="btn" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', width: '100%', borderRadius: '12px', fontSize: '0.8125rem', fontWeight: 750, padding: '0.75rem' }}>
-                                    View Guidelines
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
 
                 {/* Review Detail Modal */}
                 {selectedReview && (
@@ -2176,7 +1882,6 @@ const Dashboard = () => {
                         </div>
                     </div>
                 )}
-            </div>
 
             {/* ── Assessor Filtered Drawer ── */}
             {assessorDrawer && (() => {
@@ -2278,10 +1983,10 @@ const Dashboard = () => {
             })()}
 
             {/* ── Category SA Drawer ── */}
-            {saDrawer && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex' }}>
-                    <div style={{ flex: 1, background: 'rgba(0,0,0,0.45)' }} onClick={() => setSaDrawer(null)} />
-                    <div style={{ width: '520px', background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.15)' }}>
+        {saDrawer && (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex' }}>
+                <div style={{ flex: 1, background: 'rgba(0,0,0,0.45)' }} onClick={() => setSaDrawer(null)} />
+                <div style={{ width: '520px', background: 'white', display: 'flex', flexDirection: 'column', boxShadow: '-8px 0 40px rgba(0,0,0,0.15)' }}>
                         {/* Header */}
                         <div style={{ padding: '1.5rem 1.75rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                             <div>
@@ -2428,6 +2133,7 @@ const Dashboard = () => {
                     </div>
                 </div>
             )}
+        </div>
         </>
     );
 };

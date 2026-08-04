@@ -261,9 +261,15 @@ const ParticipantsList = () => {
 
         const doc = new jsPDF("landscape");
 
-        doc.setFont("helvetica", "normal");
-        // ⭐ dynamic columns collect karenge
-        const dynamicKeys = new Set<string>();
+if (typeof (window as any).font !== "undefined") {
+    doc.addFileToVFS("NotoSans-Regular.ttf", (window as any).font);
+    doc.addFont("NotoSans-Regular.ttf", "Noto", "normal");
+    doc.setFont("Noto");
+} else {
+    doc.setFont("helvetica", "normal");
+}
+    // ⭐ dynamic columns collect karenge
+    const dynamicKeys = new Set<string>();
 
         participants.forEach(p => {
             Object.keys(p.details || {}).forEach(k => dynamicKeys.add(k));

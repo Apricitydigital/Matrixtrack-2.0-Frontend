@@ -53,7 +53,7 @@ const resolveImageUrl = (src?: string) => {
 
 const AssessmentReview = () => {
     const { assessmentId } = useParams() as {
-        assessmentId: string;
+        assessmentId?: string;
     };
     const navigate = useNavigate();
     const [assessment, setAssessment] = useState<any>(null);
