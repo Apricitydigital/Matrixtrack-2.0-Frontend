@@ -3,29 +3,17 @@ const isBrowser = typeof window !== "undefined";
 // Server-first defaults. Set REACT_APP_LOCAL_API_ORIGIN to force local, or
 // REACT_APP_API_BASE_URL to a fully-qualified base if you want something custom.
 const REMOTE_API_ORIGIN =
-  (process.env.NEXT_PUBLIC_API_ORIGIN || process.env.REACT_APP_API_ORIGIN || "").replace(/\/+$/, "") ||
-  "http://localhost:5000";
+  (process.env.NEXT_PUBLIC_WORKFORCE_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_ORIGIN || "").replace(/\/+$/, "") ||
+  "http://localhost:4000";
 const LOCAL_API_ORIGIN =
-  (process.env.NEXT_PUBLIC_LOCAL_API_ORIGIN || process.env.REACT_APP_LOCAL_API_ORIGIN || "").replace(/\/+$/, "") ||
-  "http://localhost:5000";
+  (process.env.NEXT_PUBLIC_WORKFORCE_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_LOCAL_API_ORIGIN || "").replace(/\/+$/, "") ||
+  "http://localhost:4000";
 
-const envBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.REACT_APP_API_BASE_URL || "";
+const envBase = process.env.NEXT_PUBLIC_WORKFORCE_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 const envTrimmed = envBase.trim().replace(/\/+$/, "");
 const normalizedEnvBase = envTrimmed.replace(/\/api$/, "");
 
-// Choose origin:
-// 1) Explicit REACT_APP_API_BASE_URL if provided.
-// 2) Otherwise REMOTE_API_ORIGIN by default (server-first).
-// 3) If you set REACT_APP_USE_LOCAL_BACKEND=true, we use LOCAL_API_ORIGIN instead.
-const useLocalOverride = process.env.REACT_APP_USE_LOCAL_BACKEND === "true";
-
-// Respect explicit env first. Local backend is only used when requested.
-const chosenOrigin = normalizedEnvBase
-  ? normalizedEnvBase
-  : useLocalOverride
-    ? LOCAL_API_ORIGIN
-    : REMOTE_API_ORIGIN;
-
+const chosenOrigin = normalizedEnvBase || REMOTE_API_ORIGIN;
 const rawBaseUrl = `${chosenOrigin.replace(/\/api$/, "")}/api`;
 const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, "");
 const apiOrigin = normalizedBaseUrl.replace(/\/api$/, "");

@@ -116,3 +116,4 @@ export function getPostLoginRedirect(user: AuthUser | null) {
   if (!user) return "/login";
   return "/portal-home";
 }
+

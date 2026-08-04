@@ -11,17 +11,24 @@ export function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  const hasLocalUser = typeof window !== 'undefined' && (
+    !!localStorage.getItem('user') ||
+    !!localStorage.getItem('swachh_user') ||
+    !!localStorage.getItem('token')
+  );
+
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !hasLocalUser) {
       router.replace("/unified-login");
     }
-  }, [loading, user, router]);
+  }, [loading, user, hasLocalUser, router]);
 
-  if (!user) {
+  if (!user && !hasLocalUser) {
     return <div>Checking access...</div>;
   }
   return <>{children}</>;
 }
+
 
 export function RoleGuard({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
   const { user } = useAuth();

@@ -2,15 +2,17 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
+import { WorkspaceLoading } from '@components/ui/WorkspaceLoading';
 
 const WorkforcePortalContainer = dynamic(
   () => import('@modules/matrixtrack-workforce/WorkforcePortalContainer'),
   {
     ssr: false,
     loading: () => (
-      <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14 }}>
-        Loading Matrix Track Workforce Monitoring...
-      </div>
+      <WorkspaceLoading
+        title="Workforce Monitoring Workspace"
+        subtitle="Loading field employee management, attendance & professional leave records..."
+      />
     )
   }
 );

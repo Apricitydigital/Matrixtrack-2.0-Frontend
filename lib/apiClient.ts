@@ -147,12 +147,20 @@ async function buildHeaders(initHeaders?: HeadersInit, isFormData?: boolean) {
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isFormData = init.body instanceof FormData;
   const headers = await buildHeaders(init.headers, isFormData);
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-    credentials: "include"
-  });
+  const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000").replace(/\/+$/, "");
+  const targetUrl = `${baseUrl}${path}`;
+
+  let res: Response;
+  try {
+    res = await fetch(targetUrl, {
+      ...init,
+      headers,
+      cache: "no-store"
+    });
+  } catch (netErr: any) {
+    console.error("[apiFetch] Network error for:", targetUrl, netErr);
+    throw new ApiError(503, "Cannot connect to backend server at " + baseUrl);
+  }
 
   if (!res.ok) {
     const rawMessage = await res.text();

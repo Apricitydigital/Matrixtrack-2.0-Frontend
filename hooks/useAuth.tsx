@@ -42,6 +42,36 @@ const AuthContext = createContext<
   AuthContextValue | undefined
 >(undefined);
 
+function syncSubmoduleStorage(normalized: AuthUser | null) {
+  if (typeof window === "undefined") return;
+  if (!normalized) {
+    localStorage.removeItem("user");
+    localStorage.removeItem("swachh_user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("swachh_token");
+    return;
+  }
+  const primaryRole = (normalized.roles && normalized.roles[0]) ? normalized.roles[0].toLowerCase() : 'admin';
+  const mappedRole = (primaryRole.includes('admin') || primaryRole.includes('commissioner') || primaryRole.includes('hms')) ? 'admin' : primaryRole;
+  const moduleUser = {
+    id: normalized.id,
+    name: normalized.name,
+    email: normalized.email,
+    role: mappedRole,
+    roles: normalized.roles,
+    cityId: normalized.cityId,
+    cityName: normalized.cityName,
+    modules: normalized.modules
+  };
+  const currentToken = getStoredToken() || "";
+  localStorage.setItem("user", JSON.stringify(moduleUser));
+  localStorage.setItem("swachh_user", JSON.stringify(moduleUser));
+  if (currentToken) {
+    localStorage.setItem("token", currentToken);
+    localStorage.setItem("swachh_token", currentToken);
+  }
+}
+
 function getUnifiedSessionUser(): AuthUser | null {
   if (typeof window === "undefined") {
     return null;
@@ -125,6 +155,7 @@ export function AuthProvider({
 
       if (persist) {
         clearPersistedUserSnapshot();
+        syncSubmoduleStorage(null);
       }
 
       return;
@@ -138,6 +169,7 @@ export function AuthProvider({
 
       if (persist) {
         clearPersistedUserSnapshot();
+        syncSubmoduleStorage(null);
       }
 
       return;
@@ -152,12 +184,14 @@ export function AuthProvider({
 
     if (persist) {
       persistUserSnapshot(normalized);
+      syncSubmoduleStorage(normalized);
     }
   };
 
   const clearSession = () => {
     clearPersistedAccessToken();
     clearPersistedUserSnapshot();
+    syncSubmoduleStorage(null);
     setUser(null);
   };
 

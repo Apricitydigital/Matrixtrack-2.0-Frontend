@@ -416,7 +416,7 @@ const LandingPage = () => {
                         className="header-logo-link"
                     >
                         <img
-                            src={SwachhParvLogo.src}
+                            src={typeof SwachhParvLogo === 'string' ? SwachhParvLogo : (SwachhParvLogo as any)?.src || (SwachhParvLogo as any)}
                             alt="Swachh Pune Sankalp 2026"
                             className="header-logo"
                         />
