@@ -77,7 +77,7 @@ export default function TaskforceTasksPage() {
     }
   };
 
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isSuperAdmin = user?.roles?.includes("HMS_SUPER_ADMIN");
   const isCityAdmin = user?.roles?.includes("CITY_ADMIN") || isSuperAdmin;
 
@@ -102,9 +102,12 @@ export default function TaskforceTasksPage() {
     try {
       setLoading(true);
 
-      // Use feederRequests() which returns ALL feeder points for City Admin in one call
-      // This is the most reliable endpoint — no extra role guards
-      const [allFpRes, repRes, recRes, empRes] = await Promise.all([
+      // Fetch all data in parallel:
+      // 1. feederRequests() — ALL feeder points for City Admin (no status filter)
+      // 2. pendingReports() — reports awaiting QC review
+      // 3. getRecords(DAILY_REPORTS) — get full stats across all statuses (most accurate)
+      // 4. EmployeesApi — get registered taskforce staff count
+      const [allFpRes, repRes, statsRes, empRes] = await Promise.all([
         TaskforceApi.feederRequests().catch((err) => {
           console.error('[loadAdminData] feederRequests() failed:', err);
           return { feederPoints: [] };
@@ -113,9 +116,10 @@ export default function TaskforceTasksPage() {
           console.error('[loadAdminData] pendingReports() failed:', err);
           return { reports: [] };
         }),
-        TaskforceApi.getRecords({ cityId: selectedCity, tab: 'PENDING', limit: 1 }).catch((err) => {
-          console.error('[loadAdminData] getRecords() failed:', err);
-          return { stats: {}, data: [] };
+        // Use DAILY_REPORTS tab to get accurate stats across ALL statuses — not PENDING
+        TaskforceApi.getRecords({ tab: 'DAILY_REPORTS', limit: 1 }).catch((err) => {
+          console.error('[loadAdminData] getRecords(DAILY_REPORTS) failed:', err);
+          return { stats: null, data: [] };
         }),
         EmployeesApi.list('TASKFORCE').catch((err) => {
           console.error('[loadAdminData] EmployeesApi.list() failed:', err);
@@ -127,25 +131,28 @@ export default function TaskforceTasksPage() {
 
       const allFPs: any[] = allFpRes.feederPoints || [];
       const reports: any[] = repRes.reports || [];
-      const stats = (recRes as any).stats || {};
+      // Stats from DAILY_REPORTS gives accurate combined feeder point + report counts
+      const stats = (statsRes as any).stats || {};
 
       // Split feeder points by status
       const pendingFPs = allFPs.filter((fp: any) => fp.status === 'PENDING_QC');
       const approvedUnassigned = allFPs.filter((fp: any) => fp.status === 'APPROVED' && (!fp.assignedEmployeeIds || fp.assignedEmployeeIds.length === 0));
       const approvedAssigned = allFPs.filter((fp: any) => fp.status === 'APPROVED' && fp.assignedEmployeeIds && fp.assignedEmployeeIds.length > 0);
 
-      console.log('[loadAdminData] allFPs:', allFPs.length, '| pending:', pendingFPs.length, '| approvedUnassigned:', approvedUnassigned.length, '| approvedAssigned:', approvedAssigned.length);
+      console.log('[loadAdminData] allFPs:', allFPs.length, '| pending:', pendingFPs.length, '| approvedUnassigned:', approvedUnassigned.length, '| approvedAssigned:', approvedAssigned.length, '| stats:', stats);
 
       setPendingRequests(pendingFPs);
       setPendingReports(reports);
       setAllFeederPoints(allFPs);
-      setRecords((recRes as any).data || []);
+      setRecords((statsRes as any).data || []);
 
       setMetrics({
-        total: allFPs.length,
+        // Feeder point counts derived from the full list (most accurate)
+        total: allFPs.filter((fp: any) => fp.status === 'APPROVED').length,
         pendingRequests: pendingFPs.length,
         assignedPoints: approvedAssigned.length,
         unassignedPoints: approvedUnassigned.length,
+        // Report stats from DAILY_REPORTS tab (combined feeder point + daily report counts)
         approved: stats.approved || 0,
         rejected: stats.rejected || 0,
         actionRequired: stats.actionRequired || 0,
@@ -305,6 +312,16 @@ export default function TaskforceTasksPage() {
       setError("Failed to add activity.");
     }
   };
+
+  // ⚠️ HYDRATION FIX: Auth is client-side only. During server render, user=null → isCityAdmin=false.
+  // Returning a consistent spinner prevents the server/client HTML mismatch.
+  if (authLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
 
   if (isCityAdmin) {
     return (

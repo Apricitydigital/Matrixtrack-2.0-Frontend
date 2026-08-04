@@ -22,8 +22,9 @@ type TaskforceRecord = {
 export default function TaskforceQCDashboard() {
     const { user: authUser } = useAuth();
 
-    const [viewTab, setViewTab] = useState<'dashboard' | 'verification' | 'supervisors'>('dashboard');
+    const [viewTab, setViewTab] = useState<'dashboard' | 'verification' | 'registrations' | 'supervisors'>('dashboard');
     const [records, setRecords] = useState<TaskforceRecord[]>([]);
+    const [feederRequests, setFeederRequests] = useState<any[]>([]); // Pending feeder point registrations
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [limit] = useState(20);
@@ -46,6 +47,8 @@ export default function TaskforceQCDashboard() {
         wardIds: string[];
     } | null>(null);
 
+    const isCityAdmin = authUser?.roles?.some((r: string) => ['CITY_ADMIN', 'HMS_SUPER_ADMIN', 'COMMISSIONER', 'ULB_OFFICER'].includes(r));
+
     // Ensure verification view always shows pending queue
     useEffect(() => {
         if (viewTab === 'verification' && activeTab !== 'PENDING') {
@@ -59,10 +62,12 @@ export default function TaskforceQCDashboard() {
     }, [activeTab]);
 
     useEffect(() => {
-        if (viewTab !== 'supervisors') {
-            loadData();
-        } else {
+        if (viewTab === 'supervisors') {
             loadEmployeesOnce();
+        } else if (viewTab === 'registrations') {
+            loadFeederRequests();
+        } else {
+            loadData();
         }
     }, [activeTab, page, viewTab]);
 
@@ -122,6 +127,20 @@ export default function TaskforceQCDashboard() {
             console.error("Failed to load supervisors", empErr);
         } finally {
             if (viewTab === 'supervisors') setLoading(false);
+        }
+    }
+
+    async function loadFeederRequests() {
+        setLoading(true);
+        try {
+            const res = await TaskforceApi.feederRequests();
+            // For QC: show all pending registration requests (read-only view)
+            // For City Admin: also show them with approve/reject actions
+            setFeederRequests(res.feederPoints || []);
+        } catch (err) {
+            console.error('Failed to load feeder requests', err);
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -384,6 +403,17 @@ export default function TaskforceQCDashboard() {
                             Verification
                         </button>
                         <button
+                            className={`btn ${viewTab === 'registrations' ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => { setViewTab('registrations'); }}
+                        >
+                            🗂 Registrations
+                            {feederRequests.filter(r => r.status === 'PENDING_QC').length > 0 && (
+                                <span style={{ marginLeft: 6, background: '#ef4444', color: 'white', borderRadius: 999, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>
+                                    {feederRequests.filter(r => r.status === 'PENDING_QC').length}
+                                </span>
+                            )}
+                        </button>
+                        <button
                             className={`btn ${viewTab === 'supervisors' ? 'btn-primary' : 'btn-outline'}`}
                             onClick={() => setViewTab('supervisors')}
                         >
@@ -393,7 +423,7 @@ export default function TaskforceQCDashboard() {
                     </div>
                 </div>
 
-                {viewTab !== 'supervisors' && (
+                {viewTab !== 'supervisors' && viewTab !== 'registrations' && (
                     <div className="stats-row">
                         <StatsCard label="Pending Review" value={derivedStats.pending || 0} sub="Daily Reports" color="#d97706" />
                         <StatsCard label="Approved" value={derivedStats.approved || 0} sub="Daily Reports" color="#16a34a" />
@@ -497,6 +527,70 @@ export default function TaskforceQCDashboard() {
                                 </div>
                             </div>
                         </>
+                    )}
+                </section>
+            ) : viewTab === 'registrations' ? (
+                <section className="card card-spacious">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-lg font-bold">Feeder Point Registration Requests</h2>
+                            <p className="muted text-sm mb-0">
+                                {isCityAdmin
+                                    ? 'Review and approve/reject CTU/GVP feeder point registration requests.'
+                                    : 'Feeder point registration requests submitted by Taskforce members (read-only — approvals by City Admin).'}
+                            </p>
+                        </div>
+                        <button className="btn btn-sm btn-outline" onClick={loadFeederRequests}>↻ Refresh</button>
+                    </div>
+
+                    {loading ? (
+                        <div className="flex justify-center p-8"><span className="loading loading-spinner loading-md"></span></div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr>
+                                        {(['Feeder Point Name', 'Area / Location', 'Zone / Ward', 'Requested By', 'Households / Vehicle', 'Status', 'Submitted']).map(h => (
+                                            <th key={h} style={{ textAlign: 'left', fontSize: 11, color: '#64748b', padding: '10px 14px', borderBottom: '2px solid #f1f5f9', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {feederRequests.length === 0 ? (
+                                        <tr><td colSpan={7} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>No feeder point registration requests found.</td></tr>
+                                    ) : feederRequests.map((fp: any) => (
+                                        <tr key={fp.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '12px 14px' }}>
+                                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>{fp.feederPointName || fp.areaName || '—'}</div>
+                                                <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{fp.id.slice(0, 8)}...</div>
+                                            </td>
+                                            <td style={{ padding: '12px 14px', fontSize: 13 }}>
+                                                <div>{fp.areaName || fp.locationDescription || '—'}</div>
+                                                {fp.landmark && <div style={{ fontSize: 11, color: '#64748b' }}>Near: {fp.landmark}</div>}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', fontSize: 13 }}>
+                                                <div>{fp.zoneName || '—'}</div>
+                                                <div style={{ fontSize: 11, color: '#64748b' }}>{fp.wardName || '—'}</div>
+                                            </td>
+                                            <td style={{ padding: '12px 14px', fontSize: 13 }}>
+                                                <div style={{ fontWeight: 600 }}>{fp.requestedBy?.name || 'Taskforce Member'}</div>
+                                                <div style={{ fontSize: 11, color: '#64748b' }}>{fp.requestedBy?.email || '—'}</div>
+                                            </td>
+                                            <td style={{ padding: '12px 14px', fontSize: 13 }}>
+                                                <div>{fp.householdsCount ?? 0} households</div>
+                                                <div style={{ fontSize: 11, color: '#64748b' }}>{fp.vehicleType || 'HANDCART'}</div>
+                                            </td>
+                                            <td style={{ padding: '12px 14px' }}>
+                                                <StatusBadge status={fp.status} />
+                                            </td>
+                                            <td style={{ padding: '12px 14px', fontSize: 12, color: '#64748b' }}>
+                                                {fp.createdAt ? new Date(fp.createdAt).toLocaleDateString() : '—'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </section>
             ) : (
