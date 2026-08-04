@@ -330,4 +330,3 @@ export function FilterTabs({ tabs, activeTab, onChange }: { tabs: { id: string; 
     </div>
   );
 }
-

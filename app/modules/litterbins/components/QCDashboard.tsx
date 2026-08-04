@@ -42,11 +42,11 @@ export default function QCDashboard() {
 
     async function loadEmployees() {
         try {
-            // Assuming Twinbin module supervisors. 
+            // Assuming Twinbin module supervisors.
             // If generic, might need to list all or filter by module.
             // Using "twinbin" (lowercase) or "LITTERBINS" depending on how backend expects it.
             // Backend usually expects normalized key. Let's try "LITTERBINS" first or check what other calls use.
-            // router.ts uses "LITTERBINS". 
+            // router.ts uses "LITTERBINS".
             // Using "twinbin" (lowercase) to match the records call and likely backend canonical key
             const res = await apiFetch<{ employees: any[] }>("/city/employees?moduleKey=twinbin");
             setEmployees(res.employees || []);
@@ -543,4 +543,3 @@ function InfoItem({ label, value }: { label: string; value: React.ReactNode }) {
         </div>
     );
 }
-

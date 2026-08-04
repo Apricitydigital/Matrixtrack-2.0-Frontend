@@ -79,15 +79,13 @@ function NavItem({
       className={`
         group relative flex items-center gap-3 rounded-lg
         font-medium transition-all duration-200
-        ${
-          compact
-            ? "px-3 py-2 text-[13px]"
-            : "px-3 py-2.5 text-sm"
+        ${compact
+          ? "px-3 py-2 text-[13px]"
+          : "px-3 py-2.5 text-sm"
         }
-        ${
-          active
-            ? "bg-primary-soft text-primary-strong"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+        ${active
+          ? "bg-primary-soft text-primary-strong"
+          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
         }
       `}
     >
@@ -99,10 +97,9 @@ function NavItem({
         <span
           className={`
             flex items-center transition-colors
-            ${
-              active
-                ? "text-primary"
-                : "text-slate-400 group-hover:text-slate-600"
+            ${active
+              ? "text-primary"
+              : "text-slate-400 group-hover:text-slate-600"
             }
             ${compact ? "opacity-80" : ""}
           `}
@@ -157,10 +154,9 @@ function CollapsibleGroup({
         className={`
           grid overflow-hidden transition-all duration-200
           ease-out-expo
-          ${
-            open
-              ? "grid-rows-[1fr] opacity-100"
-              : "grid-rows-[0fr] opacity-0"
+          ${open
+            ? "grid-rows-[1fr] opacity-100"
+            : "grid-rows-[0fr] opacity-0"
           }
         `}
       >
@@ -234,11 +230,17 @@ export default function Sidebar() {
       },
       {
         label: "Login",
-        href: "/login",
+        href: "/unified-login",
         icon: <Shield size={18} />,
       }
     );
   } else {
+    links.push({
+      label: "Portal Home",
+      href: "/portal-home",
+      icon: <Layout size={18} />,
+    });
+
     if (
       !isCommissioner &&
       !isCityAdmin &&
@@ -289,7 +291,6 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace("/login");
   };
 
   /*
@@ -428,7 +429,7 @@ export default function Sidebar() {
 
         {!loading && !user && (
           <Link
-            href="/login"
+            href="/unified-login"
             className="flex w-full items-center justify-center rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 shadow-sm"
           >
             Login

@@ -348,9 +348,9 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         return matchesSearch && isSupported;
     });
 
-    // handling zoom in func map controller 
+    // handling zoom in func map controller
     const handleZoomIn = () => window.dispatchEvent(new CustomEvent("map-zoom-in"));
-    // handling zoom out func map controller 
+    // handling zoom out func map controller
     const handleZoomOut = () => window.dispatchEvent(new CustomEvent("map-zoom-out"));
 
     return (
@@ -932,4 +932,3 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         </div>
     );
 }
-
