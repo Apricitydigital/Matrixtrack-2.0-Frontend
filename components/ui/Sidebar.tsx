@@ -28,6 +28,7 @@ import {
   Bell,
   LogOut,
   Building2,
+  Globe,
 } from "lucide-react";
 
 const getModuleIcon = (key: string) => {
@@ -262,6 +263,11 @@ export default function Sidebar() {
           icon: <Shield size={18} />,
         },
         {
+          label: "City Directory",
+          href: "/portal-home/city-directory",
+          icon: <Globe size={18} />,
+        },
+        {
           label: "Onboard City",
           href: "/hms/cities/new",
           icon: <Building2 size={18} />,
@@ -280,7 +286,7 @@ export default function Sidebar() {
       });
       links.push({
         label: "Integrated Registration",
-        href: "/common-registration",
+        href: "/portal-home/common-registration",
         icon: <UserPlus size={18} />,
       });
     } else {
@@ -413,7 +419,7 @@ export default function Sidebar() {
         {/* Module links */}
         {user && moduleLinks.length > 0 && (
           <CollapsibleGroup
-            label="Modules"
+            label="Active Operational Workspaces"
             icon={<Layout size={18} />}
             open={modulesOpen}
             onToggle={() =>

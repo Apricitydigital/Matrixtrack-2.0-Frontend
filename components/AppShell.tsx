@@ -8,7 +8,7 @@ import { Topbar } from "@components/ui/Topbar";
 
 const STANDALONE_PATHS = [
   "/",
-  "/login",
+  "/unified-login",
   "/register",
   "/unified-login",
   "/create-account",

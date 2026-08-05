@@ -37,7 +37,7 @@ function App() {
         <div className="app">
             <Routes>
                 {/* Public Routes */}
-                <Route path="/login" element={<Login />} />
+                <Route path="/unified-login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
 
                 {/* Private Routes with Sidebar Layout */}
@@ -49,7 +49,7 @@ function App() {
                                 <Dashboard />
                             </Layout>
                         ) : (
-                            <Navigate to="/login" />
+                            <Navigate to="/unified-login" />
                         )
                     }
                 />
@@ -189,7 +189,7 @@ function App() {
                                 <Profile />
                             </Layout>
                         ) : (
-                            <Navigate to="/login" />
+                            <Navigate to="/unified-login" />
                         )
                     }
                 />
