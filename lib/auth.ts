@@ -25,15 +25,11 @@ export function setAuthCookie(
   if (typeof window !== "undefined") {
     setBrowserCookie(token);
 
-    localStorage.setItem(
-      "token",
-      token
-    );
-
-    localStorage.setItem(
-      "swachh_token",
-      token
-    );
+    localStorage.setItem("token", token);
+    localStorage.setItem("swachh_token", token);
+    localStorage.setItem("hms_access_token", token);
+    localStorage.setItem("taskforce_access_token", token);
+    localStorage.setItem("matrixtrack_access_token", token);
 
     return;
   }
@@ -61,9 +57,10 @@ export function clearAuthCookie() {
       `${AUTH_COOKIE}=; Max-Age=0; path=/`;
 
     localStorage.removeItem("token");
-    localStorage.removeItem(
-      "swachh_token"
-    );
+    localStorage.removeItem("swachh_token");
+    localStorage.removeItem("hms_access_token");
+    localStorage.removeItem("taskforce_access_token");
+    localStorage.removeItem("matrixtrack_access_token");
     localStorage.removeItem("user");
 
     return;
@@ -97,15 +94,12 @@ export function getTokenFromCookies():
 
     const localToken =
       localStorage.getItem("token") ||
-      localStorage.getItem(
-        "swachh_token"
-      );
+      localStorage.getItem("swachh_token") ||
+      localStorage.getItem("hms_access_token") ||
+      localStorage.getItem("taskforce_access_token") ||
+      localStorage.getItem("matrixtrack_access_token");
 
-    if (
-      localToken &&
-      localToken !==
-      "matrix_track_session_token"
-    ) {
+    if (localToken) {
       return localToken;
     }
   }

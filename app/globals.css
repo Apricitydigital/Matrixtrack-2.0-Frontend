@@ -1369,3 +1369,38 @@ label {
   color: var(--primary);
   font-weight: 700;
 }
+
+/* Unified Portal Content Sizing - Compact & Proportionate */
+.portal-main-content {
+  font-size: 13px;
+}
+
+.portal-main-content h1 {
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  line-height: 1.25 !important;
+}
+
+.portal-main-content h2 {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+}
+
+.portal-main-content h3 {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
+.portal-main-content table th,
+.portal-main-content table td {
+  font-size: 12px !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.portal-main-content button,
+.portal-main-content input,
+.portal-main-content select {
+  font-size: 12px !important;
+}

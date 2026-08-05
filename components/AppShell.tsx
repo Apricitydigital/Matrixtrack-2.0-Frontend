@@ -10,13 +10,15 @@ const STANDALONE_PATHS = [
   "/",
   "/unified-login",
   "/register",
-  "/unified-login",
   "/create-account",
   "/applications",
   "/portal-home",
+  "/city",
   "/ward-ranking",
   "/workforce-monitoring",
   "/admin-management",
+  "/employees",
+  "/modules",
 ];
 
 export function AppShell({
