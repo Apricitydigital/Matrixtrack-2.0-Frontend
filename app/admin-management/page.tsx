@@ -23,6 +23,7 @@ interface UserRecord {
   taskforceAccess: AccessLevel;
   swachhAccess: AccessLevel;
   workforceAccess: AccessLevel;
+  mrfAccess: AccessLevel;
 }
 
 // Storage Key for Local Persistence across page refreshes
@@ -37,7 +38,7 @@ const RBAC_ROLES = [
     color: '#2563eb',
     bg: '#eff6ff',
     border: '#bfdbfe',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'WRITE' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'WRITE' as AccessLevel, mrf: 'WRITE' as AccessLevel }
   },
   {
     key: 'COMMISSIONER',
@@ -46,16 +47,16 @@ const RBAC_ROLES = [
     color: '#0284c7',
     bg: '#e0f2fe',
     border: '#bae6fd',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'WRITE' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'WRITE' as AccessLevel, mrf: 'WRITE' as AccessLevel }
   },
   {
     key: 'CITY_ADMIN',
     label: 'City Admin',
-    desc: 'City-level management with complete workspace creation & edit rights',
+    desc: 'City-level management with configurable multi-workspace creation & edit rights',
     color: '#16a34a',
     bg: '#f0fdf4',
     border: '#bbf7d0',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'WRITE' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'WRITE' as AccessLevel, mrf: 'WRITE' as AccessLevel }
   },
   {
     key: 'DIVISION_ADMIN',
@@ -64,7 +65,7 @@ const RBAC_ROLES = [
     color: '#7c3aed',
     bg: '#f3e8ff',
     border: '#ddd6fe',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'READ' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'READ' as AccessLevel, mrf: 'READ' as AccessLevel }
   },
   {
     key: 'ZONE_ADMIN',
@@ -73,7 +74,7 @@ const RBAC_ROLES = [
     color: '#d97706',
     bg: '#fffbeb',
     border: '#fef3c7',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'RESTRICTED' as AccessLevel, workforce: 'WRITE' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'RESTRICTED' as AccessLevel, workforce: 'WRITE' as AccessLevel, mrf: 'RESTRICTED' as AccessLevel }
   },
   {
     key: 'WARD_ADMIN',
@@ -82,7 +83,7 @@ const RBAC_ROLES = [
     color: '#059669',
     bg: '#ecfdf5',
     border: '#a7f3d0',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'RESTRICTED' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'RESTRICTED' as AccessLevel, mrf: 'RESTRICTED' as AccessLevel }
   },
   {
     key: 'QC',
@@ -91,7 +92,7 @@ const RBAC_ROLES = [
     color: '#9333ea',
     bg: '#faf5ff',
     border: '#e9d5ff',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'READ' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'WRITE' as AccessLevel, workforce: 'READ' as AccessLevel, mrf: 'READ' as AccessLevel }
   },
   {
     key: 'ACTION_OFFICER',
@@ -100,7 +101,7 @@ const RBAC_ROLES = [
     color: '#ea580c',
     bg: '#fff7ed',
     border: '#ffedd5',
-    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'READ' as AccessLevel, workforce: 'RESTRICTED' as AccessLevel }
+    defaults: { taskforce: 'WRITE' as AccessLevel, swachh: 'READ' as AccessLevel, workforce: 'RESTRICTED' as AccessLevel, mrf: 'RESTRICTED' as AccessLevel }
   },
   {
     key: 'SUPERVISOR',
@@ -109,7 +110,7 @@ const RBAC_ROLES = [
     color: '#0891b2',
     bg: '#ecfeff',
     border: '#cffaff',
-    defaults: { taskforce: 'READ' as AccessLevel, swachh: 'RESTRICTED' as AccessLevel, workforce: 'WRITE' as AccessLevel }
+    defaults: { taskforce: 'READ' as AccessLevel, swachh: 'RESTRICTED' as AccessLevel, workforce: 'WRITE' as AccessLevel, mrf: 'RESTRICTED' as AccessLevel }
   },
   {
     key: 'EMPLOYEE',
@@ -118,7 +119,7 @@ const RBAC_ROLES = [
     color: '#475569',
     bg: '#f8fafc',
     border: '#e2e8f0',
-    defaults: { taskforce: 'READ' as AccessLevel, swachh: 'RESTRICTED' as AccessLevel, workforce: 'RESTRICTED' as AccessLevel }
+    defaults: { taskforce: 'READ' as AccessLevel, swachh: 'RESTRICTED' as AccessLevel, workforce: 'RESTRICTED' as AccessLevel, mrf: 'RESTRICTED' as AccessLevel }
   },
 ];
 
@@ -151,6 +152,7 @@ export default function SuperAdminAccessManagementPage() {
     taskforceAccess: AccessLevel;
     swachhAccess: AccessLevel;
     workforceAccess: AccessLevel;
+    mrfAccess: AccessLevel;
   }>({
     name: '',
     email: '',
@@ -159,6 +161,7 @@ export default function SuperAdminAccessManagementPage() {
     taskforceAccess: 'WRITE',
     swachhAccess: 'WRITE',
     workforceAccess: 'WRITE',
+    mrfAccess: 'WRITE',
   });
 
   // Form State for Editing User
@@ -168,12 +171,14 @@ export default function SuperAdminAccessManagementPage() {
     taskforceAccess: AccessLevel;
     swachhAccess: AccessLevel;
     workforceAccess: AccessLevel;
+    mrfAccess: AccessLevel;
   }>({
     name: '',
     role: 'CITY_ADMIN',
     taskforceAccess: 'WRITE',
     swachhAccess: 'WRITE',
     workforceAccess: 'WRITE',
+    mrfAccess: 'WRITE',
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -214,6 +219,7 @@ export default function SuperAdminAccessManagementPage() {
         if (keys[0].includes('TASKFORCE')) return roleDef.defaults.taskforce;
         if (keys[0].includes('SWACHH')) return roleDef.defaults.swachh;
         if (keys[0].includes('WORKFORCE')) return roleDef.defaults.workforce;
+        if (keys[0].includes('MRF') || keys[0].includes('PROCESSING')) return roleDef.defaults.mrf;
       }
       return 'RESTRICTED';
     }
@@ -242,6 +248,7 @@ export default function SuperAdminAccessManagementPage() {
             taskforceAccess: parseAccessLevel(u, ['TASKFORCE', 'SWEEPING']),
             swachhAccess: parseAccessLevel(u, ['SWACHH', 'WARD']),
             workforceAccess: parseAccessLevel(u, ['WORKFORCE', 'ATTENDANCE']),
+            mrfAccess: parseAccessLevel(u, ['MRF', 'PROCESSING']),
           };
         });
 
@@ -260,14 +267,14 @@ export default function SuperAdminAccessManagementPage() {
     } catch (e) {
       // Mock Fallback Base Users
       const baseMockUsers: UserRecord[] = [
-        { id: '1', name: 'Super Admin', email: 'admin@matrixtrack.in', role: 'HMS_SUPER_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE' },
-        { id: '2', name: 'Municipal Commissioner', email: 'commissioner@matrixtrack.in', role: 'COMMISSIONER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE' },
-        { id: '3', name: 'Indore City Admin', email: 'cityadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE' },
-        { id: '4', name: 'Zone 01 Admin', email: 'zoneadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE' },
-        { id: '5', name: 'Ward 15 Admin', email: 'wardadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE' },
-        { id: '6', name: 'Quality Controller (QC)', email: 'qc@indore.local', role: 'QC', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'READ' },
-        { id: '7', name: 'Mahendra (Action Officer)', email: 'mahendra@gmail.com', role: 'ACTION_OFFICER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'READ', workforceAccess: 'RESTRICTED' },
-        { id: '8', name: 'Field Supervisor', email: 'supervisor.vaani@gmail.com', role: 'SUPERVISOR', createdAt: new Date().toISOString(), taskforceAccess: 'READ', swachhAccess: 'RESTRICTED', workforceAccess: 'WRITE' },
+        { id: '1', name: 'Super Admin', email: 'admin@matrixtrack.in', role: 'HMS_SUPER_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'WRITE' },
+        { id: '2', name: 'Municipal Commissioner', email: 'commissioner@matrixtrack.in', role: 'COMMISSIONER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'WRITE' },
+        { id: '3', name: 'Indore City Admin', email: 'cityadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'WRITE' },
+        { id: '4', name: 'Zone 01 Admin', email: 'zoneadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
+        { id: '5', name: 'Ward 15 Admin', email: 'wardadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
+        { id: '6', name: 'Quality Controller (QC)', email: 'qc@indore.local', role: 'QC', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'READ', mrfAccess: 'READ' },
+        { id: '7', name: 'Mahendra (Action Officer)', email: 'mahendra@gmail.com', role: 'ACTION_OFFICER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'READ', workforceAccess: 'RESTRICTED', mrfAccess: 'RESTRICTED' },
+        { id: '8', name: 'Field Supervisor', email: 'supervisor.vaani@gmail.com', role: 'SUPERVISOR', createdAt: new Date().toISOString(), taskforceAccess: 'READ', swachhAccess: 'RESTRICTED', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
       ];
 
       // Merge stored overrides!
@@ -307,6 +314,7 @@ export default function SuperAdminAccessManagementPage() {
         taskforceAccess: roleDef.defaults.taskforce,
         swachhAccess: roleDef.defaults.swachh,
         workforceAccess: roleDef.defaults.workforce,
+        mrfAccess: roleDef.defaults.mrf,
       }));
     } else {
       setCreateFormData(prev => ({ ...prev, role: newRole }));
@@ -322,6 +330,7 @@ export default function SuperAdminAccessManagementPage() {
         taskforceAccess: roleDef.defaults.taskforce,
         swachhAccess: roleDef.defaults.swachh,
         workforceAccess: roleDef.defaults.workforce,
+        mrfAccess: roleDef.defaults.mrf,
       }));
     } else {
       setEditFormData(prev => ({ ...prev, role: newRole }));
@@ -335,11 +344,11 @@ export default function SuperAdminAccessManagementPage() {
     return 'WRITE';
   };
 
-  const toggleInlineAccess = (userId: string, moduleKey: 'taskforceAccess' | 'swachhAccess' | 'workforceAccess') => {
+  const toggleInlineAccess = (userId: string, moduleKey: 'taskforceAccess' | 'swachhAccess' | 'workforceAccess' | 'mrfAccess') => {
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
-          const nextLevel = cycleAccessLevel(u[moduleKey]);
+          const nextLevel = cycleAccessLevel(u[moduleKey] || 'RESTRICTED');
           return { ...u, [moduleKey]: nextLevel };
         }
         return u;
@@ -354,6 +363,7 @@ export default function SuperAdminAccessManagementPage() {
           const isDirty = (userNow.taskforceAccess !== origUser.taskforceAccess) ||
                           (userNow.swachhAccess !== origUser.swachhAccess) ||
                           (userNow.workforceAccess !== origUser.workforceAccess) ||
+                          (userNow.mrfAccess !== origUser.mrfAccess) ||
                           (userNow.role !== origUser.role);
           setDirtyUserIds(prev => {
             const next = new Set(prev);
@@ -381,7 +391,8 @@ export default function SuperAdminAccessManagementPage() {
       createdAt: new Date().toISOString(),
       taskforceAccess: createFormData.taskforceAccess,
       swachhAccess: createFormData.swachhAccess,
-      workforceAccess: createFormData.workforceAccess
+      workforceAccess: createFormData.workforceAccess,
+      mrfAccess: createFormData.mrfAccess
     };
 
     try {
@@ -405,7 +416,7 @@ export default function SuperAdminAccessManagementPage() {
     setIsCreateModalOpen(false);
     setCreateFormData({
       name: '', email: '', password: '', role: 'CITY_ADMIN',
-      taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE'
+      taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'WRITE'
     });
     setSubmitting(false);
   };
@@ -415,9 +426,10 @@ export default function SuperAdminAccessManagementPage() {
     setEditFormData({
       name: user.name,
       role: user.role,
-      taskforceAccess: user.taskforceAccess,
-      swachhAccess: user.swachhAccess,
-      workforceAccess: user.workforceAccess,
+      taskforceAccess: user.taskforceAccess || 'RESTRICTED',
+      swachhAccess: user.swachhAccess || 'RESTRICTED',
+      workforceAccess: user.workforceAccess || 'RESTRICTED',
+      mrfAccess: user.mrfAccess || 'RESTRICTED',
     });
     setIsEditModalOpen(true);
   };
@@ -445,6 +457,7 @@ export default function SuperAdminAccessManagementPage() {
       taskforceAccess: editFormData.taskforceAccess,
       swachhAccess: editFormData.swachhAccess,
       workforceAccess: editFormData.workforceAccess,
+      mrfAccess: editFormData.mrfAccess,
     };
 
     const updatedList = users.map(u => u.id === editingUser.id ? updatedUser : u);
@@ -565,6 +578,17 @@ export default function SuperAdminAccessManagementPage() {
               <RefreshCw size={16} /> Refresh
             </button>
 
+            <Link
+              href="/hms"
+              style={{
+                height: 46, padding: '0 20px', borderRadius: 14, border: '1.5px solid #d97706',
+                background: '#fffbe3', fontSize: 13.5, fontWeight: 800, color: '#b45309', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none'
+              }}
+            >
+              <Building2 size={17} /> Onboard City (/hms)
+            </Link>
+
             <button
               onClick={() => setIsCreateModalOpen(true)}
               style={{
@@ -574,7 +598,7 @@ export default function SuperAdminAccessManagementPage() {
                 display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)'
               }}
             >
-              <UserPlus size={18} /> Create New Account
+              <UserPlus size={18} /> Create City Admin / Account
             </button>
           </div>
         </div>
@@ -804,6 +828,12 @@ export default function SuperAdminAccessManagementPage() {
                             <AccessLevelBadge level={u.workforceAccess} onToggle={() => toggleInlineAccess(u.id, 'workforceAccess')} />
                           </div>
 
+                          {/* Processing & MRF Plant */}
+                          <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 14, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 12.5, fontWeight: 800, color: '#334155' }}>Processing & MRF</span>
+                            <AccessLevelBadge level={u.mrfAccess || 'RESTRICTED'} onToggle={() => toggleInlineAccess(u.id, 'mrfAccess')} />
+                          </div>
+
                         </div>
                       </div>
 
@@ -865,16 +895,17 @@ export default function SuperAdminAccessManagementPage() {
                 <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', fontSize: 12, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   <th style={{ padding: '16px 24px' }}>User Details</th>
                   <th style={{ padding: '16px 20px' }}>Security Role</th>
-                  <th style={{ padding: '16px 20px', textAlign: 'center' }}>Taskforce 20</th>
-                  <th style={{ padding: '16px 20px', textAlign: 'center' }}>Swachh Sync</th>
-                  <th style={{ padding: '16px 20px', textAlign: 'center' }}>Workforce Monitoring</th>
+                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Taskforce 20</th>
+                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Swachh Sync</th>
+                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Workforce</th>
+                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Processing & MRF</th>
                   <th style={{ padding: '16px 24px', textAlign: 'right' }}>Actions & Save</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14, fontWeight: 600 }}>
+                    <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14, fontWeight: 600 }}>
                       No user accounts found matching your search.
                     </td>
                   </tr>
@@ -936,18 +967,23 @@ export default function SuperAdminAccessManagementPage() {
                         </td>
 
                         {/* Taskforce Access */}
-                        <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                        <td style={{ padding: '16px 14px', textAlign: 'center' }}>
                           <AccessLevelBadge level={u.taskforceAccess} onToggle={() => toggleInlineAccess(u.id, 'taskforceAccess')} />
                         </td>
 
                         {/* Swachh Sync Access */}
-                        <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                        <td style={{ padding: '16px 14px', textAlign: 'center' }}>
                           <AccessLevelBadge level={u.swachhAccess} onToggle={() => toggleInlineAccess(u.id, 'swachhAccess')} />
                         </td>
 
                         {/* Workforce Monitoring Access */}
-                        <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                        <td style={{ padding: '16px 14px', textAlign: 'center' }}>
                           <AccessLevelBadge level={u.workforceAccess} onToggle={() => toggleInlineAccess(u.id, 'workforceAccess')} />
+                        </td>
+
+                        {/* Processing & MRF Access */}
+                        <td style={{ padding: '16px 14px', textAlign: 'center' }}>
+                          <AccessLevelBadge level={u.mrfAccess || 'RESTRICTED'} onToggle={() => toggleInlineAccess(u.id, 'mrfAccess')} />
                         </td>
 
                         {/* Actions */}
@@ -1102,6 +1138,12 @@ export default function SuperAdminAccessManagementPage() {
                     value={createFormData.workforceAccess}
                     onChange={(val) => setCreateFormData({ ...createFormData, workforceAccess: val })}
                   />
+
+                  <SegmentedAccessControl
+                    label="Processing & MRF Plant Workspace Access"
+                    value={createFormData.mrfAccess}
+                    onChange={(val) => setCreateFormData({ ...createFormData, mrfAccess: val })}
+                  />
                 </div>
 
                 {/* Submit Button */}
@@ -1193,6 +1235,12 @@ export default function SuperAdminAccessManagementPage() {
                     value={editFormData.workforceAccess}
                     onChange={(val) => setEditFormData({ ...editFormData, workforceAccess: val })}
                   />
+
+                  <SegmentedAccessControl
+                    label="Processing & MRF Plant Workspace Access"
+                    value={editFormData.mrfAccess}
+                    onChange={(val) => setEditFormData({ ...editFormData, mrfAccess: val })}
+                  />
                 </div>
 
                 {/* Buttons Action Bar */}
@@ -1262,6 +1310,7 @@ export default function SuperAdminAccessManagementPage() {
                       <BadgeDisplay level={r.defaults.taskforce} name="Taskforce" />
                       <BadgeDisplay level={r.defaults.swachh} name="Swachh" />
                       <BadgeDisplay level={r.defaults.workforce} name="Workforce" />
+                      <BadgeDisplay level={r.defaults.mrf} name="MRF" />
                     </div>
                   </div>
                 ))}

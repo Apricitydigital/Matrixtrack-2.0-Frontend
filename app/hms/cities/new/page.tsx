@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,11 @@ import {
   MapPin,
   Send,
   Sparkles,
+  ShieldCheck,
+  Users,
+  TrendingUp,
+  Layers,
+  Lock
 } from "lucide-react";
 
 import { ApiError, CityApi } from "@lib/apiClient";
@@ -42,6 +47,19 @@ export default function CreateCityPage() {
 
   const [code, setCode] = useState("");
   const [ulbCode, setUlbCode] = useState("");
+
+  // Module Access Configuration for City Cluster Onboarding
+  const [enabledModules, setEnabledModules] = useState<{
+    taskforce: boolean;
+    swachh: boolean;
+    workforce: boolean;
+    mrf: boolean;
+  }>({
+    taskforce: true,
+    swachh: true,
+    workforce: true,
+    mrf: true
+  });
 
   const [status, setStatus] = useState("");
   const [creating, setCreating] = useState(false);
@@ -607,6 +625,131 @@ export default function CreateCityPage() {
                     Urban Local Body code used in reporting.
                   </span>
                 </label>
+              </div>
+
+              <div className="my-6 h-px bg-slate-100" />
+
+              {/* ── AUTHORIZED PLATFORM MODULES ASSIGNMENT ── */}
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <span className="block text-[12px] font-black uppercase tracking-[0.06em] text-slate-700">
+                      Authorized Software Modules for City Cluster <span className="text-rose-500">*</span>
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Select which workspace modules are enabled and provisioned for this city
+                    </span>
+                  </div>
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-600">
+                    {Object.values(enabledModules).filter(Boolean).length} / 4 Enabled
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                  {/* 1. Taskforce 2.0 */}
+                  <div
+                    onClick={() => setEnabledModules(prev => ({ ...prev, taskforce: !prev.taskforce }))}
+                    className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
+                      enabledModules.taskforce
+                        ? "border-blue-500 bg-blue-50/50 shadow-sm"
+                        : "border-slate-200 bg-slate-50/50 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
+                        <ShieldCheck size={18} className={enabledModules.taskforce ? "text-blue-600" : "text-slate-400"} />
+                        Taskforce 20 Monitoring
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={enabledModules.taskforce}
+                        onChange={() => {}}
+                        className="h-4 w-4 accent-blue-600"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                      Beat Sweeping, Litterbins, Toilets & CTU Spot Transformation monitoring suite.
+                    </p>
+                  </div>
+
+                  {/* 2. Swachh Ward Ranking */}
+                  <div
+                    onClick={() => setEnabledModules(prev => ({ ...prev, swachh: !prev.swachh }))}
+                    className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
+                      enabledModules.swachh
+                        ? "border-emerald-500 bg-emerald-50/50 shadow-sm"
+                        : "border-slate-200 bg-slate-50/50 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
+                        <Building2 size={18} className={enabledModules.swachh ? "text-emerald-600" : "text-slate-400"} />
+                        Swachh Ward Ranking
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={enabledModules.swachh}
+                        onChange={() => {}}
+                        className="h-4 w-4 accent-emerald-600"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                      Assessor evaluations, Ward Ranking scoring system, and QC inspection portal.
+                    </p>
+                  </div>
+
+                  {/* 3. Workforce Monitoring */}
+                  <div
+                    onClick={() => setEnabledModules(prev => ({ ...prev, workforce: !prev.workforce }))}
+                    className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
+                      enabledModules.workforce
+                        ? "border-purple-500 bg-purple-50/50 shadow-sm"
+                        : "border-slate-200 bg-slate-50/50 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
+                        <Users size={18} className={enabledModules.workforce ? "text-purple-600" : "text-slate-400"} />
+                        Workforce Monitoring (MatrixTrack)
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={enabledModules.workforce}
+                        onChange={() => {}}
+                        className="h-4 w-4 accent-purple-600"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                      Employee attendance tracking, face verification, shift logs & daily rosters.
+                    </p>
+                  </div>
+
+                  {/* 4. Processing & MRF Plant */}
+                  <div
+                    onClick={() => setEnabledModules(prev => ({ ...prev, mrf: !prev.mrf }))}
+                    className={`cursor-pointer rounded-2xl border p-4 transition-all duration-200 ${
+                      enabledModules.mrf
+                        ? "border-amber-500 bg-amber-50/50 shadow-sm"
+                        : "border-slate-200 bg-slate-50/50 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
+                        <TrendingUp size={18} className={enabledModules.mrf ? "text-amber-600" : "text-slate-400"} />
+                        Processing & MRF Plant
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={enabledModules.mrf}
+                        onChange={() => {}}
+                        className="h-4 w-4 accent-amber-600"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                      Weighbridge gross/tare logging, recyclables sorting analytics & plant ledger.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Status */}
