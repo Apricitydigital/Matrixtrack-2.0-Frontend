@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -30,7 +30,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { ApiError, CityApi } from "@lib/apiClient";
+import { ApiError, CityApi, ModuleApi } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
 import { Card } from "@components/ui/Card";
 import { Button } from "@components/ui/Button";
@@ -89,6 +89,17 @@ export default function HmsDashboardPage() {
   const [cityMasterId, setCityMasterId] = useState("");
   const [cityCode, setCityCode] = useState("");
   const [cityUlbCode, setCityUlbCode] = useState("");
+  const [cityModules, setCityModules] = useState<{
+    taskforce: boolean;
+    swachh: boolean;
+    workforce: boolean;
+    mrf: boolean;
+  }>({
+    taskforce: true,
+    swachh: true,
+    workforce: true,
+    mrf: true
+  });
   const [cityStatus, setCityStatus] = useState("");
   const [cityCreating, setCityCreating] = useState(false);
 
@@ -213,7 +224,30 @@ export default function HmsDashboardPage() {
         stateId, divisionId, districtId, cityMasterId,
         code: cityCode, ulbCode: cityUlbCode || cityCode
       };
-      await CityApi.create(payload);
+      const res: any = await CityApi.create(payload);
+
+      if (res?.city?.id) {
+        const sysModulesRes = await ModuleApi.list().catch(() => ({ modules: [] }));
+        const sysModules = sysModulesRes.modules || [];
+        for (const mod of sysModules) {
+          const modName = mod.name.toUpperCase();
+          let isEnabled = true;
+          if (["TASKFORCE", "TOILET", "SWEEPING", "LITTERBINS"].includes(modName)) {
+            isEnabled = cityModules.taskforce;
+          } else if (modName === "SWACHH_RANKING" || modName === "SWACHH") {
+            isEnabled = cityModules.swachh;
+          } else if (modName === "WORKFORCE_MONITORING" || modName === "WORKFORCE") {
+            isEnabled = cityModules.workforce;
+          } else if (modName === "MRF") {
+            isEnabled = cityModules.mrf;
+          }
+
+          if (!isEnabled) {
+            await CityApi.toggleModule(res.city.id, mod.id, false).catch(() => {});
+          }
+        }
+      }
+
       showToast({ title: "City created", description: "New city cluster deployed successfully.", tone: "success" });
       resetCityForm();
       setCreateCityOpen(false);
@@ -2140,6 +2174,39 @@ export default function HmsDashboardPage() {
             <input className={inputClass} value={cityUlbCode} onChange={(e) => setCityUlbCode(e.target.value)} placeholder="e.g. idr01" />
           </FormField>
 
+          {/* Authorized Modules Assignment */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 mt-1">
+            <div className="mb-2.5 flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+                Authorized Platform Modules *
+              </span>
+              <span className="text-[10px] font-extrabold text-blue-600 bg-blue-100/70 px-2 py-0.5 rounded-full">
+                {Object.values(cityModules).filter(Boolean).length} / 4 Enabled
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <label onClick={() => setCityModules(p => ({ ...p, taskforce: !p.taskforce }))} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${cityModules.taskforce ? 'bg-white border-blue-400 font-bold text-blue-800' : 'bg-slate-100 border-slate-200 text-slate-500 opacity-60'}`}>
+                <input type="checkbox" checked={cityModules.taskforce} onChange={() => {}} className="accent-blue-600" />
+                <span>Taskforce 20</span>
+              </label>
+
+              <label onClick={() => setCityModules(p => ({ ...p, swachh: !p.swachh }))} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${cityModules.swachh ? 'bg-white border-emerald-400 font-bold text-emerald-800' : 'bg-slate-100 border-slate-200 text-slate-500 opacity-60'}`}>
+                <input type="checkbox" checked={cityModules.swachh} onChange={() => {}} className="accent-emerald-600" />
+                <span>Swachh Ward Ranking</span>
+              </label>
+
+              <label onClick={() => setCityModules(p => ({ ...p, workforce: !p.workforce }))} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${cityModules.workforce ? 'bg-white border-purple-400 font-bold text-purple-800' : 'bg-slate-100 border-slate-200 text-slate-500 opacity-60'}`}>
+                <input type="checkbox" checked={cityModules.workforce} onChange={() => {}} className="accent-purple-600" />
+                <span>Workforce Monitoring</span>
+              </label>
+
+              <label onClick={() => setCityModules(p => ({ ...p, mrf: !p.mrf }))} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${cityModules.mrf ? 'bg-white border-amber-400 font-bold text-amber-800' : 'bg-slate-100 border-slate-200 text-slate-500 opacity-60'}`}>
+                <input type="checkbox" checked={cityModules.mrf} onChange={() => {}} className="accent-amber-600" />
+                <span>Processing & MRF</span>
+              </label>
+            </div>
+          </div>
+
           {cityStatus && (
             <div className={`text-xs font-semibold ${cityStatus.toLowerCase().includes("fail") ? "text-danger" : "text-primary"}`}>
               {cityStatus}
@@ -2290,10 +2357,45 @@ function EditCityModal({
   const [adminEmail, setAdminEmail] = useState(city.cityAdmin?.email || "");
   const [loading, setLoading] = useState(false);
   const [loadingMasters, setLoadingMasters] = useState(false);
+  const [moduleList, setModuleList] = useState<{ id: string; name: string; enabled: boolean }[]>([]);
+  const [loadingModules, setLoadingModules] = useState(false);
 
   const selectClass = "h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm focus:border-primary/40 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 disabled:opacity-60";
   const inputClass = selectClass;
   const readOnlyClass = "h-10 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500";
+
+  useEffect(() => {
+    let active = true;
+    setLoadingModules(true);
+    ModuleApi.list()
+      .then((res) => {
+        if (!active) return;
+        const available = res.modules || [];
+        const mapped = available.map((m) => {
+          const existing = (city.modules || []).find(
+            (cm) => cm.id === m.id || cm.name.toUpperCase() === m.name.toUpperCase()
+          );
+          return {
+            id: m.id,
+            name: m.name,
+            enabled: existing ? existing.enabled : true,
+          };
+        });
+        setModuleList(mapped);
+      })
+      .catch(() => {
+        if (!active) return;
+        if (city.modules && city.modules.length > 0) {
+          setModuleList(city.modules.map((m) => ({ id: m.id, name: m.name, enabled: m.enabled })));
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingModules(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [city]);
 
   useEffect(() => {
     if (!stateId) {
@@ -2358,6 +2460,23 @@ function EditCityModal({
 
   const selectedMasterCity = masterCities.find((item) => item.id === cityMasterId) || null;
 
+  const getModuleMeta = (name: string) => {
+    const upper = name.toUpperCase();
+    if (upper === "TASKFORCE") return { label: "CTU / GVP Spot Transformation", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
+    if (upper === "LITTERBINS") return { label: "Litter Bins Collection", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
+    if (upper === "SWEEPING") return { label: "Beat Sweeping & Sanitation", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
+    if (upper === "TOILET") return { label: "Cleanliness of Toilets (CT/PT)", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
+    if (upper === "SWACHH_RANKING" || upper === "SWACHH") return { label: "Swachh Ward Ranking System", suite: "PLATFORM", activeClass: "bg-white border-emerald-400 font-bold text-emerald-800", checkClass: "accent-emerald-600" };
+    if (upper === "WORKFORCE_MONITORING" || upper === "WORKFORCE") return { label: "Workforce Monitoring (Matrix Track)", suite: "PLATFORM", activeClass: "bg-white border-purple-400 font-bold text-purple-800", checkClass: "accent-purple-600" };
+    if (upper === "MRF" || upper === "PROCESSING") return { label: "Processing & MRF Telemetry", suite: "PLATFORM", activeClass: "bg-white border-amber-400 font-bold text-amber-800", checkClass: "accent-amber-600" };
+    return {
+      label: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
+      suite: "PLATFORM",
+      activeClass: "bg-white border-blue-400 font-bold text-blue-800",
+      checkClass: "accent-blue-600"
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -2367,9 +2486,27 @@ function EditCityModal({
         ...(selectedMasterCity ? { name: selectedMasterCity.name } : { name: city.name }),
         code, ulbCode, adminName, adminEmail
       });
+
+      for (const m of moduleList) {
+        const existing = (city.modules || []).find((cm) => cm.id === m.id);
+        if (!existing || existing.enabled !== m.enabled) {
+          await CityApi.toggleModule(city.id, m.id, m.enabled).catch(() => {});
+        }
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const taskforceModules = moduleList.filter((m) => getModuleMeta(m.name).suite === "TASKFORCE_20");
+  const platformModules = moduleList.filter((m) => getModuleMeta(m.name).suite === "PLATFORM");
+
+  const allTaskforceEnabled = taskforceModules.length > 0 && taskforceModules.every((m) => m.enabled);
+  const toggleAllTaskforce = () => {
+    const nextState = !allTaskforceEnabled;
+    setModuleList((prev) =>
+      prev.map((item) => (getModuleMeta(item.name).suite === "TASKFORCE_20" ? { ...item, enabled: nextState } : item))
+    );
   };
 
   return (
@@ -2426,6 +2563,101 @@ function EditCityModal({
             <input className={inputClass} type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
           </FormField>
         </div>
+
+        {/* Authorized Modules Re-assignment */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 mt-1 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+              Authorized Platform Modules & Sub-Modules *
+            </span>
+            <span className="text-[10px] font-extrabold text-blue-600 bg-blue-100/70 px-2 py-0.5 rounded-full">
+              {loadingModules ? "Loading..." : `${moduleList.filter((m) => m.enabled).length} Enabled`}
+            </span>
+          </div>
+
+          {/* Taskforce 20 Suite Box */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-3">
+            <div className="flex items-center justify-between mb-2">
+              <label
+                onClick={toggleAllTaskforce}
+                className="flex items-center gap-2 font-bold text-xs text-blue-900 cursor-pointer select-none"
+              >
+                <input
+                  type="checkbox"
+                  checked={allTaskforceEnabled}
+                  onChange={() => {}}
+                  className="accent-blue-600 rounded"
+                />
+                <span>Taskforce 20 Combined Monitoring Suite</span>
+              </label>
+              <span className="text-[10px] text-blue-600 font-medium">
+                {taskforceModules.filter((m) => m.enabled).length} / {taskforceModules.length} Sub-Modules
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {taskforceModules.map((m) => {
+                const meta = getModuleMeta(m.name);
+                return (
+                  <label
+                    key={m.id}
+                    onClick={() => {
+                      setModuleList((prev) =>
+                        prev.map((item) => (item.id === m.id ? { ...item, enabled: !item.enabled } : item))
+                      );
+                    }}
+                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition select-none ${
+                      m.enabled ? meta.activeClass : "bg-slate-100 border-slate-200 text-slate-500 opacity-60"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={m.enabled}
+                      onChange={() => {}}
+                      className={`${meta.checkClass} rounded`}
+                    />
+                    <span className="truncate">{meta.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Standalone Platforms Box */}
+          {platformModules.length > 0 && (
+            <div>
+              <div className="text-[11px] font-bold text-slate-600 mb-1.5 uppercase tracking-wider">
+                Governance Platforms
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {platformModules.map((m) => {
+                  const meta = getModuleMeta(m.name);
+                  return (
+                    <label
+                      key={m.id}
+                      onClick={() => {
+                        setModuleList((prev) =>
+                          prev.map((item) => (item.id === m.id ? { ...item, enabled: !item.enabled } : item))
+                        );
+                      }}
+                      className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition select-none ${
+                        m.enabled ? meta.activeClass : "bg-slate-100 border-slate-200 text-slate-500 opacity-60"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={m.enabled}
+                        onChange={() => {}}
+                        className={`${meta.checkClass} rounded`}
+                      />
+                      <span className="truncate">{meta.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="mt-2 flex gap-3">
           <Button type="button" variant="secondary" className="flex-1" onClick={onClose} disabled={loading}>Discard</Button>
           <Button type="submit" className="flex-1" loading={loading}>Commit Changes</Button>

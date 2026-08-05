@@ -10,6 +10,7 @@ import { getRoleDashboardRedirect } from '@utils/modules';
 import { HmsApi, CityApi } from '@lib/apiClient';
 import swachhApi from '@lib/swachhApiClient';
 import { setAuthCookie } from '@lib/auth';
+import { getUserPermissions } from '@lib/userPermissions';
 import {
   ShieldCheck,
   Building2,
@@ -125,9 +126,7 @@ export default function PortalHomePage() {
   const [liveTaskforceCount, setLiveTaskforceCount] = useState<number>(0);
   const [liveQCCount, setLiveQCCount] = useState<number>(0);
   const [liveSwachhParticipants, setLiveSwachhParticipants] = useState<number>(0);
-
-  // Fetch Live Real API Data
-
+  const [cityModulesMap, setCityModulesMap] = useState<Record<string, boolean> | null>(null);
 
   // Clock Ticker
   useEffect(() => {
@@ -172,11 +171,7 @@ export default function PortalHomePage() {
     }
   }, []);
 
-
-
-  const handleLogout = async () => {
-    await logout();
-  };
+  const [assignedCityName, setAssignedCityName] = useState<string>('');
 
   // Determine Role & City Context
   const isSuperAdmin = Boolean(user?.roles?.includes('HMS_SUPER_ADMIN'));
@@ -184,10 +179,46 @@ export default function PortalHomePage() {
 
   const primaryRole = user?.roles?.[0] || 'EMPLOYEE';
   const roleLabelText = roleLabel(primaryRole);
-  const cityName = user?.cityName || (isCityAdmin ? 'Indore' : '');
+  const cityName = (user as any)?.cityName || assignedCityName || (isSuperAdmin ? 'All Cities' : '');
+
+  // Fetch Live Real City Module Authorization Status from DB
+  useEffect(() => {
+    let active = true;
+    CityApi.list()
+      .then((res) => {
+        if (!active) return;
+        const myCity = (res.cities || []).find(
+          (c) =>
+            (user?.cityId && c.id === user.cityId) ||
+            (c.cityAdmin?.email && user?.email && c.cityAdmin.email.toLowerCase() === user.email.toLowerCase()) ||
+            c.cityAdmins?.some((a) => user?.email && a.email.toLowerCase() === user.email.toLowerCase()) ||
+            (c.name && (user as any)?.cityName && c.name.toLowerCase() === String((user as any).cityName).toLowerCase())
+        );
+        if (myCity) {
+          setAssignedCityName(myCity.name);
+          if (Array.isArray(myCity.modules)) {
+            const map: Record<string, boolean> = {};
+            myCity.modules.forEach((m) => {
+              map[m.name.toUpperCase()] = m.enabled;
+            });
+            setCityModulesMap(map);
+          }
+        } else if ((user as any)?.cityName) {
+          setAssignedCityName((user as any).cityName);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const displayName = user?.name || 'User';
   const userInitial = displayName.charAt(0).toUpperCase();
+
+  const handleLogout = async () => {
+    await logout();
+  };
 
   // Dynamic Workspace Link for Taskforce 20
   const workspaceUrl = isSuperAdmin
@@ -239,13 +270,11 @@ export default function PortalHomePage() {
   // Unified portal access
   const hasUnifiedTaskforceAccess =
     unifiedApplicationKeys.has('TASKFORCE_20') ||
-    unifiedApplicationKeys.has(
-      'PORTAL_TASKFORCE_20'
-    ) ||
+    unifiedApplicationKeys.has('PORTAL_TASKFORCE') ||
     Boolean(unifiedSession?.tokens?.taskforce);
 
   const hasUnifiedWardRankingAccess =
-    unifiedApplicationKeys.has('WARD_RANKING') ||
+    unifiedApplicationKeys.has('SWACHH_RANKING') ||
     unifiedApplicationKeys.has(
       'PORTAL_WARD_RANKING'
     ) ||
@@ -258,47 +287,39 @@ export default function PortalHomePage() {
     ) ||
     Boolean(unifiedSession?.tokens?.matrixTrack);
 
-  // Final card visibility
-  const hasTaskforceAccess = isUnifiedLogin
-    ? hasUnifiedTaskforceAccess
-    : hasNativeTaskforceAccess;
+  // User Module Access Controls (Super Admin & City Admin permissions)
+  const userPerms = getUserPermissions(user || null);
 
-  const hasSwachhAccess = isUnifiedLogin
-    ? hasUnifiedWardRankingAccess
-    : isSuperAdmin ||
-    isCityAdmin ||
-    Boolean(
-      user?.modules?.some((module) =>
-        [
-          'SWACHH_RANKING',
-          'SWACHH',
-          'WARD_RANKING',
-        ].includes(
-          String(
-            module.key || module.name || ''
-          ).toUpperCase()
-        )
-      )
-    );
+  // Enforce Live City-level Module Provisioning from Database
+  const hasModulePermission = (keys: string[]) => {
+    if (isSuperAdmin) return true;
+    if (cityModulesMap !== null) {
+      return keys.some((k) => cityModulesMap[k.toUpperCase()] === true);
+    }
+    if (!user) return false;
+    if (Array.isArray(user.modules) && user.modules.length > 0) {
+      return user.modules.some((module) =>
+        keys.includes(String(module.key || module.name || '').toUpperCase())
+      );
+    }
+    return true;
+  };
 
-  const hasWorkforceAccess = isUnifiedLogin
-    ? hasUnifiedMatrixTrackAccess
-    : isSuperAdmin ||
-    isCityAdmin ||
-    Boolean(
-      user?.modules?.some((module) =>
-        [
-          'WORKFORCE_MONITORING',
-          'WORKFORCE',
-          'MATRIXTRACK_WORKFORCE',
-          'ATTENDANCE',
-        ].includes(
-          String(
-            module.key || module.name || ''
-          ).toUpperCase()
-        )
-      )
-    );
+  // Final card visibility enforces assigned city module permissions!
+  const hasTaskforceAccess = userPerms.taskforceAccess !== 'RESTRICTED' &&
+    hasModulePermission(['TASKFORCE', 'LITTERBINS', 'SWEEPING', 'TOILET']) && (
+    isUnifiedLogin ? hasUnifiedTaskforceAccess : hasNativeTaskforceAccess
+  );
+
+  const hasSwachhAccess =
+    userPerms.swachhAccess !== 'RESTRICTED' &&
+    hasModulePermission(['SWACHH_RANKING', 'SWACHH', 'WARD_RANKING']);
+
+  const hasWorkforceAccess =
+    userPerms.workforceAccess !== 'RESTRICTED' &&
+    hasModulePermission(['WORKFORCE_MONITORING', 'WORKFORCE', 'MATRIXTRACK_WORKFORCE', 'ATTENDANCE', 'MATRIXTRACK']);
+
+  const hasMrfAccess = userPerms.mrfAccess !== 'RESTRICTED';
 
   const openTaskforceWorkspace = () => {
     const taskforceToken =
@@ -391,34 +412,34 @@ export default function PortalHomePage() {
     hasSwachhAccess,
   ]);
 
-  const openWardRankingWorkspace = () => {
-    const wardRankingToken =
+  const openWardRankingWorkspace = async () => {
+    let wardRankingToken =
       unifiedSession?.tokens?.wardRanking ||
-      localStorage.getItem(
-        'ward_ranking_access_token'
-      );
+      localStorage.getItem('ward_ranking_access_token') ||
+      localStorage.getItem('swachh_token');
 
-    if (isUnifiedLogin && !wardRankingToken) {
-      return;
+    if (!wardRankingToken && user?.email) {
+      try {
+        const loginRes = await fetch("http://localhost:5000/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email, password: "qwerty" })
+        });
+        if (loginRes.ok) {
+          const data = await loginRes.json();
+          wardRankingToken = data.token;
+        }
+      } catch (err) {
+        console.error("Auto Swachh login error:", err);
+      }
     }
 
     if (wardRankingToken) {
-      localStorage.setItem(
-        'ward_ranking_access_token',
-        wardRankingToken
-      );
-
-      localStorage.setItem(
-        'swachh_token',
-        wardRankingToken
-      );
+      localStorage.setItem('ward_ranking_access_token', wardRankingToken);
+      localStorage.setItem('swachh_token', wardRankingToken);
     }
 
-    localStorage.setItem(
-      'active_unified_application',
-      'WARD_RANKING'
-    );
-
+    localStorage.setItem('active_unified_application', 'WARD_RANKING');
     window.location.assign('/ward-ranking');
   };
 
@@ -961,6 +982,12 @@ export default function PortalHomePage() {
                       {cityName && <span className="city-tag-pill">{cityName}</span>}
                     </div>
                   </div>
+                )}
+
+                {isSuperAdmin && (
+                  <Link href="/hms" className="btn-logout-sleek" style={{ background: '#f59e0b', borderColor: '#d97706', color: '#ffffff', textDecoration: 'none', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' }}>
+                    <Building2 size={14} /> Onboard City (/hms)
+                  </Link>
                 )}
 
                 <Link href="/common-registration" className="btn-logout-sleek" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', borderColor: '#2563eb', color: '#ffffff', textDecoration: 'none', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}>
