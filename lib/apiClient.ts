@@ -147,12 +147,20 @@ async function buildHeaders(initHeaders?: HeadersInit, isFormData?: boolean) {
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const isFormData = init.body instanceof FormData;
   const headers = await buildHeaders(init.headers, isFormData);
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-    credentials: "include"
-  });
+  const baseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000").replace(/\/+$/, "");
+  const targetUrl = `${baseUrl}${path}`;
+
+  let res: Response;
+  try {
+    res = await fetch(targetUrl, {
+      ...init,
+      headers,
+      cache: "no-store"
+    });
+  } catch (netErr: any) {
+    console.error("[apiFetch] Network error for:", targetUrl, netErr);
+    throw new ApiError(503, "Cannot connect to backend server at " + baseUrl);
+  }
 
   if (!res.ok) {
     const rawMessage = await res.text();
@@ -344,6 +352,71 @@ export const AuthApi = {
 
   getMe: async () =>
     apiFetch<AuthMeResponse>("/auth/me"),
+};
+
+export interface IntegratedRegistrationPayload {
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  aadharNumber?: string;
+  cityId?: string;
+  zoneId?: string;
+  wardId?: string;
+  targetSystems: Array<"TASKFORCE_20" | "SWACHH_RANKING">;
+  taskforceConfig?: {
+    role?: string;
+    moduleKeys?: string[];
+  };
+  swachhConfig?: {
+    role?: "accessor" | "qc" | "admin";
+    accessorType?: "hms" | "pmc" | "janwani";
+    ward?: string;
+    zone?: string;
+  };
+}
+
+export const CommonRegistrationApi = {
+  register: (body: IntegratedRegistrationPayload) =>
+    apiFetch<{
+      success: boolean;
+      email: string;
+      userId?: string;
+      swachhUserId?: string;
+      taskforceCreated: boolean;
+      swachhCreated: boolean;
+      message: string;
+    }>("/common-registration/register", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  bulkImport: (employees: IntegratedRegistrationPayload[]) =>
+    apiFetch<{
+      success: boolean;
+      total: number;
+      successCount: number;
+      failCount: number;
+      results: Array<{
+        success: boolean;
+        email: string;
+        message: string;
+        taskforceCreated: boolean;
+        swachhCreated: boolean;
+      }>;
+    }>("/common-registration/bulk-import", {
+      method: "POST",
+      body: JSON.stringify({ employees }),
+    }),
+
+  getConfig: () =>
+    apiFetch<{
+      cities: { id: string; name: string; code: string }[];
+      modules: { key: string; name: string }[];
+      taskforceRoles: { key: string; label: string }[];
+      swachhRoles: { key: string; label: string }[];
+      swachhAccessorTypes: { key: string; label: string }[];
+    }>("/common-registration/config"),
 };
 
 export const CityApi = {

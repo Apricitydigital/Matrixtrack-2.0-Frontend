@@ -37,7 +37,7 @@ interface ParticipantSummary {
 
 const ParticipantAssessments = () => {
     const { participantId } = useParams() as {
-        participantId: string;
+        participantId?: string;
     };
     const navigate = useNavigate();
     const [participant, setParticipant] = useState<ParticipantSummary | null>(null);

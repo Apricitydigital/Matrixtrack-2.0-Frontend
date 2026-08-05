@@ -4,9 +4,36 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch, CityApi, AreaBeatApi, ModuleRecordsApi, CityModulesApi, GeoApi, ToiletApi, TwinbinApi, TaskforceApi } from "@lib/apiClient";
 import {
-  Package, Search, Landmark, Users, UserCog, ShieldCheck, Shield,
-  Map, Target, Activity, Database, AlertCircle, CheckCircle,
-  MapPin, ArrowRight, RefreshCw, Building2, ChevronRight, Zap, TrendingUp, BarChart3, Bell
+  Package,
+  Search,
+  Landmark,
+  Users,
+  UserCog,
+  ShieldCheck,
+  Shield,
+  Map,
+  Target,
+  Activity,
+  Database,
+  AlertCircle,
+  CheckCircle,
+  MapPin,
+  ArrowRight,
+  RefreshCw,
+  Building2,
+  ChevronRight,
+  Zap,
+  TrendingUp,
+  BarChart3,
+  Bell,
+
+  // New icons for premium panels
+  Toilet,
+  Trash2,
+  BrushCleaning,
+  Truck,
+  FileUser,
+  Eye,
 } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 
@@ -234,7 +261,7 @@ export default function CityDashboardPage() {
 
         // Build QC leaderboard from toilet inspections
         try {
-          const inspRes = await ToiletApi.listInspections({ pageSize: 500 });
+          const inspRes = await ToiletApi.listInspections({ pageSize: 50 });
           const inspections = inspRes?.inspections || [];
           const qcMap: Record<string, { name: string; count: number }> = {};
           inspections.forEach((insp: any) => {
@@ -274,6 +301,82 @@ export default function CityDashboardPage() {
     { label: "Action Officers", key: "actionOfficers", color: "#059669", bg: "#f0fdf4", icon: <UserCog size={16} />, href: "/city/users?role=ACTION_OFFICER" },
     { label: "City Admins", key: "cityAdmins", color: "#4f46e5", bg: "#eef2ff", icon: <ShieldCheck size={16} />, href: "/city/users?role=CITY_ADMIN" },
   ];
+  const quickActions = [
+    {
+      title: "Add New User",
+      description: "Create new user account",
+      href: "/city/users/create",
+      icon: Users,
+      cardAccent: "before:bg-blue-600",
+      iconStyle: "bg-blue-50 text-blue-600",
+    },
+    {
+      title: "Manage Areas",
+      description: "Add or update areas",
+      href: "/city/areas",
+      icon: Target,
+      cardAccent: "before:bg-violet-600",
+      iconStyle: "bg-violet-50 text-violet-600",
+    },
+    {
+      title: "Reg Requests",
+      description: "Review pending requests",
+      href: "/registration-requests",
+      icon: Bell,
+      cardAccent: "before:bg-orange-500",
+      iconStyle: "bg-orange-50 text-orange-600",
+      showBadge: true,
+    },
+  ];
+
+  const getModuleVisual = (module: {
+    name?: string;
+    key?: string;
+  }) => {
+    const moduleIdentity =
+      `${module.key || ""} ${module.name || ""}`.toLowerCase();
+
+    if (moduleIdentity.includes("toilet")) {
+      return {
+        Icon: Toilet,
+        iconClass: "bg-blue-50 text-blue-600",
+      };
+    }
+
+    if (
+      moduleIdentity.includes("litter") ||
+      moduleIdentity.includes("twinbin") ||
+      moduleIdentity.includes("bin")
+    ) {
+      return {
+        Icon: Trash2,
+        iconClass: "bg-orange-50 text-orange-600",
+      };
+    }
+
+    if (moduleIdentity.includes("sweep")) {
+      return {
+        Icon: BrushCleaning,
+        iconClass: "bg-emerald-50 text-emerald-600",
+      };
+    }
+
+    if (
+      moduleIdentity.includes("taskforce") ||
+      moduleIdentity.includes("gvp") ||
+      moduleIdentity.includes("ctu")
+    ) {
+      return {
+        Icon: Truck,
+        iconClass: "bg-violet-50 text-violet-600",
+      };
+    }
+
+    return {
+      Icon: Package,
+      iconClass: "bg-slate-100 text-slate-600",
+    };
+  };
 
   const maxRoleVal = Math.max(...roleData.map((r) => stats?.[r.key] || 0), 1);
 
@@ -293,6 +396,628 @@ export default function CityDashboardPage() {
         .header-flex { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; position: relative; }
         .req-table { display: grid; grid-template-columns: 1fr 120px 100px; gap: 12px; }
 
+
+/* ================= CITY ADMIN PREMIUM HEADER ================= */
+
+.city-admin-top-section {
+  padding: 24px 28px 0;
+}
+
+.city-admin-hero {
+  position: relative;
+  overflow: hidden;
+
+  min-height: 390px;          /* main card ki height */
+  display: flex;
+  flex-direction: column;
+
+  background:
+    radial-gradient(
+      circle at 88% 18%,
+      rgba(59, 130, 246, 0.08),
+      transparent 28%
+    ),
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #fbfdff 70%,
+      #f4f8ff 100%
+    );
+
+  border: 1px solid #dbe4f0;
+  border-top: 3px solid #2563eb;
+  border-radius: 24px;
+
+  padding: 34px 32px 18px;   /* bottom padding bhi add hua */
+
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.07),
+    0 3px 10px rgba(15, 23, 42, 0.03);
+}
+
+.city-admin-hero::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 88px;
+  width: 500px;
+  height: 190px;
+  opacity: 0.68;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgba(219, 234, 254, 0.75), transparent 80%);
+  clip-path: polygon(
+    0 100%, 0 76%, 6% 76%, 6% 58%, 11% 58%, 11% 69%,
+    17% 69%, 17% 40%, 22% 40%, 22% 67%, 28% 67%,
+    28% 55%, 34% 55%, 34% 74%, 42% 74%, 42% 45%,
+    48% 45%, 48% 73%, 55% 73%, 55% 50%, 61% 50%,
+    61% 68%, 67% 68%, 67% 34%, 73% 34%, 73% 70%,
+    79% 70%, 79% 52%, 85% 52%, 85% 72%, 92% 72%,
+    92% 43%, 97% 43%, 97% 100%
+  );
+}
+
+.city-admin-hero-main {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.city-admin-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.city-admin-logo-ring {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(239, 246, 255, 0.95);
+  border: 1px solid #bfdbfe;
+  box-shadow:
+    0 0 0 5px rgba(219, 234, 254, 0.55),
+    0 7px 18px rgba(37, 99, 235, 0.13);
+}
+
+.city-admin-logo-ring::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.city-admin-logo-ring::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  bottom: 6px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #06b6d4;
+}
+
+.city-admin-logo-core {
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: linear-gradient(145deg, #2563eb, #6d28d9);
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.25);
+}
+
+.city-admin-eyebrow {
+  margin-bottom: 3px;
+  color: #2563eb;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.city-admin-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.city-admin-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.city-admin-ulb {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  color: #6d28d9;
+  background: #f5f3ff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.city-admin-updated {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.city-admin-welcome {
+  margin: 24px 0 0 104px;
+  position: relative;
+  z-index: 2;
+  max-width: 560px;
+}
+
+.city-admin-welcome h2 {
+  margin: 0 0 7px;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.city-admin-welcome p {
+  margin: 0;
+  max-width: 540px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.65;
+}
+
+.city-admin-actions {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.city-admin-action-btn {
+  height: 38px;
+  padding: 0 13px;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
+}
+
+.city-admin-action-btn:hover {
+  border-color: #bfdbfe;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.1);
+}
+
+.city-admin-action-btn.primary {
+  height: 40px;
+  padding: 0 16px;
+  border-color: transparent;
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #6d28d9);
+  box-shadow: 0 7px 16px rgba(79, 70, 229, 0.22);
+}
+
+.city-admin-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.city-admin-action-pills {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.city-admin-action-pill {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+
+  box-shadow: 0 4px 11px rgba(37, 99, 235, 0.06);
+}
+
+.city-admin-action-pill.purple {
+  color: #6d28d9;
+  border-color: #ddd6fe;
+  background: rgba(250, 245, 255, 0.93);
+}
+
+.city-admin-action-pill strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.city-admin-status-grid {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  margin-top: auto;
+
+  border: 1px solid #dbe4f0;
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.95);
+  overflow: hidden;
+
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.04);
+}
+
+.city-admin-status-item {
+  min-height: 82px;
+  padding: 13px 16px;
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  border-right: 1px solid #e2e8f0;
+}
+
+.city-admin-status-item:last-child {
+  border-right: none;
+}
+
+.city-admin-status-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+
+  border: 1px solid;
+  border-radius: 12px;
+
+  display: grid;
+  place-items: center;
+}
+
+.city-admin-status-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  margin-bottom: 4px;
+
+  color: #475569;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.city-admin-status-label-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.city-admin-status-value {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.city-admin-status-help {
+  margin-top: 3px;
+
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* ================= CITY ADMIN USER CARDS ================= */
+
+/* ================= COMPACT USER OVERVIEW ================= */
+
+.city-user-overview {
+  padding: 20px 0 0;
+}
+
+.city-user-overview-title {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
+  color: #0f172a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.city-user-overview-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -7px;
+  width: 38px;
+  height: 2px;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.city-user-card-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.city-user-card {
+  min-height: 154px;
+  padding: 14px 14px 12px;
+
+  border: 1px solid #dbe4f0;
+  border-radius: 17px;
+  background: #ffffff;
+
+  display: flex;
+  flex-direction: column;
+
+  box-shadow:
+    0 7px 18px rgba(15, 23, 42, 0.045),
+    0 2px 4px rgba(15, 23, 42, 0.02);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.city-user-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.city-user-card.modules-card {
+  border: 2px solid #315bea;
+
+  background:
+    radial-gradient(
+      circle at 95% 0%,
+      rgba(99, 102, 241, 0.12),
+      transparent 36%
+    ),
+    linear-gradient(145deg, #ffffff 0%, #eef2ff 100%);
+
+  box-shadow:
+    0 9px 20px rgba(37, 99, 235, 0.12),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.4);
+}
+
+.city-user-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.city-user-card-icon {
+  width: 43px;
+  height: 43px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.city-user-card-arrow {
+  margin-top: 2px;
+  color: #94a3b8;
+}
+
+.city-user-card-main-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  margin-top: 9px;
+  min-height: 35px;
+}
+
+.city-user-card-number {
+  margin: 0;
+  flex-shrink: 0;
+
+  color: #0f172a;
+  font-size: 27px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.city-user-card-label {
+  margin: 0 0 2px;
+
+  color: #475569;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.city-user-status {
+  margin-top: auto;
+  min-height: 34px;
+  padding: 0 10px;
+
+  border-radius: 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.city-user-status-left {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.city-user-status-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.city-user-card.modules-card .city-user-status {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #2563eb, #3b65e9) !important;
+  box-shadow: 0 5px 12px rgba(37, 99, 235, 0.18);
+}
+
+
+
+@media (max-width: 1250px) {
+  .city-user-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .city-admin-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .city-admin-status-item:nth-child(2) {
+    border-right: none;
+  }
+
+  .city-admin-status-item:nth-child(-n + 2) {
+    border-bottom: 1px solid #e2e8f0;
+  }
+}
+
+@media (max-width: 850px) {
+  .city-admin-top-section,
+  .city-user-overview {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .city-admin-hero {
+    padding: 25px 20px 0;
+    border-radius: 18px;
+  }
+
+  .city-admin-hero-main {
+    flex-direction: column;
+  }
+
+  .city-admin-actions,
+  .city-admin-action-pills {
+    justify-content: flex-start;
+  }
+
+  .city-admin-welcome {
+    margin-left: 0;
+  }
+
+  .city-user-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .city-admin-identity {
+    gap: 14px;
+  }
+
+  .city-admin-logo-ring {
+    width: 66px;
+    height: 66px;
+  }
+
+  .city-admin-logo-core {
+    width: 46px;
+    height: 46px;
+  }
+
+  .city-admin-title {
+    font-size: 32px;
+  }
+
+  .city-admin-action-btn {
+    flex: 1;
+    padding: 0 12px;
+  }
+
+  .city-admin-action-pill {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .city-admin-status-grid,
+  .city-user-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .city-admin-status-item,
+  .city-admin-status-item:nth-child(2) {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .city-admin-status-item:last-child {
+    border-bottom: none;
+  }
+}
+
+
         @media (max-width: 1200px) {
           .responsive-grid-sidebar { grid-template-columns: 240px 1fr; }
           .responsive-grid-3 { grid-template-columns: 1fr 1fr; }
@@ -310,7 +1035,10 @@ export default function CityDashboardPage() {
           .req-table { grid-template-columns: 1fr 80px; }
           .req-table .req-role { display: none; } /* Hide role on mobile to save space */
         }
-      `}</style>
+      `}
+
+
+      </style>
 
       {/* ══════════════ COMMISSIONER / ULB OFFICER VIEW — PREMIUM ══════════════ */}
       {isReadOnlyView ? (
@@ -850,272 +1578,807 @@ export default function CityDashboardPage() {
 
 
         <>
-          {/* ── Hero Banner (City Admin Only) ── */}
-          <div className="hero-banner" style={{
-            background: 'linear-gradient(120deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%)',
-            padding: '32px 36px 28px',
-            position: 'relative', overflow: 'hidden'
-          }}>
-            <div style={{ position: 'absolute', top: -40, right: -40, width: 220, height: 220, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', pointerEvents: 'none' }} />
-            <div style={{ position: 'absolute', bottom: -60, right: 160, width: 180, height: 180, borderRadius: '50%', background: 'rgba(37,99,235,0.1)', pointerEvents: 'none' }} />
-            <div className="header-flex">
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 11, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Building2 size={20} color="#fff" />
+          {/* ── Premium Hero Banner (City Admin Only) ── */}
+          <div className="city-admin-top-section">
+            <section className="city-admin-hero">
+
+              <div className="city-admin-hero-main">
+                <div style={{ minWidth: 0 }}>
+                  <div className="city-admin-identity">
+                    <div className="city-admin-logo-ring">
+                      <div className="city-admin-logo-core">
+                        <Building2 size={27} strokeWidth={2.2} />
+                      </div>
+                    </div>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div className="city-admin-eyebrow">
+                        City Administration
+                      </div>
+
+                      <h1 className="city-admin-title">
+                        {cityName || "City Dashboard"}
+                      </h1>
+
+                      <div className="city-admin-meta">
+                        <span className="city-admin-ulb">
+                          <Landmark size={13} />
+                          ULB: {ulbCode || "—"}
+                        </span>
+
+                        <span className="city-admin-updated">
+                          Updated{" "}
+                          {lastRefreshed.toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
+                        </span>
+                      </div>
+                    </div>
                   </div>
+
+                  <div className="city-admin-welcome">
+                    <h2>
+                      Welcome back, {cityName || "City"} City Admin 👋
+                    </h2>
+
+                    <p>
+                      Monitor city operations, users, and modules. Stay informed and
+                      manage your administration efficiently.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="city-admin-actions">
+                    <div className="city-admin-action-btn">
+                      <Activity size={16} color="#2563eb" />
+                      {lastRefreshed.toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={loadAll}
+                      disabled={refreshing}
+                      className="city-admin-action-btn"
+                    >
+                      <RefreshCw
+                        size={16}
+                        style={{
+                          animation: refreshing
+                            ? "spin 0.8s linear infinite"
+                            : "none",
+                        }}
+                      />
+                      {refreshing ? "Refreshing..." : "Refresh"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={share}
+                      className="city-admin-action-btn primary"
+                    >
+                      <ArrowRight size={16} />
+                      Share Report
+                    </button>
+                  </div>
+
+                  <div className="city-admin-action-pills">
+                    <div className="city-admin-action-pill purple">
+                      <Package size={17} />
+                      <strong>
+                        {statsLoading ? "—" : stats?.totalModules ?? 0}
+                      </strong>
+                      Modules
+                    </div>
+
+                    <div className="city-admin-action-pill">
+                      <Users size={17} />
+                      <strong>{statsLoading ? "—" : totalUsers}</strong>
+                      Total Users
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="city-admin-status-grid">
+                <div className="city-admin-status-item">
+                  <div
+                    className="city-admin-status-icon"
+                    style={{
+                      color: "#059669",
+                      background: "#ecfdf5",
+                      borderColor: "#a7f3d0",
+                    }}
+                  >
+                    <Activity size={23} />
+                  </div>
+
                   <div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>City Administration</div>
-                    <h1 style={{ fontSize: 26, fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>
-                      {cityName || 'Dashboard'}
-                    </h1>
+                    <div className="city-admin-status-label">
+                      <span
+                        className="city-admin-status-label-dot"
+                        style={{ background: "#10b981" }}
+                      />
+                      System Status
+                    </div>
+
+                    <div className="city-admin-status-value">
+                      Operational
+                    </div>
+
+                    <div className="city-admin-status-help">
+                      All systems running smoothly
+                    </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                  <span style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 7, padding: '4px 12px', fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Landmark size={12} /> ULB: {ulbCode || '—'}
-                  </span>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-                    Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                  </span>
+
+                <div className="city-admin-status-item">
+                  <div
+                    className="city-admin-status-icon"
+                    style={{
+                      color: "#7c3aed",
+                      background: "#f5f3ff",
+                      borderColor: "#ddd6fe",
+                    }}
+                  >
+                    <Package size={23} />
+                  </div>
+
+                  <div>
+                    <div className="city-admin-status-label">
+                      <span
+                        className="city-admin-status-label-dot"
+                        style={{ background: "#7c3aed" }}
+                      />
+                      Modules
+                    </div>
+
+                    <div className="city-admin-status-value">
+                      {statsLoading ? "—" : stats?.totalModules ?? 0} active
+                    </div>
+
+                    <div className="city-admin-status-help">
+                      Across all departments
+                    </div>
+                  </div>
+                </div>
+
+                <div className="city-admin-status-item">
+                  <div
+                    className="city-admin-status-icon"
+                    style={{
+                      color: "#2563eb",
+                      background: "#eff6ff",
+                      borderColor: "#bfdbfe",
+                    }}
+                  >
+                    <Users size={23} />
+                  </div>
+
+                  <div>
+                    <div className="city-admin-status-label">
+                      <span
+                        className="city-admin-status-label-dot"
+                        style={{ background: "#2563eb" }}
+                      />
+                      User Base
+                    </div>
+
+                    <div className="city-admin-status-value">
+                      {statsLoading ? "—" : totalUsers} total users
+                    </div>
+
+                    <div className="city-admin-status-help">
+                      Across all roles
+                    </div>
+                  </div>
+                </div>
+
+                <div className="city-admin-status-item">
+                  <div
+                    className="city-admin-status-icon"
+                    style={{
+                      color: "#d97706",
+                      background: "#fffbeb",
+                      borderColor: "#fde68a",
+                    }}
+                  >
+                    <UserCog size={23} />
+                  </div>
+
+                  <div>
+                    <div className="city-admin-status-label">
+                      <span
+                        className="city-admin-status-label-dot"
+                        style={{ background: "#f59e0b" }}
+                      />
+                      Admin Network
+                    </div>
+
+                    <div className="city-admin-status-value">
+                      {roleData.length} role groups
+                    </div>
+
+                    <div className="city-admin-status-help">
+                      Active across the city
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={loadAll} disabled={refreshing} style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: refreshing ? 'not-allowed' : 'pointer', backdropFilter: 'blur(8px)' }}>
-                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
-                </button>
-                <button onClick={share} style={{ background: '#25d366', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  Share Report
-                </button>
-              </div>
-            </div>
-            <div className="hero-stats" style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
-              {[
-                { label: 'Modules', value: stats?.totalModules ?? '—', icon: <Package size={14} /> },
-                { label: 'Total Users', value: statsLoading ? '—' : totalUsers, icon: <Users size={14} /> },
-              ].map((c, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10, color: '#fff' }}>
-                  <span style={{ opacity: 0.6 }}>{c.icon}</span>
-                  <span style={{ fontSize: 13, fontWeight: 800 }}>{c.value}</span>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>{c.label}</span>
-                </div>
-              ))}
-            </div>
+            </section>
           </div>
+
 
           <div className="page-padding">
 
             {/* ── User Role KPI Cards (City Admin only) ── */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#000', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>User Overview</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 14 }}>
-                {roleData.map((r, i) => (
-                  <Link key={i} href={r.href} className="da-link">
-                    <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 18px', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 9, background: r.bg, color: r.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {r.icon}
+            {/* ── Premium User Role KPI Cards (City Admin only) ── */}
+            <div className="city-user-overview">
+              <div className="city-user-overview-title">
+                User Overview
+              </div>
+
+              <div className="city-user-card-grid">
+                {roleData.map((role, index) => {
+                  const roleValue = stats?.[role.key] ?? 0;
+                  const rolePercentage = roleValue > 0 ? 100 : 0;
+
+                  return (
+                    <Link
+                      key={index}
+                      href={role.href}
+                      className="da-link"
+                    >
+                      <div className="city-user-card">
+                        <div className="city-user-card-top">
+                          <div
+                            className="city-user-card-icon"
+                            style={{
+                              color: role.color,
+                              background: role.bg,
+                            }}
+                          >
+                            {role.icon}
+                          </div>
+
+                          <ChevronRight
+                            size={20}
+                            className="city-user-card-arrow"
+                          />
                         </div>
-                        <ChevronRight size={14} color="#cbd5e1" />
+
+                        <div className="city-user-card-main-row">
+                          <div
+                            className="city-user-card-number"
+                            style={{ color: roleValue > 0 ? "#0f172a" : role.color }}
+                          >
+                            {statsLoading ? "—" : roleValue}
+                          </div>
+
+                          <div className="city-user-card-label">
+                            {role.label}
+                          </div>
+                        </div>
+
+                        <div
+                          className="city-user-status"
+                          style={{
+                            color: role.color,
+                            background: role.bg,
+                          }}
+                        >
+                          <span className="city-user-status-left">
+                            <span
+                              className="city-user-status-dot"
+                              style={{ background: role.color }}
+                            />
+                            Active
+                          </span>
+
+                          <span>{rolePercentage}%</span>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 30, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 6 }}>
-                        {statsLoading ? <span style={{ color: '#e2e8f0' }}>—</span> : (stats?.[r.key] ?? 0)}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500, lineHeight: 1.3 }}>{r.label}</div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
+
                 <Link href="/city/modules" className="da-link">
-                  <div className="da-card" style={{ background: '#2563eb', border: 'none', borderRadius: 12, padding: '18px 18px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,99,235,0.28)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(255,255,255,0.18)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Package size={16} />
+                  <div className="city-user-card modules-card">
+                    <div className="city-user-card-top">
+                      <div
+                        className="city-user-card-icon"
+                        style={{
+                          color: "#ffffff",
+                          background: "linear-gradient(145deg, #2563eb, #4f46e5)",
+                          boxShadow: "0 8px 18px rgba(37,99,235,0.25)",
+                        }}
+                      >
+                        <Package size={22} />
                       </div>
-                      <ChevronRight size={14} color="rgba(255,255,255,0.4)" />
+
+                      <ChevronRight
+                        size={20}
+                        style={{ color: "#6366f1", marginTop: 4 }}
+                      />
                     </div>
-                    <div style={{ fontSize: 30, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 6 }}>
-                      {statsLoading ? '—' : (stats?.totalModules ?? 0)}
+
+                    <div className="city-user-card-main-row">
+                      <div className="city-user-card-number">
+                        {statsLoading ? "—" : stats?.totalModules ?? 0}
+                      </div>
+
+                      <div className="city-user-card-label">
+                        Total Modules
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>Total Modules</div>
+
+                    <div className="city-user-status">
+                      <span className="city-user-status-left">
+                        <span
+                          className="city-user-status-dot"
+                          style={{ background: "#ffffff" }}
+                        />
+                        Active
+                      </span>
+
+                      <span>
+                        {(stats?.totalModules ?? 0) > 0 ? 100 : 0}%
+                      </span>
+                    </div>
                   </div>
                 </Link>
               </div>
             </div>
 
             {/* ── Quick Actions (City Admin only) ── */}
-            <div style={{ marginBottom: 24, marginTop: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#000', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>Quick Actions</div>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <Link href="/city/users/create" className="da-link" style={{ flex: 1, minWidth: 150 }}>
-                  <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f0f9ff', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Users size={16} />
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Add New User</span>
-                  </div>
-                </Link>
-                <Link href="/city/areas" className="da-link" style={{ flex: 1, minWidth: 150 }}>
-                  <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f5f3ff', color: '#6d28d9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Target size={16} />
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Manage Areas</span>
-                  </div>
-                </Link>
-                <Link href="/registration-requests" className="da-link" style={{ flex: 1, minWidth: 150 }}>
-                  <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fff7ed', color: '#c2410c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Bell size={16} />
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Reg Requests</span>
-                    {pendingRegCount > 0 && (
-                      <span style={{ position: 'absolute', top: -5, right: -5, background: '#dc2626', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 10, boxShadow: '0 2px 4px rgba(220,38,38,0.3)' }}>
-                        {pendingRegCount}
-                      </span>
-                    )}
-                  </div>
-                </Link>
+            {/* ── Premium Quick Actions ── */}
+            {/* ── Compact Quick Actions ── */}
+            <section className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.045)]">
+              <div className="relative mb-5 inline-flex text-[10px] font-black uppercase tracking-[0.1em] text-slate-900 after:absolute after:-bottom-2 after:left-0 after:h-[3px] after:w-11 after:rounded-full after:bg-gradient-to-r after:from-blue-600 after:to-sky-400">
+                Quick Actions
               </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24 }}>
-              {/* Registration Requests Widget */}
-              <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>New Registrations</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Approval pending</div>
-                  </div>
-                  <Link href="/registration-requests" style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}>View All →</Link>
-                </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
 
-                <div style={{ flex: 1 }}>
-                  {recentRegistrationRequests.length === 0 ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                      <Users size={24} style={{ marginBottom: 12, opacity: 0.3 }} />
-                      <div style={{ fontSize: 13 }}>No pending requests</div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      {recentRegistrationRequests.map((req, i) => (
-                        <div key={i} style={{ padding: '14px 22px', borderBottom: i < recentRegistrationRequests.length - 1 ? '1px solid #f8fafc' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{req.name}</div>
-                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>{req.email} • {req.phone}</div>
-                          </div>
-                          <Link href="/registration-requests" style={{ padding: '6px 14px', borderRadius: 8, background: '#eff6ff', color: '#2563eb', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Review</Link>
+                  return (
+                    <Link
+                      key={action.title}
+                      href={action.href}
+                      className="group no-underline"
+                    >
+                      <div
+                        className={`
+              relative flex min-h-[78px] items-center gap-3 overflow-hidden
+              rounded-xl border border-slate-200 bg-white px-4 py-3
+              shadow-[0_4px_14px_rgba(15,23,42,0.035)]
+              transition-all duration-200
+              before:absolute before:bottom-3 before:left-0 before:top-3
+              before:w-[3px] before:rounded-r-full
+              hover:-translate-y-0.5 hover:border-blue-200
+              hover:shadow-[0_9px_20px_rgba(15,23,42,0.07)]
+              ${action.cardAccent}
+            `}
+                      >
+                        <div
+                          className={`
+                grid h-11 w-11 shrink-0 place-items-center rounded-xl
+                ${action.iconStyle}
+              `}
+                        >
+                          <Icon size={20} strokeWidth={2} />
                         </div>
-                      ))}
-                      <div style={{ padding: '14px 22px', background: '#f8fafc', textAlign: 'center' }}>
-                        <Link href="/registration-requests" style={{ fontSize: 12, fontWeight: 700, color: '#475569', textDecoration: 'none' }}>
-                          {recentRegistrationRequests.length === 5 ? 'View All Requests' : 'Manage Requests'}
-                        </Link>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[13px] font-extrabold text-slate-900">
+                            {action.title}
+                          </div>
+
+                          <div className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
+                            {action.description}
+                          </div>
+                        </div>
+
+                        <ChevronRight
+                          size={17}
+                          className="shrink-0 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5"
+                        />
+
+                        {action.showBadge && pendingRegCount > 0 && (
+                          <span className="absolute right-2 top-2 grid min-h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[8px] font-black text-white shadow-md shadow-red-200">
+                            {pendingRegCount}
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+
+
+            {/* ── Premium Operations Grid ── */}
+            <div className="mt-6 grid grid-cols-1 items-start gap-5 xl:grid-cols-3">
+
+              {/* ================= NEW REGISTRATIONS ================= */}
+              <section className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                      <Users size={18} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">
+                        New Registrations
+                      </div>
+
+                      <div className="mt-0.5 text-[15px] font-extrabold leading-tight text-slate-900">
+                        Approval Pending
+                      </div>
+
+                      <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500">
+                        Review newly submitted user requests
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Officer Panel */}
-              <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '22px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>Field Operations</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 18 }}>Action Officers</div>
-
-                {/* AO big count */}
-                <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #bbf7d0', borderRadius: 12, padding: '16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <UserCog size={22} color="#fff" />
                   </div>
-                  <div>
-                    <div style={{ fontSize: 32, fontWeight: 900, color: '#0f172a', lineHeight: 1, letterSpacing: '-0.02em' }}>
-                      {statsLoading ? '—' : (stats?.actionOfficers ?? 0)}
+
+                  <Link
+                    href="/registration-requests"
+                    className="flex shrink-0 items-center gap-1 pt-1 text-[10px] font-extrabold text-blue-600 no-underline"
+                  >
+                    View All
+                    <ArrowRight size={12} />
+                  </Link>
+                </div>
+
+                {/* Content */}
+                {recentRegistrationRequests.length === 0 ? (
+                  <div className="grid min-h-[150px] place-items-center px-5 py-6 text-center text-[11px] text-slate-400">
+                    <div>
+                      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-50">
+                        <Users size={21} />
+                      </div>
+
+                      No pending registration requests
                     </div>
-                    <div style={{ fontSize: 12, color: '#16a34a', fontWeight: 600, marginTop: 3 }}>Action Officers Active</div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2.5 p-3">
+                    {recentRegistrationRequests.map((req, index) => (
+                      <div
+                        key={index}
+                        className="
+              group flex min-h-[88px] items-center gap-3 rounded-xl
+              border border-slate-200 bg-gradient-to-br from-white to-slate-50
+              p-3 transition-all duration-200
+              hover:translate-x-0.5 hover:border-blue-200
+              hover:shadow-[0_6px_16px_rgba(37,99,235,0.06)]
+            "
+                      >
+                        <div
+                          className={`
+                grid h-11 w-11 shrink-0 place-items-center rounded-full
+                text-sm font-black
+                ${index % 3 === 0
+                              ? "bg-blue-50 text-blue-600"
+                              : index % 3 === 1
+                                ? "bg-emerald-50 text-emerald-600"
+                                : "bg-violet-50 text-violet-600"
+                            }
+              `}
+                        >
+                          {(req.name?.trim()?.charAt(0) || "?").toUpperCase()}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[11px] font-extrabold text-slate-900">
+                            {req.name}
+                          </div>
+
+                          <div className="mt-1 truncate text-[9px] font-medium text-slate-500">
+                            {req.email}
+                          </div>
+
+                          <div className="mt-0.5 truncate text-[9px] font-medium text-slate-500">
+                            {req.phone ? `• ${req.phone}` : "Phone not provided"}
+                          </div>
+                        </div>
+
+                        <Link
+                          href="/registration-requests"
+                          className="
+                shrink-0 rounded-lg bg-blue-50 px-3 py-2
+                text-[9px] font-extrabold text-blue-600 no-underline
+                transition-colors hover:bg-blue-100
+              "
+                        >
+                          Review
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Footer */}
+                <Link
+                  href="/registration-requests"
+                  className="
+        mx-3 mb-3 flex min-h-[58px] items-center justify-between
+        rounded-xl border border-blue-100
+        bg-gradient-to-r from-blue-50 to-slate-50 px-3
+        text-[10px] font-extrabold text-blue-600 no-underline
+      "
+                >
+                  <span className="flex items-center gap-2">
+                    <FileUser size={17} strokeWidth={2} />
+
+                    <span>
+                      <span className="block">Manage Requests</span>
+
+                      <span className="mt-0.5 block text-[8px] font-medium text-slate-500">
+                        View and manage all requests
+                      </span>
+                    </span>
+                  </span>
+
+                  <ChevronRight size={15} />
+                </Link>
+              </section>
+
+              {/* ================= ACTION OFFICERS ================= */}
+              <section className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+                {/* Header */}
+                <div className="flex items-start gap-3 border-b border-slate-200 px-4 py-4">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <ShieldCheck size={18} />
+                  </div>
+
+                  <div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-emerald-600">
+                      Field Operations
+                    </div>
+
+                    <div className="mt-0.5 text-[15px] font-extrabold leading-tight text-slate-900">
+                      Action Officers
+                    </div>
+
+                    <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500">
+                      Module-level action monitoring
+                    </div>
                   </div>
                 </div>
 
-                {/* Module-wise AO pending from moduleActivity */}
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Pending Actions by Module</div>
-                <div style={{ flex: 1 }}>
+                {/* Content */}
+                <div className="px-3 pt-3">
+                  <div
+                    className="
+          relative mb-4 flex min-h-[92px] items-center gap-3 overflow-hidden
+          rounded-xl border border-emerald-200
+          bg-gradient-to-br from-emerald-50 to-green-100 p-3
+          after:absolute after:-bottom-8 after:-right-5
+          after:h-28 after:w-28 after:rounded-full
+          after:border-[20px] after:border-emerald-200/30
+        "
+                  >
+                    <div className="relative z-10 grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-500 text-white shadow-md shadow-emerald-200">
+                      <UserCog size={22} />
+                    </div>
+
+                    <div className="relative z-10">
+                      <div className="text-[30px] font-black leading-none tracking-tight text-slate-900">
+                        {statsLoading ? "—" : stats?.actionOfficers ?? 0}
+                      </div>
+
+                      <div className="mt-1 text-[10px] font-extrabold text-green-600">
+                        Action Officers Active
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-2 text-[9px] font-black uppercase tracking-[0.09em] text-slate-500">
+                    Pending Actions by Module
+                  </div>
+
                   {moduleActivity.length === 0 ? (
-                    <div style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', padding: '12px 0' }}>Loading...</div>
+                    <div className="grid min-h-[150px] place-items-center py-6 text-center text-[11px] text-slate-400">
+                      <div>
+                        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-50">
+                          <Package size={21} />
+                        </div>
+
+                        Loading module activity...
+                      </div>
+                    </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {moduleActivity.map((m, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: m.actionRequired > 0 ? '#fef2f2' : '#f8fafc', borderRadius: 8, border: `1px solid ${m.actionRequired > 0 ? '#fecaca' : '#f1f5f9'}` }}>
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{m.name}</div>
-                            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>Total: {m.total} records</div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            {m.actionRequired > 0 ? (
-                              <span style={{ background: '#dc2626', color: '#fff', fontSize: 11, fontWeight: 800, borderRadius: 6, padding: '3px 8px' }}>
-                                ⚠ {m.actionRequired}
+                    <div className="flex flex-col gap-2">
+                      {moduleActivity.map((module, index) => {
+                        const moduleVisual = getModuleVisual(module);
+                        const ModuleIcon = moduleVisual.Icon;
+
+                        return (
+                          <div
+                            key={module.key || `${module.name}-${index}`}
+                            className="
+                  flex min-h-[62px] items-center gap-3 rounded-xl
+                  border border-slate-200 bg-white p-2.5
+                  transition-all duration-200
+                  hover:border-slate-300
+                  hover:shadow-[0_5px_15px_rgba(15,23,42,0.05)]
+                "
+                          >
+                            <div
+                              className={`
+                    grid h-9 w-9 shrink-0 place-items-center rounded-lg
+                    ${moduleVisual.iconClass}
+                  `}
+                            >
+                              <ModuleIcon size={17} strokeWidth={2} />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[10px] font-extrabold text-slate-900">
+                                {module.name}
+                              </div>
+
+                              <div className="mt-0.5 text-[8px] font-medium text-slate-500">
+                                Total: {module.total} records
+                              </div>
+                            </div>
+
+                            {module.actionRequired > 0 ? (
+                              <span className="shrink-0 rounded-lg bg-red-600 px-2.5 py-1.5 text-[8px] font-extrabold text-white">
+                                ⚠ {module.actionRequired}
                               </span>
                             ) : (
-                              <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 8px' }}>
+                              <span className="shrink-0 rounded-lg bg-green-100 px-2.5 py-1.5 text-[8px] font-extrabold text-green-600">
                                 ✓ Clear
                               </span>
                             )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
-                  <Link href="/city/users?role=ACTION_OFFICER" style={{ textDecoration: 'none', fontSize: 12, fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    Manage Action Officers <ArrowRight size={12} />
-                  </Link>
-                </div>
-              </div>
+                {/* Footer */}
+                <Link
+                  href="/city/users?role=ACTION_OFFICER"
+                  className="
+        mx-3 mb-3 mt-4 flex min-h-[58px] items-center justify-between
+        rounded-xl border border-emerald-100
+        bg-gradient-to-r from-emerald-50 to-white px-3
+        text-[10px] font-extrabold text-emerald-600 no-underline
+      "
+                >
+                  <span className="flex items-center gap-2">
+                    <UserCog size={16} />
+                    Manage Action Officers
+                  </span>
 
-              {/* Live Activity Feed */}
-              <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div className="avatar" style={{ background: '#fff', border: '1px solid #e2e8f0', transform: 'scale(0.8)' }}>
-                      <Activity size={16} color="#2563eb" />
+                  <ArrowRight size={15} />
+                </Link>
+              </section>
+
+              {/* ================= LIVE FIELD ACTIVITY ================= */}
+              <section className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                      <Activity size={18} />
                     </div>
+
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Live Field Activity</div>
-                      <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Real-time audit stream</div>
+                      <div className="text-[15px] font-extrabold leading-tight text-slate-900">
+                        Live Field Activity
+                      </div>
+
+                      <div className="mt-1 text-[10px] font-medium text-slate-500">
+                        Real-time audit stream
+                      </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 6, height: 6, borderRadius: 9, background: '#16a34a', boxShadow: '0 0 8px #22c55e' }} />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a' }}>LIVE</span>
+
+                  <div className="mt-0.5 flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[8px] font-black text-emerald-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(34,197,94,0.1)]" />
+                    LIVE
                   </div>
                 </div>
 
-                <div style={{ padding: '0', overflowY: 'auto', maxHeight: '420px', flex: 1 }}>
-                  {recentLogs.length === 0 ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                      <RefreshCw size={24} style={{ marginBottom: 12, opacity: 0.3 }} />
-                      <div style={{ fontSize: 13 }}>No recent activity found</div>
+                {/* Content */}
+                {recentLogs.length === 0 ? (
+                  <div className="grid min-h-[150px] place-items-center px-5 py-6 text-center text-[11px] text-slate-400">
+                    <div>
+                      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-50">
+                        <RefreshCw size={21} />
+                      </div>
+
+                      No recent activity found
                     </div>
-                  ) : (
-                    recentLogs.map((log, i) => (
-                      <div key={i} style={{ padding: '14px 20px', borderBottom: '1px solid #f8fafc', display: 'flex', gap: 12, alignItems: 'center' }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: log.status === 'APPROVED' ? '#eff6ff' : '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <MapPin size={14} color={log.status === 'APPROVED' ? '#2563eb' : '#d97706'} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{log.moduleName} Audit</span>
-                            <span style={{ fontSize: 10, color: '#94a3b8' }}>{new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                ) : (
+                  <div className="relative max-h-[420px] overflow-y-auto px-4 py-4 before:absolute before:bottom-8 before:left-[25px] before:top-8 before:w-px before:bg-gradient-to-b before:from-blue-200 before:to-transparent">
+                    {recentLogs.map((log, index) => (
+                      <div
+                        key={index}
+                        className="relative mb-3 flex items-start gap-3 last:mb-0"
+                      >
+                        <div className="relative z-10 flex shrink-0 items-center">
+                          <span className="absolute -left-[6px] h-2.5 w-2.5 rounded-full border-2 border-white bg-blue-600 shadow-[0_0_0_2px_#bfdbfe]" />
+
+                          <div className="grid h-9 w-9 place-items-center rounded-full bg-orange-50 text-orange-500">
+                            <MapPin size={17} strokeWidth={2.2} />
                           </div>
-                          <div style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 2 }}>
-                            By <b>{log.createdByUser?.name || 'Field User'}</b> • {log.status}
+                        </div>
+
+                        <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="truncate text-[10px] font-extrabold text-slate-900">
+                              {log.moduleName} Audit
+                            </div>
+
+                            <div className="shrink-0 text-[8px] font-medium text-slate-400">
+                              {new Date(log.createdAt).toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="mt-1 truncate text-[8px] font-medium text-slate-500">
+                            By{" "}
+                            <strong>
+                              {log.createdByUser?.name || "Field User"}
+                            </strong>
+
+                            {" • "}
+
+                            <span className="font-extrabold text-blue-600">
+                              {log.status}
+                            </span>
                           </div>
                         </div>
                       </div>
-                    ))
-                  )}
+                    ))}
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div
+                  className="
+        mx-3 mb-3 flex min-h-[58px] items-center gap-3
+        rounded-xl border border-blue-100
+        bg-gradient-to-r from-blue-50 to-white px-3
+      "
+                >
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600">
+                    <Eye size={17} strokeWidth={2.2} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-extrabold text-blue-600">
+                      View Live Stream
+                    </div>
+
+                    <div className="mt-0.5 text-[8px] font-medium text-slate-500">
+                      Monitor all field activities
+                    </div>
+                  </div>
+
+                  <ChevronRight size={15} className="shrink-0 text-slate-400" />
                 </div>
-              </div>
+              </section>
             </div>
 
             {/* ── Analytics Section ── */}

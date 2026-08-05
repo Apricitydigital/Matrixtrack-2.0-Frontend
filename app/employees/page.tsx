@@ -16,12 +16,16 @@ type Employee = {
   createdAt?: string;
 };
 
+import CommonRegistrationModal from "@components/CommonRegistrationModal";
+import { UserPlus, Sparkles } from "lucide-react";
+
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeModule, setActiveModule] = useState<string>('ALL');
   const [activeRole, setActiveRole] = useState<string>('ALL');
   const [search, setSearch] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     load();
@@ -183,12 +187,33 @@ export default function EmployeesPage() {
   return (
     <div className="content">
       <section className="card mb-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold mb-1">Employees</h1>
             <p className="muted text-sm">Manage access and assignments across modules.</p>
           </div>
-          <div className="badge badge-neutral">{employees.length} Total</div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              style={{
+                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                border: "none",
+                borderRadius: "10px",
+                padding: "10px 18px",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: "13px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)"
+              }}
+            >
+              <UserPlus size={16} /> + Integrated Registration & Bulk Import
+            </button>
+            <div className="badge badge-neutral" style={{ padding: "12px 14px" }}>{employees.length} Total</div>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -225,6 +250,14 @@ export default function EmployeesPage() {
           emptyMessage="No employees found matching criteria."
         />
       </section>
+
+      <CommonRegistrationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={() => {
+          load();
+        }}
+      />
     </div>
   );
 }
