@@ -4,8 +4,11 @@ import React, { useState, useEffect } from "react";
 import {
   CommonRegistrationApi,
   IntegratedRegistrationPayload,
-  PublicGeoApi
+  PublicGeoApi,
+  CityModulesApi
 } from "@lib/apiClient";
+import { useAuth } from "@hooks/useAuth";
+import { getUserPermissions } from "@lib/userPermissions";
 import {
   X,
   UserPlus,
@@ -20,7 +23,8 @@ import {
   Download,
   Trash2,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Lock
 } from "lucide-react";
 
 interface CommonRegistrationModalProps {
@@ -36,6 +40,8 @@ export default function CommonRegistrationModal({
   onSuccess,
   asPage
 }: CommonRegistrationModalProps) {
+  const { user } = useAuth();
+  const userPerms = getUserPermissions(user);
   const [activeTab, setActiveTab] = useState<"single" | "bulk">("single");
 
   // Config options from API
@@ -115,6 +121,7 @@ export default function CommonRegistrationModal({
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const [cityModulesMap, setCityModulesMap] = useState<Record<string, boolean> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -145,7 +152,50 @@ export default function CommonRegistrationModal({
         })
         .catch(() => {});
     }
+
+    try {
+      const modulesRes = await CityModulesApi.list();
+      if (Array.isArray(modulesRes)) {
+        const map: Record<string, boolean> = {};
+        modulesRes.forEach((m: any) => {
+          if (m.key || m.name) {
+            map[String(m.key || m.name).toUpperCase()] = m.enabled !== false;
+          }
+        });
+        setCityModulesMap(map);
+      }
+    } catch {
+      setCityModulesMap(null);
+    }
   };
+
+  const isSwachhPermitted =
+    userPerms.swachhAccess !== 'RESTRICTED' &&
+    (cityModulesMap === null ||
+      Boolean(
+        cityModulesMap['SWACHH_RANKING'] ||
+        cityModulesMap['SWACHH'] ||
+        cityModulesMap['WARD_RANKING']
+      ));
+
+  const isTaskforcePermitted =
+    userPerms.taskforceAccess !== 'RESTRICTED' &&
+    (cityModulesMap === null ||
+      Boolean(
+        cityModulesMap['TASKFORCE'] ||
+        cityModulesMap['LITTERBINS'] ||
+        cityModulesMap['SWEEPING'] ||
+        cityModulesMap['TOILET']
+      ));
+
+  useEffect(() => {
+    if (!isSwachhPermitted) {
+      setForm((f) => ({
+        ...f,
+        targetSystems: f.targetSystems.filter((s) => s !== "SWACHH_RANKING")
+      }));
+    }
+  }, [isSwachhPermitted]);
 
   const handleCityChange = async (cityId: string) => {
     setForm((f) => ({ ...f, cityId, zoneId: "", wardId: "" }));
@@ -577,74 +627,126 @@ export default function CommonRegistrationModal({
                     letterSpacing: "0.03em"
                   }}
                 >
-                  Target Software / Applications
+                  Target Software / Applications (Permitted Workspace Modules)
                 </label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   {/* Taskforce 2.0 Card */}
-                  <div
-                    onClick={() => toggleTargetSystem("TASKFORCE_20")}
-                    style={{
-                      padding: "16px",
-                      borderRadius: "16px",
-                      border: form.targetSystems.includes("TASKFORCE_20")
-                        ? "2px solid #3b82f6"
-                        : "1.5px solid #e2e8f0",
-                      background: form.targetSystems.includes("TASKFORCE_20") ? "#eff6ff" : "#f8fafc",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      display: "flex",
-                      gap: "12px",
-                      alignItems: "flex-start"
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={form.targetSystems.includes("TASKFORCE_20")}
-                      onChange={() => {}}
-                      style={{ marginTop: "3px", accentColor: "#2563eb" }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: "15px", color: "#1e3a8a", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <ShieldCheck size={16} /> Taskforce 2.0 (Matrixtrack)
+                  {isTaskforcePermitted ? (
+                    <div
+                      onClick={() => toggleTargetSystem("TASKFORCE_20")}
+                      style={{
+                        padding: "16px",
+                        borderRadius: "16px",
+                        border: form.targetSystems.includes("TASKFORCE_20")
+                          ? "2px solid #3b82f6"
+                          : "1.5px solid #e2e8f0",
+                        background: form.targetSystems.includes("TASKFORCE_20") ? "#eff6ff" : "#f8fafc",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "flex-start"
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.targetSystems.includes("TASKFORCE_20")}
+                        onChange={() => {}}
+                        style={{ marginTop: "3px", accentColor: "#2563eb" }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#1e3a8a", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <ShieldCheck size={16} /> Taskforce 2.0 (Matrixtrack)
+                        </div>
+                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
+                          Assign to Sweeping, Litter Bins, Toilet & CTU Feeder modules
+                        </p>
                       </div>
-                      <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
-                        Assign to Sweeping, Litter Bins, Toilet & CTU Feeder modules
-                      </p>
                     </div>
-                  </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: "16px",
+                        borderRadius: "16px",
+                        border: "1.5px dashed #cbd5e1",
+                        background: "#f1f5f9",
+                        opacity: 0.65,
+                        cursor: "not-allowed",
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "flex-start"
+                      }}
+                    >
+                      <Lock size={16} style={{ marginTop: "3px", color: "#64748b" }} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
+                          Taskforce 2.0 (Restricted)
+                        </div>
+                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#94a3b8", lineHeight: 1.4 }}>
+                          Module not assigned/enabled for this city cluster by Super Admin
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Swachh Ranking Card */}
-                  <div
-                    onClick={() => toggleTargetSystem("SWACHH_RANKING")}
-                    style={{
-                      padding: "16px",
-                      borderRadius: "16px",
-                      border: form.targetSystems.includes("SWACHH_RANKING")
-                        ? "2px solid #10b981"
-                        : "1.5px solid #e2e8f0",
-                      background: form.targetSystems.includes("SWACHH_RANKING") ? "#ecfdf5" : "#f8fafc",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      display: "flex",
-                      gap: "12px",
-                      alignItems: "flex-start"
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={form.targetSystems.includes("SWACHH_RANKING")}
-                      onChange={() => {}}
-                      style={{ marginTop: "3px", accentColor: "#059669" }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: "15px", color: "#065f46", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <Building2 size={16} /> Swachh Ranking Software
+                  {isSwachhPermitted ? (
+                    <div
+                      onClick={() => toggleTargetSystem("SWACHH_RANKING")}
+                      style={{
+                        padding: "16px",
+                        borderRadius: "16px",
+                        border: form.targetSystems.includes("SWACHH_RANKING")
+                          ? "2px solid #10b981"
+                          : "1.5px solid #e2e8f0",
+                        background: form.targetSystems.includes("SWACHH_RANKING") ? "#ecfdf5" : "#f8fafc",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "flex-start"
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.targetSystems.includes("SWACHH_RANKING")}
+                        onChange={() => {}}
+                        style={{ marginTop: "3px", accentColor: "#059669" }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#065f46", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <Building2 size={16} /> Swachh Ranking Software
+                        </div>
+                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
+                          Auto-sync user account as Assessor / Evaluator in Swachh Ward Ranking
+                        </p>
                       </div>
-                      <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
-                        Auto-sync user account as Assessor / Evaluator in Swachh Ward Ranking
-                      </p>
                     </div>
-                  </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: "16px",
+                        borderRadius: "16px",
+                        border: "1.5px dashed #cbd5e1",
+                        background: "#f1f5f9",
+                        opacity: 0.65,
+                        cursor: "not-allowed",
+                        display: "flex",
+                        gap: "12px",
+                        alignItems: "flex-start"
+                      }}
+                    >
+                      <Lock size={16} style={{ marginTop: "3px", color: "#64748b" }} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
+                          Swachh Ranking (Restricted)
+                        </div>
+                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#94a3b8", lineHeight: 1.4 }}>
+                          Module not assigned/enabled for this city cluster by Super Admin
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

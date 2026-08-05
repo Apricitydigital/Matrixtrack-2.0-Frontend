@@ -237,12 +237,6 @@ export default function Sidebar() {
       }
     );
   } else {
-    links.push({
-      label: "Portal Home",
-      href: "/portal-home",
-      icon: <Layout size={18} />,
-    });
-
     if (
       !isCommissioner &&
       !isCityAdmin &&
@@ -261,16 +255,6 @@ export default function Sidebar() {
           label: "HMS Super Admin",
           href: "/hms",
           icon: <Shield size={18} />,
-        },
-        {
-          label: "City Directory",
-          href: "/portal-home/city-directory",
-          icon: <Globe size={18} />,
-        },
-        {
-          label: "Onboard City",
-          href: "/hms/cities/new",
-          icon: <Building2 size={18} />,
         }
       );
     } else if (isCityAdmin || isCommissioner) {

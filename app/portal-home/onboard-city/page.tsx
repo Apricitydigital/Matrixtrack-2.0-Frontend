@@ -243,10 +243,10 @@ export default function CreateCityPage() {
         <nav className="flex items-center gap-2 text-sm">
           <button
             type="button"
-            onClick={() => router.push("/hms")}
+            onClick={() => router.push("/portal-home")}
             className="font-semibold text-blue-600 transition hover:text-blue-700"
           >
-            HMS
+            Portal Home
           </button>
 
           <span className="text-slate-300">/</span>

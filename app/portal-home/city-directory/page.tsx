@@ -593,7 +593,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
         <button
           onClick={() => {
             if (onProvisionClick) onProvisionClick();
-            else window.location.href = '/hms/cities/new';
+            else window.location.href = '/portal-home/onboard-city';
           }}
           className="
             inline-flex h-11 shrink-0 items-center justify-center gap-2
