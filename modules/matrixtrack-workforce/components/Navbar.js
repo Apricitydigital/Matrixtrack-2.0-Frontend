@@ -391,10 +391,10 @@ flex-shrink-0
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="hidden sm:flex flex-col text-right">
             <span className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Welcome back</span>
-            <span className="text-sm font-semibold text-slate-800 dark:text-white">{user?.name || "User"}</span>
-            {user?.role !== "supervisor" && (
-              <span className="text-xs text-slate-500 dark:text-slate-400">Role: {user?.role || "—"}</span>
-            )}
+            <span className="text-sm font-semibold text-slate-800 dark:text-white">{user?.name || user?.email || "User"}</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              Role: {user?.roleLabels?.[0] || (user?.roles?.[0] ? user.roles[0].replace('_', ' ') : null) || user?.role || "Admin"}
+            </span>
           </div>
 
           <button

@@ -254,10 +254,6 @@ export default function Sidebar() {
       });
     }
 
-    /*
-     * HMS Super Admin navigation
-     * These links are visible only to HMS_SUPER_ADMIN.
-     */
     if (isHmsSuperAdmin) {
       links.push(
         {
@@ -271,17 +267,12 @@ export default function Sidebar() {
           icon: <Building2 size={18} />,
         }
       );
-    }
-
-    if (isCityAdmin || isCommissioner) {
+    } else if (isCityAdmin || isCommissioner) {
       links.push({
         label: "City Dashboard",
         href: "/city",
         icon: <LayoutDashboard size={18} />,
       });
-    }
-
-    if (!isHmsSuperAdmin) {
       links.push({
         label: "Employees",
         href: "/employees",
@@ -291,6 +282,12 @@ export default function Sidebar() {
         label: "Integrated Registration",
         href: "/common-registration",
         icon: <UserPlus size={18} />,
+      });
+    } else {
+      links.push({
+        label: "Home",
+        href: "/",
+        icon: <Home size={18} />,
       });
     }
   }
@@ -335,6 +332,23 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:thin]">
+        {/* Prominent Portal Home SSO Hub Badge */}
+        {user && (
+          <div className="mb-4 px-1">
+            <Link
+              href="/portal-home"
+              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all duration-200 shadow-sm ${
+                pathname === "/portal-home"
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-blue-500/25 shadow-md"
+                  : "bg-slate-900 text-white hover:bg-slate-800"
+              }`}
+            >
+              <Layout size={16} className="text-blue-300" />
+              <span>Portal Home</span>
+            </Link>
+          </div>
+        )}
+
         <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
           Navigation
         </div>

@@ -1,57 +1,157 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, AuthApi } from "@lib/apiClient";
+import { ApiError, AuthApi, PublicGeoApi } from "@lib/apiClient";
+import { setAuthCookie, decodeToken } from "@lib/auth";
 import { useAuth } from "@hooks/useAuth";
 import { getPostLoginRedirect } from "@utils/modules";
 import { Eye, EyeOff, ShieldCheck, ArrowRight, Building2 } from "lucide-react";
 
 export default function LoginPage() {
-    const router = useRouter();
-    const { setAuthenticatedUser } = useAuth();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
+  const { setUser, setAuthenticatedUser } = useAuth();
+  
+  // Drawer state
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const params = new URLSearchParams(window.location.search);
-        if (params.get("reason") === "session-expired") {
-            setError("Your session expired while you were working. Please sign in again.");
-        }
-    }, []);
+  // Login Form States
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError("");
-        try {
-            const { token, user: authUser } = await AuthApi.login({ email, password });
-            setAuthenticatedUser(token, authUser);
-            router.replace(getPostLoginRedirect(authUser));
-        } catch (err) {
-            if (err instanceof ApiError && err.status === 401) {
-                setError("Invalid email or password. Please try again.");
-            } else if (err instanceof ApiError) {
-                setError(err.message || "An error occurred. Please try again.");
-            } else {
-                setError("Login failed. Please check your connection.");
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
+  // 100% Exact Original Register Form States
+  const [regForm, setRegForm] = useState({
+    ulbCode: "",
+    name: "",
+    email: "",
+    phone: "",
+    aadharNumber: "",
+    password: "",
+    cityId: "",
+    zoneId: "",
+    wardId: ""
+  });
+  const [regStatus, setRegStatus] = useState("");
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [zones, setZones] = useState<{ id: string; name: string }[]>([]);
+  const [wards, setWards] = useState<{ id: string; name: string }[]>([]);
+  const [loadingGeo, setLoadingGeo] = useState(false);
 
-    return (
-        <div style={{
-            display: "flex",
-            minHeight: "100vh",
-            width: "100%",
-            fontFamily: "'Inter', system-ui, -apple-system, sans-serif"
-        }}>
+  // Fetch Cities on load for registration
+  useEffect(() => {
+    PublicGeoApi.cities().then((res) => setCities(res.cities || [])).catch(() => {});
+  }, []);
+
+  const handleCityChange = async (cityId: string) => {
+    setRegForm((f) => ({ ...f, cityId, zoneId: "", wardId: "" }));
+    setZones([]);
+    setWards([]);
+    if (!cityId) return;
+    setLoadingGeo(true);
+    try {
+      const res = await PublicGeoApi.zones(cityId);
+      setZones(res.zones || []);
+    } finally {
+      setLoadingGeo(false);
+    }
+  };
+
+  const handleZoneChange = async (zoneId: string) => {
+    setRegForm((f) => ({ ...f, zoneId, wardId: "" }));
+    setWards([]);
+    if (!zoneId) return;
+    setLoadingGeo(true);
+    try {
+      const res = await PublicGeoApi.wards(zoneId);
+      setWards(res.wards || []);
+    } finally {
+      setLoadingGeo(false);
+    }
+  };
+
+  const updateRegForm = (key: keyof typeof regForm, value: string) => {
+    setRegForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    console.log("[Login] Submitting credentials for:", email);
+    try {
+      const res = await AuthApi.login({ email, password });
+      console.log("[Login] Success response:", res);
+      setAuthCookie(res.token);
+      const decoded = decodeToken(res.token, res.user);
+      const finalUser = decoded || (res.user as any);
+      setAuthenticatedUser(res.token, finalUser);
+      console.log("[Login] Navigating to /portal-home...");
+      if (typeof window !== "undefined") {
+        window.location.href = "/portal-home";
+      } else {
+        router.replace("/portal-home");
+      }
+    } catch (err: any) {
+      console.error("[Login] Error caught:", err);
+      setLoading(false);
+      if (err instanceof ApiError && err.status === 401) {
+        setError("Invalid email or password. Please try again.");
+      } else if (err instanceof ApiError) {
+        setError(err.message || "An error occurred. Please try again.");
+      } else {
+        setError(err?.message || "Login failed. Please check backend connection.");
+      }
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setRegStatus("");
+    try {
+      if (!regForm.cityId || !regForm.zoneId || !regForm.wardId) {
+        setError("City, Zone, and Ward are required");
+        setLoading(false);
+        return;
+      }
+      await AuthApi.registerRequest(regForm);
+      setRegStatus("Registration request sent to City Admin. You will be notified once approved.");
+      setRegForm({
+        ulbCode: "",
+        name: "",
+        email: "",
+        phone: "",
+        aadharNumber: "",
+        password: "",
+        cityId: "",
+        zoneId: "",
+        wardId: ""
+      });
+      setZones([]);
+      setWards([]);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || "Failed to submit request");
+      } else {
+        setError("Failed to submit request");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      display: "flex",
+      minHeight: "100vh",
+      width: "100%",
+      fontFamily: "'Inter', system-ui, -apple-system, sans-serif"
+    }}>
 
             {/* ─── LEFT PANEL ─── */}
             <div style={{
@@ -177,7 +277,7 @@ export default function LoginPage() {
                         </p>
                     </div>
 
-                    <form onSubmit={handleSubmit}>
+                    <form onSubmit={handleLoginSubmit}>
                         {/* Email */}
                         <div style={{ marginBottom: 20 }}>
                             <label htmlFor="login-email" style={{
@@ -408,13 +508,6 @@ export default function LoginPage() {
                     </p>
                 </div>
             </div>
-
-            {/* Mobile hidden style */}
-            <style>{`
-        @media (max-width: 900px) {
-          .auth-left-panel { display: none !important; }
-        }
-      `}</style>
         </div>
     );
 }

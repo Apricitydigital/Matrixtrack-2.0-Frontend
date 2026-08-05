@@ -687,8 +687,8 @@ const SelfAssessmentQCReview = () => {
         setBulkDownloading(true);
         try {
             let pmcB64 = '', swachhB64 = '';
-            try { pmcB64 = await toBase64(pmcLogoSrc.src); } catch { /* skip */ }
-            try { swachhB64 = await toBase64(swachhLogoSrc.src); } catch { /* skip */ }
+            try { pmcB64    = await toBase64(typeof pmcLogoSrc === 'string' ? pmcLogoSrc : (pmcLogoSrc as any)?.src || '');    } catch { /* skip */ }
+            try { swachhB64 = await toBase64(typeof swachhLogoSrc === 'string' ? swachhLogoSrc : (swachhLogoSrc as any)?.src || ''); } catch { /* skip */ }
 
             const details: DetailData[] = [];
             for (const id of ids) {
@@ -715,8 +715,8 @@ const SelfAssessmentQCReview = () => {
     const exportListPDF = async () => {
         let pmcB64 = '';
         let swachhB64 = '';
-        try { pmcB64 = await toBase64(pmcLogoSrc.src); } catch { /* skip */ }
-        try { swachhB64 = await toBase64(swachhLogoSrc.src); } catch { /* skip */ }
+        try { pmcB64    = await toBase64(typeof pmcLogoSrc === 'string' ? pmcLogoSrc : (pmcLogoSrc as any)?.src || '');   } catch { /* skip */ }
+        try { swachhB64 = await toBase64(typeof swachhLogoSrc === 'string' ? swachhLogoSrc : (swachhLogoSrc as any)?.src || ''); } catch { /* skip */ }
 
         const NAVY_C = [30, 58, 138] as [number, number, number];
         const WHITE_C = [255, 255, 255] as [number, number, number];
@@ -817,8 +817,8 @@ const SelfAssessmentQCReview = () => {
 
     const exportDetailPDF = async (detail: DetailData) => {
         let pmcB64 = '', swachhB64 = '';
-        try { pmcB64 = await toBase64(pmcLogoSrc.src); } catch { /* skip */ }
-        try { swachhB64 = await toBase64(swachhLogoSrc.src); } catch { /* skip */ }
+        try { pmcB64    = await toBase64(typeof pmcLogoSrc === 'string' ? pmcLogoSrc : (pmcLogoSrc as any)?.src || '');    } catch { /* skip */ }
+        try { swachhB64 = await toBase64(typeof swachhLogoSrc === 'string' ? swachhLogoSrc : (swachhLogoSrc as any)?.src || ''); } catch { /* skip */ }
         const doc = new jsPDF({ unit: 'mm', format: 'a4' });
         buildWardPagesInDoc(doc, detail, pmcB64, swachhB64, 0);
         addPdfFooters(doc);

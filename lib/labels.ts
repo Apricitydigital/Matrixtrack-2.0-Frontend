@@ -1,13 +1,15 @@
 import { Role } from "../types/auth";
 
 export const ROLE_LABELS: Record<Role | string, string> = {
+  HMS_SUPER_ADMIN: "HMS Super Admin",
+  SUPER_ADMIN: "State Super Admin",
+  DIVISION_ADMIN: "Division Admin",
   EMPLOYEE: "Employee",
   SUPERVISOR: "Supervisor",
   COMMISSIONER: "ULB Official",
   QC: "Quality Controller",
   CITY_ADMIN: "City Admin",
-  ACTION_OFFICER: "Action Officer",
-  HMS_SUPER_ADMIN: "HMS Super Admin"
+  ACTION_OFFICER: "Action Officer"
 };
 
 export function roleLabel(role: Role | string) {

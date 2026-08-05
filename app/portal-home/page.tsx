@@ -259,6 +259,10 @@ export default function PortalHomePage() {
           'LITTERBINS',
           'SWEEPING',
           'TOILET',
+          'WORKFORCE_MONITORING',
+          'WORKFORCE',
+          'MATRIXTRACK_WORKFORCE',
+          'ATTENDANCE',
         ].includes(
           String(
             module.key || module.name || ''
