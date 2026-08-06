@@ -57,9 +57,9 @@ export default function EmployeeAssignmentsPage() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "16px", marginBottom: "28px" }}>
           {[
-            { label: "Supervisor Beats", value: beats.length, icon: MapPinned, color: "#2563eb", bg: "#eff6ff" },
-            { label: "Supervisors", value: totalSupervisors, icon: ArrowLeftRight, color: "#7c3aed", bg: "#f5f3ff" },
-            { label: "Employee Deployments", value: totalEmployeeSegments, icon: Users, color: "#059669", bg: "#ecfdf5" },
+            { label: "Beats Assigned to Supervisors", value: beats.length, icon: MapPinned, color: "#2563eb", bg: "#eff6ff" },
+            { label: "Total Active Supervisors", value: totalSupervisors, icon: ArrowLeftRight, color: "#7c3aed", bg: "#f5f3ff" },
+            { label: "Total Field Employee Deployments", value: totalEmployeeSegments, icon: Users, color: "#059669", bg: "#ecfdf5" },
           ].map((card) => (
             <div key={card.label} style={{ backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "18px", padding: "18px 20px", display: "flex", alignItems: "center", gap: "14px" }}>
               <div style={{ width: "48px", height: "48px", borderRadius: "14px", backgroundColor: card.bg, color: card.color, display: "flex", alignItems: "center", justifyContent: "center" }}>

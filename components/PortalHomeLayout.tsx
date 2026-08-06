@@ -57,20 +57,14 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
   const [workforceOpen, setWorkforceOpen] = useState(isWorkforceActive);
   const [modulesSubOpen, setModulesSubOpen] = useState(pathname.startsWith('/modules'));
   const [masterSubOpen, setMasterSubOpen] = useState(pathname.startsWith('/city/zones') || pathname.startsWith('/city/wards') || pathname.startsWith('/city/areas') || pathname.startsWith('/city/users'));
-  const [portalToolsOpen, setPortalToolsOpen] = useState(!isInsideWorkspace);
+  const [portalToolsOpen, setPortalToolsOpen] = useState(true);
 
   useEffect(() => {
-    if (isInsideWorkspace) {
-      setPortalToolsOpen(false);
-    } else {
-      setPortalToolsOpen(true);
-    }
+    // Sync initial workspace states once on mount
     if (isTaskforceActive) setTaskforceOpen(true);
     if (isSwachhActive) setSwachhOpen(true);
     if (isWorkforceActive) setWorkforceOpen(true);
-    if (pathname.startsWith('/modules')) setModulesSubOpen(true);
-    if (pathname.startsWith('/city/zones') || pathname.startsWith('/city/wards') || pathname.startsWith('/city/areas') || pathname.startsWith('/city/users')) setMasterSubOpen(true);
-  }, [pathname, isTaskforceActive, isSwachhActive, isWorkforceActive, isInsideWorkspace]);
+  }, []);
 
   useEffect(() => {
     const updateClock = () => {
@@ -442,13 +436,13 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                       : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck size={18} className={isTaskforceActive ? 'text-blue-600' : 'text-slate-500'} />
-                    <span>Inspection & Performance System</span>
+                  <div className="flex items-center gap-3 text-left min-w-0">
+                    <ShieldCheck size={18} className={`shrink-0 ${isTaskforceActive ? 'text-blue-600' : 'text-slate-500'}`} />
+                    <span className="text-left leading-snug">Inspection & Performance System</span>
                   </div>
                   <ChevronDown
                     size={16}
-                    className={`transition-transform duration-200 ${taskforceOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
+                    className={`shrink-0 transition-transform duration-200 ${taskforceOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
                   />
                 </button>
 
@@ -478,13 +472,13 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <Package size={15} className={pathname.startsWith('/modules') || pathname === '/city/modules' ? 'text-blue-600' : 'text-slate-400'} />
-                          <span>Modules</span>
+                        <div className="flex items-center gap-2.5 text-left min-w-0">
+                          <Package size={15} className={`shrink-0 ${pathname.startsWith('/modules') || pathname === '/city/modules' ? 'text-blue-600' : 'text-slate-400'}`} />
+                          <span className="text-left leading-snug">Modules</span>
                         </div>
                         <ChevronDown
                           size={14}
-                          className={`transition-transform duration-200 ${modulesSubOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
+                          className={`shrink-0 transition-transform duration-200 ${modulesSubOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
                         />
                       </button>
 
@@ -524,13 +518,13 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                       : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Building2 size={18} className={isSwachhActive ? 'text-purple-600' : 'text-slate-500'} />
-                    <span>Ward Ranking System</span>
+                  <div className="flex items-center gap-3 text-left min-w-0">
+                    <Building2 size={18} className={`shrink-0 ${isSwachhActive ? 'text-purple-600' : 'text-slate-500'}`} />
+                    <span className="text-left leading-snug">Ward Ranking System</span>
                   </div>
                   <ChevronDown
                     size={16}
-                    className={`transition-transform duration-200 ${swachhOpen ? 'rotate-180 text-purple-600' : 'text-slate-400'}`}
+                    className={`shrink-0 transition-transform duration-200 ${swachhOpen ? 'rotate-180 text-purple-600' : 'text-slate-400'}`}
                   />
                 </button>
 
@@ -574,9 +568,9 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                       : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Users size={18} className={isWorkforceActive ? 'text-cyan-600' : 'text-slate-500'} />
-                    <span>Workforce Attendance System</span>
+                  <div className="flex items-center gap-3 text-left min-w-0">
+                    <Users size={18} className={`shrink-0 ${isWorkforceActive ? 'text-cyan-600' : 'text-slate-500'}`} />
+                    <span className="text-left leading-snug">Workforce Attendance System</span>
                   </div>
                   <ChevronDown
                     size={16}
@@ -626,36 +620,41 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="portal-main-content flex-1 ml-72 p-5 sm:p-6 min-w-0 min-h-screen text-slate-800">
-        <div className="mb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 sm:px-6 sm:py-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/80 backdrop-blur-xl p-5 sm:px-8 sm:py-5 rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] sticky top-4 z-40 transition-all">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-widest text-blue-700 flex items-center gap-1.5 mb-0.5">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center gap-2 mb-1">
               <ShieldCheck size={14} className="text-blue-600" /> MATRIXTRACK 2.0 
             </div>
-            <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
               {pageTitle}
             </h1>
           </div>
 
           {user && (
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex flex-col items-end gap-1 px-1 mr-2">
-                <span className="inline-flex items-center gap-2 text-emerald-700 font-extrabold text-[11px] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 w-fit shadow-sm">
-                  <span className="pulse-dot w-2 h-2 rounded-full bg-emerald-500"></span> LIVE API FEED
+            <div className="flex items-center gap-5">
+              <div className="hidden sm:flex flex-col items-end gap-1 px-1">
+                <span className="inline-flex items-center gap-2 text-emerald-700 font-extrabold text-[11px] bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 w-fit shadow-sm relative overflow-hidden group">
+                  <span className="absolute inset-0 bg-emerald-500/10 group-hover:bg-emerald-500/20 transition-colors"></span>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="relative">LIVE API FEED</span>
                 </span>
-                <span className="text-[10px] font-extrabold text-slate-500">{clockStr}</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{clockStr}</span>
               </div>
 
-              <div className="flex items-center gap-3.5 bg-slate-50 border border-slate-200 shadow-sm px-4 py-2.5 rounded-2xl shrink-0">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] text-white font-black text-base flex items-center justify-center shadow-md shadow-blue-600/25 shrink-0">
+              <div className="flex items-center gap-3.5 bg-white border border-slate-100 shadow-sm px-4 py-2.5 rounded-[20px] shrink-0 hover:shadow-md transition-all cursor-pointer">
+                <div className="w-11 h-11 rounded-[14px] bg-gradient-to-br from-[#1e3a8a] via-[#2563eb] to-[#3b82f6] text-white font-black text-base flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0 ring-2 ring-white">
                   {userInitial}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-black text-slate-900 truncate leading-snug">{displayName}</span>
+                  <span className="text-[13px] font-black text-slate-900 truncate leading-tight">{displayName}</span>
                   {roleLabelText !== displayName && (
-                    <span className="text-[11px] font-medium text-slate-500 truncate leading-snug">{roleLabelText}</span>
+                    <span className="text-[11px] font-bold text-slate-500 truncate leading-tight mt-0.5">{roleLabelText}</span>
                   )}
                   {cityName && (
-                    <span className="text-[11px] font-medium text-blue-600 truncate leading-snug">{cityName}</span>
+                    <span className="text-[10px] font-extrabold text-blue-600 truncate leading-tight uppercase tracking-wider mt-0.5">{cityName}</span>
                   )}
                 </div>
               </div>

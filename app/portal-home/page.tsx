@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import UnifiedExecutiveDashboard from '@modules/taskforce/components/dashboard/UnifiedExecutiveDashboard';
 import { CityApi, CityUserApi, RegistrationApi } from '@lib/apiClient';
-import type { CityRow } from '../types/api';
+import type { CityRow } from '../../types/api';
 
 export default function PortalHomePage() {
   const { user } = useAuth();

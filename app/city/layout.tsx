@@ -7,12 +7,12 @@ const ALLOWED_ROLES = ["CITY_ADMIN", "HMS_SUPER_ADMIN", "COMMISSIONER", "ULB_OFF
 
 export default function CityAdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <PortalHomeLayout>
-      <Protected>
-        <RoleGuard roles={[...ALLOWED_ROLES]}>
+    <Protected>
+      <RoleGuard roles={[...ALLOWED_ROLES]}>
+        <PortalHomeLayout>
           {children}
-        </RoleGuard>
-      </Protected>
-    </PortalHomeLayout>
+        </PortalHomeLayout>
+      </RoleGuard>
+    </Protected>
   );
 }

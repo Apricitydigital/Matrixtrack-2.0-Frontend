@@ -30,6 +30,7 @@ import {
   UserPlus,
   Users,
   Zap,
+  MoreVertical,
 } from "lucide-react";
 import { ApiError, CityApi } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
@@ -65,7 +66,7 @@ type CityUpdateInput = {
   adminEmail?: string;
 };
 
-export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClick?: () => void }) {
+export default function HmsDashboardPage() {
   const { showToast } = useToast();
   const [cities, setCities] = useState<CityRow[]>([]);
   const [states, setStates] = useState<MasterNode[]>([]);
@@ -550,8 +551,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
     {/* Add City Button */}
     <button
       onClick={() => {
-        if (onProvisionClick) onProvisionClick();
-        else window.location.href = '/portal-home/onboard-city';
+        window.location.href = '/portal-home/onboard-city';
       }}
       className="
         inline-flex h-11 shrink-0 items-center justify-center gap-2
@@ -701,25 +701,27 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
   <div className="overflow-x-auto">
     <table className="w-full min-w-[1180px] table-fixed">
       <colgroup>
-        <col className="w-[8%]" />
-        <col className="w-[18%]" />
-        <col className="w-[26%]" />
-        <col className="w-[18%]" />
+        <col className="w-[6%]" />
+        <col className="w-[14%]" />
+        <col className="w-[16%]" />
+        <col className="w-[16%]" />
+        <col className="w-[14%]" />
         <col className="w-[12%]" />
-        <col className="w-[10%]" />
-        <col className="w-[8%]" />
+        <col className="w-[16%]" />
+        <col className="w-[6%]" />
       </colgroup>
 
       <thead>
         <tr className="border-b border-slate-200 bg-slate-50/75">
           {[
             "Sr. No.",
+            "State",
             "City",
             "Hierarchy",
             "Users",
-            "Date Created On",
-            "Status",
-            "Control",
+            "Created On",
+            "Assigned Modules",
+            "Actions",
           ].map((heading) => (
             <th
               key={heading}
@@ -770,14 +772,19 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                   {srNo}
                 </td>
 
-                {/* City (Icon Removed) */}
+                {/* State */}
+                <td className="px-5 py-4 align-middle text-[13px] font-bold text-slate-700">
+                  {city.state?.name || "No state"}
+                </td>
+
+                {/* City */}
                 <td className="px-5 py-4 align-middle">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-black text-slate-900">
                       {city.name}
                     </div>
-                    <div className="mt-0.5 truncate text-xs font-semibold text-slate-400">
-                      {city.code || `ID-${city.id.slice(0, 6)}`}
+                    <div className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
+                      CODE: {city.code || `ID-${city.id.slice(0, 6)}`}
                     </div>
                   </div>
                 </td>
@@ -785,7 +792,10 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                 {/* Hierarchy */}
                 <td className="px-5 py-4 align-middle">
                   <div className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
-                    {hierarchyItems.map((item, hierarchyIndex) => (
+                    {[
+                      { label: city.division?.name || "No division", missing: !city.division?.name },
+                      { label: city.district?.name || "No district", missing: !city.district?.name },
+                    ].map((item, hierarchyIndex, arr) => (
                       <div
                         key={`${city.id}-${hierarchyIndex}`}
                         className="flex min-w-0 items-center gap-1.5"
@@ -802,7 +812,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                         </span>
 
                         {hierarchyIndex <
-                          hierarchyItems.length - 1 && (
+                          arr.length - 1 && (
                           <ChevronRight
                             size={13}
                             className="shrink-0 text-slate-300"
@@ -915,126 +925,55 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                   )}
                 </td>
 
-                {/* Status */}
+                {/* Created On */}
                 <td className="px-5 py-4 align-middle">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleToggleCity(city.id, !city.enabled)
-                    }
-                    title={
-                      city.enabled
-                        ? "Click to mark inactive"
-                        : "Click to mark active"
-                    }
-                    className={`
-                      inline-flex items-center gap-2 rounded-[9px]
-                      border px-3 py-1.5 text-xs font-bold
-                      transition
-                      ${
-                        city.enabled
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                          : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
-                      }
-                    `}
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        city.enabled
-                          ? "bg-emerald-500"
-                          : "bg-slate-400"
-                      }`}
-                    />
-
-                    {city.enabled ? "Active" : "Inactive"}
-                  </button>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[12px] font-bold text-slate-700">{createdDate}</span>
+                    <span className="text-[10px] font-semibold text-slate-400">{city.createdAt ? new Date(city.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '10:30 AM'}</span>
+                  </div>
                 </td>
 
-                {/* Control */}
-                <td className="px-5 py-4 pr-7 align-middle">
-                  <div className="flex items-center gap-1.5">
+                {/* Assigned Modules */}
+                <td className="px-5 py-4 align-middle">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10">Inspection & Performance</span>
+                    <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-[10px] font-bold text-purple-700 ring-1 ring-inset ring-purple-700/10">Workforce</span>
+                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-700/10">Ward Ranking</span>
+                  </div>
+                </td>
+
+                {/* Actions */}
+                <td className="px-5 py-4 pr-7 align-middle relative group cursor-pointer">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-[9px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 ml-auto">
+                    <MoreVertical size={16} />
+                  </div>
+                  
+                  {/* Dropdown */}
+                  <div className="absolute right-7 top-10 z-[100] hidden w-[170px] flex-col rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg group-hover:flex">
                     <button
-                      type="button"
                       onClick={() => setEditingCity(city)}
-                      aria-label={`Edit city ${city.name}`}
-                      title="Edit City Configuration"
-                      className="
-                        flex h-8 w-8 items-center justify-center
-                        rounded-[9px] border border-slate-200
-                        bg-white text-slate-600 transition
-                        hover:border-blue-200 hover:bg-blue-50
-                        hover:text-blue-600
-                      "
+                      className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 text-left"
                     >
-                      <Edit2 size={14} />
+                      Edit City
                     </button>
-
-                    {admins.length > 0 && admins[0].id && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditingAdmin({
-                              cityId: city.id,
-                              cityName: city.name,
-                              admin: admins[0],
-                            })
-                          }
-                          aria-label={`Edit Admin ${admins[0].name}`}
-                          title="Edit City Administrator"
-                          className="
-                            flex h-8 w-8 items-center justify-center
-                            rounded-[9px] border border-slate-200
-                            bg-white text-slate-500 transition
-                            hover:border-amber-200 hover:bg-amber-50
-                            hover:text-amber-600
-                          "
-                        >
-                          <UserCog size={14} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteAdmin(
-                              city.id,
-                              admins[0].id || "",
-                              admins[0].name
-                            )
-                          }
-                          aria-label={`Delete Admin ${admins[0].name}`}
-                          title="Remove City Administrator"
-                          className="
-                            flex h-8 w-8 items-center justify-center
-                            rounded-[9px] border border-slate-200
-                            bg-white text-slate-400 transition
-                            hover:border-rose-200 hover:bg-rose-50
-                            hover:text-rose-600
-                          "
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
-
-                    {/* Delete City Button (STRICTLY FOR SUPER ADMIN ONLY) */}
                     {isSuperAdmin && (
                       <button
-                        type="button"
                         onClick={() => handleDeleteCity(city.id, city.name)}
-                        aria-label={`Delete city ${city.name}`}
-                        title="Delete City Permanently (Super Admin Only)"
-                        className="
-                          flex h-8 w-8 items-center justify-center
-                          rounded-[9px] border border-rose-200
-                          bg-rose-50 text-rose-600 transition
-                          hover:border-rose-300 hover:bg-rose-100
-                          hover:text-rose-700
-                        "
+                        className="flex w-full items-center px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 text-left"
                       >
-                        <Trash2 size={14} />
+                        Delete City
                       </button>
                     )}
+                    <div className="my-1 border-t border-slate-100"></div>
+                    <button
+                      className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 text-left"
+                      onClick={() => {
+                        // TODO: Open Assign Modules modal
+                        alert("Assign Modules implementation pending");
+                      }}
+                    >
+                      Assign Modules
+                    </button>
                   </div>
                 </td>
               </tr>

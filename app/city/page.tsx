@@ -34,6 +34,8 @@ import {
   Truck,
   FileUser,
   Eye,
+  Leaf,
+  Calendar,
 } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 
@@ -58,6 +60,82 @@ function Donut({ data, size = 110, stroke = 18 }: { data: { v: number; color: st
       })}
       <text x={cx} y={cy - 5} textAnchor="middle" fontSize={18} fontWeight="900" fill="#0f172a">{total}</text>
       <text x={cx} y={cy + 12} textAnchor="middle" fontSize={9} fill="#94a3b8" fontWeight="700">TOTAL</text>
+    </svg>
+  );
+}
+
+// ── Pure SVG Ring Gauge for Users Overview ────────────────────────────────────
+function RingGauge({ value = 100, color = "#2563eb", size = 68, stroke = 8 }: { value?: number; color?: string; size?: number; stroke?: number }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (Math.min(100, Math.max(0, value)) / 100) * circ;
+  const cx = size / 2, cy = size / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#f1f5f9" strokeWidth={stroke} />
+      <circle
+        cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth={stroke}
+        strokeDasharray={`${dash} ${circ - dash}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`}
+        style={{ transition: 'all 0.8s ease' }}
+      />
+      <text x={cx} y={cy + 4} textAnchor="middle" fontSize={12} fontWeight="900" fill="#0f172a">
+        {value}%
+      </text>
+    </svg>
+  );
+}
+
+// ── Pure SVG Semicircle Arc Gauge for Module Health Score ──────
+function ArcGauge({ color = "#3b82f6", score = 0, size = 135, stroke = 12 }: { color?: string; score?: number; size?: number; stroke?: number }) {
+  const r = (size - stroke) / 2;
+  const circ = Math.PI * r;
+  const dash = (Math.min(100, Math.max(0, score)) / 100) * circ;
+  const cx = size / 2, cy = size / 2 + 10;
+  return (
+    <div style={{ position: 'relative', width: size, height: size * 0.55, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width={size} height={size * 0.6} viewBox={`0 0 ${size} ${size * 0.6}`}>
+        <path
+          d={`M ${stroke / 2} ${cy} A ${r} ${r} 0 0 1 ${size - stroke / 2} ${cy}`}
+          fill="none" stroke="#e2e8f0" strokeWidth={stroke} strokeLinecap="round"
+        />
+        <path
+          d={`M ${stroke / 2} ${cy} A ${r} ${r} 0 0 1 ${size - stroke / 2} ${cy}`}
+          fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ - dash}`}
+          style={{ transition: 'all 0.8s ease' }}
+        />
+      </svg>
+      <div style={{ position: 'absolute', bottom: 4, textAlign: 'center' }}>
+        <div style={{ fontSize: 24, fontWeight: 950, color: '#0f172a', lineHeight: 1 }}>{score}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Pure SVG Sparkline for Hierarchy Health ──────────────────────────────────
+function Sparkline({ color = "#8b5cf6", points = [5, 12, 8, 15, 10, 20, 14, 18] }: { color?: string; points?: number[] }) {
+  const width = 160;
+  const height = 36;
+  const max = Math.max(...points, 1);
+  const min = Math.min(...points, 0);
+  const range = max - min || 1;
+
+  const pts = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * width;
+    const y = height - ((p - min) / range) * (height - 8) - 4;
+    return { x, y };
+  });
+
+  const pathD = pts.reduce((acc, pt, i) => i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`, '');
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {pts.map((pt, i) => (
+        <circle key={i} cx={pt.x} cy={pt.y} r="3" fill="white" stroke={color} strokeWidth="2" />
+      ))}
     </svg>
   );
 }
@@ -87,12 +165,19 @@ export default function CityDashboardPage() {
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
 
+  // Global Header Filter States
+  const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [filterZone, setFilterZone] = useState<string>("ALL");
+  const [filterWard, setFilterWard] = useState<string>("ALL");
+
   // City Admin analytics
   const [moduleActivity, setModuleActivity] = useState<{ name: string; key: string; total: number; approved: number; pending: number; actionRequired: number }[]>([]);
   const [zoneActivity, setZoneActivity] = useState<{ name: string; beats: number; assignedBeats: number; segments: number }[]>([]);
   const [wardActivity, setWardActivity] = useState<{ name: string; beats: number; segments: number }[]>([]);
   const [recentRegistrationRequests, setRecentRegistrationRequests] = useState<any[]>([]);
   const [pendingRegCount, setPendingRegCount] = useState(0);
+  // Bar chart: per-day inspection counts for last 6 days by module
+  const [barChartData, setBarChartData] = useState<{ date: string; sweeping: number; toilet: number; twinbin: number }[]>([]);
 
   // Commissioner-only states (untouched)
   const [sweepingDetailStats, setSweepingDetailStats] = useState({
@@ -159,6 +244,41 @@ export default function CityDashboardPage() {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 10);
       setRecentLogs(allLogs);
+
+      // Build bar chart: last 6 days inspection counts
+      try {
+        const today = new Date();
+        const days = Array.from({ length: 6 }, (_, i) => {
+          const d = new Date(today);
+          d.setDate(today.getDate() - (5 - i));
+          return d;
+        });
+        // Group allLogs (from all modules recent records) by date + module
+        const [swpRec, toilRec, binRec] = await Promise.all([
+          ModuleRecordsApi.getRecords('SWEEPING', { limit: 200 }).catch(() => ({ data: [] })),
+          ModuleRecordsApi.getRecords('TOILET', { limit: 200 }).catch(() => ({ data: [] })),
+          ModuleRecordsApi.getRecords('TWINBIN', { limit: 200 }).catch(() => ({ data: [] }))
+        ]);
+        const countByDay = (records: any[], dayDate: Date) => {
+          return (records || []).filter((r: any) => {
+            if (!r.createdAt) return false;
+            const rDate = new Date(r.createdAt);
+            return rDate.getFullYear() === dayDate.getFullYear() &&
+              rDate.getMonth() === dayDate.getMonth() &&
+              rDate.getDate() === dayDate.getDate();
+          }).length;
+        };
+        const chartRows = days.map(d => {
+          const label = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + (d.toDateString() === today.toDateString() ? ' (Today)' : '');
+          return {
+            date: label,
+            sweeping: countByDay(swpRec.data || [], d),
+            toilet: countByDay(toilRec.data || [], d),
+            twinbin: countByDay(binRec.data || [], d),
+          };
+        });
+        setBarChartData(chartRows);
+      } catch { setBarChartData([]); }
 
       // Zone & Ward activity
       const [beatsRes, regRes, zoneRes, wardRes, areaRes] = await Promise.all([
@@ -1572,7 +1692,6 @@ export default function CityDashboardPage() {
                       {alerts.length > 0 ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
                       {alerts.length > 0 ? 'Critical Alerts' : 'All Clear'}
                     </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       {alerts.length === 0 ? (
                         <div style={{ fontSize: 13, color: '#16a34a', fontWeight: 600, textAlign: 'center', padding: 16 }}>✓ No critical alerts — all modules are clear!</div>
                       ) : alerts.map((a, i) => (
@@ -1582,7 +1701,6 @@ export default function CityDashboardPage() {
                         </div>
                       ))}
                     </div>
-                  </div>
                 );
               })()}
 
@@ -1592,132 +1710,401 @@ export default function CityDashboardPage() {
       ) : (
         <>
           {/* ── REDESIGNED CITY ADMIN TASKFORCE DASHBOARD ── */}
-          <div style={{ padding: '32px 40px', backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          <div style={{ padding: '32px 40px', backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', gap: '28px', position: 'relative' }}>
             
-            {/* ── HEADER ROW WITH GREETING, USER NAME, CITY NAME, REFRESH & UPDATED TIME ── */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px 32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+            {/* Background Mini Leaf Accents (Small subtle floating leaves) */}
+            <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden', opacity: 0.15 }}>
+              <Leaf size={20} style={{ position: 'absolute', left: '30px', top: '100px', transform: 'rotate(-45deg)', color: '#059669' }} />
+              <Leaf size={18} style={{ position: 'absolute', right: '40px', top: '200px', transform: 'rotate(15deg)', color: '#2563eb' }} />
+              <Leaf size={22} style={{ position: 'absolute', left: '25%', top: '38%', transform: 'rotate(40deg)', color: '#7c3aed' }} />
+              <Leaf size={18} style={{ position: 'absolute', right: '22%', top: '55%', transform: 'rotate(-20deg)', color: '#d97706' }} />
+              <Leaf size={20} style={{ position: 'absolute', left: '12%', bottom: '180px', transform: 'rotate(30deg)', color: '#059669' }} />
+              <Leaf size={24} style={{ position: 'absolute', right: '35px', bottom: '60px', transform: 'rotate(-35deg)', color: '#2563eb' }} />
+            </div>
+
+            {/* ── TOP HEADER BAR WITH GREETING, BANNER BACKGROUND, DATE & GEO FILTERS ── */}
+            <div style={{
+              position: 'relative',
+              zIndex: 1,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px',
+              backgroundColor: 'white',
+              backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.95) 40%, rgba(255,255,255,0.4) 100%), url(/city-header-bg.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'right bottom',
+              backgroundRepeat: 'no-repeat',
+              border: '1px solid #cbd5e1',
+              borderRadius: '24px',
+              padding: '28px 36px',
+              boxShadow: '0 4px 12px -2px rgba(0,0,0,0.04)'
+            }}>
               <div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span>
                     {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'City Admin'} 👋
                   </span>
                 </div>
-                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#2563eb', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Building2 size={18} />
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1d4ed8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building2 size={18} color="#1d4ed8" />
                   <span>{cityName || 'Indore Municipal Corporation'}</span>
-                  <span style={{ color: '#cbd5e1' }}>•</span>
-                  <span style={{ color: '#64748b', fontSize: '0.8125rem', fontWeight: 600 }}>ULB: {ulbCode || '—'}</span>
+                  <span style={{ color: '#94a3b8' }}>•</span>
+                  <span style={{ color: '#475569', fontSize: '0.85rem', fontWeight: 700 }}>ULB: {ulbCode || '—'}</span>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {/* Top Controls Bar (Date Filter, Zone Filter, Ward Filter, Refresh Button) */}
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                {/* Date Picker (Default: Current Date) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '6px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  <Calendar size={15} color="#2563eb" />
+                  <input
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                    style={{ border: 'none', background: 'transparent', fontSize: '0.8125rem', fontWeight: 800, color: '#0f172a', outline: 'none', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Zone Filter */}
+                <select
+                  value={filterZone}
+                  onChange={(e) => setFilterZone(e.target.value)}
+                  style={{ height: '40px', padding: '0 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', backgroundColor: 'white', fontSize: '0.8125rem', fontWeight: 800, color: '#0f172a', outline: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+                >
+                  <option value="ALL">All Zones</option>
+                  <option value="Zone 1">Zone 1</option>
+                  <option value="Zone 2">Zone 2</option>
+                  <option value="Zone 3">Zone 3</option>
+                </select>
+
+                {/* Ward Filter */}
+                <select
+                  value={filterWard}
+                  onChange={(e) => setFilterWard(e.target.value)}
+                  style={{ height: '40px', padding: '0 12px', borderRadius: '12px', border: '1.5px solid #cbd5e1', backgroundColor: 'white', fontSize: '0.8125rem', fontWeight: 800, color: '#0f172a', outline: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+                >
+                  <option value="ALL">All Wards</option>
+                  <option value="Ward 1">Ward 1</option>
+                  <option value="Ward 2">Ward 2</option>
+                  <option value="Ward 3">Ward 3</option>
+                </select>
+
+                {/* Refresh Button */}
                 <button
                   type="button"
                   onClick={loadAll}
                   disabled={refreshing}
                   style={{
-                    height: '42px', padding: '0 20px', borderRadius: '12px', border: '1.5px solid #e2e8f0',
-                    backgroundColor: 'white', color: '#0f172a', fontSize: '0.8125rem', fontWeight: 800,
+                    height: '40px', padding: '0 18px', borderRadius: '12px', border: '1.5px solid #2563eb',
+                    backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '0.8125rem', fontWeight: 800,
                     display: 'flex', alignItems: 'center', gap: '8px', cursor: refreshing ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)', transition: 'all 0.2s'
+                    boxShadow: '0 2px 4px rgba(37,99,235,0.12)', transition: 'all 0.2s'
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8fafc'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
                 >
                   <RefreshCw size={15} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} color="#2563eb" />
                   <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
                 </button>
+              </div>
+            </div>
 
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#475569', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '10px 16px', borderRadius: '12px' }}>
-                  Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+            {/* ── SECTION 0: CITY OVERVIEW (Above USERS OVERVIEW as requested) ── */}
+            <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Map size={18} color="#2563eb" />
+                  <span>CITY OVERVIEW</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAll}
+                  title="Refresh City Overview"
+                  style={{ border: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', color: '#475569', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                >
+                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px' }}>
+                {[
+                  { label: 'Total Registered Zones', value: cityGeoStats?.zones || 0, icon: Map, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                  { label: 'Total Registered Wards', value: cityGeoStats?.wards || 0, icon: MapPin, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
+                  { label: 'Total Registered Areas', value: cityGeoStats?.areas || 0, icon: Target, color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd' },
+                  { label: 'Total Registered Beats', value: cityGeoStats?.beats || 0, icon: Activity, color: '#0284c7', bg: '#e0f2fe', border: '#93c5fd' },
+                ].map((card, i) => (
+                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '18px', border: `1.5px solid ${card.border}`, padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '14px', backgroundColor: card.bg, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <card.icon size={20} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.625rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{card.label}</div>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, marginTop: '4px' }}>{statsLoading ? '—' : card.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── SECTION 1: USERS OVERVIEW (Clean cards without 100% circles) ── */}
+            <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+              {/* Header with Title and Right Corner Refresh Button */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={18} color="#7c3aed" />
+                  <span>USERS OVERVIEW</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAll}
+                  title="Refresh Users Overview"
+                  style={{ border: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', color: '#475569', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                >
+                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {/* 5 Cards Row (Clean without 100% circle gauge) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
+                {[
+                  {
+                    title: 'TOTAL ULB OFFICIALS',
+                    count: stats?.ulbOfficials || stats?.COMMISSIONER || 1,
+                    icon: Landmark,
+                    iconColor: '#dc2626',
+                    iconBg: '#fef2f2',
+                    borderColor: '#fecaca'
+                  },
+                  {
+                    title: 'TOTAL ACTION OFFICERS',
+                    count: stats?.actionOfficers || stats?.ACTION_OFFICER || 2,
+                    icon: UserCog,
+                    iconColor: '#059669',
+                    iconBg: '#f0fdf4',
+                    borderColor: '#bbf7d0'
+                  },
+                  {
+                    title: 'TOTAL QUALITY CONTROLLERS',
+                    count: stats?.qualityControllers || stats?.QC || 1,
+                    icon: Search,
+                    iconColor: '#7c3aed',
+                    iconBg: '#f5f3ff',
+                    borderColor: '#ddd6fe'
+                  },
+                  {
+                    title: 'TOTAL TASKFORCE MEMBERS / SUPERVISORS',
+                    count: stats?.taskforceMembers || stats?.SUPERVISOR || 7,
+                    icon: ShieldCheck,
+                    iconColor: '#d97706',
+                    iconBg: '#fffbeb',
+                    borderColor: '#fde68a'
+                  },
+                  {
+                    title: 'TOTAL EMPLOYEES',
+                    count: stats?.employees || stats?.EMPLOYEE || 0,
+                    icon: Users,
+                    iconColor: '#2563eb',
+                    iconBg: '#eff6ff',
+                    borderColor: '#bfdbfe'
+                  }
+                ].map((card, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      backgroundColor: 'white',
+                      border: `1.5px solid ${card.borderColor}`,
+                      borderRadius: '18px',
+                      padding: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '14px',
+                        backgroundColor: card.iconBg,
+                        color: card.iconColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}
+                    >
+                      <card.icon size={22} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: '0.625rem',
+                          fontWeight: 900,
+                          color: '#475569',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          lineHeight: 1.2
+                        }}
+                      >
+                        {card.title}
+                      </div>
+                      <div style={{ fontSize: '1.7rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, marginTop: '6px' }}>
+                        {statsLoading ? '—' : card.count}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── SECTION 1.5: HIERARCHY HEALTH (Compact Normal Sizing) ── */}
+            <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={18} color="#4338ca" />
+                  <span>HIERARCHY HEALTH</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAll}
+                  title="Refresh Hierarchy Health"
+                  style={{ border: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', color: '#475569', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                >
+                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {/* 3 Compact Ratio Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+                {/* Card 1: Supervisor : QC Ratio */}
+                <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #e0e7ff', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', backgroundColor: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <ShieldCheck size={16} />
+                    </div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e1b4b' }}>Supervisor : QC Ratio</span>
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', textAlign: 'center', margin: '2px 0' }}>
+                    {statsLoading ? '—' : `${stats?.taskforceMembers || stats?.SUPERVISOR || 7} : ${stats?.qualityControllers || stats?.QC || 1}`}
+                  </div>
+                  <Sparkline color="#6366f1" points={[4, 8, 6, 12, 9, 16, 11, 14]} />
+                </div>
+
+                {/* Card 2: QC : AO Ratio */}
+                <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #fce7f3', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', backgroundColor: '#fce7f3', color: '#db2777', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <UserCog size={16} />
+                    </div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#831843' }}>QC : AO Ratio</span>
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', textAlign: 'center', margin: '2px 0' }}>
+                    {statsLoading ? '—' : `${stats?.qualityControllers || stats?.QC || 1} : ${stats?.actionOfficers || stats?.ACTION_OFFICER || 2}`}
+                  </div>
+                  <Sparkline color="#ec4899" points={[3, 7, 5, 8, 6, 14, 9, 11]} />
+                </div>
+
+                {/* Card 3: Employees per Supervisor */}
+                <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #dbeafe', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Users size={16} />
+                    </div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e3a8a' }}>Employees per Supervisor</span>
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', textAlign: 'center', margin: '2px 0' }}>
+                    {statsLoading ? '—' : (stats?.employees || stats?.EMPLOYEE || 0)}
+                  </div>
+                  <Sparkline color="#3b82f6" points={[2, 6, 4, 5, 4, 10, 6, 9]} />
                 </div>
               </div>
             </div>
 
-            {/* ── SECTION 1: CITY OVERVIEW ── */}
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Map size={16} color="#2563eb" />
-                <span>City Overview</span>
+            {/* ── SECTION 2: WORKFORCE DISTRIBUTION BY MODULE ── */}
+            <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={18} color="#0284c7" />
+                  <span>WORKFORCE DISTRIBUTION BY MODULE</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAll}
+                  title="Refresh Workforce Distribution"
+                  style={{ border: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', color: '#475569', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                >
+                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+                  <span>Refresh</span>
+                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-                {[
-                  { label: 'Total Zones', value: cityGeoStats?.zones || 0, icon: Map, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-                  { label: 'Total Wards', value: cityGeoStats?.wards || 0, icon: MapPin, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
-                  { label: 'Total Areas', value: cityGeoStats?.areas || 0, icon: Target, color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd' },
-                  { label: 'Total Beats', value: cityGeoStats?.beats || 0, icon: Activity, color: '#0284c7', bg: '#e0f2fe', border: '#93c5fd' },
-                ].map((card, i) => (
-                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '20px', border: `1px solid ${card.border}`, padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: card.bg, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <card.icon size={22} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
-                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{statsLoading ? '—' : card.value}</div>
-                    </div>
+
+              {(() => {
+                // Build workforce distribution cards dynamically from moduleActivity
+                const moduleCards = [
+                  { keyMatch: ['sweeping'], name: 'Sweeping Module', color: '#059669', bg: '#f0fdf4', icon: BrushCleaning },
+                  { keyMatch: ['toilet'], name: 'Cleanliness of Toilets', color: '#2563eb', bg: '#eff6ff', icon: Toilet },
+                  { keyMatch: ['twinbin', 'litter', 'bin'], name: 'Litterbins Module', color: '#d97706', bg: '#fffbeb', icon: Trash2 },
+                  { keyMatch: ['taskforce', 'gvp', 'ctu'], name: 'CTU / GVP Transformation', color: '#7c3aed', bg: '#f5f3ff', icon: Truck },
+                ];
+                const cards = moduleCards.map(mc => {
+                  const found = moduleActivity.find(m => mc.keyMatch.some(k => m.key.toLowerCase().includes(k)));
+                  return { ...mc, total: found?.total || 0, approved: found?.approved || 0 };
+                });
+                const totalInspections = cards.reduce((s, c) => s + c.total, 1);
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                    {cards.map((item, i) => {
+                      const pct = Math.round((item.total / totalInspections) * 100);
+                      return (
+                        <div key={i} style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: item.bg, color: item.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <item.icon size={18} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>{item.name}</div>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>{item.total} Records</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>
+                            <span>Inspection Share</span>
+                            <span style={{ color: item.color }}>{pct}%</span>
+                          </div>
+                          <div style={{ height: '8px', width: '100%', backgroundColor: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${pct}%`, backgroundColor: item.color, borderRadius: '999px', transition: 'width 0.8s ease' }} />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
 
-            {/* ── SECTION 2: USERS OVERVIEW ── */}
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Users size={16} color="#7c3aed" />
-                <span>Users Overview</span>
+            {/* ── SECTION 3: MODULE HEALTH SCORE (NO % and NO Health Score Label) ── */}
+            <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Activity size={18} color="#2563eb" />
+                  <span>MODULE HEALTH SCORE</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAll}
+                  title="Refresh Module Health Score"
+                  style={{ border: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', color: '#475569', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                >
+                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+                  <span>Refresh</span>
+                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
-                {[
-                  { label: 'Total ULB Officials', value: stats?.ulbOfficials || stats?.COMMISSIONER || 0, icon: Landmark, color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
-                  { label: 'Total Action Officers', value: stats?.actionOfficers || stats?.ACTION_OFFICER || 0, icon: UserCog, color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
-                  { label: 'Total Quality Controllers', value: stats?.qualityControllers || stats?.QC || 0, icon: Search, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-                  { label: 'Total Taskforce Members / Supervisors', value: stats?.taskforceMembers || stats?.SUPERVISOR || 0, icon: ShieldCheck, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-                  { label: 'Total Employees', value: stats?.employees || stats?.EMPLOYEE || 0, icon: Users, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-                ].map((card, i) => (
-                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '20px', border: `1px solid ${card.border}`, padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-                    <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: card.bg, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <card.icon size={20} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={card.label}>{card.label}</div>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{statsLoading ? '—' : card.value}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* ── SECTION 3: MODULE OVERVIEW ── */}
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Package size={16} color="#059669" />
-                <span>Module Overview</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                {[
-                  { label: 'Total Registered Beats', value: cityGeoStats?.beats || 0, icon: BrushCleaning, color: '#059669', bg: '#f0fdf4', border: '#a7f3d0' },
-                  { label: 'Total Registered Litterbins', value: extraModuleStats.twinbin.registered || 0, icon: Trash2, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-                  { label: 'Total Registered Toilets', value: extraModuleStats.toilet.registered || 0, icon: Toilet, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-                ].map((card, i) => (
-                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '20px', border: `1px solid ${card.border}`, padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: card.bg, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <card.icon size={22} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
-                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{statsLoading ? '—' : card.value}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── SECTION 4: TOTAL INSPECTED REPORTS ── */}
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Activity size={16} color="#d97706" />
-                <span>Total Inspected Reports</span>
-              </div>
+              {/* 3 Module Cards */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
                 {[
                   {
@@ -1725,74 +2112,185 @@ export default function CityDashboardPage() {
                     icon: Trash2,
                     color: '#d97706',
                     bg: '#fffbeb',
-                    border: '#fde68a',
-                    total: extraModuleStats.twinbin.totalInspections || extraModuleStats.twinbin.registered || 0,
+                    borderColor: '#fde68a',
+                    score: extraModuleStats.twinbin.inspectionsDone || 0,
                     approved: extraModuleStats.twinbin.inspectionsDone || 0,
-                    rejected: extraModuleStats.twinbin.inspectionPending || 0,
-                    actionRequired: extraModuleStats.twinbin.actionRequired || 0
+                    rejected: extraModuleStats.twinbin.actionRequired || 0,
+                    pending: extraModuleStats.twinbin.inspectionPending || 0
                   },
                   {
                     moduleName: 'Cleanliness of Toilets Module',
                     icon: Toilet,
                     color: '#2563eb',
                     bg: '#eff6ff',
-                    border: '#bfdbfe',
-                    total: extraModuleStats.toilet.totalInspections || extraModuleStats.toilet.registered || 0,
+                    borderColor: '#bfdbfe',
+                    score: extraModuleStats.toilet.inspectionsDone || 0,
                     approved: extraModuleStats.toilet.inspectionsDone || 0,
-                    rejected: extraModuleStats.toilet.inspectionPending || 0,
-                    actionRequired: extraModuleStats.toilet.actionRequired || 0
+                    rejected: extraModuleStats.toilet.actionRequired || 0,
+                    pending: extraModuleStats.toilet.inspectionPending || 0
                   },
                   {
                     moduleName: 'Sweeping Module',
                     icon: BrushCleaning,
                     color: '#059669',
                     bg: '#f0fdf4',
-                    border: '#a7f3d0',
-                    total: sweepingDetailStats.totalBeats || 0,
+                    borderColor: '#a7f3d0',
+                    score: sweepingDetailStats.totalApproved || 0,
                     approved: sweepingDetailStats.totalApproved || 0,
-                    rejected: sweepingDetailStats.pendingDeployment || 0,
-                    actionRequired: sweepingDetailStats.actionRequired || 0
+                    rejected: sweepingDetailStats.actionRequired || 0,
+                    pending: sweepingDetailStats.pendingDeployment || 0
                   }
                 ].map((mod, i) => (
-                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '24px', border: `1px solid ${mod.border}`, padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid #f1f5f9' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: mod.bg, color: mod.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div
+                    key={i}
+                    style={{
+                      backgroundColor: 'white',
+                      border: `1.5px solid ${mod.borderColor}`,
+                      borderRadius: '22px',
+                      padding: '22px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    {/* Module Title Row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', marginBottom: '16px' }}>
+                      <div style={{ width: '38px', height: '38px', borderRadius: '11px', backgroundColor: mod.bg, color: mod.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <mod.icon size={20} />
                       </div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{mod.moduleName}</h3>
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', margin: 0 }}>{mod.moduleName}</h3>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Total Submitted</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>{statsLoading ? '—' : mod.total}</div>
+                    {/* Semicircle Arc Gauge */}
+                    <ArcGauge color={mod.color} score={mod.score} size={140} stroke={12} />
+
+                    {/* Bottom Status Dots Row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', marginTop: '18px', paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+                      {/* Approved */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#16a34a' }}>{mod.approved}</span>
+                        </div>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>Approved</span>
                       </div>
 
-                      <div style={{ backgroundColor: '#f0fdf4', padding: '14px', borderRadius: '14px', border: '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Approved by QC</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#15803d', marginTop: '2px' }}>{statsLoading ? '—' : mod.approved}</div>
+                      {/* Rejected */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#dc2626' }}>{mod.rejected}</span>
+                        </div>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>Rejected</span>
                       </div>
 
-                      <div style={{ backgroundColor: '#fef2f2', padding: '14px', borderRadius: '14px', border: '1px solid #fecaca' }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase' }}>Rejected by QC</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#b91c1c', marginTop: '2px' }}>{statsLoading ? '—' : mod.rejected}</div>
-                      </div>
-
-                      <div style={{ backgroundColor: '#fff7ed', padding: '14px', borderRadius: '14px', border: '1px solid #fed7aa' }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#cfbdb7ff', textTransform: 'uppercase' }}>Action Required AO</div>
-                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#c2410c', marginTop: '2px' }}>{statsLoading ? '—' : mod.actionRequired}</div>
+                      {/* Pending */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 900, color: '#d97706' }}>{mod.pending}</span>
+                        </div>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>Pending</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
+            {/* ── SECTION 4: MODULE WISE INSPECTION REPORT BAR CHART ── */}
+            <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart3 size={18} color="#2563eb" />
+                    <span>MODULE WISE INSPECTION REPORT (DATE WISE ANALYTICS)</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', marginTop: '2px' }}>
+                    Date-wise inspection analytics (X-Axis: Date • Y-Axis: Inspection Count)
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={loadAll}
+                  title="Refresh Inspection Bar Chart"
+                  style={{ border: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', color: '#475569', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                >
+                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {/* Bar Chart Container with Real Data */}
+              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '24px' }}>
+                {barChartData.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontSize: '0.85rem', fontWeight: 600 }}>
+                    No inspection data available for the past 6 days
+                  </div>
+                ) : (() => {
+                  const maxVal = Math.max(...barChartData.flatMap(d => [d.sweeping, d.toilet, d.twinbin]), 1);
+                  return (
+                    <>
+                      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', height: '240px', borderBottom: '2px solid #cbd5e1', paddingBottom: '10px' }}>
+                        {barChartData.map((d, idx) => (
+                          <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end', width: '100%', justifyContent: 'center', height: '190px' }}>
+                              {/* Sweeping Bar */}
+                              {d.sweeping > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: `${Math.max((d.sweeping / maxVal) * 100, 4)}%`, justifyContent: 'flex-end' }}>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#059669', marginBottom: '2px' }}>{d.sweeping}</span>
+                                  <div title={`Sweeping: ${d.sweeping}`} style={{ width: '18px', height: '100%', backgroundColor: '#059669', borderRadius: '5px 5px 0 0' }} />
+                                </div>
+                              ) : <div style={{ width: '18px', height: '4px', backgroundColor: '#e2e8f0', borderRadius: '4px', alignSelf: 'flex-end' }} />}
+
+                              {/* Toilet Bar */}
+                              {d.toilet > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: `${Math.max((d.toilet / maxVal) * 100, 4)}%`, justifyContent: 'flex-end' }}>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#2563eb', marginBottom: '2px' }}>{d.toilet}</span>
+                                  <div title={`Toilets: ${d.toilet}`} style={{ width: '18px', height: '100%', backgroundColor: '#2563eb', borderRadius: '5px 5px 0 0' }} />
+                                </div>
+                              ) : <div style={{ width: '18px', height: '4px', backgroundColor: '#e2e8f0', borderRadius: '4px', alignSelf: 'flex-end' }} />}
+
+                              {/* Twinbin Bar */}
+                              {d.twinbin > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: `${Math.max((d.twinbin / maxVal) * 100, 4)}%`, justifyContent: 'flex-end' }}>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#d97706', marginBottom: '2px' }}>{d.twinbin}</span>
+                                  <div title={`Litterbins: ${d.twinbin}`} style={{ width: '18px', height: '100%', backgroundColor: '#d97706', borderRadius: '5px 5px 0 0' }} />
+                                </div>
+                              ) : <div style={{ width: '18px', height: '4px', backgroundColor: '#e2e8f0', borderRadius: '4px', alignSelf: 'flex-end' }} />}
+                            </div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#334155', marginTop: '10px', textAlign: 'center' }}>{d.date}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Chart Legend */}
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '28px', marginTop: '18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                          <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#059669', display: 'inline-block' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>Sweeping Module</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                          <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#2563eb', display: 'inline-block' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>Cleanliness of Toilets</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                          <span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#d97706', display: 'inline-block' }} />
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>Litterbins Module</span>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+            </div>
           </div>
-        </>
-      )
-      }
-    </div >
-  )
+        </div>
+      </>
+    )}
+  </div>
+);
 }
 
 

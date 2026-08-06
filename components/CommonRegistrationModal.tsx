@@ -424,7 +424,7 @@ export default function CommonRegistrationModal({
           ? {
               display: "flex",
               justifyContent: "center",
-              padding: "20px",
+              padding: "0",
               width: "100%"
             }
           : {
@@ -444,11 +444,11 @@ export default function CommonRegistrationModal({
         style={{
           background: "#ffffff",
           borderRadius: "24px",
-          maxWidth: "840px",
+          maxWidth: asPage ? "100%" : "840px",
           width: "100%",
           maxHeight: asPage ? "none" : "90vh",
           overflowY: asPage ? "visible" : "auto",
-          boxShadow: asPage ? "0 4px 20px -10px rgba(0,0,0,0.1)" : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+          boxShadow: asPage ? "0 4px 24px -8px rgba(0, 0, 0, 0.08)" : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           border: "1px solid rgba(226, 232, 240, 0.8)",
           fontFamily: "'Inter', sans-serif"
         }}
@@ -753,10 +753,9 @@ export default function CommonRegistrationModal({
               {/* Personal Details Row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
-                  <label className="form-label">Full Name *</label>
+                  <label className="form-label">Full Name</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Ramesh Kumar"
                     className="form-input"
                     value={form.name}
@@ -764,10 +763,9 @@ export default function CommonRegistrationModal({
                   />
                 </div>
                 <div>
-                  <label className="form-label">Email Address *</label>
+                  <label className="form-label">Email Address</label>
                   <input
                     type="email"
-                    required
                     placeholder="e.g. ramesh@gov.in"
                     className="form-input"
                     value={form.email}
@@ -779,10 +777,9 @@ export default function CommonRegistrationModal({
               {/* Contact & Password Row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
-                  <label className="form-label">Mobile Number *</label>
+                  <label className="form-label">Mobile Number</label>
                   <input
                     type="text"
-                    required
                     placeholder="+91 98765 43210"
                     className="form-input"
                     value={form.phone}
@@ -790,7 +787,7 @@ export default function CommonRegistrationModal({
                   />
                 </div>
                 <div>
-                  <label className="form-label">Password (Optional)</label>
+                  <label className="form-label">Password</label>
                   <input
                     type="password"
                     placeholder="Default: Matrix@2026"
@@ -800,7 +797,7 @@ export default function CommonRegistrationModal({
                   />
                 </div>
                 <div>
-                  <label className="form-label">Aadhaar Number (Optional)</label>
+                  <label className="form-label">Aadhaar Number</label>
                   <input
                     type="text"
                     placeholder="12-digit Aadhaar"
@@ -883,11 +880,14 @@ export default function CommonRegistrationModal({
                       value={form.taskforceRole}
                       onChange={(e) => setForm({ ...form, taskforceRole: e.target.value })}
                     >
-                      {config.taskforceRoles.map((r) => (
-                        <option key={r.key} value={r.key}>
-                          {r.label}
-                        </option>
-                      ))}
+                      {config.taskforceRoles
+                        /* Field Employee option commented out/hidden from UI dropdown */
+                        .filter((r) => r.key !== "EMPLOYEE")
+                        .map((r) => (
+                          <option key={r.key} value={r.key}>
+                            {r.label}
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div>

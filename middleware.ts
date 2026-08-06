@@ -27,6 +27,14 @@ const UNIFIED_PREFIXES = [
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  
+  if (pathname.includes("%20") || pathname.includes(" ")) {
+    const cleanPathname = pathname.replace(/(%20|\s)+/g, "-");
+    const cleanUrl = new URL(cleanPathname, req.url);
+    cleanUrl.search = req.nextUrl.search;
+    return NextResponse.redirect(cleanUrl);
+  }
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   if (isPublic) return NextResponse.next();
 

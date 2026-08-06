@@ -42,6 +42,7 @@ export interface CityRow {
   cityAdmins?: CityAdminInfo[];
   cityAdmin: CityAdminInfo | null;
   modules?: { id: string; name: string; enabled: boolean }[];
+  createdAt?: string | Date;
 }
 
 export interface CityListResponse {

@@ -589,14 +589,11 @@ export default function CreateCityPage() {
 
               {/* ── AUTHORIZED PLATFORM MODULES ASSIGNMENT ── */}
               <div>
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
-                    <span className="block text-[12px] font-black uppercase tracking-[0.06em] text-slate-700">
-                      Authorized Software Modules for City Cluster <span className="text-rose-500">*</span>
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      Select which workspace modules are enabled and provisioned for this city
-                    </span>
+                    <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+                      Select and Assign Modules
+                    </h3>
                   </div>
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-600">
                     {Object.values(enabledModules).filter(Boolean).length} / 4 Enabled
