@@ -7,7 +7,7 @@ import { useAuth } from "@hooks/useAuth";
 import type { Role } from "../../../types/auth";
 import { RoleGuard } from "@components/Guards";
 import { roleLabel, moduleLabel } from "@lib/labels";
-import { canonicalizeModules } from "@utils/modules";
+import { canonicalizeModules, normalizeModuleKey } from "@utils/modules";
 import {
   Users, UserPlus, Shield, MapPin,
   Settings, Save, Trash2, MoreHorizontal,
@@ -56,9 +56,14 @@ export default function CityUsersPageWrapper() {
 }
 
 function CityUsersPage() {
+  const [mounted, setMounted] = useState(false);
   const { user: currentUser } = useAuth();
   const searchParams = useSearchParams();
   const isReadOnly = currentUser?.roles?.some(r => ["COMMISSIONER", "ULB_OFFICER"].includes(r));
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -122,6 +127,17 @@ function CityUsersPage() {
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [users, searchQuery, activeTab]);
+
+  const displayModules = useMemo(() => {
+    const keyMap = new Map<string, CityModule>();
+
+    availableModules.forEach((m) => {
+      const normKey = normalizeModuleKey(m.key);
+      keyMap.set(normKey, { ...m, key: normKey });
+    });
+
+    return Array.from(keyMap.values());
+  }, [availableModules]);
 
   const loadModules = async () => {
     setLoadingModules(true);
@@ -321,7 +337,19 @@ function CityUsersPage() {
           zoneIds: current.role === "QC" ? Array.from(current.zoneIds) : [],
           wardIds: current.role === "QC" ? Array.from(current.wardIds) : []
         };
-      else delete modules[moduleId];
+      else {
+        delete modules[moduleId];
+        const userObj = users.find((u) => u.id === userId);
+        const targetMod = displayModules.find((m) => m.id === moduleId);
+        if (targetMod && userObj) {
+          Object.keys(modules).forEach((mid) => {
+            const uMod = userObj.modules?.find((um) => um.id === mid);
+            if (uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(targetMod.key)) {
+              delete modules[mid];
+            }
+          });
+        }
+      }
       return { ...prev, [userId]: { ...current, modules: enforceRoleWriteRules(current.role, modules) } };
     });
   };
@@ -453,6 +481,8 @@ function CityUsersPage() {
       setSavingUserId(null);
     }
   };
+
+  if (!mounted) return null;
 
   return (
     <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "COMMISSIONER", "ULB_OFFICER"]}>
@@ -705,7 +735,7 @@ function CityUsersPage() {
                         {loadingModules ? (
                           Array(4).fill(0).map((_, i) => <div key={i} className="skeleton" style={{ height: "60px", borderRadius: "16px" }} />)
                         ) : (
-                          availableModules.map((m) => {
+                          displayModules.map((m) => {
                             const selected = newUserModules[m.id];
                             return (
                               <div key={m.id} style={{
@@ -904,7 +934,7 @@ function CityUsersPage() {
                         edit={editing[u.id] || { name: u.name, role: u.role, modules: {}, zoneIds: new Set(), wardIds: new Set() }}
                         zones={zones}
                         wards={wards}
-                        availableModules={availableModules}
+                        availableModules={displayModules}
                         savingUserId={savingUserId}
                         onUpdateUser={updateUser}
                         onDeleteUser={deleteUser}
@@ -1167,7 +1197,13 @@ function UserRow({
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                     {availableModules.map((m) => {
-                      const selected = edit.modules[m.id];
+                      const selectedKey = Object.keys(edit.modules).find((mid) => {
+                        if (mid === m.id) return true;
+                        const uMod = u.modules?.find((um) => um.id === mid);
+                        return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
+                      });
+                      const selected = selectedKey ? edit.modules[selectedKey] : undefined;
+                      const activeModuleId = selectedKey || m.id;
                       return (
                         <div key={m.id} style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1178,7 +1214,7 @@ function UserRow({
                           transition: "all 0.2s"
                         }}>
                           <label style={{ display: "flex", alignItems: "center", gap: "12px", cursor: isReadOnly ? "default" : "pointer", flex: 1 }} onClick={(e) => e.stopPropagation()}>
-                            <input type="checkbox" style={{ width: "18px", height: "18px", accentColor: "#2563eb" }} checked={Boolean(selected)} onChange={(e) => onToggleUserModule(u.id, m.id, e.target.checked)} disabled={isReadOnly} />
+                            <input type="checkbox" style={{ width: "18px", height: "18px", accentColor: "#2563eb" }} checked={Boolean(selected)} onChange={(e) => onToggleUserModule(u.id, activeModuleId, e.target.checked)} disabled={isReadOnly} />
                             <div style={{ display: "flex", flexDirection: "column" }}>
                               <span style={{ fontSize: "0.875rem", fontWeight: 700, color: selected ? "#1e40af" : "#475569" }}>{moduleLabel(m.key, m.name)}</span>
                               {selected && (
@@ -1190,7 +1226,7 @@ function UserRow({
                           </label>
                           {selected && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); if (!isReadOnly) onToggleUserWrite(u.id, m.id, !selected.canWrite); }}
+                              onClick={(e) => { e.stopPropagation(); if (!isReadOnly) onToggleUserWrite(u.id, activeModuleId, !selected.canWrite); }}
                               style={{
                                 border: "1px solid",
                                 borderColor: selected.canWrite ? "#bbf7d0" : "#e2e8f0",

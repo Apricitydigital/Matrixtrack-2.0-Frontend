@@ -64,12 +64,13 @@ function Donut({ data, size = 110, stroke = 18 }: { data: { v: number; color: st
 
 export default function CityDashboardPage() {
   const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
   const [cityName, setCityName] = useState<string | null>(null);
   const [ulbCode, setUlbCode] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState(new Date());
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
 
   // City Admin analytics
@@ -282,12 +283,31 @@ export default function CityDashboardPage() {
     } finally { setLastRefreshed(new Date()); setRefreshing(false); }
   };
 
-  useEffect(() => { loadAll(); }, [isReadOnlyView]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      loadAll();
+    }
+  }, [mounted, isReadOnlyView]);
 
   const share = () => {
     const msg = `*${cityName || 'City'} | City Admin Report*\nShared via Taskforce20`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
+
+  if (!mounted) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#64748b', fontSize: 14, fontWeight: 600 }}>
+          <RefreshCw size={18} style={{ animation: 'spin 0.8s linear infinite' }} />
+          Loading City Dashboard...
+        </div>
+      </div>
+    );
+  }
 
   const totalUsers = (stats?.qualityControllers || 0) + (stats?.taskforceMembers || 0) +
     (stats?.ulbOfficials || 0) + (stats?.actionOfficers || 0) + (stats?.cityAdmins || 0);
@@ -1070,7 +1090,7 @@ export default function CityDashboardPage() {
                     <Landmark size={12} /> ULB: {ulbCode || '—'}
                   </span>
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-                    Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                    Updated {lastRefreshed ? lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now'}
                   </span>
                 </div>
               </div>
@@ -1608,11 +1628,11 @@ export default function CityDashboardPage() {
 
                         <span className="city-admin-updated">
                           Updated{" "}
-                          {lastRefreshed.toLocaleTimeString("en-IN", {
+                          {lastRefreshed ? lastRefreshed.toLocaleTimeString("en-IN", {
                             hour: "2-digit",
                             minute: "2-digit",
                             hour12: true,
-                          })}
+                          }) : "Just now"}
                         </span>
                       </div>
                     </div>
@@ -1634,11 +1654,11 @@ export default function CityDashboardPage() {
                   <div className="city-admin-actions">
                     <div className="city-admin-action-btn">
                       <Activity size={16} color="#2563eb" />
-                      {lastRefreshed.toLocaleDateString("en-IN", {
+                      {lastRefreshed ? lastRefreshed.toLocaleDateString("en-IN", {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",
-                      })}
+                      }) : "Today"}
                     </div>
 
                     <button

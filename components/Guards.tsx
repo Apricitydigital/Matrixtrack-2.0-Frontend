@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@hooks/useAuth";
 import { canWriteModule, getModuleAssignment, hasRole, isHmsSuperAdmin } from "@utils/rbac";
 import type { ModuleName, Role } from "../types/auth";
@@ -10,6 +10,11 @@ import type { ModuleName, Role } from "../types/auth";
 export function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const hasLocalUser = typeof window !== 'undefined' && (
     !!localStorage.getItem('user') ||
@@ -18,20 +23,60 @@ export function Protected({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    if (!loading && !user && !hasLocalUser) {
+    if (mounted && !loading && !user && !hasLocalUser) {
       router.replace("/unified-login");
     }
-  }, [loading, user, hasLocalUser, router]);
+  }, [mounted, loading, user, hasLocalUser, router]);
+
+  if (!mounted) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: 600 }}>
+        Checking access...
+      </div>
+    );
+  }
 
   if (!user && !hasLocalUser) {
-    return <div>Checking access...</div>;
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: 600 }}>
+        Checking access...
+      </div>
+    );
   }
   return <>{children}</>;
 }
 
 
 export function RoleGuard({ roles, children }: { roles: Role[]; children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || loading) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: 600 }}>
+        Checking authorization...
+      </div>
+    );
+  }
+
+  const hasLocalUser = typeof window !== 'undefined' && (
+    !!localStorage.getItem('user') ||
+    !!localStorage.getItem('swachh_user') ||
+    !!localStorage.getItem('token')
+  );
+
+  if (!user && hasLocalUser) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: 600 }}>
+        Checking authorization...
+      </div>
+    );
+  }
+
   if (!hasRole(user, roles)) {
     return (
       <div style={{ padding: 24 }}>
@@ -57,7 +102,35 @@ export function ModuleGuard({
   children: React.ReactNode;
   requireWrite?: boolean;
 }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || loading) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: 600 }}>
+        Checking module permissions...
+      </div>
+    );
+  }
+
+  const hasLocalUser = typeof window !== 'undefined' && (
+    !!localStorage.getItem('user') ||
+    !!localStorage.getItem('swachh_user') ||
+    !!localStorage.getItem('token')
+  );
+
+  if (!user && hasLocalUser) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontWeight: 600 }}>
+        Checking module permissions...
+      </div>
+    );
+  }
+
   const assigned = getModuleAssignment(user, module);
   const allowedByRole = hasRole(user, roles) || isHmsSuperAdmin(user);
 
