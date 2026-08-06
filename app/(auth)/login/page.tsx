@@ -11,6 +11,10 @@ import { Eye, EyeOff, ShieldCheck, ArrowRight, Building2 } from "lucide-react";
 export default function LoginPage() {
   const router = useRouter();
   const { setUser, setAuthenticatedUser } = useAuth();
+
+  useEffect(() => {
+    router.replace("/unified-login");
+  }, [router]);
   
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
