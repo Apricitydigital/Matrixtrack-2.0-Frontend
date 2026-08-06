@@ -28,6 +28,7 @@ import {
   Bell,
   LogOut,
   Building2,
+  Globe,
 } from "lucide-react";
 
 const getModuleIcon = (key: string) => {
@@ -239,12 +240,6 @@ export default function Sidebar() {
       }
     );
   } else {
-    links.push({
-      label: "Portal Home",
-      href: "/portal-home",
-      icon: <Layout size={18} />,
-    });
-
     if (
       !isCommissioner &&
       !isCityAdmin &&
@@ -263,11 +258,6 @@ export default function Sidebar() {
           label: "HMS Super Admin",
           href: "/hms",
           icon: <Shield size={18} />,
-        },
-        {
-          label: "Onboard City",
-          href: "/hms/cities/new",
-          icon: <Building2 size={18} />,
         }
       );
     } else if (isCityAdmin || isCommissioner) {
@@ -282,8 +272,8 @@ export default function Sidebar() {
         icon: <Users size={18} />,
       });
       links.push({
-        label: "Integrated Registration",
-        href: "/common-registration",
+        label: "User Registration",
+        href: "/portal-home/common-registration",
         icon: <UserPlus size={18} />,
       });
     } else {
@@ -402,11 +392,11 @@ export default function Sidebar() {
                 href: "/city/users",
                 icon: <Users size={16} />,
               },
-              {
-                label: "Registration Requests",
-                href: "/registration-requests",
-                icon: <Bell size={16} />,
-              },
+              // {
+              //   label: "Registration Requests",
+              //   href: "/registration-requests",
+              //   icon: <Bell size={16} />,
+              // },
             ].map((link) => (
               <NavItem
                 key={link.href}
@@ -421,7 +411,26 @@ export default function Sidebar() {
         {/* Module links */}
         {user && moduleLinks.length > 0 && (
           <CollapsibleGroup
-            label="Modules"
+            label="Active Operational System"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             icon={<Layout size={18} />}
             open={modulesOpen}
             onToggle={() =>

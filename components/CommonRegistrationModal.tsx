@@ -31,12 +31,14 @@ interface CommonRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  asPage?: boolean;
 }
 
 export default function CommonRegistrationModal({
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  asPage
 }: CommonRegistrationModalProps) {
   const { user } = useAuth();
   const userPerms = getUserPermissions(user);
@@ -413,21 +415,30 @@ export default function CommonRegistrationModal({
     window.URL.revokeObjectURL(url);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !asPage) return null;
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        background: "rgba(15, 23, 42, 0.75)",
-        backdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px"
-      }}
+      style={
+        asPage
+          ? {
+              display: "flex",
+              justifyContent: "center",
+              padding: "20px",
+              width: "100%"
+            }
+          : {
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              background: "rgba(15, 23, 42, 0.75)",
+              backdropFilter: "blur(8px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px"
+            }
+      }
     >
       <div
         style={{
@@ -435,9 +446,9 @@ export default function CommonRegistrationModal({
           borderRadius: "24px",
           maxWidth: "840px",
           width: "100%",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+          maxHeight: asPage ? "none" : "90vh",
+          overflowY: asPage ? "visible" : "auto",
+          boxShadow: asPage ? "0 4px 20px -10px rgba(0,0,0,0.1)" : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           border: "1px solid rgba(226, 232, 240, 0.8)",
           fontFamily: "'Inter', sans-serif"
         }}
@@ -479,23 +490,25 @@ export default function CommonRegistrationModal({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              color: "#fff",
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              cursor: "pointer",
-              transition: "background 0.2s"
-            }}
-          >
-            <X size={18} />
-          </button>
+          {!asPage && (
+            <button
+              onClick={onClose}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                border: "none",
+                color: "#fff",
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+                transition: "background 0.2s"
+              }}
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         {/* Modal Content */}

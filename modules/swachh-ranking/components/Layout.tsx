@@ -9,9 +9,10 @@ import LiveNotification from './LiveNotification';
 
 interface LayoutProps {
     children: ReactNode;
+    hideSidebar?: boolean;
 }
 
-const Layout = ({ children }: LayoutProps) => {
+const Layout = ({ children, hideSidebar = true }: LayoutProps) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
@@ -39,21 +40,20 @@ const Layout = ({ children }: LayoutProps) => {
 
     return (
         <>
-        <EnvironmentalBranding />
         <AchievementEffect />
         <LiveNotification />
         <div className="app-layout">
             {/* Mobile overlay */}
-            {sidebarOpen && (
+            {!hideSidebar && sidebarOpen && (
                 <div
                     className="sidebar-overlay"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
-            <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="layout-main">
-                <Header onMenuToggle={() => setSidebarOpen(prev => !prev)} />
-                <main className="main-content">
+            {!hideSidebar && <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
+            <div className="layout-main" style={hideSidebar ? { marginLeft: 0 } : undefined}>
+                {!hideSidebar && <Header onMenuToggle={() => setSidebarOpen(prev => !prev)} />}
+                <main className="main-content" style={hideSidebar ? { padding: '0.5rem 0' } : undefined}>
                     {children}
                 </main>
             </div>

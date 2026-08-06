@@ -255,7 +255,7 @@ function MainContent({ darkMode, setDarkMode }) {
   const isPublicPage = !user && (
     window.location.pathname === "/" ||
     window.location.pathname === "/home" ||
-    window.location.pathname === "/login"
+    window.location.pathname === "/unified-login"
   );
 
   if (isPublicPage) {
@@ -263,7 +263,7 @@ function MainContent({ darkMode, setDarkMode }) {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/home" element={<Navigate to="/" replace />} />
-        <Route path="/login" element={<RedirectIfAuthenticated />} />
+        <Route path="/unified-login" element={<RedirectIfAuthenticated />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -330,7 +330,7 @@ function MainContent({ darkMode, setDarkMode }) {
 ">          <Routes>
             <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <HomePage />} />
             <Route path="/home" element={<Navigate to="/" replace />} />
-            <Route path="/login" element={<RedirectIfAuthenticated />} />
+            <Route path="/unified-login" element={<RedirectIfAuthenticated />} />
             <Route path="/no-access" element={<NoAccess />} />
 
             {ROUTE_CONFIG.map((route) => (

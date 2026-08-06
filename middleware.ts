@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = [
-  "/login",
+  "/unified-login",
   "/register",
   "/unified-login",
   "/create-account",
