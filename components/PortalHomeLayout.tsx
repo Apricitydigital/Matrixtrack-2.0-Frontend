@@ -88,7 +88,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
     router.push('/unified-login');
   };
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'hms_super_admin' || (user?.roles || []).includes('hms_super_admin') || (user?.roles || []).includes('HMS_SUPER_ADMIN');
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'hms_super_admin' || user?.role === 'SUPER_ADMIN' || (user?.roles || []).includes('hms_super_admin') || (user?.roles || []).includes('HMS_SUPER_ADMIN') || (user?.roles || []).includes('SUPER_ADMIN') || (user?.roles || []).includes('super_admin');
   const displayName = user?.name || 'User';
   const roleLabelText = user?.role ? roleLabel(user.role) : '';
   const cityName = user?.city ? user.city.name : '';
@@ -116,17 +116,17 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   let pageTitle = `${getGreeting()}, ${displayName}!`;
-  if (pathname.includes('/onboard-city')) pageTitle = 'City Deployment Control';
+  if (pathname.includes('/onboard-city')) pageTitle = 'Create City';
   if (pathname.includes('/city-directory')) pageTitle = 'City Directory';
-  if (pathname.includes('/common-registration')) pageTitle = 'Integrated Employee Registration';
-  if (pathname.includes('/admin-management')) pageTitle = 'Enterprise User & RBAC Governance Center';
+  if (pathname.includes('/common-registration')) pageTitle = 'Employee Registration';
+  if (pathname.includes('/admin-management')) pageTitle = 'User & Admin Management';
 
   if (isTaskforceActive) {
-    if (pathname.includes('/modules')) pageTitle = 'Taskforce - Modules Governance';
-    else if (pathname.includes('/zones')) pageTitle = 'Taskforce - Zones Governance';
-    else if (pathname.includes('/wards')) pageTitle = 'Taskforce - Wards Governance';
-    else if (pathname.includes('/areas')) pageTitle = 'Taskforce - Areas & Beats Governance';
-    else if (pathname.includes('/users')) pageTitle = 'Taskforce - Municipal Users Governance';
+    if (pathname.includes('/modules')) pageTitle = 'Taskforce - Modules';
+    else if (pathname.includes('/zones')) pageTitle = 'Taskforce - Zones';
+    else if (pathname.includes('/wards')) pageTitle = 'Taskforce - Wards';
+    else if (pathname.includes('/areas')) pageTitle = 'Taskforce - Areas & Beats';
+    else if (pathname.includes('/users')) pageTitle = 'Taskforce - Municipal Users';
     else pageTitle = 'Taskforce Workspace Dashboard';
   } else if (isSwachhActive) {
     if (currentView === 'approvals') pageTitle = 'Swachh Sync - Access Requests';
@@ -147,7 +147,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
     else if (currentView === 'supervisors') pageTitle = 'Workforce - Supervisors Management';
     else if (currentView === 'assignSupervisorWard' || currentView === 'assign-supervisor-ward') pageTitle = 'Workforce - Assign Supervisor Kothi';
     else if (currentView === 'supervisor-audit') pageTitle = 'Workforce - Attendance Audit';
-    else if (currentView === 'supervisor-self-punch-requests') pageTitle = 'Workforce - Professional Access Requests';
+    else if (currentView === 'supervisor-self-punch-requests') pageTitle = 'Workforce - Access Requests';
     else if (currentView === 'supervisor-professional-attendance') pageTitle = 'Workforce - Professional Attendance';
     else if (currentView === 'supervisor-professional-leave') pageTitle = 'Workforce - Professional Leave Management';
     else if (currentView === 'settings') pageTitle = 'Workforce - System Settings';
@@ -255,6 +255,9 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
     }
   ].map(g => ({ ...g, items: g.items.filter(i => i.visible) })).filter(g => g.items.length > 0);
 
+  const canAccessRegistration = isSuperAdmin || isCityAdmin;
+  const navItemsCount = 1 + (canAccessRegistration ? 1 : 0) + (isSuperAdmin ? 2 : 0);
+
   return (
     <div className="min-h-screen bg-slate-50/50 flex">
       <style>{`
@@ -290,19 +293,25 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
           <nav className="flex flex-col gap-2">
             {/* COLLAPSIBLE TOP NAVIGATION MENU */}
             <div className="flex flex-col">
-              <button
-                type="button"
-                onClick={() => setPortalToolsOpen((prev) => !prev)}
-                className="flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <span>Navigation Menu</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform duration-200 ${portalToolsOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
-                />
-              </button>
+              {navItemsCount > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setPortalToolsOpen((prev) => !prev)}
+                  className="flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  <span>Navigation Menu</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-200 ${portalToolsOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
+                  />
+                </button>
+              ) : (
+                <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Navigation Menu
+                </div>
+              )}
 
-              {portalToolsOpen && (
+              {(portalToolsOpen || navItemsCount <= 1) && (
                 <div className="flex flex-col gap-1 mt-1">
                   <Link
                     href="/portal-home"
@@ -316,6 +325,20 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                     <span>Home</span>
                   </Link>
 
+                  {canAccessRegistration && (
+                    <Link
+                      href="/portal-home/common-registration"
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                        pathname.includes('/common-registration')
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <UserCheck2 size={16} className={pathname.includes('/common-registration') ? 'text-white' : 'text-slate-500'} />
+                      <span>Employee Registration</span>
+                    </Link>
+                  )}
+
                   {isSuperAdmin && (
                     <>
                       <Link
@@ -327,7 +350,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                         }`}
                       >
                         <PlusCircle size={16} className={pathname.includes('/onboard-city') ? 'text-white' : 'text-slate-500'} />
-                        <span>Onboard City Cluster</span>
+                        <span>Create City</span>
                       </Link>
 
                       <Link
@@ -341,32 +364,20 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                         <Globe size={16} className={pathname.includes('/city-directory') ? 'text-white' : 'text-slate-500'} />
                         <span>City Directory</span>
                       </Link>
+
+                      <Link
+                        href="/portal-home/admin-management"
+                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                          pathname.includes('/admin-management')
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                      >
+                        <ShieldCheck size={16} className={pathname.includes('/admin-management') ? 'text-white' : 'text-slate-500'} />
+                        <span>Admin Access Manager</span>
+                      </Link>
                     </>
                   )}
-
-                  <Link
-                    href="/portal-home/common-registration"
-                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                      pathname.includes('/common-registration')
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
-                  >
-                    <UserCheck2 size={16} className={pathname.includes('/common-registration') ? 'text-white' : 'text-slate-500'} />
-                    <span>Employee Registration</span>
-                  </Link>
-
-                  <Link
-                    href="/portal-home/admin-management"
-                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                      pathname.includes('/admin-management')
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
-                  >
-                    <ShieldCheck size={16} className={pathname.includes('/admin-management') ? 'text-white' : 'text-slate-500'} />
-                    <span>Admin Access Manager</span>
-                  </Link>
                 </div>
               )}
             </div>

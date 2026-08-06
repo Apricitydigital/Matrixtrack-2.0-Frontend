@@ -71,7 +71,7 @@ export default function PortalHomePage() {
   const [activeModalKey, setActiveModalKey] = useState<string | null>(null);
   const activeModalData = activeModalKey ? ROADMAP_MODULES[activeModalKey] : null;
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'hms_super_admin' || (user?.roles || []).includes('hms_super_admin') || (user?.roles || []).includes('HMS_SUPER_ADMIN');
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'hms_super_admin' || user?.role === 'SUPER_ADMIN' || (user?.roles || []).includes('hms_super_admin') || (user?.roles || []).includes('HMS_SUPER_ADMIN') || (user?.roles || []).includes('SUPER_ADMIN') || (user?.roles || []).includes('super_admin');
   const cityName = user?.city ? user.city.name : '';
 
   // Determine what workspaces they have access to
@@ -296,7 +296,7 @@ export default function PortalHomePage() {
         }
       `}</style>
       
-      <HmsKpiCards />
+      <HmsKpiCards isSuperAdmin={isSuperAdmin} userCityName={cityName || 'Indore'} />
 
       {/* Active Operational Workspaces */}
       <div className="section-title-box">
@@ -324,9 +324,9 @@ export default function PortalHomePage() {
                   </span>
                 </div>
                 <h3 className="hero-card-title">Taskforce</h3>
-                <div className="hero-card-sub">4-Module Combined Performance Monitoring Suite</div>
+                <div className="hero-card-sub">4-Module Performance Monitoring</div>
                 <div className="hero-card-desc">
-                  Next-gen urban sanitation suite driving automated monitoring across Beat Sweeping, Smart Litterbins, Vulnerable Spot (GVP/CTU) Transformation, and Community Toilet (CT/PT) Cleanliness.
+                  Urban sanitation monitoring across Beat Sweeping, Smart Litterbins, Vulnerable Spot (GVP/CTU) Transformation, and Community Toilet (CT/PT) Cleanliness.
                 </div>
 
                 <div className="hero-tags-row">
@@ -427,9 +427,9 @@ export default function PortalHomePage() {
                   </span>
                 </div>
                 <h3 className="hero-card-title">Workforce Monitoring</h3>
-                <div className="hero-card-sub" style={{ color: '#0284c7' }}>Matrix Track Attendance Suite</div>
+                <div className="hero-card-sub" style={{ color: '#0284c7' }}>Matrix Track Attendance Tracking</div>
                 <div className="hero-card-desc">
-                  Biometric facial verification & GPS geo-fenced live attendance tracking suite for municipal sanitation workers & supervisors.
+                  Biometric facial verification & GPS geo-fenced live attendance tracking for municipal sanitation workers & supervisors.
                 </div>
 
                 <div className="hero-tags-row">

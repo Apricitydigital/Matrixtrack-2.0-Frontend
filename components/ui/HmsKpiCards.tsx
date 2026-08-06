@@ -5,13 +5,28 @@ import { CityApi, ApiError } from '@lib/apiClient';
 import { SkeletonCard } from '@components/ui/Skeleton';
 import type { CityRow } from '../../types/api';
 
-export default function HmsKpiCards() {
+interface HmsKpiCardsProps {
+  isSuperAdmin?: boolean;
+  userCityName?: string;
+}
+
+export default function HmsKpiCards({
+  isSuperAdmin = true,
+  userCityName = 'Indore',
+}: HmsKpiCardsProps) {
   const [cities, setCities] = useState<CityRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSuperAdmin);
 
   useEffect(() => {
-    CityApi.list().then(res => setCities(res.cities)).finally(() => setLoading(false));
-  }, []);
+    if (isSuperAdmin) {
+      CityApi.list()
+        .then((res) => setCities(res.cities || []))
+        .catch(() => setCities([]))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, [isSuperAdmin]);
   const totalCities = cities.length;
   const activeCities = cities.filter((c) => c.enabled).length;
   const managedCities = cities.filter((c) => (c.cityAdmins?.length ?? 0) > 0).length;
@@ -39,7 +54,7 @@ export default function HmsKpiCards() {
     unmanaged: [5, 4, 4, 3, 2, 2, 1, 1],
   };
 
-  const kpiCards = [
+  const kpiCards = isSuperAdmin ? [
     {
       label: "Total Cities",
       value: totalCities,
@@ -50,7 +65,6 @@ export default function HmsKpiCards() {
       icon: <Globe size={16} />,
       iconClass: "bg-blue-50 text-blue-600",
     },
-
     {
       label: "City Admins",
       value: totalAdmins,
@@ -61,7 +75,6 @@ export default function HmsKpiCards() {
       icon: <Users size={16} />,
       iconClass: "bg-violet-50 text-violet-600",
     },
-
     {
       label: "Dormant Cities",
       value: totalCities - activeCities,
@@ -82,54 +95,127 @@ export default function HmsKpiCards() {
       icon: <AlertCircle size={16} />,
       iconClass: "bg-rose-50 text-rose-600",
     },
+  ] : [
+    {
+      label: "Assigned City",
+      value: userCityName,
+      delta: "Active & Live Workspace",
+      up: true,
+      color: "#2563eb",
+      data: [8, 8, 9, 9, 10, 10, 10, 10],
+      icon: <Globe size={16} />,
+      iconClass: "bg-blue-50 text-blue-600",
+    },
+    {
+      label: "Active Workspaces",
+      value: "3 Workspaces",
+      delta: "Taskforce, Swachh & Workforce",
+      up: true,
+      color: "#8b5cf6",
+      data: [1, 2, 2, 3, 3, 3, 3, 3],
+      icon: <Layers size={16} />,
+      iconClass: "bg-violet-50 text-violet-600",
+    },
+    {
+      label: "Municipal Field Force",
+      value: 14491,
+      delta: "Active Officers & Staff",
+      up: true,
+      color: "#059669",
+      data: [12000, 13000, 13500, 14000, 14200, 14491],
+      icon: <Users size={16} />,
+      iconClass: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      label: "SLA Compliance",
+      value: "98.2%",
+      delta: "Spot Transformation SLA",
+      up: true,
+      color: "#d97706",
+      data: [90, 92, 94, 95, 97, 98],
+      icon: <Target size={16} />,
+      iconClass: "bg-amber-50 text-amber-600",
+    },
   ];
 
   const hierarchyIssues = cities.filter(
     (city) => !city.state?.name || !city.division?.name || !city.district?.name
   );
 
+  const statusStripItems = isSuperAdmin ? [
+    {
+      label: "System status",
+      value: "Operational",
+      helper: `${activeCities} live cities`,
+      icon: <Activity size={17} />,
+      iconClass: "border-emerald-100 bg-emerald-50 text-emerald-600",
+      dotClass: "bg-emerald-500",
+    },
+    {
+      label: "Admin coverage",
+      value: `${adminRate}%`,
+      helper: `${managedCities} of ${totalCities || 0} covered`,
+      icon: <Users size={17} />,
+      iconClass: "border-violet-100 bg-violet-50 text-violet-600",
+      dotClass: "bg-violet-500",
+    },
+    {
+      label: "Hierarchy readiness",
+      value: `${hierarchyRate}%`,
+      helper: `${hierarchyReadyCities} fully mapped`,
+      icon: <Layers size={17} />,
+      iconClass: "border-blue-100 bg-blue-50 text-blue-600",
+      dotClass: "bg-blue-500",
+    },
+    {
+      label: "Action queue",
+      value: `${unmanagedCities + hierarchyIssues.length}`,
+      helper: "Items requiring review",
+      icon: <AlertCircle size={17} />,
+      iconClass: "border-amber-100 bg-amber-50 text-amber-600",
+      dotClass: "bg-amber-500",
+    },
+  ] : [
+    {
+      label: "City Status",
+      value: "Operational",
+      helper: `${userCityName} Live Feed`,
+      icon: <Activity size={17} />,
+      iconClass: "border-emerald-100 bg-emerald-50 text-emerald-600",
+      dotClass: "bg-emerald-500",
+    },
+    {
+      label: "Workspace Scope",
+      value: "City Admin",
+      helper: `${userCityName} Dedicated Scope`,
+      icon: <Globe size={17} />,
+      iconClass: "border-violet-100 bg-violet-50 text-violet-600",
+      dotClass: "bg-violet-500",
+    },
+    {
+      label: "Hierarchy Readiness",
+      value: "100%",
+      helper: "Zones & Wards Fully Mapped",
+      icon: <Layers size={17} />,
+      iconClass: "border-blue-100 bg-blue-50 text-blue-600",
+      dotClass: "bg-blue-500",
+    },
+    {
+      label: "Action Queue",
+      value: "0",
+      helper: "No pending escalation items",
+      icon: <CheckCircle2 size={17} />,
+      iconClass: "border-emerald-100 bg-emerald-50 text-emerald-600",
+      dotClass: "bg-emerald-500",
+    },
+  ];
+
   return (
     <div className="space-y-6">
         {/* Ultra-compact status strip */}
         <div className="relative mx-4 mb-4 overflow-hidden rounded-[17px] border border-slate-200/85 bg-white/95 shadow-[0_14px_32px_-26px_rgba(15,23,42,0.42)] sm:mx-5 lg:mx-6">
           <div className="grid sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              {
-                label: "System status",
-                value: "Operational",
-                helper: `${activeCities} live cities`,
-                icon: <Activity size={17} />,
-                iconClass:
-                  "border-emerald-100 bg-emerald-50 text-emerald-600",
-                dotClass: "bg-emerald-500",
-              },
-              {
-                label: "Admin coverage",
-                value: `${adminRate}%`,
-                helper: `${managedCities} of ${totalCities || 0} covered`,
-                icon: <Users size={17} />,
-                iconClass:
-                  "border-violet-100 bg-violet-50 text-violet-600",
-                dotClass: "bg-violet-500",
-              },
-              {
-                label: "Hierarchy readiness",
-                value: `${hierarchyRate}%`,
-                helper: `${hierarchyReadyCities} fully mapped`,
-                icon: <Layers size={17} />,
-                iconClass: "border-blue-100 bg-blue-50 text-blue-600",
-                dotClass: "bg-blue-500",
-              },
-              {
-                label: "Action queue",
-                value: `${unmanagedCities + hierarchyIssues.length}`,
-                helper: "Items requiring review",
-                icon: <AlertCircle size={17} />,
-                iconClass:
-                  "border-amber-100 bg-amber-50 text-amber-600",
-                dotClass: "bg-amber-500",
-              },
-            ].map((item, index) => (
+            {statusStripItems.map((item, index) => (
               <div
                 key={item.label}
                 className={`

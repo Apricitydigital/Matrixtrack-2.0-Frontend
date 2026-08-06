@@ -269,7 +269,7 @@ export default function Sidebar() {
         icon: <Users size={18} />,
       });
       links.push({
-        label: "Integrated Registration",
+        label: "Employee Registration",
         href: "/portal-home/common-registration",
         icon: <UserPlus size={18} />,
       });

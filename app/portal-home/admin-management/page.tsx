@@ -8,7 +8,7 @@ import {
   Sparkles, Check, X, AlertCircle, Edit3, Trash2, Eye, EyeOff, Save, Info,
   Grid, List, SlidersHorizontal, Layers, Activity, UserCheck, ShieldAlert
 } from 'lucide-react';
-import { Protected } from '@components/Guards';
+import { Protected, RoleGuard } from '@components/Guards';
 import { useAuth } from '@hooks/useAuth';
 import { CityUserApi, CityModulesApi } from '@lib/apiClient';
 
@@ -537,18 +537,19 @@ export default function SuperAdminAccessManagementPage() {
 
   return (
     <Protected>
-      <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '32px 40px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <RoleGuard roles={['HMS_SUPER_ADMIN', 'SUPER_ADMIN']}>
+        <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '32px 40px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         
         {/* Top Navigation */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
             <Link href="/portal-home" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 800, color: '#2563eb', textDecoration: 'none', marginBottom: 8 }}>
-              <ArrowLeft size={16} /> Back to Command Console
+              <ArrowLeft size={16} /> Back to Home
             </Link>
             <h1 style={{ fontSize: 28, fontWeight: 950, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 12, letterSpacing: '-0.02em' }}>
-              <ShieldCheck size={34} style={{ color: '#2563eb' }} /> Enterprise User & RBAC Governance Center
+              <ShieldCheck size={34} style={{ color: '#2563eb' }} /> User & Admin Management
               <span style={{ fontSize: 11, fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '4px 12px', borderRadius: 20, border: '1px solid #bfdbfe' }}>
-                RBAC Engine v2.0
+                System Access
               </span>
             </h1>
             <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0', fontWeight: 500 }}>
@@ -1320,6 +1321,7 @@ export default function SuperAdminAccessManagementPage() {
         )}
 
       </div>
+      </RoleGuard>
     </Protected>
   );
 }

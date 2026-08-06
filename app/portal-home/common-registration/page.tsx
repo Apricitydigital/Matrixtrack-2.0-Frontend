@@ -1,21 +1,22 @@
 'use client';
 
-import React, { useState } from "react";
+import React from "react";
 import CommonRegistrationModal from "@components/CommonRegistrationModal";
-import { UserPlus, Sparkles, ShieldCheck, Building2, CheckCircle2 } from "lucide-react";
-import Link from "next/link";
+import { RoleGuard } from "@components/Guards";
 
 export default function IntegratedRegistrationPage() {
   return (
-    <div className="min-w-0 space-y-5 pb-10">
-      <CommonRegistrationModal
-        isOpen={true}
-        onClose={() => {}}
-        onSuccess={() => {
-          console.log("Registration complete");
-        }}
-        asPage={true}
-      />
-    </div>
+    <RoleGuard roles={['HMS_SUPER_ADMIN', 'SUPER_ADMIN', 'CITY_ADMIN', 'COMMISSIONER']}>
+      <div className="min-w-0 space-y-5 pb-10">
+        <CommonRegistrationModal
+          isOpen={true}
+          onClose={() => {}}
+          onSuccess={() => {
+            console.log("Registration complete");
+          }}
+          asPage={true}
+        />
+      </div>
+    </RoleGuard>
   );
 }

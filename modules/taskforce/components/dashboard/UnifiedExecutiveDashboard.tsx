@@ -424,10 +424,10 @@ export default function UnifiedExecutiveDashboard({
           </div>
           <BarComparisonChart
             items={[
-              { label: 'Zone 1 (Central Indore)', value: 98, max: 100, color: '#2563eb' },
-              { label: 'Zone 2 (Rajwada Commercial)', value: 95, max: 100, color: '#059669' },
-              { label: 'Zone 3 (Vijay Nagar North)', value: 92, max: 100, color: '#7c3aed' },
-              { label: 'Zone 4 (Palasia Hub)', value: 89, max: 100, color: '#d97706' },
+              { label: `Zone 1 (Central ${userCityName})`, value: 98, max: 100, color: '#2563eb' },
+              { label: `Zone 2 (${userCityName} Commercial)`, value: 95, max: 100, color: '#059669' },
+              { label: `Zone 3 (${userCityName} North)`, value: 92, max: 100, color: '#7c3aed' },
+              { label: `Zone 4 (${userCityName} South)`, value: 89, max: 100, color: '#d97706' },
             ]}
           />
         </div>
@@ -481,7 +481,7 @@ export default function UnifiedExecutiveDashboard({
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#f8fafc', borderRadius: 12, border: '1px solid #f1f5f9' }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb' }} />
               <div style={{ flex: 1, fontSize: 12.5, color: '#334155', fontWeight: 600 }}>
-                Citizen Survekshan entry submitted by Sector 3 RWA &middot; Indore Zone 4
+                Citizen Survekshan entry submitted by Sector 3 RWA &middot; {userCityName} Zone 4
               </div>
               <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700 }}>14m ago</span>
             </div>
