@@ -510,6 +510,15 @@ export const GeoApi = {
 export const AreaBeatApi = {
   list: () => apiFetch<{ beats: any[] }>("/city/areas"),
   listMyBeats: () => apiFetch<{ beats: any[] }>("/city/areas/my-beats"),
+  listPendingRequests: (status?: string) =>
+    apiFetch<{ pendingBeats: any[]; counts?: { pending: number; approved: number; rejected: number; all: number } }>(
+      `/city/areas/pending-requests${status ? `?status=${status}` : ""}`
+    ),
+  reviewBeatRequest: (id: string, action: "APPROVE" | "REJECT", rejectionReason?: string) =>
+    apiFetch<{ success: boolean; beat: any }>(`/city/areas/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify({ action, rejectionReason })
+    }),
   create: (formData: FormData) =>
     apiFetch<{ id: string }>("/city/areas", {
       method: "POST",

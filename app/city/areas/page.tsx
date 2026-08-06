@@ -51,11 +51,21 @@ export default function AreasPage() {
     );
   }, [beats, searchQuery]);
 
+  const [pendingCount, setPendingCount] = useState(0);
+
   const loadBeats = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await AreaBeatApi.list();
-      setBeats(res.beats || []);
+      const [beatsRes, pendingRes] = await Promise.allSettled([
+        AreaBeatApi.list(),
+        AreaBeatApi.listPendingRequests()
+      ]);
+      if (beatsRes.status === "fulfilled") {
+        setBeats(beatsRes.value.beats || []);
+      }
+      if (pendingRes.status === "fulfilled") {
+        setPendingCount(pendingRes.value.pendingBeats?.length || 0);
+      }
     } catch (err) {
       console.error("Failed to load beats", err);
     } finally {
@@ -139,6 +149,40 @@ export default function AreasPage() {
               </div>
               {!isReadOnly && (
                 <>
+                  <Link
+                    href="/city/beat-requests"
+                    style={{
+                      height: "48px",
+                      borderRadius: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontWeight: 700,
+                      padding: "0 20px",
+                      backgroundColor: pendingCount > 0 ? "#fef3c7" : "white",
+                      border: pendingCount > 0 ? "1px solid #fde68a" : "1px solid #e2e8f0",
+                      color: pendingCount > 0 ? "#b45309" : "#0f172a",
+                      textDecoration: "none",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                    }}
+                  >
+                    <FileText size={18} />
+                    Beat Requests
+                    {pendingCount > 0 && (
+                      <span
+                        style={{
+                          backgroundColor: "#d97706",
+                          color: "white",
+                          borderRadius: "9999px",
+                          padding: "2px 8px",
+                          fontSize: "0.75rem",
+                          fontWeight: 800
+                        }}
+                      >
+                        {pendingCount}
+                      </span>
+                    )}
+                  </Link>
                   <Link
                     href="/city/areas/employee-assignments"
                     style={{ height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, padding: "0 20px", backgroundColor: "white", border: "1px solid #e2e8f0", color: "#0f172a", textDecoration: "none" }}

@@ -273,23 +273,36 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         if (beat.segments && beat.segments.length > 0) {
             return {
                 type: "FeatureCollection",
-                features: beat.segments.map((seg: any, i: number) => ({
-                    type: "Feature",
-                    geometry: seg.geometry,
-                    properties: {
-                        id: seg.id,
-                        index: i,
-                        isSegment: true,
-                        name: seg.name || `Beat ${i + 1}`,
-                        assignedToName: seg.employeeAssignedToName || seg.supervisorAssignedToName || beat.assignedToName,
-                        assignedToId: seg.employeeAssignedToId || seg.supervisorAssignedToId || beat.assignedToId,
-                        supervisorAssignedToName: seg.supervisorAssignedToName || beat.assignedToName,
-                        supervisorAssignedToId: seg.supervisorAssignedToId || beat.assignedToId,
-                        employeeAssignedToName: seg.employeeAssignedToName || null,
-                        employeeAssignedToId: seg.employeeAssignedToId || null,
-                        isUnassigned: assignmentMode === "SUPERVISOR" ? !(seg.supervisorAssignedToId || beat.assignedToId) : !seg.employeeAssignedToId
+                features: beat.segments.map((seg: any, i: number) => {
+                    const points = Array.isArray(beat.points) ? beat.points : [];
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+                    let segName = seg.name;
+                    if (!segName || segName === `Beat ${i + 1}`) {
+                        if (p1?.name && p2?.name) segName = `${p1.name} → ${p2.name}`;
+                        else if (p1?.name) segName = p1.name;
+                        else if (p2?.name) segName = p2.name;
+                        else segName = `Sub-Beat ${i + 1}`;
                     }
-                }))
+
+                    return {
+                        type: "Feature",
+                        geometry: seg.geometry,
+                        properties: {
+                            id: seg.id,
+                            index: i,
+                            isSegment: true,
+                            name: segName,
+                            assignedToName: seg.employeeAssignedToName || seg.supervisorAssignedToName || beat.assignedToName,
+                            assignedToId: seg.employeeAssignedToId || seg.supervisorAssignedToId || beat.assignedToId,
+                            supervisorAssignedToName: seg.supervisorAssignedToName || beat.assignedToName,
+                            supervisorAssignedToId: seg.supervisorAssignedToId || beat.assignedToId,
+                            employeeAssignedToName: seg.employeeAssignedToName || null,
+                            employeeAssignedToId: seg.employeeAssignedToId || null,
+                            isUnassigned: assignmentMode === "SUPERVISOR" ? !(seg.supervisorAssignedToId || beat.assignedToId) : !seg.employeeAssignedToId
+                        }
+                    };
+                })
             };
         }
 

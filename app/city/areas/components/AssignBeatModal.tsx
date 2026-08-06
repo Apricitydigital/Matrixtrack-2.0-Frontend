@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Check, Loader2, Search, AlertCircle, Layers } from "lucide-react";
+import { X, Check, Loader2, Search, AlertCircle, Layers, UserX } from "lucide-react";
 import { AreaBeatApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 
@@ -11,6 +11,24 @@ interface AssignBeatModalProps {
     onClose: () => void;
     onSuccess: () => void;
     mode?: "SUPERVISOR" | "EMPLOYEE";
+}
+
+function findClosestPointIndex(coord: [number, number], points: any[]): number {
+    if (!Array.isArray(points) || points.length === 0 || !coord) return 0;
+    let bestIdx = 0;
+    let minDistance = Infinity;
+    points.forEach((p: any, idx: number) => {
+        const pLon = p.longitude ?? p.lng ?? p.lon;
+        const pLat = p.latitude ?? p.lat;
+        if (typeof pLon === "number" && typeof pLat === "number") {
+            const dist = Math.hypot(pLon - coord[0], pLat - coord[1]);
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestIdx = idx;
+            }
+        }
+    });
+    return bestIdx;
 }
 
 export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], onClose, onSuccess, mode }: AssignBeatModalProps) {
@@ -26,7 +44,18 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
 
     const isCityAdmin = currentUser?.roles?.includes("CITY_ADMIN") || currentUser?.roles?.includes("HMS_SUPER_ADMIN");
     const targetRole: "SUPERVISOR" | "EMPLOYEE" = mode || (isCityAdmin ? "SUPERVISOR" : "EMPLOYEE");
-    const segments = beat.segments || [];
+    const segments = useMemo(() => {
+        const points = Array.isArray(beat.points) ? beat.points : [];
+        const list = [...(beat.segments || [])];
+        if (points.length > 0) {
+            list.sort((a: any, b: any) => {
+                const startA = a.geometry?.coordinates?.[0] || [0, 0];
+                const startB = b.geometry?.coordinates?.[0] || [0, 0];
+                return findClosestPointIndex(startA, points) - findClosestPointIndex(startB, points);
+            });
+        }
+        return list;
+    }, [beat.segments, beat.points]);
     const allowSegmentSelection = segments.length > 0;
 
     useEffect(() => {
@@ -150,14 +179,55 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
                                                     {segments.map((seg: any, i: number) => {
                                                         const isSelected = selectedSegmentIds.includes(seg.id);
                                                         const alreadyAssigned = targetRole === "SUPERVISOR" ? !!(seg.supervisorAssignedToId || beat.assignedToId) : !!seg.employeeAssignedToId;
+
+                                                        const points = Array.isArray(beat.points) ? beat.points : [];
+                                                        const p1 = points[i];
+                                                        const p2 = points[i + 1];
+
+                                                        let displayName = seg.name;
+                                                        if (!displayName || displayName === `Beat ${i + 1}`) {
+                                                            if (p1?.name && p2?.name) {
+                                                                displayName = `${p1.name} → ${p2.name}`;
+                                                            } else if (p1?.name) {
+                                                                displayName = p1.name;
+                                                            } else if (p2?.name) {
+                                                                displayName = p2.name;
+                                                            } else {
+                                                                displayName = `Sub-Beat ${i + 1}`;
+                                                            }
+                                                        }
+
                                                         return (
                                                             <button
                                                                 key={seg.id}
                                                                 onClick={() => toggleSegment(seg.id)}
-                                                                style={{ padding: "6px 12px", borderRadius: "8px", border: isSelected ? "1px solid #2563eb" : "1px solid #e2e8f0", backgroundColor: isSelected ? "#2563eb" : alreadyAssigned ? "#ecfdf5" : "white", color: isSelected ? "white" : (alreadyAssigned ? "#059669" : "#64748b"), fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                                                                style={{
+                                                                    padding: "8px 12px",
+                                                                    borderRadius: "10px",
+                                                                    border: isSelected ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                                                                    backgroundColor: isSelected ? "#2563eb" : alreadyAssigned ? "#ecfdf5" : "white",
+                                                                    color: isSelected ? "white" : (alreadyAssigned ? "#047857" : "#334155"),
+                                                                    fontSize: "0.75rem",
+                                                                    fontWeight: 700,
+                                                                    cursor: "pointer",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    gap: "6px",
+                                                                    boxShadow: isSelected ? "0 2px 6px rgba(37, 99, 235, 0.2)" : "none",
+                                                                    transition: "all 0.15s ease-in-out"
+                                                                }}
                                                             >
-                                                                {i + 1}
-                                                                {alreadyAssigned && !isSelected && <Check size={10} />}
+                                                                <span style={{
+                                                                    fontSize: "0.65rem",
+                                                                    opacity: 0.8,
+                                                                    backgroundColor: isSelected ? "rgba(255,255,255,0.25)" : "#f1f5f9",
+                                                                    padding: "1px 5px",
+                                                                    borderRadius: "4px"
+                                                                }}>
+                                                                    #{i + 1}
+                                                                </span>
+                                                                <span>{displayName}</span>
+                                                                {alreadyAssigned && !isSelected && <Check size={12} />}
                                                             </button>
                                                         );
                                                     })}
@@ -217,9 +287,31 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
                             <button
                                 onClick={() => handleAssign(null)}
                                 disabled={loading}
-                                style={{ marginTop: "8px", width: "100%", padding: "12px 14px", borderRadius: "12px", border: "1px dashed #ef4444", backgroundColor: "white", color: "#ef4444", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}
+                                style={{
+                                    marginTop: "12px",
+                                    width: "100%",
+                                    padding: "12px 14px",
+                                    borderRadius: "12px",
+                                    border: "1.5px dashed #ef4444",
+                                    backgroundColor: "#fef2f2",
+                                    color: "#dc2626",
+                                    fontWeight: 700,
+                                    fontSize: "0.85rem",
+                                    cursor: loading ? "not-allowed" : "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "8px"
+                                }}
                             >
-                                Unassign / Clear Current Selection
+                                {loading && assigningUserId === null ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <>
+                                        <UserX size={16} />
+                                        <span>Unassign {targetRole === "SUPERVISOR" ? "Supervisor" : "Employee"} (Clear Selection)</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

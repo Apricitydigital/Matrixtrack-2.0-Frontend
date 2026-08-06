@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Protected, ModuleGuard } from "@components/Guards";
 import { AreaBeatApi, ModuleRecordsApi } from "@lib/apiClient";
 import BeatTable from "../../city/areas/components/BeatTable";
@@ -24,6 +25,7 @@ export default function SweepingModulePage() {
     const [assigningBeat, setAssigningBeat] = useState<any | null>(null);
     const [deployingBeat, setDeployingBeat] = useState<any | null>(null);
     const [filteredUserId, setFilteredUserId] = useState<string | null>(null);
+    const [pendingBeatCount, setPendingBeatCount] = useState(0);
 
     const [viewMode, setViewMode] = useState<"table" | "map">("table");
     const [activeTab, setActiveTab] = useState<"beats" | "assessments">("assessments");
@@ -42,11 +44,16 @@ export default function SweepingModulePage() {
     const loadBeats = useCallback(async () => {
         try {
             setLoading(true);
-            const res = (isQC || isAO)
-                ? await AreaBeatApi.listMyBeats()
-                : await AreaBeatApi.list();
-
-            setBeats(res.beats || []);
+            const [beatsRes, pendingRes] = await Promise.allSettled([
+                (isQC || isAO) ? AreaBeatApi.listMyBeats() : AreaBeatApi.list(),
+                AreaBeatApi.listPendingRequests()
+            ]);
+            if (beatsRes.status === "fulfilled") {
+                setBeats(beatsRes.value.beats || []);
+            }
+            if (pendingRes.status === "fulfilled") {
+                setPendingBeatCount(pendingRes.value.pendingBeats?.length || 0);
+            }
         } catch (err) {
             console.error("Failed to load beats", err);
         } finally {
@@ -163,6 +170,29 @@ export default function SweepingModulePage() {
                                 >
                                     Beat Management ({beats.length})
                                 </button>
+                                <Link
+                                    href="/city/beat-requests"
+                                    style={{
+                                        padding: "8px 16px",
+                                        borderRadius: "8px",
+                                        fontSize: "13px",
+                                        fontWeight: 700,
+                                        backgroundColor: pendingBeatCount > 0 ? "#fef3c7" : "transparent",
+                                        color: pendingBeatCount > 0 ? "#b45309" : "#64748b",
+                                        textDecoration: "none",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        transition: "all 0.2s"
+                                    }}
+                                >
+                                    Beat Requests
+                                    {pendingBeatCount > 0 && (
+                                        <span style={{ backgroundColor: "#d97706", color: "white", padding: "2px 6px", borderRadius: "10px", fontSize: "10px", fontWeight: 800 }}>
+                                            {pendingBeatCount}
+                                        </span>
+                                    )}
+                                </Link>
                             </div>
 
                             {activeTab === "beats" && (
