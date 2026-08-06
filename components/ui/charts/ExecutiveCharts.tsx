@@ -5,7 +5,7 @@ import React from 'react';
 // 1. Reusable Area Line Trend Chart (SVG Smooth Curve with Soft Glow & Gradient)
 export function LineTrendChart({
   data,
-  height = 150,
+  height = 160,
   strokeColor = '#2563eb',
   fillColor = 'rgba(37, 99, 235, 0.1)',
   valueSuffix = '%'
@@ -85,10 +85,14 @@ export function LineTrendChart({
 // 2. Reusable Horizontal Bar Comparison Chart
 export function BarComparisonChart({
   items,
-  barColor = '#2563eb'
+  barColor = '#2563eb',
+  unit = '',
+  showMax = false,
 }: {
   items: { label: string; value: number; max?: number; color?: string }[];
   barColor?: string;
+  unit?: string;
+  showMax?: boolean;
 }) {
   const globalMax = Math.max(...items.map(i => i.max || i.value), 1);
 
@@ -101,12 +105,14 @@ export function BarComparisonChart({
           <div key={idx}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
               <span>{item.label}</span>
-              <span style={{ color: activeColor, fontWeight: 800 }}>{item.value.toLocaleString()} {item.max ? `/ ${item.max}` : ''}</span>
+              <span style={{ color: activeColor, fontWeight: 800 }}>
+                {item.value.toLocaleString()} {unit ? unit : (showMax && item.max ? `/ ${item.max}` : '')}
+              </span>
             </div>
             <div style={{ height: 8, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
               <div style={{
                 height: '100%',
-                width: `${Math.min(percentage, 100)}%`,
+                width: `${Math.max(percentage, item.value > 0 ? 8 : 0)}%`,
                 background: `linear-gradient(90deg, ${activeColor}, ${activeColor}dd)`,
                 borderRadius: 6,
                 transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -119,22 +125,24 @@ export function BarComparisonChart({
   );
 }
 
-// 3. Reusable Donut Status Distribution Chart
+// 3. Reusable Large Donut Status Distribution Chart
 export function DonutDistributionChart({
-  segments
+  segments,
+  size = 230,
+  strokeWidth = 26,
 }: {
   segments: { label: string; value: number; color: string }[];
+  size?: number;
+  strokeWidth?: number;
 }) {
   const total = segments.reduce((sum, s) => sum + s.value, 0);
-  const size = 130;
-  const strokeWidth = 14;
   const radius = (size - strokeWidth) / 2;
   const circ = 2 * Math.PI * radius;
 
   let currentOffset = 0;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+    <div className="flex flex-col sm:flex-row items-center justify-center gap-8 py-6 w-full my-auto">
       <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
           {total === 0 ? (
@@ -168,18 +176,18 @@ export function DonutDistributionChart({
           )}
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          <span style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{total}</span>
-          <span style={{ fontSize: 9.5, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginTop: 3, letterSpacing: '0.5px' }}>Total</span>
+          <span style={{ fontSize: 38, fontWeight: 900, color: '#0f172a', lineHeight: 1, letterSpacing: '-1px' }}>{total}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginTop: 4, letterSpacing: '1px' }}>TOTAL</span>
         </div>
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, justifyContent: 'center' }}>
         {segments.map((seg, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, fontWeight: 700, color: '#334155' }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: seg.color, boxShadow: `0 0 0 3px ${seg.color}22` }} />
+          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+            <div style={{ width: 14, height: 14, borderRadius: '50%', background: seg.color, boxShadow: `0 0 0 3px ${seg.color}25` }} />
             <span>{seg.label}:</span>
-            <strong style={{ color: '#0f172a', fontWeight: 800 }}>{seg.value}</strong>
+            <strong style={{ color: '#0f172a', fontStyle: 'normal', fontWeight: 900, fontSize: 16, marginLeft: 'auto' }}>{seg.value}</strong>
           </div>
         ))}
       </div>

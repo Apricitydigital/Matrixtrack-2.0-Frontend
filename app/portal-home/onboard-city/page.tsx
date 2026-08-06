@@ -48,7 +48,7 @@ export default function CreateCityPage() {
   const [code, setCode] = useState("");
   const [ulbCode, setUlbCode] = useState("");
 
-  // Module Access Configuration for City Cluster Onboarding
+  // Module Access Configuration for City  Onboarding
   const [enabledModules, setEnabledModules] = useState<{
     taskforce: boolean;
     swachh: boolean;
@@ -299,7 +299,7 @@ export default function CreateCityPage() {
                 </div>
 
                 <p className="mt-2 text-sm text-slate-500 sm:text-base">
-                  Deploy a new city cluster into the system.
+                  Create a new city into the system.
                 </p>
               </div>
             </div>
@@ -392,12 +392,12 @@ export default function CreateCityPage() {
 
                 <div className="pt-0.5">
                   <div className="text-sm font-extrabold text-slate-800">
-                    Review & Deploy
+                    Review & submit
                   </div>
 
                   <p className="mt-1 text-xs leading-5 text-slate-400">
                     Validate the details and activate the city
-                    cluster.
+                    city.
                   </p>
                 </div>
               </div>
@@ -405,24 +405,7 @@ export default function CreateCityPage() {
 
             <div className="my-6 h-px bg-slate-100" />
 
-            <div className="rounded-[16px] border border-blue-100 bg-blue-50/70 p-4">
-              <div className="flex gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
-                  <CircleHelp size={17} />
-                </span>
-
-                <div>
-                  <div className="text-sm font-extrabold text-blue-700">
-                    Need help?
-                  </div>
-
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Select State, Division, District and City in
-                    sequence for accurate system mapping.
-                  </p>
-                </div>
-              </div>
-            </div>
+            
 
             <div className="mt-auto pt-6">
               <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -447,7 +430,7 @@ export default function CreateCityPage() {
 
                   <p className="mt-1 text-sm text-slate-400">
                     Select the complete geographic hierarchy to
-                    register a new city cluster.
+                    register a new city .
                   </p>
                 </div>
               </div>
@@ -581,51 +564,9 @@ export default function CreateCityPage() {
                 </label>
               </div>
 
-              <div className="my-6 h-px bg-slate-100" />
-
-              {/* Identifier fields */}
-              <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
-                    System Code{" "}
-                    <span className="text-rose-500">*</span>
-                  </span>
-
-                  <input
-                    className={fieldClass}
-                    value={code}
-                    onChange={(event) =>
-                      setCode(event.target.value)
-                    }
-                    placeholder="e.g. indore"
-                    required
-                  />
-
-                  <span className="mt-2 block text-xs text-slate-400">
-                    Used internally for routing and system
-                    references.
-                  </span>
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
-                    ULB Identifier
-                  </span>
-
-                  <input
-                    className={fieldClass}
-                    value={ulbCode}
-                    onChange={(event) =>
-                      setUlbCode(event.target.value)
-                    }
-                    placeholder="e.g. idr01"
-                  />
-
-                  <span className="mt-2 block text-xs text-slate-400">
-                    Urban Local Body code used in reporting.
-                  </span>
-                </label>
-              </div>
+              {/* Identifier fields - Hidden from UI */}
+              <input type="hidden" value={code} />
+              <input type="hidden" value={ulbCode} />
 
               <div className="my-6 h-px bg-slate-100" />
 
@@ -634,7 +575,7 @@ export default function CreateCityPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <span className="block text-[12px] font-black uppercase tracking-[0.06em] text-slate-700">
-                      Authorized Software Modules for City Cluster <span className="text-rose-500">*</span>
+                      Authorized Software Modules for City <span className="text-rose-500">*</span>
                     </span>
                     <span className="text-xs text-slate-400">
                       Select which workspace modules are enabled and provisioned for this city

@@ -62,8 +62,23 @@ function Donut({ data, size = 110, stroke = 18 }: { data: { v: number; color: st
   );
 }
 
+import PortalHomePage from "../portal-home/page";
+
 export default function CityDashboardPage() {
   const { user } = useAuth();
+
+  const isSuperAdmin =
+    user?.role === 'super_admin' ||
+    user?.role === 'hms_super_admin' ||
+    user?.role === 'SUPER_ADMIN' ||
+    (user?.roles || []).includes('hms_super_admin') ||
+    (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
+    (user?.roles || []).includes('SUPER_ADMIN') ||
+    (user?.roles || []).includes('super_admin');
+
+  if (isSuperAdmin) {
+    return <PortalHomePage />;
+  }
   const [cityName, setCityName] = useState<string | null>(null);
   const [ulbCode, setUlbCode] = useState<string | null>(null);
   const [stats, setStats] = useState<any>(null);
@@ -1575,954 +1590,201 @@ export default function CityDashboardPage() {
           </div>
         </div>
       ) : (
-
-
         <>
-          {/* ── Premium Hero Banner (City Admin Only) ── */}
-          <div className="city-admin-top-section">
-            <section className="city-admin-hero">
+          {/* ── REDESIGNED CITY ADMIN TASKFORCE DASHBOARD ── */}
+          <div style={{ padding: '32px 40px', backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            
+            {/* ── HEADER ROW WITH GREETING, USER NAME, CITY NAME, REFRESH & UPDATED TIME ── */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px 32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+              <div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span>
+                    {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'City Admin'} 👋
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#2563eb', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Building2 size={18} />
+                  <span>{cityName || 'Indore Municipal Corporation'}</span>
+                  <span style={{ color: '#cbd5e1' }}>•</span>
+                  <span style={{ color: '#64748b', fontSize: '0.8125rem', fontWeight: 600 }}>ULB: {ulbCode || '—'}</span>
+                </div>
+              </div>
 
-              <div className="city-admin-hero-main">
-                <div style={{ minWidth: 0 }}>
-                  <div className="city-admin-identity">
-                    <div className="city-admin-logo-ring">
-                      <div className="city-admin-logo-core">
-                        <Building2 size={27} strokeWidth={2.2} />
-                      </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={loadAll}
+                  disabled={refreshing}
+                  style={{
+                    height: '42px', padding: '0 20px', borderRadius: '12px', border: '1.5px solid #e2e8f0',
+                    backgroundColor: 'white', color: '#0f172a', fontSize: '0.8125rem', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', gap: '8px', cursor: refreshing ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.04)', transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
+                >
+                  <RefreshCw size={15} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} color="#2563eb" />
+                  <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+
+                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#475569', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '10px 16px', borderRadius: '12px' }}>
+                  Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </div>
+              </div>
+            </div>
+
+            {/* ── SECTION 1: CITY OVERVIEW ── */}
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Map size={16} color="#2563eb" />
+                <span>City Overview</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                {[
+                  { label: 'Total Zones', value: cityGeoStats?.zones || 0, icon: Map, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                  { label: 'Total Wards', value: cityGeoStats?.wards || 0, icon: MapPin, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe' },
+                  { label: 'Total Areas', value: cityGeoStats?.areas || 0, icon: Target, color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd' },
+                  { label: 'Total Beats', value: cityGeoStats?.beats || 0, icon: Activity, color: '#0284c7', bg: '#e0f2fe', border: '#93c5fd' },
+                ].map((card, i) => (
+                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '20px', border: `1px solid ${card.border}`, padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: card.bg, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <card.icon size={22} />
                     </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{statsLoading ? '—' : card.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
+            {/* ── SECTION 2: USERS OVERVIEW ── */}
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} color="#7c3aed" />
+                <span>Users Overview</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
+                {[
+                  { label: 'Total ULB Officials', value: stats?.ulbOfficials || stats?.COMMISSIONER || 0, icon: Landmark, color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+                  { label: 'Total Action Officers', value: stats?.actionOfficers || stats?.ACTION_OFFICER || 0, icon: UserCog, color: '#059669', bg: '#f0fdf4', border: '#bbf7d0' },
+                  { label: 'Total Quality Controllers', value: stats?.qualityControllers || stats?.QC || 0, icon: Search, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+                  { label: 'Total Taskforce Members / Supervisors', value: stats?.taskforceMembers || stats?.SUPERVISOR || 0, icon: ShieldCheck, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+                  { label: 'Total Employees', value: stats?.employees || stats?.EMPLOYEE || 0, icon: Users, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                ].map((card, i) => (
+                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '20px', border: `1px solid ${card.border}`, padding: '18px', display: 'flex', alignItems: 'center', gap: '14px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '12px', backgroundColor: card.bg, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <card.icon size={20} />
+                    </div>
                     <div style={{ minWidth: 0 }}>
-                      <div className="city-admin-eyebrow">
-                        City Administration
-                      </div>
-
-                      <h1 className="city-admin-title">
-                        {cityName || "City Dashboard"}
-                      </h1>
-
-                      <div className="city-admin-meta">
-                        <span className="city-admin-ulb">
-                          <Landmark size={13} />
-                          ULB: {ulbCode || "—"}
-                        </span>
-
-                        <span className="city-admin-updated">
-                          Updated{" "}
-                          {lastRefreshed.toLocaleTimeString("en-IN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            hour12: true,
-                          })}
-                        </span>
-                      </div>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={card.label}>{card.label}</div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{statsLoading ? '—' : card.value}</div>
                     </div>
                   </div>
-
-                  <div className="city-admin-welcome">
-                    <h2>
-                      Welcome back, {cityName || "City"} City Admin 👋
-                    </h2>
-
-                    <p>
-                      Monitor city operations, users, and modules. Stay informed and
-                      manage your administration efficiently.
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="city-admin-actions">
-                    <div className="city-admin-action-btn">
-                      <Activity size={16} color="#2563eb" />
-                      {lastRefreshed.toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={loadAll}
-                      disabled={refreshing}
-                      className="city-admin-action-btn"
-                    >
-                      <RefreshCw
-                        size={16}
-                        style={{
-                          animation: refreshing
-                            ? "spin 0.8s linear infinite"
-                            : "none",
-                        }}
-                      />
-                      {refreshing ? "Refreshing..." : "Refresh"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={share}
-                      className="city-admin-action-btn primary"
-                    >
-                      <ArrowRight size={16} />
-                      Share Report
-                    </button>
-                  </div>
-
-                  <div className="city-admin-action-pills">
-                    <div className="city-admin-action-pill purple">
-                      <Package size={17} />
-                      <strong>
-                        {statsLoading ? "—" : stats?.totalModules ?? 0}
-                      </strong>
-                      Modules
-                    </div>
-
-                    <div className="city-admin-action-pill">
-                      <Users size={17} />
-                      <strong>{statsLoading ? "—" : totalUsers}</strong>
-                      Total Users
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="city-admin-status-grid">
-                <div className="city-admin-status-item">
-                  <div
-                    className="city-admin-status-icon"
-                    style={{
-                      color: "#059669",
-                      background: "#ecfdf5",
-                      borderColor: "#a7f3d0",
-                    }}
-                  >
-                    <Activity size={23} />
-                  </div>
-
-                  <div>
-                    <div className="city-admin-status-label">
-                      <span
-                        className="city-admin-status-label-dot"
-                        style={{ background: "#10b981" }}
-                      />
-                      System Status
-                    </div>
-
-                    <div className="city-admin-status-value">
-                      Operational
-                    </div>
-
-                    <div className="city-admin-status-help">
-                      All systems running smoothly
-                    </div>
-                  </div>
-                </div>
-
-                <div className="city-admin-status-item">
-                  <div
-                    className="city-admin-status-icon"
-                    style={{
-                      color: "#7c3aed",
-                      background: "#f5f3ff",
-                      borderColor: "#ddd6fe",
-                    }}
-                  >
-                    <Package size={23} />
-                  </div>
-
-                  <div>
-                    <div className="city-admin-status-label">
-                      <span
-                        className="city-admin-status-label-dot"
-                        style={{ background: "#7c3aed" }}
-                      />
-                      Modules
-                    </div>
-
-                    <div className="city-admin-status-value">
-                      {statsLoading ? "—" : stats?.totalModules ?? 0} active
-                    </div>
-
-                    <div className="city-admin-status-help">
-                      Across all departments
-                    </div>
-                  </div>
-                </div>
-
-                <div className="city-admin-status-item">
-                  <div
-                    className="city-admin-status-icon"
-                    style={{
-                      color: "#2563eb",
-                      background: "#eff6ff",
-                      borderColor: "#bfdbfe",
-                    }}
-                  >
-                    <Users size={23} />
-                  </div>
-
-                  <div>
-                    <div className="city-admin-status-label">
-                      <span
-                        className="city-admin-status-label-dot"
-                        style={{ background: "#2563eb" }}
-                      />
-                      User Base
-                    </div>
-
-                    <div className="city-admin-status-value">
-                      {statsLoading ? "—" : totalUsers} total users
-                    </div>
-
-                    <div className="city-admin-status-help">
-                      Across all roles
-                    </div>
-                  </div>
-                </div>
-
-                <div className="city-admin-status-item">
-                  <div
-                    className="city-admin-status-icon"
-                    style={{
-                      color: "#d97706",
-                      background: "#fffbeb",
-                      borderColor: "#fde68a",
-                    }}
-                  >
-                    <UserCog size={23} />
-                  </div>
-
-                  <div>
-                    <div className="city-admin-status-label">
-                      <span
-                        className="city-admin-status-label-dot"
-                        style={{ background: "#f59e0b" }}
-                      />
-                      Admin Network
-                    </div>
-
-                    <div className="city-admin-status-value">
-                      {roleData.length} role groups
-                    </div>
-
-                    <div className="city-admin-status-help">
-                      Active across the city
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </div>
-
-
-          <div className="page-padding">
-
-            {/* ── User Role KPI Cards (City Admin only) ── */}
-            {/* ── Premium User Role KPI Cards (City Admin only) ── */}
-            <div className="city-user-overview">
-              <div className="city-user-overview-title">
-                User Overview
-              </div>
-
-              <div className="city-user-card-grid">
-                {roleData.map((role, index) => {
-                  const roleValue = stats?.[role.key] ?? 0;
-                  const rolePercentage = roleValue > 0 ? 100 : 0;
-
-                  return (
-                    <Link
-                      key={index}
-                      href={role.href}
-                      className="da-link"
-                    >
-                      <div className="city-user-card">
-                        <div className="city-user-card-top">
-                          <div
-                            className="city-user-card-icon"
-                            style={{
-                              color: role.color,
-                              background: role.bg,
-                            }}
-                          >
-                            {role.icon}
-                          </div>
-
-                          <ChevronRight
-                            size={20}
-                            className="city-user-card-arrow"
-                          />
-                        </div>
-
-                        <div className="city-user-card-main-row">
-                          <div
-                            className="city-user-card-number"
-                            style={{ color: roleValue > 0 ? "#0f172a" : role.color }}
-                          >
-                            {statsLoading ? "—" : roleValue}
-                          </div>
-
-                          <div className="city-user-card-label">
-                            {role.label}
-                          </div>
-                        </div>
-
-                        <div
-                          className="city-user-status"
-                          style={{
-                            color: role.color,
-                            background: role.bg,
-                          }}
-                        >
-                          <span className="city-user-status-left">
-                            <span
-                              className="city-user-status-dot"
-                              style={{ background: role.color }}
-                            />
-                            Active
-                          </span>
-
-                          <span>{rolePercentage}%</span>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-
-                <Link href="/city/modules" className="da-link">
-                  <div className="city-user-card modules-card">
-                    <div className="city-user-card-top">
-                      <div
-                        className="city-user-card-icon"
-                        style={{
-                          color: "#ffffff",
-                          background: "linear-gradient(145deg, #2563eb, #4f46e5)",
-                          boxShadow: "0 8px 18px rgba(37,99,235,0.25)",
-                        }}
-                      >
-                        <Package size={22} />
-                      </div>
-
-                      <ChevronRight
-                        size={20}
-                        style={{ color: "#6366f1", marginTop: 4 }}
-                      />
-                    </div>
-
-                    <div className="city-user-card-main-row">
-                      <div className="city-user-card-number">
-                        {statsLoading ? "—" : stats?.totalModules ?? 0}
-                      </div>
-
-                      <div className="city-user-card-label">
-                        Total Modules
-                      </div>
-                    </div>
-
-                    <div className="city-user-status">
-                      <span className="city-user-status-left">
-                        <span
-                          className="city-user-status-dot"
-                          style={{ background: "#ffffff" }}
-                        />
-                        Active
-                      </span>
-
-                      <span>
-                        {(stats?.totalModules ?? 0) > 0 ? 100 : 0}%
-                      </span>
-                    </div>
-                  </div>
-                </Link>
+                ))}
               </div>
             </div>
 
-            {/* ── Quick Actions (City Admin only) ── */}
-            {/* ── Premium Quick Actions ── */}
-            {/* ── Compact Quick Actions ── */}
-            <section className="mt-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.045)]">
-              <div className="relative mb-5 inline-flex text-[10px] font-black uppercase tracking-[0.1em] text-slate-900 after:absolute after:-bottom-2 after:left-0 after:h-[3px] after:w-11 after:rounded-full after:bg-gradient-to-r after:from-blue-600 after:to-sky-400">
-                Quick Actions
+            {/* ── SECTION 3: MODULE OVERVIEW ── */}
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Package size={16} color="#059669" />
+                <span>Module Overview</span>
               </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                {quickActions.map((action) => {
-                  const Icon = action.icon;
-
-                  return (
-                    <Link
-                      key={action.title}
-                      href={action.href}
-                      className="group no-underline"
-                    >
-                      <div
-                        className={`
-              relative flex min-h-[78px] items-center gap-3 overflow-hidden
-              rounded-xl border border-slate-200 bg-white px-4 py-3
-              shadow-[0_4px_14px_rgba(15,23,42,0.035)]
-              transition-all duration-200
-              before:absolute before:bottom-3 before:left-0 before:top-3
-              before:w-[3px] before:rounded-r-full
-              hover:-translate-y-0.5 hover:border-blue-200
-              hover:shadow-[0_9px_20px_rgba(15,23,42,0.07)]
-              ${action.cardAccent}
-            `}
-                      >
-                        <div
-                          className={`
-                grid h-11 w-11 shrink-0 place-items-center rounded-xl
-                ${action.iconStyle}
-              `}
-                        >
-                          <Icon size={20} strokeWidth={2} />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-extrabold text-slate-900">
-                            {action.title}
-                          </div>
-
-                          <div className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
-                            {action.description}
-                          </div>
-                        </div>
-
-                        <ChevronRight
-                          size={17}
-                          className="shrink-0 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5"
-                        />
-
-                        {action.showBadge && pendingRegCount > 0 && (
-                          <span className="absolute right-2 top-2 grid min-h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[8px] font-black text-white shadow-md shadow-red-200">
-                            {pendingRegCount}
-                          </span>
-                        )}
-                      </div>
-                    </Link>
-                  );
-                })}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                {[
+                  { label: 'Total Registered Beats', value: cityGeoStats?.beats || 0, icon: BrushCleaning, color: '#059669', bg: '#f0fdf4', border: '#a7f3d0' },
+                  { label: 'Total Registered Litterbins', value: extraModuleStats.twinbin.registered || 0, icon: Trash2, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+                  { label: 'Total Registered Toilets', value: extraModuleStats.toilet.registered || 0, icon: Toilet, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                ].map((card, i) => (
+                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '20px', border: `1px solid ${card.border}`, padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+                    <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: card.bg, color: card.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <card.icon size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</div>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', lineHeight: 1.1, marginTop: '2px' }}>{statsLoading ? '—' : card.value}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </section>
-
-
-            {/* ── Premium Operations Grid ── */}
-            <div className="mt-6 grid grid-cols-1 items-start gap-5 xl:grid-cols-3">
-
-              {/* ================= NEW REGISTRATIONS ================= */}
-              <section className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
-                      <Users size={18} />
-                    </div>
-
-                    <div className="min-w-0">
-                      <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">
-                        New Registrations
-                      </div>
-
-                      <div className="mt-0.5 text-[15px] font-extrabold leading-tight text-slate-900">
-                        Approval Pending
-                      </div>
-
-                      <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500">
-                        Review newly submitted user requests
-                      </div>
-                    </div>
-                  </div>
-
-                  <Link
-                    href="/registration-requests"
-                    className="flex shrink-0 items-center gap-1 pt-1 text-[10px] font-extrabold text-blue-600 no-underline"
-                  >
-                    View All
-                    <ArrowRight size={12} />
-                  </Link>
-                </div>
-
-                {/* Content */}
-                {recentRegistrationRequests.length === 0 ? (
-                  <div className="grid min-h-[150px] place-items-center px-5 py-6 text-center text-[11px] text-slate-400">
-                    <div>
-                      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-50">
-                        <Users size={21} />
-                      </div>
-
-                      No pending registration requests
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2.5 p-3">
-                    {recentRegistrationRequests.map((req, index) => (
-                      <div
-                        key={index}
-                        className="
-              group flex min-h-[88px] items-center gap-3 rounded-xl
-              border border-slate-200 bg-gradient-to-br from-white to-slate-50
-              p-3 transition-all duration-200
-              hover:translate-x-0.5 hover:border-blue-200
-              hover:shadow-[0_6px_16px_rgba(37,99,235,0.06)]
-            "
-                      >
-                        <div
-                          className={`
-                grid h-11 w-11 shrink-0 place-items-center rounded-full
-                text-sm font-black
-                ${index % 3 === 0
-                              ? "bg-blue-50 text-blue-600"
-                              : index % 3 === 1
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-violet-50 text-violet-600"
-                            }
-              `}
-                        >
-                          {(req.name?.trim()?.charAt(0) || "?").toUpperCase()}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[11px] font-extrabold text-slate-900">
-                            {req.name}
-                          </div>
-
-                          <div className="mt-1 truncate text-[9px] font-medium text-slate-500">
-                            {req.email}
-                          </div>
-
-                          <div className="mt-0.5 truncate text-[9px] font-medium text-slate-500">
-                            {req.phone ? `• ${req.phone}` : "Phone not provided"}
-                          </div>
-                        </div>
-
-                        <Link
-                          href="/registration-requests"
-                          className="
-                shrink-0 rounded-lg bg-blue-50 px-3 py-2
-                text-[9px] font-extrabold text-blue-600 no-underline
-                transition-colors hover:bg-blue-100
-              "
-                        >
-                          Review
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Footer */}
-                <Link
-                  href="/registration-requests"
-                  className="
-        mx-3 mb-3 flex min-h-[58px] items-center justify-between
-        rounded-xl border border-blue-100
-        bg-gradient-to-r from-blue-50 to-slate-50 px-3
-        text-[10px] font-extrabold text-blue-600 no-underline
-      "
-                >
-                  <span className="flex items-center gap-2">
-                    <FileUser size={17} strokeWidth={2} />
-
-                    <span>
-                      <span className="block">Manage Requests</span>
-
-                      <span className="mt-0.5 block text-[8px] font-medium text-slate-500">
-                        View and manage all requests
-                      </span>
-                    </span>
-                  </span>
-
-                  <ChevronRight size={15} />
-                </Link>
-              </section>
-
-              {/* ================= ACTION OFFICERS ================= */}
-              <section className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                {/* Header */}
-                <div className="flex items-start gap-3 border-b border-slate-200 px-4 py-4">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-                    <ShieldCheck size={18} />
-                  </div>
-
-                  <div>
-                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-emerald-600">
-                      Field Operations
-                    </div>
-
-                    <div className="mt-0.5 text-[15px] font-extrabold leading-tight text-slate-900">
-                      Action Officers
-                    </div>
-
-                    <div className="mt-1 text-[10px] font-medium leading-4 text-slate-500">
-                      Module-level action monitoring
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="px-3 pt-3">
-                  <div
-                    className="
-          relative mb-4 flex min-h-[92px] items-center gap-3 overflow-hidden
-          rounded-xl border border-emerald-200
-          bg-gradient-to-br from-emerald-50 to-green-100 p-3
-          after:absolute after:-bottom-8 after:-right-5
-          after:h-28 after:w-28 after:rounded-full
-          after:border-[20px] after:border-emerald-200/30
-        "
-                  >
-                    <div className="relative z-10 grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-green-600 to-emerald-500 text-white shadow-md shadow-emerald-200">
-                      <UserCog size={22} />
-                    </div>
-
-                    <div className="relative z-10">
-                      <div className="text-[30px] font-black leading-none tracking-tight text-slate-900">
-                        {statsLoading ? "—" : stats?.actionOfficers ?? 0}
-                      </div>
-
-                      <div className="mt-1 text-[10px] font-extrabold text-green-600">
-                        Action Officers Active
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-2 text-[9px] font-black uppercase tracking-[0.09em] text-slate-500">
-                    Pending Actions by Module
-                  </div>
-
-                  {moduleActivity.length === 0 ? (
-                    <div className="grid min-h-[150px] place-items-center py-6 text-center text-[11px] text-slate-400">
-                      <div>
-                        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-50">
-                          <Package size={21} />
-                        </div>
-
-                        Loading module activity...
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {moduleActivity.map((module, index) => {
-                        const moduleVisual = getModuleVisual(module);
-                        const ModuleIcon = moduleVisual.Icon;
-
-                        return (
-                          <div
-                            key={module.key || `${module.name}-${index}`}
-                            className="
-                  flex min-h-[62px] items-center gap-3 rounded-xl
-                  border border-slate-200 bg-white p-2.5
-                  transition-all duration-200
-                  hover:border-slate-300
-                  hover:shadow-[0_5px_15px_rgba(15,23,42,0.05)]
-                "
-                          >
-                            <div
-                              className={`
-                    grid h-9 w-9 shrink-0 place-items-center rounded-lg
-                    ${moduleVisual.iconClass}
-                  `}
-                            >
-                              <ModuleIcon size={17} strokeWidth={2} />
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-[10px] font-extrabold text-slate-900">
-                                {module.name}
-                              </div>
-
-                              <div className="mt-0.5 text-[8px] font-medium text-slate-500">
-                                Total: {module.total} records
-                              </div>
-                            </div>
-
-                            {module.actionRequired > 0 ? (
-                              <span className="shrink-0 rounded-lg bg-red-600 px-2.5 py-1.5 text-[8px] font-extrabold text-white">
-                                ⚠ {module.actionRequired}
-                              </span>
-                            ) : (
-                              <span className="shrink-0 rounded-lg bg-green-100 px-2.5 py-1.5 text-[8px] font-extrabold text-green-600">
-                                ✓ Clear
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <Link
-                  href="/city/users?role=ACTION_OFFICER"
-                  className="
-        mx-3 mb-3 mt-4 flex min-h-[58px] items-center justify-between
-        rounded-xl border border-emerald-100
-        bg-gradient-to-r from-emerald-50 to-white px-3
-        text-[10px] font-extrabold text-emerald-600 no-underline
-      "
-                >
-                  <span className="flex items-center gap-2">
-                    <UserCog size={16} />
-                    Manage Action Officers
-                  </span>
-
-                  <ArrowRight size={15} />
-                </Link>
-              </section>
-
-              {/* ================= LIVE FIELD ACTIVITY ================= */}
-              <section className="h-fit overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
-                      <Activity size={18} />
-                    </div>
-
-                    <div>
-                      <div className="text-[15px] font-extrabold leading-tight text-slate-900">
-                        Live Field Activity
-                      </div>
-
-                      <div className="mt-1 text-[10px] font-medium text-slate-500">
-                        Real-time audit stream
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-0.5 flex items-center gap-2 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[8px] font-black text-emerald-600">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(34,197,94,0.1)]" />
-                    LIVE
-                  </div>
-                </div>
-
-                {/* Content */}
-                {recentLogs.length === 0 ? (
-                  <div className="grid min-h-[150px] place-items-center px-5 py-6 text-center text-[11px] text-slate-400">
-                    <div>
-                      <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-slate-50">
-                        <RefreshCw size={21} />
-                      </div>
-
-                      No recent activity found
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative max-h-[420px] overflow-y-auto px-4 py-4 before:absolute before:bottom-8 before:left-[25px] before:top-8 before:w-px before:bg-gradient-to-b before:from-blue-200 before:to-transparent">
-                    {recentLogs.map((log, index) => (
-                      <div
-                        key={index}
-                        className="relative mb-3 flex items-start gap-3 last:mb-0"
-                      >
-                        <div className="relative z-10 flex shrink-0 items-center">
-                          <span className="absolute -left-[6px] h-2.5 w-2.5 rounded-full border-2 border-white bg-blue-600 shadow-[0_0_0_2px_#bfdbfe]" />
-
-                          <div className="grid h-9 w-9 place-items-center rounded-full bg-orange-50 text-orange-500">
-                            <MapPin size={17} strokeWidth={2.2} />
-                          </div>
-                        </div>
-
-                        <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="truncate text-[10px] font-extrabold text-slate-900">
-                              {log.moduleName} Audit
-                            </div>
-
-                            <div className="shrink-0 text-[8px] font-medium text-slate-400">
-                              {new Date(log.createdAt).toLocaleTimeString("en-IN", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true,
-                              })}
-                            </div>
-                          </div>
-
-                          <div className="mt-1 truncate text-[8px] font-medium text-slate-500">
-                            By{" "}
-                            <strong>
-                              {log.createdByUser?.name || "Field User"}
-                            </strong>
-
-                            {" • "}
-
-                            <span className="font-extrabold text-blue-600">
-                              {log.status}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div
-                  className="
-        mx-3 mb-3 flex min-h-[58px] items-center gap-3
-        rounded-xl border border-blue-100
-        bg-gradient-to-r from-blue-50 to-white px-3
-      "
-                >
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-600">
-                    <Eye size={17} strokeWidth={2.2} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-extrabold text-blue-600">
-                      View Live Stream
-                    </div>
-
-                    <div className="mt-0.5 text-[8px] font-medium text-slate-500">
-                      Monitor all field activities
-                    </div>
-                  </div>
-
-                  <ChevronRight size={15} className="shrink-0 text-slate-400" />
-                </div>
-              </section>
             </div>
 
-            {/* ── Analytics Section ── */}
-            <div style={{ marginTop: 28 }}>
-
-              {/* Section label */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-                <TrendingUp size={15} color="#2563eb" />
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#000' }}>Activity Analytics</span>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+            {/* ── SECTION 4: TOTAL INSPECTED REPORTS ── */}
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={16} color="#d97706" />
+                <span>Total Inspected Reports</span>
               </div>
-
-              <div className="responsive-grid-3">
-
-                {/* ── Most Active Modules ── */}
-                <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Zap size={14} color="#2563eb" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                {[
+                  {
+                    moduleName: 'Litterbins Module',
+                    icon: Trash2,
+                    color: '#d97706',
+                    bg: '#fffbeb',
+                    border: '#fde68a',
+                    total: extraModuleStats.twinbin.totalInspections || extraModuleStats.twinbin.registered || 0,
+                    approved: extraModuleStats.twinbin.inspectionsDone || 0,
+                    rejected: extraModuleStats.twinbin.inspectionPending || 0,
+                    actionRequired: extraModuleStats.twinbin.actionRequired || 0
+                  },
+                  {
+                    moduleName: 'Cleanliness of Toilets Module',
+                    icon: Toilet,
+                    color: '#2563eb',
+                    bg: '#eff6ff',
+                    border: '#bfdbfe',
+                    total: extraModuleStats.toilet.totalInspections || extraModuleStats.toilet.registered || 0,
+                    approved: extraModuleStats.toilet.inspectionsDone || 0,
+                    rejected: extraModuleStats.toilet.inspectionPending || 0,
+                    actionRequired: extraModuleStats.toilet.actionRequired || 0
+                  },
+                  {
+                    moduleName: 'Sweeping Module',
+                    icon: BrushCleaning,
+                    color: '#059669',
+                    bg: '#f0fdf4',
+                    border: '#a7f3d0',
+                    total: sweepingDetailStats.totalBeats || 0,
+                    approved: sweepingDetailStats.totalApproved || 0,
+                    rejected: sweepingDetailStats.pendingDeployment || 0,
+                    actionRequired: sweepingDetailStats.actionRequired || 0
+                  }
+                ].map((mod, i) => (
+                  <div key={i} style={{ backgroundColor: 'white', borderRadius: '24px', border: `1px solid ${mod.border}`, padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid #f1f5f9' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: mod.bg, color: mod.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <mod.icon size={20} />
                       </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Most Active Modules</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>By total records submitted</div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{mod.moduleName}</h3>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Total Submitted</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', marginTop: '2px' }}>{statsLoading ? '—' : mod.total}</div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#f0fdf4', padding: '14px', borderRadius: '14px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase' }}>Approved by QC</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#15803d', marginTop: '2px' }}>{statsLoading ? '—' : mod.approved}</div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#fef2f2', padding: '14px', borderRadius: '14px', border: '1px solid #fecaca' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase' }}>Rejected by QC</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#b91c1c', marginTop: '2px' }}>{statsLoading ? '—' : mod.rejected}</div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#fff7ed', padding: '14px', borderRadius: '14px', border: '1px solid #fed7aa' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#cfbdb7ff', textTransform: 'uppercase' }}>Action Required AO</div>
+                        <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#c2410c', marginTop: '2px' }}>{statsLoading ? '—' : mod.actionRequired}</div>
                       </div>
                     </div>
-                    <Link href="/city/modules" style={{ textDecoration: 'none', fontSize: 11, color: '#2563eb', fontWeight: 700 }}>View all →</Link>
                   </div>
-                  {moduleActivity.length === 0 ? (
-                    <div style={{ padding: '28px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No module data yet</div>
-                  ) : (
-                    <div style={{ padding: '8px 0' }}>
-                      {moduleActivity.map((m, i) => {
-                        const maxM = moduleActivity[0]?.total || 1;
-                        const pct = Math.max((m.total / maxM) * 100, 2);
-                        return (
-                          <div key={i} style={{ padding: '10px 20px', borderBottom: i < moduleActivity.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ width: 22, height: 22, borderRadius: 6, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#475569' }}>{i + 1}</span>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{m.name}</span>
-                              </div>
-                              <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{m.total}</span>
-                            </div>
-                            <div style={{ height: 5, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 5 }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #2563eb, #7c3aed)', borderRadius: 99, transition: 'width 0.8s ease' }} />
-                            </div>
-                            <div style={{ display: 'flex', gap: 10 }}>
-                              <span style={{ fontSize: 10, color: '#16a34a', fontWeight: 600 }}>✓ {m.approved}</span>
-                              <span style={{ fontSize: 10, color: '#d97706', fontWeight: 600 }}>⏳ {m.pending}</span>
-                              {m.actionRequired > 0 && <span style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>⚠ {m.actionRequired}</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Most Active Zones ── */}
-                <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Map size={14} color="#7c3aed" />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Most Active Zones</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>By beats assigned</div>
-                      </div>
-                    </div>
-                    <Link href="/city/zones" style={{ textDecoration: 'none', fontSize: 11, color: '#7c3aed', fontWeight: 700 }}>Manage →</Link>
-                  </div>
-                  {zoneActivity.length === 0 ? (
-                    <div style={{ padding: '28px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No zone data yet</div>
-                  ) : (
-                    <div style={{ padding: '8px 0' }}>
-                      {zoneActivity.map((z, i) => {
-                        const maxZ = zoneActivity[0]?.beats || 1;
-                        const pct = Math.max((z.beats / maxZ) * 100, 2);
-                        const assignedPct = z.beats > 0 ? Math.round((z.assignedBeats / z.beats) * 100) : 0;
-                        return (
-                          <div key={i} style={{ padding: '10px 20px', borderBottom: i < zoneActivity.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ width: 22, height: 22, borderRadius: 6, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#7c3aed' }}>{i + 1}</span>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{z.name}</span>
-                              </div>
-                              <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{z.beats} beats</span>
-                            </div>
-                            <div style={{ height: 5, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 5 }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: '#7c3aed', borderRadius: 99, transition: 'width 0.8s ease' }} />
-                            </div>
-                            <div style={{ display: 'flex', gap: 12 }}>
-                              <span style={{ fontSize: 10, color: '#059669', fontWeight: 600 }}>✓ {z.assignedBeats} assigned ({assignedPct}%)</span>
-                              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>Segments: {z.segments}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Top Wards ── */}
-                <div className="da-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                  <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <MapPin size={14} color="#059669" />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Top Wards</div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>By beat coverage</div>
-                      </div>
-                    </div>
-                    <Link href="/city/wards" style={{ textDecoration: 'none', fontSize: 11, color: '#059669', fontWeight: 700 }}>Manage →</Link>
-                  </div>
-                  {wardActivity.length === 0 ? (
-                    <div style={{ padding: '28px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No ward data yet</div>
-                  ) : (
-                    <div style={{ padding: '8px 0' }}>
-                      {wardActivity.map((w, i) => {
-                        const maxW = wardActivity[0]?.beats || 1;
-                        const pct = Math.max((w.beats / maxW) * 100, 2);
-                        return (
-                          <div key={i} style={{ padding: '10px 20px', borderBottom: i < wardActivity.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ width: 22, height: 22, borderRadius: 6, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#059669' }}>{i + 1}</span>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{w.name}</span>
-                              </div>
-                              <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{w.beats} beats</span>
-                            </div>
-                            <div style={{ height: 5, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 5 }}>
-                              <div style={{ height: '100%', width: `${pct}%`, background: '#059669', borderRadius: 99, transition: 'width 0.8s ease' }} />
-                            </div>
-                            <span style={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>{w.segments} total segments</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
             </div>
           </div>

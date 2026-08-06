@@ -581,51 +581,9 @@ export default function CreateCityPage() {
                 </label>
               </div>
 
-              <div className="my-6 h-px bg-slate-100" />
-
-              {/* Identifier fields */}
-              <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
-                    System Code{" "}
-                    <span className="text-rose-500">*</span>
-                  </span>
-
-                  <input
-                    className={fieldClass}
-                    value={code}
-                    onChange={(event) =>
-                      setCode(event.target.value)
-                    }
-                    placeholder="e.g. indore"
-                    required
-                  />
-
-                  <span className="mt-2 block text-xs text-slate-400">
-                    Used internally for routing and system
-                    references.
-                  </span>
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
-                    ULB Identifier
-                  </span>
-
-                  <input
-                    className={fieldClass}
-                    value={ulbCode}
-                    onChange={(event) =>
-                      setUlbCode(event.target.value)
-                    }
-                    placeholder="e.g. idr01"
-                  />
-
-                  <span className="mt-2 block text-xs text-slate-400">
-                    Urban Local Body code used in reporting.
-                  </span>
-                </label>
-              </div>
+              {/* Identifier fields - Hidden from UI */}
+              <input type="hidden" value={code} />
+              <input type="hidden" value={ulbCode} />
 
               <div className="my-6 h-px bg-slate-100" />
 

@@ -524,11 +524,13 @@ export default function SuperAdminAccessManagementPage() {
     });
   };
 
-  const filteredUsers = users.filter((u) => {
-    const matchesQuery = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = selectedRoleFilter === 'ALL' || u.role === selectedRoleFilter;
-    return matchesQuery && matchesRole;
-  });
+  const filteredUsers = users
+    .filter((u) => {
+      const matchesQuery = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = selectedRoleFilter === 'ALL' || u.role === selectedRoleFilter;
+      return matchesQuery && matchesRole;
+    })
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   // Metrics Overview Calculation
   const writeAccessCount = users.filter(u => u.taskforceAccess === 'WRITE' || u.swachhAccess === 'WRITE' || u.workforceAccess === 'WRITE').length;
@@ -894,11 +896,12 @@ export default function SuperAdminAccessManagementPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0', fontSize: 12, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <th style={{ padding: '16px 20px' }}>Sr. No.</th>
                   <th style={{ padding: '16px 24px' }}>User Details</th>
                   <th style={{ padding: '16px 20px' }}>Security Role</th>
-                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Taskforce 20</th>
-                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Swachh Sync</th>
-                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Workforce</th>
+                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Inspection & Performance System</th>
+                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Ward Ranking System</th>
+                  <th style={{ padding: '16px 14px', textAlign: 'center' }}>Workforce Attendance System</th>
                   <th style={{ padding: '16px 14px', textAlign: 'center' }}>Processing & MRF</th>
                   <th style={{ padding: '16px 24px', textAlign: 'right' }}>Actions & Save</th>
                 </tr>
@@ -906,12 +909,12 @@ export default function SuperAdminAccessManagementPage() {
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14, fontWeight: 600 }}>
+                    <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 14, fontWeight: 600 }}>
                       No user accounts found matching your search.
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((u) => {
+                  filteredUsers.map((u, index) => {
                     const isDirty = dirtyUserIds.has(u.id);
                     const isSaving = savingUserIds.has(u.id);
                     const isJustSaved = savedUserId === u.id;
@@ -926,6 +929,10 @@ export default function SuperAdminAccessManagementPage() {
                           background: isJustSaved ? '#f0fdf4' : isDirty ? '#fffbeb' : 'transparent',
                         }}
                       >
+                        {/* Sr. No. */}
+                        <td style={{ padding: '16px 20px', fontSize: 13, fontWeight: 800, color: '#475569' }}>
+                          {index + 1}
+                        </td>
                         {/* User Details */}
                         <td style={{ padding: '16px 24px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>

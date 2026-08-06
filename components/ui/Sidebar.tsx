@@ -269,7 +269,7 @@ export default function Sidebar() {
         icon: <Users size={18} />,
       });
       links.push({
-        label: "Employee Registration",
+        label: "User Registration",
         href: "/portal-home/common-registration",
         icon: <UserPlus size={18} />,
       });
@@ -380,15 +380,15 @@ export default function Sidebar() {
                 icon: <Target size={16} />,
               },
               {
-                label: "Municipal Users",
+                label: "Registered Users",
                 href: "/city/users",
                 icon: <Users size={16} />,
               },
-              {
-                label: "Registration Requests",
-                href: "/registration-requests",
-                icon: <Bell size={16} />,
-              },
+              // {
+              //   label: "Registration Requests",
+              //   href: "/registration-requests",
+              //   icon: <Bell size={16} />,
+              // },
             ].map((link) => (
               <NavItem
                 key={link.href}
@@ -403,7 +403,26 @@ export default function Sidebar() {
         {/* Module links */}
         {user && moduleLinks.length > 0 && (
           <CollapsibleGroup
-            label="Active Operational Workspaces"
+            label="Active Operational System"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             icon={<Layout size={18} />}
             open={modulesOpen}
             onToggle={() =>

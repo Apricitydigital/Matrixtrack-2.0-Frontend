@@ -40,7 +40,6 @@ const Layout = ({ children, hideSidebar = true }: LayoutProps) => {
 
     return (
         <>
-        <EnvironmentalBranding />
         <AchievementEffect />
         <LiveNotification />
         <div className="app-layout">

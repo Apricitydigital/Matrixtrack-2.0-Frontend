@@ -143,14 +143,31 @@ function normalizeModules(modules: unknown): ModuleAssignment[] {
 }
 
 export function normalizeAuthUser(
-  user: (Partial<AuthUser> & { role?: string | Role }) | null | undefined
+  user: (Partial<AuthUser> & { role?: string | Role; permissions?: any[]; assignedModules?: any[] }) | null | undefined
 ): AuthUser | null {
   if (!user?.id) return null;
-  const roles = Array.isArray(user.roles)
+  const initialRoles = Array.isArray(user.roles)
     ? user.roles
     : user.role
       ? [user.role as Role]
       : [];
+
+  const rolesSet = new Set<string>(initialRoles.map((r) => String(r)));
+  if (user.role) rolesSet.add(String(user.role));
+  if (Array.isArray(user.permissions)) {
+    user.permissions.forEach((p) => { if (p) rolesSet.add(String(p)); });
+  }
+  if (Array.isArray(user.assignedModules)) {
+    user.assignedModules.forEach((m) => { if (m) rolesSet.add(String(m)); });
+  }
+  if (Array.isArray(user.modules)) {
+    user.modules.forEach((m: any) => {
+      if (m.key) rolesSet.add(String(m.key));
+      if (m.name) rolesSet.add(String(m.name));
+    });
+  }
+
+  const roles = Array.from(rolesSet) as Role[];
 
   return {
     id: user.id,

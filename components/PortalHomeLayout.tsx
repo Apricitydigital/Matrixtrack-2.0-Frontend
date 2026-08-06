@@ -96,17 +96,30 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
 
   const userRoles = user?.roles || [];
   const userRole = user?.role || '';
-  const userPermissions = user?.permissions || [];
+  const userPermissions = (user as any)?.permissions || [];
+  const userModules = (user as any)?.modules || [];
+  const userAssignedModules = (user as any)?.assignedModules || [];
 
-  const isCityAdmin = isSuperAdmin || userRoles.some(r => ['CITY_ADMIN', 'COMMISSIONER', 'ULB_OFFICER', 'HMS_SUPER_ADMIN'].includes(r));
-  const isSwachhAdmin = isSuperAdmin || userRole === 'admin' || userRoles.some(r => ['admin', 'SWACHH_ADMIN', 'SWACHH'].includes(r));
-  const isQcUser = userRole === 'qc' || userRoles.includes('qc');
-  const isAccessorUser = userRole === 'accessor' || userRoles.includes('accessor');
-  const isWorkforceAdmin = isSuperAdmin || userRole === 'admin' || userRoles.some(r => ['admin', 'WORKFORCE_ADMIN', 'WORKFORCE'].includes(r));
+  // Normalize all user roles, permissions, modules to uppercase strings
+  const normalizedAllRoles = Array.from(
+    new Set([
+      userRole,
+      ...userRoles,
+      ...userPermissions,
+      ...userAssignedModules,
+      ...userModules.map((m: any) => m.key || m.name || m.moduleId || '')
+    ].filter(Boolean).map((r: any) => String(r).trim().toUpperCase()))
+  );
 
-  const hasTaskforceAccess = isSuperAdmin || userRoles.includes('taskforce') || userRoles.includes('TASKFORCE_ADMIN') || isCityAdmin;
-  const hasSwachhAccess = isSuperAdmin || userRoles.includes('swachh') || userRoles.includes('SWACHH_ADMIN') || isSwachhAdmin || isQcUser || isAccessorUser;
-  const hasWorkforceAccess = isSuperAdmin || userRoles.includes('workforce') || userRoles.includes('WORKFORCE_ADMIN') || isWorkforceAdmin;
+  const isCityAdmin = isSuperAdmin || normalizedAllRoles.some(r => ['CITY_ADMIN', 'COMMISSIONER', 'ULB_OFFICER', 'HMS_SUPER_ADMIN', 'HMS_ADMIN'].includes(r));
+  const isSwachhAdmin = isSuperAdmin || normalizedAllRoles.some(r => ['ADMIN', 'SWACHH_ADMIN', 'SWACHH', 'SWACHH_SYNC', 'SWACHH_RANKING', 'WARD_RANKING', 'SWACHH_ACCESS'].includes(r));
+  const isQcUser = normalizedAllRoles.includes('QC');
+  const isAccessorUser = normalizedAllRoles.includes('ACCESSOR');
+  const isWorkforceAdmin = isSuperAdmin || normalizedAllRoles.some(r => ['ADMIN', 'WORKFORCE_ADMIN', 'WORKFORCE', 'MATRIX_TRACK', 'WORKFORCE_MONITORING', 'WORKFORCE_ACCESS'].includes(r));
+
+  const hasTaskforceAccess = isSuperAdmin || normalizedAllRoles.some(r => ['TASKFORCE', 'TASKFORCE_20', 'TASKFORCE_ADMIN', 'CITY_ADMIN', 'HMS_ADMIN', 'SWEEPING', 'LITTERBINS', 'TOILET'].includes(r));
+  const hasSwachhAccess = isSuperAdmin || isSwachhAdmin || isQcUser || isAccessorUser || normalizedAllRoles.some(r => ['SWACHH', 'SWACHH_ADMIN', 'SWACHH_SYNC', 'SWACHH_RANKING', 'WARD_RANKING', 'SWACHH_ACCESS'].includes(r));
+  const hasWorkforceAccess = isSuperAdmin || isWorkforceAdmin || normalizedAllRoles.some(r => ['WORKFORCE', 'WORKFORCE_ADMIN', 'MATRIX_TRACK', 'WORKFORCE_MONITORING', 'WORKFORCE_ACCESS'].includes(r));
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -167,10 +180,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
   ];
 
   const masterSubTabs = [
+    ...(isSuperAdmin ? [{ name: 'Create City', href: '/portal-home/onboard-city', icon: <PlusCircle size={15} />, isActive: pathname.includes('/onboard-city') }] : []),
     { name: 'Zones', href: '/city/zones', icon: <Map size={15} />, isActive: pathname.startsWith('/city/zones') },
     { name: 'Wards', href: '/city/wards', icon: <MapPin size={15} />, isActive: pathname.startsWith('/city/wards') },
     { name: 'Areas & Beats', href: '/city/areas', icon: <Target size={15} />, isActive: pathname.startsWith('/city/areas') },
-    { name: 'Municipal Users', href: '/city/users', icon: <Users size={15} />, isActive: pathname.startsWith('/city/users') },
   ];
 
   const swachhGroups = [
@@ -284,9 +297,6 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
               <div className="truncate text-base font-black tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
                 MatrixTrack 2.0
               </div>
-              <div className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">
-                Enterprise Portal
-              </div>
             </div>
           </Link>
 
@@ -326,70 +336,101 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                   </Link>
 
                   {canAccessRegistration && (
+                    <>
+                      <Link
+                        href="/portal-home/common-registration"
+                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                          pathname.includes('/common-registration')
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                      >
+                        <UserCheck2 size={16} className={pathname.includes('/common-registration') ? 'text-white' : 'text-slate-500'} />
+                        <span>Employee Registration</span>
+                      </Link>
+
+                      <Link
+                        href="/portal-home/registered-users"
+                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                          pathname.includes('/registered-users')
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                      >
+                        <Users size={16} className={pathname.includes('/registered-users') ? 'text-white' : 'text-slate-500'} />
+                        <span>Registered Users</span>
+                      </Link>
+                    </>
+                  )}
+
+                  {isSuperAdmin && (
                     <Link
-                      href="/portal-home/common-registration"
+                      href="/portal-home/city-directory"
                       className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                        pathname.includes('/common-registration')
+                        pathname.includes('/city-directory')
                           ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
                           : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                       }`}
                     >
-                      <UserCheck2 size={16} className={pathname.includes('/common-registration') ? 'text-white' : 'text-slate-500'} />
-                      <span>Employee Registration</span>
+                      <Globe size={16} className={pathname.includes('/city-directory') ? 'text-white' : 'text-slate-500'} />
+                      <span>City Directory</span>
                     </Link>
                   )}
 
-                  {isSuperAdmin && (
-                    <>
-                      <Link
-                        href="/portal-home/onboard-city"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                          pathname.includes('/onboard-city')
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                  {/* MASTER COLLAPSIBLE DROPDOWN IN NAVIGATION MENU */}
+                  {isCityAdmin && (
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        onClick={() => setMasterSubOpen((prev) => !prev)}
+                        className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                          masterSubOpen
+                            ? 'text-blue-600 font-extrabold bg-blue-50'
                             : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                       >
-                        <PlusCircle size={16} className={pathname.includes('/onboard-city') ? 'text-white' : 'text-slate-500'} />
-                        <span>Create City</span>
-                      </Link>
+                        <div className="flex items-center gap-3">
+                          <Map size={16} className={masterSubOpen ? 'text-blue-600' : 'text-slate-500'} />
+                          <span>Master Control</span>
+                        </div>
+                        <ChevronDown
+                          size={15}
+                          className={`transition-transform duration-200 ${masterSubOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
+                        />
+                      </button>
 
-                      <Link
-                        href="/portal-home/city-directory"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                          pathname.includes('/city-directory')
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                        }`}
-                      >
-                        <Globe size={16} className={pathname.includes('/city-directory') ? 'text-white' : 'text-slate-500'} />
-                        <span>City Directory</span>
-                      </Link>
-
-                      <Link
-                        href="/portal-home/admin-management"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                          pathname.includes('/admin-management')
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                        }`}
-                      >
-                        <ShieldCheck size={16} className={pathname.includes('/admin-management') ? 'text-white' : 'text-slate-500'} />
-                        <span>Admin Access Manager</span>
-                      </Link>
-                    </>
+                      {masterSubOpen && (
+                        <div className="ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1">
+                          {masterSubTabs.map((sub) => (
+                            <Link
+                              key={sub.name}
+                              href={sub.href}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                                sub.isActive
+                                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                              }`}
+                            >
+                              <span className={sub.isActive ? 'text-white' : 'text-slate-400'}>{sub.icon}</span>
+                              <span>{sub.name}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
             </div>
 
-            {/* WORKSPACES */}
+            {/* WORKSPACES / SYSTEMS */}
             {(hasTaskforceAccess || hasSwachhAccess || hasWorkforceAccess) && (
               <div className="px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 mb-1">
-                Active Workspaces
+                Active Systems
               </div>
             )}
             
-            {/* TASKFORCE WORKSPACE */}
+            {/* INSPECTION & PERFORMANCE SYSTEM */}
             {hasTaskforceAccess && (
               <div className="flex flex-col">
                 <button
@@ -403,7 +444,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   <div className="flex items-center gap-3">
                     <ShieldCheck size={18} className={isTaskforceActive ? 'text-blue-600' : 'text-slate-500'} />
-                    <span>Taskforce Workspace</span>
+                    <span>Inspection & Performance System</span>
                   </div>
                   <ChevronDown
                     size={16}
@@ -466,55 +507,12 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                         </div>
                       )}
                     </div>
-
-                    {/* Master Collapsible Dropdown */}
-                    {isCityAdmin && (
-                      <div className="flex flex-col">
-                        <button
-                          type="button"
-                          onClick={() => setMasterSubOpen((prev) => !prev)}
-                          className={`flex items-center justify-between w-full px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-                            masterSubOpen
-                              ? 'text-blue-600 font-bold bg-blue-50'
-                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Map size={15} className={masterSubOpen ? 'text-blue-600' : 'text-slate-400'} />
-                            <span>Master</span>
-                          </div>
-                          <ChevronDown
-                            size={14}
-                            className={`transition-transform duration-200 ${masterSubOpen ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}
-                          />
-                        </button>
-
-                        {masterSubOpen && (
-                          <div className="ml-3 mt-1 pl-2.5 border-l border-blue-200 flex flex-col gap-1">
-                            {masterSubTabs.map((sub) => (
-                              <Link
-                                key={sub.name}
-                                href={sub.href}
-                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${
-                                  sub.isActive
-                                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                }`}
-                              >
-                                <span className={sub.isActive ? 'text-white' : 'text-slate-400'}>{sub.icon}</span>
-                                <span>{sub.name}</span>
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* SWACHH SYNC WORKSPACE */}
+            {/* WARD RANKING SYSTEM */}
             {hasSwachhAccess && (
               <div className="flex flex-col">
                 <button
@@ -528,7 +526,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   <div className="flex items-center gap-3">
                     <Building2 size={18} className={isSwachhActive ? 'text-purple-600' : 'text-slate-500'} />
-                    <span>Swachh Sync Workspace</span>
+                    <span>Ward Ranking System</span>
                   </div>
                   <ChevronDown
                     size={16}
@@ -564,7 +562,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
               </div>
             )}
 
-            {/* WORKFORCE WORKSPACE */}
+            {/* WORKFORCE ATTENDANCE SYSTEM */}
             {hasWorkforceAccess && (
               <div className="flex flex-col">
                 <button
@@ -578,7 +576,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   <div className="flex items-center gap-3">
                     <Users size={18} className={isWorkforceActive ? 'text-cyan-600' : 'text-slate-500'} />
-                    <span>Workforce Workspace</span>
+                    <span>Workforce Attendance System</span>
                   </div>
                   <ChevronDown
                     size={16}

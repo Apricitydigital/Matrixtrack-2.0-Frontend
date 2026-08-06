@@ -78,7 +78,32 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
   const [editingCity, setEditingCity] = useState<CityRow | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<{ cityId: string; cityName: string; admin: CityAdminInfo } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ cityId: string; userId: string; adminName: string } | null>(null);
+  const [deleteCityTarget, setDeleteCityTarget] = useState<{ cityId: string; cityName: string } | null>(null);
   const [createCityOpen, setCreateCityOpen] = useState(false);
+
+  // Check if current logged-in user is Super Admin
+  const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
+  const isSuperAdmin = currentUser?.role === 'HMS_SUPER_ADMIN' || currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'hms_admin' || !currentUser?.role || currentUser?.isSuperAdmin === true;
+
+  const handleDeleteCity = (cityId: string, cityName: string) => {
+    setDeleteCityTarget({ cityId, cityName });
+  };
+
+  const confirmDeleteCity = async () => {
+    if (!deleteCityTarget) return;
+    try {
+      await CityApi.delete(deleteCityTarget.cityId);
+      await refresh();
+      showToast({ title: "City deleted", description: `${deleteCityTarget.cityName} was permanently removed.`, tone: "success" });
+      setDeleteCityTarget(null);
+    } catch (err) {
+      showToast({
+        title: "City deletion failed",
+        description: err instanceof ApiError ? err.message : "Failed to delete city.",
+        tone: "error"
+      });
+    }
+  };
   const [createAdminOpen, setCreateAdminOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "live" | "dormant" | "managed" | "unmanaged">("all");
@@ -215,7 +240,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
         code: cityCode, ulbCode: cityUlbCode || cityCode
       };
       await CityApi.create(payload);
-      showToast({ title: "City created", description: "New city cluster deployed successfully.", tone: "success" });
+      showToast({ title: "City created", description: "New city city deployed successfully.", tone: "success" });
       resetCityForm();
       setCreateCityOpen(false);
       await refresh();
@@ -246,7 +271,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
       await CityApi.update(cityId, data);
       await refresh();
       setEditingCity(null);
-      showToast({ title: "City updated", description: "Cluster details saved.", tone: "success" });
+      showToast({ title: "City updated", description: "City details saved.", tone: "success" });
     } catch (err) {
       showToast({
         title: "City update failed",
@@ -297,7 +322,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
     setAdminStatus("Creating...");
     try {
       await CityApi.createCityAdmin(adminCityId, { email: adminEmail, password: adminPassword, name: adminName });
-      showToast({ title: "Admin created", description: "City administrator provisioned successfully.", tone: "success" });
+      showToast({ title: "Admin created", tone: "success" });
       setAdminName(""); setAdminEmail(""); setAdminPassword(""); setAdminCityId("");
       setCreateAdminOpen(false);
       await refresh();
@@ -424,10 +449,22 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
 
 
 
+  const [filterState, setFilterState] = useState("");
+  const [filterDivision, setFilterDivision] = useState("");
+  const [filterDistrict, setFilterDistrict] = useState("");
+
+  const uniqueFilterStates = useMemo(() => Array.from(new Set(cities.map((c) => c.state?.name).filter(Boolean))), [cities]);
+  const uniqueFilterDivisions = useMemo(() => Array.from(new Set(cities.map((c) => c.division?.name).filter(Boolean))), [cities]);
+  const uniqueFilterDistricts = useMemo(() => Array.from(new Set(cities.map((c) => c.district?.name).filter(Boolean))), [cities]);
+
+  useEffect(() => {
+    setTablePage(1);
+  }, [searchQuery, statusFilter, filterState, filterDivision, filterDistrict]);
+
   const filteredCities = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
-    return cities.filter((city) => {
+    const result = cities.filter((city) => {
       const adminNames = [
         ...(city.cityAdmins ?? []).flatMap((admin) => [admin.name, admin.email]),
         city.cityAdmin?.name,
@@ -458,9 +495,16 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
         (statusFilter === "managed" && hasAdmin) ||
         (statusFilter === "unmanaged" && !hasAdmin);
 
-      return matchesQuery && matchesStatus;
+      const matchesState = !filterState || city.state?.name === filterState;
+      const matchesDivision = !filterDivision || city.division?.name === filterDivision;
+      const matchesDistrict = !filterDistrict || city.district?.name === filterDistrict;
+
+      return matchesQuery && matchesStatus && matchesState && matchesDivision && matchesDistrict;
     });
-  }, [cities, searchQuery, statusFilter]);
+
+    // Sort alphabetically by City Name (A to Z)
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }, [cities, searchQuery, statusFilter, filterState, filterDivision, filterDistrict]);
 
   const tablePageSize = 6;
   const tablePageCount = Math.max(1, Math.ceil(filteredCities.length / tablePageSize));
@@ -498,153 +542,156 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
       <h2 className="text-[21px] font-black tracking-[-0.025em] text-slate-950">
         City Directory
       </h2>
-
       <p className="mt-1 text-sm text-slate-400">
-        Overview of city clusters and their administrative ownership.
+        Overview of cities and their admins sorted alphabetically
       </p>
     </div>
 
-    {/* Search, filter and create */}
-    <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-      <div className="relative min-w-0 sm:w-[285px]">
-        <Search
-          size={17}
-          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-        />
+    {/* Add City Button */}
+    <button
+      onClick={() => {
+        if (onProvisionClick) onProvisionClick();
+        else window.location.href = '/portal-home/onboard-city';
+      }}
+      className="
+        inline-flex h-11 shrink-0 items-center justify-center gap-2
+        rounded-[11px] bg-blue-600 px-5
+        text-sm font-extrabold text-white
+        shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
+        hover:bg-blue-500 transition
+      "
+    >
+      <PlusCircle size={16} />
+      Add new city
+    </button>
+  </div>
 
-        <input
-          value={searchQuery}
-          onChange={(event) => {
-            setSearchQuery(event.target.value);
-            setTablePage(1);
-          }}
-          placeholder="Search cities..."
-          className="
-            h-11 w-full rounded-[11px] border border-slate-200
-            bg-white pl-10 pr-10 text-sm font-medium text-slate-700
-            outline-none transition
-            placeholder:text-slate-400
-            hover:border-slate-300
-            focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10
-          "
-        />
-
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQuery("");
-              setTablePage(1);
-            }}
-            aria-label="Clear search"
-            className="
-              absolute right-3 top-1/2 flex h-5 w-5
-              -translate-y-1/2 items-center justify-center
-              rounded text-xs font-bold text-slate-400
-              transition hover:bg-slate-100 hover:text-slate-700
-            "
-          >
-            ×
-          </button>
-        )}
-      </div>
-
-      <div className="relative sm:w-[190px]">
-        <Filter
-          size={16}
-          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-        />
-
-        <select
-          value={statusFilter}
-          onChange={(event) => {
-            setStatusFilter(
-              event.target.value as
-                | "all"
-                | "live"
-                | "dormant"
-                | "managed"
-                | "unmanaged"
-            );
-            setTablePage(1);
-          }}
-          className="
-            h-11 w-full appearance-none rounded-[11px]
-            border border-slate-200 bg-white
-            pl-10 pr-9 text-sm font-semibold text-slate-600
-            outline-none transition
-            hover:border-slate-300
-            focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10
-          "
-        >
-          <option value="all">All Status</option>
-          <option value="live">Live</option>
-          <option value="dormant">Dormant</option>
-          <option value="managed">Managed</option>
-          <option value="unmanaged">Needs Admin</option>
-        </select>
-
-        <ChevronRight
-          size={15}
-          className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 rotate-90 text-slate-400"
-        />
-      </div>
-
+  {/* ── FILTER TOOLBAR ROW (STATE, DIVISION, DISTRICT, STATUS, SEARCH) ── */}
+  <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3.5 lg:px-7">
+    {/* Search Box */}
+    <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
+      <Search
+        size={16}
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+      />
+      <input
+        value={searchQuery}
+        onChange={(event) => {
+          setSearchQuery(event.target.value);
+          setTablePage(1);
+        }}
+        placeholder="Search cities..."
+        className="
+          h-10 w-full rounded-[10px] border border-slate-200
+          bg-white pl-9 pr-8 text-xs font-semibold text-slate-700
+          outline-none transition placeholder:text-slate-400
+          hover:border-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10
+        "
+      />
+      {searchQuery && (
         <button
+          type="button"
           onClick={() => {
-            if (onProvisionClick) onProvisionClick();
-            else window.location.href = '/portal-home/onboard-city';
+            setSearchQuery("");
+            setTablePage(1);
           }}
-          className="
-            inline-flex h-11 shrink-0 items-center justify-center gap-2
-            rounded-[11px] bg-blue-600 px-5
-            text-sm font-extrabold text-white
-            shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
-            hover:bg-blue-500
-          "
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-700"
         >
-          <PlusCircle size={16} />
-          Provision City
+          ×
         </button>
-      </div>
+      )}
     </div>
 
-  {/* Active filter summary */}
-  {(searchQuery || statusFilter !== "all") && (
-    <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2.5 lg:px-7">
-      <span className="text-xs font-semibold text-slate-400">
-        Active filters:
-      </span>
+    {/* State Filter */}
+    <div className="relative min-w-[140px]">
+      <select
+        value={filterState}
+        onChange={(e) => { setFilterState(e.target.value); setTablePage(1); }}
+        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+      >
+        <option value="">All States</option>
+        {uniqueFilterStates.map((st) => (
+          <option key={st} value={st}>{st}</option>
+        ))}
+      </select>
+    </div>
 
+    {/* Division Filter */}
+    <div className="relative min-w-[140px]">
+      <select
+        value={filterDivision}
+        onChange={(e) => { setFilterDivision(e.target.value); setTablePage(1); }}
+        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+      >
+        <option value="">All Divisions</option>
+        {uniqueFilterDivisions.map((div) => (
+          <option key={div} value={div}>{div}</option>
+        ))}
+      </select>
+    </div>
+
+    {/* District Filter */}
+    <div className="relative min-w-[140px]">
+      <select
+        value={filterDistrict}
+        onChange={(e) => { setFilterDistrict(e.target.value); setTablePage(1); }}
+        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+      >
+        <option value="">All Districts</option>
+        {uniqueFilterDistricts.map((dis) => (
+          <option key={dis} value={dis}>{dis}</option>
+        ))}
+      </select>
+    </div>
+
+    {/* Status Filter */}
+    <div className="relative min-w-[130px]">
+      <select
+        value={statusFilter}
+        onChange={(e) => { setStatusFilter(e.target.value as any); setTablePage(1); }}
+        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+      >
+        <option value="all">All Status</option>
+        <option value="live">Live</option>
+        <option value="dormant">Dormant</option>
+        <option value="managed">Managed</option>
+        <option value="unmanaged">Needs Admin</option>
+      </select>
+    </div>
+  </div>
+
+  {/* Active Filter Summary Pills */}
+  {(searchQuery || statusFilter !== "all" || filterState || filterDivision || filterDistrict) && (
+    <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2 lg:px-7">
+      <span className="text-xs font-bold text-slate-400">Active filters:</span>
       {searchQuery && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
           Search: {searchQuery}
-          <button
-            type="button"
-            onClick={() => {
-              setSearchQuery("");
-              setTablePage(1);
-            }}
-            className="text-blue-400 hover:text-blue-700"
-          >
-            ×
-          </button>
+          <button type="button" onClick={() => setSearchQuery("")} className="text-blue-400 hover:text-blue-700">×</button>
         </span>
       )}
-
+      {filterState && (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+          State: {filterState}
+          <button type="button" onClick={() => setFilterState("")} className="text-slate-400 hover:text-slate-700">×</button>
+        </span>
+      )}
+      {filterDivision && (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+          Division: {filterDivision}
+          <button type="button" onClick={() => setFilterDivision("")} className="text-slate-400 hover:text-slate-700">×</button>
+        </span>
+      )}
+      {filterDistrict && (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+          District: {filterDistrict}
+          <button type="button" onClick={() => setFilterDistrict("")} className="text-slate-400 hover:text-slate-700">×</button>
+        </span>
+      )}
       {statusFilter !== "all" && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold capitalize text-slate-600">
-          {statusFilter === "unmanaged" ? "Needs admin" : statusFilter}
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter("all");
-              setTablePage(1);
-            }}
-            className="text-slate-400 hover:text-slate-700"
-          >
-            ×
-          </button>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold capitalize text-slate-700">
+          Status: {statusFilter}
+          <button type="button" onClick={() => setStatusFilter("all")} className="text-slate-400 hover:text-slate-700">×</button>
         </span>
       )}
     </div>
@@ -654,10 +701,11 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
   <div className="overflow-x-auto">
     <table className="w-full min-w-[1180px] table-fixed">
       <colgroup>
-        <col className="w-[17%]" />
+        <col className="w-[8%]" />
+        <col className="w-[18%]" />
         <col className="w-[26%]" />
-        <col className="w-[14%]" />
-        <col className="w-[25%]" />
+        <col className="w-[18%]" />
+        <col className="w-[12%]" />
         <col className="w-[10%]" />
         <col className="w-[8%]" />
       </colgroup>
@@ -665,10 +713,11 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
       <thead>
         <tr className="border-b border-slate-200 bg-slate-50/75">
           {[
+            "Sr. No.",
             "City",
             "Hierarchy",
-            "Identity",
-            "Administrator",
+            "Users",
+            "Date Created On",
             "Status",
             "Control",
           ].map((heading) => (
@@ -688,7 +737,8 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
 
       <tbody>
         {visibleCities.length ? (
-          visibleCities.map((city, cityIndex) => {
+          visibleCities.map((city, index) => {
+            const srNo = (safeTablePage - 1) * tablePageSize + index + 1;
             const admins =
               (city.cityAdmins?.length ?? 0) > 0
                 ? city.cityAdmins ?? []
@@ -696,32 +746,15 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                   ? [city.cityAdmin]
                   : [];
 
-            const cityIconTones = [
-              "bg-violet-50 text-violet-600",
-              "bg-emerald-50 text-emerald-600",
-              "bg-orange-50 text-orange-600",
-              "bg-rose-50 text-rose-600",
-              "bg-blue-50 text-blue-600",
-              "bg-cyan-50 text-cyan-600",
-            ];
-
-            const cityTone =
-              cityIconTones[cityIndex % cityIconTones.length];
-
             const hierarchyItems = [
-              {
-                label: city.state?.name || "No state",
-                missing: !city.state?.name,
-              },
-              {
-                label: city.division?.name || "No division",
-                missing: !city.division?.name,
-              },
-              {
-                label: city.district?.name || "No district",
-                missing: !city.district?.name,
-              },
+              { label: city.state?.name || "No state", missing: !city.state?.name },
+              { label: city.division?.name || "No division", missing: !city.division?.name },
+              { label: city.district?.name || "No district", missing: !city.district?.name },
             ];
+
+            const createdDate = city.createdAt
+              ? new Date(city.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+              : '06 Aug 2026';
 
             return (
               <tr
@@ -732,33 +765,19 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                   hover:bg-blue-50/20
                 "
               >
-                {/* City */}
-                <td className="px-5 py-4 pl-7 align-middle">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={`
-                        flex h-11 w-11 shrink-0 items-center
-                        justify-center rounded-full
-                        transition-transform duration-200
-                        group-hover:scale-105
-                        ${
-                          city.enabled
-                            ? cityTone
-                            : "bg-slate-100 text-slate-400"
-                        }
-                      `}
-                    >
-                      <Building2 size={18} strokeWidth={2} />
-                    </span>
+                {/* Sr. No. */}
+                <td className="px-5 py-4 pl-7 align-middle text-xs font-black text-slate-700">
+                  {srNo}
+                </td>
 
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-extrabold text-slate-900">
-                        {city.name}
-                      </div>
-
-                      <div className="mt-1 truncate text-xs font-medium text-slate-400">
-                        {city.code || `ID-${city.id.slice(0, 6)}`}
-                      </div>
+                {/* City (Icon Removed) */}
+                <td className="px-5 py-4 align-middle">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-black text-slate-900">
+                      {city.name}
+                    </div>
+                    <div className="mt-0.5 truncate text-xs font-semibold text-slate-400">
+                      {city.code || `ID-${city.id.slice(0, 6)}`}
                     </div>
                   </div>
                 </td>
@@ -794,8 +813,8 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                   </div>
                 </td>
 
-                {/* Identity */}
-                <td className="px-5 py-4 align-middle">
+                {/* Identity - Hidden from UI */}
+                <td className="px-5 py-4 align-middle hidden">
                   <div className="flex items-center gap-2.5">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600">
                       <Building2 size={15} />
@@ -871,30 +890,6 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                                 </div>
                               </div>
                             </div>
-
-                            <div className="flex min-w-0 items-center gap-2.5">
-                              {/* Initial avatar — no profile image */}
-                              <span
-                                className={`
-                                  flex h-9 w-9 shrink-0 items-center
-                                  justify-center rounded-full
-                                  text-[11px] font-black
-                                  ${avatarTone}
-                                `}
-                              >
-                                {initials}
-                              </span>
-
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-extrabold text-slate-800">
-                                  {admin.name}
-                                </div>
-
-                                <div className="mt-0.5 truncate text-xs text-slate-400">
-                                  {admin.email}
-                                </div>
-                              </div>
-                            </div>
                           </div>
                         );
                       })}
@@ -929,8 +924,8 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                     }
                     title={
                       city.enabled
-                        ? "Click to mark dormant"
-                        : "Click to mark live"
+                        ? "Click to mark inactive"
+                        : "Click to mark active"
                     }
                     className={`
                       inline-flex items-center gap-2 rounded-[9px]
@@ -951,7 +946,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                       }`}
                     />
 
-                    {city.enabled ? "Live" : "Dormant"}
+                    {city.enabled ? "Active" : "Inactive"}
                   </button>
                 </td>
 
@@ -1020,6 +1015,25 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
                           <Trash2 size={14} />
                         </button>
                       </>
+                    )}
+
+                    {/* Delete City Button (STRICTLY FOR SUPER ADMIN ONLY) */}
+                    {isSuperAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCity(city.id, city.name)}
+                        aria-label={`Delete city ${city.name}`}
+                        title="Delete City Permanently (Super Admin Only)"
+                        className="
+                          flex h-8 w-8 items-center justify-center
+                          rounded-[9px] border border-rose-200
+                          bg-rose-50 text-rose-600 transition
+                          hover:border-rose-300 hover:bg-rose-100
+                          hover:text-rose-700
+                        "
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     )}
                   </div>
                 </td>
@@ -1231,17 +1245,33 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
             </select>
           </FormField>
           <FormField label="City" required>
-            <select className={selectClass} value={cityMasterId} onChange={(e) => setCityMasterId(e.target.value)} disabled={!districtId} required>
+            <select
+              className={selectClass}
+              value={cityMasterId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCityMasterId(val);
+                const match = masterCities.find((c) => c.id === val);
+                if (match) {
+                  setCityCode(match.code.toLowerCase());
+                  setCityUlbCode(match.code.toLowerCase());
+                }
+              }}
+              disabled={!districtId}
+              required
+            >
               <option value="">{districtId ? (masterLoading ? "Loading cities..." : "Select city") : "Select district first"}</option>
               {masterCities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </FormField>
-          <FormField label="System Code" required>
-            <input className={inputClass} value={cityCode} onChange={(e) => setCityCode(e.target.value)} placeholder="e.g. indore" required />
-          </FormField>
-          <FormField label="ULB Identifier">
-            <input className={inputClass} value={cityUlbCode} onChange={(e) => setCityUlbCode(e.target.value)} placeholder="e.g. idr01" />
-          </FormField>
+          <div className="hidden">
+            <FormField label="System Code">
+              <input className={inputClass} value={cityCode} onChange={(e) => setCityCode(e.target.value)} placeholder="e.g. indore" />
+            </FormField>
+            <FormField label="ULB Identifier">
+              <input className={inputClass} value={cityUlbCode} onChange={(e) => setCityUlbCode(e.target.value)} placeholder="e.g. idr01" />
+            </FormField>
+          </div>
 
           {cityStatus && (
             <div className={`text-xs font-semibold ${cityStatus.toLowerCase().includes("fail") ? "text-danger" : "text-primary"}`}>
@@ -1264,24 +1294,24 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
       <Modal
         open={createAdminOpen}
         onClose={() => setCreateAdminOpen(false)}
-        title="Provision City Admin"
+        title="Register City Admin"
         subtitle="Delegate control to local authorities"
         size="sm"
       >
         <form onSubmit={handleCreateAdmin} className="flex flex-col gap-4">
-          <FormField label="Target Cluster" required>
+          <FormField label="City" required>
             <select className={selectClass} value={adminCityId} onChange={(e) => setAdminCityId(e.target.value)} required>
-              <option value="">Select city cluster...</option>
+              <option value="">Select city...</option>
               {cities.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
             </select>
           </FormField>
           <FormField label="Full Name" required>
             <input className={inputClass} value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Administrator Name" required />
           </FormField>
-          <FormField label="Provisioning Email" required>
+          <FormField label="Email Id" required>
             <input className={inputClass} type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="admin@city.local" required />
           </FormField>
-          <FormField label="Secure Password" required>
+          <FormField label="Enter Password" required>
             <input className={inputClass} type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="••••••••" required />
           </FormField>
 
@@ -1296,7 +1326,7 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
               Cancel
             </Button>
             <Button type="submit" className="flex-1" loading={adminCreating} icon={<Shield size={15} />}>
-              Provision Admin
+             Create
             </Button>
           </div>
         </form>
@@ -1310,11 +1340,23 @@ export default function HmsDashboardPage({ onProvisionClick }: { onProvisionClic
         <ConfirmDialog
           open={!!deleteTarget}
           title="Delete City Admin"
-          message={`Remove ${deleteTarget.adminName} from this city cluster? This action removes the administrator mapping immediately. If the user has no other assignments, the account will also be deleted.`}
+          message={`Remove ${deleteTarget.adminName} from this city ? This action removes the administrator mapping immediately. If the user has no other assignments, the account will also be deleted.`}
           confirmLabel="Delete Admin"
           tone="danger"
           onCancel={() => setDeleteTarget(null)}
           onConfirm={confirmDeleteAdmin}
+        />
+      )}
+
+      {deleteCityTarget && (
+        <ConfirmDialog
+          open={!!deleteCityTarget}
+          title="Delete City"
+          message={`Are you sure you want to permanently delete city "${deleteCityTarget.cityName}"? This action cannot be undone and will unmap all city configurations.`}
+          confirmLabel="Delete City"
+          tone="danger"
+          onCancel={() => setDeleteCityTarget(null)}
+          onConfirm={confirmDeleteCity}
         />
       )}
 
@@ -1393,6 +1435,18 @@ function EditCityModal({
   const [adminEmail, setAdminEmail] = useState(city.cityAdmin?.email || "");
   const [loading, setLoading] = useState(false);
   const [loadingMasters, setLoadingMasters] = useState(false);
+
+  // Module & Sub-Module Authorization Checkboxes State
+  const [modules, setModules] = useState({
+    taskforceMain: true,
+    litter: true,
+    sweeping: true,
+    ctu: true,
+    toilets: true,
+    mrf: true,
+    swachh: true,
+    workforce: true,
+  });
 
   const selectClass = "h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm focus:border-primary/40 focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10 disabled:opacity-60";
   const inputClass = selectClass;
@@ -1475,11 +1529,14 @@ function EditCityModal({
     }
   };
 
+  const activeSubModulesCount = [modules.litter, modules.sweeping, modules.ctu, modules.toilets].filter(Boolean).length;
+  const totalEnabledModulesCount = [modules.taskforceMain, modules.litter, modules.sweeping, modules.ctu, modules.toilets, modules.mrf, modules.swachh, modules.workforce].filter(Boolean).length;
+
   return (
     <Modal
       open
       onClose={onClose}
-      title="Modify Cluster"
+      title="Edit city"
       subtitle={`${city.state?.name || "No state"} / ${city.division?.name || "No division"} / ${city.district?.name || "No district"}`}
       size="lg"
     >
@@ -1510,17 +1567,20 @@ function EditCityModal({
             </select>
           </FormField>
         </div>
+
         <FormField label="City Name">
           <input className={readOnlyClass} value={selectedMasterCity?.name || city.name} readOnly />
         </FormField>
-        <div className="grid grid-cols-2 gap-4">
+
+        {/* <div className="grid grid-cols-2 gap-4">
           <FormField label="City Code" required>
             <input className={inputClass} value={code} onChange={(e) => setCode(e.target.value)} required />
           </FormField>
           <FormField label="ULB Code" required>
             <input className={inputClass} value={ulbCode} onChange={(e) => setUlbCode(e.target.value)} required />
           </FormField>
-        </div>
+        </div> */}
+
         <div className="grid grid-cols-2 gap-4">
           <FormField label="Admin Name">
             <input className={inputClass} value={adminName} onChange={(e) => setAdminName(e.target.value)} />
@@ -1529,9 +1589,125 @@ function EditCityModal({
             <input className={inputClass} type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
           </FormField>
         </div>
+
+        {/* ── AUTHORIZED PLATFORM MODULES & SUB-MODULES CONTAINER ── */}
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+              Authorized Platform Modules & Sub-Modules <span className="text-rose-500">*</span>
+            </span>
+            <span className="rounded-full bg-blue-100 px-3 py-0.5 text-[11px] font-black text-blue-700">
+              {totalEnabledModulesCount} Enabled
+            </span>
+          </div>
+
+          {/* 1. Taskforce 20 Suite Container */}
+          <div className="rounded-xl border border-blue-100 bg-white p-3.5 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <label className="flex items-center gap-2.5 font-extrabold text-slate-900 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={modules.taskforceMain}
+                  onChange={(e) => setModules(prev => ({ ...prev, taskforceMain: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-blue-900 font-black">Taskforce 20 Combined Monitoring Suite</span>
+              </label>
+              <span className="text-[10px] font-bold text-blue-600">
+                {activeSubModulesCount} / 4 Sub-Modules
+              </span>
+            </div>
+
+            {/* 4 Sub-Modules Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-blue-50/50 transition">
+                <input
+                  type="checkbox"
+                  checked={modules.litter}
+                  onChange={(e) => setModules(prev => ({ ...prev, litter: e.target.checked }))}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Litter Bins Collection
+              </label>
+
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-blue-50/50 transition">
+                <input
+                  type="checkbox"
+                  checked={modules.sweeping}
+                  onChange={(e) => setModules(prev => ({ ...prev, sweeping: e.target.checked }))}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Beat Sweeping & Sanitation
+              </label>
+
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-blue-50/50 transition">
+                <input
+                  type="checkbox"
+                  checked={modules.ctu}
+                  onChange={(e) => setModules(prev => ({ ...prev, ctu: e.target.checked }))}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                CTU / GVP Spot Transformation
+              </label>
+
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/80 px-3 py-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-blue-50/50 transition">
+                <input
+                  type="checkbox"
+                  checked={modules.toilets}
+                  onChange={(e) => setModules(prev => ({ ...prev, toilets: e.target.checked }))}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Cleanliness of Toilets (CT/PT)
+              </label>
+            </div>
+          </div>
+
+          {/* 2. Governance Platforms */}
+          <div className="space-y-2.5 pt-1">
+            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
+              Governance Platforms
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <label className="flex items-center gap-2.5 rounded-xl border border-amber-200/80 bg-amber-50/60 px-3.5 py-2.5 text-xs font-black text-amber-900 cursor-pointer hover:bg-amber-100/60 transition">
+                <input
+                  type="checkbox"
+                  checked={modules.mrf}
+                  onChange={(e) => setModules(prev => ({ ...prev, mrf: e.target.checked }))}
+                  className="h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                />
+                Processing & MRF Telemetry
+              </label>
+
+              <label className="flex items-center gap-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-3.5 py-2.5 text-xs font-black text-emerald-900 cursor-pointer hover:bg-emerald-100/60 transition">
+                <input
+                  type="checkbox"
+                  checked={modules.swachh}
+                  onChange={(e) => setModules(prev => ({ ...prev, swachh: e.target.checked }))}
+                  className="h-4 w-4 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500"
+                />
+                Swachh Ward Ranking System
+              </label>
+
+              <label className="flex items-center gap-2.5 rounded-xl border border-purple-200/80 bg-purple-50/60 px-3.5 py-2.5 text-xs font-black text-purple-900 cursor-pointer hover:bg-purple-100/60 transition sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={modules.workforce}
+                  onChange={(e) => setModules(prev => ({ ...prev, workforce: e.target.checked }))}
+                  className="h-4 w-4 rounded border-purple-400 text-purple-600 focus:ring-purple-500"
+                />
+                Workforce Monitoring (Matrix Track)
+              </label>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-2 flex gap-3">
-          <Button type="button" variant="secondary" className="flex-1" onClick={onClose} disabled={loading}>Discard</Button>
-          <Button type="submit" className="flex-1" loading={loading}>Commit Changes</Button>
+          <Button type="button" variant="secondary" className="flex-1" onClick={onClose} disabled={loading}>
+            Discard
+          </Button>
+          <Button type="submit" className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-extrabold" loading={loading}>
+            Commit Changes
+          </Button>
         </div>
       </form>
     </Modal>
