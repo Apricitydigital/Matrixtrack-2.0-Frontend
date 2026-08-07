@@ -188,14 +188,6 @@ export default function HmsKpiCards({
           iconBg: 'bg-indigo-100 text-indigo-700',
           icon: <UserCheck size={16} />,
         },
-        {
-          label: 'Assigned System',
-          value: '3 system',
-          cardBg: 'bg-amber-50/80 border-amber-200',
-          badgeBg: 'bg-amber-100 text-amber-800',
-          iconBg: 'bg-amber-100 text-amber-700',
-          icon: <Layers size={16} />,
-        },
         // {
         //   label: 'Pending Registrations',
         //   value: pendingRequestsCount,
@@ -238,9 +230,7 @@ export default function HmsKpiCards({
                   {kpi.icon}
                 </span>
 
-                <span className={`truncate text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${kpi.badgeBg}`}>
-                  Live Stat
-                </span>
+              
               </div>
 
               <div className="mt-2.5">

@@ -137,7 +137,7 @@ export default function CommonRegistrationModal({
         fetchedCities = res.cities || [];
         setConfig((prev) => ({
           ...prev,
-          cities: fetchedCities,
+          cities: res.cities || [],
           modules: res.modules?.length ? res.modules : prev.modules,
           taskforceRoles: res.taskforceRoles?.length ? res.taskforceRoles : prev.taskforceRoles,
           swachhRoles: res.swachhRoles?.length ? res.swachhRoles : prev.swachhRoles,
@@ -145,14 +145,18 @@ export default function CommonRegistrationModal({
         }));
       }
     } catch {
-      // Fallback to public geo cities
-      try {
-        const res = await PublicGeoApi.cities();
-        if (res?.cities) {
-          fetchedCities = res.cities.map((c) => ({ id: c.id, name: c.name, code: "" }));
-          setConfig((prev) => ({ ...prev, cities: fetchedCities }));
-        }
-      } catch {}
+      const fetchGeoConfig = async () => {
+        setLoadingGeo(true);
+        try {
+          let fetchedCities: any[] = [];
+          const res = await CommonRegistrationApi.getConfig();
+          if (res?.cities) {
+            fetchedCities = res.cities.map((c) => ({ id: c.id, name: c.name, code: c.code || "" }));
+            setConfig((prev) => ({ ...prev, cities: fetchedCities }));
+          }
+        } catch {}
+      };
+      fetchGeoConfig();
     }
 
     // Auto-select city if user is a CITY_ADMIN and is assigned a city

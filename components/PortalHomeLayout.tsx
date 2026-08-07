@@ -134,7 +134,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
     else if (pathname.includes('/wards')) pageTitle = 'Taskforce - Wards';
     else if (pathname.includes('/areas')) pageTitle = 'Taskforce - Areas & Beats';
     else if (pathname.includes('/users')) pageTitle = 'Taskforce - Municipal Users';
-    else pageTitle = 'Taskforce Workspace Dashboard';
+    else pageTitle = 'Inspection & Performance System Dashboard';
   } else if (isSwachhActive) {
     if (currentView === 'approvals') pageTitle = 'Swachh Sync - Access Requests';
     else if (currentView === 'users') pageTitle = 'Swachh Sync - User Management';
@@ -606,12 +606,12 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="portal-main-content flex-1 ml-72 p-5 sm:p-6 min-w-0 min-h-screen text-slate-800">
-        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/80 backdrop-blur-xl p-5 sm:px-8 sm:py-5 rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] sticky top-4 z-40 transition-all">
+        <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white/90 backdrop-blur-xl px-6 py-3.5 rounded-2xl border border-slate-200/80 shadow-[0_4px_20px_rgb(0,0,0,0.03)] sticky top-3 z-40 transition-all">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center gap-2 mb-1">
-              <ShieldCheck size={14} className="text-blue-600" /> MATRIXTRACK 2.0 
+            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center gap-1.5 mb-0.5">
+              <ShieldCheck size={13} className="text-blue-600" /> MATRIXTRACK 2.0 
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
               {pageTitle}
             </h1>
           </div>

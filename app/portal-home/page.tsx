@@ -22,6 +22,7 @@ import {
   Zap,
 } from 'lucide-react';
 import UnifiedExecutiveDashboard from '@modules/taskforce/components/dashboard/UnifiedExecutiveDashboard';
+import CityAdminDashboard from './CityAdminDashboard';
 import { CityApi, CityUserApi, RegistrationApi } from '@lib/apiClient';
 import type { CityRow } from '../../types/api';
 
@@ -42,6 +43,12 @@ export default function PortalHomePage() {
     (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
     (user?.roles || []).includes('SUPER_ADMIN') ||
     (user?.roles || []).includes('super_admin');
+
+  const isCityAdmin =
+    user?.role === 'CITY_ADMIN' ||
+    user?.role === 'city_admin' ||
+    (user?.roles || []).includes('CITY_ADMIN') ||
+    (user?.roles || []).includes('city_admin');
 
   const userCityName = user?.city ? user.city.name : 'Indore';
   const userRoles = user?.roles || [];
@@ -224,14 +231,18 @@ export default function PortalHomePage() {
 
       {/* 4. EXECUTIVE ANALYTICS DASHBOARD (CHARTS & WORKSPACE PERFORMANCE) */}
       <div className="px-4 sm:px-5 lg:px-6">
-        <UnifiedExecutiveDashboard
-          isSuperAdmin={isSuperAdmin}
-          userRoles={userRoles}
-          userCityName={userCityName}
-          workspaceUrl="/city"
-          enableTaskforceData={true}
-          enableWardRankingData={true}
-        />
+        {isCityAdmin && !isSuperAdmin ? (
+          <CityAdminDashboard />
+        ) : (
+          <UnifiedExecutiveDashboard
+            isSuperAdmin={isSuperAdmin}
+            userRoles={userRoles}
+            userCityName={userCityName}
+            workspaceUrl="/city"
+            enableTaskforceData={true}
+            enableWardRankingData={true}
+          />
+        )}
       </div>
     </div>
   );

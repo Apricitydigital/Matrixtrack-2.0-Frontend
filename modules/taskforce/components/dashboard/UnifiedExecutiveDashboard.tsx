@@ -356,7 +356,20 @@ export default function UnifiedExecutiveDashboard({
                   cities.slice(0, 5).map((c) => (
                     <tr key={c.id} className="hover:bg-slate-50 transition">
                       <td className="py-2.5 px-3 font-bold text-slate-900">{c.name}</td>
-                      <td className="py-2.5 px-3 text-slate-500">Taskforce, Swachh, Workforce</td>
+                      <td className="py-2.5 px-3 text-slate-500 font-medium">
+                        {c.modules && c.modules.length > 0 
+                          ? c.modules
+                              .filter((m: any) => m.enabled !== false)
+                              .map((m: any) => {
+                                const name = (m.name || m.id || '').toLowerCase();
+                                if (name.includes('taskforce') || name.includes('inspection')) return 'Inspection & Performance System';
+                                if (name.includes('swachh') || name.includes('ward')) return 'Ward Ranking System';
+                                if (name.includes('workforce') || name.includes('attendance')) return 'Workforce Attendance System';
+                                return m.name;
+                              })
+                              .join(', ')
+                          : 'No modules assigned'}
+                      </td>
                       <td className="py-2.5 px-3">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${c.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                           {c.enabled ? 'Active' : 'Inactive'}

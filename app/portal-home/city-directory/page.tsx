@@ -741,12 +741,7 @@ export default function HmsDashboardPage() {
         {visibleCities.length ? (
           visibleCities.map((city, index) => {
             const srNo = (safeTablePage - 1) * tablePageSize + index + 1;
-            const admins =
-              (city.cityAdmins?.length ?? 0) > 0
-                ? city.cityAdmins ?? []
-                : city.cityAdmin
-                  ? [city.cityAdmin]
-                  : [];
+            const admins = city.cityAdmin ? [city.cityAdmin] : [];
 
             const hierarchyItems = [
               { label: city.state?.name || "No state", missing: !city.state?.name },
@@ -936,9 +931,30 @@ export default function HmsDashboardPage() {
                 {/* Assigned Modules */}
                 <td className="px-5 py-4 align-middle">
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10">Inspection & Performance</span>
-                    <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-[10px] font-bold text-purple-700 ring-1 ring-inset ring-purple-700/10">Workforce</span>
-                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-700/10">Ward Ranking</span>
+                    {city.modules && city.modules.length > 0 ? (
+                      city.modules.filter((m: any) => m.enabled !== false).map((m: any, idx: number) => {
+                        const name = (m.name || m.id || '').toLowerCase();
+                        let display = m.name;
+                        let colorClass = 'bg-slate-50 text-slate-700 ring-slate-700/10';
+                        if (name.includes('taskforce') || name.includes('inspection')) {
+                          display = 'Inspection & Performance';
+                          colorClass = 'bg-blue-50 text-blue-700 ring-blue-700/10';
+                        } else if (name.includes('workforce') || name.includes('attendance')) {
+                          display = 'Workforce Attendance System';
+                          colorClass = 'bg-purple-50 text-purple-700 ring-purple-700/10';
+                        } else if (name.includes('swachh') || name.includes('ward')) {
+                          display = 'Ward Ranking';
+                          colorClass = 'bg-emerald-50 text-emerald-700 ring-emerald-700/10';
+                        }
+                        return (
+                          <span key={idx} className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${colorClass}`}>
+                            {display}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="text-xs text-slate-400 font-semibold italic">No modules assigned</span>
+                    )}
                   </div>
                 </td>
 
