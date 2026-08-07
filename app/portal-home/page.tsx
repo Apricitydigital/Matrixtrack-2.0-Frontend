@@ -102,7 +102,6 @@ export default function PortalHomePage() {
                 <PlusCircle size={15} /> Create New City
               </button>
             </div>
-
             {/* Scrollable horizontal cards container */}
             <div className="flex gap-4 overflow-x-auto pb-3 pt-1 scrollbar-hide">
               {cities.length === 0 && !loadingCities ? (

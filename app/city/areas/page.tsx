@@ -111,36 +111,65 @@ export default function AreasPage() {
       <div className="page" style={{ padding: "28px 36px", backgroundColor: "#f8fafc", minHeight: "100vh" }}>
         <div style={{ width: "100%" }}>
           {/* Header */}
-          <div style={{ marginBottom: "24px", display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "space-between", alignItems: "center" }}>
+          {/* Header */}
+          <div style={{ marginBottom: "28px", display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "16px" }}>
             <div>
-              <div className="breadcrumb" style={{ fontSize: "0.8125rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "6px", fontWeight: 600 }}>
+              <div className="breadcrumb" style={{ fontSize: "0.75rem", color: "#64748b", display: "flex", gap: "6px", marginBottom: "4px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 <span>City Admin</span>
                 <span>/</span>
-                <span style={{ color: "#2563eb", fontWeight: 700 }}>Area & Beat Management</span>
+                <span style={{ color: "#3b82f6" }}>Areas & Beats</span>
               </div>
-              <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>
-                Area & Beat Management
+              <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.01em" }}>
+                Areas & Beats
               </h1>
-              <p style={{ marginTop: "4px", color: "#64748b", fontSize: "0.875rem", fontWeight: 600 }}>
+              <p style={{ marginTop: "2px", color: "#64748b", fontSize: "0.8125rem", fontWeight: 500 }}>
                 Manage street-level beats and registered city areas.
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {/* Action Buttons to Create */}
+              {!isReadOnly && (
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={() => setActiveFormTab("area")}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "6px", height: "40px", padding: "0 16px", borderRadius: "10px",
+                      backgroundColor: "#3b82f6", border: "none", color: "white",
+                      fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s",
+                      boxShadow: "0 4px 12px rgba(59,130,246,0.2)"
+                    }}
+                  >
+                    <Plus size={15} /> Create Area
+                  </button>
+                  <button
+                    onClick={() => setActiveFormTab("beat")}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "6px", height: "40px", padding: "0 16px", borderRadius: "10px",
+                      backgroundColor: "#2563eb", border: "none", color: "white",
+                      fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s",
+                      boxShadow: "0 4px 12px rgba(37,99,235,0.2)"
+                    }}
+                  >
+                    <Plus size={15} /> Create Beat
+                  </button>
+                </div>
+              )}
+
               <div style={{ position: "relative" }}>
                 <button
                   onClick={() => setDownloadOpen(!downloadOpen)}
                   style={{
-                    height: "44px", width: "44px", borderRadius: "12px", border: "1px solid #cbd5e1", backgroundColor: "white",
-                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
+                    height: "40px", width: "40px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white",
+                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"
                   }}
                   title="Download List"
                 >
-                  <Download size={18} color="#475569" />
+                  <Download size={16} color="#475569" />
                 </button>
                 {downloadOpen && (
                   <div style={{
-                    position: "absolute", top: "52px", right: 0, backgroundColor: "white", border: "1px solid #e2e8f0",
+                    position: "absolute", top: "46px", right: 0, backgroundColor: "white", border: "1px solid #e2e8f0",
                     borderRadius: "12px", padding: "8px", width: "180px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
                     zIndex: 50, display: "flex", flexDirection: "column", gap: "4px"
                   }}>
@@ -165,25 +194,25 @@ export default function AreasPage() {
                   <Link
                     href="/city/beat-requests"
                     style={{
-                      height: "44px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px",
-                      fontWeight: 700, padding: "0 16px", backgroundColor: pendingCount > 0 ? "#fef3c7" : "white",
+                      height: "40px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "6px",
+                      fontWeight: 700, padding: "0 14px", backgroundColor: pendingCount > 0 ? "#fef3c7" : "white",
                       border: pendingCount > 0 ? "1px solid #fde68a" : "1px solid #cbd5e1", color: pendingCount > 0 ? "#b45309" : "#0f172a",
-                      textDecoration: "none", fontSize: "0.8125rem"
+                      textDecoration: "none", fontSize: "0.8rem"
                     }}
                   >
-                    <FileText size={16} />
+                    <FileText size={15} />
                     <span>Beat Requests</span>
                     {pendingCount > 0 && (
-                      <span style={{ backgroundColor: "#d97706", color: "white", borderRadius: "9999px", padding: "2px 8px", fontSize: "0.7rem", fontWeight: 800 }}>
+                      <span style={{ backgroundColor: "#d97706", color: "white", borderRadius: "9999px", padding: "1px 6px", fontSize: "0.65rem", fontWeight: 800 }}>
                         {pendingCount}
                       </span>
                     )}
                   </Link>
                   <Link
                     href="/city/areas/employee-assignments"
-                    style={{ height: "44px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, padding: "0 16px", backgroundColor: "white", border: "1px solid #cbd5e1", color: "#0f172a", textDecoration: "none", fontSize: "0.8125rem" }}
+                    style={{ height: "40px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "6px", fontWeight: 700, padding: "0 14px", backgroundColor: "white", border: "1px solid #cbd5e1", color: "#0f172a", textDecoration: "none", fontSize: "0.8rem" }}
                   >
-                    <ShieldCheck size={16} />
+                    <ShieldCheck size={15} />
                     <span>Employee Deployment</span>
                   </Link>
                 </>
@@ -253,7 +282,6 @@ export default function AreasPage() {
 
           {/* Search Box only */}
           <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "16px", flexWrap: "wrap", marginBottom: "20px" }}>
-
             <div style={{ position: "relative", minWidth: "280px" }}>
               <Search size={16} color="#94a3b8" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)" }} />
               <input
@@ -271,54 +299,35 @@ export default function AreasPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px", width: "100%" }}>
             
-            {/* Form Toggle Buttons */}
-            {!isReadOnly && (
-              <div style={{ display: "flex", gap: "12px", marginBottom: "4px" }}>
-                <button
-                  onClick={() => setActiveFormTab(activeFormTab === "area" ? null : "area")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", borderRadius: "14px",
-                    backgroundColor: activeFormTab === "area" ? "#eff6ff" : "white",
-                    border: activeFormTab === "area" ? "2px solid #3b82f6" : "1px solid #e2e8f0",
-                    color: activeFormTab === "area" ? "#1d4ed8" : "#475569",
-                    fontWeight: 800, fontSize: "0.85rem", cursor: "pointer", transition: "all 0.2s",
-                    boxShadow: activeFormTab === "area" ? "0 4px 12px rgba(59,130,246,0.15)" : "0 2px 4px rgba(0,0,0,0.02)"
-                  }}
-                >
-                  <MapPin size={18} /> {activeFormTab === "area" ? "Close Area Form" : "Create New Area"}
-                </button>
-                <button
-                  onClick={() => setActiveFormTab(activeFormTab === "beat" ? null : "beat")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "8px", padding: "12px 24px", borderRadius: "14px",
-                    backgroundColor: activeFormTab === "beat" ? "#eff6ff" : "white",
-                    border: activeFormTab === "beat" ? "2px solid #3b82f6" : "1px solid #e2e8f0",
-                    color: activeFormTab === "beat" ? "#1d4ed8" : "#475569",
-                    fontWeight: 800, fontSize: "0.85rem", cursor: "pointer", transition: "all 0.2s",
-                    boxShadow: activeFormTab === "beat" ? "0 4px 12px rgba(59,130,246,0.15)" : "0 2px 4px rgba(0,0,0,0.02)"
-                  }}
-                >
-                  <Target size={18} /> {activeFormTab === "beat" ? "Close Beat Form" : "Create New Beat"}
-                </button>
-              </div>
-            )}
-
-            {/* Active Form Container */}
+            {/* Overlay Window Modal Form container */}
             {!isReadOnly && activeFormTab && (
-              <div style={{ backgroundColor: "white", padding: "32px", borderRadius: "24px", border: "1px solid #e2e8f0", boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05)", position: "relative", overflow: "hidden" }}>
-                 <div style={{ position: "absolute", top: 0, right: 0, width: "300px", height: "300px", background: "radial-gradient(circle, rgba(59,130,246,0.04) 0%, rgba(255,255,255,0) 70%)", pointerEvents: "none" }} />
-                 <div style={{ position: "relative", zIndex: 1 }}>
-                   <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px", paddingBottom: "16px", borderBottom: "1px solid #f1f5f9" }}>
-                     {activeFormTab === "area" ? <MapPin size={24} color="#2563eb" /> : <Target size={24} color="#2563eb" />}
-                     <h2 style={{ fontSize: "1.2rem", fontWeight: 900, margin: 0, color: "#0f172a" }}>
-                       {activeFormTab === "area" ? "Create New Area" : "Create New Beat"}
-                     </h2>
-                   </div>
-                   <div style={{ maxWidth: "600px" }}>
-                     {activeFormTab === "area" && <AreaForm onSuccess={() => { setGeoVersion(v => v + 1); setActiveFormTab(null); }} />}
-                     {activeFormTab === "beat" && <BeatForm onSuccess={() => { loadBeats(); setActiveFormTab(null); }} geoVersion={geoVersion} />}
-                   </div>
-                 </div>
+              <div style={{
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
+              }}>
+                <div style={{
+                  backgroundColor: "white", padding: "32px", borderRadius: "24px", border: "1px solid #e2e8f0",
+                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.15)", position: "relative", width: "100%", maxWidth: "560px",
+                  overflowY: "auto", maxHeight: "90vh"
+                }}>
+                  <button
+                    onClick={() => setActiveFormTab(null)}
+                    style={{ position: "absolute", top: "20px", right: "20px", background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
+                  >
+                    <X size={20} />
+                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
+                    {activeFormTab === "area" ? <MapPin size={22} color="#2563eb" /> : <Target size={22} color="#2563eb" />}
+                    <h2 style={{ fontSize: "1.15rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                      {activeFormTab === "area" ? "Create New Area" : "Create New Beat"}
+                    </h2>
+                  </div>
+                  <div>
+                    {activeFormTab === "area" && <AreaForm onSuccess={() => { setGeoVersion(v => v + 1); setActiveFormTab(null); }} />}
+                    {activeFormTab === "beat" && <BeatForm onSuccess={() => { loadBeats(); setActiveFormTab(null); }} geoVersion={geoVersion} />}
+                  </div>
+                </div>
               </div>
             )}
 

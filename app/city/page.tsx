@@ -1202,7 +1202,7 @@ export default function CityDashboardPage() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 7, padding: '4px 12px', fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Landmark size={12} /> ULB: {ulbCode || '—'}
+                    <Landmark size={12} />
                   </span>
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
                     Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
@@ -1744,14 +1744,12 @@ export default function CityDashboardPage() {
               <div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span>
-                    {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'City Admin'} 👋
+                    {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'City Admin'}
                   </span>
                 </div>
                 <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1d4ed8', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Building2 size={18} color="#1d4ed8" />
                   <span>{cityName || 'Indore Municipal Corporation'}</span>
-                  <span style={{ color: '#94a3b8' }}>•</span>
-                  <span style={{ color: '#475569', fontSize: '0.85rem', fontWeight: 700 }}>ULB: {ulbCode || '—'}</span>
                 </div>
               </div>
 
@@ -1768,7 +1766,7 @@ export default function CityDashboardPage() {
                   />
                 </div>
 
-                {/* Zone Filter */}
+                {/* Zone Filter
                 <select
                   value={filterZone}
                   onChange={(e) => setFilterZone(e.target.value)}
@@ -1778,9 +1776,9 @@ export default function CityDashboardPage() {
                   <option value="Zone 1">Zone 1</option>
                   <option value="Zone 2">Zone 2</option>
                   <option value="Zone 3">Zone 3</option>
-                </select>
+                </select> */}
 
-                {/* Ward Filter */}
+                {/* Ward Filter
                 <select
                   value={filterWard}
                   onChange={(e) => setFilterWard(e.target.value)}
@@ -1790,7 +1788,7 @@ export default function CityDashboardPage() {
                   <option value="Ward 1">Ward 1</option>
                   <option value="Ward 2">Ward 2</option>
                   <option value="Ward 3">Ward 3</option>
-                </select>
+                </select> */}
 
                 {/* Refresh Button */}
                 <button
@@ -1870,14 +1868,7 @@ export default function CityDashboardPage() {
               {/* 5 Cards Row (Clean without 100% circle gauge) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
                 {[
-                  {
-                    title: 'TOTAL ULB OFFICIALS',
-                    count: stats?.ulbOfficials || stats?.COMMISSIONER || 1,
-                    icon: Landmark,
-                    iconColor: '#dc2626',
-                    iconBg: '#fef2f2',
-                    borderColor: '#fecaca'
-                  },
+                
                   {
                     title: 'TOTAL ACTION OFFICERS',
                     count: stats?.actionOfficers || stats?.ACTION_OFFICER || 2,
@@ -1887,7 +1878,7 @@ export default function CityDashboardPage() {
                     borderColor: '#bbf7d0'
                   },
                   {
-                    title: 'TOTAL QUALITY CONTROLLERS',
+                    title: 'TOTAL Quality Controller',
                     count: stats?.qualityControllers || stats?.QC || 1,
                     icon: Search,
                     iconColor: '#7c3aed',
@@ -1961,69 +1952,7 @@ export default function CityDashboardPage() {
               </div>
             </div>
 
-            {/* ── SECTION 1.5: HIERARCHY HEALTH (Compact Normal Sizing) ── */}
-            <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '20px 24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ShieldCheck size={18} color="#4338ca" />
-                  <span>HIERARCHY HEALTH</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={loadAll}
-                  title="Refresh Hierarchy Health"
-                  style={{ border: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '10px', color: '#475569', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                >
-                  <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
-                  <span>Refresh</span>
-                </button>
-              </div>
-
-              {/* 3 Compact Ratio Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-                {/* Card 1: Supervisor : QC Ratio */}
-                <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #e0e7ff', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', backgroundColor: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <ShieldCheck size={16} />
-                    </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e1b4b' }}>Supervisor : QC Ratio</span>
-                  </div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', textAlign: 'center', margin: '2px 0' }}>
-                    {statsLoading ? '—' : `${stats?.taskforceMembers || stats?.SUPERVISOR || 7} : ${stats?.qualityControllers || stats?.QC || 1}`}
-                  </div>
-                  <Sparkline color="#6366f1" points={[4, 8, 6, 12, 9, 16, 11, 14]} />
-                </div>
-
-                {/* Card 2: QC : AO Ratio */}
-                <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #fce7f3', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', backgroundColor: '#fce7f3', color: '#db2777', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <UserCog size={16} />
-                    </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#831843' }}>QC : AO Ratio</span>
-                  </div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', textAlign: 'center', margin: '2px 0' }}>
-                    {statsLoading ? '—' : `${stats?.qualityControllers || stats?.QC || 1} : ${stats?.actionOfficers || stats?.ACTION_OFFICER || 2}`}
-                  </div>
-                  <Sparkline color="#ec4899" points={[3, 7, 5, 8, 6, 14, 9, 11]} />
-                </div>
-
-                {/* Card 3: Employees per Supervisor */}
-                <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #dbeafe', borderRadius: '16px', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '10px', backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Users size={16} />
-                    </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e3a8a' }}>Employees per Supervisor</span>
-                  </div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', textAlign: 'center', margin: '2px 0' }}>
-                    {statsLoading ? '—' : (stats?.employees || stats?.EMPLOYEE || 0)}
-                  </div>
-                  <Sparkline color="#3b82f6" points={[2, 6, 4, 5, 4, 10, 6, 9]} />
-                </div>
-              </div>
-            </div>
+            
 
             {/* ── SECTION 2: WORKFORCE DISTRIBUTION BY MODULE ── */}
             <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
@@ -2046,9 +1975,9 @@ export default function CityDashboardPage() {
               {(() => {
                 // Build workforce distribution cards dynamically from moduleActivity
                 const moduleCards = [
-                  { keyMatch: ['sweeping'], name: 'Sweeping Module', color: '#059669', bg: '#f0fdf4', icon: BrushCleaning },
+                  { keyMatch: ['sweeping'], name: 'Sweeping', color: '#059669', bg: '#f0fdf4', icon: BrushCleaning },
                   { keyMatch: ['toilet'], name: 'Cleanliness of Toilets', color: '#2563eb', bg: '#eff6ff', icon: Toilet },
-                  { keyMatch: ['twinbin', 'litter', 'bin'], name: 'Litterbins Module', color: '#d97706', bg: '#fffbeb', icon: Trash2 },
+                  { keyMatch: ['twinbin', 'litter', 'bin'], name: 'Litterbins', color: '#d97706', bg: '#fffbeb', icon: Trash2 },
                   { keyMatch: ['taskforce', 'gvp', 'ctu'], name: 'CTU / GVP Transformation', color: '#7c3aed', bg: '#f5f3ff', icon: Truck },
                 ];
                 const cards = moduleCards.map(mc => {
@@ -2071,13 +2000,7 @@ export default function CityDashboardPage() {
                               <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>{item.total} Records</div>
                             </div>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '0.75rem', fontWeight: 800, color: '#475569' }}>
-                            <span>Inspection Share</span>
-                            <span style={{ color: item.color }}>{pct}%</span>
-                          </div>
-                          <div style={{ height: '8px', width: '100%', backgroundColor: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${pct}%`, backgroundColor: item.color, borderRadius: '999px', transition: 'width 0.8s ease' }} />
-                          </div>
+                          
                         </div>
                       );
                     })}

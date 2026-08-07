@@ -56,7 +56,7 @@ export function Modal({
             <X size={18} />
           </button>
         </div>
-        <div className="px-6 py-6">{children}</div>
+        <div className="px-6 py-6 overflow-y-auto max-h-[calc(100vh-180px)]">{children}</div>
         {footer && <div className="flex gap-3 border-t border-slate-100 px-6 py-4">{footer}</div>}
       </div>
     </div>

@@ -47,9 +47,7 @@ export default function EmployeeAssignmentsPage() {
             <div style={{ fontSize: "0.875rem", color: "#64748b", marginBottom: "8px" }}>
               <Link href="/city/areas" style={{ color: "#64748b", textDecoration: "none" }}>Area & Beat Management</Link> / <span style={{ color: "#0f172a", fontWeight: 600 }}>Employee Deployment</span>
             </div>
-            <h1 style={{ margin: 0, fontSize: "1.875rem", fontWeight: 800, color: "#0f172a" }}>Employee Deployment</h1>
-            <p style={{ margin: "8px 0 0", color: "#64748b" }}>Supervisor beat owner alag rahega; employee sub-beat deployment yahan se manage hoga.</p>
-          </div>
+            <h1 style={{ margin: 0, fontSize: "1.875rem", fontWeight: 800, color: "#0f172a" }}>Employee Deployment</h1>          </div>
           <Link href="/city/areas" style={{ textDecoration: "none", backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px 18px", color: "#0f172a", fontWeight: 700 }}>
             Back to Supervisors
           </Link>

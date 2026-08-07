@@ -229,36 +229,41 @@ export default function RegisteredUsersPage() {
     }
   };
 
+  // Hide header row if displayed inside nested context (i.e. URL path is common-registration)
+  const isNested = typeof window !== 'undefined' && window.location.pathname.includes('common-registration');
+
   return (
     <div className="space-y-6 pb-12">
       {/* ── HEADER TITLE ROW ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-5 lg:px-6">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
-              <Users size={22} />
-            </span>
-            Registered Users Directory
-          </h1>
-          <p className="mt-1 text-xs font-semibold text-slate-500">
-            Overview and access configuration for all employees and officials registered via User Registration
-          </p>
-        </div>
+      {!isNested && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-5 lg:px-6">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2.5">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                <Users size={22} />
+              </span>
+              Registered Users Directory
+            </h1>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              Overview and access configuration for all employees and officials registered via User Registration
+            </p>
+          </div>
 
-        <button
-          onClick={() => window.location.href = '/portal-home/common-registration'}
-          className="
-            inline-flex h-11 shrink-0 items-center justify-center gap-2
-            rounded-[11px] bg-blue-600 px-5
-            text-xs font-extrabold text-white
-            shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
-            hover:bg-blue-500 transition
-          "
-        >
-          <UserPlus size={16} />
-          Register New Employee
-        </button>
-      </div>
+          <button
+            onClick={() => window.location.href = '/portal-home/common-registration'}
+            className="
+              inline-flex h-11 shrink-0 items-center justify-center gap-2
+              rounded-[11px] bg-blue-600 px-5
+              text-xs font-extrabold text-white
+              shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
+              hover:bg-blue-500 transition
+            "
+          >
+            <UserPlus size={16} />
+            Register New Employee
+          </button>
+        </div>
+      )}
 
       {/* ── FILTER TOOLBAR ROW (SEARCH, ROLE DROPDOWN, WORKSPACE DROPDOWN, HIERARCHY) ── */}
       <div className="mx-4 sm:mx-5 lg:mx-6 overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-xs">
@@ -513,29 +518,43 @@ export default function RegisteredUsersPage() {
                         </div>
                       </td>
 
-                      {/* Assigned Modules - Dynamic from user data */}
+                      {/* Assigned Modules - Inspection & Performance System Modules only */}
                       <td className="px-3 py-3 align-middle">
                          <div className="flex flex-wrap items-center gap-1">
                            {(() => {
-                             // Collect module names from various sources
+                             // Collect only Inspection & Performance System (Taskforce) modules
+                             const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN"];
                              const mods: string[] = [];
                              if (u.modules && u.modules.length > 0) {
                                u.modules.forEach((m: any) => {
-                                 if (m.name) mods.push(m.name);
-                                 else if (m.key) mods.push(m.key);
+                                 const keyUpper = String(m.key || m.id || m.name || '').toUpperCase();
+                                 if (allowedTaskforceKeys.some(tk => keyUpper.includes(tk))) {
+                                   mods.push(m.name || m.key);
+                                 }
                                });
                              } else if (u.assignedModules && u.assignedModules.length > 0) {
-                               mods.push(...u.assignedModules);
+                               u.assignedModules.forEach((mKey: string) => {
+                                 const keyUpper = String(mKey).toUpperCase();
+                                 if (allowedTaskforceKeys.some(tk => keyUpper.includes(tk))) {
+                                   mods.push(mKey);
+                                 }
+                               });
                              }
                              if (mods.length === 0) {
-                               return <span className="text-[10px] font-semibold text-slate-400 italic">None assigned</span>;
+                               return <span className="text-[10px] font-semibold text-slate-400 italic">None</span>;
                              }
                              const colors = ['blue', 'emerald', 'purple', 'orange', 'amber'];
                              return mods.slice(0, 3).map((mod, mi) => {
                                const c = colors[mi % colors.length];
+                               // Display labels cleanly
+                               let displayLabel = mod;
+                               if (mod.toUpperCase() === "SWEEPING") displayLabel = "Sweeping";
+                               if (mod.toUpperCase().includes("LITTER")) displayLabel = "Litter Bins";
+                               if (mod.toUpperCase().includes("TOILET")) displayLabel = "Cleanliness of Toilets";
+                               if (mod.toUpperCase() === "TASKFORCE" || mod.toUpperCase().includes("CTU")) displayLabel = "CTU / GVP Transformation";
                                return (
                                  <span key={mi} className={`inline-flex items-center rounded-md border border-${c}-200 bg-${c}-50 px-2 py-0.5 text-[10px] font-bold text-${c}-700`}>
-                                   {mod}
+                                   {displayLabel}
                                  </span>
                                );
                              }).concat(mods.length > 3 ? [
@@ -804,29 +823,131 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
             Assigned Workspace Modules <span className="text-slate-400 font-normal">(Click to toggle access)</span>
           </label>
           <div className="grid grid-cols-2 gap-2">
-            {modules.map(mod => {
-              const modKey = mod.id || mod.key;
-              const isSelected = assignedModules.includes(modKey);
+            {/* Primary Modules list */}
+            {(() => {
+              // Primary Main Systems
+              const mainSystems = [
+                { id: "TASKFORCE_20", name: "Inspection & Performance System" },
+                { id: "SWACHH_RANKING", name: "Ward Ranking System" },
+                { id: "WORKFORCE_MONITORING", name: "Workforce Attendance System" },
+                { id: "PROCESSING_MRF", name: "Processing Plant System" }
+              ];
+
+              // Check which systems are currently selected. We map base modules inside matching roles.
+              // If TASKFORCE (ctu/sweeping/litter/toilet) are checked, TASKFORCE_20 system is active.
+              const isTaskforceActive = assignedModules.some(m => ["TASKFORCE", "LITTERBINS", "TOILET", "SWEEPING", "LITTERBIN"].includes(m.toUpperCase()));
+              const isSwachhActive = assignedModules.some(m => ["SWACHH", "SWACHH_RANKING", "WARD_RANKING"].includes(m.toUpperCase()));
+              const isWorkforceActive = assignedModules.some(m => ["WORKFORCE", "MATRIX"].includes(m.toUpperCase()));
+              const isProcessingActive = assignedModules.some(m => ["PROCESSING"].includes(m.toUpperCase()));
+
+              const toggleMainSystem = (sysId: string) => {
+                if (sysId === "TASKFORCE_20") {
+                  if (isTaskforceActive) {
+                    // Turn off all taskforce sub-modules
+                    setAssignedModules(prev => prev.filter(m => !["TASKFORCE", "LITTERBINS", "TOILET", "SWEEPING", "LITTERBIN"].includes(m.toUpperCase())));
+                  } else {
+                    // Turn on default taskforce modules
+                    setAssignedModules(prev => [...prev, "TASKFORCE", "LITTERBINS", "TOILET", "SWEEPING"]);
+                  }
+                } else if (sysId === "SWACHH_RANKING") {
+                  if (isSwachhActive) {
+                    setAssignedModules(prev => prev.filter(m => !["SWACHH", "SWACHH_RANKING", "WARD_RANKING"].includes(m.toUpperCase())));
+                  } else {
+                    setAssignedModules(prev => [...prev, "SWACHH_RANKING"]);
+                  }
+                } else if (sysId === "WORKFORCE_MONITORING") {
+                  if (isWorkforceActive) {
+                    setAssignedModules(prev => prev.filter(m => !["WORKFORCE", "MATRIX"].includes(m.toUpperCase())));
+                  } else {
+                    setAssignedModules(prev => [...prev, "WORKFORCE"]);
+                  }
+                } else if (sysId === "PROCESSING_MRF") {
+                  if (isProcessingActive) {
+                    setAssignedModules(prev => prev.filter(m => !["PROCESSING"].includes(m.toUpperCase())));
+                  } else {
+                    setAssignedModules(prev => [...prev, "PROCESSING"]);
+                  }
+                }
+              };
+
               return (
-                <button
-                  type="button"
-                  key={modKey}
-                  onClick={() => toggleModule(modKey)}
-                  className={`px-3 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-between transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{mod.name}</span>
-                  <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
-                    isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
-                  }`}>
-                    {isSelected && '✓'}
-                  </span>
-                </button>
+                <>
+                  {mainSystems.map(sys => {
+                    let isSelected = false;
+                    if (sys.id === "TASKFORCE_20") isSelected = isTaskforceActive;
+                    if (sys.id === "SWACHH_RANKING") isSelected = isSwachhActive;
+                    if (sys.id === "WORKFORCE_MONITORING") isSelected = isWorkforceActive;
+                    if (sys.id === "PROCESSING_MRF") isSelected = isProcessingActive;
+
+                    return (
+                      <div key={sys.id} className="col-span-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleMainSystem(sys.id)}
+                          className={`w-full px-3 py-2.5 rounded-xl border text-xs font-black flex items-center justify-between transition-all ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>{sys.name}</span>
+                          <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
+                            isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
+                          }`}>
+                            {isSelected && '✓'}
+                          </span>
+                        </button>
+
+                        {/* If Inspection & Performance System is checked, show sub-modules */}
+                        {sys.id === "TASKFORCE_20" && isSelected && (
+                          <div className="pl-4 pt-1 border-l-2 border-blue-200 grid grid-cols-2 gap-2">
+                            {[
+                              { id: "LITTERBINS", name: "Litter Bins" },
+                              { id: "SWEEPING", name: "Sweeping" },
+                              { id: "TOILET", name: "Cleanliness of Toilets" },
+                              { id: "TASKFORCE", name: "CTU / GVP Transformation" }
+                            ].map(sub => {
+                              const isSubSelected = assignedModules.some(m => String(m).toUpperCase().includes(sub.id));
+                              const toggleSub = () => {
+                                setAssignedModules(prev => {
+                                  // Find any match in array regardless of casing
+                                  const exists = prev.some(m => String(m).toUpperCase().includes(sub.id));
+                                  if (exists) {
+                                    return prev.filter(m => !String(m).toUpperCase().includes(sub.id));
+                                  } else {
+                                    return [...prev, sub.id];
+                                  }
+                                });
+                              };
+                              return (
+                                <button
+                                  type="button"
+                                  key={sub.id}
+                                  onClick={toggleSub}
+                                  className={`px-3 py-2 rounded-lg border text-[11px] font-bold flex items-center justify-between transition-all ${
+                                    isSubSelected
+                                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <span>{sub.name}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSubSelected}
+                                    onChange={() => {}}
+                                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
               );
-            })}
+            })()}
           </div>
         </div>
 

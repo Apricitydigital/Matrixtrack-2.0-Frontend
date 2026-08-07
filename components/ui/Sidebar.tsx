@@ -272,7 +272,7 @@ export default function Sidebar() {
         icon: <Users size={18} />,
       });
       links.push({
-        label: "User Registration",
+        label: "User Registration Management",
         href: "/portal-home/common-registration",
         icon: <UserPlus size={18} />,
       });

@@ -125,7 +125,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
   let pageTitle = `${getGreeting()}, ${displayName}!`;
   if (pathname.includes('/onboard-city')) pageTitle = 'Create City';
   if (pathname.includes('/city-directory')) pageTitle = 'City Directory';
-  if (pathname.includes('/common-registration')) pageTitle = 'Employee Registration';
+  if (pathname.includes('/common-registration')) pageTitle = 'User Registration';
   if (pathname.includes('/admin-management')) pageTitle = 'User & Admin Management';
 
   if (isTaskforceActive) {
@@ -330,31 +330,17 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                   </Link>
 
                   {canAccessRegistration && (
-                    <>
-                      <Link
-                        href="/portal-home/common-registration"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                          pathname.includes('/common-registration')
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                        }`}
-                      >
-                        <UserCheck2 size={16} className={pathname.includes('/common-registration') ? 'text-white' : 'text-slate-500'} />
-                        <span>Employee Registration</span>
-                      </Link>
-
-                      <Link
-                        href="/portal-home/registered-users"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                          pathname.includes('/registered-users')
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                        }`}
-                      >
-                        <Users size={16} className={pathname.includes('/registered-users') ? 'text-white' : 'text-slate-500'} />
-                        <span>Registered Users</span>
-                      </Link>
-                    </>
+                    <Link
+                      href="/portal-home/common-registration"
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                        pathname.includes('/common-registration') || pathname.includes('/registered-users')
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      <UserCheck2 size={16} className={pathname.includes('/common-registration') || pathname.includes('/registered-users') ? 'text-white' : 'text-slate-500'} />
+                      <span>User Management</span>
+                    </Link>
                   )}
 
                   {isSuperAdmin && (
