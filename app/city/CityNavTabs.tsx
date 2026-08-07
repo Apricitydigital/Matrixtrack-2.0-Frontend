@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { LayoutDashboard, Map, MapPin, Target, Users, Package } from "lucide-react";
+import { LayoutDashboard, Map, MapPin, Target, Users, Package, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 
 export default function CityNavTabs() {
@@ -22,6 +22,7 @@ export default function CityNavTabs() {
             { name: "Zones", href: "/city/zones", icon: <Map size={16} /> },
             { name: "Wards", href: "/city/wards", icon: <MapPin size={16} /> },
             { name: "Areas & Beats", href: "/city/areas", icon: <Target size={16} /> },
+            { name: "Beat Status", href: "/city/beat-status", icon: <CheckCircle2 size={16} /> },
             { name: "Municipal Users", href: "/city/users", icon: <Users size={16} /> },
         ] : []),
     ];

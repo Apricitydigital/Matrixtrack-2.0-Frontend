@@ -28,6 +28,7 @@ import {
   Bell,
   LogOut,
   Building2,
+  CheckCircle2,
 } from "lucide-react";
 
 const getModuleIcon = (key: string) => {
@@ -188,6 +189,9 @@ export default function Sidebar() {
 
   const isCommissioner =
     user?.roles.includes("COMMISSIONER" as Role) ?? false;
+
+  const isQC =
+    user?.roles.includes("QC" as Role) ?? false;
 
   const moduleLinks = useMemo(() => {
     const canonicalModules = canonicalizeModules(
@@ -364,7 +368,7 @@ export default function Sidebar() {
         </div>
 
         {/* City master links */}
-        {user && (isCityAdmin || isCommissioner) && (
+        {user && (isCityAdmin || isCommissioner || isQC) && (
           <CollapsibleGroup
             label="Master"
             icon={<Database size={18} />}
@@ -388,6 +392,16 @@ export default function Sidebar() {
                 label: "Areas & Beats",
                 href: "/city/areas",
                 icon: <Target size={16} />,
+              },
+              {
+                label: "Beat Status",
+                href: "/city/beat-status",
+                icon: <CheckCircle2 size={16} />,
+              },
+              {
+                label: "Beat Requests",
+                href: "/city/beat-requests",
+                icon: <FileText size={16} />,
               },
               {
                 label: "Municipal Users",

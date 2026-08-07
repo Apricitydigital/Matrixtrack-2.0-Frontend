@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Protected, RoleGuard } from "@components/Guards";
 import {
@@ -29,7 +30,9 @@ import {
     Wind,
     Droplets,
     PieChart as PieIcon,
-    Upload
+    Upload,
+    FileText,
+    Activity
 } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import {
@@ -305,6 +308,46 @@ export default function BeatsManagementPage() {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
+
+                            <Link
+                                href="/city/beat-requests"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    padding: "8px 14px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "rgba(37, 99, 235, 0.1)",
+                                    color: "#2563eb",
+                                    fontWeight: 700,
+                                    fontSize: "13px",
+                                    textDecoration: "none",
+                                    border: "1px solid rgba(37, 99, 235, 0.2)"
+                                }}
+                            >
+                                <FileText size={16} />
+                                Beat Requests
+                            </Link>
+
+                            <Link
+                                href="/qc/beat-status"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    padding: "8px 14px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "rgba(124, 58, 237, 0.1)",
+                                    color: "#7c3aed",
+                                    fontWeight: 700,
+                                    fontSize: "13px",
+                                    textDecoration: "none",
+                                    border: "1px solid rgba(124, 58, 237, 0.2)"
+                                }}
+                            >
+                                <Activity size={16} />
+                                Beat Status
+                            </Link>
 
                             <button
                                 onClick={() => setShowKMLUploader(true)}
