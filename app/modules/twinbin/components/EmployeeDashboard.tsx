@@ -18,7 +18,8 @@ export default function EmployeeDashboard() {
           areaName: b.areaName,
           locationName: b.locationName,
           status: b.status,
-          distanceMeters: b.latestReport?.distanceMeters
+          distanceMeters: b.latestReport?.distanceMeters,
+          latestReport: b.latestReport || null
         }));
         setAssigned(assignedBins);
         setSummary({
@@ -108,9 +109,16 @@ export default function EmployeeDashboard() {
                   </div>
 
                   <div className="flex justify-end mt-2">
-                    <Link className="btn btn-sm btn-primary" href={`/modules/twinbin/assigned/${b.id}`}>
-                      Open & Report
-                    </Link>
+                    {b.latestReport?.createdAt && new Date(b.latestReport.createdAt).toDateString() === new Date().toDateString() ? (
+                      <button className="btn btn-sm" disabled>Completed Today</button>
+                    ) : (
+                      <Link
+                        className="btn btn-sm btn-primary"
+                        href={`/modules/survey/LITTERBINS/${b.id}?name=${encodeURIComponent(b.areaName || b.locationName || 'Litter Bin')}&returnTo=${encodeURIComponent('/modules/twinbin')}`}
+                      >
+                        Start Survey
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}
@@ -134,6 +142,7 @@ type AssignedBin = {
   locationName: string;
   status: string;
   distanceMeters?: number;
+  latestReport?: { status?: string; createdAt?: string; distanceMeters?: number } | null;
 };
 
 function KpiCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {

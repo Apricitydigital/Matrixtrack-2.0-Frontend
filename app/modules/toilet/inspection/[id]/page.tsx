@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ToiletApi } from '@lib/apiClient';
 import { ModuleGuard } from '@components/Guards';
 import { useAuth } from '@hooks/useAuth';
+import { SurveyAnswersView } from '../../../common/SurveyAnswers';
 
 export default function InspectionDetailPage() {
     const { id } = useParams();
@@ -66,7 +67,7 @@ export default function InspectionDetailPage() {
     const answers = inspection.answers || {};
 
     return (
-        <ModuleGuard module="TOILET" roles={["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN", "EMPLOYEE"]}>
+        <ModuleGuard module="TOILET" roles={["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN", "SUPERVISOR", "EMPLOYEE"]}>
             <div className="report-container max-w-5xl mx-auto p-10 bg-white min-h-screen shadow-2xl my-8 rounded-3xl print:shadow-none print:my-0 print:p-5">
 
                 {/* Header */}
@@ -200,44 +201,7 @@ export default function InspectionDetailPage() {
                     <h2 className="text-2xl font-black text-slate-800 mb-8 border-l-8 border-indigo-600 pl-4">Audit Trail & Inspection Questions</h2>
 
                     <div className="space-y-8">
-                        {Object.entries(answers).map(([questionText, data]: [string, any], idx) => {
-                            // Robust check: it is new format ONLY if it is an object, not null, and has an 'answer' key.
-                            const isNewFormat = data && typeof data === 'object' && 'answer' in data;
-                            const ans = isNewFormat ? data.answer : data;
-                            const photos = isNewFormat ? (data.photos || []) : [];
-
-                            return (
-                                <div key={idx} className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 hover:border-indigo-100 transition-all">
-                                    <div className="flex justify-between items-start gap-4 mb-4">
-                                        <div className="flex-1">
-                                            <p className="text-slate-800 font-bold text-lg leading-tight">{questionText}</p>
-                                        </div>
-                                        <div className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${ans === 'YES' || ans === true ? 'bg-emerald-100 text-emerald-700' :
-                                            ans === 'NO' || ans === false ? 'bg-rose-100 text-rose-700' : 'bg-indigo-100 text-indigo-700'
-                                            }`}>
-                                            {typeof ans === 'boolean' ? (ans ? 'YES' : 'NO') : (ans || 'N/A')}
-                                        </div>
-                                    </div>
-
-                                    {photos.length > 0 && (
-                                        <div className="flex flex-wrap gap-4 mt-6">
-                                            {photos.map((p: string, pIdx: number) => (
-                                                <div key={pIdx} className="relative group">
-                                                    <img
-                                                        src={p}
-                                                        className="w-40 h-40 object-cover rounded-2xl border-4 border-white shadow-md hover:scale-105 transition-transform"
-                                                        alt="Evidence"
-                                                    />
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center pointer-events-none">
-                                                        <span className="text-white text-[10px] font-black uppercase tracking-widest">Image {pIdx + 1}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        <SurveyAnswersView answers={answers} />
                     </div>
                 </div>
 

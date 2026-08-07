@@ -23,7 +23,8 @@ export default function ToiletEmployeeDashboard() {
                     name: t.name,
                     locationName: t.ward?.name || 'Unknown Ward',
                     status: t.status,
-                    type: t.type
+                    type: t.type,
+                    inspectionStatus: t.inspectionStatus || t.lastInspectionStatus || null
                 }));
 
                 setAssigned(assignedList);
@@ -74,13 +75,13 @@ export default function ToiletEmployeeDashboard() {
                         <ActionCard
                             title="Assigned Toilets"
                             desc="View details and report inspections."
-                            href="/modules/toilet/supervisor/assigned"
+                            href="/modules/toilet/employee/assigned"
                             primary
                         />
                         <ActionCard
                             title="Validation Queue"
                             desc="Track status of pending assets."
-                            href="/modules/toilet/supervisor/pending"
+                            href="/modules/toilet/employee/pending"
                         />
                     </div>
                 </section>
@@ -88,7 +89,7 @@ export default function ToiletEmployeeDashboard() {
                 <section>
                     <div className="flex justify-between items-center mb-4">
                         <h2>Assigned Work</h2>
-                        <Link className="btn btn-sm btn-ghost" href="/modules/toilet/supervisor/assigned">
+                        <Link className="btn btn-sm btn-ghost" href="/modules/toilet/employee/assigned">
                             View All {" >"}
                         </Link>
                     </div>
@@ -114,9 +115,16 @@ export default function ToiletEmployeeDashboard() {
                                     </div>
 
                                     <div className="flex justify-end mt-2">
-                                        <button className="btn btn-sm btn-primary" disabled>
-                                            Inspect
-                                        </button>
+                                        {t.inspectionStatus ? (
+                                            <button className="btn btn-sm" disabled>Completed Today</button>
+                                        ) : (
+                                            <Link
+                                                className="btn btn-sm btn-primary"
+                                                href={`/modules/survey/TOILET/${t.id}?name=${encodeURIComponent(t.name)}&returnTo=${encodeURIComponent('/modules/toilet/employee')}`}
+                                            >
+                                                Start Survey
+                                            </Link>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -140,6 +148,7 @@ type AssignedToilet = {
     locationName: string;
     status: string;
     type: string;
+    inspectionStatus?: string | null;
 };
 
 function KpiCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {

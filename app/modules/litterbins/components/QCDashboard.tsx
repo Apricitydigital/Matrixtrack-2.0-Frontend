@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ModuleRecordsApi, TwinbinApi, ApiError, apiFetch } from "@lib/apiClient";
 import { StatsCard, RecordsTable, StatusBadge, ActionButtons, TableColumn, FilterTabs } from "../../qc-shared";
+import { SurveyAnswersView } from "../../common/SurveyAnswers";
 
 type RecordItem = {
     id: string;
@@ -501,25 +502,7 @@ function DailyReportView({ item, loading, onClose }: { item: any; loading: boole
                 <h4 className="text-md font-semibold mb-2">Questionnaire</h4>
                 <div className="grid gap-2">
                     {item.questionnaire
-                        ? Object.entries(item.questionnaire).map(([key, val]: [string, any]) => {
-                            const answer = typeof val === "object" && val !== null && "answer" in val ? (val as any).answer : val;
-                            const photos = typeof val === "object" && (val as any).photos ? (val as any).photos : [];
-                            return (
-                                <div key={key} className="p-3 rounded border border-base-200 bg-base-50">
-                                    <div className="text-sm font-semibold">{key}</div>
-                                    <div className="muted text-sm">{String(answer ?? "-")}</div>
-                                    {Array.isArray(photos) && photos.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {photos.map((p: string, idx: number) => (
-                                                <a key={idx} href={p} target="_blank" rel="noreferrer" className="block">
-                                                    <img src={p} alt={`Photo ${idx + 1}`} className="h-16 w-16 object-cover rounded border" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
+                        ? <SurveyAnswersView answers={item.questionnaire} compact />
                         : <div className="muted text-sm">No questionnaire answers.</div>}
                 </div>
             </div>

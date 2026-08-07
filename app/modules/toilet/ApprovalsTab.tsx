@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ToiletApi, GeoApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import { FilterTabs } from "../qc-shared";
+import { SurveyAnswersView } from "../common/SurveyAnswers";
 
 export default function ApprovalsTab() {
     const { user } = useAuth();
@@ -307,21 +308,7 @@ export default function ApprovalsTab() {
                             <>
                                 <div>
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>Inspection Report</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        {selectedRequest.answers && Object.entries(selectedRequest.answers).map(([qId, val]: [string, any]) => {
-                                            const isNewFormat = val && typeof val === 'object' && 'answer' in val;
-                                            const displayVal = isNewFormat ? val.answer : val;
-                                            return (
-                                                <div key={qId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, paddingBottom: 6, borderBottom: '1px solid #f8fafc' }}>
-                                                    <span style={{ color: '#334155', maxWidth: '70%' }}>{qId}</span>
-                                                    <span style={{ fontWeight: 700 }}>
-                                                        {displayVal === true || displayVal === 'YES' ? '✅ YES' :
-                                                            displayVal === false || displayVal === 'NO' ? '❌ NO' : String(displayVal)}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                    <SurveyAnswersView answers={selectedRequest.answers} compact />
                                     <div style={{ marginTop: 12 }}>
                                         <a href={`/modules/toilet/inspection/${selectedRequest.id}`} target="_blank" className="btn btn-xs btn-outline" style={{ width: '100%' }}>View Full Report Document</a>
                                     </div>
