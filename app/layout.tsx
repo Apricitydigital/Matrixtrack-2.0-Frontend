@@ -4,8 +4,8 @@ import { AppShell } from "@components/AppShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Taskforce 20",
-  description: "Enterprise administration for cities and modules"
+  title: "MatrixTrack 2.0",
+  description: "Enterprise Urban Infrastructure & Sanitation Management System",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

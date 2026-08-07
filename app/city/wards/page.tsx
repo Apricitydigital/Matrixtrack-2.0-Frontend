@@ -6,6 +6,7 @@ import { ApiError, apiFetch } from "@lib/apiClient";
 import { Edit2, Trash2, Check, X, Loader2, Map, Plus, Search, Download, FileText, FileSpreadsheet, RefreshCw } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 import { RoleGuard } from "@components/Guards";
+import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 
 type GeoNode = { id: string; name: string; parentId?: string };
 
@@ -150,6 +151,15 @@ export default function WardManagementPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <TableExportDropdown 
+                data={filteredWards.map(w => ({
+                  WardID: w.id,
+                  WardName: w.name,
+                  ParentZone: zones.find(z => z.id === w.parentId)?.name || 'Unassigned'
+                }))}
+                filename="Registered_Wards"
+                title="Registered Wards Report"
+              />
               <button
                 onClick={() => loadData(true)}
                 title="Refresh Wards"

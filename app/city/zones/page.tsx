@@ -5,6 +5,7 @@ import { ApiError, apiFetch } from "@lib/apiClient";
 import { Compass, Plus, Search, Check, X, Loader2, Download, FileSpreadsheet, FileText, Trash2, Edit2 } from "lucide-react";
 import { RoleGuard } from "@components/Guards";
 import { useAuth } from "@hooks/useAuth";
+import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 
 type GeoNode = { id: string; name: string; createdAt?: string };
 
@@ -130,6 +131,11 @@ export default function ZoneManagementPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <TableExportDropdown 
+                data={filteredZones.map(z => ({ ZoneID: z.id, ZoneName: z.name, CreatedAt: z.createdAt || '-' }))}
+                filename="Registered_Zones"
+                title="Registered Zones Report"
+              />
               {!isReadOnly && (
                 <button
                   onClick={() => setIsModalOpen(true)}

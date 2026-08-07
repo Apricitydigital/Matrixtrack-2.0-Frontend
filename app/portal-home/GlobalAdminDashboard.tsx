@@ -5,8 +5,8 @@ import { ModuleRecordsApi, CityUserApi } from '@lib/apiClient';
 import swachhApi from '../../modules/swachh-ranking/api/axios';
 import { 
   Users, ShieldCheck, 
-  Activity, MapPin, Search, 
-  Bell, Download, Calendar, Trophy, AlertTriangle, CheckCircle2, XCircle, RefreshCw
+  Bell, Download, Calendar, Trophy, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Menu,
+  Activity, MapPin, Search, Globe
 } from 'lucide-react';
 import { 
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, 
@@ -35,17 +35,17 @@ export default function GlobalAdminDashboard() {
       const filters = { fromDate, toDate, limit: 1000 };
       
       const [sweepingRes, toiletRes, twinbinRes, usersRes, swachhRes] = await Promise.all([
-        ModuleRecordsApi.getRecords('SWEEPING', filters).catch(() => ({ records: [], data: [] })),
-        ModuleRecordsApi.getRecords('TOILET', filters).catch(() => ({ records: [], data: [] })),
-        ModuleRecordsApi.getRecords('TWINBIN', filters).catch(() => ({ records: [], data: [] })),
+        ModuleRecordsApi.getRecords('SWEEPING', filters).catch(() => ({ data: [] as any[] })),
+        ModuleRecordsApi.getRecords('TOILET', filters).catch(() => ({ data: [] as any[] })),
+        ModuleRecordsApi.getRecords('TWINBIN', filters).catch(() => ({ data: [] as any[] })),
         CityUserApi.list().catch(() => ({ users: [] })),
         swachhApi.get('/admin/stats').catch(() => ({ data: null }))
       ]);
       
       setTaskforceRecords({
-        sweeping: sweepingRes.data || sweepingRes.records || [],
-        toilet: toiletRes.data || toiletRes.records || [],
-        twinbin: twinbinRes.data || twinbinRes.records || []
+        sweeping: sweepingRes.data || [],
+        toilet: toiletRes.data || [],
+        twinbin: twinbinRes.data || []
       });
       setUsers(usersRes.users || []);
       
@@ -166,49 +166,42 @@ export default function GlobalAdminDashboard() {
   return (
     <div className="space-y-6 pb-12 mt-6 max-w-[1400px] mx-auto">
       
-      {/* HEADER & EXPORT & FILTERS */}
-      <div className="bg-white rounded-2xl p-6 lg:px-8 border border-slate-200/80 shadow-sm flex flex-col xl:flex-row gap-6 items-start xl:items-center justify-between">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-            <ShieldCheck className="text-blue-600" size={28} /> Global Command Center
-          </h1>
-          <p className="text-sm font-semibold text-slate-500 mt-1.5 flex items-center gap-2">
-            <Calendar size={14} /> Inspection & Performance Monitoring across all cities
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          {/* Date Filters */}
-          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 shadow-sm">
+      {/* Action Toolbar */}
+      <div className="bg-white rounded-2xl p-4 px-6 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Calendar size={16} className="text-blue-600" />
+          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
             <input 
               type="date" 
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-2 cursor-pointer" 
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-1 cursor-pointer" 
               value={fromDate}
               onChange={e => setFromDate(e.target.value)}
             />
             <span className="text-slate-400 font-bold text-xs">-</span>
             <input 
               type="date" 
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-2 cursor-pointer" 
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-1 cursor-pointer" 
               value={toDate}
               onChange={e => setToDate(e.target.value)}
             />
           </div>
-
-          {/* Refresh Button */}
+        </div>
+        
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <button 
             onClick={() => loadData(true)}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-sm border border-slate-200"
+            disabled={refreshing}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 border border-slate-200"
           >
-            <RefreshCw size={16} className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
+            <RefreshCw size={14} className={refreshing ? 'animate-spin text-blue-600' : ''} />
+            <span>Refresh Data</span>
           </button>
 
-          {/* Export Button */}
-          <button 
+          <button
             onClick={downloadReport}
-            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-sm"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm"
           >
-            <Download size={16} /> Export CSV
+            <Download size={14} /> Export CSV Report
           </button>
         </div>
       </div>

@@ -314,7 +314,7 @@ export default function Sidebar() {
 
         <div className="min-w-0">
           <div className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-            Taskforce 20
+            MatrixTrack 2.0
           </div>
 
           <div className="text-xs font-medium text-slate-400">

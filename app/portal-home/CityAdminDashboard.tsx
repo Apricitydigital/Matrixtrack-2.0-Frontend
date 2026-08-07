@@ -7,11 +7,11 @@ import {
   Users, BarChart3, ShieldAlert, CheckCircle2, XCircle, 
   Activity, MapPin, Search, ShieldCheck, Zap, 
   Bell, Download, Calendar, Trophy, AlertTriangle, ArrowRight,
-  Landmark, GraduationCap, Building2, Store
+  Landmark, GraduationCap, Building2, Store, ClipboardList, Menu
 } from 'lucide-react';
 import { 
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, 
-  Tooltip, ResponsiveContainer, Legend 
+  Tooltip, ResponsiveContainer, Legend, AreaChart, Area, CartesianGrid
 } from 'recharts';
 
 const COLORS = ['#10b981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6'];
@@ -35,17 +35,17 @@ export default function CityAdminDashboard() {
       setLoading(true);
       try {
         const [sweepingRes, toiletRes, twinbinRes, usersRes, swachhRes] = await Promise.all([
-          ModuleRecordsApi.getRecords('SWEEPING').catch(() => ({ records: [] })),
-          ModuleRecordsApi.getRecords('TOILET').catch(() => ({ records: [] })),
-          ModuleRecordsApi.getRecords('TWINBIN').catch(() => ({ records: [] })),
+          ModuleRecordsApi.getRecords('SWEEPING').catch(() => ({ data: [] as any[] })),
+          ModuleRecordsApi.getRecords('TOILET').catch(() => ({ data: [] as any[] })),
+          ModuleRecordsApi.getRecords('TWINBIN').catch(() => ({ data: [] as any[] })),
           CityUserApi.list().catch(() => ({ users: [] })),
           swachhApi.get('/admin/stats').catch(() => ({ data: null }))
         ]);
         
         setTaskforceRecords({
-          sweeping: sweepingRes.records || [],
-          toilet: toiletRes.records || [],
-          twinbin: twinbinRes.records || []
+          sweeping: sweepingRes.data || [],
+          toilet: toiletRes.data || [],
+          twinbin: twinbinRes.data || []
         });
         setUsers(usersRes.users || []);
         
@@ -65,8 +65,6 @@ export default function CityAdminDashboard() {
     loadData();
   }, []);
 
-  // --- Aggregations ---
-
   const allTaskforce = [...taskforceRecords.sweeping, ...taskforceRecords.toilet, ...taskforceRecords.twinbin];
   const acceptedCount = allTaskforce.filter(r => r.status === 'APPROVED' || r.status === 'RESOLVED' || r.status === 'ACTION_TAKEN').length;
   const rejectedCount = allTaskforce.filter(r => r.status === 'REJECTED').length;
@@ -74,24 +72,36 @@ export default function CityAdminDashboard() {
   const pendingCount = allTaskforce.filter(r => r.status === 'PENDING').length;
 
   // Chart Data
-  const taskforceChartData = [
-    { name: 'Resolved', value: acceptedCount },
-    { name: 'Rejected', value: rejectedCount },
-    { name: 'Action Required', value: actionRequiredCount },
-    { name: 'Pending', value: pendingCount }
-  ].filter(d => d.value > 0);
+  const trendData = useMemo(() => {
+    const dates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return { 
+        fullDate: d.toISOString().split('T')[0], 
+        display: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) 
+      };
+    });
 
-  const swachhChartData = useMemo(() => {
-    if (!swachhStats?.categoryCounts) return [];
-    return Object.entries(swachhStats.categoryCounts)
-      .filter(([k, v]) => (v as number) > 0)
-      .map(([k, v]) => ({
-        name: k.replace('_', ' ').toUpperCase(),
-        count: v
-      }))
-      .sort((a, b) => (b.count as number) - (a.count as number))
-      .slice(0, 5);
-  }, [swachhStats]);
+    return dates.map(dateObj => {
+      const sweeping = taskforceRecords.sweeping.filter(r => r.createdAt?.startsWith(dateObj.fullDate)).length;
+      const toilet = taskforceRecords.toilet.filter(r => r.createdAt?.startsWith(dateObj.fullDate)).length;
+      const twinbin = taskforceRecords.twinbin.filter(r => r.createdAt?.startsWith(dateObj.fullDate)).length;
+      return { name: dateObj.display, Sweeping: sweeping, Toilets: toilet, Litterbins: twinbin };
+    });
+  }, [taskforceRecords]);
+
+  const donutData = [
+    { name: 'Approved', value: acceptedCount, color: '#10b981' },
+    { name: 'Rejected', value: rejectedCount, color: '#f43f5e' },
+    { name: 'Pending', value: pendingCount, color: '#f59e0b' }
+  ];
+  const totalDonut = donutData.reduce((acc, curr) => acc + curr.value, 0);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const inspectionsToday = allTaskforce.filter(r => r.createdAt?.startsWith(todayStr)).length;
+  const actionsTaken = allTaskforce.filter(r => r.status === 'ACTION_TAKEN').length;
+  const issuesReported = actionRequiredCount;
+  const issuesResolved = acceptedCount;
 
   // Alerts Generation
   const alerts = useMemo(() => {
@@ -163,22 +173,22 @@ export default function CityAdminDashboard() {
   return (
     <div className="space-y-6 pb-12 mt-6 max-w-[1400px] mx-auto">
       
-      {/* HEADER & EXPORT */}
-      <div className="bg-white rounded-2xl p-6 lg:px-8 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-            <ShieldCheck className="text-blue-600" size={28} /> City Command Center
-          </h1>
-          <p className="text-sm font-semibold text-slate-500 mt-1.5 flex items-center gap-2">
-            <Calendar size={14} /> {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+      {/* Action Toolbar */}
+      <div className="bg-white rounded-2xl p-4 px-6 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-2 text-slate-700 font-extrabold text-sm">
+          <Calendar size={16} className="text-blue-600" />
+          <span>Date: {todayStr}</span>
         </div>
-        <button 
-          onClick={downloadReport}
-          className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-sm"
-        >
-          <Download size={16} /> Export CSV Report
-        </button>
+        
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={downloadReport}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm"
+          >
+            <Download size={14} /> Export CSV Report
+          </button>
+        </div>
       </div>
 
       {/* LIVE ALERTS */}
@@ -199,95 +209,153 @@ export default function CityAdminDashboard() {
         </div>
       </div>
 
-      {/* KPI SECTIONS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* CHARTS SECTION - 3 PANELS ROW */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* TASKFORCE KPIs */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
-          <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
-            <MapPin size={14} /> Inspection & Performance (Taskforce)
-          </h2>
-          <div className="grid grid-cols-2 gap-4">
-            <KpiBlock label="Total Reports" value={allTaskforce.length} color="blue" />
-            <KpiBlock label="Action Required" value={actionRequiredCount} color="amber" highlight />
-            <KpiBlock label="Resolved" value={acceptedCount} color="emerald" />
-            <KpiBlock label="Rejected" value={rejectedCount} color="rose" />
+        {/* PANEL 1: INSPECTION TREND */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col h-[320px]">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest">INSPECTION TREND</h2>
+            <span className="text-[10px] font-bold text-slate-400">(Last 7 Days)</span>
           </div>
-        </div>
-
-        {/* SWACHH KPIs */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
-          <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
-            <Trophy size={14} /> Swachh Ward Ranking System
-          </h2>
-          <div className="grid grid-cols-2 gap-4">
-            <KpiBlock label="Total Participants" value={swachhStats?.totalParticipants || 0} color="violet" />
-            <KpiBlock label="QC Pending" value={swachhStats?.underReview || 0} color="amber" highlight />
-            <KpiBlock label="Completed Assessments" value={swachhStats?.totalAssessments || 0} color="emerald" />
-            <KpiBlock label="QC Approved" value={swachhStats?.qcApproved || 0} color="blue" />
-          </div>
-        </div>
-      </div>
-
-      {/* CHARTS SECTION */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* TASKFORCE CHART */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col h-[350px]">
-          <h2 className="text-xs font-black text-slate-800 mb-4">Taskforce Issue Resolution Status</h2>
           <div className="flex-1 w-full min-h-0">
-            {taskforceChartData.length > 0 ? (
+            {totalDonut > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={taskforceChartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={85}
-                    paddingAngle={5}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {taskforceChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    itemStyle={{ fontWeight: 'bold' }}
-                  />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b' }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-semibold">No taskforce data to visualize</div>
-            )}
-          </div>
-        </div>
-
-        {/* SWACHH CHART */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col h-[350px]">
-          <h2 className="text-xs font-black text-slate-800 mb-4">Top Swachh Categories by Participation</h2>
-          <div className="flex-1 w-full min-h-0">
-            {swachhChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={swachhChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorSweeping" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorToilets" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorLitterbins" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#94a3b8' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
-                  <Tooltip 
-                    cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {swachhChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#94a3b8' }} />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Legend verticalAlign="top" height={36} iconType="plainline" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#64748b', marginTop: '-15px' }} />
+                  <Area type="monotone" dataKey="Sweeping" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorSweeping)" />
+                  <Area type="monotone" dataKey="Toilets" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorToilets)" />
+                  <Area type="monotone" dataKey="Litterbins" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorLitterbins)" />
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-semibold">No category data to visualize</div>
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs font-semibold">No trend data available</div>
             )}
+          </div>
+        </div>
+
+        {/* PANEL 2: STATUS DISTRIBUTION */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col h-[320px]">
+          <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">INSPECTION STATUS DISTRIBUTION</h2>
+          <div className="flex-1 flex items-center justify-between">
+            <div className="w-1/2 h-[200px] relative flex justify-center items-center">
+              {totalDonut > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={donutData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {donutData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-black text-slate-900">{totalDonut}</span>
+                    <span className="text-[10px] font-bold text-slate-400">Total</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-slate-400 text-xs font-semibold">No data</div>
+              )}
+            </div>
+            
+            <div className="w-1/2 pl-4 flex flex-col gap-4">
+              {donutData.map((d, i) => {
+                const percentage = totalDonut > 0 ? Math.round((d.value / totalDonut) * 100) : 0;
+                return (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                      <span className="text-xs font-bold text-slate-700">{d.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-900">{d.value}</span>
+                      <span className="text-[10px] font-bold text-slate-400 w-[28px] text-right">({percentage}%)</span>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="mt-2 flex justify-center">
+                <button className="px-4 py-1.5 rounded-full border border-blue-100 bg-blue-50 text-blue-600 text-[10px] font-black hover:bg-blue-100 transition-colors">
+                  View Details
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PANEL 3: ACTIVITY SUMMARY */}
+        <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col h-[320px]">
+          <h2 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">TASKFORCE ACTIVITY SUMMARY</h2>
+          <div className="flex-1 grid grid-cols-2 gap-4">
+            
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-4 hover:border-slate-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
+                <ClipboardList size={20} />
+              </div>
+              <div>
+                <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Inspections Today</div>
+                <div className="text-2xl font-black text-slate-900 leading-none">{inspectionsToday}</div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-4 hover:border-slate-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600 border border-violet-100 shrink-0">
+                <Activity size={20} />
+              </div>
+              <div>
+                <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Actions Taken</div>
+                <div className="text-2xl font-black text-slate-900 leading-none">{actionsTaken}</div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-4 hover:border-slate-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 border border-rose-100 shrink-0">
+                <ClipboardList size={20} />
+              </div>
+              <div>
+                <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Issues Reported</div>
+                <div className="text-2xl font-black text-slate-900 leading-none">{issuesReported}</div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-4 hover:border-slate-200 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Issues Resolved</div>
+                <div className="text-2xl font-black text-slate-900 leading-none">{issuesResolved}</div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

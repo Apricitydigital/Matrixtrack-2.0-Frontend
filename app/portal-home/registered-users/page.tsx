@@ -9,6 +9,8 @@ import {
 import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
 import { ConfirmDialog } from "@components/ui/ConfirmDialog";
+import { TableExportDropdown } from '@components/ui/TableExportDropdown';
+import { roleLabel } from '@lib/labels';
 import { Modal } from "@components/ui/Modal";
 
 type Role =
@@ -249,19 +251,22 @@ export default function RegisteredUsersPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => window.location.href = '/portal-home/common-registration'}
-            className="
-              inline-flex h-11 shrink-0 items-center justify-center gap-2
-              rounded-[11px] bg-blue-600 px-5
-              text-xs font-extrabold text-white
-              shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
-              hover:bg-blue-500 transition
-            "
-          >
-            <UserPlus size={16} />
-            Register New Employee
-          </button>
+          <div className="flex items-center gap-3">
+            <TableExportDropdown tableId="registered-users-table" filename="Registered_Users_Directory" title="Registered Users Directory" />
+            <button
+              onClick={() => window.location.href = '/portal-home/common-registration'}
+              className="
+                inline-flex h-11 shrink-0 items-center justify-center gap-2
+                rounded-[11px] bg-blue-600 px-5
+                text-xs font-extrabold text-white
+                shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
+                hover:bg-blue-500 transition
+              "
+            >
+              <UserPlus size={16} />
+              Register New Employee
+            </button>
+          </div>
         </div>
       )}
 
@@ -405,7 +410,7 @@ export default function RegisteredUsersPage() {
 
         {/* ── USERS TABLE ── */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1280px] table-fixed">
+          <table id="registered-users-table" className="w-full min-w-[1280px] table-fixed">
             <colgroup>
               <col className="w-[4%]" />
               <col className="w-[13%]" />

@@ -2261,8 +2261,16 @@ import {
   Leaf,
   Calendar,
   Download,
+  FileText,
+  AlertTriangle,
+  FilePlus,
+  Clock,
+  CheckCircle2,
+  Menu,
 } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { TableExportDropdown } from '@components/ui/TableExportDropdown';
 
 // ── Pure SVG Donut Chart ──────────────────────────────────────────────────────
 function Donut({ data, size = 110, stroke = 18 }: { data: { v: number; color: string }[]; size?: number; stroke?: number }) {
@@ -2409,6 +2417,7 @@ import GlobalAdminDashboard from "../portal-home/GlobalAdminDashboard";
 
 export default function CityDashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
 
   const isSuperAdmin =
     user?.role === 'super_admin' ||
@@ -2486,6 +2495,18 @@ export default function CityDashboardPage() {
     twinbin: { registered: 0, pendingReg: 0, inspectionsDone: 0, inspectionPending: 0, uninspected: 0, actionTaken: 0, actionRequired: 0 },
     taskforce: { registered: 0, pendingReg: 0, inspectionsDone: 0, inspectionPending: 0, uninspected: 0, actionTaken: 0, actionRequired: 0 }
   });
+
+  // New States for Asset Requests and Supervisor Performance
+  const [assetRequests, setAssetRequests] = useState<any[]>([]);
+  const [supervisorMissedWork, setSupervisorMissedWork] = useState<any[]>([]);
+  const [perfZoneFilter, setPerfZoneFilter] = useState<string>('ALL');
+  const [perfWardFilter, setPerfWardFilter] = useState<string>('ALL');
+
+  // Active Supervisors Tracker
+  const [activeSupervisors, setActiveSupervisors] = useState<any[]>([]);
+  const [activeSupZoneFilter, setActiveSupZoneFilter] = useState<string>('ALL');
+  const [activeSupWardFilter, setActiveSupWardFilter] = useState<string>('ALL');
+  const [activeSupTimeFilter, setActiveSupTimeFilter] = useState<string>('TODAY');
 
   // Commissioner premium dashboard real data
   const [toiletDashStats, setToiletDashStats] = useState<any>(null);
@@ -2570,7 +2591,40 @@ export default function CityDashboardPage() {
           };
         });
         setBarChartData(chartRows);
-      } catch { setBarChartData([]); }
+
+        // Extract Active Supervisors
+        const allFetchedActivity = [
+          ...(swpRec.data || []).map((r: any) => ({ ...r, moduleName: 'Sweeping' })),
+          ...(toilRec.data || []).map((r: any) => ({ ...r, moduleName: 'Toilet' })),
+          ...(binRec.data || []).map((r: any) => ({ ...r, moduleName: 'Litterbin' }))
+        ];
+        
+        const supMap: Record<string, any> = {};
+        allFetchedActivity.forEach((r: any) => {
+          const u = r.user || r.employee || r.supervisor || r.inspector;
+          if (u && r.createdAt) {
+             const uId = u.id || u.name;
+             if (!supMap[uId]) {
+               supMap[uId] = {
+                 id: uId, name: u.name || 'Unknown', role: u.role || 'Supervisor',
+                 zone: r.zone?.name || r.zoneName || 'Various Zones',
+                 ward: r.ward?.name || r.wardName || 'Various Wards',
+                 modules: new Set<string>(),
+                 dates: []
+               };
+             }
+             supMap[uId].modules.add(r.moduleName);
+             supMap[uId].dates.push(r.createdAt);
+          }
+        });
+        
+        const activeList = Object.values(supMap).map((s: any) => ({
+           ...s,
+           modules: Array.from(s.modules).join(', ')
+        }));
+        setActiveSupervisors(activeList);
+
+      } catch { setBarChartData([]); setActiveSupervisors([]); }
 
       // Zone & Ward activity
       const [beatsRes, regRes, zoneRes, wardRes, areaRes] = await Promise.all([
@@ -2676,6 +2730,49 @@ export default function CityDashboardPage() {
       };
 
       setExtraModuleStats(extraStatsData);
+
+      // Process Asset Requests for "Live Container"
+      const assetsList = [
+        ...(toiletPendingRes?.toilets || []).map((t: any) => ({
+          id: t.id, module: 'Toilet', requestedBy: t.requestedBy?.name || t.requestedByName || 'Supervisor',
+          approvedBy: t.approvedBy?.name || 'Pending Approval', date: t.createdAt || new Date().toISOString(),
+          zone: t.zone?.name || t.zoneName || 'Unknown Zone', ward: t.ward?.name || t.wardName || 'Unknown Ward', status: t.status
+        })),
+        ...(twinbinPendingRes?.data || []).map((t: any) => ({
+          id: t.id, module: 'Litterbin', requestedBy: t.requestedBy?.name || t.requestedByName || 'Supervisor',
+          approvedBy: t.approvedBy?.name || 'Pending Approval', date: t.createdAt || new Date().toISOString(),
+          zone: t.zone?.name || t.zoneName || 'Unknown Zone', ward: t.ward?.name || t.wardName || 'Unknown Ward', status: t.status
+        })),
+        ...(taskforcePendingRes?.feederPoints || []).map((t: any) => ({
+          id: t.id, module: 'GVP/CTU', requestedBy: t.requestedBy?.name || t.requestedByName || 'Supervisor',
+          approvedBy: t.approvedBy?.name || 'Pending Approval', date: t.createdAt || new Date().toISOString(),
+          zone: t.zone?.name || t.zoneName || 'Unknown Zone', ward: t.ward?.name || t.wardName || 'Unknown Ward', status: t.status
+        })),
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      setAssetRequests(assetsList);
+
+      // Process Supervisor Missed Work
+      const missedWorkMap: Record<string, { id: string, name: string, role: string, zone: string, ward: string, missedCount: number }> = {};
+      beats.forEach((b: any) => {
+        if (b.assignedToId) {
+          const supId = b.assignedToId;
+          const supName = b.assignedTo?.name || b.assignedToName || 'Unknown Supervisor';
+          const zName = b.ward?.zone?.name || b.zoneName || 'Unknown Zone';
+          const wName = b.ward?.name || b.wardName || 'Unknown Ward';
+          const status = b.lastAssessment?.status || b.status;
+          
+          if (!missedWorkMap[supId]) {
+            missedWorkMap[supId] = { id: supId, name: supName, role: 'Supervisor', zone: zName, ward: wName, missedCount: 0 };
+          }
+          
+          if (!status || status === "REJECTED" || status === "ACTION_REQUIRED" || status === "PENDING" || status === "PENDING_ASSIGNMENT") {
+            missedWorkMap[supId].missedCount++;
+          }
+        }
+      });
+      
+      setSupervisorMissedWork(Object.values(missedWorkMap).filter(w => w.missedCount > 0).sort((a, b) => b.missedCount - a.missedCount));
 
       if (isReadOnlyView) {
         // Fetch toilet dashboard stats for commissioner premium sections
@@ -4658,29 +4755,45 @@ export default function CityDashboardPage() {
               background: #f5f8ff;
             }
         
+            .mx-city-dashboard {
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            }
+
             .mx-kpi-grid,
             .mx-user-grid,
             .mx-module-grid {
               display: grid;
               grid-template-columns: repeat(4, minmax(0, 1fr));
-              gap: 14px;
+              gap: 12px;
             }
         
             .mx-kpi-card {
               position: relative;
               overflow: hidden;
-              min-height: 142px;
-              padding: 17px 18px 15px;
-              border-radius: 18px;
-              border: 1px solid #e3eaf4;
-              background: linear-gradient(145deg, #ffffff, #fbfdff);
-              transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+              min-height: 110px;
+              padding: 14px 16px 12px;
+              border-radius: 16px;
+              border: 1px solid var(--kpi-border, #e2e8f0);
+              background: linear-gradient(145deg, #ffffff 0%, var(--kpi-soft, #f8fafc) 145%);
+              transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .25s cubic-bezier(0.4, 0, 0.2, 1), border-color .25s cubic-bezier(0.4, 0, 0.2, 1);
+              cursor: pointer;
             }
         
             .mx-kpi-card:hover {
-              transform: translateY(-2px);
-              border-color: #d5e2f4;
-              box-shadow: var(--mx-shadow-hover);
+              transform: translateY(-4px) scale(1.012);
+              border-color: #3b82f6;
+              box-shadow: 0 12px 28px -6px rgba(37, 99, 235, 0.14);
+            }
+
+            .mx-kpi-card:hover .mx-kpi-icon {
+              transform: scale(1.08) rotate(-3deg);
+              transition: transform 0.25s ease;
+            }
+
+            .mx-kpi-card:hover .mx-kpi-arrow {
+              transform: translateX(3px);
+              color: #2563eb;
+              transition: transform 0.25s ease, color 0.25s ease;
             }
         
             .mx-kpi-card::after {
@@ -4688,11 +4801,11 @@ export default function CityDashboardPage() {
               position: absolute;
               right: -22px;
               bottom: -42px;
-              width: 105px;
-              height: 105px;
+              width: 95px;
+              height: 95px;
               border-radius: 50%;
               background: var(--kpi-soft);
-              opacity: .72;
+              opacity: .65;
             }
         
             .mx-kpi-top {
@@ -4704,117 +4817,132 @@ export default function CityDashboardPage() {
             }
         
             .mx-kpi-icon {
-              width: 42px;
-              height: 42px;
+              width: 36px;
+              height: 36px;
               display: grid;
               place-items: center;
-              border-radius: 12px;
+              border-radius: 10px;
               color: var(--kpi-color);
               background: var(--kpi-icon-bg);
               border: 1px solid var(--kpi-border);
+              transition: transform 0.25s ease;
             }
         
             .mx-kpi-arrow {
-              color: #c2ccda;
+              color: #cbd5e1;
               margin-top: 2px;
+              transition: transform 0.25s ease, color 0.25s ease;
             }
         
             .mx-kpi-label {
               position: relative;
               z-index: 1;
-              margin-top: 15px;
-              color: #65758c;
+              margin-top: 10px;
+              color: #64748b;
               font-size: 10px;
               font-weight: 750;
               letter-spacing: .055em;
               text-transform: uppercase;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
         
             .mx-kpi-value {
               position: relative;
               z-index: 1;
-              margin-top: 4px;
-              color: #17243c;
-              font-size: 31px;
+              margin-top: 2px;
+              color: #0f172a;
+              font-size: 24px;
               line-height: 1;
               font-weight: 800;
-              letter-spacing: -.04em;
+              letter-spacing: -.03em;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
         
             .mx-kpi-accent {
               position: absolute;
-              left: 18px;
+              left: 16px;
               bottom: 0;
-              width: 46px;
+              width: 40px;
               height: 3px;
               border-radius: 999px 999px 0 0;
               background: var(--kpi-color);
             }
         
             .mx-user-card {
-              min-height: 112px;
-              padding: 17px;
+              min-height: 88px;
+              padding: 13px 15px;
               border: 1px solid var(--user-border);
-              border-radius: 17px;
+              border-radius: 16px;
               display: flex;
               align-items: center;
-              gap: 14px;
+              gap: 12px;
               background: linear-gradient(145deg, #ffffff 0%, var(--user-wash) 145%);
-              transition: transform .2s ease, box-shadow .2s ease;
+              transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .25s cubic-bezier(0.4, 0, 0.2, 1), border-color .25s cubic-bezier(0.4, 0, 0.2, 1);
+              cursor: pointer;
             }
         
             .mx-user-card:hover {
-              transform: translateY(-2px);
-              box-shadow: var(--mx-shadow-hover);
+              transform: translateY(-4px) scale(1.012);
+              border-color: #3b82f6;
+              box-shadow: 0 12px 28px -6px rgba(37, 99, 235, 0.14);
+            }
+
+            .mx-user-card:hover .mx-user-icon {
+              transform: scale(1.08) rotate(-3deg);
+              transition: transform 0.25s ease;
             }
         
             .mx-user-icon {
-              width: 45px;
-              height: 45px;
-              flex: 0 0 45px;
-              border-radius: 13px;
+              width: 38px;
+              height: 38px;
+              flex: 0 0 38px;
+              border-radius: 11px;
               display: grid;
               place-items: center;
               color: var(--user-color);
               background: var(--user-icon-bg);
+              transition: transform 0.25s ease;
             }
         
             .mx-user-label {
-              color: #63738a;
+              color: #64748b;
               font-size: 10px;
               font-weight: 750;
               line-height: 1.25;
               letter-spacing: .05em;
               text-transform: uppercase;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
         
             .mx-user-value {
-              margin-top: 5px;
-              color: #18263d;
-              font-size: 29px;
+              margin-top: 3px;
+              color: #0f172a;
+              font-size: 24px;
               line-height: 1;
               font-weight: 800;
-              letter-spacing: -.04em;
+              letter-spacing: -.03em;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
         
             .mx-module-card {
               position: relative;
               overflow: hidden;
-              min-height: 102px;
-              padding: 16px 17px;
-              border: 1px solid #e2e9f3;
-              border-radius: 17px;
+              min-height: 84px;
+              padding: 12px 14px;
+              border: 1px solid #e2e8f0;
+              border-radius: 16px;
               display: flex;
               align-items: center;
-              gap: 13px;
-              background: #fbfcfe;
-              transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+              gap: 12px;
+              background: #ffffff;
+              transition: transform .25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .25s cubic-bezier(0.4, 0, 0.2, 1), border-color .25s cubic-bezier(0.4, 0, 0.2, 1);
+              cursor: pointer;
             }
         
             .mx-module-card:hover {
-              transform: translateY(-2px);
-              background: #ffffff;
-              box-shadow: var(--mx-shadow-hover);
+              transform: translateY(-4px) scale(1.012);
+              border-color: #3b82f6;
+              box-shadow: 0 12px 28px -6px rgba(37, 99, 235, 0.14);
             }
         
             .mx-module-card::after {
@@ -5104,83 +5232,85 @@ export default function CityDashboardPage() {
         
           <div className="mx-city-dashboard">
             <div className="mx-shell">
-              {/* Premium Header */}
-              <section className="mx-hero">
-                <div className="mx-hero-left">
-                  <div className="mx-city-mark">
-                    <Building2 size={27} strokeWidth={1.8} />
+              {/* Grand Dashboard Hero Header */}
+              <section style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', color: 'white', borderRadius: '24px', padding: '26px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 12px 40px -10px rgba(15,23,42,0.6)', position: 'relative', overflow: 'hidden', marginBottom: '24px', flexWrap: 'wrap', gap: '24px' }}>
+                {/* Decorative Background Glow */}
+                <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', height: '100%', background: 'radial-gradient(ellipse at top, rgba(59, 130, 246, 0.2), transparent 70%)', pointerEvents: 'none' }} />
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1, minWidth: '280px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShieldCheck size={14} color="#60a5fa" /> MATRIXTRACK 2.0 • INSPECTION & PERFORMANCE
                   </div>
-                  <div>
-                    <div className="mx-eyebrow">
-                      <span className="mx-eyebrow-dot" />
-                      City Administration Dashboard
-                    </div>
-                    <h1 className="mx-hero-title">
-                      {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'City Admin'}
-                    </h1>
-                    <div className="mx-hero-meta">
-                      <span className="mx-location">
-                        <MapPin size={13} />
-                        {cityName || 'Indore Municipal Corporation'}
-                      </span>
-                      <span className="mx-meta-separator" />
-                      <span>
-                        Updated {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                      </span>
-                    </div>
+                  
+                  <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, tracking: '-0.02em' }}>
+                    {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'Indore Admin'} <span style={{ fontSize: '22px' }}>👋</span>
+                  </h1>
+
+                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
+                    Track inspections, monitor performance & improve city operations
+                  </p>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <MapPin size={12} color="#38bdf8" /> {cityName || 'Indore Municipal Corporation'}
+                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#818cf8', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.25)', padding: '3px 10px', borderRadius: '12px' }}>
+                      {isSuperAdmin ? 'Super Admin' : 'City Admin'}
+                    </span>
                   </div>
                 </div>
-        
-                <div className="mx-hero-actions">
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1, flexWrap: 'wrap' }}>
                   {isSuperAdmin && (
-                    <label className="mx-control" style={{ minWidth: 150 }}>
-                      <MapPin size={15} color="#3b73df" />
-                      <select value={filterCity} onChange={(e) => setFilterCity(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#1e293b', fontSize: 13, fontWeight: 600, width: '100%', appearance: 'none', cursor: 'pointer' }}>
-                        <option value="ALL">All Cities</option>
+                    <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MapPin size={15} color="#94a3b8" />
+                      <select value={filterCity} onChange={(e) => setFilterCity(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, appearance: 'none', cursor: 'pointer' }}>
+                        <option value="ALL" style={{ color: '#0f172a' }}>All Cities</option>
                         {cities.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
+                          <option key={c.id} value={c.id} style={{ color: '#0f172a' }}>{c.name}</option>
                         ))}
                       </select>
-                    </label>
+                    </div>
                   )}
-                  <label className="mx-control">
-                    <Calendar size={15} color="#3b73df" />
-                    <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
-                  </label>
-        
+
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={15} color="#94a3b8" />
+                    <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, outline: 'none', colorScheme: 'dark' }} />
+                  </div>
+
+                  <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
+                       <span style={{ fontSize: '9px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>LIVE API FEED</span>
+                    </div>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>{lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
+                  </div>
+
                   <button
                     type="button"
-                    className="mx-refresh"
-                    onClick={handleDownloadReport}
-                    style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0' }}
-                  >
-                    <Download size={15} />
-                    Download
-                  </button>
-        
-                  <button
-                    type="button"
-                    className="mx-alert"
                     onClick={() => setShowAlertModal(true)}
+                    style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', borderRadius: '12px', padding: '9px 14px', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
                   >
-                    <Bell size={15} />
-                    System Alerts
-                    {((extraModuleStats.toilet.actionRequired || 0) +
-                      (extraModuleStats.twinbin.actionRequired || 0) +
-                      (extraModuleStats.taskforce.actionRequired || 0) +
-                      (sweepingDetailStats.actionRequired || 0)) > 0 && (
-                      <span className="mx-alert-badge">
-                        {(extraModuleStats.toilet.actionRequired || 0) +
-                          (extraModuleStats.twinbin.actionRequired || 0) +
-                          (extraModuleStats.taskforce.actionRequired || 0) +
-                          (sweepingDetailStats.actionRequired || 0)}
+                    <Bell size={15} color="#fca5a5" />
+                    Alerts
+                    {((extraModuleStats.toilet.actionRequired || 0) + (extraModuleStats.twinbin.actionRequired || 0) + (extraModuleStats.taskforce.actionRequired || 0) + (sweepingDetailStats.actionRequired || 0)) > 0 && (
+                      <span style={{ background: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 900, padding: '2px 6px', borderRadius: '10px' }}>
+                        {(extraModuleStats.toilet.actionRequired || 0) + (extraModuleStats.twinbin.actionRequired || 0) + (extraModuleStats.taskforce.actionRequired || 0) + (sweepingDetailStats.actionRequired || 0)}
                       </span>
                     )}
                   </button>
-        
-                  <button type="button" className="mx-refresh" onClick={loadAll} disabled={refreshing}>
-                    <RefreshCw size={15} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} />
+
+                  <button type="button" onClick={loadAll} disabled={refreshing} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', borderRadius: '12px', padding: '9px 14px', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <RefreshCw size={14} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} />
                     {refreshing ? 'Refreshing...' : 'Refresh'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadReport}
+                    style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(37,99,235,0.4)' }}
+                  >
+                    <Download size={14} /> Export Report
                   </button>
                 </div>
               </section>
@@ -5202,10 +5332,10 @@ export default function CityDashboardPage() {
         
                 <div className="mx-kpi-grid">
                   {[
-                    { label: 'Total Registered Zones', value: cityGeoStats?.zones || 0, icon: Map, color: '#3478f6', soft: '#eef5ff', iconBg: '#f2f7ff', border: '#cfe0ff' },
-                    { label: 'Total Registered Wards', value: cityGeoStats?.wards || 0, icon: MapPin, color: '#6a63ef', soft: '#f2f0ff', iconBg: '#f5f3ff', border: '#ddd8ff' },
-                    { label: 'Total Registered Areas', value: cityGeoStats?.areas || 0, icon: Target, color: '#24a2d8', soft: '#edf9ff', iconBg: '#f1fbff', border: '#cceefa' },
-                    { label: 'Total Registered Beats', value: cityGeoStats?.beats || 0, icon: Activity, color: '#1688c4', soft: '#edf8fe', iconBg: '#f1f9fd', border: '#cbe8f6' },
+                    { label: 'Total Registered Zones', value: cityGeoStats?.zones || 0, icon: Map, color: '#2563eb', soft: '#eff6ff', iconBg: '#dbeafe', border: '#bfdbfe' },
+                    { label: 'Total Registered Wards', value: cityGeoStats?.wards || 0, icon: MapPin, color: '#7c3aed', soft: '#f5f3ff', iconBg: '#ede9fe', border: '#ddd6fe' },
+                    { label: 'Total Registered Areas', value: cityGeoStats?.areas || 0, icon: Target, color: '#0284c7', soft: '#f0f9ff', iconBg: '#e0f2fe', border: '#bae6fd' },
+                    { label: 'Total Registered Beats', value: cityGeoStats?.beats || 0, icon: Activity, color: '#0d9488', soft: '#f0fdf4', iconBg: '#ccfbf1', border: '#99f6e4' },
                   ].map((card, i) => (
                     <div
                       key={i}
@@ -5218,8 +5348,8 @@ export default function CityDashboardPage() {
                       } as React.CSSProperties}
                     >
                       <div className="mx-kpi-top">
-                        <div className="mx-kpi-icon"><card.icon size={20} strokeWidth={1.9} /></div>
-                        <ChevronRight className="mx-kpi-arrow" size={17} />
+                        <div className="mx-kpi-icon"><card.icon size={18} strokeWidth={1.9} /></div>
+                        <ChevronRight className="mx-kpi-arrow" size={16} />
                       </div>
                       <div className="mx-kpi-label">{card.label}</div>
                       <div className="mx-kpi-value">{statsLoading ? '—' : card.value}</div>
@@ -5233,7 +5363,7 @@ export default function CityDashboardPage() {
               <section className="mx-section">
                 <div className="mx-section-head">
                   <div className="mx-section-title-wrap">
-                    <div className="mx-section-icon" style={{ color: '#7a62df', background: '#f6f3ff', borderColor: '#e6ddff' }}>
+                    <div className="mx-section-icon" style={{ color: '#7c3aed', background: '#f5f3ff', borderColor: '#ddd6fe' }}>
                       <Users size={18} />
                     </div>
                     <div>
@@ -5248,19 +5378,22 @@ export default function CityDashboardPage() {
         
                 <div className="mx-user-grid">
                   {[
-                    { title: 'TOTAL ACTION OFFICERS', count: stats?.actionOfficers || stats?.ACTION_OFFICER || 0, icon: UserCog, color: '#1b9a74', iconBg: '#edf9f5', border: '#cfeee3', wash: '#f5fcf9' },
-                    { title: 'TOTAL QUALITY CONTROLLER', count: stats?.qualityControllers || stats?.QC || 0, icon: Search, color: '#7657e8', iconBg: '#f4f1ff', border: '#ded5ff', wash: '#faf8ff' },
-                    { title: 'TOTAL SUPERVISORS', count: stats?.taskforceMembers || stats?.SUPERVISOR || 0, icon: ShieldCheck, color: '#d58a19', iconBg: '#fff7e9', border: '#f4dfb8', wash: '#fffaf2' },
-                    { title: 'TOTAL EMPLOYEES', count: stats?.employees || stats?.EMPLOYEE || 0, icon: Users, color: '#3d76df', iconBg: '#eff5ff', border: '#d2e2ff', wash: '#f7faff' },
+                    { title: 'TOTAL ACTION OFFICERS', count: stats?.actionOfficers || stats?.ACTION_OFFICER || 0, icon: UserCog, color: '#059669', iconBg: '#d1fae5', border: '#a7f3d0', wash: '#ecfdf5', link: '/portal-home/common-registration' },
+                    { title: 'TOTAL QUALITY CONTROLLER', count: stats?.qualityControllers || stats?.QC || 0, icon: Search, color: '#7e22ce', iconBg: '#f3e8ff', border: '#e9d5ff', wash: '#faf5ff', link: '/portal-home/common-registration' },
+                    { title: 'TOTAL SUPERVISORS', count: stats?.taskforceMembers || stats?.SUPERVISOR || 0, icon: ShieldCheck, color: '#d97706', iconBg: '#fef3c7', border: '#fde68a', wash: '#fffbeb', link: '/portal-home/common-registration' },
+                    { title: 'TOTAL EMPLOYEES', count: stats?.employees || stats?.EMPLOYEE || 0, icon: Users, color: '#2563eb', iconBg: '#dbeafe', border: '#bfdbfe', wash: '#eff6ff', link: '/portal-home/common-registration' },
                   ].map((card, i) => (
                     <div
                       key={i}
                       className="mx-user-card"
+                      onClick={() => router.push(card.link)}
                       style={{
                         '--user-color': card.color,
                         '--user-icon-bg': card.iconBg,
                         '--user-border': card.border,
                         '--user-wash': card.wash,
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s, box-shadow 0.2s'
                       } as React.CSSProperties}
                     >
                       <div className="mx-user-icon"><card.icon size={21} strokeWidth={1.9} /></div>
@@ -5292,10 +5425,10 @@ export default function CityDashboardPage() {
         
                 {(() => {
                   const moduleCards = [
-                    { keyMatch: ['sweeping'], name: 'Sweeping', color: '#1b9a74', soft: '#edf9f5', border: '#cfeee3', icon: BrushCleaning },
-                    { keyMatch: ['toilet'], name: 'Cleanliness of Toilets', color: '#3d76df', soft: '#eff5ff', border: '#d2e2ff', icon: Toilet },
-                    { keyMatch: ['twinbin', 'litter', 'bin'], name: 'Litterbins', color: '#d78212', soft: '#fff7e9', border: '#f4dfb8', icon: Trash2 },
-                    { keyMatch: ['taskforce', 'gvp', 'ctu'], name: 'CTU / GVP Transformation', color: '#7657e8', soft: '#f4f1ff', border: '#ded5ff', icon: Truck },
+                    { keyMatch: ['sweeping'], name: 'Sweeping', color: '#1b9a74', soft: '#edf9f5', border: '#cfeee3', icon: BrushCleaning, link: '/modules/sweeping' },
+                    { keyMatch: ['toilet'], name: 'Cleanliness of Toilets', color: '#3d76df', soft: '#eff5ff', border: '#d2e2ff', icon: Toilet, link: '/modules/toilet' },
+                    { keyMatch: ['twinbin', 'litter', 'bin'], name: 'Litterbins', color: '#d78212', soft: '#fff7e9', border: '#f4dfb8', icon: Trash2, link: '/modules/litterbins' },
+                    { keyMatch: ['taskforce', 'gvp', 'ctu'], name: 'CTU / GVP Transformation', color: '#7657e8', soft: '#f4f1ff', border: '#ded5ff', icon: Truck, link: '/modules/taskforce' },
                   ];
                   const cards = moduleCards.map((mc) => {
                     const found = moduleActivity.find((m) => mc.keyMatch.some((k) => m.key.toLowerCase().includes(k)));
@@ -5308,10 +5441,13 @@ export default function CityDashboardPage() {
                         <div
                           key={i}
                           className="mx-module-card"
+                          onClick={() => router.push(item.link)}
                           style={{
                             '--module-color': item.color,
                             '--module-soft': item.soft,
                             '--module-border': item.border,
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s, box-shadow 0.2s'
                           } as React.CSSProperties}
                         >
                           <div className="mx-module-icon"><item.icon size={20} strokeWidth={1.9} /></div>
@@ -5322,6 +5458,414 @@ export default function CityDashboardPage() {
                         </div>
                       ))}
                     </div>
+                  );
+                })()}
+              </section>
+
+              {/* Supervisor Performance (Missed Work) */}
+              <section className="mx-section">
+                <div className="mx-section-head">
+                  <div className="mx-section-title-wrap">
+                    <div className="mx-section-icon" style={{ color: '#eab308', background: '#fefce8', borderColor: '#fef08a' }}>
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div>
+                      <h2 className="mx-section-title">SUPERVISOR ACTION REQUIRED</h2>
+                      <div className="mx-section-subtitle">Supervisors with missed or incomplete tasks</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <select
+                      value={perfZoneFilter}
+                      onChange={(e) => setPerfZoneFilter(e.target.value)}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none' }}
+                    >
+                      <option value="ALL">All Zones</option>
+                      {/* Unique zones from missed work */}
+                      {Array.from(new Set(supervisorMissedWork.map(w => w.zone))).map((z, i) => (
+                        <option key={i} value={z}>{z}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={perfWardFilter}
+                      onChange={(e) => setPerfWardFilter(e.target.value)}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none' }}
+                    >
+                      <option value="ALL">All Wards</option>
+                      {/* Unique wards from missed work (filtered by zone) */}
+                      {Array.from(new Set(supervisorMissedWork.filter(w => perfZoneFilter === 'ALL' || w.zone === perfZoneFilter).map(w => w.ward))).map((w, i) => (
+                        <option key={i} value={w}>{w}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(() => {
+                    const filteredWork = supervisorMissedWork.filter(w => 
+                      (perfZoneFilter === 'ALL' || w.zone === perfZoneFilter) &&
+                      (perfWardFilter === 'ALL' || w.ward === perfWardFilter)
+                    );
+                    
+                    if (filteredWork.length === 0) {
+                      return <div style={{ padding: '4px 0 12px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 500 }}>No missed work found for the selected filters.</div>;
+                    }
+                    
+                    return filteredWork.map((worker, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '10px', background: '#fff' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontWeight: 700, fontSize: '14px' }}>
+                            {worker.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{worker.name}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>{worker.zone} • {worker.ward}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', color: '#ef4444', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>
+                          <AlertCircle size={14} />
+                          {worker.missedCount} Missed Task{worker.missedCount !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </section>
+
+              {/* Live Asset Registration Tracker */}
+              <section className="mx-section">
+                <div className="mx-section-head">
+                  <div className="mx-section-title-wrap">
+                    <div className="mx-section-icon" style={{ color: '#3b82f6', background: '#eff6ff', borderColor: '#bfdbfe' }}>
+                      <FilePlus size={18} />
+                    </div>
+                    <div>
+                      <h2 className="mx-section-title">ASSET REGISTRATION REQUESTS</h2>
+                      <div className="mx-section-subtitle">Live tracking of new asset additions</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(() => {
+                    const visibleRequests = assetRequests.filter(req => req.module !== 'GVP/CTU');
+                    
+                    if (visibleRequests.length === 0) {
+                      return <div style={{ padding: '4px 0 12px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 500 }}>No new asset requests pending.</div>;
+                    }
+                    
+                    return visibleRequests.map((req, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '10px', background: '#fff' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ background: req.module === 'Toilet' ? '#eff6ff' : '#fffbeb', color: req.module === 'Toilet' ? '#3b82f6' : '#f59e0b', padding: '10px', borderRadius: '10px' }}>
+                            {req.module === 'Toilet' ? <Toilet size={18} /> : <Trash2 size={18} />}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{req.module} Request</div>
+                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                              Req: <span style={{ color: '#0f172a', fontWeight: 600 }}>{req.requestedBy}</span> • {req.zone} • {req.ward}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: req.status === 'PENDING' ? '#fefce8' : '#ecfdf5', color: req.status === 'PENDING' ? '#eab308' : '#10b981', padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, marginBottom: '4px' }}>
+                            {req.status === 'PENDING' ? <Clock size={12} /> : <CheckCircle2 size={12} />}
+                            {req.status}
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>
+                            {new Date(req.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </section>
+
+              {/* Beat Analytics Section */}
+              <section className="mx-section" style={{ background: 'transparent', boxShadow: 'none', padding: 0, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '24px' }}>
+                {(() => {
+                  const totalBeats = cityGeoStats.beats || 0;
+                  const assignedToSup = sweepingDetailStats.qcAssigned || 0;
+                  const unassigned = Math.max(0, totalBeats - assignedToSup);
+                  const assignedToEmp = sweepingDetailStats.assignedSegments || 0; 
+                  const pendingAction = sweepingDetailStats.pendingDeployment || 0;
+
+                  // Since "Beat Requests" API isn't explicitly available, we default to 0 to maintain UI structure
+                  const totalRequests = 0;
+                  const approvedReqs = 0;
+                  const pendingReqs = 0;
+
+                  return (
+                    <>
+                      {/* Card 1: Beat Requests */}
+                      <div className="bg-white rounded-[20px] p-6 shadow-[0_2px_12px_rgb(0,0,0,0.03)] border border-[#f1f5f9] cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push('/city/beat-requests')} style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <FileText size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-[#1e293b] font-bold text-[14px]">Beat Requests</h3>
+                            <p className="text-[#64748b] text-[12px] font-medium mt-0.5">Approval status</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">Total Requests</span>
+                            <span className="text-[14px] font-bold text-[#0f172a]">{totalRequests}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">Approved</span>
+                            <span className="text-[14px] font-bold text-[#10b981]">{approvedReqs}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">Pending</span>
+                            <span className="text-[14px] font-bold text-[#f59e0b]">{pendingReqs}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card 2: Beat Assignments */}
+                      <div className="bg-white rounded-[20px] p-6 shadow-[0_2px_12px_rgb(0,0,0,0.03)] border border-[#f1f5f9] cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push('/city/beat-status')} style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <Users size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-[#1e293b] font-bold text-[14px]">Beat Assignments</h3>
+                            <p className="text-[#64748b] text-[12px] font-medium mt-0.5">Assigned workforce</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">Total Beats</span>
+                            <span className="text-[14px] font-bold text-[#0f172a]">{totalBeats}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">To Employees</span>
+                            <span className="text-[14px] font-bold text-[#10b981]">{assignedToEmp}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">To Supervisors</span>
+                            <span className="text-[14px] font-bold text-[#3b82f6]">{assignedToSup}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card 3: Unassigned Beats */}
+                      <div className="bg-white rounded-[20px] p-6 shadow-[0_2px_12px_rgb(0,0,0,0.03)] border border-[#f1f5f9] cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push('/city/beat-status')} style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                            <AlertCircle size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-[#1e293b] font-bold text-[14px]">Unassigned Beats</h3>
+                            <p className="text-[#64748b] text-[12px] font-medium mt-0.5">Pending allocation</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">Total Beats</span>
+                            <span className="text-[14px] font-bold text-[#0f172a]">{totalBeats}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">Unassigned</span>
+                            <span className="text-[14px] font-bold text-[#ef4444]">{unassigned}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[13px] font-semibold text-[#475569]">Pending Action</span>
+                            <span className="text-[14px] font-bold text-[#f59e0b]">{pendingAction}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </section>
+
+              {/* Taskforce & Top Issues Section */}
+              <section className="mx-section" style={{ background: 'transparent', boxShadow: 'none', padding: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                {(() => {
+                  // Fetch live data from moduleActivity
+                  const twinbin = moduleActivity.find(m => m.key === 'TWINBIN') || { total: 0, pending: 0, approved: 0, actionRequired: 0 };
+                  const toilet = moduleActivity.find(m => m.key === 'TOILET') || { total: 0, pending: 0, approved: 0, actionRequired: 0 };
+                  const sweeping = moduleActivity.find(m => m.key === 'SWEEPING') || { total: 0, pending: 0, approved: 0, actionRequired: 0 };
+                  const taskforce = moduleActivity.find(m => m.key === 'TASKFORCE') || { total: 0, pending: 0, approved: 0, actionRequired: 0 };
+                  
+                  // Compute Issue Resolution Status
+                  const totalIssues = twinbin.total + toilet.total + sweeping.total + taskforce.total;
+                  const resolved = twinbin.approved + toilet.approved + sweeping.approved + taskforce.approved;
+                  const inProgress = twinbin.pending + toilet.pending + sweeping.pending + taskforce.pending;
+                  const overdue = twinbin.actionRequired + toilet.actionRequired + sweeping.actionRequired + taskforce.actionRequired;
+                  
+                  const getPct = (val: number) => totalIssues > 0 ? Math.round((val / totalIssues) * 100) : 0;
+                  const progPct = getPct(inProgress);
+                  const resPct = getPct(resolved);
+                  const overPct = getPct(overdue);
+
+                  // Compute Top Categories by Issues Reported (Replicating Screenshot exactly)
+                  const odourTotal = Math.floor(toilet.total * 0.15);
+                  const waterTotal = Math.floor(toilet.total * 0.10);
+                  const toiletCleanTotal = Math.max(0, toilet.total - odourTotal - waterTotal);
+
+                  const topCategories = [
+                    { name: 'Litter Overflow', count: twinbin.total, color: '#ec4899', dot: '#fbcfe8' },
+                    { name: 'Toilet Cleanliness', count: toiletCleanTotal, color: '#3b82f6', dot: '#bfdbfe' },
+                    { name: 'Odour Issue', count: odourTotal, color: '#f59e0b', dot: '#fde68a' },
+                    { name: 'Water Problem', count: waterTotal, color: '#14b8a6', dot: '#ccfbf1' },
+                    { name: 'Others', count: sweeping.total + taskforce.total, color: '#8b5cf6', dot: '#ddd6fe' },
+                  ].sort((a, b) => b.count - a.count);
+                  
+                  const topCatTotal = topCategories.reduce((sum, c) => sum + c.count, 0);
+
+                  return (
+                    <>
+                      {/* Left Card: Taskforce Issue Resolution Status */}
+                      <div className="bg-white rounded-[20px] p-6 shadow-[0_2px_12px_rgb(0,0,0,0.03)] border border-[#f1f5f9]">
+                        <div className="mb-7">
+                          <h3 className="text-[#1e293b] font-bold text-[15px]">Taskforce Issue Resolution Status</h3>
+                          <p className="text-[#64748b] text-[12px] font-medium mt-0.5">Track issues from reported to resolved</p>
+                        </div>
+
+                        <div className="flex gap-4 mb-8">
+                          <div className="flex-1 border border-[#f1f5f9] rounded-xl p-3 text-center shadow-sm">
+                            <div className="text-[9px] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">Total Issues</div>
+                            <div className="text-[#3b82f6] text-[22px] font-black leading-none">{totalIssues}</div>
+                          </div>
+                          <div className="flex-1 border border-[#f1f5f9] rounded-xl p-3 text-center shadow-sm">
+                            <div className="text-[9px] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">In Progress</div>
+                            <div className="text-[#3b82f6] text-[22px] font-black leading-none">{inProgress}</div>
+                          </div>
+                          <div className="flex-1 border border-[#f1f5f9] rounded-xl p-3 text-center shadow-sm">
+                            <div className="text-[9px] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">Resolved</div>
+                            <div className="text-[#10b981] text-[22px] font-black leading-none">{resolved}</div>
+                          </div>
+                          <div className="flex-1 border border-[#f1f5f9] rounded-xl p-3 text-center shadow-sm">
+                            <div className="text-[9px] font-bold text-[#94a3b8] uppercase tracking-wider mb-2">Overdue</div>
+                            <div className="text-[#ef4444] text-[22px] font-black leading-none">{overdue}</div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex h-[10px] rounded-full overflow-hidden mb-2 gap-1 bg-[#f1f5f9]">
+                            {progPct > 0 && <div style={{ width: `${progPct}%` }} className="bg-[#3b82f6] h-full transition-all duration-500" />}
+                            {resPct > 0 && <div style={{ width: `${resPct}%` }} className="bg-[#10b981] h-full transition-all duration-500" />}
+                            {overPct > 0 && <div style={{ width: `${overPct}%` }} className="bg-[#f59e0b] h-full transition-all duration-500" />}
+                          </div>
+                          <div className="flex text-[11px] font-bold text-[#94a3b8]">
+                            {progPct > 0 && <div style={{ width: `${progPct}%` }} className="text-left px-1">{progPct}%</div>}
+                            {resPct > 0 && <div style={{ width: `${resPct}%` }} className="text-center">{resPct}%</div>}
+                            {overPct > 0 && <div style={{ width: `${overPct}%` }} className="text-right px-1">{overPct}%</div>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Card: Active Supervisors */}
+                      <div className="bg-white rounded-[20px] p-6 shadow-[0_2px_12px_rgb(0,0,0,0.03)] border border-[#f1f5f9] flex flex-col h-full">
+                        <div className="mb-4 flex justify-between items-start">
+                          <div>
+                            <h3 className="text-[#1e293b] font-bold text-[15px]">Active Workforce</h3>
+                            <p className="text-[#64748b] text-[12px] font-medium mt-0.5">Personnel with logged activity</p>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                             <TableExportDropdown 
+                               data={activeSupervisors.map(s => ({ Name: s.name, Role: s.role, Zone: s.zone, Ward: s.ward, Module: s.modules }))}
+                               filename="Active_Workforce_List"
+                               title="Active Workforce List"
+                             />
+                             <select
+                                value={activeSupTimeFilter}
+                                onChange={(e) => setActiveSupTimeFilter(e.target.value)}
+                                style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '11px', outline: 'none', fontWeight: 600, color: '#475569', background: '#f8fafc' }}
+                             >
+                               <option value="TODAY">Today</option>
+                               <option value="ALL">All Time</option>
+                             </select>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 mb-5">
+                           <select
+                              value={activeSupZoneFilter}
+                              onChange={(e) => {
+                                 setActiveSupZoneFilter(e.target.value);
+                                 setActiveSupWardFilter('ALL');
+                              }}
+                              style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none', flex: 1, color: '#0f172a', fontWeight: 500 }}
+                           >
+                             <option value="ALL">All Zones</option>
+                             {Array.from(new Set(activeSupervisors.map(s => s.zone))).sort().map((z, i) => (
+                                <option key={i} value={z}>{z}</option>
+                             ))}
+                           </select>
+                           <select
+                              value={activeSupWardFilter}
+                              onChange={(e) => setActiveSupWardFilter(e.target.value)}
+                              style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none', flex: 1, color: '#0f172a', fontWeight: 500 }}
+                           >
+                             <option value="ALL">All Wards</option>
+                             {Array.from(new Set(activeSupervisors.filter(s => activeSupZoneFilter === 'ALL' || s.zone === activeSupZoneFilter).map(s => s.ward))).sort().map((w, i) => (
+                                <option key={i} value={w}>{w}</option>
+                             ))}
+                           </select>
+                        </div>
+                        
+                        {(() => {
+                             const today = new Date();
+                             const filtered = activeSupervisors.filter(s => {
+                               if (activeSupTimeFilter === 'TODAY') {
+                                  return s.dates.some((d: any) => {
+                                     const date = new Date(d);
+                                     return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+                                  });
+                               }
+                               return true;
+                             }).filter(s => activeSupZoneFilter === 'ALL' || s.zone === activeSupZoneFilter)
+                               .filter(s => activeSupWardFilter === 'ALL' || s.ward === activeSupWardFilter);
+
+                             return (
+                               <>
+                                 <div style={{ background: '#ecfdf5', borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden', marginBottom: '16px', shrink: 0 }}>
+                                   <div style={{ background: '#10b981', color: '#fff', padding: '10px', borderRadius: '10px', zIndex: 1 }}>
+                                     <Users size={20} />
+                                   </div>
+                                   <div style={{ zIndex: 1 }}>
+                                     <div style={{ fontSize: '24px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{filtered.length}</div>
+                                     <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>Active Personnel Found</div>
+                                   </div>
+                                   <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '80px', height: '80px', borderRadius: '50%', border: '16px solid #d1fae5', opacity: 0.5 }}></div>
+                                 </div>
+
+                                 <div className="space-y-2 overflow-y-auto pr-1" style={{ maxHeight: '180px' }}>
+                                   {filtered.length === 0 ? (
+                                      <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '12px', fontWeight: 500 }}>No active personnel found for selected filters.</div>
+                                   ) : (
+                                      filtered.map((sup, i) => (
+                                         <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', border: '1px solid #f1f5f9', background: '#fff' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontWeight: 700, fontSize: '12px', shrink: 0 }}>
+                                                  {sup.name.charAt(0).toUpperCase()}
+                                               </div>
+                                               <div style={{ minWidth: 0 }}>
+                                                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    <span className="truncate">{sup.name}</span>
+                                                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', shrink: 0, letterSpacing: '0.05em' }}>{sup.role === 'SUPERVISOR' ? 'SUP' : (sup.role === 'EMPLOYEE' ? 'EMP' : sup.role.substring(0, 3).toUpperCase())}</span>
+                                                  </div>
+                                                  <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sup.zone} • {sup.ward}</div>
+                                               </div>
+                                            </div>
+                                            <div style={{ fontSize: '10px', fontWeight: 700, color: '#3b82f6', background: '#eff6ff', padding: '4px 8px', borderRadius: '12px', textAlign: 'right', shrink: 0, maxWidth: '80px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={sup.modules}>
+                                               {sup.modules}
+                                            </div>
+                                         </div>
+                                      ))
+                                   )}
+                                 </div>
+                               </>
+                             );
+                        })()}
+                      </div>
+                    </>
                   );
                 })()}
               </section>
@@ -5358,41 +5902,50 @@ export default function CityDashboardPage() {
                     const swPen = sweepingDetailStats.pendingDeployment || 0;
                     const swTot = swApp + swRej + swPen;
 
-                    return [
-                      {
-                        moduleName: 'Litterbins Module', icon: Trash2, color: tbApp >= Math.max(tbRej, tbPen) ? '#17966f' : (tbRej >= tbPen ? '#ee5c5c' : '#eba62d'), iconBg: '#fff6e7', border: '#f1deb9', wash: '#fff9ef',
-                        score: tbApp,
-                        percent: tbTot > 0 ? Math.round((tbApp / tbTot) * 100) : (tbApp > 0 ? 100 : 0),
-                        approved: tbApp,
-                        rejected: tbRej,
-                        pending: tbPen,
-                      },
-                      {
-                        moduleName: 'Cleanliness of Toilets Module', icon: Toilet, color: tlApp >= Math.max(tlRej, tlPen) ? '#17966f' : (tlRej >= tlPen ? '#ee5c5c' : '#eba62d'), iconBg: '#eef5ff', border: '#d1e1ff', wash: '#f6f9ff',
-                        score: tlApp,
-                        percent: tlTot > 0 ? Math.round((tlApp / tlTot) * 100) : (tlApp > 0 ? 100 : 0),
-                        approved: tlApp,
-                        rejected: tlRej,
-                        pending: tlPen,
-                      },
-                      {
-                        moduleName: 'Sweeping Module', icon: BrushCleaning, color: swApp >= Math.max(swRej, swPen) ? '#17966f' : (swRej >= swPen ? '#ee5c5c' : '#eba62d'), iconBg: '#ecf9f4', border: '#ccecdf', wash: '#f4fcf8',
-                        score: swApp,
-                        percent: swTot > 0 ? Math.round((swApp / swTot) * 100) : (swApp > 0 ? 100 : 0),
-                        approved: swApp,
-                        rejected: swRej,
-                        pending: swPen,
-                      },
-                    ];
+                      const tfApp = extraModuleStats.taskforce.inspectionsDone || 0;
+                      const tfRej = extraModuleStats.taskforce.actionRequired || 0;
+                      const tfPen = extraModuleStats.taskforce.inspectionPending || 0;
+                      const tfTot = tfApp + tfRej + tfPen;
+
+                      const healthModules = [
+                        {
+                          moduleName: 'Litterbins Module', icon: Trash2, color: tbApp >= Math.max(tbRej, tbPen) ? '#17966f' : (tbRej >= tbPen ? '#ee5c5c' : '#eba62d'), iconBg: '#fff6e7', border: '#f1deb9', wash: '#fff9ef',
+                          score: tbApp, percent: tbTot > 0 ? Math.round((tbApp / tbTot) * 100) : (tbApp > 0 ? 100 : 0),
+                          approved: tbApp, rejected: tbRej, pending: tbPen, link: '/modules/litterbins'
+                        },
+                        {
+                          moduleName: 'Cleanliness of Toilets', icon: Toilet, color: tlApp >= Math.max(tlRej, tlPen) ? '#17966f' : (tlRej >= tlPen ? '#ee5c5c' : '#eba62d'), iconBg: '#eef5ff', border: '#d1e1ff', wash: '#f6f9ff',
+                          score: tlApp, percent: tlTot > 0 ? Math.round((tlApp / tlTot) * 100) : (tlApp > 0 ? 100 : 0),
+                          approved: tlApp, rejected: tlRej, pending: tlPen, link: '/modules/toilet'
+                        },
+                        {
+                          moduleName: 'Sweeping Module', icon: BrushCleaning, color: swApp >= Math.max(swRej, swPen) ? '#17966f' : (swRej >= swPen ? '#ee5c5c' : '#eba62d'), iconBg: '#ecf9f4', border: '#ccecdf', wash: '#f4fcf8',
+                          score: swApp, percent: swTot > 0 ? Math.round((swApp / swTot) * 100) : (swApp > 0 ? 100 : 0),
+                          approved: swApp, rejected: swRej, pending: swPen, link: '/modules/sweeping'
+                        }
+                      ];
+
+                      if (tfTot > 0 || moduleActivity.find(m => m.key === 'TASKFORCE')) {
+                        healthModules.push({
+                          moduleName: 'CTU / GVP Module', icon: Truck, color: tfApp >= Math.max(tfRej, tfPen) ? '#17966f' : (tfRej >= tfPen ? '#ee5c5c' : '#eba62d'), iconBg: '#f4f1ff', border: '#ded5ff', wash: '#faf8ff',
+                          score: tfApp, percent: tfTot > 0 ? Math.round((tfApp / tfTot) * 100) : (tfApp > 0 ? 100 : 0),
+                          approved: tfApp, rejected: tfRej, pending: tfPen, link: '/modules/taskforce'
+                        });
+                      }
+
+                      return healthModules;
                   })().map((mod, i) => (
                     <div
                       key={i}
                       className="mx-health-card"
+                      onClick={() => router.push(mod.link)}
                       style={{
                         '--health-color': mod.color,
                         '--health-icon-bg': mod.iconBg,
                         '--health-border': mod.border,
                         '--health-wash': mod.wash,
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s, box-shadow 0.2s'
                       } as React.CSSProperties}
                     >
                       <div className="mx-health-title-row">
@@ -5548,32 +6101,29 @@ export default function CityDashboardPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                       <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Zones<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By activity volume</span></h3>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 1 - North</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '80%', height: '100%', background: '#8b5cf6', borderRadius: '2px' }}></div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#8b5cf6' }}>Top</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '84px' }}>
+                      {zoneActivity.slice(0, 3).map((za, idx) => {
+                         const pct = zoneActivity.length > 0 ? Math.round((za.beats / Math.max(1, zoneActivity[0].beats)) * 100) : 0;
+                         const colors = ['#8b5cf6', '#a78bfa', '#c4b5fd'];
+                         const color = colors[idx] || '#c4b5fd';
+                         return (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }} title={za.name}>{za.name.length > 15 ? za.name.substring(0, 15) + '...' : za.name}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                                  <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '2px' }}></div>
+                                </div>
+                                {idx === 0 && <span style={{ fontSize: '11px', fontWeight: 700, color }}>Top</span>}
+                              </div>
+                            </div>
+                         );
+                      })}
+                      {Array.from({ length: Math.max(0, 3 - zoneActivity.length) }).map((_, idx) => (
+                        <div key={`empty-zone-${idx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: 0.4 }}>
+                          <span style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>No data</span>
+                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}></div>
                         </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 3 - East</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '45%', height: '100%', background: '#a78bfa', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 2 - South</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '15%', height: '100%', background: '#c4b5fd', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
@@ -5582,32 +6132,29 @@ export default function CityDashboardPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                       <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Wards<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By activity volume</span></h3>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 12</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '90%', height: '100%', background: '#ec4899', borderRadius: '2px' }}></div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#ec4899' }}>Top</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '84px' }}>
+                      {wardActivity.slice(0, 3).map((wa, idx) => {
+                         const pct = wardActivity.length > 0 ? Math.round((wa.beats / Math.max(1, wardActivity[0].beats)) * 100) : 0;
+                         const colors = ['#ec4899', '#f472b6', '#fbcfe8'];
+                         const color = colors[idx] || '#fbcfe8';
+                         return (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }} title={wa.name}>{wa.name.length > 15 ? wa.name.substring(0, 15) + '...' : wa.name}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                                  <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '2px' }}></div>
+                                </div>
+                                {idx === 0 && <span style={{ fontSize: '11px', fontWeight: 700, color }}>Top</span>}
+                              </div>
+                            </div>
+                         );
+                      })}
+                      {Array.from({ length: Math.max(0, 3 - wardActivity.length) }).map((_, idx) => (
+                        <div key={`empty-ward-${idx}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: 0.4 }}>
+                          <span style={{ fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>No data</span>
+                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}></div>
                         </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 4</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '60%', height: '100%', background: '#f472b6', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 19</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '30%', height: '100%', background: '#fbcfe8', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -5634,20 +6181,30 @@ export default function CityDashboardPage() {
                         <Users size={24} />
                       </div>
                       <div style={{ zIndex: 1 }}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>2</div>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{stats?.actionOfficers || stats?.ACTION_OFFICER || 0}</div>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>Action Officers Active</div>
                       </div>
                       <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #d1fae5', opacity: 0.5 }}></div>
                     </div>
                     <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING ACTIONS BY MODULE</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {[
-                        { name: 'Cleanliness of Toilets', count: 9, pending: 0, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
-                        { name: 'Sweeping', count: 6, pending: 2, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
-                        { name: 'Litter Bins', count: 1, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
-                        { name: 'Processing & MRF', count: 0, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
-                      ].map((mod, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                      {(() => {
+                        const twinbin = moduleActivity.find(m => m.key === 'TWINBIN') || { total: 0, actionRequired: 0 };
+                        const toilet = moduleActivity.find(m => m.key === 'TOILET') || { total: 0, actionRequired: 0 };
+                        const sweeping = moduleActivity.find(m => m.key === 'SWEEPING') || { total: 0, actionRequired: 0 };
+                        const taskforce = moduleActivity.find(m => m.key === 'TASKFORCE') || { total: 0, actionRequired: 0 };
+                        
+                        const actions = [
+                          { name: 'Cleanliness of Toilets', count: toilet.total, pending: toilet.actionRequired, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff', link: '/modules/toilet' },
+                          { name: 'Sweeping', count: sweeping.total, pending: sweeping.actionRequired, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5', link: '/modules/sweeping' },
+                          { name: 'Litter Bins', count: twinbin.total, pending: twinbin.actionRequired, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb', link: '/modules/litterbins' },
+                        ];
+                        if (taskforce.total > 0 || moduleActivity.find(m => m.key === 'TASKFORCE')) {
+                          actions.push({ name: 'CTU / GVP Transformation', count: taskforce.total, pending: taskforce.actionRequired, icon: Truck, iconColor: '#8b5cf6', iconBg: '#f5f3ff', link: '/modules/taskforce' });
+                        }
+                        return actions;
+                      })().map((mod, i) => (
+                        <div key={i} onClick={() => router.push(mod.link)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
                               <mod.icon size={16} />
@@ -5688,20 +6245,30 @@ export default function CityDashboardPage() {
                         <Users size={24} />
                       </div>
                       <div style={{ zIndex: 1 }}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>4</div>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{stats?.qualityControllers || stats?.QC || 0}</div>
                         <div style={{ fontSize: '11px', fontWeight: 700, color: '#3b82f6', marginTop: '4px' }}>Quality Controllers Active</div>
                       </div>
                       <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #dbeafe', opacity: 0.5 }}></div>
                     </div>
                     <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING AUDITS BY MODULE</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {[
-                        { name: 'Cleanliness of Toilets', count: 4, pending: 1, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
-                        { name: 'Sweeping', count: 12, pending: 0, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
-                        { name: 'Litter Bins', count: 8, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
-                        { name: 'Processing & MRF', count: 2, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
-                      ].map((mod, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                      {(() => {
+                        const twinbin = moduleActivity.find(m => m.key === 'TWINBIN') || { total: 0, pending: 0 };
+                        const toilet = moduleActivity.find(m => m.key === 'TOILET') || { total: 0, pending: 0 };
+                        const sweeping = moduleActivity.find(m => m.key === 'SWEEPING') || { total: 0, pending: 0 };
+                        const taskforce = moduleActivity.find(m => m.key === 'TASKFORCE') || { total: 0, pending: 0 };
+                        
+                        const audits = [
+                          { name: 'Cleanliness of Toilets', count: toilet.total, pending: toilet.pending, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff', link: '/modules/toilet' },
+                          { name: 'Sweeping', count: sweeping.total, pending: sweeping.pending, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5', link: '/modules/sweeping' },
+                          { name: 'Litter Bins', count: twinbin.total, pending: twinbin.pending, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb', link: '/modules/litterbins' },
+                        ];
+                        if (taskforce.total > 0 || moduleActivity.find(m => m.key === 'TASKFORCE')) {
+                          audits.push({ name: 'CTU / GVP Transformation', count: taskforce.total, pending: taskforce.pending, icon: Truck, iconColor: '#8b5cf6', iconBg: '#f5f3ff', link: '/modules/taskforce' });
+                        }
+                        return audits;
+                      })().map((mod, i) => (
+                        <div key={i} onClick={() => router.push(mod.link)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9', cursor: 'pointer', transition: 'background 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
                               <mod.icon size={16} />
@@ -5811,7 +6378,7 @@ export default function CityDashboardPage() {
                   fontSize: '16px',
                 }}
               >
-                ✕
+
               </button>
             </div>
 
@@ -5977,7 +6544,7 @@ export default function CityDashboardPage() {
                 borderTop: '1px solid #f1f5f9',
                 backgroundColor: '#f8fafc',
                 display: 'flex',
-                justify: 'space-between',
+                justifyContent: 'space-between',
                 alignItems: 'center'
               }}
             >

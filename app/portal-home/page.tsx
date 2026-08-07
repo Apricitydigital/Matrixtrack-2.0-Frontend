@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import HmsKpiCards from "@components/ui/HmsKpiCards";
+import { TableExportDropdown } from '@components/ui/TableExportDropdown';
 import { useAuth } from '@hooks/useAuth';
 import {
   ShieldCheck,
@@ -84,8 +85,52 @@ export default function PortalHomePage() {
   }, [isSuperAdmin]);
 
   return (
-    <div className="space-y-8">
-      {/* 1. TOP FAST KPI CARDS (PRESERVED & UNTOUCHED ON TOP) */}
+    <div className="space-y-6">
+      {/* 1. GRAND DASHBOARD HERO HEADER (AT VERY TOP ABOVE STATS) */}
+      <section style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', color: 'white', borderRadius: '24px', padding: '26px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 12px 40px -10px rgba(15,23,42,0.6)', position: 'relative', overflow: 'hidden', marginBottom: '20px', flexWrap: 'wrap', gap: '24px' }}>
+        {/* Background Glow */}
+        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', height: '100%', background: 'radial-gradient(ellipse at top, rgba(59, 130, 246, 0.2), transparent 70%)', pointerEvents: 'none' }} />
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1, minWidth: '280px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShieldCheck size={14} color="#60a5fa" /> MATRIXTRACK 2.0 • {isSuperAdmin ? 'GLOBAL COMMAND CENTER' : 'CITY COMMAND CENTER'}
+          </div>
+          
+          <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.02em' }}>
+            {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Admin'} <span style={{ fontSize: '22px' }}>👋</span>
+          </h1>
+
+          <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
+            Track inspections, monitor performance & improve city operations
+          </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <MapPin size={12} color="#38bdf8" /> {userCityName || 'Indore Municipal Corporation'}
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#818cf8', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.25)', padding: '3px 10px', borderRadius: '12px' }}>
+              {isSuperAdmin ? 'Super Admin' : 'City Admin'}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1, flexWrap: 'wrap' }}>
+          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Clock size={15} color="#94a3b8" />
+            <span style={{ color: '#fff', fontSize: '12px', fontWeight: 700 }}>{new Date().toISOString().split('T')[0]}</span>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+               <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
+               <span style={{ fontSize: '9px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>LIVE API FEED</span>
+            </div>
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. TOP FAST KPI CARDS (BELOW HERO HEADER) */}
       <HmsKpiCards isSuperAdmin={isSuperAdmin} userCityName={userCityName} />
 
       {/* 2. SUPER ADMIN HORIZONTAL CITIES ROW & CITY ADMIN DIRECTORY */}
@@ -180,17 +225,20 @@ export default function PortalHomePage() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => router.push('/portal-home/admin-management')}
-                className="text-xs font-extrabold text-blue-600 hover:text-blue-800 transition flex items-center gap-1"
-              >
-                Manage Access <ArrowRight size={14} />
-              </button>
+              <div className="flex items-center gap-3">
+                <TableExportDropdown tableId="city-admin-table" filename="City_Admins_List" title="City Admin Overview Table" />
+                <button
+                  type="button"
+                  onClick={() => router.push('/portal-home/admin-management')}
+                  className="text-xs font-extrabold text-blue-600 hover:text-blue-800 transition flex items-center gap-1"
+                >
+                  Manage Access <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table id="city-admin-table" className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                     <th className="py-3 px-4">User Name</th>

@@ -103,7 +103,7 @@ export function AppShell({
           </button>
 
           <span className="text-sm font-bold text-slate-800">
-            Taskforce 20
+            MatrixTrack 2.0
           </span>
         </div>
 
