@@ -79,7 +79,7 @@ export function moduleEntryPath(user: AuthUser | null, key: CanonicalModuleKey) 
 }
 
 export function getRoleDashboardRedirect(user: AuthUser | null) {
-  if (!user) return "/login";
+  if (!user) return "/unified-login";
   if (user.roles.includes("HMS_SUPER_ADMIN" as Role)) return "/hms";
 
   if (user.roles.includes("ACTION_OFFICER" as Role)) {
@@ -113,7 +113,7 @@ export function getRoleDashboardRedirect(user: AuthUser | null) {
 }
 
 export function getPostLoginRedirect(user: AuthUser | null) {
-  if (!user) return "/login";
+  if (!user) return "/unified-login";
   return "/portal-home";
 }
 

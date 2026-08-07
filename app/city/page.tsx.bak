@@ -2260,7 +2260,6 @@ import {
   Eye,
   Leaf,
   Calendar,
-  Download,
 } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 
@@ -2316,17 +2315,15 @@ function RingGauge({ value = 100, color = "#2563eb", size = 68, stroke = 8 }: { 
 function ArcGauge({
   color = "#3b82f6",
   score = 0,
-  percent = 0,
   size = 152,
   stroke = 11,
 }: {
   color?: string;
   score?: number;
-  percent?: number;
   size?: number;
   stroke?: number;
 }) {
-  const clamped = Math.min(100, Math.max(0, percent));
+  const clamped = Math.min(100, Math.max(0, score));
   const width = size;
   const height = Math.round(size * 0.58);
   const cx = width / 2;
@@ -2372,7 +2369,7 @@ function ArcGauge({
     letterSpacing: '-.04em',
   }}
 >
-  {score}
+  {score}%
 </div>
     </div>
   );
@@ -2433,34 +2430,6 @@ export default function CityDashboardPage() {
   const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [filterZone, setFilterZone] = useState<string>("ALL");
   const [filterWard, setFilterWard] = useState<string>("ALL");
-  const [cities, setCities] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (isSuperAdmin) {
-      import('@lib/apiClient').then(({ CityApi }) => {
-        CityApi.list()
-          .then(res => setCities(res.cities || []))
-          .catch(console.error);
-      }).catch(console.error);
-    }
-  }, [isSuperAdmin]);
-
-  const handleDownloadReport = () => {
-    // Generate a basic CSV report based on stats and trigger download
-    const csvContent = "data:text/csv;charset=utf-8,Module,Total,Approved,Rejected,ActionRequired\\n"
-      + `Toilet,${extraModuleStats.toilet.totalInspections || 0},${extraModuleStats.toilet.totalApproved || 0},${extraModuleStats.toilet.totalRejected || 0},${extraModuleStats.toilet.actionRequired || 0}\\n`
-      + `Sweeping,${sweepingDetailStats.totalSegments || 0},${sweepingDetailStats.totalApproved || 0},0,${sweepingDetailStats.actionRequired || 0}\\n`
-      + `Twinbin,${extraModuleStats.twinbin.totalInspections || 0},${extraModuleStats.twinbin.totalApproved || 0},${extraModuleStats.twinbin.totalRejected || 0},${extraModuleStats.twinbin.actionRequired || 0}\\n`
-      + `Taskforce,${extraModuleStats.taskforce.totalInspections || 0},${extraModuleStats.taskforce.totalApproved || 0},${extraModuleStats.taskforce.totalRejected || 0},${extraModuleStats.taskforce.actionRequired || 0}`;
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `inspection_report_${filterDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   // City Admin analytics
   const [moduleActivity, setModuleActivity] = useState<{ name: string; key: string; total: number; approved: number; pending: number; actionRequired: number }[]>([]);
@@ -3925,14 +3894,13 @@ export default function CityDashboardPage() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 40 }}>
               {[
-                { label: "Total Beats", value: sweepingDetailStats.totalBeats, icon: <Target size={20} />, color: "#3b82f6", href: "/city/areas" },
-                { label: "Total Sub-Beats", value: sweepingDetailStats.totalSegments, icon: <Database size={20} />, color: "#8b5cf6", href: "/city/areas" },
-                { label: "Assigned Sub-Beats", value: sweepingDetailStats.assignedSegments, icon: <CheckCircle size={20} />, color: "#0ea5e9", href: "/city/areas" },
+                { label: "Total Beats", value: sweepingDetailStats.totalBeats, icon: <Target size={20} />, color: "#3b82f6", href: "/modules/sweeping" },
+                { label: "Total Sub-Beats", value: sweepingDetailStats.totalSegments, icon: <Database size={20} />, color: "#8b5cf6", href: "/modules/sweeping" },
+                { label: "Assigned Sub-Beats", value: sweepingDetailStats.assignedSegments, icon: <CheckCircle size={20} />, color: "#0ea5e9", href: "/modules/sweeping" },
                 { label: "QC Assigned", value: sweepingDetailStats.qcAssigned, icon: <ShieldCheck size={20} />, color: "#10b981", href: "/city/users?role=QC" },
-                { label: "Total Approved", value: sweepingDetailStats.totalApproved, icon: <CheckCircle size={20} />, color: "#22c55e", href: "/city/beat-status" },
-                { label: "Action Required", value: sweepingDetailStats.actionRequired, icon: <AlertCircle size={20} />, color: "#ef4444", href: "/city/beat-status" },
-                { label: "Pending Deployment", value: sweepingDetailStats.pendingDeployment, icon: <Map size={20} />, color: "#f59e0b", href: "/city/areas" },
-                { label: "Beat Status Overview", value: "→ View", icon: <Activity size={20} />, color: "#7c3aed", href: "/city/beat-status" },
+                { label: "Total Approved", value: sweepingDetailStats.totalApproved, icon: <CheckCircle size={20} />, color: "#22c55e", href: "/modules/sweeping" },
+                { label: "Action Required", value: sweepingDetailStats.actionRequired, icon: <AlertCircle size={20} />, color: "#ef4444", href: "/modules/sweeping" },
+                { label: "Pending Deployment", value: sweepingDetailStats.pendingDeployment, icon: <Map size={20} />, color: "#f59e0b", href: "/modules/sweeping" },
               ].map((s, i) => (
                 <Link key={i} href={s.href} style={{ textDecoration: 'none' }}>
                   <div className="card card-hover" style={{ padding: 20, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 16, height: '100%', transition: 'all 0.2s ease' }}>
@@ -5132,31 +5100,10 @@ export default function CityDashboardPage() {
                 </div>
         
                 <div className="mx-hero-actions">
-                  {isSuperAdmin && (
-                    <label className="mx-control" style={{ minWidth: 150 }}>
-                      <MapPin size={15} color="#3b73df" />
-                      <select value={filterCity} onChange={(e) => setFilterCity(e.target.value)} style={{ background: 'transparent', border: 'none', outline: 'none', color: '#1e293b', fontSize: 13, fontWeight: 600, width: '100%', appearance: 'none', cursor: 'pointer' }}>
-                        <option value="ALL">All Cities</option>
-                        {cities.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
                   <label className="mx-control">
                     <Calendar size={15} color="#3b73df" />
                     <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
                   </label>
-        
-                  <button
-                    type="button"
-                    className="mx-refresh"
-                    onClick={handleDownloadReport}
-                    style={{ background: '#f8fafc', color: '#0f172a', border: '1px solid #e2e8f0' }}
-                  >
-                    <Download size={15} />
-                    Download
-                  </button>
         
                   <button
                     type="button"
@@ -5360,25 +5307,22 @@ export default function CityDashboardPage() {
 
                     return [
                       {
-                        moduleName: 'Litterbins Module', icon: Trash2, color: tbApp >= Math.max(tbRej, tbPen) ? '#17966f' : (tbRej >= tbPen ? '#ee5c5c' : '#eba62d'), iconBg: '#fff6e7', border: '#f1deb9', wash: '#fff9ef',
-                        score: tbApp,
-                        percent: tbTot > 0 ? Math.round((tbApp / tbTot) * 100) : (tbApp > 0 ? 100 : 0),
+                        moduleName: 'Litterbins Module', icon: Trash2, color: '#d78212', iconBg: '#fff6e7', border: '#f1deb9', wash: '#fff9ef',
+                        score: tbTot > 0 ? Math.round((tbApp / tbTot) * 100) : (tbApp > 0 ? 100 : 0),
                         approved: tbApp,
                         rejected: tbRej,
                         pending: tbPen,
                       },
                       {
-                        moduleName: 'Cleanliness of Toilets Module', icon: Toilet, color: tlApp >= Math.max(tlRej, tlPen) ? '#17966f' : (tlRej >= tlPen ? '#ee5c5c' : '#eba62d'), iconBg: '#eef5ff', border: '#d1e1ff', wash: '#f6f9ff',
-                        score: tlApp,
-                        percent: tlTot > 0 ? Math.round((tlApp / tlTot) * 100) : (tlApp > 0 ? 100 : 0),
+                        moduleName: 'Cleanliness of Toilets Module', icon: Toilet, color: '#3b73df', iconBg: '#eef5ff', border: '#d1e1ff', wash: '#f6f9ff',
+                        score: tlTot > 0 ? Math.round((tlApp / tlTot) * 100) : (tlApp > 0 ? 100 : 0),
                         approved: tlApp,
                         rejected: tlRej,
                         pending: tlPen,
                       },
                       {
-                        moduleName: 'Sweeping Module', icon: BrushCleaning, color: swApp >= Math.max(swRej, swPen) ? '#17966f' : (swRej >= swPen ? '#ee5c5c' : '#eba62d'), iconBg: '#ecf9f4', border: '#ccecdf', wash: '#f4fcf8',
-                        score: swApp,
-                        percent: swTot > 0 ? Math.round((swApp / swTot) * 100) : (swApp > 0 ? 100 : 0),
+                        moduleName: 'Sweeping Module', icon: BrushCleaning, color: '#17966f', iconBg: '#ecf9f4', border: '#ccecdf', wash: '#f4fcf8',
+                        score: swTot > 0 ? Math.round((swApp / swTot) * 100) : (swApp > 0 ? 100 : 0),
                         approved: swApp,
                         rejected: swRej,
                         pending: swPen,
@@ -5401,7 +5345,7 @@ export default function CityDashboardPage() {
                       </div>
         
                       <div className="mx-health-gauge">
-                        <ArcGauge color={mod.color} score={mod.score} percent={mod.percent} size={152} stroke={11} />
+                        <ArcGauge color={mod.color} score={mod.score} size={152} stroke={11} />
                       </div>
         
                       <div className="mx-health-stats">
@@ -5499,235 +5443,6 @@ export default function CityDashboardPage() {
           </div>
         </>
       )}
-
-      
-              {/* ====== START OF NEW SECTION ====== */}
-              {/* ====== ACTIVITY ANALYTICS ====== */}
-              <section className="mx-section">
-                <div className="mx-section-head">
-                  <div className="mx-section-title-wrap">
-                    <div className="mx-section-icon"><Activity size={18} /></div>
-                    <div>
-                      <h2 className="mx-section-title">ACTIVITY ANALYTICS</h2>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '16px' }}>
-                  {/* Card 1: Most Active Modules */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Modules<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By total records submitted</span></h3>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }}></div>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Cleanliness of Toilets</span>
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>9</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Sweeping</span>
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>6</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></div>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Litter Bins</span>
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>1</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 2: Most Active Zones */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Zones<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By activity volume</span></h3>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 1 - North</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '80%', height: '100%', background: '#8b5cf6', borderRadius: '2px' }}></div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#8b5cf6' }}>Top</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 3 - East</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '45%', height: '100%', background: '#a78bfa', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 2 - South</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '15%', height: '100%', background: '#c4b5fd', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 3: Most Active Wards */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Wards<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By activity volume</span></h3>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 12</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '90%', height: '100%', background: '#ec4899', borderRadius: '2px' }}></div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#ec4899' }}>Top</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 4</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '60%', height: '100%', background: '#f472b6', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 19</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '30%', height: '100%', background: '#fbcfe8', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* ====== FIELD OPERATIONS ====== */}
-              <section className="mx-section" style={{ marginTop: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-                  
-                  {/* Action Officers */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                      <div style={{ background: '#ecfdf5', color: '#10b981', padding: '10px', borderRadius: '10px' }}>
-                        <Shield size={20} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Action Officers</div>
-                        <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Issue resolution & ground action</div>
-                      </div>
-                    </div>
-                    <div style={{ background: '#ecfdf5', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden', marginBottom: '24px' }}>
-                      <div style={{ background: '#10b981', color: '#fff', padding: '12px', borderRadius: '10px', zIndex: 1 }}>
-                        <Users size={24} />
-                      </div>
-                      <div style={{ zIndex: 1 }}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>2</div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>Action Officers Active</div>
-                      </div>
-                      <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #d1fae5', opacity: 0.5 }}></div>
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING ACTIONS BY MODULE</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {[
-                        { name: 'Cleanliness of Toilets', count: 9, pending: 0, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
-                        { name: 'Sweeping', count: 6, pending: 2, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
-                        { name: 'Litter Bins', count: 1, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
-                        { name: 'Processing & MRF', count: 0, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
-                      ].map((mod, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
-                              <mod.icon size={16} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{mod.name}</div>
-                              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>Total: {mod.count} records</div>
-                            </div>
-                          </div>
-                          {mod.pending > 0 ? (
-                            <div style={{ background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ⚠ {mod.pending}
-                            </div>
-                          ) : (
-                            <div style={{ background: '#ecfdf5', color: '#10b981', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ✓ Clear
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quality Controllers */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                      <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '10px', borderRadius: '10px' }}>
-                        <ShieldCheck size={20} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#3b82f6', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Quality Controllers</div>
-                        <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Quality monitoring & auditing</div>
-                      </div>
-                    </div>
-                    <div style={{ background: '#eff6ff', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden', marginBottom: '24px' }}>
-                      <div style={{ background: '#3b82f6', color: '#fff', padding: '12px', borderRadius: '10px', zIndex: 1 }}>
-                        <Users size={24} />
-                      </div>
-                      <div style={{ zIndex: 1 }}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>4</div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#3b82f6', marginTop: '4px' }}>Quality Controllers Active</div>
-                      </div>
-                      <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #dbeafe', opacity: 0.5 }}></div>
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING AUDITS BY MODULE</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {[
-                        { name: 'Cleanliness of Toilets', count: 4, pending: 1, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
-                        { name: 'Sweeping', count: 12, pending: 0, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
-                        { name: 'Litter Bins', count: 8, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
-                        { name: 'Processing & MRF', count: 2, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
-                      ].map((mod, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
-                              <mod.icon size={16} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{mod.name}</div>
-                              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>Total: {mod.count} records</div>
-                            </div>
-                          </div>
-                          {mod.pending > 0 ? (
-                            <div style={{ background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ⚠ {mod.pending}
-                            </div>
-                          ) : (
-                            <div style={{ background: '#ecfdf5', color: '#10b981', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ✓ Clear
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              </section>
-              {/* ====== END OF NEW SECTION ====== */}
 
       {/* Modern System Alerts Overview Modal */}
       {showAlertModal && (

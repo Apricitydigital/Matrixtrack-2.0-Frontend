@@ -404,20 +404,7 @@ export const EnvironmentalBranding: React.FC = () => {
         return () => clearInterval(t);
     }, []);
 
-    return (
-        <>
-            <TimeOfDayOverlay tod={timeOfDay} />
-            <MicroAnimations />
-            {weatherMode && <WeatherEffect mode={weatherMode} />}
-            {trainVisible && (
-                <CityTrainAnimation
-                    key={trainKey}
-                    isGolden={isGolden}
-                    slogan={slogan}
-                />
-            )}
-        </>
-    );
+    return null;
 };
 
 export default EnvironmentalBranding;

@@ -253,7 +253,7 @@ export default function RegisterPage() {
                     <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
                         <a href="/common-registration" style={{ color: "#0f766e", fontWeight: 700, textDecoration: "none" }}>Register As Employee (Taskforce + Swachh)</a>
                         <p style={{ margin: 0, textAlign: "center", color: "#64748b", fontSize: 14 }}>
-                            Already have an account? <a href="/login" style={{ color: "#1e3a8a", fontWeight: 700, textDecoration: "none" }}>Sign In</a>
+                            Already have an account? <a href="/unified-login" style={{ color: "#1e3a8a", fontWeight: 700, textDecoration: "none" }}>Sign In</a>
                         </p>
                     </div>
                 </div>

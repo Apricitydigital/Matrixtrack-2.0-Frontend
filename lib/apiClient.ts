@@ -438,6 +438,8 @@ export const CityApi = {
     apiFetch("/hms/cities", { method: "POST", body: JSON.stringify(body) }),
   update: (cityId: string, body: { stateId?: string; divisionId?: string; districtId?: string; cityMasterId?: string; name?: string; code?: string; ulbCode?: string; enabled?: boolean; adminName?: string; adminEmail?: string }) =>
     apiFetch(`/hms/cities/${cityId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  delete: (cityId: string) =>
+    apiFetch(`/hms/cities/${cityId}`, { method: "DELETE" }),
   setEnabled: (cityId: string, enabled: boolean) =>
     CityApi.update(cityId, { enabled }),
   toggleModule: (cityId: string, moduleId: string, enabled: boolean) =>

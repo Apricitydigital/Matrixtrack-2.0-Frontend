@@ -30,7 +30,7 @@ export default function LandingPage() {
       } else {
         clearInterval(interval);
         setTimeout(() => {
-          router.replace(user ? getPostLoginRedirect(user) : '/login');
+          router.replace(user ? getPostLoginRedirect(user) : '/unified-login');
         }, 300);
       }
     }, 400);
@@ -39,7 +39,7 @@ export default function LandingPage() {
   }, [user, router]);
 
   const handleSkipSplash = () => {
-    router.replace(user ? getPostLoginRedirect(user) : '/login');
+    router.replace(user ? getPostLoginRedirect(user) : '/unified-login');
   };
 
   return (
