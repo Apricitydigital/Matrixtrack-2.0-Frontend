@@ -31,7 +31,8 @@ import {
     Droplets,
     PieChart as PieIcon,
     Upload,
-    FileText
+    FileText,
+    Activity
 } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import {
@@ -326,6 +327,26 @@ export default function BeatsManagementPage() {
                             >
                                 <FileText size={16} />
                                 Beat Requests
+                            </Link>
+
+                            <Link
+                                href="/qc/beat-status"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    padding: "8px 14px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "rgba(124, 58, 237, 0.1)",
+                                    color: "#7c3aed",
+                                    fontWeight: 700,
+                                    fontSize: "13px",
+                                    textDecoration: "none",
+                                    border: "1px solid rgba(124, 58, 237, 0.2)"
+                                }}
+                            >
+                                <Activity size={16} />
+                                Beat Status
                             </Link>
 
                             <button

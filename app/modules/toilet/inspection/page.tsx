@@ -11,12 +11,14 @@ export default function InspectionListPage() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [statusFilter, setStatusFilter] = useState('');
-    const [dateFilter, setDateFilter] = useState('all');
-    const [customDate, setCustomDate] = useState('');
+    const [dateMode, setDateMode] = useState<'today' | 'single' | 'range' | 'all'>('today');
+    const [singleDate, setSingleDate] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
 
     useEffect(() => {
         loadInspections();
-    }, [page, pageSize, statusFilter, dateFilter, customDate]);
+    }, [page, pageSize, statusFilter, dateMode, singleDate, fromDate, toDate]);
 
     const loadInspections = async () => {
         setLoading(true);
@@ -25,27 +27,25 @@ export default function InspectionListPage() {
         let endDate: string | undefined;
 
         const now = new Date();
-        if (dateFilter === 'today') {
+        if (dateMode === 'today') {
             const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
             const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
             startDate = start.toISOString();
             endDate = end.toISOString();
-        } else if (dateFilter === 'week') {
-            const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-            startDate = start.toISOString();
-            endDate = end.toISOString();
-        } else if (dateFilter === 'month') {
-            const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-            startDate = start.toISOString();
-            endDate = end.toISOString();
-        } else if (dateFilter === 'custom' && customDate) {
-            const [year, month, day] = customDate.split('-').map(Number);
+        } else if (dateMode === 'single' && singleDate) {
+            const [year, month, day] = singleDate.split('-').map(Number);
             if (year && month && day) {
                 const start = new Date(year, month - 1, day, 0, 0, 0, 0);
                 const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+                startDate = start.toISOString();
+                endDate = end.toISOString();
+            }
+        } else if (dateMode === 'range' && fromDate && toDate) {
+            const [sY, sM, sD] = fromDate.split('-').map(Number);
+            const [eY, eM, eD] = toDate.split('-').map(Number);
+            if (sY && sM && sD && eY && eM && eD) {
+                const start = new Date(sY, sM - 1, sD, 0, 0, 0, 0);
+                const end = new Date(eY, eM - 1, eD, 23, 59, 59, 999);
                 startDate = start.toISOString();
                 endDate = end.toISOString();
             }
@@ -109,16 +109,16 @@ export default function InspectionListPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 14 }}>
+                    <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 14, alignItems: 'center' }}>
                         {[
-                            { id: 'all', label: 'ALL TIME' },
                             { id: 'today', label: 'TODAY' },
-                            { id: 'week', label: 'WEEK' },
-                            { id: 'month', label: 'MONTH' },
+                            { id: 'single', label: 'SPECIFIC DATE' },
+                            { id: 'range', label: 'DATE RANGE' },
+                            { id: 'all', label: 'ALL TIME' },
                         ].map((d) => (
                             <button
                                 key={d.id}
-                                onClick={() => { setDateFilter(d.id); setPage(1); }}
+                                onClick={() => { setDateMode(d.id as any); setPage(1); }}
                                 style={{
                                     padding: '8px 14px',
                                     borderRadius: 10,
@@ -127,32 +127,52 @@ export default function InspectionListPage() {
                                     fontWeight: 900,
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
-                                    background: dateFilter === d.id ? '#0f172a' : 'transparent',
-                                    color: dateFilter === d.id ? '#ffffff' : '#64748b'
+                                    background: dateMode === d.id ? '#0f172a' : 'transparent',
+                                    color: dateMode === d.id ? '#ffffff' : '#64748b'
                                 }}
                             >
                                 {d.label}
                             </button>
                         ))}
-                        <input
-                            type="date"
-                            value={customDate}
-                            onChange={(e) => {
-                                setCustomDate(e.target.value);
-                                setDateFilter('custom');
-                                setPage(1);
-                            }}
-                            style={{
-                                border: '1px solid #e2e8f0',
-                                borderRadius: 10,
-                                padding: '4px 8px',
-                                fontSize: 11,
-                                fontWeight: 800,
-                                outline: 'none',
-                                cursor: 'pointer',
-                                background: 'white'
-                            }}
-                        />
+
+                        {dateMode === 'single' && (
+                            <input
+                                type="date"
+                                value={singleDate}
+                                onChange={(e) => {
+                                    setSingleDate(e.target.value);
+                                    setPage(1);
+                                }}
+                                style={{
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: 10,
+                                    padding: '4px 8px',
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    outline: 'none',
+                                    cursor: 'pointer',
+                                    background: 'white'
+                                }}
+                            />
+                        )}
+
+                        {dateMode === 'range' && (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <input
+                                    type="date"
+                                    value={fromDate}
+                                    onChange={(e) => { setFromDate(e.target.value); setPage(1); }}
+                                    style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '3px 6px', fontSize: 11, fontWeight: 700 }}
+                                />
+                                <span style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8' }}>-</span>
+                                <input
+                                    type="date"
+                                    value={toDate}
+                                    onChange={(e) => { setToDate(e.target.value); setPage(1); }}
+                                    style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '3px 6px', fontSize: 11, fontWeight: 700 }}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 14 }}>

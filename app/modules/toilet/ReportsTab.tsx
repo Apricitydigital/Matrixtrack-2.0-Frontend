@@ -9,13 +9,17 @@ export default function ReportsTab() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [reportsError, setReportsError] = useState('');
-    const [dateFilter, setDateFilter] = useState('today');
+    const [dateMode, setDateMode] = useState<'today' | 'single' | 'range'>('today');
+    const [singleDate, setSingleDate] = useState('');
+    const [rangeStartDate, setRangeStartDate] = useState('');
+    const [rangeEndDate, setRangeEndDate] = useState('');
+    const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'custom'>('today');
     const [customDate, setCustomDate] = useState('');
     const [statusTab, setStatusTab] = useState('');
 
     useEffect(() => {
         loadReports();
-    }, [dateFilter, customDate, statusTab]);
+    }, [dateMode, singleDate, rangeStartDate, rangeEndDate, statusTab, dateFilter, customDate]);
 
     const loadReports = async () => {
         setLoading(true);
@@ -26,27 +30,25 @@ export default function ReportsTab() {
         let endDate: string | undefined;
 
         const now = new Date();
-        if (dateFilter === 'today') {
+        if (dateMode === 'today') {
             const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
             const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
             startDate = start.toISOString();
             endDate = end.toISOString();
-        } else if (dateFilter === 'week') {
-            const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-            startDate = start.toISOString();
-            endDate = end.toISOString();
-        } else if (dateFilter === 'month') {
-            const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-            startDate = start.toISOString();
-            endDate = end.toISOString();
-        } else if (dateFilter === 'custom' && customDate) {
-            const [year, month, day] = customDate.split('-').map(Number);
+        } else if (dateMode === 'single' && singleDate) {
+            const [year, month, day] = singleDate.split('-').map(Number);
             if (year && month && day) {
                 const start = new Date(year, month - 1, day, 0, 0, 0, 0);
                 const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+                startDate = start.toISOString();
+                endDate = end.toISOString();
+            }
+        } else if (dateMode === 'range' && rangeStartDate && rangeEndDate) {
+            const [sY, sM, sD] = rangeStartDate.split('-').map(Number);
+            const [eY, eM, eD] = rangeEndDate.split('-').map(Number);
+            if (sY && sM && sD && eY && eM && eD) {
+                const start = new Date(sY, sM - 1, sD, 0, 0, 0, 0);
+                const end = new Date(eY, eM - 1, eD, 23, 59, 59, 999);
                 startDate = start.toISOString();
                 endDate = end.toISOString();
             }
@@ -111,37 +113,56 @@ export default function ReportsTab() {
                 <div className="admin-dashboard">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                         <h2 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Operational Intelligence</h2>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <FilterTabs
                                 tabs={[
                                     { id: 'today', label: 'TODAY' },
-                                    { id: 'week', label: 'WEEK' },
-                                    { id: 'month', label: 'MONTH' }
+                                    { id: 'single', label: 'SPECIFIC DATE' },
+                                    { id: 'range', label: 'DATE RANGE' }
                                 ]}
-                                activeTab={dateFilter}
-                                onChange={(id) => setDateFilter(id)}
+                                activeTab={dateMode}
+                                onChange={(id: any) => setDateMode(id)}
                             />
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#f1f5f9', padding: '4px 10px', borderRadius: 12 }}>
-                                <span style={{ fontSize: 10, fontWeight: 900, color: '#64748b' }}>📅 </span>
-                                <input
-                                    type="date"
-                                    className="date-picker-input"
-                                    value={customDate}
-                                    onChange={(e) => {
-                                        setCustomDate(e.target.value);
-                                        setDateFilter('custom');
-                                    }}
-                                />
-                            </div>
+
+                            {dateMode === 'single' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: '#f1f5f9', padding: '4px 10px', borderRadius: 12 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 900, color: '#64748b' }}>📅 Date:</span>
+                                    <input
+                                        type="date"
+                                        className="date-picker-input"
+                                        value={singleDate}
+                                        onChange={(e) => setSingleDate(e.target.value)}
+                                    />
+                                </div>
+                            )}
+
+                            {dateMode === 'range' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#f1f5f9', padding: '4px 10px', borderRadius: 12 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 900, color: '#64748b' }}>From:</span>
+                                    <input
+                                        type="date"
+                                        className="date-picker-input"
+                                        value={rangeStartDate}
+                                        onChange={(e) => setRangeStartDate(e.target.value)}
+                                    />
+                                    <span style={{ fontSize: 11, fontWeight: 900, color: '#64748b' }}>To:</span>
+                                    <input
+                                        type="date"
+                                        className="date-picker-input"
+                                        value={rangeEndDate}
+                                        onChange={(e) => setRangeEndDate(e.target.value)}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {stats[dateFilter] ? (
+                    {stats[dateMode] ? (
                         <div className="stats-compact-grid">
-                            <StatCard label={`${dateFilter === 'custom' ? customDate : dateFilter.toUpperCase()} SUBMISSIONS`} value={stats[dateFilter].submitted} sub="Total reports" color="#3b82f6" />
-                            <StatCard label="APPROVED BY QC" value={stats[dateFilter].approved} sub="Status: Verified" color="#059669" />
-                            <StatCard label="REJECTED BY QC" value={stats[dateFilter].rejected} sub="Status: Non-Compliant" color="#ef4444" />
-                            <StatCard label="PENDING REVIEW" value={stats[dateFilter].actionRequired} sub="Status: Action Required" color="#f59e0b" />
+                            <StatCard label={`${dateMode.toUpperCase()} SUBMISSIONS`} value={stats[dateMode].submitted} sub="Total reports" color="#3b82f6" />
+                            <StatCard label="APPROVED BY QC" value={stats[dateMode].approved} sub="Status: Verified" color="#059669" />
+                            <StatCard label="REJECTED BY QC" value={stats[dateMode].rejected} sub="Status: Non-Compliant" color="#ef4444" />
+                            <StatCard label="PENDING REVIEW" value={stats[dateMode].actionRequired} sub="Status: Action Required" color="#f59e0b" />
                         </div>
                     ) : (
                         <div className="stats-compact-grid">
