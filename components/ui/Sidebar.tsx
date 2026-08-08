@@ -265,6 +265,11 @@ export default function Sidebar() {
           label: "Onboard City",
           href: "/hms/cities/new",
           icon: <Building2 size={18} />,
+        },
+        {
+          label: "Registration Requests",
+          href: "/registration-requests",
+          icon: <Bell size={18} />,
         }
       );
     } else if (isCityAdmin || isCommissioner) {
@@ -380,6 +385,7 @@ export default function Sidebar() {
             }
           >
             {[
+
               {
                 label: "Zones",
                 href: "/city/zones",
