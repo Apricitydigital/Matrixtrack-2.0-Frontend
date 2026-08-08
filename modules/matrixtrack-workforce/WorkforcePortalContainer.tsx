@@ -119,20 +119,25 @@ function WorkforceContent() {
     }
   };
 
+  const hideSidebar = true;
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 relative dark:bg-slate-950">
-      <Sidebar
-        isOpen={isSidebarOpen}
-        activeView={activeView}
-        onSelectView={setActiveView}
-      />
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 pl-64">
-        <Navbar
-          toggleSidebar={() =>
-            setSidebarOpen((previous) => !previous)
-          }
+      {!hideSidebar && (
+        <Sidebar
+          isOpen={isSidebarOpen}
+          activeView={activeView}
+          onSelectView={setActiveView}
         />
-        <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">
+      )}
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${hideSidebar ? 'pl-0' : 'pl-64'}`}>
+        {!hideSidebar && (
+          <Navbar
+            toggleSidebar={() =>
+              setSidebarOpen((previous) => !previous)
+            }
+          />
+        )}
+        <main className="flex-1 p-2 lg:p-4 overflow-x-hidden">
           {renderView()}
         </main>
       </div>

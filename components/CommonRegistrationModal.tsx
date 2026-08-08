@@ -31,12 +31,14 @@ interface CommonRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  asPage?: boolean;
 }
 
 export default function CommonRegistrationModal({
   isOpen,
   onClose,
-  onSuccess
+  onSuccess,
+  asPage
 }: CommonRegistrationModalProps) {
   const { user } = useAuth();
   const userPerms = getUserPermissions(user);
@@ -60,12 +62,12 @@ export default function CommonRegistrationModal({
     taskforceRoles: [
       { key: "SUPERVISOR", label: "Supervisor" },
       { key: "EMPLOYEE", label: "Field Employee" },
-      { key: "QC", label: "QC Inspector" },
+      { key: "QC", label: "Quality Controller" },
       { key: "ACTION_OFFICER", label: "Action Officer" }
     ],
     swachhRoles: [
       { key: "accessor", label: "Assessor / Evaluator" },
-      { key: "qc", label: "QC Inspector" },
+      { key: "qc", label: "Quality Controller" },
       { key: "admin", label: "System Admin" }
     ],
     swachhAccessorTypes: [
@@ -125,12 +127,14 @@ export default function CommonRegistrationModal({
     if (isOpen) {
       loadConfig();
     }
-  }, [isOpen]);
+  }, [isOpen, user]);
 
   const loadConfig = async () => {
+    let fetchedCities: { id: string; name: string; code: string }[] = [];
     try {
       const res = await CommonRegistrationApi.getConfig();
       if (res) {
+        fetchedCities = res.cities || [];
         setConfig((prev) => ({
           ...prev,
           cities: res.cities || [],
@@ -141,14 +145,26 @@ export default function CommonRegistrationModal({
         }));
       }
     } catch {
-      // Fallback to public geo cities
-      PublicGeoApi.cities()
-        .then((res) => {
+      const fetchGeoConfig = async () => {
+        setLoadingGeo(true);
+        try {
+          let fetchedCities: any[] = [];
+          const res = await CommonRegistrationApi.getConfig();
           if (res?.cities) {
-            setConfig((prev) => ({ ...prev, cities: res.cities.map((c) => ({ id: c.id, name: c.name, code: "" })) }));
+            fetchedCities = res.cities.map((c) => ({ id: c.id, name: c.name, code: c.code || "" }));
+            setConfig((prev) => ({ ...prev, cities: fetchedCities }));
           }
-        })
-        .catch(() => {});
+        } catch {}
+      };
+      fetchGeoConfig();
+    }
+
+    // Auto-select city if user is a CITY_ADMIN and is assigned a city
+    if (user && (user.roles?.includes("CITY_ADMIN") || user.role === "CITY_ADMIN")) {
+      const assignedCityId = user.cityId || (user.city && user.city.id);
+      if (assignedCityId) {
+        handleCityChange(assignedCityId);
+      }
     }
 
     try {
@@ -194,6 +210,19 @@ export default function CommonRegistrationModal({
       }));
     }
   }, [isSwachhPermitted]);
+
+  // Derived filtered cities based on user role
+  const getFilteredCities = () => {
+    if (!user) return config.cities;
+    const isCityAdmin = user.roles?.includes("CITY_ADMIN") || user.role === "CITY_ADMIN";
+    if (isCityAdmin) {
+      const assignedCityId = user.cityId || (user.city && user.city.id);
+      if (assignedCityId) {
+        return config.cities.filter((c) => c.id === assignedCityId);
+      }
+    }
+    return config.cities;
+  };
 
   const handleCityChange = async (cityId: string) => {
     setForm((f) => ({ ...f, cityId, zoneId: "", wardId: "" }));
@@ -248,6 +277,30 @@ export default function CommonRegistrationModal({
     e.preventDefault();
     setErrorMsg("");
     setStatusMsg("");
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      setErrorMsg("Please enter a valid email address (e.g. name@domain.com)");
+      return;
+    }
+
+    // Validate mobile number (exactly 10 digits)
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (phoneDigits.length !== 10) {
+      setErrorMsg("Mobile number must be exactly 10 digits");
+      return;
+    }
+
+    // Validate Aadhaar number (exactly 12 digits if provided)
+    if (form.aadharNumber) {
+      const aadharDigits = form.aadharNumber.replace(/\D/g, "");
+      if (aadharDigits.length !== 12) {
+        setErrorMsg("Aadhaar number must be exactly 12 digits");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -283,7 +336,7 @@ export default function CommonRegistrationModal({
 
       const res = await CommonRegistrationApi.register(payload);
       if (res.success) {
-        setStatusMsg(res.message || "Employee registered successfully!");
+        setStatusMsg(res.message || "User registered successfully!");
         setForm((f) => ({
           ...f,
           name: "",
@@ -413,93 +466,104 @@ export default function CommonRegistrationModal({
     window.URL.revokeObjectURL(url);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !asPage) return null;
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        background: "rgba(15, 23, 42, 0.75)",
-        backdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px"
-      }}
+      style={
+        asPage
+          ? {
+              display: "flex",
+              justifyContent: "center",
+              padding: "0",
+              width: "100%"
+            }
+          : {
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              background: "rgba(15, 23, 42, 0.75)",
+              backdropFilter: "blur(8px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px"
+            }
+      }
     >
       <div
         style={{
           background: "#ffffff",
           borderRadius: "24px",
-          maxWidth: "840px",
+          maxWidth: asPage ? "100%" : "840px",
           width: "100%",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+          maxHeight: asPage ? "none" : "90vh",
+          overflowY: asPage ? "visible" : "auto",
+          boxShadow: asPage ? "0 4px 24px -8px rgba(0, 0, 0, 0.08)" : "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           border: "1px solid rgba(226, 232, 240, 0.8)",
           fontFamily: "'Inter', sans-serif"
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: "24px 32px",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-            color: "#ffffff",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            borderTopLeftRadius: "24px",
-            borderTopRightRadius: "24px"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "14px",
-                background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
-                display: "grid",
-                placeItems: "center",
-                color: "#fff",
-                boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)"
-              }}
-            >
-              <Sparkles size={22} />
-            </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, letterSpacing: "-0.02em" }}>
-                Integrated Employee Registration
-              </h2>
-              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#94a3b8" }}>
-                Register users simultaneously for Taskforce 2.0 & Swachh Ranking software
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
+        {!asPage && (
+          <div
             style={{
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              color: "#fff",
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              display: "grid",
-              placeItems: "center",
-              cursor: "pointer",
-              transition: "background 0.2s"
+              padding: "24px 32px",
+              background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+              color: "#ffffff",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderTopLeftRadius: "24px",
+              borderTopRightRadius: "24px"
             }}
           >
-            <X size={18} />
-          </button>
-        </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "14px",
+                  background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                  display: "grid",
+                  placeItems: "center",
+                  color: "#fff",
+                  boxShadow: "0 4px 12px rgba(59, 130, 246, 0.4)"
+                }}
+              >
+                <Sparkles size={22} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, letterSpacing: "-0.02em" }}>
+                  Integrated User Registration
+                </h2>
+                <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#94a3b8" }}>
+                  Register users simultaneously for Inspection and performance system and ward ranking system
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                border: "none",
+                color: "#fff",
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+                transition: "background 0.2s"
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
 
         {/* Modal Content */}
-        <div style={{ padding: "28px 32px" }}>
+        <div style={{ padding: "28px 32px", maxWidth: "920px", margin: "0 auto" }}>
           {/* Mode Switcher Tabs */}
           <div
             style={{
@@ -531,7 +595,7 @@ export default function CommonRegistrationModal({
                 transition: "all 0.2s"
               }}
             >
-              <UserPlus size={16} /> Single Employee Registration
+              <UserPlus size={16} /> Single User Registration
             </button>
             <button
               onClick={() => setActiveTab("bulk")}
@@ -614,7 +678,7 @@ export default function CommonRegistrationModal({
                     letterSpacing: "0.03em"
                   }}
                 >
-                  Target Software / Applications (Permitted Workspace Modules)
+                  Permitted Workspace Modules
                 </label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   {/* Taskforce 2.0 Card */}
@@ -643,10 +707,10 @@ export default function CommonRegistrationModal({
                       />
                       <div>
                         <div style={{ fontWeight: 800, fontSize: "15px", color: "#1e3a8a", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <ShieldCheck size={16} /> Taskforce 2.0 (Matrixtrack)
+                          <ShieldCheck size={16} /> Inspection and performance system 
                         </div>
                         <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
-                          Assign to Sweeping, Litter Bins, Toilet & CTU Feeder modules
+                          Assign to Inspection and performance System's module - litterbin , sweeping , and toilets.
                         </p>
                       </div>
                     </div>
@@ -740,10 +804,9 @@ export default function CommonRegistrationModal({
               {/* Personal Details Row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
-                  <label className="form-label">Full Name *</label>
+                  <label className="form-label">Full Name</label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Ramesh Kumar"
                     className="form-input"
                     value={form.name}
@@ -751,10 +814,9 @@ export default function CommonRegistrationModal({
                   />
                 </div>
                 <div>
-                  <label className="form-label">Email Address *</label>
+                  <label className="form-label">Email Address</label>
                   <input
                     type="email"
-                    required
                     placeholder="e.g. ramesh@gov.in"
                     className="form-input"
                     value={form.email}
@@ -766,10 +828,9 @@ export default function CommonRegistrationModal({
               {/* Contact & Password Row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
-                  <label className="form-label">Mobile Number *</label>
+                  <label className="form-label">Mobile Number</label>
                   <input
                     type="text"
-                    required
                     placeholder="+91 98765 43210"
                     className="form-input"
                     value={form.phone}
@@ -777,7 +838,7 @@ export default function CommonRegistrationModal({
                   />
                 </div>
                 <div>
-                  <label className="form-label">Password (Optional)</label>
+                  <label className="form-label">Password</label>
                   <input
                     type="password"
                     placeholder="Default: Matrix@2026"
@@ -787,7 +848,7 @@ export default function CommonRegistrationModal({
                   />
                 </div>
                 <div>
-                  <label className="form-label">Aadhaar Number (Optional)</label>
+                  <label className="form-label">Aadhaar Number</label>
                   <input
                     type="text"
                     placeholder="12-digit Aadhaar"
@@ -808,7 +869,7 @@ export default function CommonRegistrationModal({
                     onChange={(e) => handleCityChange(e.target.value)}
                   >
                     <option value="">Select City</option>
-                    {config.cities.map((c) => (
+                    {getFilteredCities().map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -854,54 +915,93 @@ export default function CommonRegistrationModal({
                 <div
                   style={{
                     background: "#f8fafc",
-                    border: "1.5px solid #e2e8f0",
+                    border: "1px solid #e2e8f0",
                     borderRadius: "16px",
-                    padding: "20px",
-                    marginBottom: "20px"
+                    padding: "24px",
+                    marginBottom: "24px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
                   }}
                 >
-                  <h4 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 800, color: "#1e3a8a", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <ShieldCheck size={18} /> Taskforce 2.0 Assignment Details
+                  <h4 style={{ margin: "0 0 16px", fontSize: "14px", fontWeight: 800, color: "#1e3a8a", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <ShieldCheck size={18} /> Inspection and Performance System Modules
                   </h4>
-                  <div style={{ marginBottom: "14px" }}>
-                    <label className="form-label">Taskforce Role</label>
+                  <div style={{ marginBottom: "16px" }}>
+                    <label className="form-label">Select Role</label>
                     <select
                       className="form-input"
                       value={form.taskforceRole}
                       onChange={(e) => setForm({ ...form, taskforceRole: e.target.value })}
                     >
-                      {config.taskforceRoles.map((r) => (
-                        <option key={r.key} value={r.key}>
-                          {r.label}
-                        </option>
-                      ))}
+                      {config.taskforceRoles
+                        /* Field Employee option commented out/hidden from UI dropdown */
+                        .filter((r) => r.key !== "EMPLOYEE")
+                        .map((r) => {
+                          let labelText = r.label;
+                          if (r.key === "QC" || String(r.label).toLowerCase().includes("qc inspector")) {
+                            labelText = "Quality Controller";
+                          }
+                          return (
+                            <option key={r.key} value={r.key}>
+                              {labelText}
+                            </option>
+                          );
+                        })}
                     </select>
                   </div>
                   <div>
-                    <label className="form-label">Assign Modules</label>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                      {config.modules.map((m) => (
-                        <label
-                          key={m.key}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            color: "#334155",
-                            cursor: "pointer"
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={form.taskforceModules.includes(m.key)}
-                            onChange={() => toggleTaskforceModule(m.key)}
-                            style={{ accentColor: "#2563eb" }}
-                          />
-                          {m.name}
-                        </label>
-                      ))}
+                    <label className="form-label" style={{ marginBottom: "12px" }}>Select Module</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" }}>
+                      {config.modules
+                        .filter((m) => {
+                          const nameLower = (m.name || "").toLowerCase();
+                          return (
+                            !nameLower.includes("swachh ward ranking system") &&
+                            !nameLower.includes("workforce monitoring") &&
+                            !nameLower.includes("processing & mrf") &&
+                            !nameLower.includes("processing and mrf")
+                          );
+                        })
+                        .map((m) => {
+                          const isSelected = form.taskforceModules.includes(m.key);
+                          
+                          let displayName = m.name;
+                          const nameUpper = String(m.name || '').toUpperCase();
+                          if (nameUpper.includes("SWEEPING")) displayName = "Sweeping";
+                          if (nameUpper.includes("LITTER")) displayName = "Litter Bins";
+                          if (nameUpper.includes("TOILET")) displayName = "Cleanliness of Toilets";
+                          if (nameUpper.includes("TASKFORCE") || nameUpper.includes("CTU")) displayName = "CTU / GVP Transformation";
+
+                          return (
+                            <button
+                              type="button"
+                              key={m.key}
+                              onClick={() => toggleTaskforceModule(m.key)}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "10px 12px",
+                                borderRadius: "12px",
+                                border: isSelected ? "1.5px solid #3b82f6" : "1px solid #e2e8f0",
+                                backgroundColor: isSelected ? "#eff6ff" : "#ffffff",
+                                color: isSelected ? "#1d4ed8" : "#475569",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                transition: "all 0.15s",
+                                textAlign: "left"
+                              }}
+                            >
+                              <span>{displayName}</span>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                readOnly
+                                style={{ accentColor: "#2563eb", width: "13px", height: "13px", cursor: "pointer", pointerEvents: "none" }}
+                              />
+                            </button>
+                          );
+                        })}
                     </div>
                   </div>
                 </div>
@@ -911,14 +1011,15 @@ export default function CommonRegistrationModal({
               {form.targetSystems.includes("SWACHH_RANKING") && (
                 <div
                   style={{
-                    background: "#ecfdf5",
-                    border: "1.5px solid #a7f3d0",
+                    background: "#f0fdf4",
+                    border: "1px solid #dcfce7",
                     borderRadius: "16px",
-                    padding: "20px",
-                    marginBottom: "24px"
+                    padding: "24px",
+                    marginBottom: "24px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
                   }}
                 >
-                  <h4 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 800, color: "#065f46", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <h4 style={{ margin: "0 0 16px", fontSize: "14px", fontWeight: 800, color: "#166534", display: "flex", alignItems: "center", gap: "8px" }}>
                     <Building2 size={18} /> Swachh Ranking Assignment Details
                   </h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
@@ -942,15 +1043,14 @@ export default function CommonRegistrationModal({
                       <label className="form-label">Accessor Category / Agency</label>
                       <select
                         className="form-input"
-                        disabled={form.swachhRole !== "accessor"}
                         value={form.swachhAccessorType}
                         onChange={(e) =>
                           setForm({ ...form, swachhAccessorType: e.target.value as any })
                         }
                       >
-                        {config.swachhAccessorTypes.map((a) => (
-                          <option key={a.key} value={a.key}>
-                            {a.label}
+                        {config.swachhAccessorTypes.map((t) => (
+                          <option key={t.key} value={t.key}>
+                            {t.label}
                           </option>
                         ))}
                       </select>
@@ -987,7 +1087,7 @@ export default function CommonRegistrationModal({
                   </>
                 ) : (
                   <>
-                    Register Employee Across Selected Systems <ArrowRight size={18} />
+                    Register User Across Selected Modules <ArrowRight size={18} />
                   </>
                 )}
               </button>

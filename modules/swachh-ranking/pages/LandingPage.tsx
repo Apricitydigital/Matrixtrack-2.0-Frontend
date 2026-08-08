@@ -394,7 +394,7 @@ const LandingPage = () => {
                             className="header-logo"
                         />
                     </Link>
-                    <Link to="/login" style={{ color: 'white', fontWeight: 600, textDecoration: 'none', fontSize: '0.9375rem', opacity: 0.9 }}>Portal Login</Link>
+                    <Link to="/unified-login" style={{ color: 'white', fontWeight: 600, textDecoration: 'none', fontSize: '0.9375rem', opacity: 0.9 }}>Portal Login</Link>
                     <button
                         onClick={() => { setShowModal(true); setStep(1); }}
                         className="btn"
@@ -422,7 +422,7 @@ const LandingPage = () => {
                         />
                     </Link>
 
-                    <Link to="/login" className="portal-link">
+                    <Link to="/unified-login" className="portal-link">
                         Portal Login
                     </Link>
 

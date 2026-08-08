@@ -29,6 +29,7 @@ import {
   LogOut,
   Building2,
   CheckCircle2,
+  Globe,
 } from "lucide-react";
 
 const getModuleIcon = (key: string) => {
@@ -240,12 +241,6 @@ export default function Sidebar() {
       }
     );
   } else {
-    links.push({
-      label: "Portal Home",
-      href: "/portal-home",
-      icon: <Layout size={18} />,
-    });
-
     if (
       !isCommissioner &&
       !isCityAdmin &&
@@ -264,11 +259,6 @@ export default function Sidebar() {
           label: "HMS Super Admin",
           href: "/hms",
           icon: <Shield size={18} />,
-        },
-        {
-          label: "Onboard City",
-          href: "/hms/cities/new",
-          icon: <Building2 size={18} />,
         }
       );
     } else if (isCityAdmin || isCommissioner) {
@@ -283,8 +273,8 @@ export default function Sidebar() {
         icon: <Users size={18} />,
       });
       links.push({
-        label: "Integrated Registration",
-        href: "/common-registration",
+        label: "User Registration Management",
+        href: "/portal-home/common-registration",
         icon: <UserPlus size={18} />,
       });
     } else {
@@ -341,11 +331,10 @@ export default function Sidebar() {
           <div className="mb-4 px-1">
             <Link
               href="/portal-home"
-              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all duration-200 shadow-sm ${
-                pathname === "/portal-home"
+              className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all duration-200 shadow-sm ${pathname === "/portal-home"
                   ? "bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-blue-500/25 shadow-md"
                   : "bg-slate-900 text-white hover:bg-slate-800"
-              }`}
+                }`}
             >
               <Layout size={16} className="text-blue-300" />
               <span>Portal Home</span>
@@ -408,11 +397,11 @@ export default function Sidebar() {
                 href: "/city/users",
                 icon: <Users size={16} />,
               },
-              {
-                label: "Registration Requests",
-                href: "/registration-requests",
-                icon: <Bell size={16} />,
-              },
+              // {
+              //   label: "Registration Requests",
+              //   href: "/registration-requests",
+              //   icon: <Bell size={16} />,
+              // },
             ].map((link) => (
               <NavItem
                 key={link.href}
@@ -427,7 +416,26 @@ export default function Sidebar() {
         {/* Module links */}
         {user && moduleLinks.length > 0 && (
           <CollapsibleGroup
-            label="Modules"
+            label="Active Operational System"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             icon={<Layout size={18} />}
             open={modulesOpen}
             onToggle={() =>
