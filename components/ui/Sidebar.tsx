@@ -30,6 +30,7 @@ import {
   Building2,
   CheckCircle2,
   Globe,
+
 } from "lucide-react";
 
 const getModuleIcon = (key: string) => {
@@ -332,8 +333,8 @@ export default function Sidebar() {
             <Link
               href="/portal-home"
               className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all duration-200 shadow-sm ${pathname === "/portal-home"
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-blue-500/25 shadow-md"
-                  : "bg-slate-900 text-white hover:bg-slate-800"
+                ? "bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-blue-500/25 shadow-md"
+                : "bg-slate-900 text-white hover:bg-slate-800"
                 }`}
             >
               <Layout size={16} className="text-blue-300" />

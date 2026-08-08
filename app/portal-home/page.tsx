@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import HmsKpiCards from "@components/ui/HmsKpiCards";
 import { useAuth } from '@hooks/useAuth';
+import dynamic from 'next/dynamic';
 import {
   ShieldCheck,
   Users,
@@ -133,11 +134,10 @@ export default function PortalHomePage() {
                           </span>
 
                           <span
-                            className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
-                              isLive
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
+                            className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${isLive
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}
                           >
                             {isLive ? 'Active' : 'Inactive'}
                           </span>
