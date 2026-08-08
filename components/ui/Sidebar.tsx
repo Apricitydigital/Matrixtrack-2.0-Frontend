@@ -29,8 +29,6 @@ import {
   LogOut,
   Building2,
   CheckCircle2,
-  Globe,
-
 } from "lucide-react";
 
 const getModuleIcon = (key: string) => {
@@ -265,36 +263,30 @@ export default function Sidebar() {
           label: "Onboard City",
           href: "/hms/cities/new",
           icon: <Building2 size={18} />,
-        },
-        {
-          label: "Registration Requests",
-          href: "/registration-requests",
-          icon: <Bell size={18} />,
         }
       );
     } else if (isCityAdmin || isCommissioner) {
-      links.push(
-        {
-          label: "City Dashboard",
-          href: "/city",
-          icon: <LayoutDashboard size={18} />,
-        },
-        {
-          label: "Employees",
-          href: "/employees",
-          icon: <Users size={18} />,
-        },
-        {
-          label: "Integrated Registration",
-          href: "/common-registration",
-          icon: <UserPlus size={18} />,
-        },
-        {
-          label: "User Registration Management",
-          href: "/portal-home/common-registration",
-          icon: <UserPlus size={18} />,
-        }
-      );
+      links.push({
+        label: "City Dashboard",
+        href: "/city",
+        icon: <LayoutDashboard size={18} />,
+      });
+      links.push({
+        label: "Employees",
+        href: "/employees",
+        icon: <Users size={18} />,
+      });
+      links.push({
+        label: "Integrated Registration",
+        href: "/common-registration",
+        icon: <UserPlus size={18} />,
+      });
+
+      links.push({
+        label: "User Registration Management",
+        href: "/portal-home/common-registration",
+        icon: <UserPlus size={18} />,
+      });
     } else {
       links.push({
         label: "Home",
@@ -333,7 +325,7 @@ export default function Sidebar() {
 
         <div className="min-w-0">
           <div className="truncate text-[15px] font-bold tracking-tight text-slate-900">
-            Taskforce 20
+            MatrixTrack 2.0
           </div>
 
           <div className="text-xs font-medium text-slate-400">
@@ -385,7 +377,6 @@ export default function Sidebar() {
             }
           >
             {[
-
               {
                 label: "Zones",
                 href: "/city/zones",
@@ -410,6 +401,11 @@ export default function Sidebar() {
                 label: "Beat Requests",
                 href: "/city/beat-requests",
                 icon: <FileText size={16} />,
+              },
+              {
+                label: "Registration Requests",
+                href: "/registration-requests",
+                icon: <Bell size={16} />,
               },
               {
                 label: "Municipal Users",

@@ -13,6 +13,7 @@ import { MapPin, Info, Plus, X, Download, FileSpreadsheet, FileText, Target, Shi
 import dynamic from "next/dynamic";
 import type { BeatMapViewProps } from "./components/BeatMapView";
 import { useAuth } from "@hooks/useAuth";
+import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import { RoleGuard } from "@components/Guards";
 
 
@@ -127,8 +128,20 @@ export default function AreasPage() {
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              {/* Action Buttons to Create */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <TableExportDropdown 
+                data={beats.map(b => ({
+                  BeatName: b.beatName || b.name,
+                  BeatCode: b.beatCode || '-',
+                  AreaName: b.areaName || '-',
+                  ZoneName: b.zoneName || '-',
+                  WardName: b.wardName || '-',
+                  Supervisor: b.supervisorsSummary?.[0]?.name || '-',
+                  Employee: b.employeesSummary?.[0]?.name || '-'
+                }))}
+                filename="Registered_Beats_And_Areas"
+                title="Registered Beats & Areas Report"
+              />
               {!isReadOnly && (
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button

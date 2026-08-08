@@ -521,16 +521,41 @@ export const GeoApi = {
 export const AreaBeatApi = {
   list: () => apiFetch<{ beats: any[] }>("/city/areas"),
   listMyBeats: () => apiFetch<{ beats: any[] }>("/city/areas/my-beats"),
-  beatStatusOverview: (params?: { date?: string; status?: string }) => {
-    const sp = new URLSearchParams();
-    if (params?.date) sp.append("date", params.date);
-    if (params?.status) sp.append("status", params.status);
-    const query = sp.toString() ? `?${sp.toString()}` : "";
-    return apiFetch<{
-      beats: any[];
-      summary: { total: number; completed: number; inProgress: number; notDone: number };
-      date: string;
-    }>(`/city/areas/beat-status-overview${query}`);
+  beatStatusOverview: async (params?: { date?: string; status?: string }) => {
+    const res = await apiFetch<{ beats: any[] }>("/city/areas");
+    let beats = res.beats || [];
+
+    let total = 0, completed = 0, inProgress = 0, notDone = 0;
+    beats.forEach(beat => {
+      total++;
+      const status = beat.lastAssessment?.status || beat.status;
+      if (status === "APPROVED" || status === "COMPLETED") {
+        completed++;
+        beat.beatCompletionStatus = "COMPLETED";
+      } else if (status === "PENDING" || status === "IN_PROGRESS" || status === "PENDING_QC") {
+        inProgress++;
+        beat.beatCompletionStatus = "IN_PROGRESS";
+      } else {
+        notDone++;
+        beat.beatCompletionStatus = "NOT_DONE";
+      }
+    });
+
+    if (params?.status && params.status !== "ALL") {
+      beats = beats.filter(beat => {
+        const status = beat.lastAssessment?.status || beat.status;
+        if (params.status === "COMPLETED") return status === "APPROVED" || status === "COMPLETED";
+        if (params.status === "IN_PROGRESS") return status === "PENDING" || status === "IN_PROGRESS" || status === "PENDING_QC";
+        if (params.status === "NOT_DONE") return !status || status === "REJECTED" || status === "ACTION_REQUIRED" || status === "PENDING_ASSIGNMENT";
+        return true;
+      });
+    }
+
+    return {
+      beats,
+      summary: { total, completed, inProgress, notDone },
+      date: params?.date || new Date().toISOString()
+    };
   },
   listPendingRequests: (status?: string) =>
     apiFetch<{ pendingBeats: any[]; counts?: { pending: number; approved: number; rejected: number; all: number } }>(
@@ -840,8 +865,21 @@ export const ToiletApi = {
 };
 
 export const ModuleRecordsApi = {
-  getRecords: (moduleKey: string, filters?: { zoneIds?: string[]; wardIds?: string[]; page?: number; limit?: number; cityId?: string; tab?: string; fromDate?: string; toDate?: string }) => {
+  getRecords: (
+    moduleKey: string,
+    filters?: {
+      cityId?: string;
+      zoneIds?: string[];
+      wardIds?: string[];
+      page?: number;
+      limit?: number;
+      tab?: string;
+      fromDate?: string;
+      toDate?: string;
+    }
+  ) => {
     const params = new URLSearchParams();
+    if (filters?.cityId) params.append("cityId", filters.cityId);
     if (filters?.zoneIds?.length) filters.zoneIds.forEach(id => params.append("zoneIds", id));
     if (filters?.wardIds?.length) filters.wardIds.forEach(id => params.append("wardIds", id));
     if (filters?.page) params.append("page", filters.page.toString());

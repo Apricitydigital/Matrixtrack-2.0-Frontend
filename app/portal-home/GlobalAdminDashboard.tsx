@@ -3,14 +3,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { ModuleRecordsApi, CityUserApi } from '@lib/apiClient';
 import swachhApi from '../../modules/swachh-ranking/api/axios';
-import {
-  Users, ShieldCheck,
-  Activity, MapPin, Search,
-  Bell, Download, Calendar, Trophy, AlertTriangle, CheckCircle2, XCircle, RefreshCw
+import { 
+  Users, ShieldCheck, 
+  Bell, Download, Calendar, Trophy, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Menu,
+  Activity, MapPin, Search, Globe
 } from 'lucide-react';
-import {
-  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
-  Tooltip, ResponsiveContainer, Legend
+import { 
+  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, 
+  Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
 
 const COLORS = ['#10b981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6'];
@@ -22,7 +22,7 @@ export default function GlobalAdminDashboard() {
   const [swachhStats, setSwachhStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-
+  
   // Date Filters
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
@@ -33,22 +33,22 @@ export default function GlobalAdminDashboard() {
 
     try {
       const filters = { fromDate, toDate, limit: 1000 };
-
+      
       const [sweepingRes, toiletRes, twinbinRes, usersRes, swachhRes] = await Promise.all([
-        ModuleRecordsApi.getRecords('SWEEPING', filters).catch(() => ({ records: [], data: [] })),
-        ModuleRecordsApi.getRecords('TOILET', filters).catch(() => ({ records: [], data: [] })),
-        ModuleRecordsApi.getRecords('TWINBIN', filters).catch(() => ({ records: [], data: [] })),
+        ModuleRecordsApi.getRecords('SWEEPING', filters).catch(() => ({ data: [] as any[] })),
+        ModuleRecordsApi.getRecords('TOILET', filters).catch(() => ({ data: [] as any[] })),
+        ModuleRecordsApi.getRecords('TWINBIN', filters).catch(() => ({ data: [] as any[] })),
         CityUserApi.list().catch(() => ({ users: [] })),
         swachhApi.get('/admin/stats').catch(() => ({ data: null }))
       ]);
-
+      
       setTaskforceRecords({
         sweeping: sweepingRes.data || [],
         toilet: toiletRes.data || [],
         twinbin: twinbinRes.data || []
       });
       setUsers(usersRes.users || []);
-
+      
       // Default swachh stats if null
       const defaultSwachh = {
         totalParticipants: 0, totalAssessments: 0, qcApproved: 0, underReview: 0, reassessment: 0,
@@ -114,7 +114,7 @@ export default function GlobalAdminDashboard() {
   }, [actionRequiredCount, swachhStats, rejectedCount]);
 
   // User Filter
-  const filteredUsers = users.filter(u =>
+  const filteredUsers = users.filter(u => 
     u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -122,7 +122,7 @@ export default function GlobalAdminDashboard() {
   // CSV Export
   const downloadReport = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-
+    
     // Section 1: KPIs
     csvContent += "--- Global Analytics Report ---\n\n";
     csvContent += "Taskforce KPIs\n";
@@ -165,50 +165,43 @@ export default function GlobalAdminDashboard() {
 
   return (
     <div className="space-y-6 pb-12 mt-6 max-w-[1400px] mx-auto">
-
-      {/* HEADER & EXPORT & FILTERS */}
-      <div className="bg-white rounded-2xl p-6 lg:px-8 border border-slate-200/80 shadow-sm flex flex-col xl:flex-row gap-6 items-start xl:items-center justify-between">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-            <ShieldCheck className="text-blue-600" size={28} /> Global Command Center
-          </h1>
-          <p className="text-sm font-semibold text-slate-500 mt-1.5 flex items-center gap-2">
-            <Calendar size={14} /> Inspection & Performance Monitoring across all cities
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          {/* Date Filters */}
-          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 shadow-sm">
-            <input
-              type="date"
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-2 cursor-pointer"
+      
+      {/* Action Toolbar */}
+      <div className="bg-white rounded-2xl p-4 px-6 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Calendar size={16} className="text-blue-600" />
+          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+            <input 
+              type="date" 
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-1 cursor-pointer" 
               value={fromDate}
               onChange={e => setFromDate(e.target.value)}
             />
             <span className="text-slate-400 font-bold text-xs">-</span>
-            <input
-              type="date"
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-2 cursor-pointer"
+            <input 
+              type="date" 
+              className="bg-transparent text-xs font-bold text-slate-700 outline-none px-1 cursor-pointer" 
               value={toDate}
               onChange={e => setToDate(e.target.value)}
             />
           </div>
-
-          {/* Refresh Button */}
-          <button
+        </div>
+        
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <button 
             onClick={() => loadData(true)}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-sm border border-slate-200"
+            disabled={refreshing}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 border border-slate-200"
           >
-            <RefreshCw size={16} className={refreshing ? "animate-spin text-blue-600" : ""} /> Refresh
+            <RefreshCw size={14} className={refreshing ? 'animate-spin text-blue-600' : ''} />
+            <span>Refresh Data</span>
           </button>
 
-          {/* Export Button */}
           <button
             onClick={downloadReport}
-            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-sm"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm"
           >
-            <Download size={16} /> Export CSV
+            <Download size={14} /> Export CSV Report
           </button>
         </div>
       </div>
@@ -233,7 +226,7 @@ export default function GlobalAdminDashboard() {
 
       {/* KPI SECTIONS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
+        
         {/* TASKFORCE KPIs */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
           <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
@@ -284,7 +277,7 @@ export default function GlobalAdminDashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip
+                  <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     itemStyle={{ fontWeight: 'bold' }}
                   />
@@ -306,7 +299,7 @@ export default function GlobalAdminDashboard() {
                 <BarChart data={swachhChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#94a3b8' }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
-                  <Tooltip
+                  <Tooltip 
                     cursor={{ fill: '#f8fafc' }}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
@@ -335,9 +328,9 @@ export default function GlobalAdminDashboard() {
           </div>
           <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-            <input
-              type="text"
-              placeholder="Search personnel..."
+            <input 
+              type="text" 
+              placeholder="Search personnel..." 
               className="w-full sm:w-64 pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 transition shadow-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}

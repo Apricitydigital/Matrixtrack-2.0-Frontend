@@ -33,7 +33,8 @@ import {
   Info,
   Trash2,
   Activity,
-  PlusCircle
+  PlusCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { moduleEntryPath } from '@utils/modules';
 import { setAuthCookie } from '@lib/auth';
@@ -51,6 +52,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
   const isSwachhActive = pathname.startsWith('/ward-ranking');
   const isWorkforceActive = pathname.startsWith('/workforce-monitoring');
   const isInsideWorkspace = isTaskforceActive || isSwachhActive || isWorkforceActive;
+  const isMainDashboard = pathname === '/portal-home' || pathname === '/city' || pathname === '/city/' || pathname === '/dashboard';
 
   const [taskforceOpen, setTaskforceOpen] = useState(isTaskforceActive);
   const [swachhOpen, setSwachhOpen] = useState(isSwachhActive);
@@ -144,7 +146,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
     else if (currentView === 'sa-review') pageTitle = 'Swachh Sync - Self Assessment QC Review';
     else if (currentView === 'reports') pageTitle = 'Swachh Sync - Reports';
     else if (currentView === 'results') pageTitle = 'Swachh Sync - Results';
-    else pageTitle = 'Swachh Ward Ranking Workspace';
+    else pageTitle = 'Ward Ranking Workspace';
   } else if (isWorkforceActive) {
     if (currentView === 'master') pageTitle = 'Workforce - Master Control';
     else if (currentView === 'geofencing') pageTitle = 'Workforce - GeoFencing Management';
@@ -174,10 +176,53 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
   ];
 
   const masterSubTabs = [
-    ...(isSuperAdmin ? [{ name: 'Create City', href: '/portal-home/onboard-city', icon: <PlusCircle size={15} />, isActive: pathname.includes('/onboard-city') }] : []),
-    { name: 'Zones', href: '/city/zones', icon: <Map size={15} />, isActive: pathname.startsWith('/city/zones') },
-    { name: 'Wards', href: '/city/wards', icon: <MapPin size={15} />, isActive: pathname.startsWith('/city/wards') },
-    { name: 'Areas & Beats', href: '/city/areas', icon: <Target size={15} />, isActive: pathname.startsWith('/city/areas') },
+    ...(isSuperAdmin
+      ? [
+        {
+          name: 'Create City',
+          href: '/portal-home/onboard-city',
+          icon: <PlusCircle size={15} />,
+          isActive: pathname.includes('/onboard-city'),
+        },
+      ]
+      : []),
+
+    {
+      name: 'Zones',
+      href: '/city/zones',
+      icon: <Map size={15} />,
+      isActive: pathname.startsWith('/city/zones'),
+    },
+    {
+      name: 'Wards',
+      href: '/city/wards',
+      icon: <MapPin size={15} />,
+      isActive: pathname.startsWith('/city/wards'),
+    },
+    {
+      name: 'Areas & Beats',
+      href: '/city/areas',
+      icon: <Target size={15} />,
+      isActive: pathname.startsWith('/city/areas'),
+    },
+    {
+      name: 'Beat Status',
+      href: '/city/beat-status',
+      icon: <CheckCircle2 size={15} />,
+      isActive: pathname.startsWith('/city/beat-status'),
+    },
+    {
+      name: 'Beat Requests',
+      href: '/city/beat-requests',
+      icon: <FileText size={15} />,
+      isActive: pathname.startsWith('/city/beat-requests'),
+    },
+    {
+      name: 'Registration Requests',
+      href: '/portal-home/registration-requests',
+      icon: <UserPlus size={15} />,
+      isActive: pathname.startsWith('/portal-home/registration-requests'),
+    },
   ];
 
   const swachhGroups = [
@@ -319,11 +364,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                 <div className="flex flex-col gap-1 mt-1">
                   <Link
                     href="/portal-home"
-                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                      pathname === '/portal-home'
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname === '/portal-home'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
                   >
                     <LayoutDashboard size={16} className={pathname === '/portal-home' ? 'text-white' : 'text-slate-500'} />
                     <span>Home</span>
@@ -332,11 +376,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                   {canAccessRegistration && (
                     <Link
                       href="/portal-home/common-registration"
-                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                        pathname.includes('/common-registration') || pathname.includes('/registered-users')
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.includes('/common-registration') || pathname.includes('/registered-users')
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
                     >
                       <UserCheck2 size={16} className={pathname.includes('/common-registration') || pathname.includes('/registered-users') ? 'text-white' : 'text-slate-500'} />
                       <span>User Management</span>
@@ -346,11 +389,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                   {isSuperAdmin && (
                     <Link
                       href="/portal-home/city-directory"
-                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                        pathname.includes('/city-directory')
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.includes('/city-directory')
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
                     >
                       <Globe size={16} className={pathname.includes('/city-directory') ? 'text-white' : 'text-slate-500'} />
                       <span>City Directory</span>
@@ -363,11 +405,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={() => setMasterSubOpen((prev) => !prev)}
-                        className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                          masterSubOpen
-                            ? 'text-blue-600 font-extrabold bg-blue-50'
-                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                        }`}
+                        className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${masterSubOpen
+                          ? 'text-blue-600 font-extrabold bg-blue-50'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <Map size={16} className={masterSubOpen ? 'text-blue-600' : 'text-slate-500'} />
@@ -385,11 +426,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                             <Link
                               key={sub.name}
                               href={sub.href}
-                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                sub.isActive
-                                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                              }`}
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${sub.isActive
+                                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                }`}
                             >
                               <span className={sub.isActive ? 'text-white' : 'text-slate-400'}>{sub.icon}</span>
                               <span>{sub.name}</span>
@@ -409,18 +449,17 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                 Active Systems
               </div>
             )}
-            
+
             {/* INSPECTION & PERFORMANCE SYSTEM */}
             {hasTaskforceAccess && (
               <div className="flex flex-col">
                 <button
                   type="button"
                   onClick={() => setTaskforceOpen((prev) => !prev)}
-                  className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
-                    isTaskforceActive
-                      ? 'bg-blue-50 text-blue-700 font-extrabold'
-                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isTaskforceActive
+                    ? 'bg-blue-50 text-blue-700 font-extrabold'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
                 >
                   <div className="flex items-center gap-3 text-left min-w-0">
                     <ShieldCheck size={18} className={`shrink-0 ${isTaskforceActive ? 'text-blue-600' : 'text-slate-500'}`} />
@@ -437,11 +476,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                     {/* Dashboard */}
                     <Link
                       href="/city"
-                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                        pathname === '/city'
-                          ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
+                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname === '/city'
+                        ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
                     >
                       <LayoutDashboard size={15} className={pathname === '/city' ? 'text-white' : 'text-slate-400'} />
                       <span>Dashboard</span>
@@ -452,11 +490,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={() => setModulesSubOpen((prev) => !prev)}
-                        className={`flex items-center justify-between w-full px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                          pathname.startsWith('/modules') || pathname === '/city/modules'
-                            ? 'bg-blue-50 text-blue-700 font-bold'
-                            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                        }`}
+                        className={`flex items-center justify-between w-full px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/modules') || pathname === '/city/modules'
+                          ? 'bg-blue-50 text-blue-700 font-bold'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                          }`}
                       >
                         <div className="flex items-center gap-2.5 text-left min-w-0">
                           <Package size={15} className={`shrink-0 ${pathname.startsWith('/modules') || pathname === '/city/modules' ? 'text-blue-600' : 'text-slate-400'}`} />
@@ -474,11 +511,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                             <Link
                               key={sub.name}
                               href={sub.href}
-                              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${
-                                sub.isActive
-                                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                              }`}
+                              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${sub.isActive
+                                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                }`}
                             >
                               <span className={sub.isActive ? 'text-white' : 'text-slate-400'}>{sub.icon}</span>
                               <span>{sub.name}</span>
@@ -498,11 +534,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setSwachhOpen((prev) => !prev)}
-                  className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
-                    isSwachhActive
-                      ? 'bg-purple-50 text-purple-700 font-extrabold'
-                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isSwachhActive
+                    ? 'bg-purple-50 text-purple-700 font-extrabold'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
                 >
                   <div className="flex items-center gap-3 text-left min-w-0">
                     <Building2 size={18} className={`shrink-0 ${isSwachhActive ? 'text-purple-600' : 'text-slate-500'}`} />
@@ -525,11 +560,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                           <Link
                             key={sub.name}
                             href={sub.href}
-                            className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                              sub.isActive
-                                ? 'bg-purple-600 text-white font-bold shadow-sm shadow-purple-500/20'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${sub.isActive
+                              ? 'bg-purple-600 text-white font-bold shadow-sm shadow-purple-500/20'
+                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                              }`}
                           >
                             <span className={sub.isActive ? 'text-white' : 'text-slate-400'}>{sub.icon}</span>
                             <span>{sub.name}</span>
@@ -548,11 +582,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setWorkforceOpen((prev) => !prev)}
-                  className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
-                    isWorkforceActive
-                      ? 'bg-cyan-50 text-cyan-700 font-extrabold'
-                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
+                  className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isWorkforceActive
+                    ? 'bg-cyan-50 text-cyan-700 font-extrabold'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
                 >
                   <div className="flex items-center gap-3 text-left min-w-0">
                     <Users size={18} className={`shrink-0 ${isWorkforceActive ? 'text-cyan-600' : 'text-slate-500'}`} />
@@ -575,11 +608,10 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
                           <Link
                             key={sub.name}
                             href={sub.href}
-                            className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                              sub.isActive
-                                ? 'bg-cyan-600 text-white font-bold shadow-sm shadow-cyan-500/20'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
+                            className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${sub.isActive
+                              ? 'bg-cyan-600 text-white font-bold shadow-sm shadow-cyan-500/20'
+                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                              }`}
                           >
                             <span className={sub.isActive ? 'text-white' : 'text-slate-400'}>{sub.icon}</span>
                             <span>{sub.name}</span>
@@ -606,49 +638,50 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="portal-main-content flex-1 ml-72 p-5 sm:p-6 min-w-0 min-h-screen text-slate-800">
-        <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white/90 backdrop-blur-xl px-6 py-3.5 rounded-2xl border border-slate-200/80 shadow-[0_4px_20px_rgb(0,0,0,0.03)] sticky top-3 z-40 transition-all">
-          <div>
-            <div className="text-[9px] font-black uppercase tracking-[0.18em] text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center gap-1.5 mb-0.5">
-              <ShieldCheck size={13} className="text-blue-600" /> MATRIXTRACK 2.0 
-            </div>
-            <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
-              {pageTitle}
-            </h1>
-          </div>
+        {!isMainDashboard && (
+          <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-white px-6 py-3.5 rounded-2xl border border-slate-800/80 shadow-lg sticky top-3 z-40 transition-all overflow-hidden relative" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' }}>
+            {/* Subtle Glow */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent pointer-events-none" />
 
-          {user && (
-            <div className="flex items-center gap-5">
-              <div className="hidden sm:flex flex-col items-end gap-1 px-1">
-                <span className="inline-flex items-center gap-2 text-emerald-700 font-extrabold text-[11px] bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 w-fit shadow-sm relative overflow-hidden group">
-                  <span className="absolute inset-0 bg-emerald-500/10 group-hover:bg-emerald-500/20 transition-colors"></span>
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <div className="z-10">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-400 flex items-center gap-1.5 mb-0.5">
+                <ShieldCheck size={13} className="text-blue-400" /> MATRIXTRACK 2.0
+              </div>
+              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-tight">
+                {pageTitle}
+              </h1>
+            </div>
+
+            {user && (
+              <div className="flex items-center gap-5 z-10">
+                <div className="hidden sm:flex flex-col items-end gap-1 px-1">
+                  <span className="inline-flex items-center gap-2 text-emerald-400 font-extrabold text-[11px] bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/30 w-fit shadow-sm">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="relative">LIVE API FEED</span>
                   </span>
-                  <span className="relative">LIVE API FEED</span>
-                </span>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{clockStr}</span>
-              </div>
+                  <span className="text-[10px] font-bold text-slate-400 tracking-wider">{clockStr}</span>
+                </div>
 
-              <div className="flex items-center gap-3.5 bg-white border border-slate-100 shadow-sm px-4 py-2.5 rounded-[20px] shrink-0 hover:shadow-md transition-all cursor-pointer">
-                <div className="w-11 h-11 rounded-[14px] bg-gradient-to-br from-[#1e3a8a] via-[#2563eb] to-[#3b82f6] text-white font-black text-base flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0 ring-2 ring-white">
-                  {userInitial}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[13px] font-black text-slate-900 truncate leading-tight">{displayName}</span>
-                  {roleLabelText !== displayName && (
-                    <span className="text-[11px] font-bold text-slate-500 truncate leading-tight mt-0.5">{roleLabelText}</span>
-                  )}
-                  {cityName && (
-                    <span className="text-[10px] font-extrabold text-blue-600 truncate leading-tight uppercase tracking-wider mt-0.5">{cityName}</span>
-                  )}
+                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/10 shadow-sm px-3.5 py-1.5 rounded-[16px] shrink-0 hover:bg-white/15 transition-all">
+                  <div className="w-8 h-8 rounded-[10px] bg-blue-600 text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
+                    {userInitial}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[12px] font-bold text-white truncate leading-tight">{displayName}</span>
+                    <span className="text-[10px] font-medium text-slate-300 truncate leading-tight mt-0.5">{roleLabelText}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
+
+        <div key={pathname} className="animate-page-entrance">
+          {children}
         </div>
-
-        {children}
       </main>
     </div>
   );

@@ -9,6 +9,7 @@ import {
     List, Map as MapIcon, User, Users, ChevronDown, ChevronRight,
     RefreshCw, Target, TrendingUp, Filter, X, Building2
 } from "lucide-react";
+import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import "leaflet/dist/leaflet.css";
 
 const MapContainer = dynamic(() => import("react-leaflet").then(m => m.MapContainer), { ssr: false });
@@ -416,6 +417,19 @@ export default function BeatStatusPage() {
                                 <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
                                     style={{ border: "none", outline: "none", fontSize: 13, fontFamily: "inherit", color: "#0f172a" }} />
                             </div>
+
+                            {/* Export Dropdown */}
+                            <TableExportDropdown 
+                                data={filtered.map(b => ({
+                                    BeatName: b.beatName,
+                                    Zone: b.zoneName,
+                                    Ward: b.wardName,
+                                    Status: b.beatCompletionStatus,
+                                    AssessedPoints: `${b.assessedPointsCount}/${b.totalPoints}`
+                                }))}
+                                filename="Beat_Sweeping_Status"
+                                title="Beat Sweeping Status Report"
+                            />
 
                             {/* Refresh */}
                             <button onClick={fetchData} style={{
