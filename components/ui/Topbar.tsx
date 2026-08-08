@@ -90,51 +90,6 @@ export function Topbar() {
               <Bell size={18} />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-danger" />
             </button>
-
-            <div className="mx-1 h-6 w-px bg-slate-100" />
-
-            {/* Profile menu */}
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setMenuOpen((v) => !v)}
-                className="flex items-center gap-2.5 rounded-lg py-1.5 pl-1.5 pr-2.5 transition-colors duration-200 hover:bg-slate-50"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary-soft to-primary/20 text-sm font-bold text-primary-strong">
-                  {initial}
-                </div>
-                <div className="hidden text-left leading-tight sm:block">
-                  <div className="text-sm font-semibold text-slate-800">{user?.name || "Signed in"}</div>
-                  <div className="text-xs text-slate-400">{displayRole || "User"}</div>
-                </div>
-                <ChevronDown
-                  size={14}
-                  className={`text-slate-400 transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {menuOpen && (
-                <div className="animate-scale-in absolute right-0 top-[calc(100%+8px)] w-56 origin-top-right rounded-xl border border-slate-100 bg-white p-1.5 shadow-card-hover">
-                  <div className="px-3 py-2">
-                    <div className="text-sm font-semibold text-slate-800">{user?.name}</div>
-                    <div className="truncate text-xs text-slate-400">{user?.email}</div>
-                  </div>
-                  <div className="my-1 h-px bg-slate-100" />
-                  <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50">
-                    <UserIcon size={15} /> Profile
-                  </button>
-                  <button className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50">
-                    <Settings size={15} /> Settings
-                  </button>
-                  <div className="my-1 h-px bg-slate-100" />
-                  <button
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger-bg"
-                  >
-                    <LogOut size={15} /> Logout
-                  </button>
-                </div>
-              )}
-            </div>
           </>
         ) : (
           <Link

@@ -8,10 +8,20 @@ export type Role =
   | "COMMISSIONER"
   | "SUPERVISOR"
   | "ACTION_OFFICER"
-  | "SUPERVISOR"
   | "EMPLOYEE"
   | "QC"
-  | "ULB_OFFICER";
+  | "ULB_OFFICER"
+  | "hms_super_admin"
+  | "super_admin"
+  | "taskforce"
+  | "TASKFORCE_ADMIN"
+  | "swachh"
+  | "SWACHH_ADMIN"
+  | "swachh_sync"
+  | "workforce"
+  | "WORKFORCE_ADMIN"
+  | "matrix_track"
+  | (string & {});
 
 export type ModuleKey = string;
 export type ModuleName = ModuleKey;
@@ -34,6 +44,8 @@ export interface AuthUser {
   email?: string;
   cityId?: string;
   cityName?: string;
+  role?: string;
+  city?: any;
   roles: Role[];
   roleLabels?: string[];
   modules: ModuleAssignment[];

@@ -1,11 +1,11 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 
-const ProtectedRoute = ({ element, requiredPermission, adminOnly = false, fallback = "/login" }) => {
+const ProtectedRoute = ({ element, requiredPermission, adminOnly = false, fallback = "/unified-login" }) => {
   const { user, hasPermission, isAdmin } = useAuth();
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/unified-login" replace />;
   }
 
   // adminOnly routes: only users with admin role can access

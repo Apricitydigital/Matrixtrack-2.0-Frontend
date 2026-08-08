@@ -278,7 +278,7 @@ const SelfAssessmentLogin = () => {
                 )}
 
                 <div style={{ marginTop: '2rem', textAlign: 'center' }}>
-                    <Link to="/login" style={{
+                    <Link to="/unified-login" style={{
                         color: 'var(--swachh-green-light)',
                         fontWeight: 700,
                         fontSize: '0.8125rem',

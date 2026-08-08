@@ -8,15 +8,17 @@ import { Topbar } from "@components/ui/Topbar";
 
 const STANDALONE_PATHS = [
   "/",
-  "/login",
-  "/register",
   "/unified-login",
+  "/register",
   "/create-account",
   "/applications",
   "/portal-home",
+  "/city",
   "/ward-ranking",
   "/workforce-monitoring",
   "/admin-management",
+  "/employees",
+  "/modules",
 ];
 
 export function AppShell({

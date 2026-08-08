@@ -48,7 +48,7 @@ export default function CreateCityPage() {
   const [code, setCode] = useState("");
   const [ulbCode, setUlbCode] = useState("");
 
-  // Module Access Configuration for City Cluster Onboarding
+  // Module Access Configuration for City  Onboarding
   const [enabledModules, setEnabledModules] = useState<{
     taskforce: boolean;
     swachh: boolean;
@@ -243,10 +243,10 @@ export default function CreateCityPage() {
         <nav className="flex items-center gap-2 text-sm">
           <button
             type="button"
-            onClick={() => router.push("/hms")}
+            onClick={() => router.push("/portal-home")}
             className="font-semibold text-blue-600 transition hover:text-blue-700"
           >
-            HMS
+            Portal Home
           </button>
 
           <span className="text-slate-300">/</span>
@@ -299,7 +299,7 @@ export default function CreateCityPage() {
                 </div>
 
                 <p className="mt-2 text-sm text-slate-500 sm:text-base">
-                  Deploy a new city cluster into the system.
+                  Create a new city into the system.
                 </p>
               </div>
             </div>
@@ -339,98 +339,7 @@ export default function CreateCityPage() {
         </section>
 
         {/* Main content */}
-        <section className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
-          {/* Progress panel */}
-          <aside className="flex flex-col rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_-38px_rgba(15,23,42,0.45)] sm:p-6">
-            <div>
-              <h2 className="text-base font-black text-slate-900">
-                Onboarding Progress
-              </h2>
-
-              <p className="mt-1 text-xs leading-5 text-slate-400">
-                Complete the city details and review the
-                configuration before deployment.
-              </p>
-            </div>
-
-            <div className="relative mt-7 space-y-8">
-              <div className="absolute bottom-5 left-[17px] top-5 w-px border-l border-dashed border-blue-200" />
-
-              {/* Step 1 */}
-              <div className="relative flex gap-3">
-                <span className="z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white shadow-[0_8px_18px_-8px_rgba(37,99,235,0.8)]">
-                  1
-                </span>
-
-                <div className="pt-0.5">
-                  <div className="text-sm font-extrabold text-slate-800">
-                    City Information
-                  </div>
-
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Provide geographic hierarchy and city
-                    identifiers.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 2 */}
-              <div className="relative flex gap-3">
-                <span
-                  className={`z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-black transition ${
-                    hierarchyCompleted
-                      ? "bg-emerald-500 text-white"
-                      : "border border-slate-200 bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {hierarchyCompleted ? (
-                    <Check size={15} />
-                  ) : (
-                    "2"
-                  )}
-                </span>
-
-                <div className="pt-0.5">
-                  <div className="text-sm font-extrabold text-slate-800">
-                    Review & Deploy
-                  </div>
-
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Validate the details and activate the city
-                    cluster.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="my-6 h-px bg-slate-100" />
-
-            <div className="rounded-[16px] border border-blue-100 bg-blue-50/70 p-4">
-              <div className="flex gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
-                  <CircleHelp size={17} />
-                </span>
-
-                <div>
-                  <div className="text-sm font-extrabold text-blue-700">
-                    Need help?
-                  </div>
-
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    Select State, Division, District and City in
-                    sequence for accurate system mapping.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-auto pt-6">
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <Info size={14} />
-                Fields marked with * are mandatory.
-              </div>
-            </div>
-          </aside>
+        <section className="grid grid-cols-1 items-stretch gap-5">
 
           {/* Form panel */}
           <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_48px_-38px_rgba(15,23,42,0.45)]">
@@ -447,7 +356,7 @@ export default function CreateCityPage() {
 
                   <p className="mt-1 text-sm text-slate-400">
                     Select the complete geographic hierarchy to
-                    register a new city cluster.
+                    register a new city .
                   </p>
                 </div>
               </div>
