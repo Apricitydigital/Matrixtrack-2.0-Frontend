@@ -177,7 +177,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 export type UnifiedPortalKey =
   | "TASKFORCE_20"
   | "MATRIX_TRACK"
-  | "WARD_RANKING";
+  | "WARD_RANKING"
+  | "PROCESSING_PLANT";
 
 export type UnifiedTaskforceModuleKey =
   | "TASKFORCE"
@@ -318,6 +319,9 @@ export const AuthApi = {
       requestedRole?: string;
       requestedPortals?: string[];
       taskforceModules?: string[];
+      stateId?: string;
+      divisionId?: string;
+      districtId?: string;
     }>(
       "/auth/request-unified-registration",
       {
@@ -550,9 +554,80 @@ export const AreaBeatApi = {
 };
 
 export const PublicGeoApi = {
-  cities: () => apiFetch<{ cities: { id: string; name: string }[] }>("/public/cities"),
-  zones: (cityId: string) => apiFetch<{ zones: { id: string; name: string }[] }>(`/public/cities/${cityId}/zones`),
-  wards: (zoneId: string) => apiFetch<{ wards: { id: string; name: string }[] }>(`/public/zones/${zoneId}/wards`)
+  states: () =>
+    apiFetch<{
+      states: {
+        id: string;
+        code: string;
+        name: string;
+      }[];
+    }>("/public/locations/states"),
+
+  divisions: (stateId: string) =>
+    apiFetch<{
+      divisions: {
+        id: string;
+        code: string;
+        name: string;
+        stateId: string;
+      }[];
+    }>(
+      `/public/locations/divisions?stateId=${encodeURIComponent(stateId)}`
+    ),
+
+  districts: (stateId: string, divisionId: string) =>
+    apiFetch<{
+      districts: {
+        id: string;
+        code: string;
+        name: string;
+        stateId: string;
+        divisionId: string;
+      }[];
+    }>(
+      `/public/locations/districts?stateId=${encodeURIComponent(
+        stateId
+      )}&divisionId=${encodeURIComponent(divisionId)}`
+    ),
+
+  citiesByDistrict: (districtId: string) =>
+    apiFetch<{
+      cities: {
+        id: string;
+        code: string;
+        name: string;
+        stateId?: string;
+        divisionId?: string;
+        districtId?: string;
+      }[];
+    }>(
+      `/public/locations/cities?districtId=${encodeURIComponent(districtId)}`
+    ),
+
+  // Keep existing APIs for other screens
+  cities: () =>
+    apiFetch<{
+      cities: {
+        id: string;
+        name: string;
+      }[];
+    }>("/public/cities"),
+
+  zones: (cityId: string) =>
+    apiFetch<{
+      zones: {
+        id: string;
+        name: string;
+      }[];
+    }>(`/public/cities/${cityId}/zones`),
+
+  wards: (zoneId: string) =>
+    apiFetch<{
+      wards: {
+        id: string;
+        name: string;
+      }[];
+    }>(`/public/zones/${zoneId}/wards`),
 };
 
 export const CityUserApi = {
