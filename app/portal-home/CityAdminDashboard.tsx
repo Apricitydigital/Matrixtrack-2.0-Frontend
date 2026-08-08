@@ -3,15 +3,15 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { ModuleRecordsApi, CityUserApi } from '@lib/apiClient';
 import swachhApi from '../../modules/swachh-ranking/api/axios';
-import { 
-  Users, BarChart3, ShieldAlert, CheckCircle2, XCircle, 
-  Activity, MapPin, Search, ShieldCheck, Zap, 
+import {
+  Users, BarChart3, ShieldAlert, CheckCircle2, XCircle,
+  Activity, MapPin, Search, ShieldCheck, Zap,
   Bell, Download, Calendar, Trophy, AlertTriangle, ArrowRight,
   Landmark, GraduationCap, Building2, Store
 } from 'lucide-react';
-import { 
-  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, 
-  Tooltip, ResponsiveContainer, Legend 
+import {
+  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
+  Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
 const COLORS = ['#10b981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6'];
@@ -35,20 +35,20 @@ export default function CityAdminDashboard() {
       setLoading(true);
       try {
         const [sweepingRes, toiletRes, twinbinRes, usersRes, swachhRes] = await Promise.all([
-          ModuleRecordsApi.getRecords('SWEEPING').catch(() => ({ records: [] })),
-          ModuleRecordsApi.getRecords('TOILET').catch(() => ({ records: [] })),
-          ModuleRecordsApi.getRecords('TWINBIN').catch(() => ({ records: [] })),
+          ModuleRecordsApi.getRecords('SWEEPING').catch(() => ({ data: [] })),
+          ModuleRecordsApi.getRecords('TOILET').catch(() => ({ data: [] })),
+          ModuleRecordsApi.getRecords('TWINBIN').catch(() => ({ data: [] })),
           CityUserApi.list().catch(() => ({ users: [] })),
           swachhApi.get('/admin/stats').catch(() => ({ data: null }))
         ]);
-        
+
         setTaskforceRecords({
-          sweeping: sweepingRes.records || [],
-          toilet: toiletRes.records || [],
-          twinbin: twinbinRes.records || []
+          sweeping: sweepingRes.data || [],
+          toilet: toiletRes.data || [],
+          twinbin: twinbinRes.data || []
         });
         setUsers(usersRes.users || []);
-        
+
         // Default swachh stats if null
         const defaultSwachh = {
           totalParticipants: 0, totalAssessments: 0, qcApproved: 0, underReview: 0, reassessment: 0,
@@ -112,7 +112,7 @@ export default function CityAdminDashboard() {
   }, [actionRequiredCount, swachhStats, rejectedCount]);
 
   // User Filter
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = users.filter(u =>
     u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -120,7 +120,7 @@ export default function CityAdminDashboard() {
   // CSV Export
   const downloadReport = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    
+
     // Section 1: KPIs
     csvContent += "--- City Analytics Report ---\n\n";
     csvContent += "Taskforce KPIs\n";
@@ -162,7 +162,7 @@ export default function CityAdminDashboard() {
 
   return (
     <div className="space-y-6 pb-12 mt-6 max-w-[1400px] mx-auto">
-      
+
       {/* HEADER & EXPORT */}
       <div className="bg-white rounded-2xl p-6 lg:px-8 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
@@ -173,7 +173,7 @@ export default function CityAdminDashboard() {
             <Calendar size={14} /> {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <button 
+        <button
           onClick={downloadReport}
           className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition flex items-center gap-2 shadow-sm"
         >
@@ -201,7 +201,7 @@ export default function CityAdminDashboard() {
 
       {/* KPI SECTIONS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* TASKFORCE KPIs */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
           <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
@@ -252,7 +252,7 @@ export default function CityAdminDashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     itemStyle={{ fontWeight: 'bold' }}
                   />
@@ -274,7 +274,7 @@ export default function CityAdminDashboard() {
                 <BarChart data={swachhChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#94a3b8' }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
-                  <Tooltip 
+                  <Tooltip
                     cursor={{ fill: '#f8fafc' }}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
@@ -303,9 +303,9 @@ export default function CityAdminDashboard() {
           </div>
           <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-            <input 
-              type="text" 
-              placeholder="Search personnel..." 
+            <input
+              type="text"
+              placeholder="Search personnel..."
               className="w-full sm:w-64 pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 transition shadow-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -375,7 +375,7 @@ function KpiBlock({ label, value, color, highlight = false }: { label: string, v
     rose: 'bg-rose-50 text-rose-600',
     violet: 'bg-violet-50 text-violet-600',
   };
-  
+
   return (
     <div className={`p-4 rounded-xl border transition-all ${highlight ? 'bg-amber-50/30 border-amber-200 shadow-sm' : 'bg-slate-50/50 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{label}</p>

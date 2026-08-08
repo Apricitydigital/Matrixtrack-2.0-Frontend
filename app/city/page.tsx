@@ -523,7 +523,7 @@
 //         .da-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.09) !important; transform: translateY(-2px); }
 //         .da-row:hover { background: #f8fafc !important; }
 //         .da-link { text-decoration: none; }
-        
+
 //         /* Responsive Grids */
 //         .responsive-grid-sidebar { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
 //         .responsive-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
@@ -1699,7 +1699,7 @@
 //         <>
 //           {/* ── REDESIGNED CITY ADMIN TASKFORCE DASHBOARD ── */}
 //           <div style={{ padding: '12px 24px', backgroundColor: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
-            
+
 //             {/* Background Mini Leaf Accents (Small subtle floating leaves) */}
 //             <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden', opacity: 0.15 }}>
 //               <Leaf size={20} style={{ position: 'absolute', left: '30px', top: '100px', transform: 'rotate(-45deg)', color: '#059669' }} />
@@ -1867,7 +1867,7 @@
 //               {/* 5 Cards Row (Clean without 100% circle gauge) */}
 //               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '14px' }}>
 //                 {[
-                
+
 //                   {
 //                     title: 'TOTAL ACTION OFFICERS',
 //                     count: stats?.actionOfficers || stats?.ACTION_OFFICER || 0,
@@ -1951,7 +1951,7 @@
 //               </div>
 //             </div>
 
-            
+
 
 //             {/* ── SECTION 2: WORKFORCE DISTRIBUTION BY MODULE ── */}
 //             <div style={{ position: 'relative', zIndex: 1, backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.03)' }}>
@@ -1999,7 +1999,7 @@
 //                               <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#64748b' }}>{item.total} Records</div>
 //                             </div>
 //                           </div>
-                          
+
 //                         </div>
 //                       );
 //                     })}
@@ -2359,21 +2359,21 @@ function ArcGauge({
         <circle cx={startX} cy={cy} r="3.5" fill={color} opacity=".9" />
       </svg>
 
-<div
-  style={{
-    position: 'absolute',
-    left: '50%',
-    bottom: 10,
-    transform: 'translateX(-50%)',
-    color: '#17243c',
-    fontSize: 23,
-    lineHeight: 1,
-    fontWeight: 800,
-    letterSpacing: '-.04em',
-  }}
->
-  {score}
-</div>
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          bottom: 10,
+          transform: 'translateX(-50%)',
+          color: '#17243c',
+          fontSize: 23,
+          lineHeight: 1,
+          fontWeight: 800,
+          letterSpacing: '-.04em',
+        }}
+      >
+        {score}
+      </div>
     </div>
   );
 }
@@ -2452,7 +2452,7 @@ export default function CityDashboardPage() {
       + `Sweeping,${sweepingDetailStats.totalSegments || 0},${sweepingDetailStats.totalApproved || 0},0,${sweepingDetailStats.actionRequired || 0}\\n`
       + `Twinbin,${extraModuleStats.twinbin.totalInspections || 0},${extraModuleStats.twinbin.totalApproved || 0},${extraModuleStats.twinbin.totalRejected || 0},${extraModuleStats.twinbin.actionRequired || 0}\\n`
       + `Taskforce,${extraModuleStats.taskforce.totalInspections || 0},${extraModuleStats.taskforce.totalApproved || 0},${extraModuleStats.taskforce.totalRejected || 0},${extraModuleStats.taskforce.actionRequired || 0}`;
-    
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -4331,14 +4331,14 @@ export default function CityDashboardPage() {
                       {alerts.length > 0 ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
                       {alerts.length > 0 ? 'Critical Alerts' : 'All Clear'}
                     </h3>
-                      {alerts.length === 0 ? (
-                        <div style={{ fontSize: 13, color: '#16a34a', fontWeight: 600, textAlign: 'center', padding: 16 }}>✓ No critical alerts — all modules are clear!</div>
-                      ) : alerts.map((a, i) => (
-                        <div key={i} style={{ background: '#fff', padding: 12, borderRadius: 9, border: '1px solid #fecaca', marginBottom: 9 }}>
-                          <div style={{ fontSize: 12, fontWeight: 800, color: '#991b1b' }}>{a.msg}</div>
-                          <div style={{ fontSize: 10, fontWeight: 650, color: '#64748b', marginTop: 3 }}>{a.ward}</div>
-                        </div>
-                      ))}
+                    {alerts.length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#16a34a', fontWeight: 600, textAlign: 'center', padding: 16 }}>✓ No critical alerts — all modules are clear!</div>
+                    ) : alerts.map((a, i) => (
+                      <div key={i} style={{ background: '#fff', padding: 12, borderRadius: 9, border: '1px solid #fecaca', marginBottom: 9 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#991b1b' }}>{a.msg}</div>
+                        <div style={{ fontSize: 10, fontWeight: 650, color: '#64748b', marginTop: 3 }}>{a.ward}</div>
+                      </div>
+                    ))}
                   </div>
                 );
               })()}
@@ -5101,7 +5101,7 @@ export default function CityDashboardPage() {
               .mx-hero-actions > * { flex: 1 1 auto; }
             }
           `}</style>
-        
+
           <div className="mx-city-dashboard">
             <div className="mx-shell">
               {/* Premium Header */}
@@ -5130,7 +5130,7 @@ export default function CityDashboardPage() {
                     </div>
                   </div>
                 </div>
-        
+
                 <div className="mx-hero-actions">
                   {isSuperAdmin && (
                     <label className="mx-control" style={{ minWidth: 150 }}>
@@ -5147,7 +5147,7 @@ export default function CityDashboardPage() {
                     <Calendar size={15} color="#3b73df" />
                     <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
                   </label>
-        
+
                   <button
                     type="button"
                     className="mx-refresh"
@@ -5157,7 +5157,7 @@ export default function CityDashboardPage() {
                     <Download size={15} />
                     Download
                   </button>
-        
+
                   <button
                     type="button"
                     className="mx-alert"
@@ -5169,22 +5169,22 @@ export default function CityDashboardPage() {
                       (extraModuleStats.twinbin.actionRequired || 0) +
                       (extraModuleStats.taskforce.actionRequired || 0) +
                       (sweepingDetailStats.actionRequired || 0)) > 0 && (
-                      <span className="mx-alert-badge">
-                        {(extraModuleStats.toilet.actionRequired || 0) +
-                          (extraModuleStats.twinbin.actionRequired || 0) +
-                          (extraModuleStats.taskforce.actionRequired || 0) +
-                          (sweepingDetailStats.actionRequired || 0)}
-                      </span>
-                    )}
+                        <span className="mx-alert-badge">
+                          {(extraModuleStats.toilet.actionRequired || 0) +
+                            (extraModuleStats.twinbin.actionRequired || 0) +
+                            (extraModuleStats.taskforce.actionRequired || 0) +
+                            (sweepingDetailStats.actionRequired || 0)}
+                        </span>
+                      )}
                   </button>
-        
+
                   <button type="button" className="mx-refresh" onClick={loadAll} disabled={refreshing}>
                     <RefreshCw size={15} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} />
                     {refreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
                 </div>
               </section>
-        
+
               {/* City Overview */}
               <section className="mx-section">
                 <div className="mx-section-head">
@@ -5199,7 +5199,7 @@ export default function CityDashboardPage() {
                     <RefreshCw size={12} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} /> Refresh
                   </button>
                 </div>
-        
+
                 <div className="mx-kpi-grid">
                   {[
                     { label: 'Total Registered Zones', value: cityGeoStats?.zones || 0, icon: Map, color: '#3478f6', soft: '#eef5ff', iconBg: '#f2f7ff', border: '#cfe0ff' },
@@ -5228,7 +5228,7 @@ export default function CityDashboardPage() {
                   ))}
                 </div>
               </section>
-        
+
               {/* Users Overview */}
               <section className="mx-section">
                 <div className="mx-section-head">
@@ -5245,7 +5245,7 @@ export default function CityDashboardPage() {
                     <RefreshCw size={12} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} /> Refresh
                   </button>
                 </div>
-        
+
                 <div className="mx-user-grid">
                   {[
                     { title: 'TOTAL ACTION OFFICERS', count: stats?.actionOfficers || stats?.ACTION_OFFICER || 0, icon: UserCog, color: '#1b9a74', iconBg: '#edf9f5', border: '#cfeee3', wash: '#f5fcf9' },
@@ -5272,7 +5272,7 @@ export default function CityDashboardPage() {
                   ))}
                 </div>
               </section>
-        
+
               {/* Workforce Distribution */}
               <section className="mx-section">
                 <div className="mx-section-head">
@@ -5289,7 +5289,7 @@ export default function CityDashboardPage() {
                     <RefreshCw size={12} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} /> Refresh
                   </button>
                 </div>
-        
+
                 {(() => {
                   const moduleCards = [
                     { keyMatch: ['sweeping'], name: 'Sweeping', color: '#1b9a74', soft: '#edf9f5', border: '#cfeee3', icon: BrushCleaning },
@@ -5301,7 +5301,7 @@ export default function CityDashboardPage() {
                     const found = moduleActivity.find((m) => mc.keyMatch.some((k) => m.key.toLowerCase().includes(k)));
                     return { ...mc, total: found?.total || 0 };
                   });
-        
+
                   return (
                     <div className="mx-module-grid">
                       {cards.map((item, i) => (
@@ -5325,7 +5325,7 @@ export default function CityDashboardPage() {
                   );
                 })()}
               </section>
-        
+
               {/* Module Health */}
               <section className="mx-section">
                 <div className="mx-section-head">
@@ -5340,7 +5340,7 @@ export default function CityDashboardPage() {
                     <RefreshCw size={12} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} /> Refresh
                   </button>
                 </div>
-        
+
                 <div className="mx-health-grid">
                   {(() => {
                     const tbApp = extraModuleStats.twinbin.inspectionsDone || 0;
@@ -5399,11 +5399,11 @@ export default function CityDashboardPage() {
                         <div className="mx-health-icon"><mod.icon size={19} /></div>
                         <div className="mx-health-title">{mod.moduleName}</div>
                       </div>
-        
+
                       <div className="mx-health-gauge">
                         <ArcGauge color={mod.color} score={mod.score} percent={mod.percent} size={152} stroke={11} />
                       </div>
-        
+
                       <div className="mx-health-stats">
                         <div className="mx-health-stat">
                           <span className="mx-health-number"><span className="mx-health-dot" style={{ background: '#24b875' }} />{mod.approved}</span>
@@ -5422,7 +5422,7 @@ export default function CityDashboardPage() {
                   ))}
                 </div>
               </section>
-        
+
               {/* Inspection Analytics */}
               <section className="mx-section">
                 <div className="mx-section-head">
@@ -5437,7 +5437,7 @@ export default function CityDashboardPage() {
                     <RefreshCw size={12} style={{ animation: refreshing ? 'spin .8s linear infinite' : 'none' }} /> Refresh
                   </button>
                 </div>
-        
+
                 {barChartData.length === 0 ? (
                   <div className="mx-chart-shell">
                     <div className="mx-empty-chart">No inspection data available for the past 6 days</div>
@@ -5446,13 +5446,13 @@ export default function CityDashboardPage() {
                   const maxVal = Math.max(...barChartData.flatMap((d) => [d.sweeping, d.toilet, d.twinbin]), 1);
                   const ticks = [maxVal, Math.ceil(maxVal * .75), Math.ceil(maxVal * .5), Math.ceil(maxVal * .25), 0];
                   const heightFor = (value: number) => value > 0 ? Math.max((value / maxVal) * 188, 12) : 4;
-        
+
                   return (
                     <div className="mx-chart-shell">
                       <div className="mx-y-axis">
                         {ticks.map((t, i) => <span key={i}>{t}</span>)}
                       </div>
-        
+
                       <div className="mx-chart-groups">
                         {barChartData.map((d, idx) => (
                           <div className="mx-chart-group" key={idx}>
@@ -5478,7 +5478,7 @@ export default function CityDashboardPage() {
                           </div>
                         ))}
                       </div>
-        
+
                       <div className="mx-chart-legend">
                         {[
                           { label: 'Sweeping Module', color: '#15976e' },
@@ -5500,234 +5500,234 @@ export default function CityDashboardPage() {
         </>
       )}
 
-      
-              {/* ====== START OF NEW SECTION ====== */}
-              {/* ====== ACTIVITY ANALYTICS ====== */}
-              <section className="mx-section">
-                <div className="mx-section-head">
-                  <div className="mx-section-title-wrap">
-                    <div className="mx-section-icon"><Activity size={18} /></div>
+
+      {/* ====== START OF NEW SECTION ====== */}
+      {/* ====== ACTIVITY ANALYTICS ====== */}
+      <section className="mx-section">
+        <div className="mx-section-head">
+          <div className="mx-section-title-wrap">
+            <div className="mx-section-icon"><Activity size={18} /></div>
+            <div>
+              <h2 className="mx-section-title">ACTIVITY ANALYTICS</h2>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '16px' }}>
+          {/* Card 1: Most Active Modules */}
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Modules<br /><span style={{ fontSize: '11px', color: '#718096', fontWeight: 500 }}>By total records submitted</span></h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }}></div>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Cleanliness of Toilets</span>
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>9</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Sweeping</span>
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>6</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></div>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Litter Bins</span>
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>1</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Most Active Zones */}
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Zones<br /><span style={{ fontSize: '11px', color: '#718096', fontWeight: 500 }}>By activity volume</span></h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 1 - North</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                    <div style={{ width: '80%', height: '100%', background: '#8b5cf6', borderRadius: '2px' }}></div>
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#8b5cf6' }}>Top</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 3 - East</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                    <div style={{ width: '45%', height: '100%', background: '#a78bfa', borderRadius: '2px' }}></div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 2 - South</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                    <div style={{ width: '15%', height: '100%', background: '#c4b5fd', borderRadius: '2px' }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Most Active Wards */}
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Wards<br /><span style={{ fontSize: '11px', color: '#718096', fontWeight: 500 }}>By activity volume</span></h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 12</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                    <div style={{ width: '90%', height: '100%', background: '#ec4899', borderRadius: '2px' }}></div>
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#ec4899' }}>Top</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 4</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                    <div style={{ width: '60%', height: '100%', background: '#f472b6', borderRadius: '2px' }}></div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 19</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
+                    <div style={{ width: '30%', height: '100%', background: '#fbcfe8', borderRadius: '2px' }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== FIELD OPERATIONS ====== */}
+      <section className="mx-section" style={{ marginTop: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+
+          {/* Action Officers */}
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ background: '#ecfdf5', color: '#10b981', padding: '10px', borderRadius: '10px' }}>
+                <Shield size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Action Officers</div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Issue resolution & ground action</div>
+              </div>
+            </div>
+            <div style={{ background: '#ecfdf5', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden', marginBottom: '24px' }}>
+              <div style={{ background: '#10b981', color: '#fff', padding: '12px', borderRadius: '10px', zIndex: 1 }}>
+                <Users size={24} />
+              </div>
+              <div style={{ zIndex: 1 }}>
+                <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>2</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>Action Officers Active</div>
+              </div>
+              <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #d1fae5', opacity: 0.5 }}></div>
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING ACTIONS BY MODULE</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { name: 'Cleanliness of Toilets', count: 9, pending: 0, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
+                { name: 'Sweeping', count: 6, pending: 2, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
+                { name: 'Litter Bins', count: 1, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
+                { name: 'Processing & MRF', count: 0, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
+              ].map((mod, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
+                      <mod.icon size={16} />
+                    </div>
                     <div>
-                      <h2 className="mx-section-title">ACTIVITY ANALYTICS</h2>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{mod.name}</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>Total: {mod.count} records</div>
                     </div>
                   </div>
+                  {mod.pending > 0 ? (
+                    <div style={{ background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ⚠ {mod.pending}
+                    </div>
+                  ) : (
+                    <div style={{ background: '#ecfdf5', color: '#10b981', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ✓ Clear
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '16px' }}>
-                  {/* Card 1: Most Active Modules */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Modules<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By total records submitted</span></h3>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }}></div>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Cleanliness of Toilets</span>
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>9</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }}></div>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Sweeping</span>
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>6</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></div>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Litter Bins</span>
-                        </div>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>1</span>
-                      </div>
-                    </div>
-                  </div>
+              ))}
+            </div>
+          </div>
 
-                  {/* Card 2: Most Active Zones */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Zones<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By activity volume</span></h3>
+          {/* Quality Controllers */}
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '10px', borderRadius: '10px' }}>
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#3b82f6', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Quality Controllers</div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Quality monitoring & auditing</div>
+              </div>
+            </div>
+            <div style={{ background: '#eff6ff', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden', marginBottom: '24px' }}>
+              <div style={{ background: '#3b82f6', color: '#fff', padding: '12px', borderRadius: '10px', zIndex: 1 }}>
+                <Users size={24} />
+              </div>
+              <div style={{ zIndex: 1 }}>
+                <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>4</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#3b82f6', marginTop: '4px' }}>Quality Controllers Active</div>
+              </div>
+              <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #dbeafe', opacity: 0.5 }}></div>
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING AUDITS BY MODULE</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { name: 'Cleanliness of Toilets', count: 4, pending: 1, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
+                { name: 'Sweeping', count: 12, pending: 0, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
+                { name: 'Litter Bins', count: 8, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
+                { name: 'Processing & MRF', count: 2, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
+              ].map((mod, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
+                      <mod.icon size={16} />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 1 - North</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '80%', height: '100%', background: '#8b5cf6', borderRadius: '2px' }}></div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#8b5cf6' }}>Top</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 3 - East</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '45%', height: '100%', background: '#a78bfa', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Zone 2 - South</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '15%', height: '100%', background: '#c4b5fd', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 3: Most Active Wards */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#14213d' }}>Most Active Wards<br/><span style={{fontSize: '11px', color: '#718096', fontWeight: 500}}>By activity volume</span></h3>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 12</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '90%', height: '100%', background: '#ec4899', borderRadius: '2px' }}></div>
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#ec4899' }}>Top</span>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 4</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '60%', height: '100%', background: '#f472b6', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>Ward 19</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <div style={{ width: '60px', height: '4px', background: '#f1f5f9', borderRadius: '2px' }}>
-                            <div style={{ width: '30%', height: '100%', background: '#fbcfe8', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{mod.name}</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>Total: {mod.count} records</div>
                     </div>
                   </div>
+                  {mod.pending > 0 ? (
+                    <div style={{ background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ⚠ {mod.pending}
+                    </div>
+                  ) : (
+                    <div style={{ background: '#ecfdf5', color: '#10b981', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      ✓ Clear
+                    </div>
+                  )}
                 </div>
-              </section>
+              ))}
+            </div>
+          </div>
 
-              {/* ====== FIELD OPERATIONS ====== */}
-              <section className="mx-section" style={{ marginTop: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-                  
-                  {/* Action Officers */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                      <div style={{ background: '#ecfdf5', color: '#10b981', padding: '10px', borderRadius: '10px' }}>
-                        <Shield size={20} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Action Officers</div>
-                        <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Issue resolution & ground action</div>
-                      </div>
-                    </div>
-                    <div style={{ background: '#ecfdf5', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden', marginBottom: '24px' }}>
-                      <div style={{ background: '#10b981', color: '#fff', padding: '12px', borderRadius: '10px', zIndex: 1 }}>
-                        <Users size={24} />
-                      </div>
-                      <div style={{ zIndex: 1 }}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>2</div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>Action Officers Active</div>
-                      </div>
-                      <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #d1fae5', opacity: 0.5 }}></div>
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING ACTIONS BY MODULE</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {[
-                        { name: 'Cleanliness of Toilets', count: 9, pending: 0, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
-                        { name: 'Sweeping', count: 6, pending: 2, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
-                        { name: 'Litter Bins', count: 1, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
-                        { name: 'Processing & MRF', count: 0, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
-                      ].map((mod, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
-                              <mod.icon size={16} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{mod.name}</div>
-                              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>Total: {mod.count} records</div>
-                            </div>
-                          </div>
-                          {mod.pending > 0 ? (
-                            <div style={{ background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ⚠ {mod.pending}
-                            </div>
-                          ) : (
-                            <div style={{ background: '#ecfdf5', color: '#10b981', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ✓ Clear
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quality Controllers */}
-                  <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e4ebf5', padding: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                      <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '10px', borderRadius: '10px' }}>
-                        <ShieldCheck size={20} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '10px', fontWeight: 800, color: '#3b82f6', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
-                        <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Quality Controllers</div>
-                        <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Quality monitoring & auditing</div>
-                      </div>
-                    </div>
-                    <div style={{ background: '#eff6ff', borderRadius: '12px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', overflow: 'hidden', marginBottom: '24px' }}>
-                      <div style={{ background: '#3b82f6', color: '#fff', padding: '12px', borderRadius: '10px', zIndex: 1 }}>
-                        <Users size={24} />
-                      </div>
-                      <div style={{ zIndex: 1 }}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>4</div>
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#3b82f6', marginTop: '4px' }}>Quality Controllers Active</div>
-                      </div>
-                      <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #dbeafe', opacity: 0.5 }}></div>
-                    </div>
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '12px' }}>PENDING AUDITS BY MODULE</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {[
-                        { name: 'Cleanliness of Toilets', count: 4, pending: 1, icon: Toilet, iconColor: '#3b82f6', iconBg: '#eff6ff' },
-                        { name: 'Sweeping', count: 12, pending: 0, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5' },
-                        { name: 'Litter Bins', count: 8, pending: 0, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb' },
-                        { name: 'Processing & MRF', count: 2, pending: 0, icon: Package, iconColor: '#64748b', iconBg: '#f8fafc' }
-                      ].map((mod, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ background: mod.iconBg, color: mod.iconColor, padding: '8px', borderRadius: '8px' }}>
-                              <mod.icon size={16} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{mod.name}</div>
-                              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>Total: {mod.count} records</div>
-                            </div>
-                          </div>
-                          {mod.pending > 0 ? (
-                            <div style={{ background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ⚠ {mod.pending}
-                            </div>
-                          ) : (
-                            <div style={{ background: '#ecfdf5', color: '#10b981', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              ✓ Clear
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              </section>
-              {/* ====== END OF NEW SECTION ====== */}
+        </div>
+      </section>
+      {/* ====== END OF NEW SECTION ====== */}
 
       {/* Modern System Alerts Overview Modal */}
       {showAlertModal && (
@@ -5977,7 +5977,7 @@ export default function CityDashboardPage() {
                 borderTop: '1px solid #f1f5f9',
                 backgroundColor: '#f8fafc',
                 display: 'flex',
-                justify: 'space-between',
+                justifyContent: 'space-between',
                 alignItems: 'center'
               }}
             >
