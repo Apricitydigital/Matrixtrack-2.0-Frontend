@@ -29,6 +29,7 @@ import {
   LogOut,
   Building2,
   CheckCircle2,
+  ChartNoAxesCombined,
 } from "lucide-react";
 
 const getModuleIcon = (key: string) => {
@@ -277,6 +278,13 @@ export default function Sidebar() {
         href: "/city",
         icon: <LayoutDashboard size={18} />,
       });
+      if (isCityAdmin) {
+        links.push({
+          label: "Attendance Analytics",
+          href: "/city/attendance",
+          icon: <ChartNoAxesCombined size={18} />,
+        });
+      }
       links.push({
         label: "Employees",
         href: "/employees",
