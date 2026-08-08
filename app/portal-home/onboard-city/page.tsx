@@ -522,7 +522,7 @@ export default function CreateCityPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
                         <ShieldCheck size={18} className={enabledModules.taskforce ? "text-blue-600" : "text-slate-400"} />
-                        Taskforce 20 Monitoring
+                        Inspection and Performance system
                       </div>
                       <input
                         type="checkbox"
@@ -532,7 +532,7 @@ export default function CreateCityPage() {
                       />
                     </div>
                     <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                      Beat Sweeping, Litterbins, Toilets & CTU Spot Transformation monitoring suite.
+                      Beat Sweeping, Litterbins, Toilets monitoring modules Portal
                     </p>
                   </div>
 
@@ -548,7 +548,7 @@ export default function CreateCityPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
                         <Building2 size={18} className={enabledModules.swachh ? "text-emerald-600" : "text-slate-400"} />
-                        Swachh Ward Ranking
+                        Ward Ranking System
                       </div>
                       <input
                         type="checkbox"
@@ -574,7 +574,7 @@ export default function CreateCityPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
                         <Users size={18} className={enabledModules.workforce ? "text-purple-600" : "text-slate-400"} />
-                        Workforce Monitoring (MatrixTrack)
+                        Workforce Attendance System
                       </div>
                       <input
                         type="checkbox"
@@ -584,7 +584,7 @@ export default function CreateCityPage() {
                       />
                     </div>
                     <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                      Employee attendance tracking, face verification, shift logs & daily rosters.
+                      Employee attendance tracking, face verification attendance portal. 
                     </p>
                   </div>
 
@@ -600,7 +600,7 @@ export default function CreateCityPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 font-bold text-slate-900 text-sm">
                         <TrendingUp size={18} className={enabledModules.mrf ? "text-amber-600" : "text-slate-400"} />
-                        Processing & MRF Plant
+                        Processing Plant System
                       </div>
                       <input
                         type="checkbox"
@@ -691,7 +691,7 @@ export default function CreateCityPage() {
                   ) : (
                     <>
                       <Send size={16} />
-                      Deploy City
+                      Create City
                     </>
                   )}
                 </button>

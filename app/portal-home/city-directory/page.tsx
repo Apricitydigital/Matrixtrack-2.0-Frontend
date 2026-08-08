@@ -1239,7 +1239,7 @@ export default function HmsDashboardPage() {
               Cancel
             </Button>
             <Button type="submit" className="flex-1" loading={cityCreating} icon={<Send size={15} />}>
-              Deploy City
+              Create City
             </Button>
           </div>
         </form>

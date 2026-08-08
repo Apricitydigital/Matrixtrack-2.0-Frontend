@@ -146,7 +146,7 @@ function PortalHomeLayoutContent({ children }: { children: React.ReactNode }) {
     else if (currentView === 'sa-review') pageTitle = 'Swachh Sync - Self Assessment QC Review';
     else if (currentView === 'reports') pageTitle = 'Swachh Sync - Reports';
     else if (currentView === 'results') pageTitle = 'Swachh Sync - Results';
-    else pageTitle = 'Swachh Ward Ranking Workspace';
+    else pageTitle = 'Ward Ranking Workspace';
   } else if (isWorkforceActive) {
     if (currentView === 'master') pageTitle = 'Workforce - Master Control';
     else if (currentView === 'geofencing') pageTitle = 'Workforce - GeoFencing Management';

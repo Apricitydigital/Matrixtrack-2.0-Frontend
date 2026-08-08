@@ -187,7 +187,7 @@ export default function HmsKpiCards({
           icon: <UserCheck size={16} />,
         },
         {
-          label: "Today's Active Users",
+          label: "Active Users",
           value: activeUsersCount,
           cardBg: 'bg-emerald-50/80 border-emerald-200',
           badgeBg: 'bg-emerald-100 text-emerald-800',
