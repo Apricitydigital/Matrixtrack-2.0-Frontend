@@ -22,7 +22,7 @@ type BeatStatus = "COMPLETED" | "IN_PROGRESS" | "NOT_DONE";
 const STATUS_META: Record<BeatStatus, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
     COMPLETED:   { label: "Completed",   color: "#15803d", bg: "rgba(34,197,94,0.10)",  border: "#22c55e", icon: <CheckCircle2 size={14} /> },
     IN_PROGRESS: { label: "In Progress", color: "#b45309", bg: "rgba(245,158,11,0.10)", border: "#f59e0b", icon: <Clock size={14} /> },
-    NOT_DONE:    { label: "Not Done",    color: "#b91c1c", bg: "rgba(239,68,68,0.10)",  border: "#ef4444", icon: <AlertCircle size={14} /> },
+    NOT_DONE:    { label: "Not Started",    color: "#b91c1c", bg: "rgba(239,68,68,0.10)",  border: "#ef4444", icon: <AlertCircle size={14} /> },
 };
 const MAP_COLORS: Record<BeatStatus, string> = { COMPLETED: "#22c55e", IN_PROGRESS: "#f59e0b", NOT_DONE: "#ef4444" };
 
@@ -340,7 +340,7 @@ export default function QCBeatStatusPage() {
                             { key: "ALL", label: "Total", value: summary.total, color: "#7c3aed", icon: <Target size={18} /> },
                             { key: "COMPLETED", label: "Completed", value: summary.completed, color: "#22c55e", icon: <CheckCircle2 size={18} /> },
                             { key: "IN_PROGRESS", label: "In Progress", value: summary.inProgress, color: "#f59e0b", icon: <Clock size={18} /> },
-                            { key: "NOT_DONE", label: "Not Done", value: summary.notDone, color: "#ef4444", icon: <AlertCircle size={18} /> },
+                            { key: "NOT_DONE", label: "Not started", value: summary.notDone, color: "#ef4444", icon: <AlertCircle size={18} /> },
                         ] as any[]).map(({ key, label, value, color, icon }) => (
                             <button key={key} onClick={() => { setStatusFilter(key); setSelectedBeatId("ALL"); }} style={btnStyle(statusFilter === key, color)}>
                                 <div style={{ background: `${color}20`, borderRadius: 8, padding: 8, color }}>{icon}</div>
