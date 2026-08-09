@@ -25,15 +25,11 @@ export function setAuthCookie(
   if (typeof window !== "undefined") {
     setBrowserCookie(token);
 
-    localStorage.setItem(
-      "token",
-      token
-    );
-
-    localStorage.setItem(
-      "swachh_token",
-      token
-    );
+    localStorage.setItem("token", token);
+    localStorage.setItem("swachh_token", token);
+    localStorage.setItem("hms_access_token", token);
+    localStorage.setItem("taskforce_access_token", token);
+    localStorage.setItem("matrixtrack_access_token", token);
 
     return;
   }
@@ -61,9 +57,10 @@ export function clearAuthCookie() {
       `${AUTH_COOKIE}=; Max-Age=0; path=/`;
 
     localStorage.removeItem("token");
-    localStorage.removeItem(
-      "swachh_token"
-    );
+    localStorage.removeItem("swachh_token");
+    localStorage.removeItem("hms_access_token");
+    localStorage.removeItem("taskforce_access_token");
+    localStorage.removeItem("matrixtrack_access_token");
     localStorage.removeItem("user");
 
     return;
@@ -97,15 +94,12 @@ export function getTokenFromCookies():
 
     const localToken =
       localStorage.getItem("token") ||
-      localStorage.getItem(
-        "swachh_token"
-      );
+      localStorage.getItem("swachh_token") ||
+      localStorage.getItem("hms_access_token") ||
+      localStorage.getItem("taskforce_access_token") ||
+      localStorage.getItem("matrixtrack_access_token");
 
-    if (
-      localToken &&
-      localToken !==
-      "matrix_track_session_token"
-    ) {
+    if (localToken) {
       return localToken;
     }
   }
@@ -149,14 +143,31 @@ function normalizeModules(modules: unknown): ModuleAssignment[] {
 }
 
 export function normalizeAuthUser(
-  user: (Partial<AuthUser> & { role?: string | Role }) | null | undefined
+  user: (Partial<AuthUser> & { role?: string | Role; permissions?: any[]; assignedModules?: any[] }) | null | undefined
 ): AuthUser | null {
   if (!user?.id) return null;
-  const roles = Array.isArray(user.roles)
+  const initialRoles = Array.isArray(user.roles)
     ? user.roles
     : user.role
       ? [user.role as Role]
       : [];
+
+  const rolesSet = new Set<string>(initialRoles.map((r) => String(r)));
+  if (user.role) rolesSet.add(String(user.role));
+  if (Array.isArray(user.permissions)) {
+    user.permissions.forEach((p) => { if (p) rolesSet.add(String(p)); });
+  }
+  if (Array.isArray(user.assignedModules)) {
+    user.assignedModules.forEach((m) => { if (m) rolesSet.add(String(m)); });
+  }
+  if (Array.isArray(user.modules)) {
+    user.modules.forEach((m: any) => {
+      if (m.key) rolesSet.add(String(m.key));
+      if (m.name) rolesSet.add(String(m.name));
+    });
+  }
+
+  const roles = Array.from(rolesSet) as Role[];
 
   return {
     id: user.id,

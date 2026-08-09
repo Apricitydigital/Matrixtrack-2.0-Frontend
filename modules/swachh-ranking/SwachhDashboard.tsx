@@ -93,7 +93,7 @@ export default function SwachhDashboard() {
         <div style={{ background: '#f8fafc', minHeight: '100vh', fontFamily: "'Inter', sans-serif" }}>
             <AchievementEffect />
             
-            {/* Standalone Swachh Ward Ranking Top Header */}
+            {/* Standalone  Ward Ranking  Top Header */}
             <header style={{
                 height: 72,
                 background: '#ffffff',
@@ -123,7 +123,7 @@ export default function SwachhDashboard() {
                     </div>
                     <div>
                         <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                            Swachh Ward Ranking System
+                         Ward Ranking System
                         </div>
                         <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                             Swachh Sync Portal

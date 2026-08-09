@@ -581,64 +581,19 @@ export default function CreateCityPage() {
                 </label>
               </div>
 
-              <div className="my-6 h-px bg-slate-100" />
-
-              {/* Identifier fields */}
-              <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-2">
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
-                    System Code{" "}
-                    <span className="text-rose-500">*</span>
-                  </span>
-
-                  <input
-                    className={fieldClass}
-                    value={code}
-                    onChange={(event) =>
-                      setCode(event.target.value)
-                    }
-                    placeholder="e.g. indore"
-                    required
-                  />
-
-                  <span className="mt-2 block text-xs text-slate-400">
-                    Used internally for routing and system
-                    references.
-                  </span>
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
-                    ULB Identifier
-                  </span>
-
-                  <input
-                    className={fieldClass}
-                    value={ulbCode}
-                    onChange={(event) =>
-                      setUlbCode(event.target.value)
-                    }
-                    placeholder="e.g. idr01"
-                  />
-
-                  <span className="mt-2 block text-xs text-slate-400">
-                    Urban Local Body code used in reporting.
-                  </span>
-                </label>
-              </div>
+              {/* Identifier fields - Hidden from UI */}
+              <input type="hidden" value={code} />
+              <input type="hidden" value={ulbCode} />
 
               <div className="my-6 h-px bg-slate-100" />
 
               {/* ── AUTHORIZED PLATFORM MODULES ASSIGNMENT ── */}
               <div>
-                <div className="mb-3 flex items-center justify-between">
+                <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
-                    <span className="block text-[12px] font-black uppercase tracking-[0.06em] text-slate-700">
-                      Authorized Software Modules for City Cluster <span className="text-rose-500">*</span>
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      Select which workspace modules are enabled and provisioned for this city
-                    </span>
+                    <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+                      Select and Assign Modules
+                    </h3>
                   </div>
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-600">
                     {Object.values(enabledModules).filter(Boolean).length} / 4 Enabled

@@ -11,7 +11,7 @@ const SwachhPortalContainer = dynamic(
     ssr: false,
     loading: () => (
       <WorkspaceLoading
-        title="Swachh Ward Ranking Workspace"
+        title="Ward Ranking system"
         subtitle="Loading city ranking parameters, assessment details & leaderboard..."
       />
     )

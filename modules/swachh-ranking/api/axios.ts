@@ -7,9 +7,9 @@ const getBaseUrl = () => {
     }
     if (typeof window !== 'undefined') {
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        return isLocal ? 'http://localhost:4000' : 'https://swachh-ranking.onrender.com';
+        return isLocal ? 'http://localhost:5000' : 'https://swachh-ranking.onrender.com';
     }
-    return 'http://localhost:4000';
+    return 'http://localhost:5000';
 };
 
 export const apiBaseUrl = getBaseUrl();

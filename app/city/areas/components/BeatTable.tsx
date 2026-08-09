@@ -60,7 +60,6 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                             <th style={headCell()}>Created On</th>
                             <th style={headCell()}>Location</th>
                             <th style={headCell()}>Beat Name</th>
-                            <th style={headCell()}>Coverage</th>
                             <th style={headCell()}>Supervisors</th>
                             <th style={headCell()}>Employees</th>
                             <th style={headCell()}>Status</th>
@@ -101,19 +100,13 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                         </div>
                                     </td>
                                     <td style={bodyCell()}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <span style={tagStyle()}>{beat.zoneName}</span>
-                                            <span style={tagStyle()}>{beat.wardName}</span>
-                                            <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 500 }}>{beat.areaName}</span>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                            <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 700 }}>
+                                                {beat.zoneName} - {beat.wardName} - {beat.areaName}
+                                            </span>
                                         </div>
                                     </td>
                                     <td style={{ ...bodyCell(), fontSize: "0.9375rem", fontWeight: 700, color: "#0f172a" }}>{beat.beatName}</td>
-                                    <td style={bodyCell()}>
-                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                            {supervisors.length > 0 && <span style={badgeStyle("#e0f2fe", "#0369a1")}>{supervisors.length > 1 ? `${supervisors.length} SUPERVISORS` : "SUPERVISOR ACTIVE"}</span>}
-                                            {assignedSegments > 0 && <span style={badgeStyle("#f0fdf4", "#166534")}>FIELD LIVE</span>}
-                                        </div>
-                                    </td>
                                     <td style={{ ...bodyCell(), verticalAlign: "middle" }}>
                                         {supervisors.length === 0 ? (
                                             !isAO && !isReadOnly && onAssign ? (
@@ -137,7 +130,7 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                                                 title="Click to manage supervisor"
                                             >
-                                                <PersonRow name={supervisors[0].name} subtitle={`Supervisor • ${supervisors[0].count}b`} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
+                                                <PersonRow name={supervisors[0].name} subtitle={`Supervisor • ${supervisors[0].count} Beats`} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
                                             </div>
                                         ) : (
                                             <div
@@ -148,7 +141,7 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                 title="Click to manage supervisors"
                                             >
                                                 {supervisors.slice(0, 2).map((supervisor: any) => (
-                                                    <PersonRow key={supervisor.id} name={supervisor.name} subtitle={`Supervisor • ${supervisor.count}b`} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
+                                                    <PersonRow key={supervisor.id} name={supervisor.name} subtitle={`Supervisor • ${supervisor.count} Beats`} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
                                                 ))}
                                                 {supervisors.length > 2 && <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 700 }}>+{supervisors.length - 2} more</span>}
                                             </div>
@@ -186,11 +179,7 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                         style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "4px 8px", borderRadius: "8px", transition: "all 0.15s ease" }}
                                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#fdf2f8"; }}
                                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                        title={`Click to open Employee Deployment for ${employee.name}`}
                                                     >
-                                                        <div style={{ width: 26, height: 26, borderRadius: 6, background: "linear-gradient(135deg, #ec4899 0%, #be185d 100%)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
-                                                            {employee.name[0]?.toUpperCase() || "U"}
-                                                        </div>
                                                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                                             <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1e293b" }}>{employee.name}</span>
                                                             <span style={{ fontSize: "0.7rem", backgroundColor: "#fdf2f8", color: "#db2777", padding: "1px 6px", borderRadius: 100, fontWeight: 700, border: "1px solid #fbcfe8" }}>
@@ -209,11 +198,7 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                         style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "4px 8px", borderRadius: "8px", transition: "all 0.15s ease" }}
                                                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#fffbeb"; }}
                                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                        title="Click to open Employee Deployment for pending segments"
                                                     >
-                                                        <div style={{ width: 24, height: 24, borderRadius: 6, border: "1px dashed #fbbf24", color: "#d97706", backgroundColor: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                            <span style={{ fontSize: 10, fontWeight: 800 }}>?</span>
-                                                        </div>
                                                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                                             <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "#d97706", fontStyle: "italic" }}>Employees Pending</span>
                                                             <span style={{ fontSize: "0.7rem", backgroundColor: "#fffbeb", color: "#d97706", padding: "1px 6px", borderRadius: 100, fontWeight: 700, border: "1px solid #fef3c7" }}>
@@ -265,11 +250,11 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
 }
 
 function headCell(width?: number): React.CSSProperties {
-    return { padding: "16px 24px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", ...(width ? { width } : {}) };
+    return { padding: "12px 16px", fontSize: "0.7rem", fontWeight: 800, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", ...(width ? { width } : {}) };
 }
 
 function bodyCell(): React.CSSProperties {
-    return { padding: "20px 24px" };
+    return { padding: "14px 16px" };
 }
 
 function tagStyle(): React.CSSProperties {
@@ -283,9 +268,6 @@ function badgeStyle(bg: string, color: string): React.CSSProperties {
 function PersonRow({ name, subtitle, gradient }: { name: string; subtitle: string; gradient: string }) {
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: gradient, color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
-                {name.substring(0, 2).toUpperCase()}
-            </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
                 <span style={{ fontWeight: 600, color: "#111827", fontSize: "0.875rem", lineHeight: 1 }}>{name}</span>
                 <span style={{ fontSize: "0.7rem", color: "#6b7280", marginTop: 4, fontWeight: 500 }}>{subtitle}</span>

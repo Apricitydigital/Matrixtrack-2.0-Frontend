@@ -60,7 +60,7 @@ const Sidebar = ({ mobileOpen = false, onClose }: SidebarProps) => {
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        navigate('/login');
+        navigate('/unified-login');
     };
 
     if (!user) return null;

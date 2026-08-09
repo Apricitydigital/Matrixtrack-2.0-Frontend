@@ -30,7 +30,7 @@ export default function LandingPage() {
       } else {
         clearInterval(interval);
         setTimeout(() => {
-          router.replace(user ? getPostLoginRedirect(user) : '/login');
+          router.replace(user ? getPostLoginRedirect(user) : '/unified-login');
         }, 300);
       }
     }, 400);
@@ -39,7 +39,7 @@ export default function LandingPage() {
   }, [user, router]);
 
   const handleSkipSplash = () => {
-    router.replace(user ? getPostLoginRedirect(user) : '/login');
+    router.replace(user ? getPostLoginRedirect(user) : '/unified-login');
   };
 
   return (
@@ -125,9 +125,7 @@ export default function LandingPage() {
         <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-0.02em', margin: '0 0 10px', color: '#ffffff' }}>
           MatrixTrack 2.0
         </h1>
-        <p style={{ color: '#94a3b8', fontSize: 16, margin: 0, fontWeight: 500 }}>
-          Madhya Pradesh Clean Cities Command Console
-        </p>
+
       </div>
 
       {/* Progress Bar & Status */}

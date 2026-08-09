@@ -42,7 +42,7 @@ const Register = () => {
         try {
             await api.post('/auth/register', formData);
             setSuccess(true);
-            setTimeout(() => navigate('/login'), 4000);
+            setTimeout(() => navigate('/unified-login'), 4000);
         } catch (err: any) {
             setError(err.response?.data?.message || 'Registration failed. Please try again.');
         } finally {
@@ -358,7 +358,7 @@ const Register = () => {
                     <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', fontWeight: 500, marginBottom: '0.5rem' }}>
                         Already have access?
                     </p>
-                    <Link to="/login" style={{
+                    <Link to="/unified-login" style={{
                         color: 'var(--swachh-green-light)',
                         fontWeight: 800,
                         fontSize: '1rem',

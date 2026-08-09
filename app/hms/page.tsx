@@ -2488,7 +2488,7 @@ function EditCityModal({
     if (upper === "LITTERBINS") return { label: "Litter Bins Collection", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
     if (upper === "SWEEPING") return { label: "Beat Sweeping & Sanitation", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
     if (upper === "TOILET") return { label: "Cleanliness of Toilets (CT/PT)", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
-    if (upper === "SWACHH_RANKING" || upper === "SWACHH") return { label: "Swachh Ward Ranking System", suite: "PLATFORM", activeClass: "bg-white border-emerald-400 font-bold text-emerald-800", checkClass: "accent-emerald-600" };
+    if (upper === "SWACHH_RANKING" || upper === "SWACHH") return { label: "Ward Ranking System", suite: "PLATFORM", activeClass: "bg-white border-emerald-400 font-bold text-emerald-800", checkClass: "accent-emerald-600" };
     if (upper === "WORKFORCE_MONITORING" || upper === "WORKFORCE") return { label: "Workforce Monitoring (Matrix Track)", suite: "PLATFORM", activeClass: "bg-white border-purple-400 font-bold text-purple-800", checkClass: "accent-purple-600" };
     if (upper === "MRF" || upper === "PROCESSING") return { label: "Processing & MRF Telemetry", suite: "PLATFORM", activeClass: "bg-white border-amber-400 font-bold text-amber-800", checkClass: "accent-amber-600" };
     return {
