@@ -439,16 +439,32 @@ function CityUsersPage() {
         setSavingUserId(null);
         return;
       }
-      const modules = Object.entries(payload.modules).map(([moduleId, { canWrite, zoneIds, wardIds }]) => ({
-        moduleId,
-        canWrite,
-        ...(payload.role === "QC"
-          ? {
-            zoneIds: zoneIds && zoneIds.length ? zoneIds.filter((id) => validZoneIds.has(id)) : cleanZoneIds,
-            wardIds: wardIds && wardIds.length ? wardIds.filter((id) => validWardIds.has(id)) : cleanWardIds
-          }
-          : {})
-      }));
+      const userObj = users.find((u) => u.id === id);
+      const modules = Object.entries(payload.modules)
+        .filter(([moduleId]) =>
+          availableModules.some((m) => {
+            if (m.id === moduleId) return true;
+            const uMod = userObj?.modules?.find((um) => um.id === moduleId);
+            return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
+          })
+        )
+        .map(([moduleId, { canWrite, zoneIds, wardIds }]) => {
+          const targetMod = availableModules.find((m) => {
+            if (m.id === moduleId) return true;
+            const uMod = userObj?.modules?.find((um) => um.id === moduleId);
+            return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
+          });
+          return {
+            moduleId: targetMod?.id || moduleId,
+            canWrite,
+            ...(payload.role === "QC"
+              ? {
+                zoneIds: zoneIds && zoneIds.length ? zoneIds.filter((id) => validZoneIds.has(id)) : cleanZoneIds,
+                wardIds: wardIds && wardIds.length ? wardIds.filter((id) => validWardIds.has(id)) : cleanWardIds
+              }
+              : {})
+          };
+        });
       await CityUserApi.update(id, {
         name: payload.name,
         role: payload.role,
@@ -1057,7 +1073,13 @@ function UserRow({
         <td style={{ padding: "20px 32px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>
-              {Object.keys(edit.modules).length} Active Modules
+              {availableModules.filter((m) =>
+                Object.keys(edit.modules).some((mid) => {
+                  if (mid === m.id) return true;
+                  const uMod = u.modules?.find((um) => um.id === mid);
+                  return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
+                })
+              ).length} Active Modules
             </span>
             <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
               Jurisdiction: {edit.zoneIds.size} Zones / {edit.wardIds.size} Wards
