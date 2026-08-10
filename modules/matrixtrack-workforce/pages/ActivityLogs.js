@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { 
-  ShieldCheck, 
-  CalendarRange, 
-  Search, 
-  User, 
-  X, 
-  AlertTriangle, 
-  Eye, 
-  CheckCircle, 
-  Copy, 
-  Monitor, 
-  Smartphone, 
-  Globe, 
-  RefreshCw, 
-  Activity, 
-  Trash2, 
-  Plus, 
-  Edit3, 
+import {
+  ShieldCheck,
+  CalendarRange,
+  Search,
+  User,
+  X,
+  AlertTriangle,
+  Eye,
+  CheckCircle,
+  Copy,
+  Monitor,
+  Smartphone,
+  Globe,
+  RefreshCw,
+  Activity,
+  Trash2,
+  Plus,
+  Edit3,
   LogIn,
   LogOut,
   FileJson,
@@ -40,7 +40,7 @@ import { buildApiUrl } from "../config";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 
 const SUPER_ADMIN_EMAIL = process.env.REACT_APP_SUPER_ADMIN_EMAIL || "mtadmin@apricitydigital.in";
- 
+
 export default function ActivityLogs() {
   const { user: currentUser, logPageView } = useAuth();
   const [logs, setLogs] = useState([]);
@@ -52,7 +52,7 @@ export default function ActivityLogs() {
   const [selectedLog, setSelectedLog] = useState(null);
   const [copied, setCopied] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
- 
+
   // Drill-down and View Mode states
   const [viewMode, setViewMode] = useState("grouped"); // "grouped" or "flat"
   const [selectedUserEmail, setSelectedUserEmail] = useState(null);
@@ -101,7 +101,7 @@ export default function ActivityLogs() {
         },
         body: JSON.stringify({ ip: ipToBlock, reason: blockReason })
       });
-      
+
       if (response.ok) {
         setIpToBlock(null);
         setBlockReason("");
@@ -153,7 +153,7 @@ export default function ActivityLogs() {
     }
 
     const lowerUrl = url.toLowerCase();
-    
+
     if (lowerUrl.includes("/api/auth/login") || lowerUrl.includes("/api/auth/supervisor-login")) {
       return "User Signed In";
     }
@@ -207,7 +207,7 @@ export default function ActivityLogs() {
     if (!actionObj) return "System Settings";
     const url = actionObj.url || "";
     const payload = actionObj.payload || {};
-    
+
     if (url.toLowerCase().includes("log-page-visit") || url.toLowerCase().includes("log-action")) {
       return payload.pageName || payload.actionName || "Navigation";
     }
@@ -230,7 +230,7 @@ export default function ActivityLogs() {
     if (!log || !log.action) return "other";
     const url = log.action.url?.toLowerCase() || "";
     const desc = log.action.description?.toLowerCase() || "";
-    
+
     if (url.includes("/api/auth")) return "security";
     if (url.includes("/api/admin-management")) return "admin";
     if (url.includes("/api/app/supervisor") || url.includes("/api/supervisor") || url.includes("supervisor")) return "supervisors";
@@ -239,11 +239,11 @@ export default function ActivityLogs() {
     if (url.includes("announcement")) return "announcements";
     if (url.includes("/feedback")) return "feedback";
     if (
-      url.includes("/api/cities") || 
-      url.includes("/api/zones") || 
-      url.includes("/api/sectors") || 
-      url.includes("/api/wards") || 
-      url.includes("/api/departments") || 
+      url.includes("/api/cities") ||
+      url.includes("/api/zones") ||
+      url.includes("/api/sectors") ||
+      url.includes("/api/wards") ||
+      url.includes("/api/departments") ||
       url.includes("/api/designations")
     ) {
       return "master-setup";
@@ -396,7 +396,7 @@ export default function ActivityLogs() {
       const isAdminApiAction = url.includes("/api/admin-management");
 
       // Check if the actor is an admin
-      const isAdminActor = 
+      const isAdminActor =
         ["admin", "super_admin", "operations_manager", "auditor"].includes(actorRole) ||
         actorEmail === SUPER_ADMIN_EMAIL;
 
@@ -479,7 +479,7 @@ export default function ActivityLogs() {
       groups[email].logs.push(log);
       groups[email].ipList.add(log.client?.ip || "localhost");
       groups[email].deviceList.add(log.client?.device || "Unknown Device");
-      
+
       if (new Date(log.timestamp) > new Date(groups[email].lastActive)) {
         groups[email].lastActive = log.timestamp;
       }
@@ -540,7 +540,7 @@ export default function ActivityLogs() {
         const logModule = getLogModule(log);
         if (logModule !== selectedModule) return;
       }
-      
+
       const desc = log.action?.description?.toLowerCase() || "";
       if (desc.includes("log") || desc.includes("sign")) logins++;
       else if (desc.includes("create") || desc.includes("add")) creates++;
@@ -639,11 +639,11 @@ export default function ActivityLogs() {
               <div className="flex flex-wrap gap-4 text-xs text-slate-400 dark:text-slate-500 font-semibold">
                 <div className="relative">
                   <span className="flex items-center gap-1 cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 p-1 rounded-lg transition-all group/ip"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveIpMenu(activeIpMenu?.index === `grouped-${index}` ? null : { index: `grouped-${index}`, ip: log.client?.ip || "127.0.0.1" });
-                        }}
-                        title="Click for IP options"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveIpMenu(activeIpMenu?.index === `grouped-${index}` ? null : { index: `grouped-${index}`, ip: log.client?.ip || "127.0.0.1" });
+                    }}
+                    title="Click for IP options"
                   >
                     <Globe size={12} className="text-slate-400 dark:text-slate-550 group-hover/ip:text-blue-500 dark:group-hover/ip:text-blue-400 transition-colors" />
                     IP:{" "}
@@ -653,7 +653,7 @@ export default function ActivityLogs() {
                   </span>
 
                   {activeIpMenu?.index === `grouped-${index}` && (
-                    <div 
+                    <div
                       className="absolute left-0 top-6 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl p-1.5 text-xs text-left w-44 animate-in fade-in slide-in-from-top-1 duration-150 font-sans text-slate-800 dark:text-slate-200"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -745,14 +745,14 @@ export default function ActivityLogs() {
     { name: "Updated", value: stats.updates, color: "#f59e0b" },
     { name: "Deleted", value: stats.deletes, color: "#ef4444" }
   ].filter(d => d.value > 0);
-  
+
   if (pieData.length === 0) {
     pieData.push({ name: "No Events", value: 1, color: "#e2e8f0" });
   }
 
   return (
     <div className="pt-0 px-4 pb-4 md:pt-0 md:px-6 md:pb-6 w-full space-y-4">
-      
+
       {/* Header Container */}
       <div className="relative bg-gradient-to-br from-emerald-100 via-teal-50 to-cyan-100 dark:from-slate-900 dark:via-emerald-950/20 dark:to-teal-900/15 border border-slate-200/80 dark:border-slate-800/80 p-6 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 overflow-hidden group">
         {/* Ambient Mesh Gradient */}
@@ -781,7 +781,7 @@ export default function ActivityLogs() {
             <path d="M 50 120 C 180 80, 280 40, 450 80" fill="none" stroke="white" strokeWidth="1" opacity="0.3" />
           </svg>
         </div>
-        
+
         <div className="flex items-center gap-5 z-10">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-50 to-green-100/80 dark:from-green-950/60 dark:to-green-900/40 border border-green-200/60 dark:border-green-800/50 flex items-center justify-center text-green-600 dark:text-green-400 shadow-md shadow-green-100/50 dark:shadow-none shrink-0">
             <ShieldCheck size={24} />
@@ -795,105 +795,101 @@ export default function ActivityLogs() {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2 self-start md:self-center z-10">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
           <div className="text-[10px] font-black uppercase tracking-wider text-slate-650 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl shadow-sm">
-            {filteredLogs.length === baseFilteredLogs.length 
-              ? `${filteredLogs.length} Events Logged` 
+            {filteredLogs.length === baseFilteredLogs.length
+              ? `${filteredLogs.length} Events Logged`
               : `${filteredLogs.length} of ${baseFilteredLogs.length} Selected`}
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {/* Card: Total Operations */}
-          <div 
-            onClick={() => handleCardClick("all")}
-            className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${
-              filterCategory === "all" 
-                ? "border-green-500 dark:border-green-500/60 shadow-sm ring-1 ring-green-500/30" 
-                : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
+        {/* Card: Total Operations */}
+        <div
+          onClick={() => handleCardClick("all")}
+          className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${filterCategory === "all"
+              ? "border-green-500 dark:border-green-500/60 shadow-sm ring-1 ring-green-500/30"
+              : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
             }`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-green-50 dark:bg-green-950/40 flex items-center justify-center text-green-500 shrink-0">
-              <LayoutGrid size={20} />
-            </div>
-            <div>
-              <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">All Operations</span>
-              <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{moduleFilteredLogs.length}</span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Total actions recorded</span>
-            </div>
+        >
+          <div className="w-11 h-11 rounded-xl bg-green-50 dark:bg-green-950/40 flex items-center justify-center text-green-500 shrink-0">
+            <LayoutGrid size={20} />
           </div>
-
-          {/* Card: Login events */}
-          <div 
-            onClick={() => handleCardClick("logins")}
-            className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${
-              filterCategory === "logins" 
-                ? "border-blue-500 dark:border-blue-500/60 shadow-sm ring-1 ring-blue-500/30" 
-                : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
-            }`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-500 shrink-0">
-              <Lock size={20} />
-            </div>
-            <div>
-              <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Logins / Access</span>
-              <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{stats.logins}</span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Successful logins</span>
-            </div>
-          </div>
-
-          {/* Card: Updates / Creates */}
-          <div 
-            onClick={() => handleCardClick("modifications")}
-            className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${
-              filterCategory === "modifications" 
-                ? "border-amber-500 dark:border-amber-500/60 shadow-sm ring-1 ring-amber-500/30" 
-                : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
-            }`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-500 shrink-0">
-              <Edit3 size={20} />
-            </div>
-            <div>
-              <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Modifications</span>
-              <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{stats.creates + stats.updates}</span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Data changes made</span>
-            </div>
-          </div>
-
-          {/* Card: Deletes */}
-          <div 
-            onClick={() => handleCardClick("deletions")}
-            className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${
-              filterCategory === "deletions" 
-                ? "border-rose-500 dark:border-rose-500/60 shadow-sm ring-1 ring-rose-500/30" 
-                : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
-            }`}
-          >
-            <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-500 shrink-0">
-              <Trash2 size={20} />
-            </div>
-            <div>
-              <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Deletions</span>
-              <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{stats.deletes}</span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Records deleted</span>
-            </div>
+          <div>
+            <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">All Operations</span>
+            <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{moduleFilteredLogs.length}</span>
+            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Total actions recorded</span>
           </div>
         </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-3 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden relative group">
-            {/* Moving background ambient light */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-all duration-500" />
-            
-            <style>{`
+        {/* Card: Login events */}
+        <div
+          onClick={() => handleCardClick("logins")}
+          className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${filterCategory === "logins"
+              ? "border-blue-500 dark:border-blue-500/60 shadow-sm ring-1 ring-blue-500/30"
+              : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
+            }`}
+        >
+          <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-500 shrink-0">
+            <Lock size={20} />
+          </div>
+          <div>
+            <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Logins / Access</span>
+            <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{stats.logins}</span>
+            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Successful logins</span>
+          </div>
+        </div>
+
+        {/* Card: Updates / Creates */}
+        <div
+          onClick={() => handleCardClick("modifications")}
+          className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${filterCategory === "modifications"
+              ? "border-amber-500 dark:border-amber-500/60 shadow-sm ring-1 ring-amber-500/30"
+              : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
+            }`}
+        >
+          <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-500 shrink-0">
+            <Edit3 size={20} />
+          </div>
+          <div>
+            <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Modifications</span>
+            <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{stats.creates + stats.updates}</span>
+            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Data changes made</span>
+          </div>
+        </div>
+
+        {/* Card: Deletes */}
+        <div
+          onClick={() => handleCardClick("deletions")}
+          className={`p-4 rounded-xl border flex items-center gap-4 transition-all duration-200 cursor-pointer bg-white dark:bg-slate-900 ${filterCategory === "deletions"
+              ? "border-rose-500 dark:border-rose-500/60 shadow-sm ring-1 ring-rose-500/30"
+              : "border-slate-200 dark:border-slate-800/80 shadow-sm hover:shadow hover:border-slate-300 dark:hover:border-slate-700"
+            }`}
+        >
+          <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-500 shrink-0">
+            <Trash2 size={20} />
+          </div>
+          <div>
+            <span className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-0.5">Deletions</span>
+            <span className="text-2xl font-black text-slate-900 dark:text-slate-55 leading-none block mb-1">{stats.deletes}</span>
+            <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Records deleted</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="lg:col-span-3 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden relative group">
+          {/* Moving background ambient light */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-all duration-500" />
+
+          <style>{`
               @keyframes pulseOpacity {
                 0% { stop-opacity: 0.25; }
                 50% { stop-opacity: 0.55; }
@@ -915,174 +911,174 @@ export default function ActivityLogs() {
                 animation: pulseFlow 2s linear infinite;
               }
             `}</style>
-            
-            <div className="flex items-center justify-between z-10">
-              <div>
-                <h2 className="text-slate-900 dark:text-slate-100 text-[15px] font-extrabold">Activity Overview</h2>
-                <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium mt-1">Audit pattern over time</p>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors">
-                24-Hour Range
-                <ChevronDown size={14} className="text-slate-400" />
-              </div>
-            </div>
 
-            {/* Recharts Bar Graph */}
-            <div className="flex-1 min-h-[176px] w-full flex items-end justify-center mt-6 mb-2 relative z-10">
-              {filteredLogs.length === 0 ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 dark:text-slate-450 text-xs gap-1.5 select-none">
-                  <Clock size={16} className="animate-spin text-slate-600" />
-                  <span>No activities logged today</span>
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    data={barData} 
-                    margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                    onClick={(state) => {
-                      if (state && state.activeTooltipIndex !== undefined) {
-                        const binIdx = state.activeTooltipIndex;
-                        setSelectedHourBin(binIdx);
-                        setTimeout(() => {
-                          const element = document.getElementById("logs-feed-container");
-                          if (element) {
-                            element.scrollIntoView({ behavior: "smooth", block: "start" });
-                          }
-                        }, 100);
-                      }
-                    }}
-                  >
-                    <XAxis 
-                      dataKey="time" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }}
-                      ticks={['12 AM', '4 AM', '8 AM', '12 PM', '4 PM', '8 PM', '12 AM']}
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }}
-                      ticks={[0, 20, 40, 60, 80, 100, 120]}
-                    />
-                    <RechartsTooltip 
-                      cursor={{ fill: '#f1f5f9' }}
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-xl text-xs font-semibold max-w-[240px]">
-                              <p className="text-slate-500 dark:text-slate-400 font-bold mb-1">{data.range}</p>
-                              <p className="text-slate-800 dark:text-slate-100 font-black text-sm mb-1.5 flex justify-between items-center">
-                                <span>Events Count:</span>
-                                <span className="bg-slate-150 dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-250 dark:border-slate-700 text-xs">{data.events}</span>
-                              </p>
-                              {data.events > 0 && (
-                                <div className="border-t border-slate-100 dark:border-slate-800 pt-1.5 mt-1.5 space-y-1">
-                                  <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-550 block">Actors Active:</span>
-                                  <p className="text-blue-600 dark:text-blue-400 font-bold leading-normal break-words">
-                                    {data.actorsList}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Bar dataKey="events" fill="#22c55e" barSize={12} className="cursor-pointer" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+          <div className="flex items-center justify-between z-10">
+            <div>
+              <h2 className="text-slate-900 dark:text-slate-100 text-[15px] font-extrabold">Activity Overview</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium mt-1">Audit pattern over time</p>
+            </div>
+            <div className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors">
+              24-Hour Range
+              <ChevronDown size={14} className="text-slate-400" />
             </div>
           </div>
 
-          {/* Critical Activity Distribution Widget */}
-          <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col hover:shadow-md transition-all duration-200">
-            <div>
-              <h2 className="text-slate-900 dark:text-slate-100 text-[15px] font-extrabold">Activity Distribution</h2>
-              <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium mt-1">Breakdown of events by type</p>
+          {/* Recharts Bar Graph */}
+          <div className="flex-1 min-h-[176px] w-full flex items-end justify-center mt-6 mb-2 relative z-10">
+            {filteredLogs.length === 0 ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 dark:text-slate-450 text-xs gap-1.5 select-none">
+                <Clock size={16} className="animate-spin text-slate-600" />
+                <span>No activities logged today</span>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={barData}
+                  margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                  onClick={(state) => {
+                    if (state && state.activeTooltipIndex !== undefined) {
+                      const binIdx = state.activeTooltipIndex;
+                      setSelectedHourBin(binIdx);
+                      setTimeout(() => {
+                        const element = document.getElementById("logs-feed-container");
+                        if (element) {
+                          element.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }
+                      }, 100);
+                    }
+                  }}
+                >
+                  <XAxis
+                    dataKey="time"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }}
+                    ticks={['12 AM', '4 AM', '8 AM', '12 PM', '4 PM', '8 PM', '12 AM']}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }}
+                    ticks={[0, 20, 40, 60, 80, 100, 120]}
+                  />
+                  <RechartsTooltip
+                    cursor={{ fill: '#f1f5f9' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-xl text-xs font-semibold max-w-[240px]">
+                            <p className="text-slate-500 dark:text-slate-400 font-bold mb-1">{data.range}</p>
+                            <p className="text-slate-800 dark:text-slate-100 font-black text-sm mb-1.5 flex justify-between items-center">
+                              <span>Events Count:</span>
+                              <span className="bg-slate-150 dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-250 dark:border-slate-700 text-xs">{data.events}</span>
+                            </p>
+                            {data.events > 0 && (
+                              <div className="border-t border-slate-100 dark:border-slate-800 pt-1.5 mt-1.5 space-y-1">
+                                <span className="text-[9px] font-black uppercase text-slate-400 dark:text-slate-550 block">Actors Active:</span>
+                                <p className="text-blue-600 dark:text-blue-400 font-bold leading-normal break-words">
+                                  {data.actorsList}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="events" fill="#22c55e" barSize={12} className="cursor-pointer" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Critical Activity Distribution Widget */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col hover:shadow-md transition-all duration-200">
+          <div>
+            <h2 className="text-slate-900 dark:text-slate-100 text-[15px] font-extrabold">Activity Distribution</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] font-medium mt-1">Breakdown of events by type</p>
+          </div>
+          {/* Doughnut Chart and Legend */}
+          <div className="flex-1 flex items-center justify-center gap-6 mt-4 mb-2">
+            <div className="relative w-24 h-24 shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    innerRadius={28}
+                    outerRadius={42}
+                    paddingAngle={2}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-lg font-black text-slate-850 dark:text-slate-100 leading-none">{moduleFilteredLogs.length}</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-wider leading-none">Total</span>
+              </div>
             </div>
-            {/* Doughnut Chart and Legend */}
-            <div className="flex-1 flex items-center justify-center gap-6 mt-4 mb-2">
-              <div className="relative w-24 h-24 shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      innerRadius={28}
-                      outerRadius={42}
-                      paddingAngle={2}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-lg font-black text-slate-850 dark:text-slate-100 leading-none">{moduleFilteredLogs.length}</span>
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-wider leading-none">Total</span>
+
+            <div className="w-40 space-y-2.5 shrink-0">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                  <span className="truncate">Logins</span>
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{loginPct}%</span>
+                  <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.logins}</span>
                 </div>
               </div>
-              
-              <div className="w-40 space-y-2.5 shrink-0">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
-                  <span className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" /> 
-                    <span className="truncate">Logins</span>
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{loginPct}%</span>
-                    <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.logins}</span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
-                  <span className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" /> 
-                    <span className="truncate">Created</span>
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{createPct}%</span>
-                    <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.creates}</span>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
-                  <span className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" /> 
-                    <span className="truncate">Updated</span>
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{updatePct}%</span>
-                    <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.updates}</span>
-                  </div>
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                  <span className="truncate">Created</span>
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{createPct}%</span>
+                  <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.creates}</span>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
-                  <span className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" /> 
-                    <span className="truncate">Deleted</span>
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{delPct}%</span>
-                    <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.deletes}</span>
-                  </div>
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  <span className="truncate">Updated</span>
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{updatePct}%</span>
+                  <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.updates}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-350 gap-2">
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span className="truncate">Deleted</span>
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-650 dark:text-slate-400 text-xs w-7 text-right">{delPct}%</span>
+                  <span className="text-slate-500 dark:text-slate-450 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-full text-[10px] min-w-[20px] text-center border border-slate-100 dark:border-slate-700">{stats.deletes}</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
       {/* Control Bar (Filters & Toggle View Mode) */}
       <div id="logs-feed-container" className="flex flex-col lg:flex-row gap-3 justify-between items-stretch lg:items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm scroll-mt-6">
-        
+
         <div className="flex flex-wrap items-center gap-2">
-          
+
           {/* Date Selector input */}
           <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1">
             <CalendarRange size={14} className="text-slate-500" />
@@ -1094,16 +1090,15 @@ export default function ActivityLogs() {
               className="bg-transparent text-xs font-bold text-slate-700 dark:text-slate-300 outline-none cursor-pointer focus:text-blue-600 dark:focus:text-blue-400"
             />
           </div>
-          
+
           {/* Quick Dates */}
           <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-950 p-0.5">
             <button
               onClick={setToToday}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded transition-colors ${
-                logsDate === new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
+              className={`px-2.5 py-1 text-[11px] font-bold rounded transition-colors ${logsDate === new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
                   ? "bg-white dark:bg-slate-800 text-slate-850 dark:text-slate-250 shadow-sm border border-slate-200 dark:border-slate-700"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+                }`}
             >
               Today
             </button>
@@ -1127,8 +1122,8 @@ export default function ActivityLogs() {
           {selectedHourBin !== null && (
             <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-150 dark:border-blue-900/50 rounded-lg px-2.5 py-1 text-[11px] font-bold shadow-inner">
               <span>Time: {barData[selectedHourBin]?.range}</span>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setSelectedHourBin(null)}
                 className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200 hover:bg-blue-100/50 dark:hover:bg-blue-900/50 p-0.5 rounded-full transition-colors"
               >
@@ -1140,28 +1135,26 @@ export default function ActivityLogs() {
 
         {/* Search input & Toggle Mode switch */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          
+
           {/* View Toggler */}
           {!selectedUserEmail && (
             <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-slate-50 dark:bg-slate-950 p-0.5">
               <button
                 onClick={() => setViewMode("grouped")}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded transition-all duration-200 ${
-                  viewMode === "grouped"
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded transition-all duration-200 ${viewMode === "grouped"
                     ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                }`}
+                  }`}
               >
                 <Users size={12} />
                 User-Wise Feed
               </button>
               <button
                 onClick={() => setViewMode("flat")}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded transition-all duration-200 ${
-                  viewMode === "flat"
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded transition-all duration-200 ${viewMode === "flat"
                     ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                }`}
+                  }`}
               >
                 <Activity size={12} />
                 All Events
@@ -1179,8 +1172,8 @@ export default function ActivityLogs() {
               className="w-full sm:w-48 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg pl-8 pr-8 py-1 text-xs font-bold text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:outline-none focus:border-blue-500 dark:focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 focus:ring-1 focus:ring-blue-500/20 transition-all"
             />
             {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery("")} 
+              <button
+                onClick={() => setSearchQuery("")}
                 className="absolute right-2.5 p-0.5 rounded-full text-slate-400 dark:text-slate-550 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={12} />
@@ -1195,12 +1188,12 @@ export default function ActivityLogs() {
         {modulesList.map((mod) => {
           const isActive = selectedModule === mod.id;
           const IconComponent = mod.icon;
-          
+
           // Calculate counts specifically for this module
           const count = mod.id === "all"
             ? baseFilteredLogs.length
             : baseFilteredLogs.filter(l => getLogModule(l) === mod.id).length;
- 
+
           // Curated premium colors for active module states
           const themeMap = {
             all: "from-blue-600 to-indigo-650 shadow-blue-500/15 text-white",
@@ -1213,7 +1206,7 @@ export default function ActivityLogs() {
             "master-setup": "from-rose-500 to-pink-600 shadow-rose-500/15 text-white",
             navigation: "from-slate-700 to-slate-800 shadow-slate-700/15 text-white",
           };
- 
+
           // Text color map for active badge labels to match the theme with high contrast
           const textThemeMap = {
             all: "text-blue-600",
@@ -1226,28 +1219,26 @@ export default function ActivityLogs() {
             "master-setup": "text-rose-600",
             navigation: "text-slate-800",
           };
- 
+
           const activeClasses = themeMap[mod.id] || "from-blue-600 to-indigo-650 text-white";
- 
+
           return (
             <button
               key={mod.id}
               onClick={() => { setSelectedModule(mod.id); setSelectedUserEmail(null); }}
-              className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-black transition-all duration-300 ease-out whitespace-nowrap active:scale-95 border border-transparent outline-none ${
-                isActive
+              className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-black transition-all duration-300 ease-out whitespace-nowrap active:scale-95 border border-transparent outline-none ${isActive
                   ? `bg-gradient-to-r ${activeClasses} shadow-md scale-[1.01] border-transparent`
                   : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 text-slate-550 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200 shadow-sm border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
-              }`}
+                }`}
             >
               <span className={`transition-transform duration-300 ${isActive ? "text-white scale-110" : "text-slate-400 group-hover:scale-110"}`}>
                 {IconComponent}
               </span>
               <span>{mod.label}</span>
-              <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black tracking-wider transition-all duration-300 shadow-sm ${
-                isActive 
-                  ? `bg-white dark:bg-slate-800 ${textThemeMap[mod.id] || "text-blue-600"}` 
+              <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black tracking-wider transition-all duration-300 shadow-sm ${isActive
+                  ? `bg-white dark:bg-slate-800 ${textThemeMap[mod.id] || "text-blue-600"}`
                   : "bg-slate-100 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border border-slate-250/30 dark:border-slate-850/50"
-              }`}>
+                }`}>
                 {count}
               </span>
             </button>
@@ -1257,10 +1248,10 @@ export default function ActivityLogs() {
 
       {/* Main Display Body */}
       {selectedUserEmail ? (
-        
+
         /* =================== USER TIMELINE DRILL-DOWN SCREEN =================== */
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          
+
           {/* Header Card with User info and Back Button */}
           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -1271,7 +1262,7 @@ export default function ActivityLogs() {
               >
                 <ArrowLeft size={18} />
               </button>
-              
+
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{activeUserDetail?.actor?.name || "System Actor"}</h2>
@@ -1311,7 +1302,7 @@ export default function ActivityLogs() {
         </div>
 
       ) : viewMode === "grouped" ? (
-        
+
         /* =================== GROUPED USER-WISE SUMMARY FEED =================== */
         <div className="space-y-4">
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/80 rounded-xl p-3 flex items-center justify-between">
@@ -1443,7 +1434,7 @@ export default function ActivityLogs() {
                         <Clock size={12} className="text-slate-400" />
                         <span>Last active: <strong className="text-slate-700 dark:text-slate-300">{formattedLastActive}</strong></span>
                       </div>
-                      
+
                       <button
                         type="button"
                         onClick={() => setSelectedUserEmail(userGroup.actor?.email)}
@@ -1462,7 +1453,7 @@ export default function ActivityLogs() {
         </div>
 
       ) : (
-        
+
         /* =================== FLAT CHRONOLOGICAL TIMELINE FEED =================== */
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in duration-200">
           <div className="overflow-x-auto">
@@ -1536,8 +1527,8 @@ export default function ActivityLogs() {
                     });
 
                     return (
-                      <tr 
-                        key={index} 
+                      <tr
+                        key={index}
                         className="group hover:bg-slate-55/40 dark:hover:bg-slate-800/40 hover:translate-x-0.5 transition-all duration-200"
                       >
                         <td className="p-4 pl-6 text-sm font-mono font-semibold text-slate-600 dark:text-slate-400 transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">
@@ -1562,11 +1553,11 @@ export default function ActivityLogs() {
                         </td>
                         <td className="p-4 text-sm text-slate-650 dark:text-slate-400 font-mono relative">
                           <div className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/50 p-1.5 rounded-lg w-fit transition-all group/ip"
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 setActiveIpMenu(activeIpMenu?.index === index ? null : { index, ip: log.client?.ip || "127.0.0.1" });
-                               }}
-                               title="Click for IP options"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveIpMenu(activeIpMenu?.index === index ? null : { index, ip: log.client?.ip || "127.0.0.1" });
+                            }}
+                            title="Click for IP options"
                           >
                             <Globe size={13} className="text-slate-400 dark:text-slate-500 group-hover/ip:text-blue-500 dark:group-hover/ip:text-blue-400 transition-colors" />
                             <span className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-all border-b border-dashed border-blue-300 dark:border-blue-900">
@@ -1575,7 +1566,7 @@ export default function ActivityLogs() {
                           </div>
 
                           {activeIpMenu?.index === index && (
-                            <div 
+                            <div
                               className="absolute left-4 top-10 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl p-1.5 text-xs text-left w-44 animate-in fade-in slide-in-from-top-1 duration-150 font-sans text-slate-800 dark:text-slate-200"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -1649,7 +1640,7 @@ export default function ActivityLogs() {
 
             {/* Body */}
             <div className="p-6 overflow-y-auto space-y-6">
-              
+
               {/* Context Summary Cards */}
               <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl">
                 <div className="space-y-1">
@@ -1692,7 +1683,7 @@ export default function ActivityLogs() {
                   <span>Technical Data (JSON)</span>
                   <span className="text-slate-400 font-semibold">{showRawJson ? "Hide" : "Show"}</span>
                 </button>
-                
+
                 {showRawJson && (
                   <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-950 relative">
                     <div className="flex justify-end mb-2">

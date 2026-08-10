@@ -1726,7 +1726,7 @@ function EditCityModal({
           </FormField>
         </div>
 
-        <FormField label="City Name">
+        <FormField label="City">
           <input className={readOnlyClass} value={selectedMasterCity?.name || city.name} readOnly />
         </FormField>
 
@@ -1822,9 +1822,7 @@ function EditCityModal({
 
           {/* 2. Governance Platforms */}
           <div className="space-y-2.5 pt-1">
-            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">
-              Governance Platforms
-            </span>
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <label className="flex items-center gap-2.5 rounded-xl border border-amber-200/80 bg-amber-50/60 px-3.5 py-2.5 text-xs font-black text-amber-900 cursor-pointer hover:bg-amber-100/60 transition">
                 <input

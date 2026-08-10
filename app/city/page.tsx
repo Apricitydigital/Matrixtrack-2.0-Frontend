@@ -4061,7 +4061,7 @@ export default function CityDashboardPage() {
                   { label: "Pending QC Inspection", value: extraModuleStats.toilet.inspectionPending, icon: <MapPin size={20} />, color: "#3b82f6", href: `/modules/toilet` },
                   { label: "Action Required", value: extraModuleStats.toilet.actionRequired, icon: <AlertCircle size={20} />, color: "#ef4444", href: `/modules/toilet` },
                   { label: "Action Taken by AO", value: extraModuleStats.toilet.actionTaken, icon: <CheckCircle size={20} />, color: "#10b981", href: `/modules/toilet` },
-                  { label: "Inspection Not Done", value: extraModuleStats.toilet.uninspected, icon: <Target size={20} />, color: "#64748b", href: `/modules/toilet` },
+                  { label: "Inspection Not Started", value: extraModuleStats.toilet.uninspected, icon: <Target size={20} />, color: "#64748b", href: `/modules/toilet` },
                 ];
               } else if (keyStr === 'taskforce') {
                 displayName = 'CTU/GVP Transformation';
@@ -5246,9 +5246,7 @@ export default function CityDashboardPage() {
                     {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'Indore Admin'} <span style={{ fontSize: '22px' }}>👋</span>
                   </h1>
 
-                  <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
-                    Track inspections, monitor performance & improve city operations
-                  </p>
+                  
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -5281,7 +5279,7 @@ export default function CityDashboardPage() {
                   <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
-                      <span style={{ fontSize: '9px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>LIVE API FEED</span>
+                      <span style={{ fontSize: '9px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>LIVE</span>
                     </div>
                     <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>{lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
                   </div>
@@ -5428,7 +5426,7 @@ export default function CityDashboardPage() {
                     { keyMatch: ['sweeping'], name: 'Sweeping', color: '#1b9a74', soft: '#edf9f5', border: '#cfeee3', icon: BrushCleaning, link: '/modules/sweeping' },
                     { keyMatch: ['toilet'], name: 'Cleanliness of Toilets', color: '#3d76df', soft: '#eff5ff', border: '#d2e2ff', icon: Toilet, link: '/modules/toilet' },
                     { keyMatch: ['twinbin', 'litter', 'bin'], name: 'Litterbins', color: '#d78212', soft: '#fff7e9', border: '#f4dfb8', icon: Trash2, link: '/modules/litterbins' },
-                    { keyMatch: ['taskforce', 'gvp', 'ctu'], name: 'CTU / GVP Transformation', color: '#7657e8', soft: '#f4f1ff', border: '#ded5ff', icon: Truck, link: '/modules/taskforce' },
+                    { keyMatch: ['taskforce', 'gvp', 'ctu'], name: 'GVP', color: '#7657e8', soft: '#f4f1ff', border: '#ded5ff', icon: Truck, link: '/modules/taskforce' },
                   ];
                   const cards = moduleCards.map((mc) => {
                     const found = moduleActivity.find((m) => mc.keyMatch.some((k) => m.key.toLowerCase().includes(k)));

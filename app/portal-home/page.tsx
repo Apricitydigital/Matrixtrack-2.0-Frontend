@@ -124,7 +124,7 @@ export default function PortalHomePage() {
           <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
-               <span style={{ fontSize: '9px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>LIVE API FEED</span>
+               <span style={{ fontSize: '9px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>LIVE</span>
             </div>
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
           </div>

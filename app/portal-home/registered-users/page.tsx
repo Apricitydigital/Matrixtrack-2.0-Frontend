@@ -425,7 +425,7 @@ export default function RegisteredUsersPage() {
 
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75">
-                {["SR. NO.", "USER NAME", "USER EMAIL", "USER ROLE", "STATE & CITY", "ZONE & WARD", "ASSIGNED MODULES", "DATE CREATED ON", "CONTROL"].map((h) => (
+                {["SR. NO.", "USER NAME", "USER EMAIL", "USER ROLE", "STATE & CITY", "ZONE & WARD", "ASSIGNED MODULES", "CREATED ON", "ACTION"].map((h) => (
                   <th key={h} className="px-3 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-[0.05em] text-slate-500 first:pl-5 last:pr-5">
                     {h}
                   </th>

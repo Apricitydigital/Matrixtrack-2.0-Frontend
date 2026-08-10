@@ -490,8 +490,7 @@ function CityUsersPage() {
           {/* Header Section */}
           <div style={{ marginBottom: "32px" }}>
             <div className="breadcrumb" style={{ fontSize: "0.875rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "8px" }}>
-              <span>Governance</span>
-              <span>/</span>
+              
               <span style={{ color: "#1e293b", fontWeight: 500 }}>Registered Users</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -904,10 +903,10 @@ function CityUsersPage() {
                 <thead style={{ backgroundColor: "#fafbfc", borderBottom: "1px solid #f1f5f9" }}>
                   <tr>
                     <th style={{ padding: "16px 20px 16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Sr. No.</th>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Personnel Profile</th>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Global Role</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>User Profile</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>User Role</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Access & Scope</th>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Date Created On</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Created On</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
