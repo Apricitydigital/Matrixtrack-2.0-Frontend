@@ -317,7 +317,7 @@ const handleRestore = async (id: string) => {
                         User Management
                     </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', fontWeight: 500 }}>
-                        Monitor and manage active accounts across the Swachh Ranking system.
+                        Monitor and manage active accounts across the Ward Ranking system.
                     </p>
                 </div>
                 <button

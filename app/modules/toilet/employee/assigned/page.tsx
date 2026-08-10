@@ -13,8 +13,6 @@ type Toilet = {
     type: string;
     status: string;
     createdAt: string;
-    inspectionStatus?: string | null;
-    lastInspectedAt?: string | null;
 };
 
 export default function ToiletAssignedPage() {
@@ -59,9 +57,7 @@ export default function ToiletAssignedPage() {
                         <div className="card p-8 text-center muted">No assets assigned to you at the moment.</div>
                     ) : (
                         <div className="grid grid-2">
-                            {toilets.map((t) => {
-                                const completedToday = !!t.inspectionStatus || (!!t.lastInspectedAt && new Date(t.lastInspectedAt).toDateString() === new Date().toDateString());
-                                return (
+                            {toilets.map((t) => (
                                 <div key={t.id} className="card card-hover flex flex-col gap-3">
                                     <div className="flex justify-between items-start">
                                         <div>
@@ -80,19 +76,11 @@ export default function ToiletAssignedPage() {
 
                                     <div className="card-divider"></div>
 
-                                    {completedToday ? (
-                                        <button className="btn w-full" disabled>Completed Today</button>
-                                    ) : (
-                                        <Link
-                                            className="btn btn-primary w-full"
-                                            href={`/modules/survey/TOILET/${t.id}?name=${encodeURIComponent(t.name)}&returnTo=${encodeURIComponent('/modules/toilet/employee/assigned')}`}
-                                        >
-                                            Start Survey
-                                        </Link>
-                                    )}
+                                    <button className="btn btn-primary w-full" disabled>
+                                        Perform Inspection
+                                    </button>
                                 </div>
-                                );
-                            })}
+                            ))}
                         </div>
                     )}
                 </div>

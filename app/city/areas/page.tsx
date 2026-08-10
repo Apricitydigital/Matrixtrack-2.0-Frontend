@@ -1,391 +1,1659 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import BeatForm from "./components/BeatForm";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+
 import AreaForm from "./components/AreaForm";
-import BeatTable from "./components/BeatTable";
-import EditBeatModal from "./components/EditBeatModal";
-import KMLDataViewer from "./components/KMLDataViewer";
-import AssignBeatModal from "./components/AssignBeatModal";
-import { AreaBeatApi } from "@lib/apiClient";
-import { MapPin, Info, Plus, X, Download, FileSpreadsheet, FileText, Target, ShieldCheck, Activity, Search } from "lucide-react";
-import dynamic from "next/dynamic";
-import type { BeatMapViewProps } from "./components/BeatMapView";
+
+import { apiFetch } from "@lib/apiClient";
+
+import {
+  MapPin,
+  Plus,
+  X,
+  Search,
+} from "lucide-react";
+
 import { useAuth } from "@hooks/useAuth";
+import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import { RoleGuard } from "@components/Guards";
 
 
-const BeatMapView = dynamic<BeatMapViewProps>(() => import("./components/BeatMapView"), { ssr: false });
-
 export default function AreasPage() {
   const { user } = useAuth();
-  const isReadOnly = user?.roles?.some(r => ["COMMISSIONER", "ULB_OFFICER"].includes(r));
-  const [beats, setBeats] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [viewingBeat, setViewingBeat] = useState<any | null>(null);
-  const [editingBeat, setEditingBeat] = useState<any | null>(null);
-  const [inspectingBeat, setInspectingBeat] = useState<any | null>(null);
-  const [assigningBeat, setAssigningBeat] = useState<any | null>(null);
-  const [deployingBeat, setDeployingBeat] = useState<any | null>(null);
-  const [geoVersion, setGeoVersion] = useState(0);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [downloadOpen, setDownloadOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
-  const stats = React.useMemo(() => {
-    const total = beats.length;
-    const withQC = beats.filter(b => b.assignedToId).length;
-    const withField = beats.filter(b => b.segments?.some((s: any) => s.assignedToId)).length;
-    return { total, withQC, withField };
-  }, [beats]);
-
-  const filteredBeats = React.useMemo(() => {
-    if (!searchQuery) return beats;
-    const q = searchQuery.toLowerCase();
-    return beats.filter(b =>
-      b.beatName?.toLowerCase().includes(q) ||
-      b.zoneName?.toString().includes(q) ||
-      b.wardName?.toString().includes(q) ||
-      b.areaName?.toLowerCase().includes(q)
+  const isReadOnly =
+    user?.roles?.some((r) =>
+      [
+        "COMMISSIONER",
+        "ULB_OFFICER",
+      ].includes(r)
     );
-  }, [beats, searchQuery]);
 
-  const [pendingCount, setPendingCount] = useState(0);
 
-  const loadBeats = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [beatsRes, pendingRes] = await Promise.allSettled([
-        AreaBeatApi.list(),
-        AreaBeatApi.listPendingRequests()
-      ]);
-      if (beatsRes.status === "fulfilled") {
-        setBeats(beatsRes.value.beats || []);
+  /* =========================================================
+     AREA DATA
+  ========================================================= */
+
+  const [areas, setAreas] =
+    useState<any[]>([]);
+
+  const [wards, setWards] =
+    useState<any[]>([]);
+
+  const [zones, setZones] =
+    useState<any[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+
+  /* =========================================================
+     UI STATE
+  ========================================================= */
+
+  const [
+    showCreateArea,
+    setShowCreateArea,
+  ] = useState(false);
+
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] = useState("");
+
+
+  /* =========================================================
+     DELETE AREA
+  ========================================================= */
+
+  const [
+    deleteAreaTarget,
+    setDeleteAreaTarget,
+  ] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const [
+    deletingAreaId,
+    setDeletingAreaId,
+  ] = useState<string | null>(
+    null
+  );
+
+
+  /* =========================================================
+     LOAD AREAS + WARDS + ZONES
+     EXISTING GEO APIs ONLY
+  ========================================================= */
+
+  const loadAreas =
+    useCallback(async () => {
+      try {
+        setLoading(true);
+
+        const [
+          areaResult,
+          wardResult,
+          zoneResult,
+        ] =
+          await Promise.allSettled([
+            apiFetch<{
+              nodes: any[];
+            }>(
+              "/city/geo?level=AREA"
+            ),
+
+            apiFetch<{
+              nodes: any[];
+            }>(
+              "/city/geo?level=WARD"
+            ),
+
+            apiFetch<{
+              nodes: any[];
+            }>(
+              "/city/geo?level=ZONE"
+            ),
+          ]);
+
+
+        if (
+          areaResult.status ===
+          "fulfilled"
+        ) {
+          setAreas(
+            areaResult.value?.nodes ||
+              []
+          );
+        }
+
+
+        if (
+          wardResult.status ===
+          "fulfilled"
+        ) {
+          setWards(
+            wardResult.value?.nodes ||
+              []
+          );
+        }
+
+
+        if (
+          zoneResult.status ===
+          "fulfilled"
+        ) {
+          setZones(
+            zoneResult.value?.nodes ||
+              []
+          );
+        }
+
+      } catch (err) {
+        console.error(
+          "Failed to load areas",
+          err
+        );
+      } finally {
+        setLoading(false);
       }
-      if (pendingRes.status === "fulfilled") {
-        setPendingCount(pendingRes.value.pendingBeats?.length || 0);
-      }
-    } catch (err) {
-      console.error("Failed to load beats", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }, []);
+
 
   useEffect(() => {
-    loadBeats();
-  }, [loadBeats]);
+    loadAreas();
+  }, [loadAreas]);
+
+
+  /* =========================================================
+     WARD MAP
+  ========================================================= */
+
+  const wardMap =
+    React.useMemo(() => {
+      return new Map(
+        wards.map((ward) => [
+          ward.id,
+          ward,
+        ])
+      );
+    }, [wards]);
+
+
+  /* =========================================================
+     ZONE MAP
+  ========================================================= */
+
+  const zoneMap =
+    React.useMemo(() => {
+      return new Map(
+        zones.map((zone) => [
+          zone.id,
+          zone,
+        ])
+      );
+    }, [zones]);
+
+
+  /* =========================================================
+     AREA TYPE FORMATTER
+  ========================================================= */
+
+  const formatAreaType = (
+    value: any
+  ) => {
+    if (!value) return "-";
+
+    return String(value)
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (letter) =>
+        letter.toUpperCase()
+      );
+  };
+
+
+  /* =========================================================
+     AREA + WARD + ZONE DATA
+  ========================================================= */
+
+  const enrichedAreas =
+    React.useMemo(() => {
+      return areas.map((area) => {
+
+        /*
+         * Area parent is normally Ward.
+         */
+        const ward =
+          area.parentId
+            ? wardMap.get(
+                area.parentId
+              )
+            : null;
+
+
+        /*
+         * Ward parent is normally Zone.
+         */
+        const zone =
+          ward?.parentId
+            ? zoneMap.get(
+                ward.parentId
+              )
+            : null;
+
+
+        return {
+          ...area,
+
+          areaTypeLabel:
+            formatAreaType(
+              area.areaType ||
+                area.type
+            ),
+
+          wardName:
+            area.wardName ||
+            area.ward?.name ||
+            ward?.name ||
+            "-",
+
+          zoneName:
+            area.zoneName ||
+            area.zone?.name ||
+            zone?.name ||
+            "-",
+        };
+      });
+    }, [
+      areas,
+      wardMap,
+      zoneMap,
+    ]);
+
+
+  /* =========================================================
+     SEARCH
+  ========================================================= */
+
+  const filteredAreas =
+    React.useMemo(() => {
+      if (!searchQuery.trim()) {
+        return enrichedAreas;
+      }
+
+      const q =
+        searchQuery
+          .trim()
+          .toLowerCase();
+
+      return enrichedAreas.filter(
+        (area) =>
+          area.name
+            ?.toLowerCase()
+            .includes(q) ||
+
+          area.id
+            ?.toLowerCase()
+            .includes(q) ||
+
+          area.areaTypeLabel
+            ?.toLowerCase()
+            .includes(q) ||
+
+          area.zoneName
+            ?.toLowerCase()
+            .includes(q) ||
+
+          area.wardName
+            ?.toLowerCase()
+            .includes(q) ||
+
+          user?.city?.name
+            ?.toLowerCase()
+            .includes(q)
+      );
+    }, [
+      enrichedAreas,
+      searchQuery,
+      user?.city?.name,
+    ]);
+
+
+  /* =========================================================
+     DELETE AREA
+     SAME EXISTING API
+  ========================================================= */
+
+  const confirmDeleteArea =
+    async () => {
+      if (
+        !deleteAreaTarget ||
+        isReadOnly
+      ) {
+        return;
+      }
+
+      setDeletingAreaId(
+        deleteAreaTarget.id
+      );
+
+      try {
+        await apiFetch(
+          `/city/geo/${deleteAreaTarget.id}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        setDeleteAreaTarget(null);
+
+        await loadAreas();
+
+      } catch (err) {
+        console.error(
+          "Failed to delete area",
+          err
+        );
+
+        alert(
+          "Failed to delete area"
+        );
+
+      } finally {
+        setDeletingAreaId(null);
+      }
+    };
+
+
+  /* =========================================================
+     PAGE
+  ========================================================= */
 
   return (
-    <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "COMMISSIONER", "ULB_OFFICER"]}>
-      <div className="page" style={{ padding: "32px 40px", backgroundColor: "#f8fafc", minHeight: "100vh" }}>
-        <div style={{ width: "100%" }}>
-          {/* Header */}
-          <div style={{ marginBottom: "32px", display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "space-between", alignItems: "flex-end" }}>
+    <RoleGuard
+      roles={[
+        "CITY_ADMIN",
+        "HMS_SUPER_ADMIN",
+        "COMMISSIONER",
+        "ULB_OFFICER",
+      ]}
+    >
+      <div
+        className="page"
+        style={{
+          padding: "28px 36px",
+          backgroundColor:
+            "#f8fafc",
+          minHeight: "100vh",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+          }}
+        >
+
+          {/* =================================================
+              HEADER
+          ================================================= */}
+
+          <div
+            style={{
+              marginBottom: "28px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "16px",
+              justifyContent:
+                "space-between",
+              alignItems: "center",
+              borderBottom:
+                "1px solid #e2e8f0",
+              paddingBottom: "16px",
+            }}
+          >
+
             <div>
-              <div className="breadcrumb" style={{ fontSize: "0.875rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "8px" }}>
-                <span>City Admin</span>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#64748b",
+                  display: "flex",
+                  gap: "6px",
+                  marginBottom: "4px",
+                  fontWeight: 700,
+                  textTransform:
+                    "uppercase",
+                  letterSpacing:
+                    "0.05em",
+                }}
+              >
+                <span>
+                  City Admin
+                </span>
+
                 <span>/</span>
-                <span style={{ color: "#1e293b", fontWeight: 500 }}>Area & Beat Management</span>
+
+                <span
+                  style={{
+                    color: "#3b82f6",
+                  }}
+                >
+                  Areas
+                </span>
               </div>
-              <h1 style={{ fontSize: "1.875rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                Area & Beat Management
+
+
+              <h1
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  margin: 0,
+                  letterSpacing:
+                    "-0.01em",
+                }}
+              >
+                Areas
               </h1>
-              <p style={{ marginTop: "8px", color: "#64748b", fontSize: "1rem" }}>
-                Upload KML files and manage street-level beats across city zones.
+
+
+              <p
+                style={{
+                  marginTop: "2px",
+                  color: "#64748b",
+                  fontSize:
+                    "0.8125rem",
+                  fontWeight: 500,
+                }}
+              >
+                Manage registered
+                city areas.
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => setDownloadOpen(!downloadOpen)}
-                  style={{
-                    height: "48px", width: "48px", borderRadius: "12px", border: "1px solid #e2e8f0", backgroundColor: "white",
-                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                    transition: "all 0.2s"
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#f8fafc"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
-                  title="Download List"
-                >
-                  <Download size={20} color="#475569" />
-                </button>
-                {downloadOpen && (
-                  <div style={{
-                    position: "absolute", top: "56px", right: 0, backgroundColor: "white", border: "1px solid #e2e8f0",
-                    borderRadius: "12px", padding: "8px", width: "180px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
-                    zIndex: 50, display: "flex", flexDirection: "column", gap: "4px"
-                  }}>
-                    <button
-                      onClick={() => { alert("Export to Excel/CSV functionality pending"); setDownloadOpen(false); }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: "10px", width: "100%", padding: "10px 12px",
-                        border: "none", background: "transparent", cursor: "pointer", borderRadius: "8px", fontSize: "0.875rem",
-                        fontWeight: 600, color: "#475569", textAlign: "left", transition: "all 0.2s"
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#f1f5f9"; e.currentTarget.style.color = "#0f172a"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "#475569"; }}
-                    >
-                      <FileSpreadsheet size={16} color="#10b981" />
-                      Excel / CSV
-                    </button>
-                    <button
-                      onClick={() => { alert("Export to PDF functionality pending"); setDownloadOpen(false); }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: "10px", width: "100%", padding: "10px 12px",
-                        border: "none", background: "transparent", cursor: "pointer", borderRadius: "8px", fontSize: "0.875rem",
-                        fontWeight: 600, color: "#475569", textAlign: "left", transition: "all 0.2s"
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#f1f5f9"; e.currentTarget.style.color = "#0f172a"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "#475569"; }}
-                    >
-                      <FileText size={16} color="#ef4444" />
-                      PDF
-                    </button>
-                  </div>
+
+            {/* AREA ACTIONS */}
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
+
+              {/* EXPORT */}
+
+              <TableExportDropdown
+                data={filteredAreas.map(
+                  (area, index) => ({
+                    SrNo:
+                      index + 1,
+
+                    AreaName:
+                      area.name ||
+                      "-",
+
+                    AreaType:
+                      area.areaTypeLabel ||
+                      "-",
+
+                    CityName:
+                      user?.city?.name ||
+                      "Indore",
+
+                    Zone:
+                      area.zoneName ||
+                      "-",
+
+                    Ward:
+                      area.wardName ||
+                      "-",
+
+                    CreatedOn:
+                      area.createdAt
+                        ? new Date(
+                            area.createdAt
+                          ).toLocaleDateString(
+                            "en-GB"
+                          )
+                        : "-",
+                  })
                 )}
-              </div>
+                filename="Registered_Areas"
+                title="Registered Areas Report"
+              />
+
+
+              {/* CREATE AREA */}
+
               {!isReadOnly && (
-                <>
-                  <Link
-                    href="/city/beat-requests"
-                    style={{
-                      height: "48px",
-                      borderRadius: "12px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      fontWeight: 700,
-                      padding: "0 20px",
-                      backgroundColor: pendingCount > 0 ? "#fef3c7" : "white",
-                      border: pendingCount > 0 ? "1px solid #fde68a" : "1px solid #e2e8f0",
-                      color: pendingCount > 0 ? "#b45309" : "#0f172a",
-                      textDecoration: "none",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                    }}
-                  >
-                    <FileText size={18} />
-                    Beat Requests
-                    {pendingCount > 0 && (
-                      <span
-                        style={{
-                          backgroundColor: "#d97706",
-                          color: "white",
-                          borderRadius: "9999px",
-                          padding: "2px 8px",
-                          fontSize: "0.75rem",
-                          fontWeight: 800
-                        }}
-                      >
-                        {pendingCount}
-                      </span>
-                    )}
-                  </Link>
-                  <Link
-                    href="/city/areas/employee-assignments"
-                    style={{ height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, padding: "0 20px", backgroundColor: "white", border: "1px solid #e2e8f0", color: "#0f172a", textDecoration: "none" }}
-                  >
-                    <ShieldCheck size={18} />
-                    Employee Deployment
-                  </Link>
-                  <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="btn btn-primary"
-                    style={{ height: "48px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, padding: "0 24px" }}
-                  >
-                    <Plus size={18} />
-                    Create Area & Beat
-                  </button>
-                </>
+                <button
+                  onClick={() =>
+                    setShowCreateArea(
+                      true
+                    )
+                  }
+                  style={{
+                    display: "flex",
+                    alignItems:
+                      "center",
+                    gap: "6px",
+                    height: "40px",
+                    padding:
+                      "0 16px",
+                    borderRadius:
+                      "10px",
+                    backgroundColor:
+                      "#3b82f6",
+                    border: "none",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize:
+                      "0.8rem",
+                    cursor:
+                      "pointer",
+                    transition:
+                      "all 0.15s",
+                    boxShadow:
+                      "0 4px 12px rgba(59,130,246,0.2)",
+                  }}
+                >
+                  <Plus
+                    size={15}
+                  />
+
+                  Create Area
+                </button>
               )}
             </div>
           </div>
 
 
-          {/* Stats & Search Controls */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: "24px", alignItems: "flex-end", marginBottom: "32px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
-              {[
-                { label: "Total Beats", count: stats.total, icon: Target, color: "#2563eb", bg: "#eff6ff", border: "#dbeafe" },
-                { label: "Supervisors Assigned", count: stats.withQC, icon: ShieldCheck, color: "#059669", bg: "#f0fdf4", border: "#dcfce7" },
-                { label: "Field Active", count: stats.withField, icon: Activity, color: "#dc2626", bg: "#fef2f2", border: "#fee2e2" },
-              ].map((s, i) => (
-                <div key={i} style={{
-                  backgroundColor: "white", padding: "16px 20px", borderRadius: "20px", border: "1px solid #e2e8f0",
-                  display: "flex", alignItems: "center", gap: "16px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.02)"
-                }}>
-                  <div style={{ backgroundColor: s.bg, color: s.color, width: "48px", height: "48px", borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${s.border}` }}>
-                    <s.icon size={22} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
-                    <div style={{ fontSize: "1.25rem", fontWeight: 900, color: "#0f172a", lineHeight: 1.1 }}>{s.count}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* =================================================
+              TOTAL AREAS CARD
+          ================================================= */}
 
-            <div style={{ position: "relative" }}>
-              <Search size={18} color="#94a3b8" style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)" }} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "minmax(260px, 1fr)",
+              maxWidth: "420px",
+              gap: "16px",
+              marginBottom:
+                "24px",
+            }}
+          >
+            <div
+              style={{
+                backgroundColor:
+                  "white",
+                padding:
+                  "14px 18px",
+                borderRadius:
+                  "16px",
+                border:
+                  "1px solid #e2e8f0",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                gap: "14px",
+                boxShadow:
+                  "0 1px 3px rgba(0,0,0,0.03)",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor:
+                    "#eff6ff",
+                  color:
+                    "#2563eb",
+                  width:
+                    "42px",
+                  height:
+                    "42px",
+                  borderRadius:
+                    "12px",
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
+                  border:
+                    "1px solid #dbeafe",
+                }}
+              >
+                <MapPin
+                  size={20}
+                />
+              </div>
+
+
+              <div>
+                <div
+                  style={{
+                    fontSize:
+                      "0.6875rem",
+                    fontWeight:
+                      800,
+                    color:
+                      "#64748b",
+                    textTransform:
+                      "uppercase",
+                    letterSpacing:
+                      "0.05em",
+                  }}
+                >
+                  Total Registered Areas
+                </div>
+
+                <div
+                  style={{
+                    fontSize:
+                      "1.2rem",
+                    fontWeight:
+                      900,
+                    color:
+                      "#0f172a",
+                    lineHeight:
+                      1.1,
+                  }}
+                >
+                  {areas.length}
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+          {/* =================================================
+              SEARCH
+          ================================================= */}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "flex-end",
+              alignItems:
+                "center",
+              gap: "16px",
+              flexWrap:
+                "wrap",
+              marginBottom:
+                "20px",
+            }}
+          >
+            <div
+              style={{
+                position:
+                  "relative",
+                minWidth:
+                  "300px",
+              }}
+            >
+              <Search
+                size={16}
+                color="#94a3b8"
+                style={{
+                  position:
+                    "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform:
+                    "translateY(-50%)",
+                }}
+              />
+
               <input
                 type="text"
-                placeholder="Search beats, zones or areas..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search areas, type, city, zone or ward..."
+                value={
+                  searchQuery
+                }
+                onChange={(e) =>
+                  setSearchQuery(
+                    e.target.value
+                  )
+                }
                 style={{
-                  width: "100%", height: "52px", padding: "0 16px 0 48px", borderRadius: "18px", border: "1.5px solid #e2e8f0",
-                  fontSize: "0.95rem", fontWeight: 500, outline: "none", transition: "all 0.2s",
-                  backgroundColor: "white", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)"
+                  width: "100%",
+                  padding:
+                    "8px 12px 8px 36px",
+                  borderRadius:
+                    "12px",
+                  border:
+                    "1px solid #cbd5e1",
+                  fontSize:
+                    "0.8125rem",
+                  fontWeight:
+                    700,
+                  outline:
+                    "none",
+                  backgroundColor:
+                    "white",
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#2563eb"; e.currentTarget.style.boxShadow = "0 0 0 4px rgba(37, 99, 235, 0.08)"; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.03)"; }}
               />
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "32px", width: "100%" }}>
-            {isModalOpen && (
-              <div style={{
-                position: "fixed",
-                top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: "rgba(15, 23, 42, 0.4)",
-                backdropFilter: "blur(4px)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "24px"
-              }}>
-                <div className="card" style={{
-                  padding: 0,
-                  overflow: "hidden",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "24px",
-                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                  margin: 0,
-                  width: "100%",
-                  maxWidth: "1000px",
-                  maxHeight: "90vh",
-                  display: "flex",
-                  flexDirection: "column",
-                  backgroundColor: "white"
-                }}>
-                  <div style={{
-                    padding: "24px 32px",
-                    borderBottom: "1px solid #f1f5f9",
-                    backgroundColor: "#fcfdfe",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    flexShrink: 0
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <MapPin size={20} color="#2563eb" />
-                      <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>Create Area & Beat</h2>
-                    </div>
-                    <button
-                      onClick={() => setIsModalOpen(false)}
-                      style={{
-                        border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer", padding: "4px",
-                        display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "8px", transition: "all 0.2s"
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#f1f5f9"; e.currentTarget.style.color = "#ef4444"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "#94a3b8"; }}
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
 
-                  <div style={{ overflowY: "auto", flex: 1, padding: "32px", backgroundColor: "#f8fafc" }}>
-                    <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "32px", alignItems: "start" }}>
-                      <AreaForm onSuccess={() => setGeoVersion(v => v + 1)} />
-                      <BeatForm onSuccess={() => { setIsModalOpen(false); loadBeats(); }} geoVersion={geoVersion} />
-                    </section>
-                  </div>
+          {/* =================================================
+              CREATE AREA MODAL
+          ================================================= */}
+
+          {!isReadOnly &&
+            showCreateArea && (
+              <div
+                style={{
+                  position:
+                    "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor:
+                    "rgba(15,23,42,0.4)",
+                  backdropFilter:
+                    "blur(4px)",
+                  zIndex: 100,
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
+                  padding:
+                    "24px",
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor:
+                      "white",
+                    padding:
+                      "32px",
+                    borderRadius:
+                      "24px",
+                    border:
+                      "1px solid #e2e8f0",
+                    boxShadow:
+                      "0 25px 50px -12px rgba(0,0,0,0.15)",
+                    position:
+                      "relative",
+                    width:
+                      "100%",
+                    maxWidth:
+                      "560px",
+                    overflowY:
+                      "auto",
+                    maxHeight:
+                      "90vh",
+                  }}
+                >
+                  <button
+                    onClick={() =>
+                      setShowCreateArea(
+                        false
+                      )
+                    }
+                    style={{
+                      position:
+                        "absolute",
+                      top:
+                        "20px",
+                      right:
+                        "20px",
+                      background:
+                        "transparent",
+                      border:
+                        "none",
+                      cursor:
+                        "pointer",
+                      color:
+                        "#64748b",
+                      zIndex:
+                        2,
+                    }}
+                  >
+                    <X
+                      size={20}
+                    />
+                  </button>
+
+
+                  <AreaForm
+                    onSuccess={async () => {
+                      await loadAreas();
+
+                      setShowCreateArea(
+                        false
+                      );
+                    }}
+                  />
                 </div>
               </div>
             )}
 
-            <section>
-              {loading ? (
-                <div style={{ padding: "40px", textAlign: "center", backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0" }}>
-                  <div className="animate-spin" style={{ width: "32px", height: "32px", border: "4px solid #f3f3f3", borderTop: "4px solid #2563eb", borderRadius: "50%", margin: "0 auto" }}></div>
-                  <p style={{ marginTop: "16px", color: "#64748b", fontWeight: 600 }}>Loading beats dashboard...</p>
+
+          {/* =================================================
+              DELETE AREA CONFIRMATION
+          ================================================= */}
+
+          {deleteAreaTarget && (
+            <div
+              style={{
+                position:
+                  "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor:
+                  "rgba(15,23,42,0.4)",
+                backdropFilter:
+                  "blur(4px)",
+                zIndex:
+                  110,
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "center",
+                padding:
+                  "24px",
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor:
+                    "white",
+                  borderRadius:
+                    "20px",
+                  border:
+                    "1px solid #e2e8f0",
+                  padding:
+                    "28px",
+                  maxWidth:
+                    "420px",
+                  width:
+                    "100%",
+                  boxShadow:
+                    "0 20px 25px -5px rgba(0,0,0,0.1)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize:
+                      "1.1rem",
+                    fontWeight:
+                      900,
+                    color:
+                      "#0f172a",
+                    marginBottom:
+                      "8px",
+                  }}
+                >
+                  Delete Area (
+                  {
+                    deleteAreaTarget.name
+                  }
+                  )?
                 </div>
-              ) : (
-                <BeatTable
-                  beats={filteredBeats}
-                  onRefresh={loadBeats}
-                  onView={setViewingBeat}
-                  onEdit={setEditingBeat}
-                  onViewData={setInspectingBeat}
-                  onAssign={setAssigningBeat}
-                  onAssignEmployees={setDeployingBeat}
-                  onViewUser={(beat) => setDeployingBeat(beat)}
-                  assignmentActionLabel="Assign Supervisor"
-                  isReadOnly={isReadOnly}
+
+
+                <p
+                  style={{
+                    fontSize:
+                      "0.85rem",
+                    color:
+                      "#64748b",
+                    fontWeight:
+                      600,
+                    lineHeight:
+                      1.5,
+                    marginBottom:
+                      "20px",
+                  }}
+                >
+                  Are you sure you
+                  want to delete this
+                  area? This action
+                  cannot be undone.
+                </p>
+
+
+                <div
+                  style={{
+                    display:
+                      "flex",
+                    justifyContent:
+                      "flex-end",
+                    gap:
+                      "10px",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDeleteAreaTarget(
+                        null
+                      )
+                    }
+                    style={{
+                      padding:
+                        "8px 16px",
+                      borderRadius:
+                        "10px",
+                      border:
+                        "1px solid #cbd5e1",
+                      backgroundColor:
+                        "white",
+                      color:
+                        "#475569",
+                      fontSize:
+                        "0.8125rem",
+                      fontWeight:
+                        700,
+                      cursor:
+                        "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+
+                  <button
+                    type="button"
+                    onClick={
+                      confirmDeleteArea
+                    }
+                    disabled={
+                      deletingAreaId ===
+                      deleteAreaTarget.id
+                    }
+                    style={{
+                      padding:
+                        "8px 18px",
+                      borderRadius:
+                        "10px",
+                      border:
+                        "none",
+                      backgroundColor:
+                        "#dc2626",
+                      color:
+                        "white",
+                      fontSize:
+                        "0.8125rem",
+                      fontWeight:
+                        800,
+                      cursor:
+                        "pointer",
+                    }}
+                  >
+                    {deletingAreaId ===
+                    deleteAreaTarget.id
+                      ? "Deleting..."
+                      : "Delete Area"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* =================================================
+              REGISTERED AREAS
+          ================================================= */}
+
+          <section>
+            {loading ? (
+              <div
+                style={{
+                  padding:
+                    "40px",
+                  textAlign:
+                    "center",
+                  backgroundColor:
+                    "white",
+                  borderRadius:
+                    "20px",
+                  border:
+                    "1px solid #e2e8f0",
+                }}
+              >
+                <div
+                  className="animate-spin"
+                  style={{
+                    width:
+                      "32px",
+                    height:
+                      "32px",
+                    border:
+                      "4px solid #f3f3f3",
+                    borderTop:
+                      "4px solid #2563eb",
+                    borderRadius:
+                      "50%",
+                    margin:
+                      "0 auto",
+                  }}
                 />
-              )}
-            </section>
-          </div>
+
+                <p
+                  style={{
+                    marginTop:
+                      "16px",
+                    color:
+                      "#64748b",
+                    fontWeight:
+                      600,
+                  }}
+                >
+                  Loading areas...
+                </p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  backgroundColor:
+                    "white",
+                  border:
+                    "1px solid #e2e8f0",
+                  borderRadius:
+                    "20px",
+                  overflow:
+                    "hidden",
+                  boxShadow:
+                    "0 2px 4px rgba(0,0,0,0.02)",
+                }}
+              >
+
+                {/* TABLE TITLE */}
+
+                <div
+                  style={{
+                    padding:
+                      "18px 24px",
+                    borderBottom:
+                      "1px solid #f1f5f9",
+                    backgroundColor:
+                      "#fcfdfe",
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin:
+                        0,
+                      fontSize:
+                        "0.95rem",
+                      fontWeight:
+                        900,
+                      color:
+                        "#0f172a",
+                      textTransform:
+                        "uppercase",
+                      letterSpacing:
+                        "0.04em",
+                    }}
+                  >
+                    Registered Areas (
+                    {
+                      filteredAreas.length
+                    }
+                    )
+                  </h3>
+                </div>
+
+
+                <div
+                  style={{
+                    overflowX:
+                      "auto",
+                  }}
+                >
+                  <table
+                    style={{
+                      width:
+                        "100%",
+                      minWidth:
+                        "1050px",
+                      borderCollapse:
+                        "collapse",
+                      textAlign:
+                        "left",
+                    }}
+                  >
+
+                    {/* =========================================
+                        TABLE HEADER
+                    ========================================= */}
+
+                    <thead
+                      style={{
+                        backgroundColor:
+                          "#f8fafc",
+                        borderBottom:
+                          "1px solid #e2e8f0",
+                      }}
+                    >
+                      <tr>
+
+                        <th
+                          style={
+                            headerCell
+                          }
+                        >
+                          Sr No
+                        </th>
+
+
+                        <th
+                          style={
+                            headerCell
+                          }
+                        >
+                          Area Name
+                        </th>
+
+
+                        <th
+                          style={
+                            headerCell
+                          }
+                        >
+                          Area Type
+                        </th>
+
+
+                        {/* CITY BEFORE ZONE */}
+
+                        <th
+                          style={
+                            headerCell
+                          }
+                        >
+                          City Name
+                        </th>
+
+
+                        <th
+                          style={
+                            headerCell
+                          }
+                        >
+                          Zone
+                        </th>
+
+
+                        <th
+                          style={
+                            headerCell
+                          }
+                        >
+                          Ward
+                        </th>
+
+
+                        <th
+                          style={
+                            headerCell
+                          }
+                        >
+                          Registered On
+                        </th>
+
+
+                        <th
+                          style={{
+                            ...headerCell,
+                            textAlign:
+                              "right",
+                          }}
+                        >
+                          Actions
+                        </th>
+
+                      </tr>
+                    </thead>
+
+
+                    {/* =========================================
+                        TABLE BODY
+                    ========================================= */}
+
+                    <tbody>
+
+                      {filteredAreas.length ===
+                      0 ? (
+
+                        <tr>
+                          <td
+                            colSpan={
+                              8
+                            }
+                            style={{
+                              padding:
+                                "40px",
+                              textAlign:
+                                "center",
+                              color:
+                                "#94a3b8",
+                              fontWeight:
+                                600,
+                            }}
+                          >
+                            No matching areas found.
+                          </td>
+                        </tr>
+
+                      ) : (
+
+                        filteredAreas.map(
+                          (
+                            area,
+                            index
+                          ) => {
+
+                            const createdDate =
+                              area.createdAt
+                                ? new Date(
+                                    area.createdAt
+                                  ).toLocaleDateString(
+                                    "en-GB",
+                                    {
+                                      day:
+                                        "2-digit",
+                                      month:
+                                        "short",
+                                      year:
+                                        "numeric",
+                                    }
+                                  )
+                                : "—";
+
+
+                            const createdTime =
+                              area.createdAt
+                                ? new Date(
+                                    area.createdAt
+                                  ).toLocaleTimeString(
+                                    "en-IN",
+                                    {
+                                      hour:
+                                        "2-digit",
+                                      minute:
+                                        "2-digit",
+                                      hour12:
+                                        true,
+                                    }
+                                  )
+                                : "";
+
+
+                            return (
+                              <tr
+                                key={
+                                  area.id
+                                }
+                                style={{
+                                  borderBottom:
+                                    "1px solid #f1f5f9",
+                                }}
+                              >
+
+                                {/* SR NO */}
+
+                                <td
+                                  style={
+                                    tableCell
+                                  }
+                                >
+                                  {
+                                    index +
+                                    1
+                                  }
+                                </td>
+
+
+                                {/* AREA NAME */}
+
+                                <td
+                                  style={{
+                                    ...tableCell,
+                                    fontSize:
+                                      "0.875rem",
+                                    fontWeight:
+                                      800,
+                                    color:
+                                      "#0f172a",
+                                  }}
+                                >
+                                  {
+                                    area.name
+                                  }
+                                </td>
+
+
+                                {/* AREA TYPE */}
+
+                                <td
+                                  style={
+                                    tableCell
+                                  }
+                                >
+                                  <span
+                                    style={{
+                                      display:
+                                        "inline-flex",
+                                      alignItems:
+                                        "center",
+                                      padding:
+                                        "5px 9px",
+                                      borderRadius:
+                                        "999px",
+                                      backgroundColor:
+                                        "#eff6ff",
+                                      border:
+                                        "1px solid #dbeafe",
+                                      color:
+                                        "#2563eb",
+                                      fontSize:
+                                        "0.7rem",
+                                      fontWeight:
+                                        800,
+                                      whiteSpace:
+                                        "nowrap",
+                                    }}
+                                  >
+                                    {
+                                      area.areaTypeLabel ||
+                                      "-"
+                                    }
+                                  </span>
+                                </td>
+
+
+                                {/* CITY */}
+
+                                <td
+                                  style={{
+                                    ...tableCell,
+                                    fontWeight:
+                                      700,
+                                    color:
+                                      "#334155",
+                                  }}
+                                >
+                                  {user
+                                    ?.city
+                                    ?.name ||
+                                    "Indore"}
+                                </td>
+
+
+                                {/* ZONE */}
+
+                                <td
+                                  style={{
+                                    ...tableCell,
+                                    fontWeight:
+                                      700,
+                                    color:
+                                      "#334155",
+                                  }}
+                                >
+                                  {
+                                    area.zoneName ||
+                                    "-"
+                                  }
+                                </td>
+
+
+                                {/* WARD */}
+
+                                <td
+                                  style={{
+                                    ...tableCell,
+                                    fontWeight:
+                                      700,
+                                    color:
+                                      "#334155",
+                                  }}
+                                >
+                                  {
+                                    area.wardName ||
+                                    "-"
+                                  }
+                                </td>
+
+
+                                {/* REGISTERED ON */}
+
+                                <td
+                                  style={
+                                    tableCell
+                                  }
+                                >
+                                  <div
+                                    style={{
+                                      display:
+                                        "flex",
+                                      flexDirection:
+                                        "column",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontSize:
+                                          "0.8125rem",
+                                        fontWeight:
+                                          700,
+                                        color:
+                                          "#1e293b",
+                                      }}
+                                    >
+                                      {
+                                        createdDate
+                                      }
+                                    </span>
+
+                                    <span
+                                      style={{
+                                        fontSize:
+                                          "0.7rem",
+                                        fontWeight:
+                                          600,
+                                        color:
+                                          "#94a3b8",
+                                      }}
+                                    >
+                                      {
+                                        createdTime
+                                      }
+                                    </span>
+                                  </div>
+                                </td>
+
+
+                                {/* ACTIONS */}
+
+                                <td
+                                  style={{
+                                    ...tableCell,
+                                    textAlign:
+                                      "right",
+                                    position:
+                                      "relative",
+                                  }}
+                                >
+                                  {!isReadOnly && (
+                                    <div className="group relative inline-block text-left">
+
+                                      <button
+                                        style={{
+                                          background:
+                                            "transparent",
+                                          border:
+                                            "none",
+                                          cursor:
+                                            "pointer",
+                                          color:
+                                            "#64748b",
+                                          padding:
+                                            "4px",
+                                        }}
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="16"
+                                          height="16"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        >
+                                          <circle
+                                            cx="12"
+                                            cy="12"
+                                            r="1"
+                                          />
+
+                                          <circle
+                                            cx="12"
+                                            cy="5"
+                                            r="1"
+                                          />
+
+                                          <circle
+                                            cx="12"
+                                            cy="19"
+                                            r="1"
+                                          />
+                                        </svg>
+                                      </button>
+
+
+                                      <div className="hidden group-hover:flex absolute right-0 top-full mt-1 w-32 flex-col rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-50">
+
+                                        <button
+                                          onClick={() =>
+                                            alert(
+                                              "Edit functionality pending"
+                                            )
+                                          }
+                                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition w-full text-left"
+                                        >
+                                          Edit Area
+                                        </button>
+
+
+                                        <button
+                                          onClick={() =>
+                                            setDeleteAreaTarget(
+                                              {
+                                                id:
+                                                  area.id,
+                                                name:
+                                                  area.name,
+                                              }
+                                            )
+                                          }
+                                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition w-full text-left"
+                                        >
+                                          Delete Area
+                                        </button>
+
+                                      </div>
+
+                                    </div>
+                                  )}
+                                </td>
+
+                              </tr>
+                            );
+                          }
+                        )
+                      )}
+
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
 
         </div>
 
-        {/* Modals */}
-        {viewingBeat && (
-          <BeatMapView
-            beat={viewingBeat}
-            onClose={() => setViewingBeat(null)}
-            onEdit={(b: any) => { setViewingBeat(null); setEditingBeat(b); }}
-            onRefresh={loadBeats}
-          />
-        )}
-
-        {editingBeat && (
-          <EditBeatModal
-            beat={editingBeat}
-            onClose={() => setEditingBeat(null)}
-            onSuccess={loadBeats}
-          />
-        )}
-
-        {inspectingBeat && (
-          <KMLDataViewer
-            beat={inspectingBeat}
-            onClose={() => setInspectingBeat(null)}
-          />
-        )}
-
-        {assigningBeat && (
-          <AssignBeatModal
-            beat={assigningBeat}
-            mode="SUPERVISOR"
-            onClose={() => setAssigningBeat(null)}
-            onSuccess={loadBeats}
-          />
-        )}
-
-        {deployingBeat && (
-          <AssignBeatModal
-            beat={deployingBeat}
-            mode="EMPLOYEE"
-            onClose={() => setDeployingBeat(null)}
-            onSuccess={loadBeats}
-          />
-        )}
 
         <style jsx>{`
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+          .animate-spin {
+            animation: spin 1s linear infinite;
+          }
+
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+
       </div>
-    </RoleGuard >
+    </RoleGuard>
   );
 }
+
+
+/* ===========================================================
+   TABLE STYLES
+=========================================================== */
+
+const headerCell:
+  React.CSSProperties = {
+    padding:
+      "12px 14px",
+    fontSize:
+      "0.7rem",
+    fontWeight:
+      900,
+    color:
+      "#475569",
+    textTransform:
+      "uppercase",
+    letterSpacing:
+      "0.05em",
+    whiteSpace:
+      "nowrap",
+  };
+
+
+const tableCell:
+  React.CSSProperties = {
+    padding:
+      "14px 14px",
+    fontSize:
+      "0.8125rem",
+    color:
+      "#475569",
+    verticalAlign:
+      "middle",
+    whiteSpace:
+      "nowrap",
+  };

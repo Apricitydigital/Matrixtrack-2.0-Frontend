@@ -8,15 +8,17 @@ import { Topbar } from "@components/ui/Topbar";
 
 const STANDALONE_PATHS = [
   "/",
-  "/login",
-  "/register",
   "/unified-login",
+  "/register",
   "/create-account",
   "/applications",
   "/portal-home",
+  "/city",
   "/ward-ranking",
   "/workforce-monitoring",
   "/admin-management",
+  "/employees",
+  "/modules",
 ];
 
 export function AppShell({
@@ -101,7 +103,7 @@ export function AppShell({
           </button>
 
           <span className="text-sm font-bold text-slate-800">
-            Taskforce 20
+            MatrixTrack 2.0
           </span>
         </div>
 

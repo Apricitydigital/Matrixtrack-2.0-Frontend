@@ -1,4 +1,4 @@
-import type { AccessLevel } from "../app/admin-management/page";
+import type { AccessLevel } from "../app/portal-home/admin-management/page";
 
 export interface UserModulePermissions {
   id: string;

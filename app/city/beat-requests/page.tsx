@@ -21,6 +21,7 @@ import {
   History,
   Filter
 } from "lucide-react";
+import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import dynamic from "next/dynamic";
 import "leaflet/dist/leaflet.css";
 
@@ -359,6 +360,20 @@ export default function BeatRequestsPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <TableExportDropdown 
+                data={filteredRequests.map(r => ({
+                  BeatName: r.beatName,
+                  BeatCode: r.beatCode || '-',
+                  Zone: r.zoneName || '-',
+                  Ward: r.wardName || '-',
+                  Area: r.areaName || '-',
+                  RequestedBy: r.requestedBy?.name || '-',
+                  Role: r.requestedByRole || '-',
+                  Status: r.status || 'PENDING'
+                }))}
+                filename="Beat_Requests_History"
+                title="Beat Requests & History Report"
+              />
               <button
                 onClick={loadRequests}
                 style={{
@@ -387,97 +402,74 @@ export default function BeatRequestsPage() {
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "24px",
-              borderBottom: "1px solid #e2e8f0",
-              paddingBottom: "12px",
-              overflowX: "auto"
+              gap: "12px",
+              marginBottom: "28px",
+              overflowX: "auto",
+              paddingBottom: "8px",
+              scrollbarWidth: "none"
             }}
           >
-            <button
-              onClick={() => setActiveTab("PENDING_QC")}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "12px",
-                border: "none",
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: activeTab === "PENDING_QC" ? "#2563eb" : "#f1f5f9",
-                color: activeTab === "PENDING_QC" ? "white" : "#475569",
-                transition: "all 0.2s"
-              }}
-            >
-              <Clock size={16} />
-              Pending Requests ({counts.pending})
-            </button>
-
-            <button
-              onClick={() => setActiveTab("APPROVED")}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "12px",
-                border: "none",
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: activeTab === "APPROVED" ? "#16a34a" : "#f1f5f9",
-                color: activeTab === "APPROVED" ? "white" : "#475569",
-                transition: "all 0.2s"
-              }}
-            >
-              <CheckCircle2 size={16} />
-              Approved History ({counts.approved})
-            </button>
-
-            <button
-              onClick={() => setActiveTab("REJECTED")}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "12px",
-                border: "none",
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: activeTab === "REJECTED" ? "#dc2626" : "#f1f5f9",
-                color: activeTab === "REJECTED" ? "white" : "#475569",
-                transition: "all 0.2s"
-              }}
-            >
-              <XCircle size={16} />
-              Rejected History ({counts.rejected})
-            </button>
-
-            <button
-              onClick={() => setActiveTab("ALL")}
-              style={{
-                padding: "10px 20px",
-                borderRadius: "12px",
-                border: "none",
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: activeTab === "ALL" ? "#0f172a" : "#f1f5f9",
-                color: activeTab === "ALL" ? "white" : "#475569",
-                transition: "all 0.2s"
-              }}
-            >
-              <History size={16} />
-              All Records ({counts.all})
-            </button>
+            {[
+              { id: "PENDING_QC", label: "Pending Requests", count: counts.pending, icon: <Clock size={16} />, color: "#eab308", bg: "#fefce8" },
+              { id: "APPROVED", label: "Approved History", count: counts.approved, icon: <CheckCircle2 size={16} />, color: "#10b981", bg: "#ecfdf5" },
+              { id: "REJECTED", label: "Rejected History", count: counts.rejected, icon: <XCircle size={16} />, color: "#ef4444", bg: "#fef2f2" },
+              { id: "ALL", label: "All Records", count: counts.all, icon: <History size={16} />, color: "#6366f1", bg: "#eef2ff" }
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "9999px",
+                    border: isActive ? `1.5px solid ${tab.color}` : "1.5px solid transparent",
+                    fontSize: "0.9rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    backgroundColor: isActive ? tab.bg : "rgba(255, 255, 255, 0.6)",
+                    color: isActive ? tab.color : "#64748b",
+                    boxShadow: isActive ? `0 4px 12px ${tab.color}30` : "0 2px 4px rgba(0,0,0,0.02)",
+                    backdropFilter: "blur(12px)",
+                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                    transform: isActive ? "scale(1.02)" : "scale(1)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = "white";
+                      e.currentTarget.style.color = "#334155";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.05)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.6)";
+                      e.currentTarget.style.color = "#64748b";
+                      e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.02)";
+                    }
+                  }}
+                >
+                  {React.cloneElement(tab.icon, { color: isActive ? tab.color : "currentColor" })}
+                  {tab.label}
+                  <span
+                    style={{
+                      backgroundColor: isActive ? tab.color : "#e2e8f0",
+                      color: isActive ? "white" : "#475569",
+                      padding: "2px 8px",
+                      borderRadius: "999px",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      marginLeft: "4px"
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Action Success Alert Banner */}
@@ -620,18 +612,38 @@ export default function BeatRequestsPage() {
                   <div
                     key={req.id}
                     style={{
-                      backgroundColor: "white",
-                      borderRadius: "20px",
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      backdropFilter: "blur(12px)",
+                      borderRadius: "24px",
                       border: "1px solid",
-                      borderColor: isApproved ? "#bbf7d0" : isRejected ? "#fecaca" : "#e2e8f0",
+                      borderColor: isApproved ? "rgba(16, 185, 129, 0.3)" : isRejected ? "rgba(239, 68, 68, 0.3)" : "rgba(226, 232, 240, 0.8)",
                       padding: "24px",
-                      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.03)",
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
-                      transition: "all 0.2s"
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      position: "relative",
+                      overflow: "hidden"
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-4px)";
+                      e.currentTarget.style.boxShadow = "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)";
                     }}
                   >
+                    {/* Decorative Gradient Background */}
+                    <div style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: "4px",
+                      background: isApproved ? "linear-gradient(90deg, #10b981, #34d399)" : isRejected ? "linear-gradient(90deg, #ef4444, #f87171)" : "linear-gradient(90deg, #3b82f6, #60a5fa)",
+                    }} />
                     <div>
                       {/* Top Row */}
                       <div
@@ -647,21 +659,23 @@ export default function BeatRequestsPage() {
                             style={{
                               fontSize: "0.75rem",
                               fontWeight: 800,
-                              color: "#2563eb",
-                              backgroundColor: "#eff6ff",
-                              padding: "4px 8px",
+                              color: isApproved ? "#10b981" : isRejected ? "#ef4444" : "#3b82f6",
+                              backgroundColor: isApproved ? "#ecfdf5" : isRejected ? "#fef2f2" : "#eff6ff",
+                              padding: "4px 10px",
                               borderRadius: "6px",
-                              letterSpacing: "0.05em"
+                              letterSpacing: "0.05em",
+                              border: `1px solid ${isApproved ? "#a7f3d0" : isRejected ? "#fecaca" : "#bfdbfe"}`
                             }}
                           >
                             {req.beatCode || "BEAT"}
                           </span>
                           <h3
                             style={{
-                              fontSize: "1.25rem",
+                              fontSize: "1.35rem",
                               fontWeight: 800,
                               color: "#0f172a",
-                              margin: "8px 0 0"
+                              margin: "12px 0 0",
+                              lineHeight: 1.2
                             }}
                           >
                             {req.beatName}

@@ -177,7 +177,8 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 export type UnifiedPortalKey =
   | "TASKFORCE_20"
   | "MATRIX_TRACK"
-  | "WARD_RANKING";
+  | "WARD_RANKING"
+  | "PROCESSING_PLANT";
 
 export type UnifiedTaskforceModuleKey =
   | "TASKFORCE"
@@ -222,6 +223,7 @@ export interface UnifiedLoginResponse {
     taskforce?: string | null;
     matrixTrack?: string | null;
     wardRanking?: string | null;
+    processingPlant?: string | null;
   };
 
   taskforce?: {
@@ -250,12 +252,16 @@ export interface UnifiedRegistrationRequest {
   phone: string;
   aadhaar: string;
   password: string;
-
+  stateId?: string;
+  divisionId?: string;
+  districtId?: string;
   cityId: string;
   zoneId?: string;
   wardId?: string;
 
-  requestedRole: UnifiedRegistrationRole;
+  applicationRoles?: Partial<Record<UnifiedPortalKey, string>>;
+
+  requestedRole?: UnifiedRegistrationRole;
 
   requestedPortals: UnifiedPortalKey[];
   taskforceModules: UnifiedTaskforceModuleKey[];
@@ -318,6 +324,9 @@ export const AuthApi = {
       requestedRole?: string;
       requestedPortals?: string[];
       taskforceModules?: string[];
+      stateId?: string;
+      divisionId?: string;
+      districtId?: string;
     }>(
       "/auth/request-unified-registration",
       {
@@ -438,6 +447,8 @@ export const CityApi = {
     apiFetch("/hms/cities", { method: "POST", body: JSON.stringify(body) }),
   update: (cityId: string, body: { stateId?: string; divisionId?: string; districtId?: string; cityMasterId?: string; name?: string; code?: string; ulbCode?: string; enabled?: boolean; adminName?: string; adminEmail?: string }) =>
     apiFetch(`/hms/cities/${cityId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  delete: (cityId: string) =>
+    apiFetch(`/hms/cities/${cityId}`, { method: "DELETE" }),
   setEnabled: (cityId: string, enabled: boolean) =>
     CityApi.update(cityId, { enabled }),
   toggleModule: (cityId: string, moduleId: string, enabled: boolean) =>
@@ -510,16 +521,41 @@ export const GeoApi = {
 export const AreaBeatApi = {
   list: () => apiFetch<{ beats: any[] }>("/city/areas"),
   listMyBeats: () => apiFetch<{ beats: any[] }>("/city/areas/my-beats"),
-  beatStatusOverview: (params?: { date?: string; status?: string }) => {
-    const sp = new URLSearchParams();
-    if (params?.date) sp.append("date", params.date);
-    if (params?.status) sp.append("status", params.status);
-    const query = sp.toString() ? `?${sp.toString()}` : "";
-    return apiFetch<{
-      beats: any[];
-      summary: { total: number; completed: number; inProgress: number; notDone: number };
-      date: string;
-    }>(`/city/areas/beat-status-overview${query}`);
+  beatStatusOverview: async (params?: { date?: string; status?: string }) => {
+    const res = await apiFetch<{ beats: any[] }>("/city/areas");
+    let beats = res.beats || [];
+
+    let total = 0, completed = 0, inProgress = 0, notDone = 0;
+    beats.forEach(beat => {
+      total++;
+      const status = beat.lastAssessment?.status || beat.status;
+      if (status === "APPROVED" || status === "COMPLETED") {
+        completed++;
+        beat.beatCompletionStatus = "COMPLETED";
+      } else if (status === "PENDING" || status === "IN_PROGRESS" || status === "PENDING_QC") {
+        inProgress++;
+        beat.beatCompletionStatus = "IN_PROGRESS";
+      } else {
+        notDone++;
+        beat.beatCompletionStatus = "NOT_DONE";
+      }
+    });
+
+    if (params?.status && params.status !== "ALL") {
+      beats = beats.filter(beat => {
+        const status = beat.lastAssessment?.status || beat.status;
+        if (params.status === "COMPLETED") return status === "APPROVED" || status === "COMPLETED";
+        if (params.status === "IN_PROGRESS") return status === "PENDING" || status === "IN_PROGRESS" || status === "PENDING_QC";
+        if (params.status === "NOT_DONE") return !status || status === "REJECTED" || status === "ACTION_REQUIRED" || status === "PENDING_ASSIGNMENT";
+        return true;
+      });
+    }
+
+    return {
+      beats,
+      summary: { total, completed, inProgress, notDone },
+      date: params?.date || new Date().toISOString()
+    };
   },
   listPendingRequests: (status?: string) =>
     apiFetch<{ pendingBeats: any[]; counts?: { pending: number; approved: number; rejected: number; all: number } }>(
@@ -559,9 +595,80 @@ export const AreaBeatApi = {
 };
 
 export const PublicGeoApi = {
-  cities: () => apiFetch<{ cities: { id: string; name: string }[] }>("/public/cities"),
-  zones: (cityId: string) => apiFetch<{ zones: { id: string; name: string }[] }>(`/public/cities/${cityId}/zones`),
-  wards: (zoneId: string) => apiFetch<{ wards: { id: string; name: string }[] }>(`/public/zones/${zoneId}/wards`)
+  states: () =>
+    apiFetch<{
+      states: {
+        id: string;
+        code: string;
+        name: string;
+      }[];
+    }>("/public/locations/states"),
+
+  divisions: (stateId: string) =>
+    apiFetch<{
+      divisions: {
+        id: string;
+        code: string;
+        name: string;
+        stateId: string;
+      }[];
+    }>(
+      `/public/locations/divisions?stateId=${encodeURIComponent(stateId)}`
+    ),
+
+  districts: (stateId: string, divisionId: string) =>
+    apiFetch<{
+      districts: {
+        id: string;
+        code: string;
+        name: string;
+        stateId: string;
+        divisionId: string;
+      }[];
+    }>(
+      `/public/locations/districts?stateId=${encodeURIComponent(
+        stateId
+      )}&divisionId=${encodeURIComponent(divisionId)}`
+    ),
+
+  citiesByDistrict: (districtId: string) =>
+    apiFetch<{
+      cities: {
+        id: string;
+        code: string;
+        name: string;
+        stateId?: string;
+        divisionId?: string;
+        districtId?: string;
+      }[];
+    }>(
+      `/public/locations/cities?districtId=${encodeURIComponent(districtId)}`
+    ),
+
+  // Keep existing APIs for other screens
+  cities: () =>
+    apiFetch<{
+      cities: {
+        id: string;
+        name: string;
+      }[];
+    }>("/public/cities"),
+
+  zones: (cityId: string) =>
+    apiFetch<{
+      zones: {
+        id: string;
+        name: string;
+      }[];
+    }>(`/public/cities/${cityId}/zones`),
+
+  wards: (zoneId: string) =>
+    apiFetch<{
+      wards: {
+        id: string;
+        name: string;
+      }[];
+    }>(`/public/zones/${zoneId}/wards`),
 };
 
 export const CityUserApi = {
@@ -758,8 +865,21 @@ export const ToiletApi = {
 };
 
 export const ModuleRecordsApi = {
-  getRecords: (moduleKey: string, filters?: { zoneIds?: string[]; wardIds?: string[]; page?: number; limit?: number; tab?: string; fromDate?: string; toDate?: string }) => {
+  getRecords: (
+    moduleKey: string,
+    filters?: {
+      cityId?: string;
+      zoneIds?: string[];
+      wardIds?: string[];
+      page?: number;
+      limit?: number;
+      tab?: string;
+      fromDate?: string;
+      toDate?: string;
+    }
+  ) => {
     const params = new URLSearchParams();
+    if (filters?.cityId) params.append("cityId", filters.cityId);
     if (filters?.zoneIds?.length) filters.zoneIds.forEach(id => params.append("zoneIds", id));
     if (filters?.wardIds?.length) filters.wardIds.forEach(id => params.append("wardIds", id));
     if (filters?.page) params.append("page", filters.page.toString());

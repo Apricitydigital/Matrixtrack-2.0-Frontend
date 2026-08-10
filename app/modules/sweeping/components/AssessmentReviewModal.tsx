@@ -3,7 +3,33 @@
 import React, { useState } from "react";
 import { ModuleRecordsApi, StorageApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
-import { SurveyAnswersView, extractSurveyPhotos } from "../../common/SurveyAnswers";
+
+type Question = {
+    code: string;
+    label: string;
+};
+
+const SWEEPING_QUESTIONS: Question[] = [
+    { code: "Q1", label: "Is sweeping done on this beat today?" },
+    { code: "Q2", label: "How many times is sweeping done in a day?" },
+    { code: "Q3", label: "Is sweeping done as per prescribed frequency?" },
+    { code: "Q4", label: "Is the entire beat properly cleaned?" },
+    { code: "Q5", label: "Is any litter visible after sweeping?" },
+    { code: "Q6", label: "Is sanitation worker present?" },
+    { code: "Q7", label: "Is sanitation worker wearing complete PPE?" },
+    { code: "Q8", label: "Type of road" },
+    { code: "Q9", label: "Is this a major / 4 lane road?" },
+    { code: "Q10", label: "Is mechanized sweeping required?" },
+    { code: "Q11", label: "Is mechanized sweeping happening?" },
+    { code: "Q12", label: "Any Garbage Vulnerable Point observed?" },
+    { code: "Q13", label: "If yes, is GVP cleaned regularly?" },
+    { code: "Q14", label: "Any C&D waste found?" },
+    { code: "Q15", label: "Resident Name / Mobile / Address" },
+    { code: "Q16", label: "Resident says sweeping frequency" },
+    { code: "Q17", label: "Is beat cleaned as per standards?" },
+    { code: "Q18", label: "Overall cleanliness" },
+    { code: "Q19", label: "Remarks" },
+];
 
 export default function AssessmentReviewModal({ record, onClose, onRefresh }: { record: any; onClose: () => void; onRefresh: () => void }) {
     const { user } = useAuth();
@@ -67,12 +93,7 @@ export default function AssessmentReviewModal({ record, onClose, onRefresh }: { 
     };
 
     const payload = record.payload || {};
-    const surveyAnswers = payload.surveyAnswers || payload;
-    const evidencePhotos = Array.from(new Set([
-        ...extractSurveyPhotos(surveyAnswers),
-        payload.photo,
-        payload.photoUrl
-    ].filter(Boolean)));
+    const photoUrl = payload.photo || payload.photoUrl;
 
     return (
         <div className="modal-overlay" style={{
@@ -112,7 +133,23 @@ export default function AssessmentReviewModal({ record, onClose, onRefresh }: { 
                         </div>
 
                         <div style={{ fontSize: '12px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '16px', letterSpacing: '0.05em' }}>Assessment Answers</div>
-                        <SurveyAnswersView answers={surveyAnswers} compact />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {SWEEPING_QUESTIONS.map((q) => {
+                                const answer = payload[q.code];
+                                return (
+                                    <div key={q.code} style={{ paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+                                        <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: 600, marginBottom: '4px' }}>{q.label}</div>
+                                        <div style={{
+                                            fontSize: '14px',
+                                            fontWeight: 700,
+                                            color: answer === "YES" || answer === true ? '#059669' : answer === "NO" || answer === false ? '#dc2626' : '#2563eb'
+                                        }}>
+                                            {typeof answer === 'boolean' ? (answer ? "YES" : "NO") : (answer || "N/A")}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* Right Column: Image & Actions */}
@@ -129,15 +166,11 @@ export default function AssessmentReviewModal({ record, onClose, onRefresh }: { 
                             </div>
                         )}
 
-                        {evidencePhotos.length > 0 && (
+                        {photoUrl && (
                             <div>
-                                <div style={{ fontSize: '12px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Evidence Photos ({evidencePhotos.length})</div>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
-                                    {evidencePhotos.map((photo, index) => (
-                                        <a key={index} href={photo as string} target="_blank" rel="noreferrer" style={{ borderRadius: '14px', overflow: 'hidden', border: '3px solid white', boxShadow: '0 4px 10px rgba(0,0,0,.08)', height: 140 }}>
-                                            <img src={photo as string} alt={`Assessment Evidence ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                                        </a>
-                                    ))}
+                                <div style={{ fontSize: '12px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Evidence Photo</div>
+                                <div style={{ borderRadius: '20px', overflow: 'hidden', border: '4px solid white', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+                                    <img src={photoUrl} alt="Assessment Evidence" style={{ width: '100%', height: 'auto', display: 'block' }} />
                                 </div>
                             </div>
                         )}

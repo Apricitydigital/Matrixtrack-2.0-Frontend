@@ -1,7 +1,24 @@
 'use client';
 
 import React, { useState } from "react";
-import { SurveyAnswersView, normalizeSurveyAnswers } from "../../common/SurveyAnswers";
+
+type Question = {
+    code: string;
+    label: string;
+};
+
+const LITTERBIN_QUESTIONS: Question[] = [
+    { code: "q1", label: "Is the litter bin clean and emptied?" },
+    { code: "q2", label: "Is the litter bin fixed properly?" },
+    { code: "q3", label: "Is the litter bin free of damage?" },
+    { code: "q4", label: "Is the lid present and functional?" },
+    { code: "q5", label: "Is the surrounding area clean?" },
+    { code: "q6", label: "Are twin bins separated correctly?" },
+    { code: "q7", label: "Is branding / labeling visible?" },
+    { code: "q8", label: "Is there any foul odor?" },
+    { code: "q9", label: "Is overflow prevented?" },
+    { code: "q10", label: "Overall condition compliant?" },
+];
 
 function extractPhotos(record: any): string[] {
     if (!record) return [];
@@ -206,12 +223,45 @@ export default function LitterBinReviewModal({
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            {normalizeSurveyAnswers(inspectionAnswers).length > 0 && (
-                                <SurveyAnswersView answers={inspectionAnswers} compact />
-                            )}
+                            {inspectionAnswers && typeof inspectionAnswers === 'object' ? (
+                                LITTERBIN_QUESTIONS.map((q) => {
+                                    const entry = inspectionAnswers[q.code];
+                                    const answer = typeof entry === 'object' ? entry?.answer : entry;
+                                    const qPhoto = typeof entry === 'object' ? (entry?.photoUrl || entry?.photo) : null;
+                                    if (answer === undefined && !inspectionAnswers[q.code]) return null;
 
-                            {/* Default Fallback for non-survey records */}
-                            {normalizeSurveyAnswers(inspectionAnswers).length === 0 && (
+                                    return (
+                                        <div key={q.code} style={{ paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
+                                            <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: 600, marginBottom: '4px' }}>
+                                                {q.label}
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div style={{
+                                                    fontSize: '14px',
+                                                    fontWeight: 700,
+                                                    color: answer === "YES" || answer === true ? '#059669' : answer === "NO" || answer === false ? '#dc2626' : '#2563eb'
+                                                }}>
+                                                    {typeof answer === 'boolean' ? (answer ? "YES" : "NO") : (answer || "N/A")}
+                                                </div>
+                                                {qPhoto && (
+                                                    <button
+                                                        onClick={() => setPreviewPhoto(qPhoto)}
+                                                        style={{
+                                                            fontSize: '11px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe',
+                                                            borderRadius: '6px', padding: '3px 8px', fontWeight: 700, cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        📷 View Photo
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : null}
+
+                            {/* Default Fallback for Bin Request or items without Q1-Q10 */}
+                            {(!inspectionAnswers || Object.keys(inspectionAnswers).length === 0) && (
                                 <>
                                     <div style={{ paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
                                         <div style={{ fontSize: '13px', color: '#1e293b', fontWeight: 600, marginBottom: '4px' }}>

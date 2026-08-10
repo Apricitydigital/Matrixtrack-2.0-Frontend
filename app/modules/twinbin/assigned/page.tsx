@@ -12,8 +12,6 @@ type Bin = {
   condition: string;
   status: string;
   createdAt: string;
-  latestReport?: { status?: string; createdAt?: string } | null;
-  inspectionStatus?: string | null;
 };
 
 export default function TwinbinAssignedPage() {
@@ -55,9 +53,7 @@ export default function TwinbinAssignedPage() {
             <div className="card p-8 text-center muted">No bins assigned to you at the moment.</div>
           ) : (
             <div className="grid grid-2">
-              {bins.map((b) => {
-                const completedToday = !!b.latestReport?.createdAt && new Date(b.latestReport.createdAt).toDateString() === new Date().toDateString();
-                return (
+              {bins.map((b) => (
                 <div key={b.id} className="card card-hover flex flex-col gap-3">
                   <div className="flex justify-between items-start">
                     <div>
@@ -73,19 +69,11 @@ export default function TwinbinAssignedPage() {
 
                   <div className="card-divider"></div>
 
-                  {completedToday ? (
-                    <button className="btn w-full" disabled>Completed Today</button>
-                  ) : (
-                    <Link
-                      className="btn btn-primary w-full"
-                      href={`/modules/survey/LITTERBINS/${b.id}?name=${encodeURIComponent(b.areaName || b.locationName || 'Litter Bin')}&returnTo=${encodeURIComponent('/modules/twinbin/assigned')}`}
-                    >
-                      Start Survey
-                    </Link>
-                  )}
+                  <Link className="btn btn-primary w-full" href={`/modules/twinbin/assigned/${b.id}`}>
+                    Open & Report
+                  </Link>
                 </div>
-              );
-              })}
+              ))}
             </div>
           )}
         </div>

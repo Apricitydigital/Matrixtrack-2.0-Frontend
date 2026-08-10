@@ -8,33 +8,87 @@ import {
   type UnifiedLoginResponse,
   type UnifiedPortalKey,
   type UnifiedTaskforceModuleKey,
-  type UnifiedRegistrationRole,
 } from "@lib/apiClient";
 import {
   Eye,
   EyeOff,
   ShieldCheck,
   ArrowRight,
-  Globe,
+  Building2,
   X,
-  Lock,
-  Users,
-  UserPlus,
   Hash,
+  Lock,
+  UserPlus,
+  LogIn,
   Mail,
   Phone,
   MapPin,
   CheckCircle2,
   Layers,
   Check,
-  Trash2,
-  Boxes,
-  Leaf,
-  BarChart3,
-  Clock3,
+  Landmark,
+  MapPinned,
+  KeyRound,
+  LayoutDashboard,
+  BadgeCheck,
 } from "lucide-react";
 import { setAuthCookie } from "@lib/auth";
 import { persistAccessToken } from "@lib/session";
+
+const PORTAL_ROLE_OPTIONS: Record<
+  UnifiedPortalKey,
+  Array<{ value: string; label: string }>
+> = {
+  TASKFORCE_20: [
+    { value: "SUPERVISOR", label: "Supervisor" },
+    { value: "QC", label: "Quality Controller" },
+    { value: "ACTION_OFFICER", label: "Action Officer" },
+  ],
+
+  PROCESSING_PLANT: [
+    { value: "ADMIN", label: "Admin" },
+  ],
+
+  MATRIX_TRACK: [
+    { value: "ADMIN", label: "Administrator" },
+    // { value: "EMPLOYEE", label: "Employee" },
+  ],
+
+  WARD_RANKING: [
+    { value: "ACCESSOR", label: "Assessor / Evaluator" },
+    { value: "QC", label: "Quality Controller" },
+    { value: "ADMIN", label: "Admin" },
+  ],
+};
+
+const DEFAULT_PORTAL_ROLE: Record<
+  UnifiedPortalKey,
+  string
+> = {
+  TASKFORCE_20: "SUPERVISOR",
+  PROCESSING_PLANT: "ADMIN",
+  MATRIX_TRACK: "EMPLOYEE",
+  WARD_RANKING: "ACCESSOR",
+};
+
+const PORTAL_LABELS: Record<
+  UnifiedPortalKey,
+  string
+> = {
+  TASKFORCE_20: "Inspection & Performance System",
+  PROCESSING_PLANT: "Processing Monitoring System",
+  MATRIX_TRACK: "Workforce Attendance System",
+  WARD_RANKING: "Ward Ranking System",
+};
+
+const CITY_ADMIN_APPLICATION_ROLES: Partial<
+  Record<UnifiedPortalKey, string>
+> = {
+  TASKFORCE_20: "CITY_ADMIN",
+  PROCESSING_PLANT: "ADMIN",
+  MATRIX_TRACK: "ADMIN",
+  WARD_RANKING: "ADMIN",
+};
 
 export default function LoginPage() {
   // Drawer state
@@ -42,7 +96,8 @@ export default function LoginPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   // Login Form States
-  const [email, setEmail] = useState("");
+  const [loginIdentifier, setLoginIdentifier] =
+    useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,20 +111,36 @@ export default function LoginPage() {
 
   // 100% Exact Original Register Form States
   const [regForm, setRegForm] = useState({
-    ulbCode: "",
     name: "",
     email: "",
     phone: "",
     aadharNumber: "",
     password: "",
+    stateId: "",
+    divisionId: "",
+    districtId: "",
     cityId: "",
     zoneId: "",
-    wardId: ""
+    wardId: "",
   });
   const [regStatus, setRegStatus] = useState("");
 
-  const [requestedRole, setRequestedRole] =
-    useState<UnifiedRegistrationRole | "">("");
+  const [applicationRoles, setApplicationRoles] =
+    useState<
+      Partial<Record<UnifiedPortalKey, string>>
+    >({});
+
+  const [states, setStates] = useState<
+    { id: string; name: string }[]
+  >([]);
+
+  const [divisions, setDivisions] = useState<
+    { id: string; name: string }[]
+  >([]);
+
+  const [districts, setDistricts] = useState<
+    { id: string; name: string }[]
+  >([]);
 
   const [selectedPortals, setSelectedPortals] =
     useState<UnifiedPortalKey[]>([]);
@@ -85,8 +156,115 @@ export default function LoginPage() {
 
   // Fetch Cities on load for registration
   useEffect(() => {
-    PublicGeoApi.cities().then((res) => setCities(res.cities || [])).catch(() => { });
+    PublicGeoApi.states()
+      .then((response) =>
+        setStates(response.states || []),
+      )
+      .catch(() => { });
   }, []);
+
+  const handleStateChange = async (
+    stateId: string,
+  ) => {
+    setRegForm((current) => ({
+      ...current,
+      stateId,
+      divisionId: "",
+      districtId: "",
+      cityId: "",
+      zoneId: "",
+      wardId: "",
+    }));
+
+    setDivisions([]);
+    setDistricts([]);
+    setCities([]);
+    setZones([]);
+    setWards([]);
+
+    if (!stateId) return;
+
+    setLoadingGeo(true);
+
+    try {
+      const response =
+        await PublicGeoApi.divisions(stateId);
+
+      setDivisions(response.divisions || []);
+    } finally {
+      setLoadingGeo(false);
+    }
+  };
+
+  const isCityLevelAccess =
+    Boolean(regForm.cityId) &&
+    !regForm.zoneId &&
+    !regForm.wardId;
+
+  const handleDivisionChange = async (
+    divisionId: string,
+  ) => {
+    setRegForm((current) => ({
+      ...current,
+      divisionId,
+      districtId: "",
+      cityId: "",
+      zoneId: "",
+      wardId: "",
+    }));
+
+    setDistricts([]);
+    setCities([]);
+    setZones([]);
+    setWards([]);
+
+    if (!regForm.stateId || !divisionId) return;
+
+    setLoadingGeo(true);
+
+    try {
+      const response =
+        await PublicGeoApi.districts(
+          regForm.stateId,
+          divisionId,
+        );
+
+      setDistricts(response.districts || []);
+    } finally {
+      setLoadingGeo(false);
+    }
+  };
+
+  const handleDistrictChange = async (
+    districtId: string,
+  ) => {
+    setRegForm((current) => ({
+      ...current,
+      districtId,
+      cityId: "",
+      zoneId: "",
+      wardId: "",
+    }));
+
+    setCities([]);
+    setZones([]);
+    setWards([]);
+
+    if (!districtId) return;
+
+    setLoadingGeo(true);
+
+    try {
+      const response =
+        await PublicGeoApi.citiesByDistrict(
+          districtId,
+        );
+
+      setCities(response.cities || []);
+    } finally {
+      setLoadingGeo(false);
+    }
+  };
 
   const handleCityChange = async (cityId: string) => {
     setRegForm((f) => ({ ...f, cityId, zoneId: "", wardId: "" }));
@@ -133,10 +311,21 @@ export default function LoginPage() {
           setSelectedTaskforceModules([]);
         }
 
+        setApplicationRoles((roles) => {
+          const updatedRoles = { ...roles };
+          delete updatedRoles[portal];
+          return updatedRoles;
+        });
+
         return current.filter(
           (item) => item !== portal,
         );
       }
+
+      setApplicationRoles((roles) => ({
+        ...roles,
+        [portal]: DEFAULT_PORTAL_ROLE[portal],
+      }));
 
       return [...current, portal];
     });
@@ -190,6 +379,7 @@ export default function LoginPage() {
       taskforce = null,
       matrixTrack = null,
       wardRanking = null,
+      processingPlant = null,
     } = response.tokens || {};
 
     if (taskforce) {
@@ -225,6 +415,17 @@ export default function LoginPage() {
       );
     } else {
       localStorage.removeItem("ward_ranking_access_token");
+    }
+
+    if (processingPlant) {
+      localStorage.setItem(
+        "processing_plant_access_token",
+        processingPlant,
+      );
+    } else {
+      localStorage.removeItem(
+        "processing_plant_access_token",
+      );
     }
 
     localStorage.setItem(
@@ -273,7 +474,7 @@ export default function LoginPage() {
 
     try {
       const normalizedEmail =
-        email.trim().toLowerCase();
+        loginIdentifier.trim().toLowerCase();
 
       const response = await AuthApi.unifiedLogin({
         email: normalizedEmail,
@@ -395,6 +596,11 @@ export default function LoginPage() {
             pendingLogin?.tokens?.wardRanking ||
             otpResponse.tokens?.wardRanking ||
             null,
+
+          processingPlant:
+            pendingLogin?.tokens?.processingPlant ||
+            otpResponse.tokens?.processingPlant ||
+            null,
         },
 
         requiresOtp: false,
@@ -430,26 +636,40 @@ export default function LoginPage() {
 
     try {
       if (
-        !regForm.cityId ||
-        !regForm.zoneId ||
-        !regForm.wardId
+        !regForm.stateId ||
+        !regForm.divisionId ||
+        !regForm.districtId ||
+        !regForm.cityId
       ) {
         setError(
-          "City, Zone, and Ward are required.",
+          "Please select State, Division, District and City."
         );
         return;
       }
 
-      if (!requestedRole) {
+      if (!isCityLevelAccess) {
+        const missingRole = selectedPortals.find(
+          (portal) => !applicationRoles[portal]
+        );
+
+        if (missingRole) {
+          setError(
+            "Please select a role for each application."
+          );
+          return;
+        }
+      }
+
+      if (!/^\d{10}$/.test(regForm.phone)) {
         setError(
-          "Please select the role you are requesting.",
+          "Please enter a valid 10-digit mobile number.",
         );
         return;
       }
 
-      if (selectedPortals.length === 0) {
+      if (!/^\d{12}$/.test(regForm.aadharNumber)) {
         setError(
-          "Please select at least one application.",
+          "Please enter a valid 12-digit Aadhaar number.",
         );
         return;
       }
@@ -464,33 +684,47 @@ export default function LoginPage() {
         return;
       }
 
+      const effectiveApplicationRoles =
+        isCityLevelAccess
+          ? selectedPortals.reduce<
+            Partial<Record<UnifiedPortalKey, string>>
+          >((result, portal) => {
+            const role =
+              CITY_ADMIN_APPLICATION_ROLES[portal];
+
+            if (role) {
+              result[portal] = role;
+            }
+
+            return result;
+          }, {})
+          : applicationRoles;
 
       await AuthApi.unifiedRegisterRequest({
-
         name: regForm.name.trim(),
         email: regForm.email
           .trim()
           .toLowerCase(),
         phone: regForm.phone.trim(),
-
-        // Keep the exact Aadhaar field required by
-        // UnifiedRegistrationRequest in apiClient.ts
         aadhaar: regForm.aadharNumber.trim(),
-
         password: regForm.password,
+
+        stateId: regForm.stateId,
+        divisionId: regForm.divisionId,
+        districtId: regForm.districtId,
         cityId: regForm.cityId,
         zoneId: regForm.zoneId,
         wardId: regForm.wardId,
 
-        requestedRole,
-
         requestedPortals: selectedPortals,
+        applicationRoles: effectiveApplicationRoles,
 
-        taskforceModules: selectedPortals.includes(
-          "TASKFORCE_20",
-        )
-          ? selectedTaskforceModules
-          : [],
+        taskforceModules:
+          selectedPortals.includes(
+            "TASKFORCE_20",
+          )
+            ? selectedTaskforceModules
+            : [],
       });
 
       setRegStatus(
@@ -498,20 +732,25 @@ export default function LoginPage() {
       );
 
       setRegForm({
-        ulbCode: "",
         name: "",
         email: "",
         phone: "",
         aadharNumber: "",
         password: "",
+        stateId: "",
+        divisionId: "",
+        districtId: "",
         cityId: "",
         zoneId: "",
         wardId: "",
       });
 
-      setRequestedRole("");
+      setApplicationRoles({});
       setSelectedPortals([]);
       setSelectedTaskforceModules([]);
+      setDivisions([]);
+      setDistricts([]);
+      setCities([]);
       setZones([]);
       setWards([]);
     } catch (err) {
@@ -532,19 +771,25 @@ export default function LoginPage() {
 
   return (
     <div className="mt-page">
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style>{`
         :root {
-          --mt-bg: #031b13;
-          --mt-bg-2: #05291d;
-          --mt-card: rgba(5, 42, 29, 0.82);
-          --mt-card-strong: rgba(3, 27, 19, 0.94);
-          --mt-green: #7ccb55;
-          --mt-lime: #b7e66c;
-          --mt-gold: #f5c84b;
-          --mt-warm-gold: #e9a93a;
-          --mt-white: #f7faf4;
-          --mt-muted: #a7b9aa;
-          --mt-border: rgba(170, 215, 100, 0.2);
+          --mt-navy-950: #050b16;
+          --mt-navy-900: #071225;
+          --mt-navy-850: #0a1830;
+          --mt-navy-800: #0d2142;
+          --mt-blue-600: #2563eb;
+          --mt-blue-500: #3b82f6;
+          --mt-blue-400: #60a5fa;
+          --mt-cyan-400: #22d3ee;
+          --mt-teal-400: #2dd4bf;
+          --mt-white: #ffffff;
+          --mt-slate-50: #f8fafc;
+          --mt-slate-100: #f1f5f9;
+          --mt-slate-200: #e2e8f0;
+          --mt-slate-300: #cbd5e1;
+          --mt-slate-500: #64748b;
+          --mt-slate-700: #334155;
+          --mt-slate-900: #0f172a;
         }
 
         * { box-sizing: border-box; }
@@ -553,1041 +798,1603 @@ export default function LoginPage() {
         button, input, select { font: inherit; }
         button { -webkit-tap-highlight-color: transparent; }
 
-        @keyframes mtPulse {
-          0%, 100% { transform: scale(1); opacity: .62; }
-          50% { transform: scale(1.16); opacity: .18; }
+        @keyframes mtFadeUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes mtOrbit {
-          to { transform: translate(-50%, -50%) rotate(360deg); }
+        @keyframes mtPulse {
+          0%, 100% { opacity: .42; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.22); }
+        }
+        @keyframes mtScan {
+          0% { transform: translateY(-110%); opacity: 0; }
+          16% { opacity: .72; }
+          84% { opacity: .45; }
+          100% { transform: translateY(500%); opacity: 0; }
+        }
+        @keyframes mtFlow {
+          to { stroke-dashoffset: -42; }
         }
         @keyframes mtFloat {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
+          50% { transform: translateY(-7px); }
+        }
+        @keyframes mtGlow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,.05), 0 24px 80px rgba(0,0,0,.24); }
+          50% { box-shadow: 0 0 0 9px rgba(59,130,246,.035), 0 28px 90px rgba(0,0,0,.3); }
         }
         @keyframes mtDrawer {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
-        @keyframes mtFade {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
 
         .mt-page {
           position: relative;
-          min-height: 100svh;
+          min-height: 100vh;
+          width: 100%;
           overflow-x: hidden;
           color: var(--mt-white);
-          font-family: Inter, Manrope, "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           background:
-            radial-gradient(circle at 67% 18%, rgba(124, 203, 85, .1), transparent 26%),
-            radial-gradient(circle at 17% 20%, rgba(245, 200, 75, .1), transparent 29%),
-            linear-gradient(135deg, #02150f 0%, var(--mt-bg) 40%, #05291d 100%);
+            radial-gradient(circle at 76% 20%, rgba(37,99,235,.2), transparent 31%),
+            radial-gradient(circle at 17% 76%, rgba(14,165,233,.09), transparent 30%),
+            linear-gradient(135deg, var(--mt-navy-950) 0%, var(--mt-navy-900) 45%, #081a36 100%);
         }
         .mt-page::before {
           content: "";
           position: fixed;
           inset: 0;
-          z-index: 0;
           pointer-events: none;
-          background:
-            linear-gradient(90deg, rgba(2, 21, 15, .22), rgba(2, 21, 15, .76)),
-            url('/matrixtrack-reference-bg.png') center top / cover no-repeat;
-          opacity: .20;
-          filter: saturate(.88) contrast(1.05);
+          opacity: .34;
+          background-image:
+            linear-gradient(rgba(96,165,250,.055) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(96,165,250,.055) 1px, transparent 1px);
+          background-size: 64px 64px;
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 28%, #000 100%);
         }
         .mt-page::after {
           content: "";
           position: fixed;
-          inset: 0;
-          z-index: 0;
+          inset: 78px 0 0;
           pointer-events: none;
           background:
-            linear-gradient(180deg, rgba(1, 17, 12, .12), rgba(1, 17, 12, .72)),
-            radial-gradient(circle at 50% 38%, transparent 0, rgba(1, 15, 10, .26) 54%, rgba(1, 15, 10, .72) 100%);
+            linear-gradient(118deg, transparent 0 47%, rgba(37,99,235,.06) 47.2% 47.45%, transparent 47.7%),
+            linear-gradient(23deg, transparent 0 60%, rgba(96,165,250,.045) 60.2% 60.4%, transparent 60.6%);
         }
-
-        .mt-header,
-        .mt-shell { position: relative; z-index: 2; }
-        .mt-header {
-          height: 76px;
-          width: min(100% - 56px, 1660px);
-          margin: 0 auto;
-          display: grid;
-          grid-template-columns: minmax(340px, 1fr) auto minmax(360px, 1fr);
-          align-items: center;
-          gap: 24px;
-          border-bottom: 1px solid rgba(183, 230, 108, .12);
-        }
-        .mt-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-        .mt-brand-mark {
-          width: 48px;
-          height: 52px;
-          flex: 0 0 auto;
-          display: grid;
-          place-items: center;
-          color: var(--mt-gold);
-          background: linear-gradient(145deg, rgba(124,203,85,.18), rgba(3,27,19,.84));
-          clip-path: polygon(50% 0, 92% 18%, 87% 72%, 50% 100%, 13% 72%, 8% 18%);
-          border: 1px solid rgba(245, 200, 75, .54);
-          filter: drop-shadow(0 0 14px rgba(124, 203, 85, .18));
-        }
-        .mt-brand-title { font-size: 19px; font-weight: 900; line-height: 1.05; letter-spacing: -.035em; }
-        .mt-brand-kicker { margin-top: 4px; color: var(--mt-lime); font-size: 9px; font-weight: 800; letter-spacing: .16em; }
-        .mt-nav { display: flex; align-items: center; justify-content: center; gap: clamp(18px, 2.6vw, 42px); }
-        .mt-nav a { color: rgba(247,250,244,.82); text-decoration: none; font-size: 12px; font-weight: 700; transition: color .2s ease; }
-        .mt-nav a:hover { color: var(--mt-lime); }
-        .mt-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-        .mt-outline-btn,
-        .mt-gold-btn,
-        .mt-hero-btn {
-          border: 0;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          font-weight: 900;
-          transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-        }
-        .mt-outline-btn:hover,
-        .mt-gold-btn:hover,
-        .mt-hero-btn:hover { transform: translateY(-2px); }
-        .mt-outline-btn {
-          min-height: 38px;
-          padding: 0 16px;
-          color: var(--mt-lime);
-          border: 1px solid rgba(183, 230, 108, .28);
-          border-radius: 9px;
-          background: rgba(3, 27, 19, .48);
-          font-size: 10px;
-          letter-spacing: .02em;
-          backdrop-filter: blur(12px);
-        }
-        .mt-gold-btn,
-        .mt-hero-btn {
-          color: #17200c;
-          background: linear-gradient(135deg, #ffd86c 0%, var(--mt-gold) 58%, #e9a93a 100%);
-          box-shadow: 0 10px 28px rgba(233, 169, 58, .22);
-        }
-        .mt-gold-btn { min-height: 42px; padding: 0 19px; border-radius: 10px; font-size: 11px; }
-
-        .mt-shell {
-          width: min(100% - 56px, 1660px);
-          margin: 0 auto;
-          padding: 12px 0 18px;
-        }
-        .mt-hero {
-          display: grid;
-          grid-template-columns: minmax(510px, .9fr) minmax(780px, 1.14fr);
-          gap: clamp(18px, 2vw, 32px);
-          align-items: center;
-          min-height: 438px;
-        }
-        .mt-hero-copy { padding: 8px 0 4px 18px; }
-        .mt-location-pill {
-          width: fit-content;
-          min-height: 30px;
-          padding: 0 12px;
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          color: var(--mt-lime);
-          background: rgba(5, 42, 29, .66);
-          border: 1px solid rgba(183, 230, 108, .3);
-          border-radius: 8px;
-          font-size: 11px;
-          font-weight: 800;
-          box-shadow: 0 10px 28px rgba(0,0,0,.12);
-          backdrop-filter: blur(10px);
-        }
-        .mt-title {
-          margin: 14px 0 12px;
-          max-width: 650px;
-          font-size: clamp(44px, 3.45vw, 64px);
-          line-height: .98;
-          letter-spacing: -.055em;
-          font-weight: 950;
-          text-wrap: balance;
-        }
-        .mt-title span { display: block; }
-        .mt-title .green { color: var(--mt-green); text-shadow: 0 0 28px rgba(124,203,85,.14); }
-        .mt-subtitle {
-          margin: 0;
-          max-width: 570px;
-          color: rgba(247,250,244,.8);
-          font-size: clamp(13px, 1.25vw, 17px);
-          line-height: 1.58;
-          font-weight: 500;
-        }
-        .mt-hero-btn {
-          min-height: 46px;
-          margin-top: 20px;
-          padding: 0 20px;
-          border-radius: 9px;
-          font-size: 13px;
-        }
-
-        .mt-map-layout {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 196px;
-          gap: 18px;
-          align-items: center;
-          min-width: 0;
-        }
-        .mt-map-card {
-          position: relative;
-          min-height: 430px;
-          overflow: hidden;
-          display: grid;
-          place-items: center;
-          background: transparent;
-          border-radius: 22px;
-        }
-        .mt-map-card::before {
-          content: "";
-          position: absolute;
-          inset: 10% 4%;
-          background-image:
-            linear-gradient(rgba(124,203,85,.035) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(124,203,85,.035) 1px, transparent 1px);
-          background-size: 30px 30px;
-          mask-image: radial-gradient(circle, #000 42%, transparent 75%);
-        }
-        .mt-orbit {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          border: 1px solid rgba(124,203,85,.12);
-          border-radius: 50%;
-          transform: translate(-50%, -50%);
-        }
-        .mt-orbit.one { width: 82%; height: 82%; animation: mtOrbit 30s linear infinite; }
-        .mt-orbit.two { width: 65%; height: 65%; animation: mtOrbit 24s linear reverse infinite; }
-        .mt-orbit.three { width: 48%; height: 48%; }
-        .mt-orbit::after {
-          content: "";
-          position: absolute;
-          top: -3px;
-          left: 55%;
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--mt-lime);
-          box-shadow: 0 0 14px rgba(183,230,108,.8);
-        }
-        .mt-map-svg { position: relative; z-index: 1; width: 98%; height: auto; filter: drop-shadow(0 18px 34px rgba(0,0,0,.25)); }
-        .mt-map-image {
-          position: relative;
-          z-index: 2;
-          display: block;
-          width: 100%;
-          height: 430px;
-          object-fit: contain;
-          object-position: center;
-          filter: drop-shadow(0 18px 34px rgba(0,0,0,.34));
-          user-select: none;
-        }
-        .mt-city-marker {
-          position: absolute;
-          z-index: 4;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          transform: translate(-50%, -50%);
-          white-space: nowrap;
-        }
-        .mt-city-pin {
-          position: relative;
-          width: 25px;
-          height: 25px;
-          border-radius: 50% 50% 50% 8px;
-          transform: rotate(-45deg);
-          display: grid;
-          place-items: center;
-          color: #082216;
-          background: var(--mt-lime);
-          border: 3px solid rgba(3,27,19,.9);
-          box-shadow: 0 0 0 5px rgba(124,203,85,.11), 0 0 18px rgba(124,203,85,.52);
-        }
-        .mt-city-pin::after {
-          content: "";
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #12361f;
-        }
-        .mt-city-pin-ring {
-          position: absolute;
-          inset: -12px;
-          border: 1px solid rgba(124,203,85,.35);
-          border-radius: 50%;
-          animation: mtPulse 2.6s ease-in-out infinite;
-        }
-        .mt-city-label {
-          margin-left: -2px;
-          padding: 6px 10px;
-          color: var(--mt-white);
-          background: rgba(3, 27, 19, .92);
-          border: 1px solid rgba(124,203,85,.22);
-          border-radius: 7px;
-          font-size: 10px;
-          font-weight: 800;
-          box-shadow: 0 8px 18px rgba(0,0,0,.22);
-          backdrop-filter: blur(8px);
-        }
-        .mt-key-cities { min-width: 0; }
-        .mt-key-cities h3 { margin: 0 0 10px 6px; color: var(--mt-lime); font-size: 12px; font-weight: 900; }
-        .mt-city-list { display: grid; gap: 8px; }
-        .mt-city-card {
-          min-height: 66px;
-          padding: 8px;
-          display: grid;
-          grid-template-columns: 50px 1fr;
-          align-items: center;
-          gap: 10px;
-          background: linear-gradient(145deg, rgba(7,52,33,.74), rgba(3,27,19,.78));
-          border: 1px solid rgba(183,230,108,.18);
-          border-radius: 10px;
-          box-shadow: 0 10px 22px rgba(0,0,0,.12);
-          backdrop-filter: blur(10px);
-        }
-        .mt-city-thumb {
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          display: grid;
-          place-items: center;
-          border: 1px solid rgba(245,200,75,.34);
-          overflow: hidden;
-          box-shadow: 0 0 18px rgba(245,200,75,.1);
-        }
-        .mt-city-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .mt-city-card strong { display: block; font-size: 11px; }
-        .mt-city-card span { display: block; margin-top: 3px; color: var(--mt-muted); font-size: 9px; }
-
-        .mt-lower-grid {
-          margin-top: 10px;
-          display: grid;
-          grid-template-columns: minmax(0, 1.52fr) minmax(340px, .78fr);
-          gap: 18px;
-          align-items: stretch;
-        }
-        .mt-left-stack,
-        .mt-right-stack { display: grid; gap: 12px; min-width: 0; }
-        .mt-glass {
-          background: linear-gradient(145deg, rgba(5,42,29,.82), rgba(3,27,19,.72));
-          border: 1px solid var(--mt-border);
-          box-shadow: 0 18px 44px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.02);
-          backdrop-filter: blur(15px);
-        }
-        .mt-stats {
-          min-height: 92px;
-          padding: 16px 20px;
-          border-radius: 14px;
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          align-items: center;
-        }
-        .mt-stat {
-          min-width: 0;
-          padding: 0 18px;
-          display: grid;
-          grid-template-columns: 44px 1fr;
-          align-items: center;
-          gap: 12px;
-          border-right: 1px solid rgba(183,230,108,.14);
-        }
-        .mt-stat:first-child { padding-left: 0; }
-        .mt-stat:last-child { padding-right: 0; border-right: 0; }
-        .mt-icon-ring {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          display: grid;
-          place-items: center;
-          border: 1px solid currentColor;
-          background: rgba(255,255,255,.025);
-          box-shadow: inset 0 0 18px rgba(255,255,255,.025);
-        }
-        .mt-stat-value { font-size: 22px; line-height: 1; font-weight: 950; letter-spacing: -.025em; }
-        .mt-stat-label { margin-top: 5px; color: rgba(247,250,244,.68); font-size: 10px; font-weight: 600; }
-        .accent-cyan { color: #42d8ef; }
-        .accent-green { color: #79dc58; }
-        .accent-purple { color: #bd82ff; }
-        .accent-gold { color: #f5c84b; }
-
-        .mt-features { padding: 15px 18px 14px; border-radius: 14px; }
-        .mt-section-heading { text-align: center; margin-bottom: 14px; }
-        .mt-section-heading h2 { margin: 0; color: var(--mt-lime); font-size: 14px; font-weight: 900; }
-        .mt-heading-line { width: 52px; height: 2px; margin: 8px auto 0; border-radius: 999px; background: linear-gradient(90deg, transparent, var(--mt-gold), transparent); }
-        .mt-feature-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-        .mt-feature {
-          min-width: 0;
-          min-height: 126px;
-          padding: 3px 15px 0;
-          text-align: center;
-          border-right: 1px solid rgba(183,230,108,.13);
-        }
-        .mt-feature:first-child { padding-left: 5px; }
-        .mt-feature:last-child { padding-right: 5px; border-right: 0; }
-        .mt-feature-icon { height: 36px; display: grid; place-items: center; color: var(--mt-lime); }
-        .mt-feature:nth-child(3) .mt-feature-icon,
-        .mt-feature:nth-child(4) .mt-feature-icon { color: var(--mt-gold); }
-        .mt-feature strong { display: block; margin-top: 6px; color: var(--mt-lime); font-size: 10px; }
-        .mt-feature p { margin: 7px 0 0; color: rgba(247,250,244,.7); font-size: 9px; line-height: 1.42; }
-
-        .mt-benefits {
-          min-height: 52px;
-          padding: 8px 14px;
-          border-radius: 12px;
-          display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          align-items: center;
-        }
-        .mt-benefit {
-          min-width: 0;
-          min-height: 34px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 9px;
-          padding: 0 10px;
-          color: rgba(247,250,244,.78);
-          border-right: 1px solid rgba(183,230,108,.12);
-          font-size: 8px;
-          line-height: 1.35;
-        }
-        .mt-benefit:last-child { border-right: 0; }
-        .mt-benefit svg { color: var(--mt-lime); flex: 0 0 auto; }
-
-        .mt-kpis {
-          padding: 10px;
-          border-radius: 14px;
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 9px;
-        }
-        .mt-kpi {
-          min-height: 76px;
-          padding: 12px 14px;
-          display: grid;
-          grid-template-columns: 42px 1fr;
-          align-items: center;
-          gap: 10px;
-          border-radius: 10px;
-          background: linear-gradient(145deg, rgba(7,52,33,.82), rgba(3,27,19,.84));
-          border: 1px solid rgba(183,230,108,.13);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
-        }
-        .mt-kpi .mt-icon-ring { width: 42px; height: 42px; }
-        .mt-kpi strong { display: block; font-size: 20px; line-height: 1; }
-        .mt-kpi span { display: block; margin-top: 5px; color: rgba(247,250,244,.68); font-size: 9px; }
-
-        .mt-scene {
-          position: relative;
-          min-height: 214px;
-          overflow: hidden;
-          border-radius: 14px;
-          border: 1px solid rgba(183,230,108,.15);
-          background: #061e15;
-          box-shadow: 0 18px 44px rgba(0,0,0,.2);
-        }
-        .mt-scene::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(180deg, rgba(3,27,19,.01), rgba(3,27,19,.14));
-          box-shadow: inset 0 0 42px rgba(3,27,19,.28);
-        }
-        .mt-scene img {
-          display: block;
-          width: 100%;
-          height: 214px;
-          object-fit: cover;
-          object-position: center;
-          user-select: none;
-        }
-
-        .mt-mobile-menu { display: none; }
-
-        .mt-auth-layer {
+        .mt-noise {
           position: fixed;
           inset: 0;
-          z-index: 9999;
-          display: flex;
-          justify-content: flex-end;
-          animation: mtFade .2s ease both;
-        }
-        .mt-auth-backdrop {
-          position: absolute;
-          inset: 0;
-          border: 0;
-          width: 100%;
-          height: 100%;
-          cursor: default;
-          background: rgba(1, 13, 9, .74);
-          backdrop-filter: blur(6px);
-        }
-        .mt-drawer {
-          position: relative;
+          pointer-events: none;
+          opacity: .035;
           z-index: 1;
-          width: min(100%, 560px);
-          height: 100svh;
-          overflow-y: auto;
-          color: #163021;
-          background: linear-gradient(180deg, #fbfdf8 0%, #f4f8ef 100%);
-          box-shadow: -24px 0 70px rgba(0,0,0,.42);
-          animation: mtDrawer .34s cubic-bezier(.16,1,.3,1) both;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
         }
-        .mt-drawer-inner { min-height: 100%; padding: 28px 34px 22px; display: flex; flex-direction: column; }
-        .mt-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
-        .mt-drawer-brand { display: flex; align-items: center; gap: 10px; }
-        .mt-drawer-logo {
-          width: 38px;
-          height: 42px;
+
+        .mt-header {
+          position: relative;
+          z-index: 20;
+          height: 78px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 clamp(24px, 4vw, 68px);
+          border-bottom: 1px solid rgba(148,163,184,.14);
+          background: rgba(5,11,22,.72);
+          backdrop-filter: blur(20px);
+        }
+        .mt-brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 13px;
+          min-width: 0;
+        }
+        .mt-brand-mark {
+          width: 44px;
+          height: 44px;
+          border-radius: 13px;
           display: grid;
           place-items: center;
           color: #fff;
-          background: linear-gradient(145deg, #79b94e, #14532d);
-          clip-path: polygon(50% 0, 92% 18%, 87% 72%, 50% 100%, 13% 72%, 8% 18%);
-          filter: drop-shadow(0 6px 12px rgba(20,83,45,.2));
+          flex: 0 0 auto;
+          background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+          border: 1px solid rgba(255,255,255,.24);
+          box-shadow: 0 12px 28px rgba(37,99,235,.3), inset 0 1px 0 rgba(255,255,255,.24);
         }
-        .mt-drawer-brand strong { display: block; color: #10271a; font-size: 17px; line-height: 1.1; }
-        .mt-drawer-brand small { display: block; margin-top: 3px; color: #6a806e; font-size: 9px; font-weight: 800; letter-spacing: .1em; }
-        .mt-close-btn {
-          width: 35px;
-          height: 35px;
+        .mt-brand-name {
+          color: #fff;
+          font-size: 20px;
+          font-weight: 850;
+          letter-spacing: -.025em;
+          line-height: 1;
+          white-space: nowrap;
+        }
+        .mt-header-actions { display: flex; align-items: center; gap: 10px; }
+        .mt-header-request {
+          border: 1px solid rgba(148,163,184,.2);
+          color: #cbd5e1;
+          background: rgba(255,255,255,.045);
+          min-height: 42px;
+          padding: 0 17px;
+          border-radius: 11px;
+          font-size: 13px;
+          font-weight: 750;
+          cursor: pointer;
+          transition: .2s ease;
+        }
+        .mt-header-request:hover { color: #fff; border-color: rgba(96,165,250,.48); background: rgba(59,130,246,.09); }
+        .mt-header-signin,
+        .mt-primary-button {
+          border: 0;
+          color: #fff;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          font-weight: 800;
+          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+          box-shadow: 0 12px 26px rgba(37,99,235,.28), inset 0 1px 0 rgba(255,255,255,.18);
+          transition: transform .2s ease, box-shadow .2s ease;
+        }
+        .mt-header-signin {
+          min-height: 42px;
+          padding: 0 18px;
+          border-radius: 11px;
+          font-size: 13px;
+        }
+        .mt-header-signin:hover,
+        .mt-primary-button:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(37,99,235,.38); }
+
+        .mt-main {
+          position: relative;
+          z-index: 5;
+          width: min(1500px, 100%);
+          margin: 0 auto;
+          padding: clamp(30px, 4vw, 58px) clamp(24px, 4vw, 68px) 34px;
+          min-height: calc(100vh - 78px);
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(390px, 448px);
+          align-items: center;
+          gap: clamp(34px, 5vw, 78px);
+        }
+        .mt-hero {
+          min-width: 0;
+          animation: mtFadeUp .65s ease both;
+        }
+        .mt-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          color: #bfdbfe;
+          font-size: 11px;
+          font-weight: 850;
+          letter-spacing: .16em;
+          text-transform: uppercase;
+          margin-bottom: 17px;
+        }
+        .mt-eyebrow-dot {
+          width: 7px;
+          height: 7px;
           border-radius: 50%;
-          border: 1px solid #d7e2d4;
-          color: #59705e;
-          background: #f0f5ed;
+          background: var(--mt-teal-400);
+          box-shadow: 0 0 0 6px rgba(45,212,191,.1), 0 0 18px rgba(45,212,191,.65);
+        }
+        .mt-title {
+          margin: 0;
+          color: #fff;
+          font-size: clamp(48px, 5vw, 76px);
+          line-height: .97;
+          letter-spacing: -.055em;
+          font-weight: 900;
+        }
+        .mt-title span { color: #8ab9ff; }
+        .mt-description {
+          max-width: 720px;
+          margin: 22px 0 0;
+          color: #a9bad1;
+          font-size: clamp(15px, 1.3vw, 18px);
+          line-height: 1.7;
+          font-weight: 480;
+        }
+        .mt-hero-actions {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          margin-top: 27px;
+        }
+        .mt-primary-button {
+          min-height: 50px;
+          padding: 0 22px;
+          border-radius: 13px;
+          font-size: 14px;
+        }
+        .mt-status-line {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          color: #91a5c0;
+          font-size: 12px;
+          font-weight: 650;
+        }
+        .mt-status-line span {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #2dd4bf;
+          box-shadow: 0 0 12px rgba(45,212,191,.7);
+        }
+
+        .mt-access-visual {
+          position: relative;
+          min-height: 338px;
+          margin-top: 32px;
+          overflow: hidden;
+          border-radius: 24px;
+          border: 1px solid rgba(96,165,250,.19);
+          background:
+            linear-gradient(150deg, rgba(13,33,66,.78), rgba(5,16,34,.88)),
+            radial-gradient(circle at 64% 40%, rgba(59,130,246,.14), transparent 40%);
+          box-shadow: 0 30px 90px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.035);
+          animation: mtGlow 6s ease-in-out infinite;
+        }
+        .mt-access-visual::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          opacity: .23;
+          background-image:
+            linear-gradient(rgba(96,165,250,.12) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(96,165,250,.12) 1px, transparent 1px);
+          background-size: 42px 42px;
+        }
+        .mt-access-visual::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: radial-gradient(circle at 64% 50%, transparent 0 32%, rgba(5,11,22,.26) 66%, rgba(5,11,22,.62) 100%);
+        }
+        .mt-scan-line {
+          position: absolute;
+          z-index: 4;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 90px;
+          pointer-events: none;
+          background: linear-gradient(to bottom, transparent, rgba(96,165,250,.08), rgba(96,165,250,.24), transparent);
+          animation: mtScan 7.4s linear infinite;
+        }
+        .mt-visual-content {
+          position: relative;
+          z-index: 5;
+          min-height: 338px;
+          display: grid;
+          grid-template-columns: 205px minmax(260px, 1fr) 180px;
+          gap: 20px;
+          align-items: center;
+          padding: 24px;
+        }
+        .mt-hierarchy {
+          position: relative;
+          display: grid;
+          gap: 11px;
+          align-content: center;
+        }
+        .mt-hierarchy::before {
+          content: "";
+          position: absolute;
+          left: 20px;
+          top: 31px;
+          bottom: 31px;
+          width: 1px;
+          background: linear-gradient(to bottom, rgba(96,165,250,.15), rgba(96,165,250,.8), rgba(45,212,191,.32));
+        }
+        .mt-level {
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          min-height: 52px;
+          padding: 8px 10px 8px 8px;
+          border-radius: 14px;
+          border: 1px solid rgba(148,163,184,.13);
+          background: rgba(5,18,39,.62);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+        }
+        .mt-level-icon {
+          position: relative;
+          z-index: 2;
+          width: 26px;
+          height: 26px;
+          flex: 0 0 auto;
           display: grid;
           place-items: center;
+          border-radius: 9px;
+          color: #bfdbfe;
+          background: #102a55;
+          border: 1px solid rgba(96,165,250,.28);
+        }
+        .mt-level-label {
+          color: #dbeafe;
+          font-size: 12px;
+          font-weight: 760;
+          letter-spacing: .01em;
+        }
+        .mt-level-sub {
+          margin-top: 2px;
+          color: #7085a3;
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+        }
+        .mt-core {
+          position: relative;
+          min-height: 270px;
+          display: grid;
+          place-items: center;
+        }
+        .mt-core-svg {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+        }
+        .mt-core-svg path {
+          fill: none;
+          stroke: rgba(96,165,250,.44);
+          stroke-width: 1.2;
+          stroke-dasharray: 7 8;
+          animation: mtFlow 6s linear infinite;
+        }
+        .mt-core-ring {
+          position: absolute;
+          width: 220px;
+          height: 220px;
+          border-radius: 50%;
+          border: 1px solid rgba(96,165,250,.22);
+          box-shadow: inset 0 0 45px rgba(37,99,235,.06), 0 0 55px rgba(37,99,235,.08);
+        }
+        .mt-core-ring::before,
+        .mt-core-ring::after {
+          content: "";
+          position: absolute;
+          border-radius: 50%;
+          border: 1px dashed rgba(96,165,250,.14);
+        }
+        .mt-core-ring::before { inset: 23px; }
+        .mt-core-ring::after { inset: 50px; }
+        .mt-core-badge {
+          position: relative;
+          z-index: 4;
+          width: 116px;
+          height: 116px;
+          border-radius: 31px;
+          display: grid;
+          place-items: center;
+          color: #fff;
+          background: linear-gradient(145deg, #3b82f6, #1d4ed8 68%, #1e40af);
+          border: 1px solid rgba(255,255,255,.32);
+          box-shadow: 0 24px 60px rgba(37,99,235,.3), inset 0 1px 0 rgba(255,255,255,.28);
+          transform: rotate(45deg);
+          animation: mtFloat 5.5s ease-in-out infinite;
+        }
+        .mt-core-badge svg { transform: rotate(-45deg); }
+        .mt-factor {
+          position: absolute;
+          z-index: 6;
+          min-width: 104px;
+          padding: 9px 11px;
+          border-radius: 12px;
+          border: 1px solid rgba(96,165,250,.2);
+          background: rgba(5,18,39,.83);
+          box-shadow: 0 10px 28px rgba(0,0,0,.2);
+          backdrop-filter: blur(10px);
+        }
+        .mt-factor b {
+          display: block;
+          color: #dbeafe;
+          font-size: 11px;
+          font-weight: 800;
+        }
+        .mt-factor small {
+          display: block;
+          color: #7187a7;
+          font-size: 9px;
+          margin-top: 2px;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+        }
+        .mt-factor-role { left: 1%; top: 16%; }
+        .mt-factor-geo { right: 0; top: 19%; }
+        .mt-factor-app { right: 5%; bottom: 10%; }
+        .mt-pulse-dot {
+          position: absolute;
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #60a5fa;
+          box-shadow: 0 0 13px rgba(96,165,250,.8);
+          animation: mtPulse 2.4s ease-in-out infinite;
+        }
+        .mt-dot-one { left: 12%; bottom: 25%; }
+        .mt-dot-two { right: 15%; top: 36%; animation-delay: .8s; }
+        .mt-dot-three { right: 24%; bottom: 12%; animation-delay: 1.4s; background: #2dd4bf; }
+        .mt-access-state {
+          align-self: stretch;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 18px 16px;
+          border-radius: 17px;
+          border: 1px solid rgba(148,163,184,.13);
+          background: rgba(5,18,39,.62);
+        }
+        .mt-state-label {
+          color: #7085a3;
+          font-size: 9px;
+          font-weight: 850;
+          letter-spacing: .14em;
+          text-transform: uppercase;
+        }
+        .mt-state-title {
+          margin-top: 8px;
+          color: #f8fbff;
+          font-size: 14px;
+          font-weight: 820;
+          line-height: 1.3;
+        }
+        .mt-state-list { display: grid; gap: 10px; margin-top: 18px; }
+        .mt-state-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #9db0c9;
+          font-size: 10.5px;
+          font-weight: 650;
+        }
+        .mt-state-check {
+          width: 19px;
+          height: 19px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border-radius: 6px;
+          color: #7dd3fc;
+          background: rgba(59,130,246,.12);
+          border: 1px solid rgba(96,165,250,.2);
+        }
+        .mt-state-ready {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-top: 18px;
+          padding-top: 13px;
+          border-top: 1px solid rgba(148,163,184,.1);
+          color: #8ca1bc;
+          font-size: 9.5px;
+          font-weight: 700;
+        }
+        .mt-state-ready span:last-child {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #2dd4bf;
+          box-shadow: 0 0 12px rgba(45,212,191,.7);
+        }
+
+        .mt-info-strip {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          margin-top: 17px;
+          border: 1px solid rgba(148,163,184,.12);
+          border-radius: 17px;
+          background: rgba(7,18,37,.58);
+          backdrop-filter: blur(12px);
+          overflow: hidden;
+        }
+        .mt-info-item {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          padding: 15px 17px;
+          border-right: 1px solid rgba(148,163,184,.1);
+        }
+        .mt-info-item:last-child { border-right: 0; }
+        .mt-info-icon {
+          width: 34px;
+          height: 34px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 10px;
+          color: #93c5fd;
+          background: rgba(59,130,246,.1);
+          border: 1px solid rgba(96,165,250,.16);
+        }
+        .mt-info-title {
+          color: #dce8f8;
+          font-size: 11px;
+          font-weight: 800;
+        }
+        .mt-info-copy {
+          margin-top: 2px;
+          color: #7187a7;
+          font-size: 9.5px;
+          font-weight: 650;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .mt-auth-panel {
+          position: relative;
+          z-index: 30;
+          width: 100%;
+          max-height: calc(100vh - 118px);
+          overflow: hidden;
+          border-radius: 24px;
+          color: var(--mt-slate-900);
+          background: rgba(255,255,255,.985);
+          border: 1px solid rgba(255,255,255,.7);
+          box-shadow: 0 35px 100px rgba(0,0,0,.35), 0 0 0 1px rgba(59,130,246,.05);
+          animation: mtFadeUp .75s .08s ease both;
+        }
+        .mt-auth-panel::before {
+          content: "";
+          position: absolute;
+          inset: 0 0 auto;
+          height: 4px;
+          background: linear-gradient(90deg, #1d4ed8, #60a5fa, #2dd4bf);
+        }
+        .mt-auth-inner {
+          max-height: calc(100vh - 118px);
+          overflow-y: auto;
+          padding: 28px 30px 24px;
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+        .mt-auth-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          margin-bottom: 22px;
+        }
+        .mt-auth-brand { display: flex; align-items: center; gap: 11px; }
+        .mt-auth-logo {
+          width: 38px;
+          height: 38px;
+          display: grid;
+          place-items: center;
+          border-radius: 11px;
+          color: #fff;
+          background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+          box-shadow: 0 10px 24px rgba(37,99,235,.2);
+        }
+        .mt-auth-name { color: #0f172a; font-size: 16px; font-weight: 900; letter-spacing: -.025em; }
+        .mt-auth-sub { color: #94a3b8; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+        .mt-mobile-close {
+          display: none;
+          width: 34px;
+          height: 34px;
+          place-items: center;
+          border-radius: 50%;
+          border: 1px solid #dbe4ef;
+          color: #64748b;
+          background: #f8fafc;
           cursor: pointer;
         }
-        .mt-auth-tabs {
+        .mt-tabs {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 4px;
           padding: 4px;
-          margin-bottom: 22px;
+          margin-bottom: 24px;
           border-radius: 12px;
-          background: #eaf1e6;
-          border: 1px solid #d9e5d5;
+          border: 1px solid #e2e8f0;
+          background: #f1f5f9;
         }
-        .mt-auth-tab {
+        .mt-tab {
           min-height: 40px;
           border: 0;
           border-radius: 9px;
-          cursor: pointer;
-          color: #69806d;
           background: transparent;
-          font-size: 12px;
-          font-weight: 850;
+          color: #64748b;
+          cursor: pointer;
+          font-size: 12.5px;
+          font-weight: 800;
+          transition: .2s ease;
         }
-        .mt-auth-tab.active {
-          color: #14532d;
+        .mt-tab.active {
+          color: #1e3a8a;
           background: #fff;
-          box-shadow: 0 3px 10px rgba(27,62,37,.08);
+          box-shadow: 0 4px 12px rgba(15,23,42,.07);
         }
-        .mt-form-title { margin: 0 0 4px; color: #10271a; font-size: 23px; font-weight: 950; letter-spacing: -.035em; }
-        .mt-form-copy { margin: 0 0 20px; color: #6b806f; font-size: 12px; line-height: 1.5; }
-        .drawer-label {
+        .mt-auth-heading { margin-bottom: 20px; }
+        .mt-auth-heading h2 {
+          margin: 0;
+          color: #0f172a;
+          font-size: 24px;
+          line-height: 1.1;
+          letter-spacing: -.035em;
+          font-weight: 900;
+        }
+        .mt-auth-heading p {
+          margin: 7px 0 0;
+          color: #64748b;
+          font-size: 12.5px;
+          line-height: 1.5;
+          font-weight: 520;
+        }
+        .mt-field { margin-bottom: 15px; }
+        .mt-field-label {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 7px;
           margin-bottom: 6px;
-          color: #2a4933;
+          color: #334155;
           font-size: 12px;
-          font-weight: 800;
+          font-weight: 780;
         }
-        .drawer-label svg { color: #2f8d4f !important; }
-        .drawer-input-v4 {
+        .mt-field-label svg { color: #2563eb; }
+        .mt-input {
           width: 100%;
-          height: 45px;
+          height: 46px;
           padding: 0 14px;
-          outline: none;
-          color: #12281a;
-          background: #f8fbf6;
-          border: 1.5px solid #cad9c7;
           border-radius: 10px;
-          font-size: 13px;
-          font-weight: 650;
-          transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+          border: 1.5px solid #d6e0eb;
+          outline: none;
+          color: #0f172a;
+          background: #f8fafc;
+          font-size: 13.5px;
+          font-weight: 620;
+          transition: .2s ease;
         }
-        .drawer-input-v4:focus {
+        .mt-input:hover:not(:disabled) { border-color: #bfcee0; }
+        .mt-input:focus {
+          border-color: #3b82f6;
           background: #fff;
-          border-color: #4c9e5e;
-          box-shadow: 0 0 0 4px rgba(76,158,94,.12);
+          box-shadow: 0 0 0 4px rgba(59,130,246,.1);
         }
-        .drawer-input-v4:disabled { opacity: .62; cursor: not-allowed; }
-        .btn-submit-v4 {
+        .mt-input:disabled { opacity: .58; cursor: not-allowed; }
+        .mt-password-wrap { position: relative; }
+        .mt-password-wrap .mt-input { padding-right: 44px; }
+        .mt-eye-button {
+          position: absolute;
+          right: 11px;
+          top: 50%;
+          transform: translateY(-50%);
+          display: grid;
+          place-items: center;
+          border: 0;
+          color: #94a3b8;
+          background: transparent;
+          cursor: pointer;
+        }
+        .mt-submit {
           width: 100%;
-          min-height: 49px;
-          margin-top: 12px;
+          height: 49px;
+          margin-top: 6px;
           border: 0;
           border-radius: 11px;
-          cursor: pointer;
-          color: #13210d;
-          background: linear-gradient(135deg, #ffd86c, #f5c84b 62%, #e9a93a);
-          box-shadow: 0 8px 20px rgba(233,169,58,.24);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          color: #fff;
+          background: linear-gradient(135deg, #1e40af, #2563eb);
+          box-shadow: 0 13px 28px rgba(37,99,235,.25);
           font-size: 14px;
-          font-weight: 900;
-          transition: transform .2s ease, box-shadow .2s ease;
-        }
-        .btn-submit-v4:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 11px 26px rgba(233,169,58,.3); }
-        .btn-submit-v4:disabled { opacity: .64; cursor: not-allowed; }
-        .mt-field { margin-bottom: 15px; }
-        .mt-alert { margin-bottom: 16px; padding: 11px 13px; border-radius: 9px; font-size: 12px; line-height: 1.45; font-weight: 650; }
-        .mt-alert.error { color: #a11d1d; background: #fff1f1; border: 1px solid #f2c5c5; }
-        .mt-alert.success { color: #17602f; background: #eefaf0; border: 1px solid #bfe4c6; }
-        .mt-otp-note { padding: 12px 13px; margin-bottom: 16px; color: #1d6334; background: #eef9ee; border: 1px solid #c3e5c8; border-radius: 10px; font-size: 12px; line-height: 1.5; }
-        .mt-link-btn { margin-top: 10px; padding: 0; border: 0; color: #267643; background: transparent; font-size: 12px; font-weight: 800; cursor: pointer; }
-        .mt-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0 16px; color: #87988a; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
-        .mt-divider::before, .mt-divider::after { content: ""; flex: 1; height: 1px; background: #dfe8dc; }
-        .mt-social-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .mt-social-btn { height: 42px; display: flex; align-items: center; justify-content: center; gap: 9px; color: #183022; background: #fff; border: 1px solid #d3dfd0; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
-        .mt-option-list { display: grid; gap: 9px; margin-top: 8px; }
-        .mt-portal-option {
-          width: 100%;
-          padding: 12px 13px;
-          border-radius: 11px;
-          text-align: left;
+          font-weight: 850;
           cursor: pointer;
+          transition: .2s ease;
+        }
+        .mt-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 17px 34px rgba(37,99,235,.32); }
+        .mt-submit:disabled { opacity: .62; cursor: not-allowed; }
+        .mt-message {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 15px;
+          padding: 11px 12px;
+          border-radius: 10px;
+          font-size: 11.5px;
+          font-weight: 650;
+          line-height: 1.45;
+        }
+        .mt-message.error { color: #b91c1c; background: #fff1f2; border: 1px solid #fecdd3; }
+        .mt-message.success { color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .mt-otp-note {
+          margin-bottom: 16px;
+          padding: 12px 13px;
+          border-radius: 10px;
+          border: 1px solid #bfdbfe;
+          color: #1e40af;
+          background: #eff6ff;
+          font-size: 11.5px;
+          line-height: 1.5;
+        }
+        .mt-otp-input { text-align: center; letter-spacing: .32em; font-size: 18px; font-weight: 850; }
+        .mt-link-button {
+          border: 0;
+          padding: 0;
+          color: #2563eb;
+          background: transparent;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .mt-auth-footer {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          margin-top: 22px;
+          padding-top: 16px;
+          border-top: 1px solid #eef2f7;
+          color: #94a3b8;
+          font-size: 10px;
+          font-weight: 650;
+        }
+        .mt-portal-grid { display: grid; gap: 9px; margin-top: 8px; }
+        .mt-option-card {
+          width: 100%;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          color: #183022;
+          gap: 10px;
+          padding: 11px 12px;
+          border-radius: 11px;
+          border: 1.5px solid #d7e0eb;
+          color: #0f172a;
           background: #fff;
-          border: 1.5px solid #cbd9c8;
+          text-align: left;
+          cursor: pointer;
+          transition: .2s ease;
         }
-        .mt-portal-option.selected { background: #eef8ed; border-color: #4d9e5f; }
-        .mt-option-title { font-size: 12.5px; font-weight: 850; }
-        .mt-option-description { margin-top: 3px; color: #708174; font-size: 10.5px; line-height: 1.4; }
-        .mt-check-box { width: 21px; height: 21px; flex: 0 0 auto; display: grid; place-items: center; color: #fff; background: #f4f7f2; border: 1px solid #c5d3c2; border-radius: 7px; }
-        .mt-portal-option.selected .mt-check-box { background: #378b52; border-color: #378b52; }
-        .mt-module-box { margin-bottom: 17px; padding: 13px; border-radius: 11px; background: #f4f9f1; border: 1px solid #cfe0ca; }
-        .mt-module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
-        .mt-module-btn { min-height: 42px; padding: 8px 10px; border-radius: 9px; cursor: pointer; color: #405845; background: #fff; border: 1px solid #cbd8c8; font-size: 11px; font-weight: 850; }
-        .mt-module-btn.selected { color: #1d6334; background: #e1f4df; border-color: #4d9e5f; }
-        .mt-drawer-footer { margin-top: auto; padding-top: 20px; text-align: center; color: #8a9a8d; border-top: 1px solid #e4ebe2; font-size: 10.5px; }
+        .mt-option-card:hover { border-color: #93c5fd; background: #f8fbff; }
+        .mt-option-card.selected { border-color: #3b82f6; background: #eff6ff; }
+        .mt-option-title { font-size: 12.5px; font-weight: 820; }
+        .mt-option-check {
+          width: 21px;
+          height: 21px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 7px;
+          border: 1px solid #cbd5e1;
+          color: #fff;
+          background: #f8fafc;
+        }
+        .mt-option-card.selected .mt-option-check { border-color: #2563eb; background: #2563eb; }
+        .mt-module-box {
+          margin-bottom: 16px;
+          padding: 13px;
+          border-radius: 11px;
+          border: 1px solid #bfdbfe;
+          background: #f8fbff;
+        }
+        .mt-module-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+          margin-top: 9px;
+        }
+        .mt-module-button {
+          min-height: 41px;
+          padding: 8px 9px;
+          border-radius: 9px;
+          border: 1px solid #cbd5e1;
+          color: #334155;
+          background: #fff;
+          font-size: 11.5px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .mt-module-button.selected { color: #1d4ed8; border-color: #2563eb; background: #dbeafe; }
+        .mt-mobile-backdrop { display: none; }
 
         @media (max-width: 1180px) {
-          .mt-header { grid-template-columns: 1fr auto; }
-          .mt-nav { display: none; }
-          .mt-hero { grid-template-columns: 1fr; }
-          .mt-hero-copy { max-width: 720px; }
-          .mt-map-layout { grid-template-columns: minmax(0, 1fr) 200px; }
-          .mt-lower-grid { grid-template-columns: 1fr; }
-          .mt-right-stack { grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr); }
-          .mt-scene { min-height: 210px; }
+          .mt-main { grid-template-columns: minmax(0, 1fr) minmax(370px, 414px); gap: 36px; }
+          .mt-visual-content { grid-template-columns: 185px minmax(230px, 1fr); }
+          .mt-access-state { display: none; }
         }
-        @media (max-width: 760px) {
-          .mt-header { width: min(100% - 28px, 1480px); height: 68px; grid-template-columns: 1fr auto; }
-          .mt-brand-mark { width: 40px; height: 44px; }
-          .mt-brand-title { font-size: 16px; }
-          .mt-brand-kicker { font-size: 8px; }
-          .mt-outline-btn { display: none; }
-          .mt-gold-btn { min-height: 38px; padding: 0 13px; font-size: 10px; }
-          .mt-shell { width: min(100% - 28px, 1480px); padding-top: 18px; }
-          .mt-hero { min-height: auto; gap: 18px; }
-          .mt-hero-copy { padding-left: 0; }
-          .mt-title { font-size: clamp(38px, 12vw, 55px); }
-          .mt-map-layout { grid-template-columns: 1fr; }
-          .mt-map-card { min-height: 340px; }
-          .mt-key-cities { display: none; }
-          .mt-city-label { font-size: 8px; padding: 5px 7px; }
-          .mt-city-pin { width: 21px; height: 21px; }
-          .mt-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-          .mt-stat { padding: 8px 10px; border-right: 0; border-bottom: 1px solid rgba(183,230,108,.12); }
-          .mt-stat:nth-child(3), .mt-stat:nth-child(4) { border-bottom: 0; }
-          .mt-feature-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-          .mt-feature { min-height: 110px; border-right: 0; border-bottom: 1px solid rgba(183,230,108,.12); }
-          .mt-feature:last-child { grid-column: 1 / -1; border-bottom: 0; }
-          .mt-benefits { grid-template-columns: 1fr 1fr; }
-          .mt-benefit { justify-content: flex-start; min-height: 42px; border-right: 0; border-bottom: 1px solid rgba(183,230,108,.1); }
-          .mt-benefit:last-child { grid-column: 1 / -1; border-bottom: 0; }
-          .mt-right-stack { grid-template-columns: 1fr; }
-          .mt-drawer-inner { padding: 24px 20px 20px; }
+
+        @media (max-width: 980px) {
+          .mt-header-request { display: none; }
+          .mt-main {
+            display: block;
+            min-height: calc(100vh - 78px);
+            padding-bottom: 48px;
+          }
+          .mt-hero { max-width: 820px; margin: 0 auto; }
+          .mt-auth-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 100;
+            width: min(100%, 520px);
+            max-height: none;
+            border-radius: 0;
+            transform: translateX(100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform .3s cubic-bezier(.16,1,.3,1), opacity .2s ease;
+            animation: none;
+          }
+          .mt-auth-panel.is-open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+          .mt-auth-inner { max-height: 100vh; min-height: 100vh; padding: 28px 30px; }
+          .mt-mobile-close { display: grid; }
+          .mt-mobile-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            display: block;
+            border: 0;
+            background: rgba(2,6,15,.72);
+            backdrop-filter: blur(6px);
+          }
         }
-        @media (max-width: 460px) {
-          .mt-brand-kicker { display: none; }
-          .mt-header-actions { gap: 6px; }
-          .mt-gold-btn { padding: 0 10px; }
-          .mt-gold-btn svg { display: none; }
-          .mt-map-card { min-height: 292px; }
-          .mt-map-image { height: 292px; }
-          .mt-city-label { display: none; }
-          .mt-city-pin { width: 19px; height: 19px; border-width: 2px; }
-          .mt-stats, .mt-kpis { grid-template-columns: 1fr; }
-          .mt-stat { border-bottom: 1px solid rgba(183,230,108,.12) !important; }
-          .mt-stat:last-child { border-bottom: 0 !important; }
-          .mt-feature-grid { grid-template-columns: 1fr; }
-          .mt-feature, .mt-feature:last-child { grid-column: auto; border-bottom: 1px solid rgba(183,230,108,.12); }
-          .mt-feature:last-child { border-bottom: 0; }
-          .mt-social-row, .mt-module-grid { grid-template-columns: 1fr; }
+
+        @media (max-width: 720px) {
+          .mt-header { height: 70px; padding: 0 18px; }
+          .mt-brand-mark { width: 40px; height: 40px; border-radius: 12px; }
+          .mt-brand-name { font-size: 18px; }
+          .mt-header-signin { min-height: 40px; padding: 0 14px; }
+          .mt-main { padding: 34px 18px 40px; min-height: calc(100vh - 70px); }
+          .mt-title { font-size: clamp(44px, 13vw, 62px); }
+          .mt-description { font-size: 14px; line-height: 1.65; }
+          .mt-status-line { display: none; }
+          .mt-access-visual { min-height: 368px; margin-top: 26px; }
+          .mt-visual-content {
+            min-height: 368px;
+            grid-template-columns: 132px minmax(0, 1fr);
+            gap: 10px;
+            padding: 15px;
+          }
+          .mt-level { min-height: 56px; padding: 7px; }
+          .mt-level-label { font-size: 10px; }
+          .mt-level-sub { font-size: 7.5px; }
+          .mt-core-ring { width: 180px; height: 180px; }
+          .mt-core-badge { width: 92px; height: 92px; border-radius: 25px; }
+          .mt-factor { min-width: 82px; padding: 7px 8px; }
+          .mt-factor b { font-size: 9px; }
+          .mt-factor small { font-size: 7px; }
+          .mt-factor-role { left: -4%; top: 8%; }
+          .mt-factor-geo { right: -2%; top: 15%; }
+          .mt-factor-app { right: 0; bottom: 7%; }
+          .mt-info-strip { grid-template-columns: 1fr; }
+          .mt-info-item { border-right: 0; border-bottom: 1px solid rgba(148,163,184,.1); }
+          .mt-info-item:last-child { border-bottom: 0; }
+          .mt-info-copy { white-space: normal; }
         }
-      ` }} />
+
+        @media (max-width: 480px) {
+          .mt-header-actions .mt-header-signin span { display: none; }
+          .mt-header-signin { width: 42px; padding: 0; }
+          .mt-hero-actions { justify-content: space-between; }
+          .mt-primary-button { flex: 1; }
+          .mt-visual-content { grid-template-columns: 116px minmax(0, 1fr); }
+          .mt-hierarchy { gap: 8px; }
+          .mt-level-icon { width: 23px; height: 23px; }
+          .mt-core-ring { width: 154px; height: 154px; }
+          .mt-core-badge { width: 78px; height: 78px; border-radius: 21px; }
+          .mt-factor { display: none; }
+          .mt-auth-inner { padding: 25px 20px; }
+          .mt-module-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+          }
+        }
+      `}</style>
+
+      <div className="mt-noise" aria-hidden="true" />
 
       <header className="mt-header">
         <div className="mt-brand">
-          <div className="mt-brand-mark"><ShieldCheck size={24} /></div>
-          <div>
-            <div className="mt-brand-title">MatrixTrack 2.0</div>
-            <div className="mt-brand-kicker">CLEAN CITIES PLATFORM</div>
-          </div>
+          <div className="mt-brand-mark"><ShieldCheck size={23} /></div>
+          <div className="mt-brand-name">MatrixTrack 2.0</div>
         </div>
 
-        <nav className="mt-nav" aria-label="Primary navigation">
-          <a href="#about">About Us</a>
-          <a href="#modules">Modules</a>
-          <a href="#features">Features</a>
-          <a href="#resources">Resources</a>
-          <a href="#reports">Reports</a>
-        </nav>
-
         <div className="mt-header-actions">
-          <button className="mt-outline-btn" type="button" onClick={() => { setAuthMode('login'); setIsDrawerOpen(true); }}>
-            <ShieldCheck size={14} /> UNIFIED SSO PORTAL
+          <button
+            type="button"
+            className="mt-header-request"
+            onClick={() => {
+              setAuthMode("register");
+              setError("");
+              setRegStatus("");
+              setIsDrawerOpen(true);
+            }}
+          >
+            Request Access
           </button>
-          <button className="mt-gold-btn" type="button" onClick={() => { setAuthMode('login'); setIsDrawerOpen(true); }}>
-            Sign In / Register <ArrowRight size={15} />
+          <button
+            type="button"
+            className="mt-header-signin"
+            onClick={() => {
+              setAuthMode("login");
+              setError("");
+              setRegStatus("");
+              setIsDrawerOpen(true);
+            }}
+          >
+            <LogIn size={16} /> <span>Sign In</span>
           </button>
         </div>
       </header>
 
-      <main className="mt-shell">
-        <section className="mt-hero" id="about">
-          <div className="mt-hero-copy">
-            <div className="mt-location-pill"><MapPin size={14} /> Madhya Pradesh</div>
-            <h1 className="mt-title">
-              <span>Madhya Pradesh</span>
-              <span className="green">Clean Cities</span>
-              <span>Single Sign-On Portal</span>
-            </h1>
-            <p className="mt-subtitle">
-              One Unified Single Sign-On (SSO) Portal for Taskforce 20, Swachh Ward Ranking,
-              Workforce Monitoring, and Material Recovery.
-            </p>
-            <button className="mt-hero-btn" type="button" onClick={() => { setAuthMode('login'); setIsDrawerOpen(true); }}>
-              Access Account Portal <ArrowRight size={17} />
-            </button>
+      <main className="mt-main">
+        <section className="mt-hero" aria-labelledby="matrixtrack-title">
+          <div className="mt-eyebrow">
+            <span className="mt-eyebrow-dot" />
+            Monitor in One Place. Act at Every Level.
           </div>
 
-          <div className="mt-map-layout" aria-label="Madhya Pradesh city coverage map">
-            <div className="mt-map-card">
-              <img
-                className="mt-map-image"
-                src="/mp-map-premium.png"
-                alt="Madhya Pradesh map with Gwalior, Bhopal, Ujjain, Indore and Jabalpur city markers"
-                draggable={false}
-              />
-            </div>
+          <h1 id="matrixtrack-title" className="mt-title">
+            MatrixTrack <span>2.0</span>
+          </h1>
 
-            <aside className="mt-key-cities">
-              <h3>Our Key Cities</h3>
-              <div className="mt-city-list">
+          <p className="mt-description">
+            Access your assigned workspace based on administrative role,
+            jurisdiction and authorised applications.
+          </p>
+
+
+          <div className="mt-access-visual" aria-label="Administrative access structure">
+            <div className="mt-scan-line" aria-hidden="true" />
+
+            <div className="mt-visual-content">
+              <div className="mt-hierarchy">
                 {[
-                  { name: "Bhopal", caption: "Capital City", image: "/city-bhopal.png" },
-                  { name: "Indore", caption: "Cleanest City", image: "/city-indore.png" },
-                  { name: "Gwalior", caption: "Heritage City", image: "/city-gwalior.png" },
-                  { name: "Jabalpur", caption: "Smart City", image: "/city-jabalpur.png" },
-                ].map((city) => (
-                  <div className="mt-city-card" key={city.name}>
-                    <div className="mt-city-thumb">
-                      <img src={city.image} alt="" aria-hidden="true" />
+                  { label: "State", sub: "Administration", icon: <Landmark size={14} /> },
+                  { label: "Division", sub: "Administration", icon: <Layers size={14} /> },
+                  { label: "District", sub: "Administration", icon: <MapPinned size={14} /> },
+                  { label: "City", sub: "Administration", icon: <Building2 size={14} /> },
+                ].map((level) => (
+                  <div className="mt-level" key={level.label}>
+                    <div className="mt-level-icon">{level.icon}</div>
+                    <div>
+                      <div className="mt-level-label">{level.label}</div>
+                      <div className="mt-level-sub">{level.sub}</div>
                     </div>
-                    <div><strong>{city.name}</strong><span>{city.caption}</span></div>
                   </div>
                 ))}
               </div>
-            </aside>
-          </div>
-        </section>
 
-        <section className="mt-lower-grid" id="features">
-          <div className="mt-left-stack">
-            <div className="mt-stats mt-glass">
-              {[
-                { value: "14,491+", label: "Field Workers", className: "accent-cyan", icon: <Users size={22} /> },
-                { value: "777", label: "Swachh Wards", className: "accent-green", icon: <Trash2 size={22} /> },
-                { value: "4", label: "Modules", className: "accent-purple", icon: <Boxes size={22} /> },
-                { value: "1", label: "Unified Suite", className: "accent-gold", icon: <ShieldCheck size={22} /> },
-              ].map((item) => (
-                <div className={`mt-stat ${item.className}`} key={item.label}>
-                  <div className="mt-icon-ring">{item.icon}</div>
-                  <div><div className="mt-stat-value">{item.value}</div><div className="mt-stat-label">{item.label}</div></div>
+              <div className="mt-core">
+                <svg className="mt-core-svg" viewBox="0 0 420 280" aria-hidden="true">
+                  <path d="M36 52 C112 58, 116 120, 196 133" />
+                  <path d="M386 56 C312 60, 305 112, 222 133" />
+                  <path d="M373 233 C301 218, 286 170, 225 150" />
+                </svg>
+
+                <div className="mt-core-ring" aria-hidden="true" />
+                <div className="mt-core-badge"><ShieldCheck size={44} strokeWidth={1.8} /></div>
+
+                <div className="mt-factor mt-factor-role">
+                  <b>Role</b>
+                  <small>Assigned authority</small>
                 </div>
-              ))}
-            </div>
+                <div className="mt-factor mt-factor-geo">
+                  <b>Jurisdiction</b>
+                  <small>Administrative scope</small>
+                </div>
+                <div className="mt-factor mt-factor-app">
+                  <b>Applications</b>
+                  <small>Approved workspace</small>
+                </div>
 
-            <div className="mt-features mt-glass" id="modules">
-              <div className="mt-section-heading">
-                <h2>Empowering Clean Cities with Technology &amp; Transparency</h2>
-                <div className="mt-heading-line" />
+                <span className="mt-pulse-dot mt-dot-one" aria-hidden="true" />
+                <span className="mt-pulse-dot mt-dot-two" aria-hidden="true" />
+                <span className="mt-pulse-dot mt-dot-three" aria-hidden="true" />
               </div>
-              <div className="mt-feature-grid">
-                {[
-                  { title: "Unified Access", copy: "One login for all municipal solutions", icon: <MapPin size={29} /> },
-                  { title: "Smart Monitoring", copy: "Real-time tracking of workforce & activities", icon: <Globe size={29} /> },
-                  { title: "Data & Analytics", copy: "Insights that drive better decisions", icon: <BarChart3 size={29} /> },
-                  { title: "Transparency", copy: "Building accountability & public trust", icon: <ShieldCheck size={29} /> },
-                  { title: "Sustainable Impact", copy: "Healthier cities for a better tomorrow", icon: <Leaf size={29} /> },
-                ].map((item) => (
-                  <div className="mt-feature" key={item.title}>
-                    <div className="mt-feature-icon">{item.icon}</div>
-                    <strong>{item.title}</strong>
-                    <p>{item.copy}</p>
+
+              <div className="mt-access-state">
+                <div>
+                  <div className="mt-state-label">Access context</div>
+                  <div className="mt-state-title">Workspace prepared after verification</div>
+
+                  <div className="mt-state-list">
+                    {[
+                      [<BadgeCheck size={12} key="i1" />, "Verified identity"],
+                      [<MapPin size={12} key="i2" />, "Assigned geography"],
+                      [<LayoutDashboard size={12} key="i3" />, "Enabled workspace"],
+                    ].map(([icon, label], index) => (
+                      <div className="mt-state-item" key={index}>
+                        <div className="mt-state-check">{icon}</div>
+                        <span>{label}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                <div className="mt-state-ready">
+                  <span>Secure gateway ready</span>
+                  <span />
+                </div>
               </div>
             </div>
-
-            <div className="mt-benefits mt-glass" id="resources">
-              {[
-                { label: "Secure & Unified SSO Access", icon: <ShieldCheck size={21} /> },
-                { label: "Role-Based Dashboards", icon: <Users size={21} /> },
-                { label: "Real-time Monitoring", icon: <Clock3 size={21} /> },
-                { label: "Data-Driven Decision Making", icon: <BarChart3 size={21} /> },
-                { label: "Clean Cities Better Tomorrow", icon: <Leaf size={21} /> },
-              ].map((item) => <div className="mt-benefit" key={item.label}>{item.icon}<span>{item.label}</span></div>)}
-            </div>
           </div>
 
-          <div className="mt-right-stack" id="reports">
-            <div className="mt-kpis mt-glass">
-              {[
-                { value: "14,491+", label: "Field Workers", className: "accent-cyan", icon: <Users size={21} /> },
-                { value: "777", label: "Swachh Wards", className: "accent-green", icon: <Trash2 size={21} /> },
-                { value: "4", label: "Modules", className: "accent-purple", icon: <Boxes size={21} /> },
-                { value: "1", label: "Unified Suite", className: "accent-gold", icon: <ShieldCheck size={21} /> },
-              ].map((item) => (
-                <div className={`mt-kpi ${item.className}`} key={item.label}>
-                  <div className="mt-icon-ring">{item.icon}</div>
-                  <div><strong>{item.value}</strong><span>{item.label}</span></div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-scene" aria-label="Municipal sanitation workers and green recycling truck at sunset">
-              <img
-                src="/clean-city-operations-premium.png"
-                alt="Municipal sanitation workers cleaning a public space beside a green recycling truck"
-                draggable={false}
-              />
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {isDrawerOpen && (
-        <div className="mt-auth-layer">
-          <button className="mt-auth-backdrop" type="button" aria-label="Close authentication panel" onClick={() => setIsDrawerOpen(false)} />
-
-          <aside className="mt-drawer" aria-label="Unified SSO authentication">
-            <div className="mt-drawer-inner">
+          <div className="mt-info-strip">
+            <div className="mt-info-item">
+              <div className="mt-info-icon"><Landmark size={17} /></div>
               <div>
-                <div className="mt-drawer-head">
-                  <div className="mt-drawer-brand">
-                    <div className="mt-drawer-logo"><ShieldCheck size={20} /></div>
-                    <div><strong>MatrixTrack 2.0</strong><small>UNIFIED ENTERPRISE SSO</small></div>
-                  </div>
-                  <button className="mt-close-btn" type="button" onClick={() => setIsDrawerOpen(false)}><X size={17} /></button>
+                <div className="mt-info-title">Administrative Scope</div>
+                <div className="mt-info-copy">State · Division · District · City</div>
+              </div>
+            </div>
+            <div className="mt-info-item">
+              <div className="mt-info-icon"><KeyRound size={17} /></div>
+              <div>
+                <div className="mt-info-title">Access Assignment</div>
+                <div className="mt-info-copy">Role · Geography · Application</div>
+              </div>
+            </div>
+            <div className="mt-info-item">
+              <div className="mt-info-icon"><LayoutDashboard size={17} /></div>
+              <div>
+                <div className="mt-info-title">Workspace Delivery</div>
+                <div className="mt-info-copy">Authorised dashboards only</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {isDrawerOpen && (
+          <button
+            type="button"
+            className="mt-mobile-backdrop"
+            aria-label="Close access panel"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+        )}
+
+        <aside
+          id="auth-panel"
+          className={`mt-auth-panel ${isDrawerOpen ? "is-open" : ""}`}
+          aria-label="MatrixTrack account access"
+        >
+          <div className="mt-auth-inner">
+            <div className="mt-auth-top">
+              <div className="mt-auth-brand">
+                <div className="mt-auth-logo"><ShieldCheck size={20} /></div>
+                <div>
+                  <div className="mt-auth-name">MatrixTrack 2.0</div>
+                  <div className="mt-auth-sub">Administrative Access</div>
                 </div>
-
-                <div className="mt-auth-tabs">
-                  <button type="button" className={`mt-auth-tab ${authMode === 'login' ? 'active' : ''}`} onClick={() => { setAuthMode('login'); setError(""); setRegStatus(""); }}>
-                    Sign In (Login)
-                  </button>
-                  <button type="button" className={`mt-auth-tab ${authMode === 'register' ? 'active' : ''}`} onClick={() => { setAuthMode('register'); setError(""); setRegStatus(""); }}>
-                    Create Account
-                  </button>
-                </div>
-
-                {authMode === 'login' ? (
-                  <div>
-                    <h2 className="mt-form-title">Sign In</h2>
-                    <p className="mt-form-copy">Enter your credentials to access your unified enterprise account.</p>
-
-                    <form onSubmit={otpStep ? handleOtpSubmit : handleLoginSubmit}>
-                      {!otpStep && (
-                        <>
-                          <div className="mt-field">
-                            <label className="drawer-label"><Mail size={14} /> Email Address</label>
-                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@gov.in" required className="drawer-input-v4" />
-                          </div>
-                          <div className="mt-field">
-                            <label className="drawer-label"><Lock size={14} /> Password</label>
-                            <div style={{ position: "relative" }}>
-                              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="........" required className="drawer-input-v4" style={{ paddingRight: 44 }} />
-                              <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: 11, top: "50%", transform: "translateY(-50%)", border: 0, color: "#718475", background: "transparent", cursor: "pointer" }}>
-                                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                              </button>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {otpStep && (
-                        <div className="mt-field">
-                          <div className="mt-otp-note">A verification code has been sent to <strong>{otpEmail}</strong>. Enter the 6-digit OTP to complete MatrixTrack login.</div>
-                          <label className="drawer-label"><Lock size={14} /> Verification Code</label>
-                          <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="Enter 6-digit OTP" required className="drawer-input-v4" style={{ textAlign: "center", letterSpacing: ".34em", fontSize: 18, fontWeight: 850 }} />
-                          <button className="mt-link-btn" type="button" onClick={resetOtpStep} disabled={loading}>Back to email and password</button>
-                        </div>
-                      )}
-
-                      {error && <div className="mt-alert error">{error}</div>}
-
-                      <button type="submit" disabled={loading} className="btn-submit-v4">
-                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                          {loading ? (otpStep ? "Verifying OTP..." : "Signing In...") : (otpStep ? "Verify OTP & Continue" : "Sign In")}
-                          <ArrowRight size={16} />
-                        </span>
-                      </button>
-                    </form>
-
-                    <div className="mt-divider">or continue with</div>
-                    <div className="mt-social-row">
-                      <button type="button" className="mt-social-btn">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-                          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                        </svg>
-                        Google
-                      </button>
-                      <button type="button" className="mt-social-btn">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <rect x="1" y="1" width="10.5" height="10.5" fill="#F25022" /><rect x="12.5" y="1" width="10.5" height="10.5" fill="#7FBA00" /><rect x="1" y="12.5" width="10.5" height="10.5" fill="#00A4EF" /><rect x="12.5" y="12.5" width="10.5" height="10.5" fill="#FFB900" />
-                        </svg>
-                        Microsoft
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <h2 className="mt-form-title">Create Account</h2>
-                    <p className="mt-form-copy">Fill in your details to request access to the portal.</p>
-
-                    <form onSubmit={handleRegisterSubmit}>
-                      <div className="mt-field">
-                        <label className="drawer-label"><Hash size={14} /> ULB Code</label>
-                        <input type="text" placeholder="e.g. JMC01" value={regForm.ulbCode} onChange={(e) => updateRegForm("ulbCode", e.target.value)} required className="drawer-input-v4" />
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><UserPlus size={14} /> Full Name</label>
-                        <input type="text" placeholder="John Doe" value={regForm.name} onChange={(e) => updateRegForm("name", e.target.value)} required className="drawer-input-v4" />
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><MapPin size={14} /> City</label>
-                        <select className="drawer-input-v4" value={regForm.cityId} onChange={(e) => handleCityChange(e.target.value)} required>
-                          <option value="">Select City</option>
-                          {cities.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><MapPin size={14} /> Zone</label>
-                        <select className="drawer-input-v4" value={regForm.zoneId} onChange={(e) => handleZoneChange(e.target.value)} required disabled={!regForm.cityId || loadingGeo}>
-                          <option value="">Select Zone</option>
-                          {zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><MapPin size={14} /> Ward</label>
-                        <select className="drawer-input-v4" value={regForm.wardId} onChange={(e) => updateRegForm("wardId", e.target.value)} required disabled={!regForm.zoneId || loadingGeo}>
-                          <option value="">Select Ward</option>
-                          {wards.map((ward) => <option key={ward.id} value={ward.id}>{ward.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><ShieldCheck size={14} /> Requested Role</label>
-                        <select className="drawer-input-v4" value={requestedRole} onChange={(e) => setRequestedRole(e.target.value as UnifiedRegistrationRole)} required>
-                          <option value="">Select Role</option>
-                          <option value="SUPERVISOR">Supervisor</option>
-                          <option value="EMPLOYEE">Employee</option>
-                          <option value="QC">Quality Controller</option>
-                          <option value="ACTION_OFFICER">Action Officer</option>
-                        </select>
-                      </div>
-
-                      <div className="mt-field">
-                        <label className="drawer-label"><Layers size={14} /> Required Application Access</label>
-                        <div className="mt-option-list">
-                          {[
-                            { key: "TASKFORCE_20", title: "Taskforce 20", description: "Sanitation operations and performance monitoring" },
-                            { key: "MATRIX_TRACK", title: "MatrixTrack", description: "Workforce attendance and geo-tracking" },
-                            { key: "WARD_RANKING", title: "Ward Ranking", description: "Ward assessment, ranking and QC scorecards" },
-                          ].map((portal) => {
-                            const portalKey = portal.key as UnifiedPortalKey;
-                            const selected = selectedPortals.includes(portalKey);
-                            return (
-                              <button key={portal.key} type="button" className={`mt-portal-option ${selected ? 'selected' : ''}`} onClick={() => togglePortal(portalKey)}>
-                                <div><div className="mt-option-title">{portal.title}</div><div className="mt-option-description">{portal.description}</div></div>
-                                <div className="mt-check-box">{selected && <Check size={13} />}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {selectedPortals.includes("TASKFORCE_20") && (
-                        <div className="mt-module-box">
-                          <label className="drawer-label"><ShieldCheck size={14} /> Select Taskforce Modules</label>
-                          <div className="mt-module-grid">
-                            {[
-                              { key: "TASKFORCE", label: "Taskforce" },
-                              { key: "SWEEPING", label: "Sweeping" },
-                              { key: "LITTERBINS", label: "Litter Bins" },
-                              { key: "TOILET", label: "Toilet" },
-                            ].map((module) => {
-                              const moduleKey = module.key as UnifiedTaskforceModuleKey;
-                              const selected = selectedTaskforceModules.includes(moduleKey);
-                              return <button key={module.key} type="button" className={`mt-module-btn ${selected ? 'selected' : ''}`} onClick={() => toggleTaskforceModule(moduleKey)}>{selected ? "OK - " : ""}{module.label}</button>;
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-field">
-                        <label className="drawer-label"><Mail size={14} /> Email Address</label>
-                        <input type="email" placeholder="john@gov.in" value={regForm.email} onChange={(e) => updateRegForm("email", e.target.value)} required className="drawer-input-v4" />
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><Phone size={14} /> Phone Number</label>
-                        <input type="tel" placeholder="+91 00000 00000" value={regForm.phone} onChange={(e) => updateRegForm("phone", e.target.value)} required className="drawer-input-v4" />
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><Hash size={14} /> Aadhar Number</label>
-                        <input type="text" placeholder="0000 0000 0000" value={regForm.aadharNumber} onChange={(e) => updateRegForm("aadharNumber", e.target.value)} required className="drawer-input-v4" />
-                      </div>
-                      <div className="mt-field">
-                        <label className="drawer-label"><Lock size={14} /> Password</label>
-                        <input type="password" placeholder="........" value={regForm.password} onChange={(e) => updateRegForm("password", e.target.value)} required className="drawer-input-v4" />
-                      </div>
-
-                      {regStatus && <div className="mt-alert success" style={{ display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={16} /> {regStatus}</div>}
-                      {error && <div className="mt-alert error">{error}</div>}
-
-                      <button type="submit" disabled={loading} className="btn-submit-v4">
-                        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                          {loading ? "Submitting Request..." : "Request Unified Access"}<ArrowRight size={16} />
-                        </span>
-                      </button>
-                    </form>
-                  </div>
-                )}
               </div>
 
-              <div className="mt-drawer-footer">MatrixTrack 2.0 Unified SSO Platform &copy; 2026</div>
+              <button
+                type="button"
+                className="mt-mobile-close"
+                aria-label="Close"
+                onClick={() => setIsDrawerOpen(false)}
+              >
+                <X size={18} />
+              </button>
             </div>
-          </aside>
-        </div>
-      )}
+
+            <div className="mt-tabs">
+              <button
+                type="button"
+                className={`mt-tab ${authMode === "login" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("login");
+                  setError("");
+                  setRegStatus("");
+                }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`mt-tab ${authMode === "register" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("register");
+                  setError("");
+                  setRegStatus("");
+                }}
+              >
+                Request Access
+              </button>
+            </div>
+
+            {authMode === "login" ? (
+              <div>
+                <div className="mt-auth-heading">
+                  <h2>{otpStep ? "Verify account" : "Sign in"}</h2>
+                  <p>
+                    {otpStep
+                      ? "Enter the verification code sent to your registered email."
+                      : "Use your authorised account credentials."}
+                  </p>
+                </div>
+
+                <form onSubmit={otpStep ? handleOtpSubmit : handleLoginSubmit}>
+                  {!otpStep && (
+                    <>
+                      <div className="mt-field">
+                        <label className="mt-field-label">
+                          <UserPlus size={14} /> Email or Mobile Number
+                        </label>
+
+                        <input
+                          type="text"
+                          value={loginIdentifier}
+                          onChange={(e) =>
+                            setLoginIdentifier(e.target.value)
+                          }
+                          placeholder="Email or 10-digit mobile number"
+                          required
+                          autoComplete="username"
+                          className="mt-input"
+                        />
+                      </div>
+
+                      <div className="mt-field">
+                        <label className="mt-field-label">
+                          <Lock size={14} /> Password
+                        </label>
+                        <div className="mt-password-wrap">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            required
+                            className="mt-input"
+                          />
+                          <button
+                            type="button"
+                            className="mt-eye-button"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {otpStep && (
+                    <div className="mt-field">
+                      <div className="mt-otp-note">
+                        Code sent to <strong>{otpEmail}</strong>
+                      </div>
+                      <label className="mt-field-label">
+                        <Lock size={14} /> Verification Code
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        value={otp}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                        }
+                        placeholder="000000"
+                        required
+                        className="mt-input mt-otp-input"
+                      />
+                      <button
+                        type="button"
+                        className="mt-link-button"
+                        style={{ marginTop: 11 }}
+                        onClick={resetOtpStep}
+                        disabled={loading}
+                      >
+                        Back to sign in
+                      </button>
+                    </div>
+                  )}
+
+                  {error && <div className="mt-message error">{error}</div>}
+
+                  <button type="submit" disabled={loading} className="mt-submit">
+                    <span>
+                      {loading
+                        ? otpStep
+                          ? "Verifying..."
+                          : "Signing in..."
+                        : otpStep
+                          ? "Verify OTP"
+                          : "Sign In"}
+                    </span>
+                    <ArrowRight size={17} />
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div>
+                <div className="mt-auth-heading">
+                  <h2>Request access</h2>
+                  <p>Submit your details for administrative approval.</p>
+                </div>
+
+                <form onSubmit={handleRegisterSubmit}>
+
+
+                  <div className="mt-field">
+                    <label className="mt-field-label"><UserPlus size={14} /> Full Name</label>
+                    <input
+                      type="text"
+                      placeholder="Full name"
+                      value={regForm.name}
+                      onChange={(e) => updateRegForm("name", e.target.value)}
+                      required
+                      className="mt-input"
+                    />
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label">
+                      <Landmark size={14} /> State
+                    </label>
+
+                    <select
+                      className="mt-input"
+                      value={regForm.stateId}
+                      onChange={(event) =>
+                        void handleStateChange(event.target.value)
+                      }
+                      required
+                    >
+                      <option value="">Select State</option>
+
+                      {states.map((state) => (
+                        <option
+                          key={state.id}
+                          value={state.id}
+                        >
+                          {state.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label">
+                      <Layers size={14} /> Division
+                    </label>
+
+                    <select
+                      className="mt-input"
+                      value={regForm.divisionId}
+                      onChange={(event) =>
+                        void handleDivisionChange(
+                          event.target.value,
+                        )
+                      }
+                      disabled={!regForm.stateId || loadingGeo}
+                      required
+                    >
+                      <option value="">Select Division</option>
+
+                      {divisions.map((division) => (
+                        <option
+                          key={division.id}
+                          value={division.id}
+                        >
+                          {division.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label">
+                      <MapPinned size={14} /> District
+                    </label>
+
+                    <select
+                      className="mt-input"
+                      value={regForm.districtId}
+                      onChange={(event) =>
+                        void handleDistrictChange(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        !regForm.divisionId || loadingGeo
+                      }
+                      required
+                    >
+                      <option value="">Select District</option>
+
+                      {districts.map((district) => (
+                        <option
+                          key={district.id}
+                          value={district.id}
+                        >
+                          {district.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label"><MapPin size={14} /> City</label>
+                    <select
+                      className="mt-input"
+                      value={regForm.cityId}
+                      onChange={(event) =>
+                        void handleCityChange(event.target.value)
+                      }
+                      disabled={
+                        !regForm.districtId || loadingGeo
+                      }
+                      required
+                    >
+                      <option value="">Select City</option>
+                      {cities.map((city) => (
+                        <option key={city.id} value={city.id}>{city.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+
+                  <div className="mt-field">
+                    <label className="mt-field-label"><MapPin size={14} /> Zone</label>
+                    <select
+                      className="mt-input"
+                      value={regForm.zoneId}
+                      onChange={(e) => handleZoneChange(e.target.value)}
+                      required
+                      disabled={!regForm.cityId || loadingGeo}
+                    >
+                      <option value="">Select Zone</option>
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>{zone.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label"><MapPin size={14} /> Ward</label>
+                    <select
+                      className="mt-input"
+                      value={regForm.wardId}
+                      onChange={(e) => updateRegForm("wardId", e.target.value)}
+                      required
+                      disabled={!regForm.zoneId || loadingGeo}
+                    >
+                      <option value="">Select Ward</option>
+                      {wards.map((ward) => (
+                        <option key={ward.id} value={ward.id}>{ward.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+
+
+                  <div className="mt-field">
+                    <label className="mt-field-label"><Layers size={14} /> Required Application Access</label>
+                    <div className="mt-portal-grid">
+                      {[
+                        {
+                          key: "TASKFORCE_20",
+                          title: "Inspection & Performance System",
+                        },
+                        {
+                          key: "PROCESSING_PLANT",
+                          title: "Processing Monitoring System",
+                        },
+                        {
+                          key: "MATRIX_TRACK",
+                          title: "Workforce Attendance System",
+                        },
+                        {
+                          key: "WARD_RANKING",
+                          title: "Ward Ranking System",
+                        },
+                      ].map((portal) => {
+                        const portalKey = portal.key as UnifiedPortalKey;
+                        const selected = selectedPortals.includes(portalKey);
+
+                        return (
+                          <button
+                            key={portal.key}
+                            type="button"
+                            className={`mt-option-card ${selected ? "selected" : ""}`}
+                            onClick={() => togglePortal(portalKey)}
+                          >
+                            <span className="mt-option-title">{portal.title}</span>
+                            <span className="mt-option-check">
+                              {selected && <Check size={14} />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+
+
+                  {selectedPortals.includes("TASKFORCE_20") && (
+                    <div className="mt-module-box">
+                      <label className="mt-field-label"><ShieldCheck size={14} /> Select Taskforce Modules</label>
+                      <div className="mt-module-grid">
+                        {[
+                          { key: "TASKFORCE", label: "Taskforce" },
+                          { key: "SWEEPING", label: "Sweeping" },
+                          { key: "LITTERBINS", label: "Litter Bins" },
+                          { key: "TOILET", label: "Toilet" },
+                        ].map((module) => {
+                          const moduleKey = module.key as UnifiedTaskforceModuleKey;
+                          const selected = selectedTaskforceModules.includes(moduleKey);
+
+                          return (
+                            <button
+                              key={module.key}
+                              type="button"
+                              className={`mt-module-button ${selected ? "selected" : ""}`}
+                              onClick={() => toggleTaskforceModule(moduleKey)}
+                            >
+                              {selected ? "✓ " : ""}{module.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {!isCityLevelAccess && (
+                    <>
+                      {selectedPortals.map((portalKey) => (
+                        <div
+                          className="mt-field"
+                          key={`application-role-${portalKey}`}
+                          style={{ marginTop: 12 }}
+                        >
+                          <label className="mt-field-label">
+                            <ShieldCheck size={14} />
+                            {PORTAL_LABELS[portalKey]} Role
+                          </label>
+
+                          <select
+                            className="mt-input"
+                            value={
+                              applicationRoles[portalKey] || ""
+                            }
+                            onChange={(event) =>
+                              setApplicationRoles((current) => ({
+                                ...current,
+                                [portalKey]: event.target.value,
+                              }))
+                            }
+                            required
+                          >
+                            <option value="">Select Role</option>
+
+                            {PORTAL_ROLE_OPTIONS[
+                              portalKey
+                            ].map((role) => (
+                              <option
+                                key={role.value}
+                                value={role.value}
+                              >
+                                {role.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  <div className="mt-field">
+                    <label className="mt-field-label"><Mail size={14} /> Email Address</label>
+                    <input
+                      type="email"
+                      placeholder="you@gov.in"
+                      value={regForm.email}
+                      onChange={(e) => updateRegForm("email", e.target.value)}
+                      required
+                      className="mt-input"
+                    />
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label">
+                      <Phone size={14} /> Mobile Number
+                    </label>
+
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]{10}"
+                      maxLength={10}
+                      placeholder="0000000000"
+                      value={regForm.phone}
+                      onChange={(e) =>
+                        updateRegForm(
+                          "phone",
+                          e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10),
+                        )
+                      }
+                      autoComplete="tel"
+                      required
+                      className="mt-input"
+                    />
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label">
+                      <Hash size={14} /> Aadhaar Number
+                    </label>
+
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]{12}"
+                      maxLength={12}
+                      placeholder="000000000000"
+                      value={regForm.aadharNumber}
+                      onChange={(e) =>
+                        updateRegForm(
+                          "aadharNumber",
+                          e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 12),
+                        )
+                      }
+                      autoComplete="off"
+                      required
+                      className="mt-input"
+                    />
+                  </div>
+
+                  <div className="mt-field">
+                    <label className="mt-field-label"><Lock size={14} /> Password</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={regForm.password}
+                      onChange={(e) => updateRegForm("password", e.target.value)}
+                      required
+                      className="mt-input"
+                    />
+                  </div>
+
+                  {regStatus && (
+                    <div className="mt-message success">
+                      <CheckCircle2 size={15} /> <span>{regStatus}</span>
+                    </div>
+                  )}
+
+                  {error && <div className="mt-message error">{error}</div>}
+
+                  <button type="submit" disabled={loading} className="mt-submit">
+                    <span>{loading ? "Submitting..." : "Submit Request"}</span>
+                    <ArrowRight size={17} />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <div className="mt-auth-footer">
+              <ShieldCheck size={12} /> MatrixTrack 2.0 · © 2026
+            </div>
+          </div>
+        </aside>
+      </main>
     </div>
   );
 }

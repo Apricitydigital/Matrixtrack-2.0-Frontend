@@ -56,14 +56,9 @@ export default function CityUsersPageWrapper() {
 }
 
 function CityUsersPage() {
-  const [mounted, setMounted] = useState(false);
   const { user: currentUser } = useAuth();
   const searchParams = useSearchParams();
   const isReadOnly = currentUser?.roles?.some(r => ["COMMISSIONER", "ULB_OFFICER"].includes(r));
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -91,6 +86,13 @@ function CityUsersPage() {
   const [activeTab, setActiveTab] = useState<Role | "ALL">("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const pageSize = 8;
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, activeTab]);
 
   useEffect(() => {
     const roleParam = searchParams.get("role");
@@ -125,19 +127,14 @@ function CityUsersPage() {
         const matchesTab = activeTab === "ALL" || (u.role as string) === activeTab;
         return matchesSearch && matchesTab;
       })
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [users, searchQuery, activeTab]);
 
-  const displayModules = useMemo(() => {
-    const keyMap = new Map<string, CityModule>();
-
-    availableModules.forEach((m) => {
-      const normKey = normalizeModuleKey(m.key);
-      keyMap.set(normKey, { ...m, key: normKey });
-    });
-
-    return Array.from(keyMap.values());
-  }, [availableModules]);
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedUsers = useMemo(() => {
+    return filteredUsers.slice((safePage - 1) * pageSize, safePage * pageSize);
+  }, [filteredUsers, safePage, pageSize]);
 
   const loadModules = async () => {
     setLoadingModules(true);
@@ -337,19 +334,7 @@ function CityUsersPage() {
           zoneIds: current.role === "QC" ? Array.from(current.zoneIds) : [],
           wardIds: current.role === "QC" ? Array.from(current.wardIds) : []
         };
-      else {
-        delete modules[moduleId];
-        const userObj = users.find((u) => u.id === userId);
-        const targetMod = displayModules.find((m) => m.id === moduleId);
-        if (targetMod && userObj) {
-          Object.keys(modules).forEach((mid) => {
-            const uMod = userObj.modules?.find((um) => um.id === mid);
-            if (uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(targetMod.key)) {
-              delete modules[mid];
-            }
-          });
-        }
-      }
+      else delete modules[moduleId];
       return { ...prev, [userId]: { ...current, modules: enforceRoleWriteRules(current.role, modules) } };
     });
   };
@@ -439,16 +424,32 @@ function CityUsersPage() {
         setSavingUserId(null);
         return;
       }
-      const modules = Object.entries(payload.modules).map(([moduleId, { canWrite, zoneIds, wardIds }]) => ({
-        moduleId,
-        canWrite,
-        ...(payload.role === "QC"
-          ? {
-            zoneIds: zoneIds && zoneIds.length ? zoneIds.filter((id) => validZoneIds.has(id)) : cleanZoneIds,
-            wardIds: wardIds && wardIds.length ? wardIds.filter((id) => validWardIds.has(id)) : cleanWardIds
-          }
-          : {})
-      }));
+      const userObj = users.find((u) => u.id === id);
+      const modules = Object.entries(payload.modules)
+        .filter(([moduleId]) =>
+          availableModules.some((m) => {
+            if (m.id === moduleId) return true;
+            const uMod = userObj?.modules?.find((um) => um.id === moduleId);
+            return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
+          })
+        )
+        .map(([moduleId, { canWrite, zoneIds, wardIds }]) => {
+          const targetMod = availableModules.find((m) => {
+            if (m.id === moduleId) return true;
+            const uMod = userObj?.modules?.find((um) => um.id === moduleId);
+            return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
+          });
+          return {
+            moduleId: targetMod?.id || moduleId,
+            canWrite,
+            ...(payload.role === "QC"
+              ? {
+                zoneIds: zoneIds && zoneIds.length ? zoneIds.filter((id) => validZoneIds.has(id)) : cleanZoneIds,
+                wardIds: wardIds && wardIds.length ? wardIds.filter((id) => validWardIds.has(id)) : cleanWardIds
+              }
+              : {})
+          };
+        });
       await CityUserApi.update(id, {
         name: payload.name,
         role: payload.role,
@@ -482,8 +483,6 @@ function CityUsersPage() {
     }
   };
 
-  if (!mounted) return null;
-
   return (
     <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "COMMISSIONER", "ULB_OFFICER"]}>
       <div className="page" style={{ padding: "32px 40px", backgroundColor: "#f8fafc", minHeight: "100vh" }}>
@@ -491,9 +490,8 @@ function CityUsersPage() {
           {/* Header Section */}
           <div style={{ marginBottom: "32px" }}>
             <div className="breadcrumb" style={{ fontSize: "0.875rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "8px" }}>
-              <span>Governance</span>
-              <span>/</span>
-              <span style={{ color: "#1e293b", fontWeight: 500 }}>Municipal Personnel</span>
+              
+              <span style={{ color: "#1e293b", fontWeight: 500 }}>Registered Users</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -501,7 +499,7 @@ function CityUsersPage() {
                   <Users size={28} />
                 </div>
                 <h1 style={{ fontSize: "1.875rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                  Personnel Management
+                  User Management
                 </h1>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -735,7 +733,7 @@ function CityUsersPage() {
                         {loadingModules ? (
                           Array(4).fill(0).map((_, i) => <div key={i} className="skeleton" style={{ height: "60px", borderRadius: "16px" }} />)
                         ) : (
-                          displayModules.map((m) => {
+                          availableModules.map((m) => {
                             const selected = newUserModules[m.id];
                             return (
                               <div key={m.id} style={{
@@ -904,21 +902,22 @@ function CityUsersPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
                 <thead style={{ backgroundColor: "#fafbfc", borderBottom: "1px solid #f1f5f9" }}>
                   <tr>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Personnel Profile</th>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Global Role</th>
+                    <th style={{ padding: "16px 20px 16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Sr. No.</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>User Profile</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>User Role</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Access & Scope</th>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Timeline</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Created On</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", textAlign: "right" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadingUsers ? (
                     Array(5).fill(0).map((_, i) => (
-                      <tr key={i}><td colSpan={5} style={{ padding: "24px 32px" }}><div className="skeleton" style={{ height: "40px", borderRadius: "10px" }} /></td></tr>
+                      <tr key={i}><td colSpan={6} style={{ padding: "24px 32px" }}><div className="skeleton" style={{ height: "40px", borderRadius: "10px" }} /></td></tr>
                     ))
                   ) : filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: "80px 32px", textAlign: "center" }}>
+                      <td colSpan={6} style={{ padding: "80px 32px", textAlign: "center" }}>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" }}>
                           <Search size={40} color="#cbd5e1" />
                           <p style={{ color: "#64748b", fontWeight: 600 }}>No personnel found matching your filters</p>
@@ -926,15 +925,15 @@ function CityUsersPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((u, idx) => (
+                    paginatedUsers.map((u, idx) => (
                       <UserRow
                         key={u.id}
-                        index={idx + 1}
+                        index={(safePage - 1) * pageSize + idx + 1}
                         u={u}
                         edit={editing[u.id] || { name: u.name, role: u.role, modules: {}, zoneIds: new Set(), wardIds: new Set() }}
                         zones={zones}
                         wards={wards}
-                        availableModules={displayModules}
+                        availableModules={availableModules}
                         savingUserId={savingUserId}
                         onUpdateUser={updateUser}
                         onDeleteUser={deleteUser}
@@ -953,6 +952,66 @@ function CityUsersPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {filteredUsers.length > 0 && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 32px",
+                borderTop: "1px solid #f1f5f9",
+                backgroundColor: "#fafbfc"
+              }}>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#64748b" }}>
+                  Showing {(safePage - 1) * pageSize + 1} to {Math.min(safePage * pageSize, filteredUsers.length)} of {filteredUsers.length} personnel
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: "8px",
+                      border: "1px solid #e2e8f0",
+                      backgroundColor: safePage <= 1 ? "#f1f5f9" : "white",
+                      color: safePage <= 1 ? "#94a3b8" : "#334155",
+                      fontSize: "0.8125rem",
+                      fontWeight: 700,
+                      cursor: safePage <= 1 ? "not-allowed" : "pointer",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    Previous
+                  </button>
+
+                  <span style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#0f172a", padding: "0 8px" }}>
+                    Page {safePage} of {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: "8px",
+                      border: "1px solid #e2e8f0",
+                      backgroundColor: safePage >= totalPages ? "#f1f5f9" : "white",
+                      color: safePage >= totalPages ? "#94a3b8" : "#334155",
+                      fontSize: "0.8125rem",
+                      fontWeight: 700,
+                      cursor: safePage >= totalPages ? "not-allowed" : "pointer",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1027,6 +1086,10 @@ function UserRow({
         onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = "#fafbfc"; }}
         onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = "transparent"; }}
       >
+        <td style={{ padding: "20px 20px 20px 32px", fontSize: "0.85rem", fontWeight: 800, color: "#475569" }}>
+          {index}
+        </td>
+
         <td style={{ padding: "20px 32px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             <div style={{
@@ -1057,7 +1120,13 @@ function UserRow({
         <td style={{ padding: "20px 32px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#475569" }}>
-              {Object.keys(edit.modules).length} Active Modules
+              {availableModules.filter((m) =>
+                Object.keys(edit.modules).some((mid) => {
+                  if (mid === m.id) return true;
+                  const uMod = u.modules?.find((um) => um.id === mid);
+                  return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
+                })
+              ).length} Active Modules
             </span>
             <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
               Jurisdiction: {edit.zoneIds.size} Zones / {edit.wardIds.size} Wards
@@ -1065,8 +1134,8 @@ function UserRow({
           </div>
         </td>
         <td style={{ padding: "20px 32px" }}>
-          <div style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 500 }}>
-            {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          <div style={{ fontSize: "0.8125rem", color: "#475569", fontWeight: 700 }}>
+            {u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '06 Aug 2026'}
           </div>
         </td>
         <td style={{ padding: "20px 32px", textAlign: "right" }}>
@@ -1197,13 +1266,7 @@ function UserRow({
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                     {availableModules.map((m) => {
-                      const selectedKey = Object.keys(edit.modules).find((mid) => {
-                        if (mid === m.id) return true;
-                        const uMod = u.modules?.find((um) => um.id === mid);
-                        return uMod && normalizeModuleKey(uMod.key) === normalizeModuleKey(m.key);
-                      });
-                      const selected = selectedKey ? edit.modules[selectedKey] : undefined;
-                      const activeModuleId = selectedKey || m.id;
+                      const selected = edit.modules[m.id];
                       return (
                         <div key={m.id} style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1214,7 +1277,7 @@ function UserRow({
                           transition: "all 0.2s"
                         }}>
                           <label style={{ display: "flex", alignItems: "center", gap: "12px", cursor: isReadOnly ? "default" : "pointer", flex: 1 }} onClick={(e) => e.stopPropagation()}>
-                            <input type="checkbox" style={{ width: "18px", height: "18px", accentColor: "#2563eb" }} checked={Boolean(selected)} onChange={(e) => onToggleUserModule(u.id, activeModuleId, e.target.checked)} disabled={isReadOnly} />
+                            <input type="checkbox" style={{ width: "18px", height: "18px", accentColor: "#2563eb" }} checked={Boolean(selected)} onChange={(e) => onToggleUserModule(u.id, m.id, e.target.checked)} disabled={isReadOnly} />
                             <div style={{ display: "flex", flexDirection: "column" }}>
                               <span style={{ fontSize: "0.875rem", fontWeight: 700, color: selected ? "#1e40af" : "#475569" }}>{moduleLabel(m.key, m.name)}</span>
                               {selected && (
@@ -1226,7 +1289,7 @@ function UserRow({
                           </label>
                           {selected && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); if (!isReadOnly) onToggleUserWrite(u.id, activeModuleId, !selected.canWrite); }}
+                              onClick={(e) => { e.stopPropagation(); if (!isReadOnly) onToggleUserWrite(u.id, m.id, !selected.canWrite); }}
                               style={{
                                 border: "1px solid",
                                 borderColor: selected.canWrite ? "#bbf7d0" : "#e2e8f0",

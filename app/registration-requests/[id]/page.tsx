@@ -67,7 +67,7 @@ export default function RegistrationRequestDetailPage({ params }: { params: { id
                 role: role as any,
                 moduleKeys: modules.filter((m) => selectedModuleIds.has(m.id)).map((m) => m.key.toUpperCase())
             });
-            router.push("/registration-requests"); // Go back to list
+            router.push("/portal-home/registration-requests"); // Go back to list
         } catch (err: any) {
             alert("Failed to approve: " + (err.message || "Unknown error"));
         } finally {
@@ -81,7 +81,7 @@ export default function RegistrationRequestDetailPage({ params }: { params: { id
         setProcessing(true);
         try {
             await RegistrationApi.reject(request.id);
-            router.push("/registration-requests");
+            router.push("/portal-home/registration-requests");
         } catch (err: any) {
             alert("Failed to reject: " + (err.message || "Unknown error"));
         } finally {

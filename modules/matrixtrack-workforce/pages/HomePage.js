@@ -203,7 +203,7 @@ const HomePage = () => {
             <a href="#how">How It Works</a>
             <a href="#stats">Stats</a>
           </div>
-          <button className="hp-nav-cta" onClick={() => navigate("/login")}>
+          <button className="hp-nav-cta" onClick={() => navigate("/unified-login")}>
             Sign In {icons.arrow}
           </button>
         </div>
@@ -236,7 +236,7 @@ const HomePage = () => {
           </p>
 
           <div className="hp-hero-actions animate-fade-up delay3">
-            <button className="hp-btn hp-btn--primary" onClick={() => navigate("/login")}>
+            <button className="hp-btn hp-btn--primary" onClick={() => navigate("/unified-login")}>
               Get Started {icons.arrow}
             </button>
             <a href="#features" className="hp-btn hp-btn--ghost">
@@ -365,7 +365,7 @@ const HomePage = () => {
             Join the modern workforce management revolution. Log in now and
             experience the future of attendance tracking.
           </p>
-          <button className="hp-btn hp-btn--white" onClick={() => navigate("/login")}>
+          <button className="hp-btn hp-btn--white" onClick={() => navigate("/unified-login")}>
             Sign In to Dashboard {icons.arrow}
           </button>
         </div>

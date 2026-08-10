@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi } from "@lib/apiClient";
 import LitterBinReviewModal from "./LitterBinReviewModal";
-import { extractSurveyPhotos } from "../../common/SurveyAnswers";
 
 export default function AdminDashboard() {
     const [records, setRecords] = useState<any[]>([]);
@@ -259,7 +258,11 @@ export default function AdminDashboard() {
         if (viewRecord.photoUrl) photos.push(viewRecord.photoUrl);
         if (viewRecord.visit?.photoUrl) photos.push(viewRecord.visit.photoUrl);
         if (viewRecord.payload?.photo) photos.push(viewRecord.payload.photo);
-        photos.push(...extractSurveyPhotos(viewRecord.inspectionAnswers || viewRecord.questionnaire || viewRecord.payload?.inspectionAnswers));
+        if (viewRecord.inspectionAnswers && typeof viewRecord.inspectionAnswers === 'object') {
+            Object.values(viewRecord.inspectionAnswers).forEach((val: any) => {
+                if (typeof val === 'object' && val.photoUrl) photos.push(val.photoUrl);
+            });
+        }
         return Array.from(new Set(photos.filter(Boolean)));
     }, [viewRecord]);
 

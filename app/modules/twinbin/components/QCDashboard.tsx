@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { ModuleRecordsApi, TwinbinApi, ApiError, AuthApi, EmployeesApi, apiFetch } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
-import { SurveyAnswersView } from "../../common/SurveyAnswers";
 
 export default function QCDashboard() {
     const { user: authUser } = useAuth();
@@ -141,8 +140,6 @@ export default function QCDashboard() {
                 await TwinbinApi.approve(record.id, {});
             } else if (record.type === 'VISIT_REPORT') {
                 await TwinbinApi.approveVisit(record.id);
-            } else if (record.type === 'CITIZEN_REPORT' || record.type === 'DAILY_REPORT') {
-                await TwinbinApi.approveReport(record.id);
             }
             await loadData();
             setViewRecord(null);
@@ -161,8 +158,6 @@ export default function QCDashboard() {
                 await TwinbinApi.reject(record.id);
             } else if (record.type === 'VISIT_REPORT') {
                 await TwinbinApi.rejectVisit(record.id);
-            } else if (record.type === 'CITIZEN_REPORT' || record.type === 'DAILY_REPORT') {
-                await TwinbinApi.rejectReport(record.id);
             }
             await loadData();
             setViewRecord(null);
@@ -459,12 +454,19 @@ export default function QCDashboard() {
                         </div>
 
                         {/* TYPE SPECIFIC DETAILS */}
-                        {(viewRecord.type === 'VISIT_REPORT' || viewRecord.type === 'CITIZEN_REPORT' || viewRecord.type === 'DAILY_REPORT') && (
+                        {viewRecord.type === 'VISIT_REPORT' && (
                             <div className="bg-base-200 p-4 rounded-lg">
                                 <h4 className="font-bold mb-4">Daily Report Details</h4>
 
-                                {(viewRecord.questionnaire || viewRecord.inspectionAnswers) ? (
-                                    <div className="mb-4"><SurveyAnswersView answers={viewRecord.questionnaire || viewRecord.inspectionAnswers} compact /></div>
+                                {viewRecord.questionnaire ? (
+                                    <div className="flex flex-col gap-3 mb-4">
+                                        {Object.entries(viewRecord.questionnaire).map(([key, val]: any, idx) => (
+                                            <div key={idx} className="border-b border-base-300/50 pb-2 last:border-0">
+                                                <p className="font-medium text-sm text-base-content/70">{val?.question || key}</p>
+                                                <p className="text-sm font-semibold">{val?.answer || (typeof val === 'string' ? val : JSON.stringify(val))}</p>
+                                            </div>
+                                        ))}
+                                    </div>
                                 ) : (
                                     <p className="text-sm muted italic mb-4">No questionnaire data available.</p>
                                 )}
