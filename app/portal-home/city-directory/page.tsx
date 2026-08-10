@@ -81,6 +81,8 @@ export default function HmsDashboardPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ cityId: string; userId: string; adminName: string } | null>(null);
   const [deleteCityTarget, setDeleteCityTarget] = useState<{ cityId: string; cityName: string } | null>(null);
   const [createCityOpen, setCreateCityOpen] = useState(false);
+  const [moduleCity, setModuleCity] = useState<CityRow | null>(null);
+  const [moduleSavingId, setModuleSavingId] = useState<string | null>(null);
 
   // Check if current logged-in user is Super Admin
   const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}') : {};
@@ -333,6 +335,46 @@ export default function HmsDashboardPage() {
       showToast({ title: "Admin creation failed", description: message, tone: "error" });
     } finally {
       setAdminCreating(false);
+    }
+  };
+
+  const handleToggleModule = async (
+    cityId: string,
+    moduleId: string,
+    enabled: boolean,
+  ) => {
+    try {
+      setModuleSavingId(moduleId);
+      await CityApi.toggleModule(cityId, moduleId, enabled);
+      await refresh();
+      setModuleCity((current) => {
+        if (!current || current.id !== cityId) return current;
+        return {
+          ...current,
+          modules:
+            current.modules?.map((module) =>
+              module.id === moduleId
+                ? { ...module, enabled }
+                : module,
+            ) ?? [],
+        };
+      });
+      showToast({
+        title: enabled ? "Module enabled" : "Module disabled",
+        description: "City module access updated successfully.",
+        tone: "success",
+      });
+    } catch (err) {
+      showToast({
+        title: "Module update failed",
+        description:
+          err instanceof ApiError
+            ? err.message
+            : "Failed to update city module.",
+        tone: "error",
+      });
+    } finally {
+      setModuleSavingId(null);
     }
   };
 
@@ -983,10 +1025,7 @@ export default function HmsDashboardPage() {
                     <div className="my-1 border-t border-slate-100"></div>
                     <button
                       className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 text-left"
-                      onClick={() => {
-                        // TODO: Open Assign Modules modal
-                        alert("Assign Modules implementation pending");
-                      }}
+                      onClick={() => setModuleCity(city)}
                     >
                       Assign Modules
                     </button>
@@ -1324,7 +1363,171 @@ export default function HmsDashboardPage() {
           onSave={handleUpdateAdmin}
         />
       )}
+
+      {moduleCity && (
+        <AssignModulesModal
+          city={moduleCity}
+          savingModuleId={moduleSavingId}
+          onClose={() => {
+            if (!moduleSavingId) {
+              setModuleCity(null);
+            }
+          }}
+          onToggleModule={handleToggleModule}
+        />
+      )}
     </div>
+  );
+}
+
+function getModulePresentation(moduleName: string) {
+  const name = moduleName.toLowerCase();
+
+  if (name.includes("taskforce") || name.includes("inspection")) {
+    return {
+      display: "Inspection & Performance",
+      tone: "bg-blue-50 text-blue-700 ring-blue-700/10",
+    };
+  }
+
+  if (name.includes("workforce") || name.includes("attendance")) {
+    return {
+      display: "Workforce Attendance System",
+      tone: "bg-purple-50 text-purple-700 ring-purple-700/10",
+    };
+  }
+
+  if (name.includes("swachh") || name.includes("ward")) {
+    return {
+      display: "Ward Ranking",
+      tone: "bg-emerald-50 text-emerald-700 ring-emerald-700/10",
+    };
+  }
+
+  if (name.includes("mrf")) {
+    return {
+      display: "MRF",
+      tone: "bg-amber-50 text-amber-700 ring-amber-700/10",
+    };
+  }
+
+  if (name.includes("twinbin")) {
+    return {
+      display: "TwinBin",
+      tone: "bg-cyan-50 text-cyan-700 ring-cyan-700/10",
+    };
+  }
+
+  if (name.includes("toilet")) {
+    return {
+      display: "Toilet",
+      tone: "bg-slate-100 text-slate-700 ring-slate-700/10",
+    };
+  }
+
+  return {
+    display: moduleName,
+    tone: "bg-slate-50 text-slate-700 ring-slate-700/10",
+  };
+}
+
+function AssignModulesModal({
+  city,
+  savingModuleId,
+  onClose,
+  onToggleModule,
+}: {
+  city: CityRow;
+  savingModuleId: string | null;
+  onClose: () => void;
+  onToggleModule: (
+    cityId: string,
+    moduleId: string,
+    enabled: boolean,
+  ) => Promise<void>;
+}) {
+  const modules = [...(city.modules ?? [])].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Assign Modules"
+      subtitle={`${city.name} (${city.code})`}
+      size="lg"
+    >
+      <div className="flex flex-col gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="text-sm font-bold text-slate-800">
+            Toggle the modules available for this city
+          </div>
+          <div className="mt-1 text-xs font-medium text-slate-500">
+            Enabled modules will appear in the city access configuration and can be assigned to city users.
+          </div>
+        </div>
+
+        {modules.length ? (
+          <div className="grid gap-3">
+            {modules.map((module) => {
+              const presentation = getModulePresentation(module.name);
+              const isSaving = savingModuleId === module.id;
+
+              return (
+                <div
+                  key={module.id}
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${presentation.tone}`}
+                      >
+                        {presentation.display}
+                      </span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        {module.enabled ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Module key: <span className="font-semibold text-slate-700">{module.name}</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant={module.enabled ? "secondary" : "primary"}
+                    disabled={isSaving}
+                    loading={isSaving}
+                    onClick={() =>
+                      onToggleModule(city.id, module.id, !module.enabled)
+                    }
+                  >
+                    {module.enabled ? "Disable" : "Enable"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-500">
+            No modules are available for this city yet.
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={Boolean(savingModuleId)}
+          >
+            Close
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
