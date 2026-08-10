@@ -5,6 +5,7 @@ export type AttendanceSummary = {
   uniqueEmployees: number;
   present: number;
   absent: number;
+  punchIn: number;
   checkedOut: number;
   openCheckIns: number;
   noPunch: number;
@@ -67,6 +68,18 @@ export type AttendanceDashboardResponse = {
     total: number;
     present: number;
     rate: number;
+  }>;
+  topEmployees: Array<{
+    attendanceId: string;
+    employeeName: string;
+    designation: string | null;
+    officeLocation: string | null;
+    totalDays: number;
+    presentDays: number;
+    absentDays: number;
+    attendanceRate: number;
+    completedPunches: number;
+    avgWorkMinutes: number | null;
   }>;
   records: AttendanceRecord[];
   pagination: {

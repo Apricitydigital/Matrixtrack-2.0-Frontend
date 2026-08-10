@@ -19,6 +19,7 @@ import {
   Search,
   Sparkles,
   TimerReset,
+  Trophy,
   UploadCloud,
   UserCheck,
   UserRoundX,
@@ -247,21 +248,21 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex min-h-[218px] w-full flex-col overflow-hidden rounded-[18px] border bg-white px-3.5 pb-3 pt-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.065)] transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+      className={`group relative flex min-h-[224px] w-full flex-col overflow-hidden rounded-[18px] border bg-white px-4 pb-3 pt-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.065)] transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 ${
         active
           ? "-translate-y-1 border-blue-300 shadow-[0_16px_38px_rgba(37,99,235,0.14)] ring-2 ring-blue-100"
           : "border-slate-200/90 hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_16px_38px_rgba(15,23,42,0.11)]"
       }`}
       aria-label={`View ${label} records`}
     >
-      <div className="flex min-h-[48px] items-start gap-2.5">
+      <div className="flex min-h-[50px] items-start gap-2.5">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center bg-gradient-to-br text-white shadow-lg transition-transform duration-300 group-hover:scale-105 ${toneStyle.badge} ${toneStyle.shadow}`}
           style={{ clipPath: "polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0 50%)" }}
         >
           {icon}
         </div>
-        <p className="pt-1 text-[10px] font-extrabold leading-[14px] tracking-[-0.01em] text-slate-800">
+        <p className="min-h-[30px] pt-1 text-[10.5px] font-extrabold leading-[15px] tracking-[-0.01em] text-slate-800">
           {label}
         </p>
       </div>
@@ -270,7 +271,7 @@ function KpiCard({
         <p className="whitespace-nowrap text-[27px] font-black tabular-nums leading-none tracking-[-0.04em] text-slate-950 2xl:text-[29px]">
           {value}
         </p>
-        <p className="mt-2 min-h-[28px] text-[9.5px] font-semibold leading-[14px] text-slate-500">
+        <p className="mt-2 min-h-[30px] text-[9.5px] font-semibold leading-[15px] text-slate-500">
           {detail}
         </p>
       </div>
@@ -313,7 +314,7 @@ function ChartCard({
   };
 
   return (
-    <section className="group relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/45 p-5 shadow-[0_12px_38px_rgba(15,23,42,0.055)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_20px_48px_rgba(15,23,42,0.09)]">
+    <section className="group relative h-full overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/45 p-5 shadow-[0_12px_38px_rgba(15,23,42,0.055)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_20px_48px_rgba(15,23,42,0.09)]">
       <div className={`absolute left-0 top-0 h-1 w-40 bg-gradient-to-r ${tones[tone].bar}`} />
       <div className={`pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full blur-3xl transition-transform duration-700 group-hover:scale-125 ${tones[tone].glow}`} />
       <div className="relative mb-5 flex items-start justify-between gap-4">
@@ -477,11 +478,11 @@ function UploadModal({
 
 
 type KpiDrilldown = {
-  key: "ALL" | "PRESENT" | "ABSENT" | "RATE" | "CHECKED_OUT" | "OPEN_CHECKIN" | "AVG_CHECKIN" | "AVG_WORK";
+  key: "ALL" | "PRESENT" | "ABSENT" | "RATE" | "PUNCH_IN" | "PUNCH_OUT" | "OPEN_PUNCH_IN" | "AVG_PUNCH_IN" | "AVG_WORK";
   title: string;
   subtitle: string;
   value: string;
-  tone: "blue" | "emerald" | "rose" | "violet" | "amber" | "slate";
+  tone: "blue" | "emerald" | "rose" | "violet" | "teal" | "amber" | "slate";
   query?: Partial<AttendanceDashboardQuery>;
 };
 
@@ -518,6 +519,7 @@ function KpiRecordsDrawer({
     emerald: "from-emerald-600 to-teal-500 bg-emerald-50 text-emerald-700 ring-emerald-100",
     rose: "from-rose-600 to-pink-500 bg-rose-50 text-rose-700 ring-rose-100",
     violet: "from-violet-600 to-fuchsia-500 bg-violet-50 text-violet-700 ring-violet-100",
+    teal: "from-teal-600 to-cyan-500 bg-teal-50 text-teal-700 ring-teal-100",
     amber: "from-amber-500 to-orange-500 bg-amber-50 text-amber-700 ring-amber-100",
     slate: "from-slate-700 to-slate-500 bg-slate-100 text-slate-700 ring-slate-200",
   };
@@ -572,14 +574,14 @@ function KpiRecordsDrawer({
                   <table className="w-full min-w-[960px] border-collapse">
                     <thead>
                       <tr className="bg-slate-50 text-left">
-                        {['Employee', 'Attendance ID', 'Designation', 'Date', 'In time', 'Out time', 'Duration', 'Status', 'Punch'].map((heading) => (
+                        {['Employee', 'Attendance ID', 'Designation', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
                           <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {(data?.records || []).map((record: AttendanceRecord) => {
-                        const punch = record.outTime ? "Checked out" : record.inTime ? "Open" : "No punch";
+                        const punch = record.outTime ? "Punch Out" : record.inTime ? "Punch In" : "No punch";
                         return (
                           <tr key={record.id} className="border-b border-slate-100 transition-colors odd:bg-white even:bg-slate-50/35 hover:bg-blue-50/60 last:border-b-0">
                             <td className="px-4 py-3.5">
@@ -737,6 +739,9 @@ function AttendanceDashboard() {
   };
 
   const summary = data?.summary;
+  const punchInCount = summary
+    ? summary.punchIn ?? summary.checkedOut + summary.openCheckIns
+    : 0;
 
   const attendancePie = useMemo(
     () => [
@@ -997,8 +1002,8 @@ function AttendanceDashboard() {
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             >
               <option value="ALL">All punches</option>
-              <option value="CHECKED_OUT">Punch out</option>
-              <option value="OPEN_CHECKIN">Punch in</option>
+              <option value="CHECKED_OUT">Punch Out</option>
+              <option value="OPEN_CHECKIN">Punch In</option>
               <option value="NO_PUNCH">No punch</option>
             </select>
           </label>
@@ -1098,15 +1103,118 @@ function AttendanceDashboard() {
         </section>
       ) : (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
-            <KpiCard label="Unique employees" value={numberFormatter.format(summary.uniqueEmployees)} detail={`${numberFormatter.format(summary.totalRecords)} attendance records`} icon={<UsersRound size={18} />} tone="blue" active={kpiDrilldown?.key === "ALL"} onClick={() => openKpiDrilldown({ key: "ALL", title: "Unique employees", subtitle: "Underlying employee attendance records for the current dashboard filters.", value: numberFormatter.format(summary.uniqueEmployees), tone: "blue" })} />
-            <KpiCard label="Present" value={numberFormatter.format(summary.present)} detail={`${summary.attendanceRate.toFixed(1)}% Present`} icon={<UserCheck size={18} />} tone="emerald" active={kpiDrilldown?.key === "PRESENT"} onClick={() => openKpiDrilldown({ key: "PRESENT", title: "Present employees", subtitle: "Employees marked present within the current date range and active filters.", value: numberFormatter.format(summary.present), tone: "emerald", query: { status: "P" } })} />
-            <KpiCard label="Absent" value={numberFormatter.format(summary.absent)} detail={`${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% Absent`} icon={<UserRoundX size={18} />} tone="rose" active={kpiDrilldown?.key === "ABSENT"} onClick={() => openKpiDrilldown({ key: "ABSENT", title: "Absent employees", subtitle: "Employees marked absent within the current date range and active filters.", value: numberFormatter.format(summary.absent), tone: "rose", query: { status: "A" } })} />
-            <KpiCard label="Attendance rate" value={`${summary.attendanceRate.toFixed(1)}%`} detail="Present ÷ total records" icon={<Activity size={18} />} tone="violet" active={kpiDrilldown?.key === "RATE"} onClick={() => openKpiDrilldown({ key: "RATE", title: "Attendance rate · Present records", subtitle: "The present employee records used to form the attendance rate for the current selection.", value: `${summary.attendanceRate.toFixed(1)}%`, tone: "violet", query: { status: "P" } })} />
-            <KpiCard label="Punch out" value={numberFormatter.format(summary.checkedOut)} detail="Completed punch cycle" icon={<CheckCircle2 size={18} />} tone="teal" active={kpiDrilldown?.key === "CHECKED_OUT"} onClick={() => openKpiDrilldown({ key: "CHECKED_OUT", title: "Checked-out employees", subtitle: "Attendance records that contain a completed out-time punch.", value: numberFormatter.format(summary.checkedOut), tone: "emerald", query: { checkoutState: "CHECKED_OUT" } })} />
-            <KpiCard label="Punch in" value={numberFormatter.format(summary.openCheckIns)} detail="In time without out time" icon={<Clock3 size={18} />} tone="amber" active={kpiDrilldown?.key === "OPEN_CHECKIN"} onClick={() => openKpiDrilldown({ key: "OPEN_CHECKIN", title: "Open check-ins", subtitle: "Employees with an in-time punch but no out-time punch yet.", value: numberFormatter.format(summary.openCheckIns), tone: "amber", query: { checkoutState: "OPEN_CHECKIN" } })} />
-            <KpiCard label="Avg. Punch in" value={minutesToClock(summary.avgCheckInMinutes)} detail="Across available punches" icon={<TimerReset size={18} />} tone="blue" active={kpiDrilldown?.key === "AVG_CHECKIN"} onClick={() => openKpiDrilldown({ key: "AVG_CHECKIN", title: "Check-in records", subtitle: "Employee records with an available in-time punch used for check-in-time analysis.", value: minutesToClock(summary.avgCheckInMinutes), tone: "blue", query: { checkoutState: "HAS_CHECKIN" } })} />
-            <KpiCard label="Avg. work time" value={minutesToDuration(summary.avgWorkMinutes)} detail="Completed punch cycles" icon={<BarChart3 size={18} />} tone="slate" active={kpiDrilldown?.key === "AVG_WORK"} onClick={() => openKpiDrilldown({ key: "AVG_WORK", title: "Completed work cycles", subtitle: "Employee records with valid in and out punches used for average working-time calculation.", value: minutesToDuration(summary.avgWorkMinutes), tone: "slate", query: { checkoutState: "COMPLETED_WORK" } })} />
+          <section className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+            <KpiCard
+              label="Unique employees"
+              value={numberFormatter.format(summary.uniqueEmployees)}
+              detail={`${numberFormatter.format(summary.totalRecords)} attendance records`}
+              icon={<UsersRound size={18} />}
+              tone="blue"
+              active={kpiDrilldown?.key === "ALL"}
+              onClick={() => openKpiDrilldown({
+                key: "ALL",
+                title: "Unique employees",
+                subtitle: "Underlying employee attendance records for the current dashboard filters.",
+                value: numberFormatter.format(summary.uniqueEmployees),
+                tone: "blue",
+              })}
+            />
+            <KpiCard
+              label="Present"
+              value={numberFormatter.format(summary.present)}
+              detail={`${summary.attendanceRate.toFixed(1)}% attendance`}
+              icon={<UserCheck size={18} />}
+              tone="emerald"
+              active={kpiDrilldown?.key === "PRESENT"}
+              onClick={() => openKpiDrilldown({
+                key: "PRESENT",
+                title: "Present employees",
+                subtitle: "Employees marked present within the current date range and active filters.",
+                value: numberFormatter.format(summary.present),
+                tone: "emerald",
+                query: { status: "P" },
+              })}
+            />
+            <KpiCard
+              label="Absent"
+              value={numberFormatter.format(summary.absent)}
+              detail={`${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`}
+              icon={<UserRoundX size={18} />}
+              tone="rose"
+              active={kpiDrilldown?.key === "ABSENT"}
+              onClick={() => openKpiDrilldown({
+                key: "ABSENT",
+                title: "Absent employees",
+                subtitle: "Employees marked absent within the current date range and active filters.",
+                value: numberFormatter.format(summary.absent),
+                tone: "rose",
+                query: { status: "A" },
+              })}
+            />
+            <KpiCard
+              label="Attendance rate"
+              value={`${summary.attendanceRate.toFixed(1)}%`}
+              detail="Present ÷ total records"
+              icon={<Activity size={18} />}
+              tone="violet"
+              active={kpiDrilldown?.key === "RATE"}
+              onClick={() => openKpiDrilldown({
+                key: "RATE",
+                title: "Attendance rate · Present records",
+                subtitle: "Present employee records used to calculate the attendance rate for the current selection.",
+                value: `${summary.attendanceRate.toFixed(1)}%`,
+                tone: "violet",
+                query: { status: "P" },
+              })}
+            />
+            <KpiCard
+              label="Punch In"
+              value={numberFormatter.format(punchInCount)}
+              detail={`${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`}
+              icon={<Clock3 size={18} />}
+              tone="blue"
+              active={kpiDrilldown?.key === "PUNCH_IN"}
+              onClick={() => openKpiDrilldown({
+                key: "PUNCH_IN",
+                title: "Punch In records",
+                subtitle: "Employees with a recorded Punch In within the current selection.",
+                value: numberFormatter.format(punchInCount),
+                tone: "blue",
+                query: { checkoutState: "HAS_CHECKIN" },
+              })}
+            />
+            <KpiCard
+              label="Punch Out"
+              value={numberFormatter.format(summary.checkedOut)}
+              detail="Completed Punch In / Punch Out cycle"
+              icon={<CheckCircle2 size={18} />}
+              tone="teal"
+              active={kpiDrilldown?.key === "PUNCH_OUT"}
+              onClick={() => openKpiDrilldown({
+                key: "PUNCH_OUT",
+                title: "Punch Out records",
+                subtitle: "Attendance records with a completed Punch Out.",
+                value: numberFormatter.format(summary.checkedOut),
+                tone: "teal",
+                query: { checkoutState: "CHECKED_OUT" },
+              })}
+            />
+            <KpiCard
+              label="Open Punch In"
+              value={numberFormatter.format(summary.openCheckIns)}
+              detail="Punch In recorded · Punch Out pending"
+              icon={<TimerReset size={18} />}
+              tone="amber"
+              active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
+              onClick={() => openKpiDrilldown({
+                key: "OPEN_PUNCH_IN",
+                title: "Open Punch In records",
+                subtitle: "Employees with Punch In recorded but no Punch Out yet.",
+                value: numberFormatter.format(summary.openCheckIns),
+                tone: "amber",
+                query: { checkoutState: "OPEN_CHECKIN" },
+              })}
+            />
           </section>
 
           <section className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,0.8fr)]">
@@ -1169,7 +1277,7 @@ function AttendanceDashboard() {
           </section>
 
           <section className="grid gap-5 xl:grid-cols-2">
-            <ChartCard title="Check-in activity by hour" subtitle="Hourly punch pattern and peak reporting window" badge={`Peak ${peakCheckIn.label}`} icon={<Clock3 size={18} />} tone="violet">
+            <ChartCard title="Punch In activity by hour" subtitle="Hourly Punch In pattern and peak reporting window" badge={`Peak ${peakCheckIn.label}`} icon={<Clock3 size={18} />} tone="violet">
               <div className="mb-3 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-violet-50/70 px-3 py-2.5 ring-1 ring-violet-100"><p className="text-[9px] font-black uppercase tracking-wider text-violet-500">Peak hour</p><p className="mt-0.5 text-sm font-black text-violet-900">{peakCheckIn.label}</p></div>
                 <div className="rounded-2xl bg-blue-50/70 px-3 py-2.5 ring-1 ring-blue-100"><p className="text-[9px] font-black uppercase tracking-wider text-blue-500">Peak punches</p><p className="mt-0.5 text-sm font-black text-blue-900">{numberFormatter.format(peakCheckIn.count)}</p></div>
@@ -1182,7 +1290,7 @@ function AttendanceDashboard() {
                     <XAxis dataKey="label" interval={2} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
-                    <Bar dataKey="count" name="Check-ins" fill="url(#checkInBars)" radius={[7, 7, 2, 2]} maxBarSize={26} animationDuration={900} />
+                    <Bar dataKey="count" name="Punch Ins" fill="url(#checkInBars)" radius={[7, 7, 2, 2]} maxBarSize={26} animationDuration={900} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1205,64 +1313,212 @@ function AttendanceDashboard() {
             </ChartCard>
           </section>
 
-          <section className="grid gap-5 lg:grid-cols-3">
-            <ChartCard title="Work duration" subtitle="Distribution of completed in/out punch durations" badge={`${numberFormatter.format(summary.checkedOut)} completed`} icon={<BarChart3 size={18} />} tone="blue">
-              <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-blue-50/35 to-white px-1 pt-2 ring-1 ring-blue-100/70">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.workDurationBuckets} margin={{ left: -15, right: 5, top: 8, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="bucket" tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
-                    <Bar dataKey="count" name="Employees" radius={[8, 8, 2, 2]} maxBarSize={40} animationDuration={950}>
-                      {data.workDurationBuckets.map((item, index) => <Cell key={`${item.bucket}-${index}`} fill={[chartColors.rose, chartColors.amber, chartColors.blue, chartColors.emerald, chartColors.violet][index % 5]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+          <section className="grid items-stretch gap-5 lg:grid-cols-3">
+            <ChartCard title="Work duration" subtitle="Distribution and completion quality of Punch In / Punch Out cycles" badge={`${numberFormatter.format(summary.checkedOut)} completed`} icon={<BarChart3 size={18} />} tone="blue">
+              <div className="flex h-full flex-col">
+                <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-blue-50/35 to-white px-1 pt-2 ring-1 ring-blue-100/70">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.workDurationBuckets} margin={{ left: -15, right: 5, top: 8, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="bucket" tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                      <Bar dataKey="count" name="Employees" radius={[8, 8, 2, 2]} maxBarSize={40} animationDuration={950}>
+                        {data.workDurationBuckets.map((item, index) => <Cell key={`${item.bucket}-${index}`} fill={[chartColors.rose, chartColors.amber, chartColors.blue, chartColors.emerald, chartColors.violet][index % 5]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-blue-50/75 px-3 py-2.5 ring-1 ring-blue-100">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-blue-500">Average work time</p>
+                    <p className="mt-1 text-lg font-black tabular-nums text-blue-950">{minutesToDuration(summary.avgWorkMinutes)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-violet-50/75 px-3 py-2.5 ring-1 ring-violet-100">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-violet-500">Punch completion</p>
+                    <p className="mt-1 text-lg font-black tabular-nums text-violet-950">{summary.punchIn ? ((summary.checkedOut / summary.punchIn) * 100).toFixed(1) : "0.0"}%</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-slate-100 bg-white/80 p-3.5 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">Duration mix</p>
+                      <p className="mt-0.5 text-[9.5px] font-semibold text-slate-400">Completed employees by working-hour bucket</p>
+                    </div>
+                    <TimerReset size={17} className="text-blue-500" />
+                  </div>
+                  <div className="space-y-2.5">
+                    {(data.workDurationBuckets || []).map((item, index) => {
+                      const maxCount = Math.max(...(data.workDurationBuckets || []).map((bucket) => bucket.count), 1);
+                      const width = (item.count / maxCount) * 100;
+                      const barColors = ["bg-rose-500", "bg-amber-500", "bg-blue-500", "bg-emerald-500", "bg-violet-500"];
+                      return (
+                        <div key={`duration-insight-${item.bucket}`}>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold text-slate-600">{item.bucket}</span>
+                            <span className="text-[10px] font-black tabular-nums text-slate-800">{numberFormatter.format(item.count)}</span>
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <div className={`h-full rounded-full ${barColors[index % barColors.length]} transition-[width] duration-1000`} style={{ width: `${width}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </ChartCard>
 
-            <ChartCard title="Punch health" subtitle="How complete today's attendance punch cycles are" icon={<CheckCircle2 size={18} />} tone="amber">
-              <div className="space-y-3 pt-1">
-                {[
-                  { label: "Punched out", value: summary.checkedOut, total: summary.totalRecords, color: "bg-emerald-500", text: "text-emerald-700", bg: "bg-gradient-to-r from-emerald-50 to-teal-50/60", icon: <CheckCircle2 size={16} /> },
-                  { label: "Punched in", value: summary.openCheckIns, total: summary.totalRecords, color: "bg-amber-500", text: "text-amber-700", bg: "bg-gradient-to-r from-amber-50 to-orange-50/60", icon: <Clock3 size={16} /> },
-                  { label: "No punch", value: summary.noPunch, total: summary.totalRecords, color: "bg-slate-400", text: "text-slate-600", bg: "bg-gradient-to-r from-slate-100 to-slate-50", icon: <AlertCircle size={16} /> },
-                ].map((item) => {
-                  const percent = item.total ? (item.value / item.total) * 100 : 0;
+            <ChartCard
+              title="Top attendance employees"
+              subtitle="Best employee attendance across the selected date range"
+              badge={`${Math.min(data.topEmployees?.length || 0, 3)} ranked`}
+              icon={<Trophy size={18} />}
+              tone="amber"
+            >
+              <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50/65 px-3 py-2.5">
+                <p className="text-[9.5px] font-bold leading-4 text-amber-800">
+                  Ranking is based on most present days, then attendance rate, then completed Punch In / Punch Out cycles.
+                </p>
+              </div>
+
+              <div className="space-y-2.5">
+                {(data.topEmployees || []).slice(0, 3).map((employee, index) => {
+                  const rankStyles = [
+                    "from-amber-400 to-orange-500 text-white shadow-amber-500/20",
+                    "from-slate-300 to-slate-500 text-white shadow-slate-400/20",
+                    "from-orange-300 to-amber-700 text-white shadow-orange-500/20",
+                  ];
+                  const attendanceTone =
+                    employee.attendanceRate >= 90
+                      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                      : employee.attendanceRate >= 75
+                        ? "bg-blue-50 text-blue-700 ring-blue-100"
+                        : "bg-amber-50 text-amber-700 ring-amber-100";
+                  const dayWord = employee.presentDays === 1 ? "day" : "days";
+                  const punchWord = employee.completedPunches === 1 ? "cycle" : "cycles";
+                  const whyTop = `${employee.presentDays} present ${dayWord} · ${employee.attendanceRate.toFixed(1)}% attendance · ${employee.completedPunches} completed punch ${punchWord}`;
+
                   return (
-                    <div key={item.label} className={`rounded-2xl ${item.bg} px-4 py-3.5`}>
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className={`inline-flex items-center gap-2 text-xs font-black ${item.text}`}>{item.icon}{item.label}</span>
-                        <span className="text-sm font-black tabular-nums text-slate-950">{numberFormatter.format(item.value)} <span className="text-[10px] font-bold text-slate-400">({percent.toFixed(1)}%)</span></span>
+                    <div
+                      key={employee.attendanceId}
+                      className="group/top rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-amber-50/25 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-100 hover:shadow-md"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xs font-black shadow-md ${rankStyles[index]}`}>
+                          #{index + 1}
+                        </div>
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                          {employee.employeeName.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-xs font-black text-slate-800" title={employee.employeeName}>
+                              {employee.employeeName}
+                            </p>
+                            <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ring-1 ${attendanceTone}`}>
+                              {employee.attendanceRate.toFixed(1)}%
+                            </span>
+                          </div>
+                          <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
+                            {employee.designation || "Employee"} · {employee.attendanceId}
+                          </p>
+                        </div>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-white/80">
-                        <div className={`h-full rounded-full ${item.color} transition-[width] duration-1000 ease-out`} style={{ width: `${Math.min(percent, 100)}%` }} />
+
+                      <div className="mt-2.5 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-amber-100/80">
+                        <div className="flex items-start gap-2">
+                          <Trophy size={12} className="mt-0.5 shrink-0 text-amber-500" />
+                          <p className="text-[9.5px] font-semibold leading-4 text-slate-600">
+                            <span className="font-black text-amber-700">Why #{index + 1}:</span> {whyTop}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
+
+                {!data.topEmployees?.length && (
+                  <div className="flex h-[238px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-5 text-center">
+                    <Trophy size={24} className="mb-2 text-slate-300" />
+                    <p className="text-xs font-black text-slate-600">No ranking data available</p>
+                    <p className="mt-1 text-[10px] font-medium leading-4 text-slate-400">
+                      Top employees will appear for the selected attendance date range.
+                    </p>
+                  </div>
+                )}
               </div>
             </ChartCard>
 
-            <ChartCard title="Office attendance" subtitle="Location-wise attendance strength and participation" badge={`${data.officeBreakdown.length} shown`} icon={<Activity size={18} />} tone="emerald">
-              <div className="space-y-3">
-                {data.officeBreakdown.length ? data.officeBreakdown.slice(0, 5).map((office) => (
-                  <div key={office.officeLocation} className="group/office rounded-2xl border border-slate-100 bg-gradient-to-r from-slate-50/80 to-white px-3.5 py-3 transition-all hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2"><div className={`h-7 w-1 rounded-full ${office.rate >= 85 ? "bg-emerald-500" : office.rate >= 70 ? "bg-blue-500" : office.rate >= 50 ? "bg-amber-500" : "bg-rose-500"}`} /><p className="min-w-0 truncate text-xs font-black text-slate-700" title={office.officeLocation}>{office.officeLocation}</p></div>
-                      <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-black ${office.rate >= 85 ? "bg-emerald-50 text-emerald-700" : office.rate >= 70 ? "bg-blue-50 text-blue-700" : office.rate >= 50 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700"}`}>{office.rate.toFixed(1)}%</span>
-                    </div>
-                    <div className="mt-2.5 flex items-center gap-2">
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/60">
-                        <div className={`h-full rounded-full transition-[width] duration-1000 ease-out ${office.rate >= 85 ? "bg-emerald-500" : office.rate >= 70 ? "bg-blue-500" : office.rate >= 50 ? "bg-amber-500" : "bg-rose-500"}`} style={{ width: `${Math.min(office.rate, 100)}%` }} />
+            <ChartCard title="Office attendance" subtitle="Location-wise attendance strength and workforce participation" badge={`${data.officeBreakdown.length} shown`} icon={<Activity size={18} />} tone="emerald">
+              <div className="flex h-full flex-col">
+                <div className="space-y-3">
+                  {data.officeBreakdown.length ? data.officeBreakdown.slice(0, 3).map((office) => (
+                    <div key={office.officeLocation} className="group/office rounded-2xl border border-slate-100 bg-gradient-to-r from-slate-50/80 to-white px-3.5 py-3 transition-all hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2"><div className={`h-7 w-1 rounded-full ${office.rate >= 85 ? "bg-emerald-500" : office.rate >= 70 ? "bg-blue-500" : office.rate >= 50 ? "bg-amber-500" : "bg-rose-500"}`} /><p className="min-w-0 truncate text-xs font-black text-slate-700" title={office.officeLocation}>{office.officeLocation}</p></div>
+                        <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-black ${office.rate >= 85 ? "bg-emerald-50 text-emerald-700" : office.rate >= 70 ? "bg-blue-50 text-blue-700" : office.rate >= 50 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700"}`}>{office.rate.toFixed(1)}%</span>
                       </div>
-                      <span className="w-16 text-right text-[10px] font-semibold text-slate-400">{numberFormatter.format(office.present)}/{numberFormatter.format(office.total)}</span>
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/60">
+                          <div className={`h-full rounded-full transition-[width] duration-1000 ease-out ${office.rate >= 85 ? "bg-emerald-500" : office.rate >= 70 ? "bg-blue-500" : office.rate >= 50 ? "bg-amber-500" : "bg-rose-500"}`} style={{ width: `${Math.min(office.rate, 100)}%` }} />
+                        </div>
+                        <span className="w-16 text-right text-[10px] font-semibold text-slate-400">{numberFormatter.format(office.present)}/{numberFormatter.format(office.total)}</span>
+                      </div>
                     </div>
+                  )) : (
+                    <div className="flex h-[150px] items-center justify-center text-center text-xs font-medium text-slate-400">No office/location values for this range</div>
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-emerald-50/75 px-3 py-3 ring-1 ring-emerald-100">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Present</p>
+                      <UserCheck size={14} className="text-emerald-500" />
+                    </div>
+                    <p className="mt-1 text-lg font-black tabular-nums text-emerald-950">{numberFormatter.format(summary.present)}</p>
+                    <p className="mt-0.5 text-[9px] font-semibold text-emerald-700/60">Across selected offices</p>
                   </div>
-                )) : (
-                  <div className="flex h-[210px] items-center justify-center text-center text-xs font-medium text-slate-400">No office/location values for this range</div>
-                )}
+                  <div className="rounded-2xl bg-rose-50/75 px-3 py-3 ring-1 ring-rose-100">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">Absent</p>
+                      <UserRoundX size={14} className="text-rose-500" />
+                    </div>
+                    <p className="mt-1 text-lg font-black tabular-nums text-rose-950">{numberFormatter.format(summary.absent)}</p>
+                    <p className="mt-0.5 text-[9px] font-semibold text-rose-700/60">Across selected offices</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-blue-50/60 p-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">Participation snapshot</p>
+                      <p className="mt-0.5 text-[9.5px] font-semibold text-slate-500">Present workforce against all attendance records</p>
+                    </div>
+                    <span className="rounded-xl bg-white px-2.5 py-1.5 text-sm font-black tabular-nums text-emerald-700 shadow-sm ring-1 ring-emerald-100">{summary.attendanceRate.toFixed(1)}%</span>
+                  </div>
+                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-rose-100">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-[width] duration-1000" style={{ width: `${Math.min(summary.attendanceRate, 100)}%` }} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-[9.5px] font-bold">
+                    <span className="text-emerald-700">{numberFormatter.format(summary.present)} present</span>
+                    <span className="text-rose-600">{numberFormatter.format(summary.absent)} absent</span>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2.5 shadow-sm">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Office groups</p>
+                    <p className="mt-1 text-sm font-black text-slate-900">{numberFormatter.format(data.officeBreakdown.length)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2.5 shadow-sm">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Attendance records</p>
+                    <p className="mt-1 text-sm font-black text-slate-900">{numberFormatter.format(summary.totalRecords)}</p>
+                  </div>
+                </div>
               </div>
             </ChartCard>
           </section>
@@ -1286,14 +1542,14 @@ function AttendanceDashboard() {
                 <table className="w-full min-w-[1050px] border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50/95 text-left backdrop-blur">
-                      {['Employee', 'Attendance ID', 'Designation', 'Date', 'In time', 'Out time', 'Duration', 'Status', 'Punch'].map((heading) => (
+                      {['Employee', 'Attendance ID', 'Designation', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
                         <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {data.records.map((record: AttendanceRecord) => {
-                      const punch = record.outTime ? "Checked out" : record.inTime ? "Open" : "No punch";
+                      const punch = record.outTime ? "Punch Out" : record.inTime ? "Punch In" : "No punch";
                       return (
                         <tr key={record.id} className="group border-b border-slate-100 transition-all duration-200 odd:bg-white even:bg-slate-50/25 hover:bg-blue-50/55 last:border-b-0">
                           <td className="px-4 py-3.5">
