@@ -9,6 +9,33 @@ const SUPER_ADMIN_EMAIL = process.env.REACT_APP_SUPER_ADMIN_EMAIL || "mtadmin@ap
 
 const AuthContext = createContext();
 
+const getUnifiedMatrixTrackToken = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const rawSession = localStorage.getItem("unified_auth_session");
+    if (!rawSession) return null;
+    const parsed = JSON.parse(rawSession);
+    return parsed?.tokens?.matrixTrack || null;
+  } catch {
+    return null;
+  }
+};
+
+const getPreferredWorkforceToken = () => {
+  if (typeof window === "undefined") return null;
+  const unifiedToken = getUnifiedMatrixTrackToken();
+  const token =
+    localStorage.getItem("matrixtrack_access_token") ||
+    unifiedToken;
+
+  if (token) {
+    localStorage.setItem("matrixtrack_access_token", token);
+    localStorage.setItem("token", token);
+  }
+
+  return token;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -50,7 +77,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem("token");
+    const token = getPreferredWorkforceToken();
 
     if (!token) {
       const defaultSsoUser = normalizeUser({
@@ -89,6 +116,7 @@ export const AuthProvider = ({ children }) => {
       const payload = await res.json().catch(() => ({}));
 
       if (res.ok) {
+        localStorage.setItem("token", token);
         const normalized = normalizeUser(payload);
         // eslint-disable-next-line no-console
         console.info("[Auth] /me payload:", payload);
@@ -103,6 +131,7 @@ export const AuthProvider = ({ children }) => {
            alert("Your session has been terminated by the Super Admin. Please log in again.");
         }
         localStorage.removeItem("token");
+        localStorage.removeItem("matrixtrack_access_token");
         setUser(null);
         return;
       }
@@ -174,6 +203,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       localStorage.setItem("token", data.token);
+      localStorage.setItem("matrixtrack_access_token", data.token);
       setUser(normalizeUser(data.user));
       return { success: true };
     } catch (error) {
@@ -199,6 +229,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       localStorage.setItem("token", data.token);
+      localStorage.setItem("matrixtrack_access_token", data.token);
       setUser(normalizeUser(data.user));
       return true;
     } catch (error) {
@@ -211,7 +242,7 @@ export const AuthProvider = ({ children }) => {
   // ✅ Logout function
   const logout = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getPreferredWorkforceToken();
       const headers = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -226,12 +257,13 @@ export const AuthProvider = ({ children }) => {
       console.error("Logout API call failed:", err);
     } finally {
       localStorage.removeItem("token");
+      localStorage.removeItem("matrixtrack_access_token");
       setUser(null);
     }
   };
 
   const logPageView = useCallback(async (pageName, pageUrl) => {
-    const token = localStorage.getItem("token");
+    const token = getPreferredWorkforceToken();
     if (!token) return;
     try {
       const endpoint = pageName.toLowerCase().includes("admin") || pageName.toLowerCase().includes("activity logs")
@@ -252,7 +284,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logAction = useCallback(async (actionName, actionDescription, isAdminOnly = false) => {
-    const token = localStorage.getItem("token");
+    const token = getPreferredWorkforceToken();
     if (!token) return;
     try {
       const endpoint = isAdminOnly

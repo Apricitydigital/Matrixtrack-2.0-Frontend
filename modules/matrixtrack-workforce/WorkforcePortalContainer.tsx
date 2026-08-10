@@ -10,7 +10,7 @@ import './index.css';
 import './App.css';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
-import { AuthProvider } from './AuthContext';
+import { AuthProvider, useAuth } from './AuthContext';
 import { SearchProvider } from './SearchContext';
 
 import Dashboard from './pages/Dashboard';
@@ -33,6 +33,7 @@ import ActivityLogs from './pages/ActivityLogs';
 import CityTrafficCostPage from './pages/CityTrafficCostPage';
 
 function WorkforceContent() {
+  const { user, hasPermission, isAdmin } = useAuth();
   const searchParams = useSearchParams();
   const initialView = searchParams.get('view') || 'dashboard';
   const [activeView, setActiveView] = useState<string>(initialView);
@@ -46,14 +47,95 @@ function WorkforceContent() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    let token = localStorage.getItem('token');
-    if (!token) {
-      token = 'sso-matrix-token-12345';
-      localStorage.setItem('token', token);
+  const normalizedRoles = Array.isArray(user?.roles)
+    ? user.roles.map((role) =>
+        String(role?.name || role || '')
+          .trim()
+          .toUpperCase()
+      )
+    : [];
+
+  const scopedAssignedCities = Array.isArray(user?.customPermissions?.assigned_cities)
+    ? user.customPermissions.assigned_cities
+    : [];
+
+  const isCityAdminUser = normalizedRoles.some((role) =>
+    ['CITY_ADMIN', 'COMMISSIONER', 'ULB_OFFICER'].includes(role)
+  ) || scopedAssignedCities.length > 0;
+
+  const canAccessView = (view: string) => {
+    const normalizedView = String(view || '').trim();
+    if (!normalizedView || normalizedView === 'dashboard') return true;
+
+    if (
+      isCityAdminUser &&
+      ['geofencing'].includes(normalizedView)
+    ) {
+      return false;
     }
+
+    const permissionMap: Record<string, { module: string; action: string }> = {
+      master: { module: 'master', action: 'view' },
+      geofencing: { module: 'geofencing', action: 'view' },
+      employees: { module: 'employees', action: 'view' },
+      attendance: { module: 'attendance_reports', action: 'view' },
+      'short-attendance': { module: 'short_attendance', action: 'view' },
+      supervisors: { module: 'supervisors', action: 'view' },
+      assignSupervisorWard: { module: 'assign_supervisor_ward', action: 'view' },
+      'assign-supervisor-ward': { module: 'assign_supervisor_ward', action: 'view' },
+      'supervisor-audit': { module: 'supervisor_audit', action: 'view' },
+      'supervisor-self-punch-requests': { module: 'field-access-requests', action: 'view' },
+      'supervisor-professional-attendance': { module: 'professional-attendance', action: 'view' },
+      'supervisor-professional-leave': { module: 'professional-leave-mgmt', action: 'view' },
+      announcements: { module: 'announcements', action: 'view' },
+      'system-health': { module: 'system-health', action: 'view' },
+      'admin-management': { module: 'admin_management', action: 'view' },
+      'activity-logs': { module: 'activity-logs', action: 'view' },
+      'city-traffic-cost': { module: 'dashboard', action: 'view' },
+      settings: { module: 'settings', action: 'view' },
+    };
+
+    const targetPermission = permissionMap[normalizedView];
+    if (!targetPermission) return true;
+    return Boolean(hasPermission(targetPermission) || isAdmin());
+  };
+
+  useEffect(() => {
+    if (!canAccessView(activeView)) {
+      setActiveView('dashboard');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/workforce-monitoring?view=dashboard');
+      }
+    }
+  }, [activeView, hasPermission, isAdmin, isCityAdminUser]);
+
+  useEffect(() => {
+    let unifiedMatrixTrackToken: string | null = null;
+    try {
+      const rawUnifiedSession = localStorage.getItem('unified_auth_session');
+      if (rawUnifiedSession) {
+        const parsed = JSON.parse(rawUnifiedSession);
+        unifiedMatrixTrackToken = parsed?.tokens?.matrixTrack || null;
+      }
+    } catch {
+      unifiedMatrixTrackToken = null;
+    }
+
+    const matrixTrackToken =
+      localStorage.getItem('matrixtrack_access_token') ||
+      unifiedMatrixTrackToken;
+    const genericToken = localStorage.getItem('token');
+
+    if (matrixTrackToken) {
+      localStorage.setItem('matrixtrack_access_token', matrixTrackToken);
+    }
+
+    if (matrixTrackToken && genericToken !== matrixTrackToken) {
+      localStorage.setItem('token', matrixTrackToken);
+    }
+
     let user = localStorage.getItem('user');
-    if (!user) {
+    if (!user && !matrixTrackToken && !genericToken) {
       const defaultUser = {
         id: 'admin-sso',
         name: 'Admin',
