@@ -1225,8 +1225,8 @@ function AttendanceDashboard() {
             <ChartCard title="Punch health" subtitle="How complete today's attendance punch cycles are" icon={<CheckCircle2 size={18} />} tone="amber">
               <div className="space-y-3 pt-1">
                 {[
-                  { label: "Checked out", value: summary.checkedOut, total: summary.totalRecords, color: "bg-emerald-500", text: "text-emerald-700", bg: "bg-gradient-to-r from-emerald-50 to-teal-50/60", icon: <CheckCircle2 size={16} /> },
-                  { label: "Open check-ins", value: summary.openCheckIns, total: summary.totalRecords, color: "bg-amber-500", text: "text-amber-700", bg: "bg-gradient-to-r from-amber-50 to-orange-50/60", icon: <Clock3 size={16} /> },
+                  { label: "Punched out", value: summary.checkedOut, total: summary.totalRecords, color: "bg-emerald-500", text: "text-emerald-700", bg: "bg-gradient-to-r from-emerald-50 to-teal-50/60", icon: <CheckCircle2 size={16} /> },
+                  { label: "Punched in", value: summary.openCheckIns, total: summary.totalRecords, color: "bg-amber-500", text: "text-amber-700", bg: "bg-gradient-to-r from-amber-50 to-orange-50/60", icon: <Clock3 size={16} /> },
                   { label: "No punch", value: summary.noPunch, total: summary.totalRecords, color: "bg-slate-400", text: "text-slate-600", bg: "bg-gradient-to-r from-slate-100 to-slate-50", icon: <AlertCircle size={16} /> },
                 ].map((item) => {
                   const percent = item.total ? (item.value / item.total) * 100 : 0;
