@@ -112,8 +112,7 @@ export default function RegistrationRequestsPage() {
         {/* Header Section */}
         <div style={{ marginBottom: "32px" }}>
           <div className="breadcrumb" style={{ fontSize: "0.875rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "8px" }}>
-            <span>Governance</span>
-            <span>/</span>
+           
             <span style={{ color: "#1e293b", fontWeight: 500 }}>Registration Requests</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -222,8 +221,8 @@ export default function RegistrationRequestsPage() {
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Applicant</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Requested For</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Contact</th>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Identification</th>
-                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Timeline</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Adhar Number</th>
+                    <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Registered On</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px" }}>Status</th>
                     <th style={{ padding: "16px 32px", fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", textAlign: "right" }}>Actions</th>
                   </tr>
@@ -353,7 +352,7 @@ export default function RegistrationRequestsPage() {
 
               <div style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "24px" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Administrative Role</label>
+                  <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Select Role</label>
                   <select
                     className="input"
                     style={{ width: "100%", height: "48px", borderRadius: "12px", border: "1.5px solid #e2e8f0", padding: "0 16px", fontWeight: 700, color: "#1e293b", backgroundColor: "#f8fafc" }}
