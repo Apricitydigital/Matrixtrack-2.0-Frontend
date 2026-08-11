@@ -204,7 +204,7 @@ export default function BeatAssignmentsPage() {
 
   const pageDescription = isSupervisorView
     ? "Manage supervisor allocation across registered beats."
-    : "Manage employee allocation across beat segments.";
+    : "Assign one employee to each registered beat.";
 
   /* =========================================================
      HELPERS
@@ -469,7 +469,7 @@ export default function BeatAssignmentsPage() {
                   letterSpacing: "0.05em",
                 }}
               >
-                Fully Staffed Beats
+                Employee Assigned Beats
               </div>
               <div
                 style={{
@@ -853,16 +853,30 @@ export default function BeatAssignmentsPage() {
                           >
                             <Users
                               size={14}
-                              color={allEmployeesAssigned ? "#059669" : "#d97706"}
+                              color={
+                                allEmployeesAssigned
+                                  ? "#059669"
+                                  : assignedSegments > 0
+                                    ? "#d97706"
+                                    : "#94a3b8"
+                              }
                             />
                             <span
                               style={{
-                                color: allEmployeesAssigned ? "#059669" : "#d97706",
+                                color: allEmployeesAssigned
+                                  ? "#059669"
+                                  : assignedSegments > 0
+                                    ? "#d97706"
+                                    : "#64748b",
                                 fontSize: "0.76rem",
                                 fontWeight: 700,
                               }}
                             >
-                              {assignedSegments}/{totalSegments} segments assigned
+                              {allEmployeesAssigned
+                                ? "Beat Assigned"
+                                : assignedSegments > 0
+                                  ? "Needs Reassignment"
+                                  : "Not Assigned"}
                             </span>
                           </div>
                         </td>
@@ -915,9 +929,9 @@ export default function BeatAssignmentsPage() {
                                 }}
                               >
                                 <Users size={14} />
-                                {assignedSegments > 0
-                                  ? "Manage Employees"
-                                  : "Assign Employees"}
+                                {allEmployeesAssigned
+                                  ? "Change Employee"
+                                  : "Assign Employee"}
                               </button>
                             ))}
                         </td>
