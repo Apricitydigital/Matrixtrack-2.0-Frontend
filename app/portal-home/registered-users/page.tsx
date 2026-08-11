@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
-  CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, X, Lock, Activity,
+  CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, ChevronDown, X, Lock, Activity,
   Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical
 } from "lucide-react";
 import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch } from "@lib/apiClient";
@@ -601,13 +601,7 @@ export default function RegisteredUsersPage() {
                               >
                                 <Edit2 size={13} /> Edit User
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => { setActiveMenuUserId(null); showToast({ title: u.name, description: `Email: ${u.email} | Role: ${u.role}`, tone: "info" }); }}
-                                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition w-full text-left cursor-pointer"
-                              >
-                                <Eye size={13} /> View Details
-                              </button>
+                              
                               <button
                                 type="button"
                                 onClick={() => { setDeleteTarget(u); setActiveMenuUserId(null); }}
@@ -699,11 +693,8 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [assignedModules, setAssignedModules] = useState<string[]>(user.assignedModules || []);
   const [zoneIds, setZoneIds] = useState<string[]>(user.zoneIds || (user.zoneId ? [user.zoneId] : []));
   const [wardIds, setWardIds] = useState<string[]>(user.wardIds || (user.wardId ? [user.wardId] : []));
-  const [areaIds, setAreaIds] = useState<string[]>(user.areaIds || []);
-
   const [zones, setZones] = useState<any[]>([]);
   const [wards, setWards] = useState<any[]>([]);
-  const [areas, setAreas] = useState<any[]>([]);
   const [modules, setModules] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
@@ -711,15 +702,13 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   useEffect(() => {
     async function fetchData() {
       try {
-        const [zonesRes, wardsRes, areasRes, modsRes] = await Promise.all([
+        const [zonesRes, wardsRes, modsRes] = await Promise.all([
           apiFetch<{ nodes: any[] }>("/city/geo?level=ZONE").catch(() => ({ nodes: [] })),
           apiFetch<{ nodes: any[] }>("/city/geo?level=WARD").catch(() => ({ nodes: [] })),
-          apiFetch<{ nodes: any[] }>("/city/geo?level=AREA").catch(() => ({ nodes: [] })),
           CityModulesApi.list().catch(() => [])
         ]);
         setZones(zonesRes.nodes || []);
         setWards(wardsRes.nodes || []);
-        setAreas(areasRes.nodes || []);
         
         const fetchedMods = modsRes || [];
         setModules(fetchedMods.length > 0 ? fetchedMods : [
@@ -750,36 +739,24 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
         wards.filter((w: any) => String(w.parentId || w.zoneId || "") === zId).map((w: any) => w.id)
       );
       setWardIds(prev => prev.filter(id => !wardIdsInZone.has(id)));
-      setAreaIds(prev => prev.filter(id => {
-        const area = areas.find((a: any) => a.id === id);
-        return area ? !wardIdsInZone.has(String(area.parentId || area.wardId || "")) : true;
-      }));
     }
   };
 
   const toggleWard = (wId: string) => {
-    const removing = wardIds.includes(wId);
-    setWardIds(prev => removing ? prev.filter(id => id !== wId) : [...prev, wId]);
-
-    if (removing) {
-      setAreaIds(prev => prev.filter(id => {
-        const area = areas.find((a: any) => a.id === id);
-        return area ? String(area.parentId || area.wardId || "") !== wId : true;
-      }));
-    }
-  };
-
-  const toggleArea = (aId: string) => {
-    setAreaIds(prev => prev.includes(aId) ? prev.filter(id => id !== aId) : [...prev, aId]);
+    setWardIds(prev => prev.includes(wId) ? prev.filter(id => id !== wId) : [...prev, wId]);
   };
 
   const visibleWards = zoneIds.length
     ? wards.filter((w: any) => zoneIds.includes(String(w.parentId || w.zoneId || "")))
     : wards;
 
-  const visibleAreas = wardIds.length
-    ? areas.filter((a: any) => wardIds.includes(String(a.parentId || a.wardId || "")))
-    : [];
+  const selectedZoneLabel = zoneIds.length
+    ? zones.filter((z: any) => zoneIds.includes(z.id)).map((z: any) => z.name).join(", ")
+    : "Select zone";
+
+  const selectedWardLabel = wardIds.length
+    ? wards.filter((w: any) => wardIds.includes(w.id)).map((w: any) => w.name).join(", ")
+    : "Select ward";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -806,8 +783,33 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   };
 
   return (
-    <Modal open onClose={onClose} title="Edit User & Access Permissions" subtitle={user.email} size="lg">
-      <form onSubmit={handleSubmit} className="space-y-5 pb-1">
+    <Modal
+      open
+      onClose={onClose}
+      title="Edit User & Access Permissions"
+      subtitle={user.email}
+      size="lg"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="edit-user-access-form"
+            disabled={loading}
+            className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Saving access..." : "Save Access Permissions"}
+          </button>
+        </>
+      }
+    >
+      <form id="edit-user-access-form" onSubmit={handleSubmit} className="space-y-5 pb-2">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
@@ -993,114 +995,84 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
           </div>
         </div>
 
-        {/* Geographic Access Control (Zone &rarr; Ward &rarr; Area) */}
+        {/* Geographic Access Control */}
         <div>
           <div className="mb-2 flex items-end justify-between gap-3">
             <label className="block text-xs font-bold text-slate-700">Geographic Access</label>
-            <span className="text-[10px] font-semibold text-slate-400">Zone &rarr; Ward &rarr; Area</span>
+            <span className="text-[10px] font-semibold text-slate-400">Zone &rarr; Ward</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">
-                Assigned Zones <span className="font-normal text-slate-400">({zoneIds.length} selected)</span>
-              </label>
-              <div className="h-36 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
-                {zones.length === 0 ? (
-                  <span className="block p-2 text-xs text-slate-400">No zones available</span>
-                ) : zones.map((z: any) => {
-                  const isSelected = zoneIds.includes(z.id);
-                  return (
-                    <label
-                      key={z.id}
-                      onClick={() => toggleZone(z.id)}
-                      className={`flex cursor-pointer items-center justify-between rounded-lg p-2 text-xs font-medium transition-colors ${
-                        isSelected ? 'bg-blue-100 font-bold text-blue-800' : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{z.name}</span>
-                      <input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                    </label>
-                  );
-                })}
-              </div>
+              <label className="mb-1 block text-xs font-bold text-slate-700">Assign Zone</label>
+              <details className="group rounded-xl border border-slate-200 bg-white">
+                <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-xs font-semibold text-slate-700">
+                  <span className="truncate">{selectedZoneLabel}</span>
+                  <ChevronDown size={15} className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="max-h-44 space-y-1 overflow-y-auto border-t border-slate-100 p-2">
+                  {zones.length === 0 ? (
+                    <span className="block p-2 text-xs text-slate-400">No zones available</span>
+                  ) : zones.map((z: any) => {
+                    const isSelected = zoneIds.includes(z.id);
+                    return (
+                      <label
+                        key={z.id}
+                        className={`flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs transition ${
+                          isSelected ? 'bg-blue-50 font-bold text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{z.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleZone(z.id)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </details>
+              <p className="mt-1 text-[10px] font-semibold text-slate-400">{zoneIds.length} selected</p>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">
-                Assigned Wards <span className="font-normal text-slate-400">({wardIds.length} selected)</span>
-              </label>
-              <div className="h-36 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
-                {visibleWards.length === 0 ? (
-                  <span className="block p-2 text-xs text-slate-400">{zoneIds.length ? 'No wards in selected zone' : 'No wards available'}</span>
-                ) : visibleWards.map((w: any) => {
-                  const isSelected = wardIds.includes(w.id);
-                  return (
-                    <label
-                      key={w.id}
-                      onClick={() => toggleWard(w.id)}
-                      className={`flex cursor-pointer items-center justify-between rounded-lg p-2 text-xs font-medium transition-colors ${
-                        isSelected ? 'bg-indigo-100 font-bold text-indigo-800' : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{w.name}</span>
-                      <input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">
-                Assigned Areas <span className="font-normal text-slate-400">({areaIds.length} selected)</span>
-              </label>
-              <div className="h-36 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
-                {!wardIds.length ? (
-                  <span className="block p-2 text-xs text-slate-400">Select ward first</span>
-                ) : visibleAreas.length === 0 ? (
-                  <span className="block p-2 text-xs text-slate-400">No areas in selected ward</span>
-                ) : visibleAreas.map((a: any) => {
-                  const isSelected = areaIds.includes(a.id);
-                  return (
-                    <label
-                      key={a.id}
-                      onClick={() => toggleArea(a.id)}
-                      className={`flex cursor-pointer items-center justify-between rounded-lg p-2 text-xs font-medium transition-colors ${
-                        isSelected ? 'bg-cyan-100 font-bold text-cyan-800' : 'text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{a.name}</span>
-                      <input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" />
-                    </label>
-                  );
-                })}
-              </div>
+              <label className="mb-1 block text-xs font-bold text-slate-700">Assign Ward</label>
+              <details className="group rounded-xl border border-slate-200 bg-white">
+                <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-xs font-semibold text-slate-700">
+                  <span className="truncate">{selectedWardLabel}</span>
+                  <ChevronDown size={15} className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="max-h-44 space-y-1 overflow-y-auto border-t border-slate-100 p-2">
+                  {visibleWards.length === 0 ? (
+                    <span className="block p-2 text-xs text-slate-400">{zoneIds.length ? 'No wards in selected zone' : 'No wards available'}</span>
+                  ) : visibleWards.map((w: any) => {
+                    const isSelected = wardIds.includes(w.id);
+                    return (
+                      <label
+                        key={w.id}
+                        className={`flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs transition ${
+                          isSelected ? 'bg-indigo-50 font-bold text-indigo-700' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="truncate pr-2">{w.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleWard(w.id)}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </details>
+              <p className="mt-1 text-[10px] font-semibold text-slate-400">{wardIds.length} selected</p>
             </div>
           </div>
-
-          <p className="mt-2 text-[10px] font-semibold text-amber-600">
-            Area selection is shown in the editor, but the current backend user-access API stores only zone and ward scope.
-          </p>
         </div>
 
-        <div className="sticky bottom-0 z-20 -mx-6 flex gap-3 border-t border-slate-200 bg-white px-6 pt-4 pb-1 shadow-[0_-8px_20px_rgba(15,23,42,0.06)]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors"
-          >
-            {loading ? "Saving access..." : "Save Access Permissions"}
-          </button>
-        </div>
       </form>
     </Modal>
   );

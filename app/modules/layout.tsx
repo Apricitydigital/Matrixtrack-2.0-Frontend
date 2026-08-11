@@ -6,7 +6,7 @@ import PortalHomeLayout from "@components/PortalHomeLayout";
 export default function ModulesLayout({ children }: { children: React.ReactNode }) {
   return (
     <Protected>
-      {children}
+      <PortalHomeLayout>{children}</PortalHomeLayout>
     </Protected>
   );
 }
