@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Activity,
   AlertCircle,
   ArrowDownToLine,
   ArrowUpRight,
   BarChart3,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
@@ -41,9 +43,12 @@ import {
   YAxis,
 } from "recharts";
 import { RoleGuard } from "@components/Guards";
+import { useAuth } from "@hooks/useAuth";
 import { ApiError } from "@lib/apiClient";
+import { isHmsSuperAdmin } from "@utils/rbac";
 import {
   AttendanceApi,
+  type AttendanceCity,
   type AttendanceDashboardQuery,
   type AttendanceDashboardResponse,
   type AttendanceRecord,
@@ -638,7 +643,185 @@ function KpiRecordsDrawer({
   );
 }
 
+
+function WorkDurationEmployeesPopup({
+  open,
+  bucket,
+  expectedCount,
+  data,
+  loading,
+  page,
+  onPageChange,
+  onClose,
+}: {
+  open: boolean;
+  bucket: string | null;
+  expectedCount: number;
+  data: AttendanceDashboardResponse | null;
+  loading: boolean;
+  page: number;
+  onPageChange: (page: number) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  if (!open || !bucket || typeof document === "undefined") return null;
+
+  const records = data?.records || [];
+  const total = data?.pagination.total ?? expectedCount;
+  const totalPages = Math.max(data?.pagination.totalPages || 1, 1);
+
+  return createPortal(
+    <div
+      className="z-[9999] bg-slate-950/35 backdrop-blur-[2px]"
+      style={{
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100dvh",
+      }}
+      onMouseDown={onClose}
+    >
+      <div
+        className="flex flex-col overflow-hidden rounded-[22px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.28)]"
+        style={{
+          position: "fixed",
+          left: "50vw",
+          top: "50dvh",
+          transform: "translate(-50%, -50%)",
+          width: "min(560px, calc(100vw - 28px))",
+          maxHeight: "min(560px, calc(100dvh - 56px))",
+          margin: 0,
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50 via-white to-violet-50 px-4 py-3.5 sm:px-5">
+          <div className="min-w-0">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-white">
+                Work duration
+              </span>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-slate-700 ring-1 ring-slate-200">
+                {numberFormatter.format(total)} employees
+              </span>
+            </div>
+            <h3 className="truncate text-[15px] font-black tracking-tight text-slate-900">
+              {bucket} employees
+            </h3>
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-500">
+              Completed Punch In / Punch Out records in this duration range.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Close work duration employees"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4">
+          {loading && !data ? (
+            <div className="flex min-h-[260px] flex-col items-center justify-center gap-2 text-slate-500">
+              <RefreshCw size={20} className="animate-spin text-blue-600" />
+              <p className="text-xs font-bold">Loading employees...</p>
+            </div>
+          ) : records.length ? (
+            <div className="space-y-2">
+              {records.map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/65 px-3 py-2.5 transition hover:border-blue-100 hover:bg-blue-50/45"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-[11px] font-black text-blue-700 shadow-sm ring-1 ring-blue-100">
+                    {record.employeeName.slice(0, 1).toUpperCase()}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-[11px] font-black text-slate-800" title={record.employeeName}>
+                        {record.employeeName}
+                      </p>
+                      <span className="shrink-0 rounded-md bg-blue-50 px-2 py-1 text-[9px] font-black text-blue-700 ring-1 ring-blue-100">
+                        {durationLabel(record.inTime, record.outTime)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400">
+                      {record.designation || "Employee"} · {record.attendanceId}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-bold">
+                      <span className="rounded-md bg-white px-1.5 py-1 text-slate-600 ring-1 ring-slate-200">
+                        {formatShortDate(record.attendanceDate)}
+                      </span>
+                      <span className="rounded-md bg-blue-50 px-1.5 py-1 text-blue-700 ring-1 ring-blue-100">
+                        In {formatTime(record.inTime)}
+                      </span>
+                      <span className="rounded-md bg-emerald-50 px-1.5 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                        Out {formatTime(record.outTime)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-[260px] flex-col items-center justify-center px-5 text-center">
+              <UsersRound size={24} className="mb-2 text-slate-300" />
+              <p className="text-xs font-black text-slate-600">No employees found</p>
+              <p className="mt-1 text-[10px] font-medium text-slate-400">
+                No completed work durations match this bucket under the current filters.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
+          <p className="text-[9.5px] font-semibold text-slate-500">
+            Page {data?.pagination.page || page} of {totalPages}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onPageChange(Math.max(1, page - 1))}
+              disabled={page <= 1 || loading}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9.5px] font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              <ChevronLeft size={12} />
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+              disabled={page >= totalPages || loading}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9.5px] font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              Next
+              <ChevronRight size={12} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function AttendanceDashboard() {
+  const { user } = useAuth();
+  const hmsSuperAdmin = isHmsSuperAdmin(user);
+  const [cities, setCities] = useState<AttendanceCity[]>([]);
+  const [selectedCityId, setSelectedCityId] = useState("");
+  const [citiesLoading, setCitiesLoading] = useState(false);
   const [data, setData] = useState<AttendanceDashboardResponse | null>(null);
   const [draftFilters, setDraftFilters] = useState<FilterState>(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(emptyFilters);
@@ -654,8 +837,13 @@ function AttendanceDashboard() {
   const [kpiDrilldownData, setKpiDrilldownData] = useState<AttendanceDashboardResponse | null>(null);
   const [kpiDrilldownPage, setKpiDrilldownPage] = useState(1);
   const [kpiDrilldownLoading, setKpiDrilldownLoading] = useState(false);
+  const [workDurationBucket, setWorkDurationBucket] = useState<string | null>(null);
+  const [workDurationData, setWorkDurationData] = useState<AttendanceDashboardResponse | null>(null);
+  const [workDurationPage, setWorkDurationPage] = useState(1);
+  const [workDurationLoading, setWorkDurationLoading] = useState(false);
 
   const buildQuery = (filters: FilterState, requestedPage: number): AttendanceDashboardQuery => ({
+    cityId: hmsSuperAdmin ? selectedCityId || undefined : undefined,
     from: filters.from || undefined,
     to: filters.to || undefined,
     status: filters.status === "ALL" ? undefined : filters.status,
@@ -667,6 +855,38 @@ function AttendanceDashboard() {
     page: requestedPage,
     pageSize: 25,
   });
+
+  useEffect(() => {
+    if (!hmsSuperAdmin) return;
+
+    let cancelled = false;
+
+    const loadCities = async () => {
+      setCitiesLoading(true);
+      try {
+        const result = await AttendanceApi.cities();
+        if (cancelled) return;
+
+        setCities(result.cities);
+        setSelectedCityId((current) => {
+          if (current && result.cities.some((city) => city.id === current)) return current;
+          if (user?.cityId && result.cities.some((city) => city.id === user.cityId)) return user.cityId;
+          return result.cities[0]?.id || "";
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : "Unable to load cities");
+        }
+      } finally {
+        if (!cancelled) setCitiesLoading(false);
+      }
+    };
+
+    void loadCities();
+    return () => {
+      cancelled = true;
+    };
+  }, [hmsSuperAdmin, user?.cityId]);
 
   const loadDashboard = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -696,9 +916,14 @@ function AttendanceDashboard() {
   };
 
   useEffect(() => {
+    if (hmsSuperAdmin && !selectedCityId) {
+      setLoading(false);
+      return;
+    }
+
     void loadDashboard(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters, page]);
+  }, [appliedFilters, page, selectedCityId, hmsSuperAdmin]);
 
   useEffect(() => {
     if (!kpiDrilldown) {
@@ -730,7 +955,72 @@ function AttendanceDashboard() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kpiDrilldown, kpiDrilldownPage, appliedFilters]);
+  }, [kpiDrilldown, kpiDrilldownPage, appliedFilters, selectedCityId, hmsSuperAdmin]);
+
+
+  useEffect(() => {
+    if (!workDurationBucket) {
+      setWorkDurationData(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadWorkDurationEmployees = async () => {
+      setWorkDurationLoading(true);
+      try {
+        const result = await AttendanceApi.dashboard({
+          ...buildQuery(appliedFilters, workDurationPage),
+          workDurationBucket,
+          page: workDurationPage,
+          pageSize: 8,
+        });
+
+        if (!cancelled) {
+          setWorkDurationData(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Unable to load employees for this work duration"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setWorkDurationLoading(false);
+        }
+      }
+    };
+
+    void loadWorkDurationEmployees();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workDurationBucket, workDurationPage, appliedFilters, selectedCityId, hmsSuperAdmin]);
+
+  const handleCityChange = (cityId: string) => {
+    setSelectedCityId(cityId);
+    setData(null);
+    setDraftFilters({ ...emptyFilters });
+    setAppliedFilters({ ...emptyFilters });
+    setPage(1);
+    setKpiDrilldown(null);
+    setKpiDrilldownData(null);
+    setWorkDurationBucket(null);
+    setWorkDurationData(null);
+    setNotice("");
+    setError("");
+  };
+
+  const openWorkDurationBucket = (bucket: string) => {
+    setWorkDurationBucket(bucket);
+    setWorkDurationPage(1);
+    setWorkDurationData(null);
+  };
 
   const openKpiDrilldown = (config: KpiDrilldown) => {
     setKpiDrilldownPage(1);
@@ -808,7 +1098,10 @@ function AttendanceDashboard() {
     setError("");
     setNotice("");
     try {
-      const result: AttendanceUploadResponse = await AttendanceApi.upload(file);
+      const result: AttendanceUploadResponse = await AttendanceApi.upload(
+        file,
+        hmsSuperAdmin ? selectedCityId : undefined
+      );
       setUploadOpen(false);
       setNotice(
         `Attendance imported for ${formatShortDate(result.batch.attendanceDate)} · ${numberFormatter.format(
@@ -832,6 +1125,10 @@ function AttendanceDashboard() {
       ? formatShortDate(data.range.from)
       : `${formatShortDate(data.range.from)} – ${formatShortDate(data.range.to)}`
     : "No attendance data";
+
+  const selectedCity = hmsSuperAdmin
+    ? cities.find((city) => city.id === selectedCityId) || null
+    : null;
 
   if (loading && !data) {
     return (
@@ -863,6 +1160,18 @@ function AttendanceDashboard() {
         onPageChange={setKpiDrilldownPage}
         onClose={() => setKpiDrilldown(null)}
       />
+      <WorkDurationEmployeesPopup
+        open={Boolean(workDurationBucket)}
+        bucket={workDurationBucket}
+        expectedCount={
+          data?.workDurationBuckets.find((item) => item.bucket === workDurationBucket)?.count || 0
+        }
+        data={workDurationData}
+        loading={workDurationLoading}
+        page={workDurationPage}
+        onPageChange={setWorkDurationPage}
+        onClose={() => setWorkDurationBucket(null)}
+      />
 
       <style jsx global>{`
         @keyframes attendanceRise {
@@ -879,44 +1188,66 @@ function AttendanceDashboard() {
         }
       `}</style>
 
-      <section className="relative overflow-hidden rounded-[30px] border border-blue-900/10 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 px-6 py-6 text-white shadow-[0_22px_65px_rgba(30,58,138,0.2)] sm:px-7 lg:px-8">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-[-100px] left-[32%] h-56 w-56 rounded-full bg-violet-500/15 blur-3xl" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-3xl">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-100">
-                <Sparkles size={12} /> City Attendance Intelligence
-              </span>
-              <span className="rounded-full border border-white/10 bg-slate-900/25 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-300">
-                {visibleRangeLabel}
-              </span>
-            </div>
-            <h1 className="text-2xl font-black tracking-[-0.035em] text-white sm:text-3xl">Attendance Analytics</h1>
-            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-blue-100/75">
-              Upload daily attendance CSVs and monitor workforce presence, punch activity, working hours and employee-level records from one dashboard.
-            </p>
-          </div>
+      <section className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700 ring-1 ring-blue-100">
+            <Sparkles size={12} />
+            {hmsSuperAdmin && selectedCity ? `${selectedCity.name} Attendance` : "City Attendance Intelligence"}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
+            <CalendarDays size={12} />
+            {visibleRangeLabel}
+          </span>
+          {lastUpdated && (
+            <span className="text-[10px] font-semibold text-slate-400">
+              Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => void loadDashboard(true)}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/15 disabled:opacity-50"
-            >
-              <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => setUploadOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-blue-950 shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5"
-            >
-              <UploadCloud size={16} />
-              Upload CSV
-            </button>
-          </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {hmsSuperAdmin && (
+            <label className="flex h-9 min-w-[210px] items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/70 px-3 shadow-sm">
+              <Building2 size={14} className="shrink-0 text-blue-600" />
+              <select
+                value={selectedCityId}
+                onChange={(event) => handleCityChange(event.target.value)}
+                disabled={citiesLoading || !cities.length}
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-black text-blue-900 outline-none disabled:opacity-50"
+                aria-label="Select city attendance dashboard"
+              >
+                {!cities.length && (
+                  <option value="">{citiesLoading ? "Loading cities..." : "No cities available"}</option>
+                )}
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name}{city.code ? ` · ${city.code}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <button
+            type="button"
+            onClick={() => void loadDashboard(true)}
+            disabled={refreshing || (hmsSuperAdmin && !selectedCityId)}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+            Refresh
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            disabled={hmsSuperAdmin && !selectedCityId}
+            title={hmsSuperAdmin && selectedCity ? `Upload attendance for ${selectedCity.name}` : undefined}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-blue-600/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          >
+            <UploadCloud size={14} />
+            Upload CSV
+          </button>
         </div>
       </section>
 
@@ -1314,7 +1645,7 @@ function AttendanceDashboard() {
           </section>
 
           <section className="grid items-stretch gap-5 lg:grid-cols-3">
-            <ChartCard title="Work duration" subtitle="Distribution and completion quality of Punch In / Punch Out cycles" badge={`${numberFormatter.format(summary.checkedOut)} completed`} icon={<BarChart3 size={18} />} tone="blue">
+            <ChartCard title="Work duration" subtitle="Click a bar to view employees in that working-hour range" badge={`${numberFormatter.format(summary.checkedOut)} completed`} icon={<BarChart3 size={18} />} tone="blue">
               <div className="flex h-full flex-col">
                 <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-blue-50/35 to-white px-1 pt-2 ring-1 ring-blue-100/70">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1323,8 +1654,27 @@ function AttendanceDashboard() {
                       <XAxis dataKey="bucket" tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
                       <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickLine={false} axisLine={false} />
                       <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
-                      <Bar dataKey="count" name="Employees" radius={[8, 8, 2, 2]} maxBarSize={40} animationDuration={950}>
-                        {data.workDurationBuckets.map((item, index) => <Cell key={`${item.bucket}-${index}`} fill={[chartColors.rose, chartColors.amber, chartColors.blue, chartColors.emerald, chartColors.violet][index % 5]} />)}
+                      <Bar
+                        dataKey="count"
+                        name="Employees"
+                        radius={[8, 8, 2, 2]}
+                        maxBarSize={40}
+                        animationDuration={950}
+                        cursor="pointer"
+                        onClick={(entry: any) => {
+                          const bucket = String(entry?.bucket || entry?.payload?.bucket || "");
+                          if (bucket) openWorkDurationBucket(bucket);
+                        }}
+                      >
+                        {data.workDurationBuckets.map((item, index) => (
+                          <Cell
+                            key={`${item.bucket}-${index}`}
+                            fill={[chartColors.rose, chartColors.amber, chartColors.blue, chartColors.emerald, chartColors.violet][index % 5]}
+                            fillOpacity={
+                              workDurationBucket && workDurationBucket !== item.bucket ? 0.35 : 1
+                            }
+                          />
+                        ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
@@ -1666,7 +2016,7 @@ function AttendanceDashboard() {
 
 export default function AttendanceAnalyticsPage() {
   return (
-    <RoleGuard roles={["CITY_ADMIN"]}>
+    <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
       <AttendanceDashboard />
     </RoleGuard>
   );

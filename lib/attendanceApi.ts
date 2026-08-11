@@ -97,6 +97,7 @@ export type AttendanceDashboardResponse = {
 };
 
 export type AttendanceDashboardQuery = {
+  cityId?: string;
   from?: string;
   to?: string;
   status?: string;
@@ -104,9 +105,22 @@ export type AttendanceDashboardQuery = {
   officeLocation?: string;
   divisionUnit?: string;
   checkoutState?: string;
+  workDurationBucket?: string;
   search?: string;
   page?: number;
   pageSize?: number;
+};
+
+
+export type AttendanceCity = {
+  id: string;
+  name: string;
+  code: string;
+  ulbCode: string | null;
+};
+
+export type AttendanceCitiesResponse = {
+  cities: AttendanceCity[];
 };
 
 export type AttendanceUploadResponse = {
@@ -138,14 +152,19 @@ function toQueryString(query: AttendanceDashboardQuery) {
 }
 
 export const AttendanceApi = {
+  cities: () =>
+    apiFetch<AttendanceCitiesResponse>("/city/attendance/cities"),
+
   dashboard: (query: AttendanceDashboardQuery = {}) =>
     apiFetch<AttendanceDashboardResponse>(
       `/city/attendance/dashboard${toQueryString(query)}`
     ),
 
-  upload: (file: File) => {
+  upload: (file: File, cityId?: string) => {
     const formData = new FormData();
     formData.append("file", file);
+    if (cityId) formData.append("cityId", cityId);
+
     return apiFetch<AttendanceUploadResponse>("/city/attendance/upload", {
       method: "POST",
       body: formData,
