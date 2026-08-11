@@ -14,6 +14,10 @@ function Master() {
   const role = String(user?.role || "").toLowerCase();
   const isSupervisor = role === "supervisor";
   const isAdmin = role === "admin";
+  const isScopedCityAdmin =
+    Array.isArray(user?.customPermissions?.assigned_cities) &&
+    user.customPermissions.assigned_cities.length > 0;
+  const canManageMasterAdminTabs = isAdmin && !isScopedCityAdmin;
   const [activeTab, setActiveTab] = useState(isSupervisor ? 2 : 1);
 
   useEffect(() => {
@@ -31,7 +35,9 @@ function Master() {
     { id: 7, label: "Migration", component: <EmployeeMigrationManager />, adminOnly: true },
   ];
 
-  const tabs = allTabs.filter((tab) => !tab.adminOnly || isAdmin);
+  const tabs = allTabs.filter(
+    (tab) => !tab.adminOnly || canManageMasterAdminTabs
+  );
 
   useEffect(() => {
     if (!tabs.find((tab) => tab.id === activeTab)) {

@@ -55,6 +55,7 @@ export function SearchProvider({ children }) {
   const [isOpen, setIsOpen]     = useState(false);
   const [results, setResults]   = useState([]);
   const [dataReady, setDataReady] = useState(false);
+  const [isFetchingData, setIsFetchingData] = useState(false);
 
   // Central data store — fetched once here, available to ALL searches
   const dataStore = useRef({ employees: [], supervisors: [] });
@@ -62,9 +63,10 @@ export function SearchProvider({ children }) {
   // ── Fetch all searchable data once (when user is logged in) ──────────────
   const fetchAllSearchData = useCallback(async () => {
     const token = window.localStorage.getItem("token");
-    if (!token) return; // not logged in yet
+    if (!token || isFetchingData || dataReady) return; // not logged in yet
 
     try {
+      setIsFetchingData(true);
       const [empRes, supRes] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/api/employees`,  buildRequestConfig()),
         axios.get(`${API_BASE_URL}/api/supervisor`, { ...buildRequestConfig(), params: { cityId: "all" } }),
@@ -83,12 +85,16 @@ export function SearchProvider({ children }) {
       setDataReady(true);
     } catch (err) {
       console.error("Search data prefetch failed:", err);
+    } finally {
+      setIsFetchingData(false);
     }
-  }, []);
+  }, [dataReady, isFetchingData]);
 
   useEffect(() => {
-    fetchAllSearchData();
-  }, [fetchAllSearchData]);
+    if (isOpen && !dataReady) {
+      fetchAllSearchData();
+    }
+  }, [isOpen, dataReady, fetchAllSearchData]);
 
   // Pages can still call registerData to keep search fresh after CRUD ops
   const registerData = useCallback((key, records) => {

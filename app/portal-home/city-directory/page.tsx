@@ -128,6 +128,24 @@ export default function HmsDashboardPage() {
   const [adminStatus, setAdminStatus] = useState("");
   const [adminCreating, setAdminCreating] = useState(false);
 
+  const openCreateAdminModal = (cityId = "") => {
+    setAdminCityId(cityId);
+    setAdminName("");
+    setAdminEmail("");
+    setAdminPassword("");
+    setAdminStatus("");
+    setCreateAdminOpen(true);
+  };
+
+  const closeCreateAdminModal = () => {
+    setCreateAdminOpen(false);
+    setAdminCityId("");
+    setAdminName("");
+    setAdminEmail("");
+    setAdminPassword("");
+    setAdminStatus("");
+  };
+
   const refresh = async () => {
     try {
       setLoading(true);
@@ -326,8 +344,7 @@ export default function HmsDashboardPage() {
     try {
       await CityApi.createCityAdmin(adminCityId, { email: adminEmail, password: adminPassword, name: adminName });
       showToast({ title: "Admin created", tone: "success" });
-      setAdminName(""); setAdminEmail(""); setAdminPassword(""); setAdminCityId("");
-      setCreateAdminOpen(false);
+      closeCreateAdminModal();
       await refresh();
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to create city admin.";
@@ -783,7 +800,11 @@ export default function HmsDashboardPage() {
         {visibleCities.length ? (
           visibleCities.map((city, index) => {
             const srNo = (safeTablePage - 1) * tablePageSize + index + 1;
-            const admins = city.cityAdmin ? [city.cityAdmin] : [];
+            const admins = city.cityAdmins?.length
+              ? city.cityAdmins
+              : city.cityAdmin
+                ? [city.cityAdmin]
+                : [];
 
             const hierarchyItems = [
               { label: city.state?.name || "No state", missing: !city.state?.name },
@@ -944,10 +965,7 @@ export default function HmsDashboardPage() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        setAdminCityId(city.id);
-                        setCreateAdminOpen(true);
-                      }}
+                      onClick={() => openCreateAdminModal(city.id)}
                       className="
                         inline-flex items-center gap-2 rounded-[9px]
                         border border-amber-200 bg-amber-50
@@ -1028,6 +1046,12 @@ export default function HmsDashboardPage() {
                       onClick={() => setModuleCity(city)}
                     >
                       Assign Modules
+                    </button>
+                    <button
+                      className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-amber-50 hover:text-amber-700 text-left"
+                      onClick={() => openCreateAdminModal(city.id)}
+                    >
+                      Add City Admin
                     </button>
                   </div>
                 </td>
@@ -1287,9 +1311,9 @@ export default function HmsDashboardPage() {
       {/* Create Admin Modal */}
       <Modal
         open={createAdminOpen}
-        onClose={() => setCreateAdminOpen(false)}
+        onClose={closeCreateAdminModal}
         title="Register City Admin"
-        subtitle="Delegate control to local authorities"
+        subtitle="Create one or more administrators for a city"
         size="sm"
       >
         <form onSubmit={handleCreateAdmin} className="flex flex-col gap-4">
@@ -1316,7 +1340,7 @@ export default function HmsDashboardPage() {
           )}
 
           <div className="mt-2 flex gap-3">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setCreateAdminOpen(false)}>
+            <Button type="button" variant="secondary" className="flex-1" onClick={closeCreateAdminModal}>
               Cancel
             </Button>
             <Button type="submit" className="flex-1" loading={adminCreating} icon={<Shield size={15} />}>
