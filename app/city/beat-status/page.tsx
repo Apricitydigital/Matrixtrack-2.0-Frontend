@@ -869,7 +869,7 @@ function BeatListRow({
                                     <div style={{ marginTop: 6, color: "#64748b", fontSize: 10.5, lineHeight: 1.55 }}>
                                         <div><b>Latitude:</b> {typeof lat === "number" ? lat.toFixed(6) : "—"}</div>
                                         <div><b>Longitude:</b> {typeof lng === "number" ? lng.toFixed(6) : "—"}</div>
-                                        {point.type ? <div><b>Type:</b> {String(point.type).replaceAll("_", " ")}</div> : null}
+                                        {point.type ? <div><b>Type:</b> {String(point.type).replace(/_/g, " ")}</div> : null}
                                     </div>
                                 </div>
                             );

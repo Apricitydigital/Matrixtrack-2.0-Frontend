@@ -790,24 +790,24 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
       subtitle={user.email}
       size="lg"
       footer={
-        <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="edit-user-access-form"
-            disabled={loading}
-            className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Saving access..." : "Save Access Permissions"}
-          </button>
-        </>
-      }
+  <div className="flex items-center justify-end gap-3">
+    <button
+      type="button"
+onClick={onClose}
+      className="rounded-xl border border-slate-200 px-5 py-3"
+    >
+      Cancel
+    </button>
+
+    <button
+      type="submit"
+      form="edit-user-form"
+      className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white"
+    >
+      Save Access Permissions
+    </button>
+  </div>
+}
     >
       <form id="edit-user-access-form" onSubmit={handleSubmit} className="space-y-5 pb-2">
         <div className="grid grid-cols-2 gap-4">

@@ -346,11 +346,24 @@ export default function PortalHomePage() {
     (user?.roles || []).includes('CITY_ADMIN') ||
     (user?.roles || []).includes('city_admin');
 
+  const isCommissioner =
+    user?.role === 'COMMISSIONER' ||
+    user?.role === 'commissioner' ||
+    (user?.roles || []).includes('COMMISSIONER') ||
+    (user?.roles || []).includes('commissioner');
+
   const userCityName = user?.city ? user.city.name : 'Indore';
   const userRoles = user?.roles || [];
 
   useEffect(() => {
+    if (isCommissioner && !isSuperAdmin) {
+      router.replace('/municipal/commissioner');
+    }
+  }, [isCommissioner, isSuperAdmin, router]);
+
+  useEffect(() => {
     async function loadData() {
+      if (isCommissioner && !isSuperAdmin) return;
       setLoadingCities(true);
       try {
         if (isSuperAdmin) {
@@ -377,7 +390,11 @@ export default function PortalHomePage() {
     }
 
     loadData();
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, isCommissioner]);
+
+  if (isCommissioner && !isSuperAdmin) {
+    return null;
+  }
 
 
   useEffect(() => {
@@ -411,12 +428,12 @@ export default function PortalHomePage() {
       <section style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', color: 'white', borderRadius: '24px', padding: '26px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 12px 40px -10px rgba(15,23,42,0.6)', position: 'relative', overflow: 'hidden', marginBottom: '20px', flexWrap: 'wrap', gap: '24px' }}>
         {/* Background Glow */}
         <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', height: '100%', background: 'radial-gradient(ellipse at top, rgba(59, 130, 246, 0.2), transparent 70%)', pointerEvents: 'none' }} />
-        
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1, minWidth: '280px' }}>
           <div style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ShieldCheck size={14} color="#60a5fa" /> MATRIXTRACK 2.0 • {isSuperAdmin ? 'GLOBAL COMMAND CENTER' : 'CITY COMMAND CENTER'}
           </div>
-          
+
           <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.02em' }}>
             {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Admin'} 
           </h1>
@@ -491,8 +508,26 @@ export default function PortalHomePage() {
 
           <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '6px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-               <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981' }}></div>
-               <span style={{ fontSize: '9px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>LIVE</span>
+              <div
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  boxShadow: '0 0 8px #10b981',
+                }}
+              />
+
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 800,
+                  color: '#10b981',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                LIVE
+              </span>
             </div>
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', marginTop: '2px' }}>{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</span>
           </div>

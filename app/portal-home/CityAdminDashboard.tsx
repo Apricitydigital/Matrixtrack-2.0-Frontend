@@ -792,12 +792,14 @@ export default function CityAdminDashboard({
       (item: any) => !item?.status || up(item.status) === "PENDING"
     ).length;
 
-    const beatRequests = (
-      beatRequestResponse?.pendingBeats ||
-      beatRequestResponse?.beats ||
-      beatRequestResponse?.data ||
-      []
-    ).length;
+const beatPayload = beatRequestResponse as any;
+
+const beatRequests = (
+  beatPayload?.pendingBeats ||
+  beatPayload?.beats ||
+  beatPayload?.data ||
+  []
+).length;
 
     const toiletRequests = (
       toiletRequestResponse?.toilets ||
@@ -2320,7 +2322,7 @@ export default function CityAdminDashboard({
 
                 {directoryRoleOptions.map((role) => (
                   <option key={role} value={role}>
-                    {role.replaceAll("_", " ")}
+                    {role.replace(/_/g, " ")}
                   </option>
                 ))}
               </select>
@@ -2430,7 +2432,7 @@ export default function CityAdminDashboard({
                               key={role}
                               className="rounded-md border border-violet-100 bg-violet-50 px-2 py-0.5 text-[8px] font-black text-violet-700"
                             >
-                              {role.replaceAll("_", " ")}
+                              {role.replace(/_/g, " ")}
                             </span>
                           ))
                         ) : (
@@ -2603,7 +2605,7 @@ function prettyModuleName(value: string): string {
   return (
     names[key] ||
     value
-      .replaceAll("_", " ")
+      .replace(/_/g, " ")
       .toLowerCase()
       .replace(/\b\w/g, (char) => char.toUpperCase())
   );
