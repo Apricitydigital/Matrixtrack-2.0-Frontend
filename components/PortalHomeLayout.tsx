@@ -306,6 +306,11 @@ function PortalHomeLayoutContent({
   const userPermissions =
     (user as any)?.permissions || [];
 
+  const scopedAssignedCities =
+    Array.isArray((user as any)?.customPermissions?.assigned_cities)
+      ? (user as any).customPermissions.assigned_cities
+      : [];
+
   const userModules =
     (user as any)?.modules || [];
 
@@ -347,6 +352,7 @@ function PortalHomeLayoutContent({
 
   const isCityAdmin =
     isSuperAdmin ||
+    scopedAssignedCities.length > 0 ||
     normalizedAllRoles.some(
       (r) =>
         [
@@ -1220,6 +1226,17 @@ function PortalHomeLayoutContent({
 
   const checkWorkforcePerm =
     (mod: string) => {
+      if (
+        isCityAdmin &&
+        ['geofencing'].includes(
+          String(mod || '')
+            .trim()
+            .toLowerCase()
+        )
+      ) {
+        return false;
+      }
+
       if (isWorkforceAdmin) {
         return true;
       }

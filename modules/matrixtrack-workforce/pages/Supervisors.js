@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback , useRef} from "react";
 import axios from "axios";
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL, ALLOWED_CITIES_ENDPOINT } from "../config";
 import Swal from "sweetalert2";
 import { useSearch } from "../SearchContext";
 import { matchesSearchTerm } from "../utils/search";
 import { useAuth } from "../AuthContext";
-import { Filter, Search, RefreshCw, MapPin, Users, User, Shield, Building2, ChevronDown, ChevronUp, Check, FileText, X, ShieldCheck, Camera, Image as ImageIcon, Key, Info, ChevronLeft, ChevronRight } from "lucide-react";
+import { Filter, Search, RefreshCw, MapPin, Users, User, Shield, Building2, ChevronDown, ChevronUp, Check, FileText, X, Camera, Image as ImageIcon, Key, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import Loader from "../components/Loader";
 
 const ExpandableListCell = ({ value, label, textClass = "text-slate-600", emptyText = "N/A", emptyClass = "text-slate-300" }) => {
@@ -96,8 +96,6 @@ const ExpandableListCell = ({ value, label, textClass = "text-slate-600", emptyT
   );
 };
 
-const ALLOWED_CITIES_ENDPOINT = `${API_BASE_URL}/cities`;
-
 const apiUrl = API_BASE_URL;
 const buildRequestConfig = (extraHeaders = {}) => {
   if (typeof window === "undefined") {
@@ -175,19 +173,11 @@ function Supervisors() {
     reg_ward_id: "",
   });
   const [formErrors, setFormErrors] = useState({});
-  // OTP states
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [otpValue, setOtpValue] = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpError, setOtpError] = useState("");
-  const [otpSuccess, setOtpSuccess] = useState("");
-  const [otpCooldown, setOtpCooldown] = useState(0);
   const [openActionMenuId, setOpenActionMenuId] = useState(null);
   const [isEditing, setIsEditing] = useState(null);
   
   // Registration Flow states
-  const [regStep, setRegStep] = useState(1); // 1: Basic, 2: Aadhaar, 3: OTP, 4: Photo, 5: Password
+  const [regStep, setRegStep] = useState(1); // 1: Identity, 2: Location, 3: Photo, 4: Password
   const [capturedPhoto, setCapturedPhoto] = useState(null);
   const [showCamera, setShowCamera] = useState(false);
   const videoRef = useRef(null);
@@ -745,79 +735,10 @@ function Supervisors() {
       if (name === "reg_sector_id") setFormData(prev => ({ ...prev, reg_ward_id: "" }));
 
       setFormData((prev) => ({ ...prev, [name]: value }));
-      if (name === "phone") {
-        setOtpSent(false);
-        setOtpVerified(false);
-        setOtpValue("");
-        setOtpError("");
-        setOtpSuccess("");
-        setOtpCooldown(0);
-      }
     }
     setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
-
-  // Send OTP via AWS SNS
-  const handleSendOtp = async () => {
-    const phone = formData.phone.trim();
-    if (!/^\d{10}$/.test(phone)) {
-      setFormErrors((prev) => ({ ...prev, phone: "Enter a valid 10-digit phone number first." }));
-      return;
-    }
-    setOtpLoading(true);
-    setOtpError("");
-    setOtpSuccess("");
-    try {
-      const config = buildRequestConfig({ "Content-Type": "application/json" });
-      await axios.post(`${apiUrl}/otp/send`, { phone }, config);
-      setOtpSent(true);
-      setOtpSuccess("OTP sent to +91" + phone + ". Valid for 5 minutes.");
-      // Start 60s cooldown
-      setOtpCooldown(60);
-      const timer = setInterval(() => {
-        setOtpCooldown((prev) => {
-          if (prev <= 1) { clearInterval(timer); return 0; }
-          return prev - 1;
-        });
-      }, 1000);
-    } catch (err) {
-      const msg = err?.response?.data?.error || "Failed to send OTP.";
-      const cooldown = err?.response?.data?.cooldown;
-      setOtpError(msg);
-      if (cooldown) {
-        setOtpCooldown(cooldown);
-        const timer = setInterval(() => {
-          setOtpCooldown((prev) => { if (prev <= 1) { clearInterval(timer); return 0; } return prev - 1; });
-        }, 1000);
-      }
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  // Verify OTP
-  const handleVerifyOtp = async () => {
-    if (!/^\d{6}$/.test(otpValue.trim())) {
-      setOtpError("OTP must be exactly 6 digits.");
-      return;
-    }
-    setOtpLoading(true);
-    setOtpError("");
-    try {
-      const config = buildRequestConfig({ "Content-Type": "application/json" });
-      await axios.post(`${apiUrl}/otp/verify`, { phone: formData.phone.trim(), otp: otpValue.trim() }, config);
-      setOtpVerified(true);
-      setOtpSuccess("✓ Phone verified successfully!");
-      setOtpError("");
-      // Auto move to next step after verification?
-      setTimeout(() => goToNextStep(), 1500);
-    } catch (err) {
-      setOtpError(err?.response?.data?.error || "OTP verification failed.");
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
+ 
   // Camera Functions
   const startCamera = async () => {
     setShowCamera(true);
@@ -898,9 +819,9 @@ function Supervisors() {
         allMissing = step1Fields.every(f => !formData[f] || (typeof formData[f] === 'string' && !formData[f].trim()));
       } else if (regStep === 2) {
         allMissing = !formData.reg_city_id && !formData.reg_zone_id && !formData.reg_sector_id && !formData.reg_ward_id;
-      } else if (regStep === 4) {
+      } else if (regStep === 3) {
         allMissing = !capturedPhoto;
-      } else if (regStep === 5) {
+      } else if (regStep === 4) {
         allMissing = !formData.password || !formData.confirmPassword;
       }
 
@@ -955,7 +876,6 @@ function Supervisors() {
     }
 
     setFormErrors({});
-    if (regStep === 3) setOtpValue(""); 
     setRegStep(prev => prev + 1);
   };
 
@@ -978,16 +898,14 @@ function Supervisors() {
       if (!formData.reg_zone_id) errors.reg_zone_id = "Zone is required";
       if (!formData.reg_sector_id) errors.reg_sector_id = "Ward is required";
       if (!formData.reg_ward_id) errors.reg_ward_id = "Kothi is required";
-    } else if (regStep === 3) { // OTP
-      if (!otpVerified) errors.otp = "Please verify your mobile number first";
-    } else if (regStep === 4 && !isEditing) { // Photo (New Only)
+    } else if (regStep === 3 && !isEditing) { // Photo (New Only)
       if (!capturedPhoto) {
         errors.photo = "Photo is mandatory";
       }
     }
     
-    // Password validation (Step 5 for New OR if changePassword is true for Edit)
-    if (regStep === 5 || (isEditing && changePassword)) {
+    // Password validation (Step 4 for New OR if changePassword is true for Edit)
+    if (regStep === 4 || (isEditing && changePassword)) {
       if (!formData.password) errors.password = "Password is required";
       else if (formData.password.length < 6) errors.password = "Min 6 characters";
       if (formData.password !== formData.confirmPassword) errors.confirmPassword = "Passwords mismatch";
@@ -1413,16 +1331,15 @@ gap-2
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-100 dark:bg-slate-800 z-0">
                         <div 
                           className="h-full bg-indigo-600 transition-all duration-500 ease-out" 
-                          style={{ width: `${((regStep - 1) / 4) * 100}%` }}
+                          style={{ width: `${((regStep - 1) / 3) * 100}%` }}
                         />
                       </div>
                       
                       {[
                         { step: 1, label: "Identity", icon: User },
                         { step: 2, label: "Location", icon: MapPin },
-                        { step: 3, label: "OTP Verification", icon: ShieldCheck },
-                        { step: 4, label: "Face Capture", icon: Camera },
-                        { step: 5, label: "Credentials", icon: Key }
+                        { step: 3, label: "Face Capture", icon: Camera },
+                        { step: 4, label: "Credentials", icon: Key }
                       ].map((s) => {
                         const StepIcon = s.icon;
                         const isActive = regStep >= s.step;
@@ -1584,50 +1501,8 @@ gap-2
                     </div>
                   )}
 
-                  {/* Step 3: Mobile OTP Verification */}
+                  {/* Step 3: Photo */}
                   {regStep === 3 && !isEditing && (
-                    <div className="animate-in fade-in zoom-in duration-500">
-                      <div className="bg-white dark:bg-slate-900 rounded-xl p-8 border border-slate-200 dark:border-slate-800 shadow-lg text-center">
-                        <ShieldCheck size={48} className="mx-auto text-indigo-600 mb-4" />
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2">Mobile Verification</h3>
-                        
-                        <div className="mb-6">
-                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Verifying Number:</p>
-                           <div className="flex items-center justify-center gap-2">
-                              <span className="font-bold text-lg text-slate-800 dark:text-slate-200">+91 {formData.phone}</span>
-                              <button type="button" onClick={() => setRegStep(1)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 text-xs font-bold underline">Edit</button>
-                           </div>
-                        </div>
-
-                        {!otpSent ? (
-                          <button type="button" onClick={handleSendOtp} disabled={otpLoading} className="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-md">
-                            {otpLoading && <RefreshCw className="animate-spin" size={16} />}
-                            Send OTP Code
-                          </button>
-                        ) : (
-                          <div className="space-y-4">
-                            <input type="text" value={otpValue} onChange={(e) => setOtpValue(e.target.value)} placeholder="XXXXXX" maxLength={6} disabled={otpVerified} className="w-full border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white p-3 rounded-lg text-center text-2xl font-bold tracking-widest focus:border-indigo-500 outline-none" />
-                            {otpError && <p className="text-red-600 text-xs font-bold">{otpError}</p>}
-                            {otpSuccess && <p className="text-green-600 text-xs font-bold">{otpSuccess}</p>}
-                            
-                            {!otpVerified && (
-                              <div className="flex justify-center">
-                                <button type="button" onClick={handleVerifyOtp} disabled={otpLoading} className="w-full max-w-xs bg-green-600 text-white p-3 rounded-lg font-bold hover:bg-green-700 transition-all shadow-md transform hover:scale-[1.02] active:scale-[0.98]">
-                                  Verify OTP
-                                </button>
-                              </div>
-                            )}
-                            <button type="button" onClick={handleSendOtp} disabled={otpLoading || otpCooldown > 0} className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
-                              {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : "Resend OTP Now"}
-                            </button>
-                          </div>
-                        )}
-                        {formErrors.otp && <p className="text-red-500 text-xs font-bold mt-4">{formErrors.otp}</p>}
-                      </div>
-                    </div>
-                  )}
-                  {/* Step 4: Photo */}
-                  {regStep === 4 && !isEditing && (
                     <div className="animate-in fade-in zoom-in duration-500">
                       <div className="bg-white rounded-xl p-8 border border-slate-200 shadow-lg text-center">
                         <Camera size={48} className="mx-auto text-indigo-600 mb-4" />
@@ -1682,8 +1557,8 @@ gap-2
                     </div>
                   )}
 
-                  {/* Step 5: Password */}
-                  {(regStep === 5 || (isEditing && changePassword)) && (
+                  {/* Step 4: Password */}
+                  {(regStep === 4 || (isEditing && changePassword)) && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-lg">
                         <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-3">
@@ -1771,15 +1646,15 @@ gap-2
                   )}
 
                   <div className="flex flex-wrap justify-center gap-4 mt-4 pt-6 border-t border-slate-100 max-w-5xl mx-auto w-full">
-                    {!isEditing && regStep > 1 && regStep !== 5 && (
+                    {!isEditing && regStep > 1 && (
                       <button type="button" onClick={goToPrevStep} className="bg-slate-100 text-slate-600 px-8 py-2.5 rounded-lg font-bold hover:bg-slate-200 transition-all flex items-center gap-2 border border-slate-200">
                         <ChevronLeft size={18} /> Back
                       </button>
                     )}
                     
                     <button type="submit" className="min-w-[200px] bg-indigo-600 text-white px-8 py-2.5 rounded-lg shadow-lg font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 transform hover:translate-y-[-1px] active:translate-y-[0px]">
-                      {isEditing ? "Save Changes" : regStep === 5 ? "Complete Registration" : "Next Step"}
-                      {regStep < 5 && !isEditing && <ChevronRight size={18} />}
+                      {isEditing ? "Save Changes" : regStep === 4 ? "Complete Registration" : "Next Step"}
+                      {regStep < 4 && !isEditing && <ChevronRight size={18} />}
                     </button>
 
                     {isEditing && (
@@ -2932,4 +2807,3 @@ gap-1
 }
 
 export default Supervisors;
-

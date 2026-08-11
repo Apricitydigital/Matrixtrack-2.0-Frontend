@@ -7,7 +7,10 @@ import { useAuth } from "@hooks/useAuth";
 import type { Role } from "../../../types/auth";
 import { RoleGuard } from "@components/Guards";
 import { roleLabel, moduleLabel } from "@lib/labels";
-import { canonicalizeModules, normalizeModuleKey } from "@utils/modules";
+import {
+  canonicalizeModules,
+  normalizeModuleKey,
+} from "@utils/modules";
 import {
   Users, UserPlus, Shield, MapPin,
   Settings, Save, Trash2, MoreHorizontal,
@@ -490,7 +493,7 @@ function CityUsersPage() {
           {/* Header Section */}
           <div style={{ marginBottom: "32px" }}>
             <div className="breadcrumb" style={{ fontSize: "0.875rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "8px" }}>
-              
+
               <span style={{ color: "#1e293b", fontWeight: 500 }}>Registered Users</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

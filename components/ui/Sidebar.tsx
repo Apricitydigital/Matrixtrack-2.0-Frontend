@@ -266,7 +266,13 @@ export default function Sidebar() {
           icon: <Building2 size={18} />,
         }
       );
-    } else if (isCityAdmin || isCommissioner) {
+    } else if (isCommissioner) {
+      links.push({
+        label: "Executive Dashboard",
+        href: "/municipal/commissioner",
+        icon: <LayoutDashboard size={18} />,
+      });
+    } else if (isCityAdmin) {
       links.push({
         label: "City Dashboard",
         href: "/city",
@@ -337,7 +343,9 @@ export default function Sidebar() {
           </div>
 
           <div className="text-xs font-medium text-slate-400">
-            Admin Portal
+            {isCommissioner
+              ? "Commissioner Console"
+              : "Admin Portal"}
           </div>
         </div>
       </div>
@@ -345,7 +353,7 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:thin]">
         {/* Prominent Portal Home SSO Hub Badge */}
-        {user && (
+        {user && !isCommissioner && (
           <div className="mb-4 px-1">
             <Link
               href="/portal-home"
@@ -375,7 +383,7 @@ export default function Sidebar() {
         </div>
 
         {/* City master links */}
-        {user && (isCityAdmin || isCommissioner || isQC) && (
+        {user && (isCityAdmin || isQC) && (
           <CollapsibleGroup
             label="Master"
             icon={<Database size={18} />}
@@ -437,7 +445,7 @@ export default function Sidebar() {
         )}
 
         {/* Module links */}
-        {user && moduleLinks.length > 0 && (
+        {user && !isCommissioner && moduleLinks.length > 0 && (
           <CollapsibleGroup
             label="Active Operational System"
 

@@ -315,9 +315,18 @@ export default function ApplicationsPage() {
                 matrixTrackToken,
             );
 
-            setMessage(
-                "MatrixTrack authentication is complete. Its dashboard route will be connected in the next integration step.",
+            // Workforce pages still read the generic token key.
+            localStorage.setItem("token", matrixTrackToken);
+
+            // Keep middleware/cookie-based auth flows aligned with the active app.
+            setAuthCookie(matrixTrackToken);
+
+            localStorage.setItem(
+                "active_unified_application",
+                "MATRIX_TRACK",
             );
+
+            router.push("/workforce-monitoring?view=dashboard");
             return;
         }
 

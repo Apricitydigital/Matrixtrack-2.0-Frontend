@@ -6,9 +6,24 @@ export const apiClient = axios.create({
   timeout: 30000,
 });
 
+const getUnifiedMatrixTrackToken = () => {
+  try {
+    const rawSession = localStorage.getItem("unified_auth_session");
+    if (!rawSession) return null;
+    const parsed = JSON.parse(rawSession);
+    return parsed?.tokens?.matrixTrack || null;
+  } catch {
+    return null;
+  }
+};
+
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+  const token =
+    localStorage.getItem("matrixtrack_access_token") ||
+    getUnifiedMatrixTrackToken();
   if (token) {
+    localStorage.setItem("matrixtrack_access_token", token);
+    localStorage.setItem("token", token);
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;

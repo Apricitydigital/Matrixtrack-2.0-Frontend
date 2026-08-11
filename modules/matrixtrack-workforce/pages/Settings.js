@@ -15,7 +15,7 @@ import {
   Laptop
 } from "lucide-react";
 import { useCallback } from "react";
-import { buildApiUrl } from "../config";
+import { ALLOWED_CITIES_ENDPOINT, buildApiUrl } from "../config";
 import { useAuth } from "../AuthContext";
 import SearchableSelect from "../components/SearchableSelect";
 import Swal from "sweetalert2";
@@ -66,6 +66,7 @@ function Settings() {
   const [availableZones, setAvailableZones] = useState([]);
   const [availableSectors, setAvailableSectors] = useState([]);
   const [availableWards, setAvailableWards] = useState([]);
+  const [cityScopeAll, setCityScopeAll] = useState(false);
   const [selectedCityIds, setSelectedCityIds] = useState([]);
   const [selectedZoneIds, setSelectedZoneIds] = useState([]);
   const [selectedKothiIds, setSelectedKothiIds] = useState([]);
@@ -218,15 +219,52 @@ function Settings() {
   const fetchAllowedCities = async () => {
     try {
       const { data } = await axios.get(
-        buildApiUrl("/cities"),
+        ALLOWED_CITIES_ENDPOINT,
         buildRequestConfig
       );
-      setAvailableCities(Array.isArray(data) ? data : []);
+      const payload = data || {};
+      const cityList = Array.isArray(payload.cities)
+        ? payload.cities
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      setCityScopeAll(Boolean(payload.all));
+      setAvailableCities(cityList);
     } catch (err) {
       console.error("Failed to load cities", err);
       setAvailableCities([]);
+      setCityScopeAll(false);
     }
   };
+
+  const scopedCityIds = useMemo(() => {
+    if (cityScopeAll) return new Set();
+    return new Set(
+      availableCities
+        .map((city) => Number(city.city_id))
+        .filter((cityId) => Number.isFinite(cityId))
+    );
+  }, [availableCities, cityScopeAll]);
+
+  const userFallsWithinScopedCities = useCallback(
+    (user) => {
+      if (cityScopeAll) return true;
+      if (scopedCityIds.size === 0) return false;
+
+      const access = user?.access || {};
+      const candidateIds = [
+        ...(Array.isArray(access.cities) ? access.cities.map((city) => city.city_id) : []),
+        ...(Array.isArray(access.zones) ? access.zones.map((zone) => zone.city_id) : []),
+        ...(Array.isArray(access.kothis) ? access.kothis.map((kothi) => kothi.city_id) : []),
+      ]
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value));
+
+      if (!candidateIds.length) return false;
+      return candidateIds.some((cityId) => scopedCityIds.has(cityId));
+    },
+    [cityScopeAll, scopedCityIds]
+  );
 
   const unifiedTree = useMemo(() => {
     const tree = {};
@@ -585,7 +623,9 @@ function Settings() {
   };
 
   const filteredUsers = useMemo(() => {
-    const nonAdmins = users.filter((u) => u.role !== 'admin');
+    const nonAdmins = users
+      .filter((u) => u.role !== 'admin')
+      .filter(userFallsWithinScopedCities);
     if (isAdmin) return nonAdmins;
     
     const me = currentUser?.user_id;
@@ -594,7 +634,7 @@ function Settings() {
         String(u.user_id) === String(me) ||
         String(u.created_by) === String(me)
     );
-  }, [users, isAdmin, currentUser]);
+  }, [users, isAdmin, currentUser, userFallsWithinScopedCities]);
 
   const assignedUsers = useMemo(() => {
     const base = isAdmin ? users : filteredUsers;

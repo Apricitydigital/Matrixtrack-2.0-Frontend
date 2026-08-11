@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { AlertCircle, MapPin, Pencil, Trash2 } from "lucide-react";
-import API_BASE_URL from "../config";
+import API_BASE_URL, { ALLOWED_CITIES_ENDPOINT } from "../config";
 import Swal from "sweetalert2";
 
 const apiUrl = `${API_BASE_URL}/api/cities`;
@@ -45,6 +45,9 @@ function CreateCity() {
   const [cityFilter, setCityFilter] = useState("all");
   const [editingCity, setEditingCity] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [cityScopeAll, setCityScopeAll] = useState(false);
+  const singleCityMode = !cityScopeAll && cities.length === 1;
+  const canCreateCity = cityScopeAll;
 
   // Resizable columns state
   const [columnWidths, setColumnWidths] = useState({
@@ -128,10 +131,23 @@ function CreateCity() {
 
   const fetchCities = useCallback(async () => {
     try {
-      const response = await axios.get(apiUrl, buildRequestConfig());
-      setCities(response.data);
-      applyCityFilter(cityFilter, response.data);
-      return response.data;
+      const response = await axios.get(ALLOWED_CITIES_ENDPOINT, buildRequestConfig());
+      const payload = response.data || {};
+      const cityList = Array.isArray(payload.cities)
+        ? payload.cities
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      const scopedAll = Boolean(payload.all);
+      const nextFilter =
+        !scopedAll && cityList.length === 1
+          ? String(cityList[0].city_id)
+          : cityFilter;
+      setCityScopeAll(scopedAll);
+      setCities(cityList);
+      setCityFilter(nextFilter);
+      applyCityFilter(nextFilter, cityList);
+      return cityList;
     } catch (error) {
       console.error("Error fetching cities:", error);
       if (error?.response?.status === 401) {
@@ -145,9 +161,21 @@ function CreateCity() {
     fetchCities();
   }, [fetchCities]);
 
+  useEffect(() => {
+    if (singleCityMode && cities[0]) {
+      const scopedCityId = String(cities[0].city_id);
+      setCityFilter(scopedCityId);
+      applyCityFilter(scopedCityId, cities);
+    }
+  }, [singleCityMode, cities, applyCityFilter]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage(""); // Clear previous errors
+    if (!canCreateCity && !editingCity) {
+      setErrorMessage("You can manage only your assigned city.");
+      return;
+    }
     try {
       if (editingCity) {
         // Update existing city
@@ -364,7 +392,7 @@ text-slate-700
 dark:text-slate-200
 "
         >
-          <option value="all">All Cities</option>
+          {cityScopeAll && <option value="all">All Cities</option>}
           {cities.map((city) => (
             <option key={city.city_id} value={city.city_id}>
               {city.city_name}
@@ -372,6 +400,11 @@ dark:text-slate-200
           ))}
         </select>
       </div>
+      {!canCreateCity && !editingCity && (
+        <div className="mb-4 text-xs font-medium text-slate-500 dark:text-slate-400">
+          City creation is restricted to the assigned xcity. Visible city records remain editable.
+        </div>
+      )}
 
       {/* City Table */}
       <table
