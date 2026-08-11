@@ -446,6 +446,29 @@ export default function LoginPage() {
       `unified_session=1; Path=/; Max-Age=28800; SameSite=Lax${secureCookie}`;
   };
 
+  const resolveUnifiedRedirect = (
+    response: UnifiedLoginResponse,
+  ) => {
+    const roles = [
+      response.user?.role,
+      ...(Array.isArray(response.user?.roles)
+        ? response.user.roles
+        : []),
+      response.taskforce?.user?.role,
+      ...(Array.isArray(response.taskforce?.user?.roles)
+        ? response.taskforce.user.roles
+        : []),
+    ]
+      .filter(Boolean)
+      .map((role) => String(role).toUpperCase());
+
+    if (roles.includes("COMMISSIONER")) {
+      return "/municipal/commissioner";
+    }
+
+    return response.redirectTo || "/portal-home";
+  };
+
   const completeUnifiedLogin = (
     response: UnifiedLoginResponse,
   ) => {
@@ -453,7 +476,9 @@ export default function LoginPage() {
 
     // Full reload lets AuthProvider read the newly saved
     // cookie and unified session before guards execute.
-    window.location.assign("/portal-home");
+    window.location.assign(
+      resolveUnifiedRedirect(response),
+    );
   };
 
   const resetOtpStep = () => {

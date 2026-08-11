@@ -128,6 +128,14 @@ export default function HmsDashboardPage() {
   const [adminStatus, setAdminStatus] = useState("");
   const [adminCreating, setAdminCreating] = useState(false);
 
+  const [createCommissionerOpen, setCreateCommissionerOpen] = useState(false);
+  const [commissionerCityId, setCommissionerCityId] = useState("");
+  const [commissionerName, setCommissionerName] = useState("");
+  const [commissionerEmail, setCommissionerEmail] = useState("");
+  const [commissionerPassword, setCommissionerPassword] = useState("");
+  const [commissionerStatus, setCommissionerStatus] = useState("");
+  const [commissionerCreating, setCommissionerCreating] = useState(false);
+
   const openCreateAdminModal = (cityId = "") => {
     setAdminCityId(cityId);
     setAdminName("");
@@ -144,6 +152,24 @@ export default function HmsDashboardPage() {
     setAdminEmail("");
     setAdminPassword("");
     setAdminStatus("");
+  };
+
+  const openCreateCommissionerModal = (cityId = "") => {
+    setCommissionerCityId(cityId);
+    setCommissionerName("");
+    setCommissionerEmail("");
+    setCommissionerPassword("");
+    setCommissionerStatus("");
+    setCreateCommissionerOpen(true);
+  };
+
+  const closeCreateCommissionerModal = () => {
+    setCreateCommissionerOpen(false);
+    setCommissionerCityId("");
+    setCommissionerName("");
+    setCommissionerEmail("");
+    setCommissionerPassword("");
+    setCommissionerStatus("");
   };
 
   const refresh = async () => {
@@ -355,6 +381,45 @@ export default function HmsDashboardPage() {
     }
   };
 
+  const handleCreateCommissioner = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setCommissionerCreating(true);
+    setCommissionerStatus("Creating...");
+
+    try {
+      await CityApi.createCommissioner(commissionerCityId, {
+        email: commissionerEmail,
+        password: commissionerPassword,
+        name: commissionerName,
+      });
+
+      showToast({
+        title: "Commissioner created",
+        description: "Commissioner account created successfully.",
+        tone: "success",
+      });
+
+      closeCreateCommissionerModal();
+      await refresh();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Failed to create commissioner.";
+
+      setCommissionerStatus(message);
+
+      showToast({
+        title: "Commissioner creation failed",
+        description: message,
+        tone: "error",
+      });
+    } finally {
+      setCommissionerCreating(false);
+    }
+  };
+
   const handleToggleModule = async (
     cityId: string,
     moduleId: string,
@@ -433,7 +498,7 @@ export default function HmsDashboardPage() {
       icon: <Globe size={16} />,
       iconClass: "bg-blue-50 text-blue-600",
     },
-   
+
     {
       label: "City Admins",
       value: totalAdmins,
@@ -444,7 +509,7 @@ export default function HmsDashboardPage() {
       icon: <Users size={16} />,
       iconClass: "bg-violet-50 text-violet-600",
     },
-   
+
     {
       label: "Dormant Cities",
       value: totalCities - activeCities,
@@ -507,7 +572,7 @@ export default function HmsDashboardPage() {
   }));
 
 
-
+  const [viewUsersCity, setViewUsersCity] = useState<CityRow | null>(null);
 
   const [filterState, setFilterState] = useState("");
   const [filterDivision, setFilterDivision] = useState("");
@@ -594,646 +659,676 @@ export default function HmsDashboardPage() {
         </div>
       )}
 
-     {/* Clean Provisioned Cities table */}
-<section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_-30px_rgba(15,23,42,0.35)]">
-  {/* Header */}
-  <div className="flex flex-col gap-5 border-b border-slate-200 px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-7">
-    <div className="min-w-0">
-      <h2 className="text-[21px] font-black tracking-[-0.025em] text-slate-950">
-        City Directory
-      </h2>
-      <p className="mt-1 text-sm text-slate-400">
-        Overview of cities and their admins sorted alphabetically
-      </p>
-    </div>
+      {/* Clean Provisioned Cities table */}
+      <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_-30px_rgba(15,23,42,0.35)]">
+        {/* Header */}
+        <div className="flex flex-col gap-5 border-b border-slate-200 px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-7">
+          <div className="min-w-0">
+            <h2 className="text-[21px] font-black tracking-[-0.025em] text-slate-950">
+              City Directory
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Overview of cities and their admins sorted alphabetically
+            </p>
+          </div>
 
-    {/* Add City Button */}
-    <button
-      onClick={() => {
-        window.location.href = '/portal-home/onboard-city';
-      }}
-      className="
+          {/* Add City Button */}
+          <button
+            onClick={() => {
+              window.location.href = '/portal-home/onboard-city';
+            }}
+            className="
         inline-flex h-11 shrink-0 items-center justify-center gap-2
         rounded-[11px] bg-blue-600 px-5
         text-sm font-extrabold text-white
         shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
         hover:bg-blue-500 transition
       "
-    >
-      <PlusCircle size={16} />
-      Add new city
-    </button>
-  </div>
+          >
+            <PlusCircle size={16} />
+            Add new city
+          </button>
+        </div>
 
-  {/* ── FILTER TOOLBAR ROW (STATE, DIVISION, DISTRICT, STATUS, SEARCH) ── */}
-  <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3.5 lg:px-7">
-    {/* Search Box */}
-    <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
-      <Search
-        size={16}
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-      />
-      <input
-        value={searchQuery}
-        onChange={(event) => {
-          setSearchQuery(event.target.value);
-          setTablePage(1);
-        }}
-        placeholder="Search cities..."
-        className="
+        {/* ── FILTER TOOLBAR ROW (STATE, DIVISION, DISTRICT, STATUS, SEARCH) ── */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3.5 lg:px-7">
+          {/* Search Box */}
+          <div className="relative min-w-0 flex-1 sm:min-w-[220px]">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setTablePage(1);
+              }}
+              placeholder="Search cities..."
+              className="
           h-10 w-full rounded-[10px] border border-slate-200
           bg-white pl-9 pr-8 text-xs font-semibold text-slate-700
           outline-none transition placeholder:text-slate-400
           hover:border-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10
         "
-      />
-      {searchQuery && (
-        <button
-          type="button"
-          onClick={() => {
-            setSearchQuery("");
-            setTablePage(1);
-          }}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-700"
-        >
-          ×
-        </button>
-      )}
-    </div>
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setTablePage(1);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-700"
+              >
+                ×
+              </button>
+            )}
+          </div>
 
-    {/* State Filter */}
-    <div className="relative min-w-[140px]">
-      <select
-        value={filterState}
-        onChange={(e) => { setFilterState(e.target.value); setTablePage(1); }}
-        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
-      >
-        <option value="">All States</option>
-        {uniqueFilterStates.map((st) => (
-          <option key={st} value={st}>{st}</option>
-        ))}
-      </select>
-    </div>
+          {/* State Filter */}
+          <div className="relative min-w-[140px]">
+            <select
+              value={filterState}
+              onChange={(e) => { setFilterState(e.target.value); setTablePage(1); }}
+              className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+            >
+              <option value="">All States</option>
+              {uniqueFilterStates.map((st) => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+          </div>
 
-    {/* Division Filter */}
-    <div className="relative min-w-[140px]">
-      <select
-        value={filterDivision}
-        onChange={(e) => { setFilterDivision(e.target.value); setTablePage(1); }}
-        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
-      >
-        <option value="">All Divisions</option>
-        {uniqueFilterDivisions.map((div) => (
-          <option key={div} value={div}>{div}</option>
-        ))}
-      </select>
-    </div>
+          {/* Division Filter */}
+          <div className="relative min-w-[140px]">
+            <select
+              value={filterDivision}
+              onChange={(e) => { setFilterDivision(e.target.value); setTablePage(1); }}
+              className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+            >
+              <option value="">All Divisions</option>
+              {uniqueFilterDivisions.map((div) => (
+                <option key={div} value={div}>{div}</option>
+              ))}
+            </select>
+          </div>
 
-    {/* District Filter */}
-    <div className="relative min-w-[140px]">
-      <select
-        value={filterDistrict}
-        onChange={(e) => { setFilterDistrict(e.target.value); setTablePage(1); }}
-        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
-      >
-        <option value="">All Districts</option>
-        {uniqueFilterDistricts.map((dis) => (
-          <option key={dis} value={dis}>{dis}</option>
-        ))}
-      </select>
-    </div>
+          {/* District Filter */}
+          <div className="relative min-w-[140px]">
+            <select
+              value={filterDistrict}
+              onChange={(e) => { setFilterDistrict(e.target.value); setTablePage(1); }}
+              className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+            >
+              <option value="">All Districts</option>
+              {uniqueFilterDistricts.map((dis) => (
+                <option key={dis} value={dis}>{dis}</option>
+              ))}
+            </select>
+          </div>
 
-    {/* Status Filter */}
-    <div className="relative min-w-[130px]">
-      <select
-        value={statusFilter}
-        onChange={(e) => { setStatusFilter(e.target.value as any); setTablePage(1); }}
-        className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
-      >
-        <option value="all">All Status</option>
-        <option value="live">Live</option>
-        <option value="dormant">Dormant</option>
-        <option value="managed">Managed</option>
-        <option value="unmanaged">Needs Admin</option>
-      </select>
-    </div>
-  </div>
+          {/* Status Filter */}
+          <div className="relative min-w-[130px]">
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value as any); setTablePage(1); }}
+              className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
+            >
+              <option value="all">All Status</option>
+              <option value="live">Live</option>
+              <option value="dormant">Dormant</option>
+              <option value="managed">Managed</option>
+              <option value="unmanaged">Needs Admin</option>
+            </select>
+          </div>
+        </div>
 
-  {/* Active Filter Summary Pills */}
-  {(searchQuery || statusFilter !== "all" || filterState || filterDivision || filterDistrict) && (
-    <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2 lg:px-7">
-      <span className="text-xs font-bold text-slate-400">Active filters:</span>
-      {searchQuery && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
-          Search: {searchQuery}
-          <button type="button" onClick={() => setSearchQuery("")} className="text-blue-400 hover:text-blue-700">×</button>
-        </span>
-      )}
-      {filterState && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-          State: {filterState}
-          <button type="button" onClick={() => setFilterState("")} className="text-slate-400 hover:text-slate-700">×</button>
-        </span>
-      )}
-      {filterDivision && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-          Division: {filterDivision}
-          <button type="button" onClick={() => setFilterDivision("")} className="text-slate-400 hover:text-slate-700">×</button>
-        </span>
-      )}
-      {filterDistrict && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-          District: {filterDistrict}
-          <button type="button" onClick={() => setFilterDistrict("")} className="text-slate-400 hover:text-slate-700">×</button>
-        </span>
-      )}
-      {statusFilter !== "all" && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold capitalize text-slate-700">
-          Status: {statusFilter}
-          <button type="button" onClick={() => setStatusFilter("all")} className="text-slate-400 hover:text-slate-700">×</button>
-        </span>
-      )}
-    </div>
-  )}
+        {/* Active Filter Summary Pills */}
+        {(searchQuery || statusFilter !== "all" || filterState || filterDivision || filterDistrict) && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2 lg:px-7">
+            <span className="text-xs font-bold text-slate-400">Active filters:</span>
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                Search: {searchQuery}
+                <button type="button" onClick={() => setSearchQuery("")} className="text-blue-400 hover:text-blue-700">×</button>
+              </span>
+            )}
+            {filterState && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                State: {filterState}
+                <button type="button" onClick={() => setFilterState("")} className="text-slate-400 hover:text-slate-700">×</button>
+              </span>
+            )}
+            {filterDivision && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                Division: {filterDivision}
+                <button type="button" onClick={() => setFilterDivision("")} className="text-slate-400 hover:text-slate-700">×</button>
+              </span>
+            )}
+            {filterDistrict && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                District: {filterDistrict}
+                <button type="button" onClick={() => setFilterDistrict("")} className="text-slate-400 hover:text-slate-700">×</button>
+              </span>
+            )}
+            {statusFilter !== "all" && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold capitalize text-slate-700">
+                Status: {statusFilter}
+                <button type="button" onClick={() => setStatusFilter("all")} className="text-slate-400 hover:text-slate-700">×</button>
+              </span>
+            )}
+          </div>
+        )}
 
-  {/* Table */}
-  <div className="overflow-x-auto">
-    <table className="w-full min-w-[1180px] table-fixed">
-      <colgroup>
-        <col className="w-[6%]" />
-        <col className="w-[14%]" />
-        <col className="w-[16%]" />
-        <col className="w-[16%]" />
-        <col className="w-[14%]" />
-        <col className="w-[12%]" />
-        <col className="w-[16%]" />
-        <col className="w-[6%]" />
-      </colgroup>
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1180px] table-fixed">
+            <colgroup>
+              <col className="w-[6%]" />
+              <col className="w-[14%]" />
+              <col className="w-[16%]" />
+              <col className="w-[16%]" />
+              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+              <col className="w-[16%]" />
+              <col className="w-[6%]" />
+            </colgroup>
 
-      <thead>
-        <tr className="border-b border-slate-200 bg-slate-50/75">
-          {[
-            "Sr. No.",
-            "State",
-            "City",
-            "Hierarchy",
-            "Users",
-            "Created On",
-            "Assigned Modules",
-            "Actions",
-          ].map((heading) => (
-            <th
-              key={heading}
-              className="
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/75">
+                {[
+                  "Sr. No.",
+                  "State",
+                  "City",
+                  "Hierarchy",
+                  "Users",
+                  "Created On",
+                  "Assigned Modules",
+                  "Actions",
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className="
                 px-5 py-4 text-left text-[11px] font-extrabold
                 uppercase tracking-[0.08em] text-slate-500
                 first:pl-7 last:pr-7
               "
-            >
-              {heading}
-            </th>
-          ))}
-        </tr>
-      </thead>
+                  >
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
 
-      <tbody>
-        {visibleCities.length ? (
-          visibleCities.map((city, index) => {
-            const srNo = (safeTablePage - 1) * tablePageSize + index + 1;
-            const admins = city.cityAdmins?.length
-              ? city.cityAdmins
-              : city.cityAdmin
-                ? [city.cityAdmin]
-                : [];
+            <tbody>
+              {visibleCities.length ? (
+                visibleCities.map((city, index) => {
+                  const srNo = (safeTablePage - 1) * tablePageSize + index + 1;
+                  const admins = city.cityAdmins?.length
+                    ? city.cityAdmins
+                    : city.cityAdmin
+                      ? [city.cityAdmin]
+                      : [];
 
-            const hierarchyItems = [
-              { label: city.state?.name || "No state", missing: !city.state?.name },
-              { label: city.division?.name || "No division", missing: !city.division?.name },
-              { label: city.district?.name || "No district", missing: !city.district?.name },
-            ];
+                  const commissioners = city.commissioners ?? [];
 
-            const createdDate = city.createdAt
-              ? new Date(city.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-              : '06 Aug 2026';
+                  const cityUsers = [
+                    ...admins.map((user) => ({
+                      ...user,
+                      roleLabel: "City Admin",
+                      roleTone: "bg-blue-50 text-blue-700 border-blue-100",
+                    })),
 
-            return (
-              <tr
-                key={city.id}
-                className="
+                    ...commissioners.map((user) => ({
+                      ...user,
+                      roleLabel: "Commissioner",
+                      roleTone: "bg-violet-50 text-violet-700 border-violet-100",
+                    })),
+                  ];
+
+                  const visibleUsers = cityUsers.slice(0, 3);
+                  const hiddenUsersCount = Math.max(cityUsers.length - 3, 0);
+
+                  const hierarchyItems = [
+                    { label: city.state?.name || "No state", missing: !city.state?.name },
+                    { label: city.division?.name || "No division", missing: !city.division?.name },
+                    { label: city.district?.name || "No district", missing: !city.district?.name },
+                  ];
+
+                  const createdDate = city.createdAt
+                    ? new Date(city.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : '06 Aug 2026';
+
+                  return (
+                    <tr
+                      key={city.id}
+                      className="
                   group border-b border-slate-200/80
                   transition-colors last:border-b-0
                   hover:bg-blue-50/20
                 "
-              >
-                {/* Sr. No. */}
-                <td className="px-5 py-4 pl-7 align-middle text-xs font-black text-slate-700">
-                  {srNo}
-                </td>
+                    >
+                      {/* Sr. No. */}
+                      <td className="px-5 py-4 pl-7 align-middle text-xs font-black text-slate-700">
+                        {srNo}
+                      </td>
 
-                {/* State */}
-                <td className="px-5 py-4 align-middle text-[13px] font-bold text-slate-700">
-                  {city.state?.name || "No state"}
-                </td>
+                      {/* State */}
+                      <td className="px-5 py-4 align-middle text-[13px] font-bold text-slate-700">
+                        {city.state?.name || "No state"}
+                      </td>
 
-                {/* City */}
-                <td className="px-5 py-4 align-middle">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-black text-slate-900">
-                      {city.name}
-                    </div>
-                    <div className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
-                      CODE: {city.code || `ID-${city.id.slice(0, 6)}`}
-                    </div>
-                  </div>
-                </td>
+                      {/* City */}
+                      <td className="px-5 py-4 align-middle">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-black text-slate-900">
+                            {city.name}
+                          </div>
+                          <div className="mt-0.5 truncate text-[11px] font-bold text-slate-400">
+                            CODE: {city.code || `ID-${city.id.slice(0, 6)}`}
+                          </div>
+                        </div>
+                      </td>
 
-                {/* Hierarchy */}
-                <td className="px-5 py-4 align-middle">
-                  <div className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
-                    {[
-                      { label: city.division?.name || "No division", missing: !city.division?.name },
-                      { label: city.district?.name || "No district", missing: !city.district?.name },
-                    ].map((item, hierarchyIndex, arr) => (
-                      <div
-                        key={`${city.id}-${hierarchyIndex}`}
-                        className="flex min-w-0 items-center gap-1.5"
-                      >
-                        <span
-                          className={`max-w-[130px] truncate font-medium ${
-                            item.missing
-                              ? "text-amber-600"
-                              : "text-slate-500"
-                          }`}
-                          title={item.label}
-                        >
-                          {item.label}
-                        </span>
-
-                        {hierarchyIndex <
-                          arr.length - 1 && (
-                          <ChevronRight
-                            size={13}
-                            className="shrink-0 text-slate-300"
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </td>
-
-                {/* Identity - Hidden from UI */}
-                <td className="px-5 py-4 align-middle hidden">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600">
-                      <Building2 size={15} />
-                    </span>
-
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-bold text-slate-600">
-                        {city.code || "No code"}
-                      </div>
-
-                      <div className="mt-0.5 truncate text-xs text-slate-400">
-                        ULB: {city.ulbCode || "—"}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-
-                {/* Administrator */}
-                <td className="px-5 py-4 align-middle">
-                  {admins.length ? (
-                    <div className="space-y-2.5">
-                      {admins.map((admin, adminIndex) => {
-                        const initials =
-                          admin.name
-                            ?.trim()
-                            .split(/\s+/)
-                            .slice(0, 2)
-                            .map((part) => part.charAt(0))
-                            .join("")
-                            .toUpperCase() || "A";
-
-                        const avatarTones = [
-                          "bg-blue-100 text-blue-700",
-                          "bg-violet-100 text-violet-700",
-                          "bg-emerald-100 text-emerald-700",
-                          "bg-amber-100 text-amber-700",
-                        ];
-
-                        const avatarTone =
-                          avatarTones[
-                            adminIndex % avatarTones.length
-                          ];
-
-                        return (
-                          <div
-                            key={
-                              admin.id ||
-                              admin.email ||
-                              `${city.id}-${adminIndex}`
-                            }
-                            className="flex items-center justify-between gap-3"
-                          >
-                            <div className="flex min-w-0 items-center gap-2.5">
-                              {/* Initial avatar — no profile image */}
+                      {/* Hierarchy */}
+                      <td className="px-5 py-4 align-middle">
+                        <div className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
+                          {[
+                            { label: city.division?.name || "No division", missing: !city.division?.name },
+                            { label: city.district?.name || "No district", missing: !city.district?.name },
+                          ].map((item, hierarchyIndex, arr) => (
+                            <div
+                              key={`${city.id}-${hierarchyIndex}`}
+                              className="flex min-w-0 items-center gap-1.5"
+                            >
                               <span
-                                className={`
-                                  flex h-9 w-9 shrink-0 items-center
-                                  justify-center rounded-full
-                                  text-[11px] font-black
-                                  ${avatarTone}
-                                `}
+                                className={`max-w-[130px] truncate font-medium ${item.missing
+                                  ? "text-amber-600"
+                                  : "text-slate-500"
+                                  }`}
+                                title={item.label}
                               >
-                                {initials}
+                                {item.label}
                               </span>
 
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-extrabold text-slate-800">
-                                  {admin.name}
-                                </div>
+                              {hierarchyIndex <
+                                arr.length - 1 && (
+                                  <ChevronRight
+                                    size={13}
+                                    className="shrink-0 text-slate-300"
+                                  />
+                                )}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
 
-                                <div className="mt-0.5 truncate text-xs text-slate-400">
-                                  {admin.email}
-                                </div>
-                              </div>
+                      {/* Identity - Hidden from UI */}
+                      <td className="px-5 py-4 align-middle hidden">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-blue-50 text-blue-600">
+                            <Building2 size={15} />
+                          </span>
+
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-bold text-slate-600">
+                              {city.code || "No code"}
+                            </div>
+
+                            <div className="mt-0.5 truncate text-xs text-slate-400">
+                              ULB: {city.ulbCode || "—"}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => openCreateAdminModal(city.id)}
-                      className="
-                        inline-flex items-center gap-2 rounded-[9px]
-                        border border-amber-200 bg-amber-50
-                        px-3 py-2 text-xs font-extrabold text-amber-700
-                        transition hover:border-amber-300
-                        hover:bg-amber-100
-                      "
-                    >
-                      <UserPlus size={14} />
-                      Assign administrator
-                    </button>
-                  )}
-                </td>
+                        </div>
+                      </td>
 
-                {/* Created On */}
-                <td className="px-5 py-4 align-middle">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[12px] font-bold text-slate-700">{createdDate}</span>
-                    <span className="text-[10px] font-semibold text-slate-400">{city.createdAt ? new Date(city.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '10:30 AM'}</span>
-                  </div>
-                </td>
+                      {/* Administrator */}
+                      <td className="px-5 py-4 align-middle">
+                        {cityUsers.length ? (
+                          <div className="min-w-[190px]">
+                            {/* Avatar stack */}
+                            <div className="flex items-center">
+                              {visibleUsers.map((user, userIndex) => {
+                                const initials =
+                                  user.name
+                                    ?.trim()
+                                    .split(/\s+/)
+                                    .slice(0, 2)
+                                    .map((part) => part.charAt(0))
+                                    .join("")
+                                    .toUpperCase() || "U";
 
-                {/* Assigned Modules */}
-                <td className="px-5 py-4 align-middle">
-                  <div className="flex flex-wrap gap-1.5">
-                    {city.modules && city.modules.length > 0 ? (
-                      city.modules.filter((m: any) => m.enabled !== false).map((m: any, idx: number) => {
-                        const name = (m.name || m.id || '').toLowerCase();
-                        let display = m.name;
-                        let colorClass = 'bg-slate-50 text-slate-700 ring-slate-700/10';
-                        if (name.includes('taskforce') || name.includes('inspection')) {
-                          display = 'Inspection & Performance';
-                          colorClass = 'bg-blue-50 text-blue-700 ring-blue-700/10';
-                        } else if (name.includes('workforce') || name.includes('attendance')) {
-                          display = 'Workforce Attendance System';
-                          colorClass = 'bg-purple-50 text-purple-700 ring-purple-700/10';
-                        } else if (name.includes('swachh') || name.includes('ward')) {
-                          display = 'Ward Ranking';
-                          colorClass = 'bg-emerald-50 text-emerald-700 ring-emerald-700/10';
-                        }
-                        return (
-                          <span key={idx} className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${colorClass}`}>
-                            {display}
+                                const avatarTone =
+                                  user.roleLabel === "Commissioner"
+                                    ? "bg-violet-100 text-violet-700"
+                                    : "bg-blue-100 text-blue-700";
+
+                                return (
+                                  <div
+                                    key={user.id || user.email || userIndex}
+                                    title={`${user.name} · ${user.roleLabel}`}
+                                    className={`
+                flex h-9 w-9 items-center justify-center
+                rounded-full border-2 border-white
+                text-[10px] font-black
+                ${userIndex > 0 ? "-ml-2.5" : ""}
+                ${avatarTone}
+              `}
+                                  >
+                                    {initials}
+                                  </div>
+                                );
+                              })}
+
+                              {hiddenUsersCount > 0 && (
+                                <div
+                                  className="
+              -ml-2.5 flex h-9 w-9 items-center justify-center
+              rounded-full border-2 border-white
+              bg-slate-100 text-[10px] font-black text-slate-600
+            "
+                                >
+                                  +{hiddenUsersCount}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Summary */}
+                            <div className="mt-2">
+                              <div className="text-sm font-black text-slate-800">
+                                {cityUsers.length} {cityUsers.length === 1 ? "user" : "users"}
+                              </div>
+
+                              <div className="mt-0.5 text-[11px] font-semibold text-slate-400">
+                                {admins.length} {admins.length === 1 ? "City Admin" : "City Admins"}
+                                {commissioners.length > 0 && (
+                                  <>
+                                    <span className="mx-1">•</span>
+                                    {commissioners.length} Commissioner
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setViewUsersCity(city)}
+                              className="
+          mt-2 text-[11px] font-extrabold text-blue-600
+          transition hover:text-blue-700
+        "
+                            >
+                              View users →
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-400">
+                            No users assigned
                           </span>
-                        );
-                      })
-                    ) : (
-                      <span className="text-xs text-slate-400 font-semibold italic">No modules assigned</span>
-                    )}
-                  </div>
-                </td>
+                        )}
+                      </td>
 
-                {/* Actions */}
-                <td className="px-5 py-4 pr-7 align-middle relative group cursor-pointer">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-[9px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 ml-auto">
-                    <MoreVertical size={16} />
-                  </div>
-                  
-                  {/* Dropdown */}
-                  <div className="absolute right-7 top-10 z-[100] hidden w-[170px] flex-col rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg group-hover:flex">
-                    <button
-                      onClick={() => setEditingCity(city)}
-                      className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 text-left"
-                    >
-                      Edit City
-                    </button>
-                    {isSuperAdmin && (
+                      {/* Created On */}
+                      <td className="px-5 py-4 align-middle">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[12px] font-bold text-slate-700">{createdDate}</span>
+                          <span className="text-[10px] font-semibold text-slate-400">{city.createdAt ? new Date(city.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '10:30 AM'}</span>
+                        </div>
+                      </td>
+
+                      {/* Assigned Modules */}
+                      <td className="px-5 py-4 align-middle">
+                        <div className="flex flex-wrap gap-1.5">
+                          {city.modules && city.modules.length > 0 ? (
+                            city.modules.filter((m: any) => m.enabled !== false).map((m: any, idx: number) => {
+                              const name = (m.name || m.id || '').toLowerCase();
+                              let display = m.name;
+                              let colorClass = 'bg-slate-50 text-slate-700 ring-slate-700/10';
+                              if (name.includes('taskforce') || name.includes('inspection')) {
+                                display = 'Inspection & Performance';
+                                colorClass = 'bg-blue-50 text-blue-700 ring-blue-700/10';
+                              } else if (name.includes('workforce') || name.includes('attendance')) {
+                                display = 'Workforce Attendance System';
+                                colorClass = 'bg-purple-50 text-purple-700 ring-purple-700/10';
+                              } else if (name.includes('swachh') || name.includes('ward')) {
+                                display = 'Ward Ranking';
+                                colorClass = 'bg-emerald-50 text-emerald-700 ring-emerald-700/10';
+                              }
+                              return (
+                                <span key={idx} className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${colorClass}`}>
+                                  {display}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="text-xs text-slate-400 font-semibold italic">No modules assigned</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-4 pr-7 align-middle relative group cursor-pointer">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-[9px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 ml-auto">
+                          <MoreVertical size={16} />
+                        </div>
+
+                        {/* Dropdown */}
+                        <div className="absolute right-7 top-10 z-[100] hidden w-[170px] flex-col rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg group-hover:flex">
+                          <button
+                            onClick={() => setEditingCity(city)}
+                            className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600 text-left"
+                          >
+                            Edit City
+                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => handleDeleteCity(city.id, city.name)}
+                              className="flex w-full items-center px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 text-left"
+                            >
+                              Delete City
+                            </button>
+                          )}
+                          <div className="my-1 border-t border-slate-100"></div>
+                          <button
+                            className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 text-left"
+                            onClick={() => setModuleCity(city)}
+                          >
+                            Assign Modules
+                          </button>
+                          <button
+                            className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-amber-50 hover:text-amber-700 text-left"
+                            onClick={() => openCreateAdminModal(city.id)}
+                          >
+                            Add City Admin
+                          </button>
+
+                          <button
+                            className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700 text-left"
+                            onClick={() => openCreateCommissionerModal(city.id)}
+                          >
+                            Add Commissioner
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                      <Search size={19} />
+                    </div>
+
+                    <div className="mt-3 text-sm font-extrabold text-slate-700">
+                      No matching cities found
+                    </div>
+
+                    <div className="mt-1 text-xs text-slate-400">
+                      Try changing your search text or status filter.
+                    </div>
+
+                    {(searchQuery || statusFilter !== "all") && (
                       <button
-                        onClick={() => handleDeleteCity(city.id, city.name)}
-                        className="flex w-full items-center px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 text-left"
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setStatusFilter("all");
+                          setTablePage(1);
+                        }}
+                        className="mt-4 text-xs font-bold text-blue-600 hover:text-blue-700"
                       >
-                        Delete City
+                        Clear all filters
                       </button>
                     )}
-                    <div className="my-1 border-t border-slate-100"></div>
-                    <button
-                      className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 text-left"
-                      onClick={() => setModuleCity(city)}
-                    >
-                      Assign Modules
-                    </button>
-                    <button
-                      className="flex w-full items-center px-4 py-2 text-xs font-bold text-slate-600 hover:bg-amber-50 hover:text-amber-700 text-left"
-                      onClick={() => openCreateAdminModal(city.id)}
-                    >
-                      Add City Admin
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })
-        ) : (
-          <tr>
-            <td colSpan={6} className="px-6 py-16 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                <Search size={19} />
-              </div>
-
-              <div className="mt-3 text-sm font-extrabold text-slate-700">
-                No matching cities found
-              </div>
-
-              <div className="mt-1 text-xs text-slate-400">
-                Try changing your search text or status filter.
-              </div>
-
-              {(searchQuery || statusFilter !== "all") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setStatusFilter("all");
-                    setTablePage(1);
-                  }}
-                  className="mt-4 text-xs font-bold text-blue-600 hover:text-blue-700"
-                >
-                  Clear all filters
-                </button>
+                  </td>
+                </tr>
               )}
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
+            </tbody>
+          </table>
+        </div>
 
-  {/* Pagination */}
-  <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/40 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between lg:px-7">
-    <div className="text-xs font-medium text-slate-500">
-      Showing{" "}
-      <span className="font-bold text-slate-700">
-        {filteredCities.length
-          ? (safeTablePage - 1) * tablePageSize + 1
-          : 0}
-      </span>{" "}
-      to{" "}
-      <span className="font-bold text-slate-700">
-        {Math.min(
-          safeTablePage * tablePageSize,
-          filteredCities.length
-        )}
-      </span>{" "}
-      of{" "}
-      <span className="font-bold text-slate-700">
-        {filteredCities.length}
-      </span>{" "}
-      cities
-    </div>
+        {/* Pagination */}
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50/40 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between lg:px-7">
+          <div className="text-xs font-medium text-slate-500">
+            Showing{" "}
+            <span className="font-bold text-slate-700">
+              {filteredCities.length
+                ? (safeTablePage - 1) * tablePageSize + 1
+                : 0}
+            </span>{" "}
+            to{" "}
+            <span className="font-bold text-slate-700">
+              {Math.min(
+                safeTablePage * tablePageSize,
+                filteredCities.length
+              )}
+            </span>{" "}
+            of{" "}
+            <span className="font-bold text-slate-700">
+              {filteredCities.length}
+            </span>{" "}
+            cities
+          </div>
 
-    <div className="flex flex-wrap items-center gap-1.5">
-      {/* First page */}
-      <button
-        type="button"
-        onClick={() => setTablePage(1)}
-        disabled={safeTablePage === 1}
-        aria-label="First page"
-        className="
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* First page */}
+            <button
+              type="button"
+              onClick={() => setTablePage(1)}
+              disabled={safeTablePage === 1}
+              aria-label="First page"
+              className="
           flex h-9 w-9 items-center justify-center rounded-[8px]
           border border-slate-200 bg-white text-xs font-bold
           text-slate-500 transition
           hover:border-blue-200 hover:text-blue-600
           disabled:cursor-not-allowed disabled:opacity-35
         "
-      >
-        «
-      </button>
+            >
+              «
+            </button>
 
-      {/* Previous page */}
-      <button
-        type="button"
-        onClick={() =>
-          setTablePage((page) => Math.max(1, page - 1))
-        }
-        disabled={safeTablePage === 1}
-        aria-label="Previous page"
-        className="
+            {/* Previous page */}
+            <button
+              type="button"
+              onClick={() =>
+                setTablePage((page) => Math.max(1, page - 1))
+              }
+              disabled={safeTablePage === 1}
+              aria-label="Previous page"
+              className="
           flex h-9 w-9 items-center justify-center rounded-[8px]
           border border-slate-200 bg-white text-slate-500
           transition hover:border-blue-200 hover:text-blue-600
           disabled:cursor-not-allowed disabled:opacity-35
         "
-      >
-        <ChevronLeft size={15} />
-      </button>
+            >
+              <ChevronLeft size={15} />
+            </button>
 
-      {/* Numbered pages */}
-      {(() => {
-        const visiblePageCount = Math.min(tablePageCount, 5);
+            {/* Numbered pages */}
+            {(() => {
+              const visiblePageCount = Math.min(tablePageCount, 5);
 
-        const startPage = Math.max(
-          1,
-          Math.min(
-            safeTablePage - 2,
-            Math.max(1, tablePageCount - visiblePageCount + 1)
-          )
-        );
+              const startPage = Math.max(
+                1,
+                Math.min(
+                  safeTablePage - 2,
+                  Math.max(1, tablePageCount - visiblePageCount + 1)
+                )
+              );
 
-        return Array.from(
-          { length: visiblePageCount },
-          (_, index) => startPage + index
-        ).map((pageNumber) => (
-          <button
-            key={pageNumber}
-            type="button"
-            onClick={() => setTablePage(pageNumber)}
-            aria-current={
-              safeTablePage === pageNumber ? "page" : undefined
-            }
-            className={`
+              return Array.from(
+                { length: visiblePageCount },
+                (_, index) => startPage + index
+              ).map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setTablePage(pageNumber)}
+                  aria-current={
+                    safeTablePage === pageNumber ? "page" : undefined
+                  }
+                  className={`
               flex h-9 min-w-9 items-center justify-center
               rounded-[8px] border px-2 text-xs font-bold
               transition
-              ${
-                safeTablePage === pageNumber
-                  ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
-                  : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-600"
-              }
+              ${safeTablePage === pageNumber
+                      ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-600"
+                    }
             `}
-          >
-            {pageNumber}
-          </button>
-        ));
-      })()}
+                >
+                  {pageNumber}
+                </button>
+              ));
+            })()}
 
-      {/* Next page */}
-      <button
-        type="button"
-        onClick={() =>
-          setTablePage((page) =>
-            Math.min(tablePageCount, page + 1)
-          )
-        }
-        disabled={safeTablePage === tablePageCount}
-        aria-label="Next page"
-        className="
+            {/* Next page */}
+            <button
+              type="button"
+              onClick={() =>
+                setTablePage((page) =>
+                  Math.min(tablePageCount, page + 1)
+                )
+              }
+              disabled={safeTablePage === tablePageCount}
+              aria-label="Next page"
+              className="
           flex h-9 w-9 items-center justify-center rounded-[8px]
           border border-slate-200 bg-white text-slate-500
           transition hover:border-blue-200 hover:text-blue-600
           disabled:cursor-not-allowed disabled:opacity-35
         "
-      >
-        <ChevronRight size={15} />
-      </button>
+            >
+              <ChevronRight size={15} />
+            </button>
 
-      {/* Last page */}
-      <button
-        type="button"
-        onClick={() => setTablePage(tablePageCount)}
-        disabled={safeTablePage === tablePageCount}
-        aria-label="Last page"
-        className="
+            {/* Last page */}
+            <button
+              type="button"
+              onClick={() => setTablePage(tablePageCount)}
+              disabled={safeTablePage === tablePageCount}
+              aria-label="Last page"
+              className="
           flex h-9 w-9 items-center justify-center rounded-[8px]
           border border-slate-200 bg-white text-xs font-bold
           text-slate-500 transition
           hover:border-blue-200 hover:text-blue-600
           disabled:cursor-not-allowed disabled:opacity-35
         "
-      >
-        »
-      </button>
+            >
+              »
+            </button>
 
-      <span className="ml-1 inline-flex h-9 items-center rounded-[8px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500">
-        {tablePageSize} / page
-      </span>
-    </div>
-  </div>
-</section>
+            <span className="ml-1 inline-flex h-9 items-center rounded-[8px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500">
+              {tablePageSize} / page
+            </span>
+          </div>
+        </div>
+      </section>
 
       {/* Create City Modal */}
       <Modal
@@ -1344,7 +1439,103 @@ export default function HmsDashboardPage() {
               Cancel
             </Button>
             <Button type="submit" className="flex-1" loading={adminCreating} icon={<Shield size={15} />}>
-             Create
+              Create
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Create Commissioner Modal */}
+      <Modal
+        open={createCommissionerOpen}
+        onClose={closeCreateCommissionerModal}
+        title="Register Commissioner"
+        subtitle="Create a city-level read-only Commissioner account"
+        size="sm"
+      >
+        <form
+          onSubmit={handleCreateCommissioner}
+          className="flex flex-col gap-4"
+        >
+          <FormField label="City" required>
+            <select
+              className={selectClass}
+              value={commissionerCityId}
+              onChange={(e) => setCommissionerCityId(e.target.value)}
+              required
+            >
+              <option value="">Select city...</option>
+
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Full Name" required>
+            <input
+              className={inputClass}
+              value={commissionerName}
+              onChange={(e) => setCommissionerName(e.target.value)}
+              placeholder="Commissioner Name"
+              required
+            />
+          </FormField>
+
+          <FormField label="Email Id" required>
+            <input
+              className={inputClass}
+              type="email"
+              value={commissionerEmail}
+              onChange={(e) => setCommissionerEmail(e.target.value)}
+              placeholder="commissioner@city.local"
+              required
+            />
+          </FormField>
+
+          <FormField label="Enter Password" required>
+            <input
+              className={inputClass}
+              type="password"
+              value={commissionerPassword}
+              onChange={(e) => setCommissionerPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </FormField>
+
+          {commissionerStatus && (
+            <div
+              className={`text-xs font-semibold ${commissionerStatus.toLowerCase().includes("fail") ||
+                commissionerStatus.toLowerCase().includes("already") ||
+                commissionerStatus.toLowerCase().includes("error")
+                ? "text-danger"
+                : "text-primary"
+                }`}
+            >
+              {commissionerStatus}
+            </div>
+          )}
+
+          <div className="mt-2 flex gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={closeCreateCommissionerModal}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              className="flex-1"
+              loading={commissionerCreating}
+              icon={<Shield size={15} />}
+            >
+              Create
             </Button>
           </div>
         </form>
@@ -1386,6 +1577,92 @@ export default function HmsDashboardPage() {
           onClose={() => setEditingAdmin(null)}
           onSave={handleUpdateAdmin}
         />
+      )}
+
+      {viewUsersCity && (
+        <Modal
+          open
+          onClose={() => setViewUsersCity(null)}
+          title={`${viewUsersCity.name} Users`}
+          subtitle="City-level accounts"
+          size="md"
+        >
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+            {[
+              ...(viewUsersCity.cityAdmins?.length
+                ? viewUsersCity.cityAdmins
+                : viewUsersCity.cityAdmin
+                  ? [viewUsersCity.cityAdmin]
+                  : []
+              ).map((user) => ({
+                ...user,
+                roleLabel: "City Admin",
+                roleTone: "bg-blue-50 text-blue-700 border-blue-100",
+              })),
+
+              ...(viewUsersCity.commissioners ?? []).map((user) => ({
+                ...user,
+                roleLabel: "Commissioner",
+                roleTone: "bg-violet-50 text-violet-700 border-violet-100",
+              })),
+            ].map((user, index) => {
+              const initials =
+                user.name
+                  ?.trim()
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((part) => part.charAt(0))
+                  .join("")
+                  .toUpperCase() || "U";
+
+              return (
+                <div
+                  key={user.id || user.email || index}
+                  className="
+              flex items-center justify-between gap-3
+              rounded-xl border border-slate-100
+              bg-slate-50/70 px-4 py-3
+            "
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div
+                      className={`
+                  flex h-10 w-10 shrink-0 items-center justify-center
+                  rounded-xl text-xs font-black
+                  ${user.roleLabel === "Commissioner"
+                          ? "bg-violet-100 text-violet-700"
+                          : "bg-blue-100 text-blue-700"
+                        }
+                `}
+                    >
+                      {initials}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-extrabold text-slate-800">
+                        {user.name}
+                      </div>
+
+                      <div className="mt-0.5 truncate text-xs text-slate-400">
+                        {user.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`
+                shrink-0 rounded-md border px-2 py-1
+                text-[9px] font-black uppercase tracking-wide
+                ${user.roleTone}
+              `}
+                  >
+                    {user.roleLabel}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Modal>
       )}
 
       {moduleCity && (
@@ -1846,7 +2123,7 @@ function EditCityModal({
 
           {/* 2. Governance Platforms */}
           <div className="space-y-2.5 pt-1">
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <label className="flex items-center gap-2.5 rounded-xl border border-amber-200/80 bg-amber-50/60 px-3.5 py-2.5 text-xs font-black text-amber-900 cursor-pointer hover:bg-amber-100/60 transition">
                 <input

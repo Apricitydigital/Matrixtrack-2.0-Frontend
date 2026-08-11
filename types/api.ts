@@ -41,6 +41,7 @@ export interface CityRow {
   district?: MasterNode | null;
   cityAdmins?: CityAdminInfo[];
   cityAdmin: CityAdminInfo | null;
+  commissioners?: CityAdminInfo[];
   modules?: { id: string; name: string; enabled: boolean }[];
   createdAt?: string | Date;
 }
