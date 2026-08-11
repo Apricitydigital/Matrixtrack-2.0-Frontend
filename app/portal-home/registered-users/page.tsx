@@ -43,6 +43,7 @@ type UserRecord = {
   wardName?: string;
   zoneIds?: string[];
   wardIds?: string[];
+  areaIds?: string[];
   city?: any;
   zone?: any;
   ward?: any;
@@ -698,9 +699,11 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [assignedModules, setAssignedModules] = useState<string[]>(user.assignedModules || []);
   const [zoneIds, setZoneIds] = useState<string[]>(user.zoneIds || (user.zoneId ? [user.zoneId] : []));
   const [wardIds, setWardIds] = useState<string[]>(user.wardIds || (user.wardId ? [user.wardId] : []));
+  const [areaIds, setAreaIds] = useState<string[]>(user.areaIds || []);
 
   const [zones, setZones] = useState<any[]>([]);
   const [wards, setWards] = useState<any[]>([]);
+  const [areas, setAreas] = useState<any[]>([]);
   const [modules, setModules] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
@@ -708,13 +711,15 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   useEffect(() => {
     async function fetchData() {
       try {
-        const [zonesRes, wardsRes, modsRes] = await Promise.all([
+        const [zonesRes, wardsRes, areasRes, modsRes] = await Promise.all([
           apiFetch<{ nodes: any[] }>("/city/geo?level=ZONE").catch(() => ({ nodes: [] })),
           apiFetch<{ nodes: any[] }>("/city/geo?level=WARD").catch(() => ({ nodes: [] })),
+          apiFetch<{ nodes: any[] }>("/city/geo?level=AREA").catch(() => ({ nodes: [] })),
           CityModulesApi.list().catch(() => [])
         ]);
         setZones(zonesRes.nodes || []);
         setWards(wardsRes.nodes || []);
+        setAreas(areasRes.nodes || []);
         
         const fetchedMods = modsRes || [];
         setModules(fetchedMods.length > 0 ? fetchedMods : [
@@ -737,12 +742,44 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   };
 
   const toggleZone = (zId: string) => {
-    setZoneIds(prev => prev.includes(zId) ? prev.filter(id => id !== zId) : [...prev, zId]);
+    const removing = zoneIds.includes(zId);
+    setZoneIds(prev => removing ? prev.filter(id => id !== zId) : [...prev, zId]);
+
+    if (removing) {
+      const wardIdsInZone = new Set(
+        wards.filter((w: any) => String(w.parentId || w.zoneId || "") === zId).map((w: any) => w.id)
+      );
+      setWardIds(prev => prev.filter(id => !wardIdsInZone.has(id)));
+      setAreaIds(prev => prev.filter(id => {
+        const area = areas.find((a: any) => a.id === id);
+        return area ? !wardIdsInZone.has(String(area.parentId || area.wardId || "")) : true;
+      }));
+    }
   };
 
   const toggleWard = (wId: string) => {
-    setWardIds(prev => prev.includes(wId) ? prev.filter(id => id !== wId) : [...prev, wId]);
+    const removing = wardIds.includes(wId);
+    setWardIds(prev => removing ? prev.filter(id => id !== wId) : [...prev, wId]);
+
+    if (removing) {
+      setAreaIds(prev => prev.filter(id => {
+        const area = areas.find((a: any) => a.id === id);
+        return area ? String(area.parentId || area.wardId || "") !== wId : true;
+      }));
+    }
   };
+
+  const toggleArea = (aId: string) => {
+    setAreaIds(prev => prev.includes(aId) ? prev.filter(id => id !== aId) : [...prev, aId]);
+  };
+
+  const visibleWards = zoneIds.length
+    ? wards.filter((w: any) => zoneIds.includes(String(w.parentId || w.zoneId || "")))
+    : wards;
+
+  const visibleAreas = wardIds.length
+    ? areas.filter((a: any) => wardIds.includes(String(a.parentId || a.wardId || "")))
+    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -770,7 +807,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
   return (
     <Modal open onClose={onClose} title="Edit User & Access Permissions" subtitle={user.email} size="lg">
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5 pb-1">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
@@ -956,70 +993,98 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
           </div>
         </div>
 
-        {/* Geographic Access Control (Zones & Wards) */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Assigned Zones <span className="text-slate-400 font-normal">({zoneIds.length} selected)</span>
-            </label>
-            <div className="h-32 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
-              {zones.length === 0 ? (
-                <span className="text-xs text-slate-400 p-2 block">No zones available</span>
-              ) : zones.map(z => {
-                const isSelected = zoneIds.includes(z.id);
-                return (
-                  <label
-                    key={z.id}
-                    onClick={() => toggleZone(z.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                      isSelected ? 'bg-blue-100 text-blue-800 font-bold' : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <span>{z.name}</span>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {}}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </label>
-                );
-              })}
+        {/* Geographic Access Control (Zone &rarr; Ward &rarr; Area) */}
+        <div>
+          <div className="mb-2 flex items-end justify-between gap-3">
+            <label className="block text-xs font-bold text-slate-700">Geographic Access</label>
+            <span className="text-[10px] font-semibold text-slate-400">Zone &rarr; Ward &rarr; Area</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-700">
+                Assigned Zones <span className="font-normal text-slate-400">({zoneIds.length} selected)</span>
+              </label>
+              <div className="h-36 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                {zones.length === 0 ? (
+                  <span className="block p-2 text-xs text-slate-400">No zones available</span>
+                ) : zones.map((z: any) => {
+                  const isSelected = zoneIds.includes(z.id);
+                  return (
+                    <label
+                      key={z.id}
+                      onClick={() => toggleZone(z.id)}
+                      className={`flex cursor-pointer items-center justify-between rounded-lg p-2 text-xs font-medium transition-colors ${
+                        isSelected ? 'bg-blue-100 font-bold text-blue-800' : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{z.name}</span>
+                      <input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-700">
+                Assigned Wards <span className="font-normal text-slate-400">({wardIds.length} selected)</span>
+              </label>
+              <div className="h-36 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                {visibleWards.length === 0 ? (
+                  <span className="block p-2 text-xs text-slate-400">{zoneIds.length ? 'No wards in selected zone' : 'No wards available'}</span>
+                ) : visibleWards.map((w: any) => {
+                  const isSelected = wardIds.includes(w.id);
+                  return (
+                    <label
+                      key={w.id}
+                      onClick={() => toggleWard(w.id)}
+                      className={`flex cursor-pointer items-center justify-between rounded-lg p-2 text-xs font-medium transition-colors ${
+                        isSelected ? 'bg-indigo-100 font-bold text-indigo-800' : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{w.name}</span>
+                      <input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-700">
+                Assigned Areas <span className="font-normal text-slate-400">({areaIds.length} selected)</span>
+              </label>
+              <div className="h-36 space-y-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                {!wardIds.length ? (
+                  <span className="block p-2 text-xs text-slate-400">Select ward first</span>
+                ) : visibleAreas.length === 0 ? (
+                  <span className="block p-2 text-xs text-slate-400">No areas in selected ward</span>
+                ) : visibleAreas.map((a: any) => {
+                  const isSelected = areaIds.includes(a.id);
+                  return (
+                    <label
+                      key={a.id}
+                      onClick={() => toggleArea(a.id)}
+                      className={`flex cursor-pointer items-center justify-between rounded-lg p-2 text-xs font-medium transition-colors ${
+                        isSelected ? 'bg-cyan-100 font-bold text-cyan-800' : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{a.name}</span>
+                      <input type="checkbox" checked={isSelected} onChange={() => {}} className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" />
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Assigned Wards <span className="text-slate-400 font-normal">({wardIds.length} selected)</span>
-            </label>
-            <div className="h-32 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
-              {wards.length === 0 ? (
-                <span className="text-xs text-slate-400 p-2 block">No wards available</span>
-              ) : wards.map(w => {
-                const isSelected = wardIds.includes(w.id);
-                return (
-                  <label
-                    key={w.id}
-                    onClick={() => toggleWard(w.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                      isSelected ? 'bg-indigo-100 text-indigo-800 font-bold' : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <span>{w.name}</span>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {}}
-                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </label>
-                );
-              })}
-            </div>
-          </div>
+          <p className="mt-2 text-[10px] font-semibold text-amber-600">
+            Area selection is shown in the editor, but the current backend user-access API stores only zone and ward scope.
+          </p>
         </div>
 
-        <div className="pt-3 flex gap-3">
+        <div className="sticky bottom-0 z-20 -mx-6 flex gap-3 border-t border-slate-200 bg-white px-6 pt-4 pb-1 shadow-[0_-8px_20px_rgba(15,23,42,0.06)]">
           <button
             type="button"
             onClick={onClose}
