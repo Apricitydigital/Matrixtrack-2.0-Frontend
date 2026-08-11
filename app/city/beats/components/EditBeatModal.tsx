@@ -99,7 +99,7 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
                             <input
                                 id="edit-kml-upload"
                                 type="file"
-                                accept=".kml"
+                                accept=".kml,.kmz"
                                 onChange={handleFileChange}
                                 style={{ display: "none" }}
                             />
