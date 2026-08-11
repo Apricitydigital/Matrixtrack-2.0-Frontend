@@ -48,18 +48,22 @@ function WorkforceContent() {
   }, [searchParams]);
 
   const normalizedRoles = Array.isArray(user?.roles)
-    ? user.roles.map((role) =>
-        String(role?.name || role || '')
-          .trim()
-          .toUpperCase()
+    ? user.roles.map((role: string | { name?: string }) =>
+      String(
+        typeof role === 'string'
+          ? role
+          : role?.name || ''
       )
+        .trim()
+        .toUpperCase()
+    )
     : [];
 
   const scopedAssignedCities = Array.isArray(user?.customPermissions?.assigned_cities)
     ? user.customPermissions.assigned_cities
     : [];
 
-  const isCityAdminUser = normalizedRoles.some((role) =>
+  const isCityAdminUser = normalizedRoles.some((role: string) =>
     ['CITY_ADMIN', 'COMMISSIONER', 'ULB_OFFICER'].includes(role)
   ) || scopedAssignedCities.length > 0;
 
