@@ -8,7 +8,7 @@ import React, {
 
 import AreaForm from "./components/AreaForm";
 
-import { apiFetch } from "@lib/apiClient";
+import { apiFetch, CityApi } from "@lib/apiClient";
 
 import {
   MapPin,
@@ -33,6 +33,12 @@ export default function AreasPage() {
       ].includes(r)
     );
 
+  const isSuperAdmin =
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "HMS_SUPER_ADMIN" ||
+    user?.roles?.some((r) => ["SUPER_ADMIN", "HMS_SUPER_ADMIN"].includes(r));
+
+  const assignedCityName = user?.city?.name || user?.cityName;
 
   /* =========================================================
      AREA DATA
@@ -47,12 +53,15 @@ export default function AreasPage() {
   const [zones, setZones] =
     useState<any[]>([]);
 
+  const [cities, setCities] =
+    useState<any[]>([]);
+
   const [loading, setLoading] =
     useState(true);
 
 
   /* =========================================================
-     UI STATE
+     UI STATE / FILTERS
   ========================================================= */
 
   const [
@@ -64,6 +73,11 @@ export default function AreasPage() {
     searchQuery,
     setSearchQuery,
   ] = useState("");
+
+  const [selectedCity, setSelectedCity] = useState("ALL");
+  const [selectedZone, setSelectedZone] = useState("ALL");
+  const [selectedWard, setSelectedWard] = useState("ALL");
+  const [selectedAreaType, setSelectedAreaType] = useState("ALL");
 
 
   /* =========================================================
@@ -87,7 +101,7 @@ export default function AreasPage() {
 
 
   /* =========================================================
-     LOAD AREAS + WARDS + ZONES
+     LOAD AREAS + WARDS + ZONES + CITIES
      EXISTING GEO APIs ONLY
   ========================================================= */
 
@@ -100,6 +114,7 @@ export default function AreasPage() {
           areaResult,
           wardResult,
           zoneResult,
+          cityResult,
         ] =
           await Promise.allSettled([
             apiFetch<{
@@ -119,6 +134,8 @@ export default function AreasPage() {
             }>(
               "/city/geo?level=ZONE"
             ),
+
+            CityApi.list().catch(() => ({ cities: [] })),
           ]);
 
 
@@ -154,6 +171,16 @@ export default function AreasPage() {
           );
         }
 
+        if (
+          cityResult.status ===
+          "fulfilled"
+        ) {
+          setCities(
+            (cityResult.value as any)?.cities ||
+              []
+          );
+        }
+
       } catch (err) {
         console.error(
           "Failed to load areas",
@@ -168,6 +195,13 @@ export default function AreasPage() {
   useEffect(() => {
     loadAreas();
   }, [loadAreas]);
+
+  // Set default city if user is City Admin
+  useEffect(() => {
+    if (!isSuperAdmin && assignedCityName) {
+      setSelectedCity(assignedCityName);
+    }
+  }, [isSuperAdmin, assignedCityName]);
 
 
   /* =========================================================
@@ -268,60 +302,163 @@ export default function AreasPage() {
             area.zone?.name ||
             zone?.name ||
             "-",
+
+          cityName:
+            zone?.city?.name ||
+            area.city?.name ||
+            ward?.city?.name ||
+            user?.city?.name ||
+            "Indore",
         };
       });
     }, [
       areas,
       wardMap,
       zoneMap,
+      user?.city?.name,
     ]);
 
 
   /* =========================================================
-     SEARCH
+     FILTER DROPDOWN OPTIONS
+  ========================================================= */
+
+  // Unique cities options
+  const cityOptions = React.useMemo(() => {
+    if (!isSuperAdmin && assignedCityName) {
+      return [assignedCityName];
+    }
+    const set = new Set<string>();
+    enrichedAreas.forEach(a => {
+      if (a.cityName) set.add(a.cityName);
+    });
+    cities.forEach(c => {
+      if (c.name) set.add(c.name);
+    });
+    return Array.from(set);
+  }, [enrichedAreas, cities, isSuperAdmin, assignedCityName]);
+
+  // Unique zones options based on city filter
+  const zoneOptions = React.useMemo(() => {
+    let zonesFiltered = zones;
+    if (selectedCity !== "ALL") {
+      zonesFiltered = zones.filter(z => {
+        const zCity = (z as any).city?.name || user?.city?.name || "Indore";
+        return zCity.toLowerCase() === selectedCity.toLowerCase();
+      });
+    }
+    return zonesFiltered;
+  }, [zones, selectedCity, user?.city?.name]);
+
+  // Unique wards options based on zone/city filter
+  const wardOptions = React.useMemo(() => {
+    let wardsFiltered = wards;
+    if (selectedZone !== "ALL") {
+      wardsFiltered = wards.filter(w => w.parentId === selectedZone);
+    } else if (selectedCity !== "ALL") {
+      const zoneIdsInCity = new Set(zoneOptions.map(z => z.id));
+      wardsFiltered = wards.filter(w => w.parentId && zoneIdsInCity.has(w.parentId));
+    }
+    return wardsFiltered;
+  }, [wards, selectedZone, selectedCity, zoneOptions]);
+
+  // Unique area types options
+  const areaTypeOptions = React.useMemo(() => {
+    const types = new Set<string>();
+    enrichedAreas.forEach(a => {
+      const typeVal = a.areaType || a.type;
+      if (typeVal) types.add(typeVal);
+    });
+    return Array.from(types);
+  }, [enrichedAreas]);
+
+
+  // Reset child filters if parent changes
+  useEffect(() => {
+    if (selectedCity !== "ALL") {
+      const validZoneIds = new Set(zoneOptions.map(z => z.id));
+      if (selectedZone !== "ALL" && !validZoneIds.has(selectedZone)) {
+        setSelectedZone("ALL");
+        setSelectedWard("ALL");
+      }
+    }
+  }, [selectedCity, zoneOptions, selectedZone]);
+
+  useEffect(() => {
+    if (selectedZone !== "ALL") {
+      const validWardIds = new Set(wardOptions.map(w => w.id));
+      if (selectedWard !== "ALL" && !validWardIds.has(selectedWard)) {
+        setSelectedWard("ALL");
+      }
+    }
+  }, [selectedZone, wardOptions, selectedWard]);
+
+
+  /* =========================================================
+     SEARCH & FILTERS APPLICATION
   ========================================================= */
 
   const filteredAreas =
     React.useMemo(() => {
-      if (!searchQuery.trim()) {
-        return enrichedAreas;
+      let result = enrichedAreas;
+
+      // Filter by City
+      if (selectedCity !== "ALL") {
+        result = result.filter(
+          (area) =>
+            area.cityName?.toLowerCase() === selectedCity.toLowerCase()
+        );
       }
 
-      const q =
-        searchQuery
-          .trim()
-          .toLowerCase();
+      // Filter by Zone
+      if (selectedZone !== "ALL") {
+        result = result.filter(
+          (area) =>
+            area.parentId && wardMap.get(area.parentId)?.parentId === selectedZone
+        );
+      }
 
-      return enrichedAreas.filter(
-        (area) =>
-          area.name
-            ?.toLowerCase()
-            .includes(q) ||
+      // Filter by Ward
+      if (selectedWard !== "ALL") {
+        result = result.filter(
+          (area) =>
+            area.parentId === selectedWard
+        );
+      }
 
-          area.id
-            ?.toLowerCase()
-            .includes(q) ||
+      // Filter by Area Type
+      if (selectedAreaType !== "ALL") {
+        result = result.filter(
+          (area) =>
+            area.areaType === selectedAreaType ||
+            area.type === selectedAreaType ||
+            area.areaTypeLabel?.toLowerCase() === selectedAreaType.toLowerCase()
+        );
+      }
 
-          area.areaTypeLabel
-            ?.toLowerCase()
-            .includes(q) ||
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        result = result.filter(
+          (area) =>
+            area.name?.toLowerCase().includes(q) ||
+            area.id?.toLowerCase().includes(q) ||
+            area.areaTypeLabel?.toLowerCase().includes(q) ||
+            area.zoneName?.toLowerCase().includes(q) ||
+            area.wardName?.toLowerCase().includes(q) ||
+            area.cityName?.toLowerCase().includes(q)
+        );
+      }
 
-          area.zoneName
-            ?.toLowerCase()
-            .includes(q) ||
-
-          area.wardName
-            ?.toLowerCase()
-            .includes(q) ||
-
-          user?.city?.name
-            ?.toLowerCase()
-            .includes(q)
-      );
+      return result;
     }, [
       enrichedAreas,
       searchQuery,
-      user?.city?.name,
+      selectedCity,
+      selectedZone,
+      selectedWard,
+      selectedAreaType,
+      wardMap,
     ]);
 
 
@@ -677,73 +814,165 @@ export default function AreasPage() {
 
 
           {/* =================================================
-              SEARCH
+              SEARCH & FILTERS
           ================================================= */}
 
           <div
             style={{
-              display: "flex",
-              justifyContent:
-                "flex-end",
-              alignItems:
-                "center",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
               gap: "16px",
-              flexWrap:
-                "wrap",
-              marginBottom:
-                "20px",
+              backgroundColor: "white",
+              padding: "20px 24px",
+              borderRadius: "16px",
+              border: "1px solid #e2e8f0",
+              marginBottom: "20px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+              width: "100%",
             }}
           >
-            <div
-              style={{
-                position:
-                  "relative",
-                minWidth:
-                  "300px",
-              }}
-            >
-              <Search
-                size={16}
-                color="#94a3b8"
-                style={{
-                  position:
-                    "absolute",
-                  left: "12px",
-                  top: "50%",
-                  transform:
-                    "translateY(-50%)",
-                }}
-              />
-
-              <input
-                type="text"
-                placeholder="Search areas, type, city, zone or ward..."
-                value={
-                  searchQuery
-                }
-                onChange={(e) =>
-                  setSearchQuery(
-                    e.target.value
-                  )
-                }
+            {/* City Filter */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>City</span>
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                disabled={!isSuperAdmin && !!assignedCityName}
                 style={{
                   width: "100%",
-                  padding:
-                    "8px 12px 8px 36px",
-                  borderRadius:
-                    "12px",
-                  border:
-                    "1px solid #cbd5e1",
-                  fontSize:
-                    "0.8125rem",
-                  fontWeight:
-                    700,
-                  outline:
-                    "none",
-                  backgroundColor:
-                    "white",
+                  height: "38px",
+                  padding: "0 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "0.8125rem",
+                  fontWeight: 700,
+                  backgroundColor: !isSuperAdmin && !!assignedCityName ? "#f1f5f9" : "white",
+                  color: "#334155",
+                  outline: "none",
+                  cursor: !isSuperAdmin && !!assignedCityName ? "not-allowed" : "pointer",
                 }}
-              />
+              >
+                {isSuperAdmin && <option value="ALL">All Cities</option>}
+                {cityOptions.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Zone Filter */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Zone</span>
+              <select
+                value={selectedZone}
+                onChange={(e) => setSelectedZone(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: "38px",
+                  padding: "0 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "0.8125rem",
+                  fontWeight: 700,
+                  backgroundColor: "white",
+                  color: "#334155",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="ALL">All Zones</option>
+                {zoneOptions.map((z) => (
+                  <option key={z.id} value={z.id}>{z.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Ward Filter */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Ward</span>
+              <select
+                value={selectedWard}
+                onChange={(e) => setSelectedWard(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: "38px",
+                  padding: "0 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "0.8125rem",
+                  fontWeight: 700,
+                  backgroundColor: "white",
+                  color: "#334155",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="ALL">All Wards</option>
+                {wardOptions.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Area Type Filter */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Area Type</span>
+              <select
+                value={selectedAreaType}
+                onChange={(e) => setSelectedAreaType(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: "38px",
+                  padding: "0 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "0.8125rem",
+                  fontWeight: 700,
+                  backgroundColor: "white",
+                  color: "#334155",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="ALL">All Types</option>
+                {areaTypeOptions.map((t) => (
+                  <option key={t} value={t}>{formatAreaType(t)}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Search bar */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Search</span>
+              <div style={{ position: "relative", width: "100%" }}>
+                <Search
+                  size={15}
+                  color="#94a3b8"
+                  style={{
+                    position: "absolute",
+                    left: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Search areas, type, city, zone or ward..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: "100%",
+                    height: "38px",
+                    padding: "0 12px 0 36px",
+                    borderRadius: "10px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    outline: "none",
+                    backgroundColor: "white",
+                    color: "#334155",
+                  }}
+                />
+              </div>
             </div>
           </div>
 
@@ -1396,10 +1625,7 @@ export default function AreasPage() {
                                       "#334155",
                                   }}
                                 >
-                                  {user
-                                    ?.city
-                                    ?.name ||
-                                    "Indore"}
+                                  {area.cityName}
                                 </td>
 
 
