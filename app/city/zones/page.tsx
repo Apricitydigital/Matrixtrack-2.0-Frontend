@@ -115,22 +115,66 @@ export default function ZoneManagementPage() {
         <div style={{ width: "100%" }}>
 
           {/* Header Section */}
-          <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+          <div
+            style={{
+              marginBottom: "28px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "16px",
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderBottom: "1px solid #e2e8f0",
+              paddingBottom: "16px",
+            }}
+          >
             <div>
-              <div className="breadcrumb" style={{ fontSize: "0.8125rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "6px", fontWeight: 600 }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "#64748b",
+                  display: "flex",
+                  gap: "6px",
+                  marginBottom: "4px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 <span>City Admin</span>
                 <span>/</span>
-                <span style={{ color: "#2563eb", fontWeight: 700 }}>Zone Management</span>
+                <span style={{ color: "#3b82f6" }}>Zones</span>
               </div>
-              <h1 style={{ fontSize: "1.75rem", fontWeight: 900, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>
+              <h1
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  margin: 0,
+                  letterSpacing: "-0.01em",
+                }}
+              >
                 Zone Management
               </h1>
-              <p style={{ marginTop: "4px", color: "#64748b", fontSize: "0.875rem", fontWeight: 600 }}>
+              <p
+                style={{
+                  marginTop: "2px",
+                  color: "#64748b",
+                  fontSize: "0.8125rem",
+                  fontWeight: 500,
+                }}
+              >
                 Manage and review primary geographic zones across the city.
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
               <TableExportDropdown 
                 data={filteredZones.map(z => ({ ZoneID: z.id, ZoneName: z.name, CreatedAt: z.createdAt || '-' }))}
                 filename="Registered_Zones"
@@ -140,12 +184,23 @@ export default function ZoneManagementPage() {
                 <button
                   onClick={() => setIsModalOpen(true)}
                   style={{
-                    height: "44px", borderRadius: "12px", backgroundColor: "#2563eb", color: "white",
-                    display: "flex", alignItems: "center", gap: "8px", fontWeight: 800, padding: "0 20px",
-                    border: "none", cursor: "pointer", boxShadow: "0 4px 12px rgba(37,99,235,0.2)"
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    height: "40px",
+                    padding: "0 16px",
+                    borderRadius: "10px",
+                    backgroundColor: "#3b82f6",
+                    border: "none",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    boxShadow: "0 4px 12px rgba(59,130,246,0.2)"
                   }}
                 >
-                  <Plus size={18} />
+                  <Plus size={15} />
                   <span>Create New Zone</span>
                 </button>
               )}

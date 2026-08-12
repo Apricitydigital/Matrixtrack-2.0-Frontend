@@ -147,6 +147,12 @@ export default function AreaForm({ onSuccess }: AreaFormProps) {
                             <option value="RESIDENTIAL">Residential</option>
                             <option value="COMMERCIAL">Commercial</option>
                             <option value="SLUM">Slum</option>
+                            <option value="RELIGIOUS_PLACE">Religious Place</option>
+                            <option value="TOURIST_AREA">Tourist Area</option>
+                            <option value="TRANSPORT_HUB">Transport Hub</option>
+                            <option value="PARKS_AND_GARDENS">Parks and Gardens</option>
+                            <option value="MARKET_AREA">Market Area</option>
+                            <option value="PARKING">Parking Area</option>
                         </select>
                     </div>
                 </div>
