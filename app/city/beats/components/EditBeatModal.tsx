@@ -19,8 +19,13 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (selectedFile) {
-            if (!selectedFile.name.toLowerCase().endsWith(".kml")) {
-                setError("Only .kml files are allowed");
+            const fileName = selectedFile.name.toLowerCase();
+
+            if (
+                !fileName.endsWith(".kml") &&
+                !fileName.endsWith(".kmz")
+            ) {
+                setError("Only .kml or .kmz files are allowed");
                 setFile(null);
                 return;
             }
@@ -82,19 +87,19 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
                     </div>
 
                     <div>
-                        <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Replace KML File (Optional)</label>
+                        <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Replace KML / KMZ File (Optional)</label>
                         <div
                             style={{ border: "2px dashed #e5e7eb", borderRadius: "8px", padding: "16px", textAlign: "center", backgroundColor: "#f9fafb", cursor: "pointer" }}
                             onClick={() => document.getElementById("edit-kml-upload")?.click()}
                         >
                             <Upload size={24} style={{ margin: "0 auto 8px", color: "#6b7280" }} />
                             <p style={{ margin: 0, fontSize: "0.75rem", color: "#4b5563" }}>
-                                {file ? file.name : "Click to replace KML"}
+                                {file ? file.name : "Click to replace KML / KMZ"}
                             </p>
                             <input
                                 id="edit-kml-upload"
                                 type="file"
-                                accept=".kml"
+                                accept=".kml,.kmz"
                                 onChange={handleFileChange}
                                 style={{ display: "none" }}
                             />

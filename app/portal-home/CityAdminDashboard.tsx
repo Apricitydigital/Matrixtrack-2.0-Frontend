@@ -1711,16 +1711,12 @@ const beatRequests = (
   }
 
   if (loading) {
-    return (
-      <div className="p-12 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Activity className="animate-spin text-blue-600" size={28} />
-          <span className="text-xs font-bold text-slate-500">
-            Loading city analytics...
-          </span>
-        </div>
+    return <div className="p-12 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <Activity className="animate-spin text-blue-600" size={32} />
+        <span className="text-slate-500 font-semibold text-sm">Aggregating Live City Data...</span>
       </div>
-    );
+    </div>;
   }
 
   return (
@@ -2757,332 +2753,90 @@ const beatRequests = (
       {/* EXTRA CITY INSIGHTS */}
       
 
-      {/* PLATFORM USER DIRECTORY - 10 ROW PREVIEW */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="border-b border-slate-100 bg-slate-50/80 p-5">
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Users size={16} className="text-blue-600" />
-
-                <h3 className="text-sm font-black text-slate-800">
-                  Platform User Directory
-                </h3>
-
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
-                  {filteredUsers.length}
-                </span>
-              </div>
-
-              <p className="text-[10px] uppercase text-slate-400 font-bold mt-1">
-                Cross-system access and role breakdown
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[210px] flex-1 xl:flex-none">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search personnel..."
-                  className="h-9 w-full xl:w-60 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[10px] font-bold outline-none focus:border-blue-400"
-                />
-              </div>
-
-              <select
-                value={directoryRole}
-                onChange={(event) => setDirectoryRole(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Roles</option>
-
-                {directoryRoleOptions.map((role) => (
-                  <option key={role} value={role}>
-                    {role.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={directoryModule}
-                onChange={(event) => setDirectoryModule(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Modules</option>
-
-                {directoryModuleOptions.map((module) => (
-                  <option key={module} value={module}>
-                    {prettyModuleName(module)}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={directoryStatus}
-                onChange={(event) => setDirectoryStatus(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Status</option>
-
-                {directoryStatusOptions.map((statusValue) => (
-                  <option key={statusValue} value={statusValue}>
-                    {statusValue}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={() => router.push("/portal-home/registered-users")}
-                className="h-9 rounded-xl bg-blue-600 px-3.5 text-[10px] font-black text-white flex items-center gap-1.5 hover:bg-blue-700 transition shadow-sm"
-              >
-                View All Users
-                <ArrowRight size={12} />
-              </button>
-            </div>
+      {/* INTEGRATED USER DIRECTORY */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-slate-50/50">
+          <div>
+            <h3 className="font-black text-slate-800 text-sm flex items-center gap-2">
+              <Users size={16} className="text-blue-600" /> Platform User Directory
+            </h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-1">Cross-system access and role breakdown</p>
           </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
-            <span>
-              Showing {Math.min(10, filteredUsers.length)} of {filteredUsers.length} matching user
-              {filteredUsers.length === 1 ? "" : "s"}
-            </span>
-
-            {(search ||
-              directoryRole !== "ALL" ||
-              directoryModule !== "ALL" ||
-              directoryStatus !== "ALL") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setDirectoryRole("ALL");
-                  setDirectoryModule("ALL");
-                  setDirectoryStatus("ALL");
-                }}
-                className="text-blue-600 hover:text-blue-700"
-              >
-                Clear directory filters
-              </button>
-            )}
+          <div className="relative w-full sm:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+            <input 
+              type="text" 
+              placeholder="Search personnel..." 
+              className="w-full sm:w-64 pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 transition shadow-sm"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-xs">
-            <thead className="bg-white">
-              <tr className="border-b border-slate-200 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                <th className="p-4">Personnel</th>
-                <th className="p-4">System Roles</th>
-                <th className="p-4">Active Modules</th>
-                <th className="p-4 text-right">Status</th>
+        <div className="overflow-x-auto max-h-[500px]">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead className="sticky top-0 bg-white shadow-sm z-10">
+              <tr className="border-b border-slate-200 text-[9px] font-black uppercase text-slate-400 tracking-wider">
+                <th className="py-4 px-5">Personnel</th>
+                <th className="py-4 px-5">System Roles</th>
+                <th className="py-4 px-5">Active Modules</th>
+                <th className="py-4 px-5 text-right">Status</th>
               </tr>
             </thead>
-
-            <tbody className="divide-y divide-slate-100">
-              {visibleDirectoryUsers.map((user, index) => {
-                const roles = getUserRoleLabels(user);
-                const modules = getUserModuleLabels(user);
-                const statusValue = getUserStatus(user);
-
-                return (
-                  <tr
-                    key={user.id || user.email || index}
-                    className="hover:bg-slate-50 transition"
-                  >
-                    <td className="p-4">
-                      <div className="font-black text-[11px] text-slate-900">
-                        {user.name || "Unnamed Personnel"}
-                      </div>
-
-                      <div className="mt-1 text-[9px] font-semibold text-slate-400">
-                        {user.email || user.phone || "-"}
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        {roles.length ? (
-                          roles.map((role) => (
-                            <span
-                              key={role}
-                              className="rounded-md border border-violet-100 bg-violet-50 px-2 py-0.5 text-[8px] font-black text-violet-700"
-                            >
-                              {role.replace(/_/g, " ")}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[9px] font-semibold text-slate-400">
-                            No role assigned
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        {modules.length ? (
-                          modules.slice(0, 5).map((module) => (
-                            <span
-                              key={module}
-                              className="rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 text-[8px] font-black text-blue-700"
-                            >
-                              {prettyModuleName(module)}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[9px] font-semibold text-slate-400">
-                            No specific module
-                          </span>
-                        )}
-
-                        {modules.length > 5 && (
-                          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[8px] font-black text-slate-500">
-                            +{modules.length - 5}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="p-4 text-right">
-                      <span
-                        className={`rounded-md border px-2 py-1 text-[8px] font-black ${
-                          statusValue === "ACTIVE"
-                            ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-                            : "border-slate-200 bg-slate-50 text-slate-500"
-                        }`}
-                      >
-                        {statusValue}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {visibleDirectoryUsers.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="py-14 text-center text-[10px] font-bold text-slate-400"
-                  >
-                    No personnel records match the selected filters.
+            <tbody className="divide-y divide-slate-100 font-semibold text-slate-700 bg-white">
+              {filteredUsers.map((u, idx) => (
+                <tr key={u.id || idx} className="hover:bg-slate-50/80 transition-colors group">
+                  <td className="py-3 px-5">
+                    <div className="font-bold text-slate-900 text-xs">{u.name || 'Unnamed Personnel'}</div>
+                    <div className="text-[10px] font-semibold text-slate-400 mt-0.5">{u.email || u.phone || '-'}</div>
+                  </td>
+                  <td className="py-3 px-5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {u.roles && u.roles.length > 0 ? u.roles.map((r: string, i: number) => (
+                        <span key={i} className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[9px] uppercase font-bold border border-violet-100">{r.replace('_', ' ')}</span>
+                      )) : (
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[9px] uppercase font-bold border border-slate-200">{u.role || 'USER'}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {u.modules && u.modules.length > 0 ? u.modules.map((m: any, i: number) => (
+                        <span key={i} className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[9px] uppercase font-bold border border-blue-100 flex items-center gap-1">
+                          {m.module?.key || m.moduleId}
+                        </span>
+                      )) : (
+                        <span className="text-[10px] text-slate-400 font-bold italic">No specific module</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 px-5 text-right">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase border border-emerald-100">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> {u.status || 'ACTIVE'}
+                    </span>
                   </td>
                 </tr>
+              ))}
+              {filteredUsers.length === 0 && (
+                <tr><td colSpan={4} className="py-16 text-center text-slate-400 font-bold text-xs">No personnel records found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-
-        {filteredUsers.length > 10 && (
-          <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center justify-between gap-3">
-            <span className="text-[9px] font-bold text-slate-400">
-              Preview is limited to 10 users for a cleaner dashboard.
-            </span>
-
-            <button
-              type="button"
-              onClick={() => router.push("/portal-home/registered-users")}
-              className="text-[9px] font-black text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              Open full directory
-              <ArrowRight size={11} />
-            </button>
-          </div>
-        )}
-      </section>
+      </div>
     </div>
   );
 }
 
-function getUserRoleLabels(user: any): string[] {
-  const raw = [
-    ...(Array.isArray(user?.roles) ? user.roles : []),
-    user?.role,
-    user?.systemRole,
-    user?.primaryRole,
-  ];
-
-  return Array.from(
-    new Set(
-      raw
-        .map((item: any) =>
-          norm(
-            typeof item === "string"
-              ? item
-              : item?.key ?? item?.name ?? item?.role ?? item?.code
-          )
-        )
-        .filter(Boolean)
-        .map(up)
-    )
-  );
-}
-
-function getUserModuleLabels(user: any): string[] {
-  const raw = [
-    ...(Array.isArray(user?.modules) ? user.modules : []),
-    ...(Array.isArray(user?.assignedModules) ? user.assignedModules : []),
-    ...(Array.isArray(user?.workspaceModules) ? user.workspaceModules : []),
-    ...(Array.isArray(user?.moduleAccess) ? user.moduleAccess : []),
-    ...(Array.isArray(user?.access?.modules) ? user.access.modules : []),
-  ];
-
-  const values = raw
-    .map((item: any) =>
-      norm(
-        typeof item === "string"
-          ? item
-          : item?.module?.key ??
-              item?.module?.name ??
-              item?.moduleKey ??
-              item?.moduleName ??
-              item?.key ??
-              item?.name ??
-              item?.code
-      )
-    )
-    .filter(Boolean)
-    .map(up);
-
-  return Array.from(new Set(values));
-}
-
-function getUserStatus(user: any): string {
-  if (user?.enabled === false) return "INACTIVE";
-
-  const status = up(user?.status || user?.accountStatus || "ACTIVE");
-
-  if (["DISABLED", "BLOCKED", "INACTIVE"].includes(status)) {
-    return "INACTIVE";
-  }
-
-  return status || "ACTIVE";
-}
-
-function prettyModuleName(value: string): string {
-  const key = up(value);
-
-  const names: Record<string, string> = {
-    TASKFORCE: "Inspection & Performance",
-    INSPECTION_AND_PERFORMANCE: "Inspection & Performance",
-    SWEEPING: "Sweeping",
-    TOILET: "Cleanliness of Toilets",
-    CLEANLINESS_OF_TOILET: "Cleanliness of Toilets",
-    TWINBIN: "Litter Bins",
-    LITTERBIN: "Litter Bins",
-    LITTER_BINS: "Litter Bins",
-    GVP: "GVP",
-    WARD_RANKING: "Ward Ranking",
-    SWACHH_RANKING: "Ward Ranking",
-    WORKFORCE_ATTENDANCE: "Workforce Attendance",
-    ATTENDANCE: "Workforce Attendance",
+function KpiBlock({ label, value, color, highlight = false }: { label: string, value: number, color: string, highlight?: boolean }) {
+  const colorMap: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    amber: 'bg-amber-50 text-amber-600',
+    rose: 'bg-rose-50 text-rose-600',
+    violet: 'bg-violet-50 text-violet-600',
   };
-
+  
   return (
     names[key] ||
     value

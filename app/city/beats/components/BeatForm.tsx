@@ -79,8 +79,16 @@ export default function BeatForm({ onSuccess, geoVersion }: BeatFormProps) {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (selectedFile) {
-            if (!selectedFile.name.toLowerCase().endsWith(".kml")) {
-                setStatus({ type: "error", message: "Only .kml files are allowed" });
+            const fileName = selectedFile.name.toLowerCase();
+
+            if (
+                !fileName.endsWith(".kml") &&
+                !fileName.endsWith(".kmz")
+            ) {
+                setStatus({
+                    type: "error",
+                    message: "Only .kml or .kmz files are allowed",
+                });
                 setFile(null);
                 return;
             }
@@ -202,7 +210,7 @@ export default function BeatForm({ onSuccess, geoVersion }: BeatFormProps) {
                 </div>
 
                 <div className="form-group">
-                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Upload KML File</label>
+                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Upload KML / KMZ File</label>
                     <div
                         style={{
                             border: "2px dashed #e5e7eb",
@@ -220,12 +228,12 @@ export default function BeatForm({ onSuccess, geoVersion }: BeatFormProps) {
                             {file ? file.name : "Click to upload or drag and drop"}
                         </p>
                         <p style={{ margin: "4px 0 0", fontSize: "0.75rem", color: "#9ca3af" }}>
-                            Only .kml files allowed (Max 5MB)
+                            .kml and .kmz files supported (Max 5MB)
                         </p>
                         <input
                             id="kml-upload"
                             type="file"
-                            accept=".kml"
+                            accept=".kml,.kmz"
                             onChange={handleFileChange}
                             style={{ display: "none" }}
                         />
