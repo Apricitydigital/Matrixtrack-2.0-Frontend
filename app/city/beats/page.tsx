@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
@@ -18,24 +23,22 @@ import { RoleGuard } from "@components/Guards";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 
 import {
-  Activity,
-  CircleDot,
-  FileText,
   Plus,
-  RotateCcw,
-  Search,
-  ShieldCheck,
-  Target,
-  Users,
   X,
+  FileText,
+  Target,
+  ShieldCheck,
+  Activity,
+  Search,
+  RotateCcw,
 } from "lucide-react";
 
 const BeatMapView = dynamic<BeatMapViewProps>(
   () => import("./components/BeatMapView"),
-  { ssr: false }
+  {
+    ssr: false,
+  }
 );
-
-const POINT_TARGET = 5;
 
 export default function BeatsPage() {
   const { user } = useAuth();
@@ -44,87 +47,105 @@ export default function BeatsPage() {
     ["COMMISSIONER", "ULB_OFFICER"].includes(r)
   );
 
+  /* =========================================================
+     DATA
+  ========================================================= */
+
   const [beats, setBeats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
 
-  const [viewingBeat, setViewingBeat] = useState<any | null>(null);
-  const [editingBeat, setEditingBeat] = useState<any | null>(null);
-  const [inspectingBeat, setInspectingBeat] = useState<any | null>(null);
-  const [assigningBeat, setAssigningBeat] = useState<any | null>(null);
-  const [deployingBeat, setDeployingBeat] = useState<any | null>(null);
-  const [showCreateBeat, setShowCreateBeat] = useState(false);
+  /* =========================================================
+     BEAT MODALS
+  ========================================================= */
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [zoneFilter, setZoneFilter] = useState("ALL");
-  const [wardFilter, setWardFilter] = useState("ALL");
-  const [areaFilter, setAreaFilter] = useState("ALL");
+  const [viewingBeat, setViewingBeat] =
+    useState<any | null>(null);
 
+  const [editingBeat, setEditingBeat] =
+    useState<any | null>(null);
+
+  const [inspectingBeat, setInspectingBeat] =
+    useState<any | null>(null);
+
+  const [assigningBeat, setAssigningBeat] =
+    useState<any | null>(null);
+
+  const [deployingBeat, setDeployingBeat] =
+    useState<any | null>(null);
+
+  const [showCreateBeat, setShowCreateBeat] =
+    useState(false);
+
+  /* =========================================================
+     FILTER STATE
+  ========================================================= */
+
+  const [searchQuery, setSearchQuery] =
+    useState("");
+
+  const [zoneFilter, setZoneFilter] =
+    useState("ALL");
+
+  const [wardFilter, setWardFilter] =
+    useState("ALL");
+
+  const [areaFilter, setAreaFilter] =
+    useState("ALL");
+
+  /*
+   * Existing BeatForm prop.
+   * Kept unchanged.
+   */
   const [geoVersion] = useState(0);
 
-  const stats = useMemo(() => {
+  /* =========================================================
+     STATS
+  ========================================================= */
+
+  const stats = React.useMemo(() => {
     const total = beats.length;
 
-    const totalRegisteredPoints = beats.reduce(
-      (sum, beat) => sum + getRegisteredPointCount(beat),
-      0
-    );
-
-    const totalRequiredPoints = total * POINT_TARGET;
-
-    const remainingPoints = beats.reduce(
-      (sum, beat) =>
-        sum + Math.max(0, POINT_TARGET - getRegisteredPointCount(beat)),
-      0
-    );
-
-    const pointCompleteBeats = beats.filter(
-      (beat) => getRegisteredPointCount(beat) >= POINT_TARGET
+    const withQC = beats.filter(
+      (b) => b.assignedToId
     ).length;
 
-    const supervisorAssigned = beats.filter(
-      (beat) => getSupervisorCount(beat) > 0
+    const withField = beats.filter(
+      (b) =>
+        b.segments?.some(
+          (s: any) => s.assignedToId
+        )
     ).length;
-
-    const employeeAssigned = beats.filter(
-      (beat) => getEmployeeCount(beat) > 0
-    ).length;
-
-    const totalSupervisors = beats.reduce(
-      (sum, beat) => sum + getSupervisorCount(beat),
-      0
-    );
-
-    const totalEmployees = beats.reduce(
-      (sum, beat) => sum + getEmployeeCount(beat),
-      0
-    );
 
     return {
       total,
-      totalRegisteredPoints,
-      totalRequiredPoints,
-      remainingPoints,
-      pointCompleteBeats,
-      supervisorAssigned,
-      employeeAssigned,
-      totalSupervisors,
-      totalEmployees,
+      withQC,
+      withField,
     };
   }, [beats]);
 
-  const availableZones = useMemo(() => {
+  /* =========================================================
+     FILTER OPTIONS
+  ========================================================= */
+
+  const availableZones = React.useMemo(() => {
     return Array.from(
-      new Set(beats.map((beat) => beat.zoneName).filter(Boolean))
+      new Set(
+        beats
+          .map((beat) => beat.zoneName)
+          .filter(Boolean)
+      )
     ).sort();
   }, [beats]);
 
-  const availableWards = useMemo(() => {
+  const availableWards = React.useMemo(() => {
     return Array.from(
       new Set(
         beats
           .filter((beat) =>
-            zoneFilter === "ALL" ? true : beat.zoneName === zoneFilter
+            zoneFilter === "ALL"
+              ? true
+              : beat.zoneName === zoneFilter
           )
           .map((beat) => beat.wardName)
           .filter(Boolean)
@@ -132,47 +153,91 @@ export default function BeatsPage() {
     ).sort();
   }, [beats, zoneFilter]);
 
-  const availableAreas = useMemo(() => {
+  const availableAreas = React.useMemo(() => {
     return Array.from(
       new Set(
         beats
           .filter((beat) =>
-            zoneFilter === "ALL" ? true : beat.zoneName === zoneFilter
+            zoneFilter === "ALL"
+              ? true
+              : beat.zoneName === zoneFilter
           )
           .filter((beat) =>
-            wardFilter === "ALL" ? true : beat.wardName === wardFilter
+            wardFilter === "ALL"
+              ? true
+              : beat.wardName === wardFilter
           )
           .map((beat) => beat.areaName)
           .filter(Boolean)
       )
     ).sort();
-  }, [beats, zoneFilter, wardFilter]);
+  }, [
+    beats,
+    zoneFilter,
+    wardFilter,
+  ]);
 
-  const filteredBeats = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+  /* =========================================================
+     FILTER BEATS
+  ========================================================= */
+
+  const filteredBeats = React.useMemo(() => {
+    const q =
+      searchQuery
+        .trim()
+        .toLowerCase();
 
     return beats.filter((beat) => {
       const matchesSearch =
         !q ||
-        beat.beatName?.toLowerCase().includes(q) ||
-        beat.beatCode?.toLowerCase().includes(q) ||
-        String(beat.beatNumber || "").toLowerCase().includes(q) ||
-        beat.zoneName?.toString().toLowerCase().includes(q) ||
-        beat.wardName?.toString().toLowerCase().includes(q) ||
-        beat.areaName?.toLowerCase().includes(q);
+        beat.beatName
+          ?.toLowerCase()
+          .includes(q) ||
+        beat.beatCode
+          ?.toLowerCase()
+          .includes(q) ||
+        beat.zoneName
+          ?.toString()
+          .toLowerCase()
+          .includes(q) ||
+        beat.wardName
+          ?.toString()
+          .toLowerCase()
+          .includes(q) ||
+        beat.areaName
+          ?.toLowerCase()
+          .includes(q);
 
       const matchesZone =
-        zoneFilter === "ALL" || beat.zoneName === zoneFilter;
+        zoneFilter === "ALL" ||
+        beat.zoneName === zoneFilter;
 
       const matchesWard =
-        wardFilter === "ALL" || beat.wardName === wardFilter;
+        wardFilter === "ALL" ||
+        beat.wardName === wardFilter;
 
       const matchesArea =
-        areaFilter === "ALL" || beat.areaName === areaFilter;
+        areaFilter === "ALL" ||
+        beat.areaName === areaFilter;
 
-      return matchesSearch && matchesZone && matchesWard && matchesArea;
+      return (
+        matchesSearch &&
+        matchesZone &&
+        matchesWard &&
+        matchesArea
+      );
     });
-  }, [beats, searchQuery, zoneFilter, wardFilter, areaFilter]);
+  }, [
+    beats,
+    searchQuery,
+    zoneFilter,
+    wardFilter,
+    areaFilter,
+  ]);
+
+  /* =========================================================
+     RESET FILTERS
+  ========================================================= */
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -187,24 +252,46 @@ export default function BeatsPage() {
     wardFilter !== "ALL" ||
     areaFilter !== "ALL";
 
+  /* =========================================================
+     LOAD BEATS
+     EXISTING API
+  ========================================================= */
+
   const loadBeats = useCallback(async () => {
     try {
       setLoading(true);
 
-      const [beatsRes, pendingRes] = await Promise.allSettled([
+      const [
+        beatsRes,
+        pendingRes,
+      ] = await Promise.allSettled([
         AreaBeatApi.list(),
         AreaBeatApi.listPendingRequests(),
       ]);
 
-      if (beatsRes.status === "fulfilled") {
-        setBeats(beatsRes.value.beats || []);
+      if (
+        beatsRes.status ===
+        "fulfilled"
+      ) {
+        setBeats(
+          beatsRes.value.beats || []
+        );
       }
 
-      if (pendingRes.status === "fulfilled") {
-        setPendingCount(pendingRes.value.pendingBeats?.length || 0);
+      if (
+        pendingRes.status ===
+        "fulfilled"
+      ) {
+        setPendingCount(
+          pendingRes.value
+            .pendingBeats?.length || 0
+        );
       }
     } catch (err) {
-      console.error("Failed to load beats", err);
+      console.error(
+        "Failed to load beats",
+        err
+      );
     } finally {
       setLoading(false);
     }
@@ -214,27 +301,9 @@ export default function BeatsPage() {
     loadBeats();
   }, [loadBeats]);
 
-  const exportRows = filteredBeats.map((beat, index) => ({
-    SrNo: index + 1,
-    BeatNumber:
-      beat.beatNumber ||
-      beat.beatNo ||
-      beat.beatCode ||
-      `BEAT-${String(index + 1).padStart(2, "0")}`,
-    BeatName: beat.beatName || beat.name || "-",
-    Zone: beat.zoneName || "-",
-    Ward: beat.wardName || "-",
-    Area: beat.areaName || "-",
-    RegisteredPoints: getRegisteredPointCount(beat),
-    PointTarget: POINT_TARGET,
-    RemainingPoints: Math.max(
-      0,
-      POINT_TARGET - getRegisteredPointCount(beat)
-    ),
-    SupervisorCount: getSupervisorCount(beat),
-    EmployeeCount: getEmployeeCount(beat),
-    RegisteredOn: beat.createdAt || "-",
-  }));
+  /* =========================================================
+     PAGE
+  ========================================================= */
 
   return (
     <RoleGuard
@@ -252,20 +321,32 @@ export default function BeatsPage() {
           minHeight: "100vh",
         }}
       >
-        <div style={{ width: "100%" }}>
+        <div
+          style={{
+            width: "100%",
+          }}
+        >
+          {/* =================================================
+              HEADER
+          ================================================= */}
+
           <div
             style={{
-              marginBottom: "24px",
+              marginBottom: "28px",
               display: "flex",
               flexWrap: "wrap",
               gap: "16px",
-              justifyContent: "space-between",
+              justifyContent:
+                "space-between",
               alignItems: "center",
-              borderBottom: "1px solid #e2e8f0",
+              borderBottom:
+                "1px solid #e2e8f0",
               paddingBottom: "16px",
             }}
           >
             <div>
+              {/* BREADCRUMB */}
+
               <div
                 style={{
                   fontSize: "0.75rem",
@@ -274,16 +355,34 @@ export default function BeatsPage() {
                   gap: "6px",
                   marginBottom: "4px",
                   fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
+                  textTransform:
+                    "uppercase",
+                  letterSpacing:
+                    "0.05em",
                 }}
               >
-                <span>City Admin</span>
+                <span>
+                  City Admin
+                </span>
+
                 <span>/</span>
-                <span>Beats</span>
+
+                <span>
+                  Beats
+                </span>
+
                 <span>/</span>
-                <span style={{ color: "#3b82f6" }}>Beat Management</span>
+
+                <span
+                  style={{
+                    color: "#3b82f6",
+                  }}
+                >
+                  Beat Management
+                </span>
               </div>
+
+              {/* TITLE */}
 
               <h1
                 style={{
@@ -291,7 +390,8 @@ export default function BeatsPage() {
                   fontWeight: 800,
                   color: "#0f172a",
                   margin: 0,
-                  letterSpacing: "-0.01em",
+                  letterSpacing:
+                    "-0.01em",
                 }}
               >
                 Beat Management
@@ -302,13 +402,19 @@ export default function BeatsPage() {
                   marginTop: "2px",
                   marginBottom: 0,
                   color: "#64748b",
-                  fontSize: "0.8125rem",
+                  fontSize:
+                    "0.8125rem",
                   fontWeight: 500,
                 }}
               >
-                Registered beat details, geo points and workforce assignment.
+                Create, view and manage
+                registered beats.
               </p>
             </div>
+
+            {/* ===============================================
+                ACTION BUTTONS
+            =============================================== */}
 
             <div
               style={{
@@ -318,22 +424,91 @@ export default function BeatsPage() {
                 flexWrap: "wrap",
               }}
             >
+              {/* EXPORT */}
+
               <TableExportDropdown
-                data={exportRows}
+                data={filteredBeats.map(
+                  (b) => ({
+                    BeatName:
+                      b.beatName ||
+                      b.name ||
+                      "-",
+
+                    BeatCode:
+                      b.beatCode ||
+                      "-",
+
+                    AreaName:
+                      b.areaName ||
+                      "-",
+
+                    ZoneName:
+                      b.zoneName ||
+                      "-",
+
+                    WardName:
+                      b.wardName ||
+                      "-",
+
+                    Supervisor:
+                      b
+                        .supervisorsSummary?.[0]
+                        ?.name ||
+                      "-",
+
+                    Employee:
+                      b
+                        .employeesSummary?.[0]
+                        ?.name ||
+                      "-",
+                  })
+                )}
                 filename="Registered_Beats"
                 title="Registered Beats Report"
               />
 
+              {/* CREATE BEAT */}
+
               {!isReadOnly && (
                 <button
                   type="button"
-                  onClick={() => setShowCreateBeat(true)}
-                  style={primaryButton}
+                  onClick={() =>
+                    setShowCreateBeat(
+                      true
+                    )
+                  }
+                  style={{
+                    display: "flex",
+                    alignItems:
+                      "center",
+                    gap: "6px",
+                    height: "40px",
+                    padding:
+                      "0 16px",
+                    borderRadius:
+                      "10px",
+                    backgroundColor:
+                      "#2563eb",
+                    border: "none",
+                    color: "white",
+                    fontWeight: 700,
+                    fontSize:
+                      "0.8rem",
+                    cursor:
+                      "pointer",
+                    boxShadow:
+                      "0 4px 12px rgba(37,99,235,0.2)",
+                  }}
                 >
-                  <Plus size={15} />
+                  <Plus
+                    size={15}
+                  />
+
                   Create Beat
                 </button>
               )}
+
+              {/* BEAT REQUESTS */}
 
               {!isReadOnly && (
                 <>
@@ -341,411 +516,906 @@ export default function BeatsPage() {
                     href="/city/beat-requests"
                     style={{
                       height: "40px",
-                      borderRadius: "10px",
+                      borderRadius:
+                        "10px",
                       display: "flex",
-                      alignItems: "center",
+                      alignItems:
+                        "center",
                       gap: "6px",
                       fontWeight: 700,
-                      padding: "0 14px",
-                      backgroundColor: pendingCount > 0 ? "#fef3c7" : "white",
+                      padding:
+                        "0 14px",
+
+                      backgroundColor:
+                        pendingCount > 0
+                          ? "#fef3c7"
+                          : "white",
+
                       border:
                         pendingCount > 0
                           ? "1px solid #fde68a"
                           : "1px solid #cbd5e1",
-                      color: pendingCount > 0 ? "#b45309" : "#0f172a",
-                      textDecoration: "none",
-                      fontSize: "0.8rem",
+
+                      color:
+                        pendingCount > 0
+                          ? "#b45309"
+                          : "#0f172a",
+
+                      textDecoration:
+                        "none",
+                      fontSize:
+                        "0.8rem",
                     }}
                   >
-                    <FileText size={15} />
-                    <span>Beat Requests</span>
+                    <FileText
+                      size={15}
+                    />
 
-                    {pendingCount > 0 && (
+                    <span>
+                      Beat Requests
+                    </span>
+
+                    {pendingCount >
+                      0 && (
                       <span
                         style={{
-                          backgroundColor: "#d97706",
-                          color: "white",
-                          borderRadius: "9999px",
-                          padding: "1px 6px",
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
+                          backgroundColor:
+                            "#d97706",
+                          color:
+                            "white",
+                          borderRadius:
+                            "9999px",
+                          padding:
+                            "1px 6px",
+                          fontSize:
+                            "0.65rem",
+                          fontWeight:
+                            800,
                         }}
                       >
-                        {pendingCount}
+                        {
+                          pendingCount
+                        }
                       </span>
                     )}
                   </Link>
 
+                  {/* EXISTING EMPLOYEE DEPLOYMENT */}
+
                   <Link
-                    href="/city/beats/assignments?view=employee"
-                    style={secondaryLinkButton}
+                    href="/city/areas/employee-assignments"
+                    style={{
+                      height: "40px",
+                      borderRadius:
+                        "10px",
+                      display:
+                        "flex",
+                      alignItems:
+                        "center",
+                      gap: "6px",
+                      fontWeight:
+                        700,
+                      padding:
+                        "0 14px",
+                      backgroundColor:
+                        "white",
+                      border:
+                        "1px solid #cbd5e1",
+                      color:
+                        "#0f172a",
+                      textDecoration:
+                        "none",
+                      fontSize:
+                        "0.8rem",
+                    }}
                   >
-                    <Users size={15} />
-                    <span>Employee Assignment</span>
+                    <ShieldCheck
+                      size={15}
+                    />
+
+                    <span>
+                      Employee Deployment
+                    </span>
                   </Link>
                 </>
               )}
             </div>
           </div>
 
+          {/* =================================================
+              STATS
+          ================================================= */}
+
           <div
-            className="beat-stats-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-              gap: "12px",
-              marginBottom: "20px",
+              gridTemplateColumns:
+                "repeat(3, minmax(0, 1fr))",
+              gap: "16px",
+              marginBottom:
+                "24px",
             }}
           >
-            <StatCard
-              label="Total Registered Beats"
-              value={stats.total}
-              helper={`${stats.pointCompleteBeats} point-complete`}
-              icon={<Target size={19} />}
-              tone="blue"
-            />
+            {[
+              {
+                label:
+                  "Total Registered Beats",
+                count:
+                  stats.total,
+                icon:
+                  Target,
+                color:
+                  "#2563eb",
+                bg:
+                  "#eff6ff",
+                border:
+                  "#dbeafe",
+              },
 
-            <StatCard
-              label="Registered Points"
-              value={stats.totalRegisteredPoints}
-              helper={`Target ${stats.totalRequiredPoints}`}
-              icon={<CircleDot size={19} />}
-              tone="violet"
-            />
+              {
+                label:
+                  "Beats with Supervisors",
+                count:
+                  stats.withQC,
+                icon:
+                  ShieldCheck,
+                color:
+                  "#059669",
+                bg:
+                  "#f0fdf4",
+                border:
+                  "#dcfce7",
+              },
 
-            <StatCard
-              label="Points Remaining"
-              value={stats.remainingPoints}
-              helper={`5 required per beat`}
-              icon={<Activity size={19} />}
-              tone="orange"
-            />
+              {
+                label:
+                  "Beats with Field Employees",
+                count:
+                  stats.withField,
+                icon:
+                  Activity,
+                color:
+                  "#dc2626",
+                bg:
+                  "#fef2f2",
+                border:
+                  "#fee2e2",
+              },
+            ].map((s, i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundColor:
+                    "white",
+                  padding:
+                    "14px 18px",
+                  borderRadius:
+                    "16px",
+                  border:
+                    "1px solid #e2e8f0",
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  gap:
+                    "14px",
+                  boxShadow:
+                    "0 1px 3px rgba(0,0,0,0.03)",
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor:
+                      s.bg,
+                    color:
+                      s.color,
+                    width:
+                      "42px",
+                    height:
+                      "42px",
+                    borderRadius:
+                      "12px",
+                    display:
+                      "flex",
+                    alignItems:
+                      "center",
+                    justifyContent:
+                      "center",
+                    border:
+                      `1px solid ${s.border}`,
+                    flexShrink:
+                      0,
+                  }}
+                >
+                  <s.icon
+                    size={20}
+                  />
+                </div>
 
-            <StatCard
-              label="Supervisor Assigned Beats"
-              value={stats.supervisorAssigned}
-              helper={`${stats.totalSupervisors} assignment(s)`}
-              icon={<ShieldCheck size={19} />}
-              tone="green"
-            />
+                <div>
+                  <div
+                    style={{
+                      fontSize:
+                        "0.6875rem",
+                      fontWeight:
+                        800,
+                      color:
+                        "#64748b",
+                      textTransform:
+                        "uppercase",
+                      letterSpacing:
+                        "0.05em",
+                    }}
+                  >
+                    {s.label}
+                  </div>
 
-            <StatCard
-              label="Employee Assigned Beats"
-              value={stats.employeeAssigned}
-              helper={`${stats.totalEmployees} employee assignment(s)`}
-              icon={<Users size={19} />}
-              tone="cyan"
-            />
+                  <div
+                    style={{
+                      fontSize:
+                        "1.2rem",
+                      fontWeight:
+                        900,
+                      color:
+                        "#0f172a",
+                      lineHeight:
+                        1.1,
+                      marginTop:
+                        "3px",
+                    }}
+                  >
+                    {s.count}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
+
+          {/* =================================================
+              FILTER BAR
+          ================================================= */}
 
           <div
             style={{
-              backgroundColor: "white",
-              border: "1px solid #e2e8f0",
-              borderRadius: "16px",
-              padding: "14px",
-              marginBottom: "20px",
-              boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+              backgroundColor:
+                "white",
+              border:
+                "1px solid #e2e8f0",
+              borderRadius:
+                "16px",
+              padding:
+                "14px",
+              marginBottom:
+                "20px",
+              boxShadow:
+                "0 2px 8px rgba(15,23,42,0.03)",
             }}
           >
             <div
               className="beat-filter-grid"
               style={{
-                display: "grid",
+                display:
+                  "grid",
                 gridTemplateColumns:
                   "minmax(220px, 1.4fr) repeat(3, minmax(145px, 1fr)) auto",
-                gap: "10px",
-                alignItems: "center",
+                gap:
+                  "10px",
+                alignItems:
+                  "center",
               }}
             >
-              <div style={{ position: "relative" }}>
+              {/* SEARCH */}
+
+              <div
+                style={{
+                  position:
+                    "relative",
+                }}
+              >
                 <Search
                   size={16}
                   color="#94a3b8"
                   style={{
-                    position: "absolute",
-                    left: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    pointerEvents: "none",
+                    position:
+                      "absolute",
+                    left:
+                      "12px",
+                    top:
+                      "50%",
+                    transform:
+                      "translateY(-50%)",
+                    pointerEvents:
+                      "none",
                   }}
                 />
 
                 <input
                   type="text"
-                  placeholder="Search beat number, name or location..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search beats..."
+                  value={
+                    searchQuery
+                  }
+                  onChange={(e) =>
+                    setSearchQuery(
+                      e.target
+                        .value
+                    )
+                  }
                   style={{
-                    width: "100%",
-                    height: "42px",
-                    padding: "0 12px 0 36px",
-                    borderRadius: "11px",
-                    border: "1px solid #cbd5e1",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    outline: "none",
-                    backgroundColor: "white",
-                    color: "#0f172a",
+                    width:
+                      "100%",
+                    height:
+                      "42px",
+                    padding:
+                      "0 12px 0 36px",
+                    borderRadius:
+                      "11px",
+                    border:
+                      "1px solid #cbd5e1",
+                    fontSize:
+                      "0.8rem",
+                    fontWeight:
+                      600,
+                    outline:
+                      "none",
+                    backgroundColor:
+                      "white",
+                    color:
+                      "#0f172a",
                   }}
                 />
               </div>
 
-              <select
-                value={zoneFilter}
-                onChange={(e) => {
-                  setZoneFilter(e.target.value);
-                  setWardFilter("ALL");
-                  setAreaFilter("ALL");
-                }}
-                style={filterSelectStyle}
-              >
-                <option value="ALL">All Zones</option>
-                {availableZones.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone}
-                  </option>
-                ))}
-              </select>
+              {/* ZONE FILTER */}
 
               <select
-                value={wardFilter}
+                value={
+                  zoneFilter
+                }
                 onChange={(e) => {
-                  setWardFilter(e.target.value);
-                  setAreaFilter("ALL");
+                  setZoneFilter(
+                    e.target
+                      .value
+                  );
+
+                  setWardFilter(
+                    "ALL"
+                  );
+
+                  setAreaFilter(
+                    "ALL"
+                  );
                 }}
-                style={filterSelectStyle}
+                style={
+                  filterSelectStyle
+                }
               >
-                <option value="ALL">All Wards</option>
-                {availableWards.map((ward) => (
-                  <option key={ward} value={ward}>
-                    {ward}
-                  </option>
-                ))}
+                <option value="ALL">
+                  All Zones
+                </option>
+
+                {availableZones.map(
+                  (zone) => (
+                    <option
+                      key={zone}
+                      value={zone}
+                    >
+                      {zone}
+                    </option>
+                  )
+                )}
               </select>
 
+              {/* WARD FILTER */}
+
               <select
-                value={areaFilter}
-                onChange={(e) => setAreaFilter(e.target.value)}
-                style={filterSelectStyle}
+                value={
+                  wardFilter
+                }
+                onChange={(e) => {
+                  setWardFilter(
+                    e.target
+                      .value
+                  );
+
+                  setAreaFilter(
+                    "ALL"
+                  );
+                }}
+                style={
+                  filterSelectStyle
+                }
               >
-                <option value="ALL">All Areas</option>
-                {availableAreas.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
-                  </option>
-                ))}
+                <option value="ALL">
+                  All Wards
+                </option>
+
+                {availableWards.map(
+                  (ward) => (
+                    <option
+                      key={ward}
+                      value={ward}
+                    >
+                      {ward}
+                    </option>
+                  )
+                )}
               </select>
+
+              {/* AREA FILTER */}
+
+              <select
+                value={
+                  areaFilter
+                }
+                onChange={(e) =>
+                  setAreaFilter(
+                    e.target
+                      .value
+                  )
+                }
+                style={
+                  filterSelectStyle
+                }
+              >
+                <option value="ALL">
+                  All Areas
+                </option>
+
+                {availableAreas.map(
+                  (area) => (
+                    <option
+                      key={area}
+                      value={area}
+                    >
+                      {area}
+                    </option>
+                  )
+                )}
+              </select>
+
+              {/* RESET */}
 
               <button
                 type="button"
-                onClick={resetFilters}
-                disabled={!hasActiveFilters}
+                onClick={
+                  resetFilters
+                }
+                disabled={
+                  !hasActiveFilters
+                }
                 style={{
-                  height: "42px",
-                  padding: "0 14px",
-                  borderRadius: "11px",
-                  border: "1px solid #cbd5e1",
-                  backgroundColor: "#f8fafc",
-                  color: hasActiveFilters ? "#475569" : "#94a3b8",
-                  fontSize: "0.76rem",
-                  fontWeight: 800,
-                  cursor: hasActiveFilters ? "pointer" : "default",
-                  whiteSpace: "nowrap",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
+                  height:
+                    "42px",
+                  padding:
+                    "0 14px",
+                  borderRadius:
+                    "11px",
+                  border:
+                    "1px solid #cbd5e1",
+                  backgroundColor:
+                    "#f8fafc",
+                  color:
+                    hasActiveFilters
+                      ? "#475569"
+                      : "#94a3b8",
+                  fontSize:
+                    "0.76rem",
+                  fontWeight:
+                    800,
+                  cursor:
+                    hasActiveFilters
+                      ? "pointer"
+                      : "default",
+                  whiteSpace:
+                    "nowrap",
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
+                  gap:
+                    "6px",
                 }}
               >
-                <RotateCcw size={14} />
+                <RotateCcw
+                  size={14}
+                />
+
                 Reset
               </button>
             </div>
 
             <div
               style={{
-                marginTop: "10px",
-                fontSize: "0.7rem",
-                color: "#94a3b8",
-                fontWeight: 700,
+                marginTop:
+                  "10px",
+                fontSize:
+                  "0.7rem",
+                color:
+                  "#94a3b8",
+                fontWeight:
+                  700,
               }}
             >
-              Showing {filteredBeats.length} of {beats.length} registered beats
+              Showing{" "}
+              {filteredBeats.length}{" "}
+              of {beats.length}{" "}
+              registered beats
             </div>
           </div>
 
-          {!isReadOnly && showCreateBeat && (
-            <div
-              style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(15,23,42,0.4)",
-                backdropFilter: "blur(4px)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "24px",
-              }}
-            >
+          {/* =================================================
+              CREATE BEAT MODAL
+          ================================================= */}
+
+          {!isReadOnly &&
+            showCreateBeat && (
               <div
                 style={{
-                  backgroundColor: "white",
-                  padding: "32px",
-                  borderRadius: "24px",
-                  border: "1px solid #e2e8f0",
-                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.15)",
-                  position: "relative",
-                  width: "100%",
-                  maxWidth: "560px",
-                  overflowY: "auto",
-                  maxHeight: "90vh",
+                  position:
+                    "fixed",
+                  top:
+                    0,
+                  left:
+                    0,
+                  right:
+                    0,
+                  bottom:
+                    0,
+                  backgroundColor:
+                    "rgba(15,23,42,0.4)",
+                  backdropFilter:
+                    "blur(4px)",
+                  zIndex:
+                    100,
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
+                  padding:
+                    "24px",
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => setShowCreateBeat(false)}
-                  style={{
-                    position: "absolute",
-                    top: "20px",
-                    right: "20px",
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#64748b",
-                  }}
-                >
-                  <X size={20} />
-                </button>
-
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    marginBottom: "20px",
-                    paddingBottom: "12px",
-                    borderBottom: "1px solid #f1f5f9",
+                    backgroundColor:
+                      "white",
+                    padding:
+                      "32px",
+                    borderRadius:
+                      "24px",
+                    border:
+                      "1px solid #e2e8f0",
+                    boxShadow:
+                      "0 25px 50px -12px rgba(0,0,0,0.15)",
+                    position:
+                      "relative",
+                    width:
+                      "100%",
+                    maxWidth:
+                      "560px",
+                    overflowY:
+                      "auto",
+                    maxHeight:
+                      "90vh",
                   }}
                 >
-                  <Target size={22} color="#2563eb" />
-                  <h2
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowCreateBeat(
+                        false
+                      )
+                    }
                     style={{
-                      fontSize: "1.15rem",
-                      fontWeight: 800,
-                      margin: 0,
-                      color: "#0f172a",
+                      position:
+                        "absolute",
+                      top:
+                        "20px",
+                      right:
+                        "20px",
+                      background:
+                        "transparent",
+                      border:
+                        "none",
+                      cursor:
+                        "pointer",
+                      color:
+                        "#64748b",
                     }}
                   >
-                    Create New Beat
-                  </h2>
-                </div>
+                    <X
+                      size={20}
+                    />
+                  </button>
 
-                <BeatForm
-                  onSuccess={() => {
-                    loadBeats();
-                    setShowCreateBeat(false);
-                  }}
-                  geoVersion={geoVersion}
-                />
+                  <div
+                    style={{
+                      display:
+                        "flex",
+                      alignItems:
+                        "center",
+                      gap:
+                        "10px",
+                      marginBottom:
+                        "20px",
+                      paddingBottom:
+                        "12px",
+                      borderBottom:
+                        "1px solid #f1f5f9",
+                    }}
+                  >
+                    <Target
+                      size={22}
+                      color="#2563eb"
+                    />
+
+                    <h2
+                      style={{
+                        fontSize:
+                          "1.15rem",
+                        fontWeight:
+                          800,
+                        margin:
+                          0,
+                        color:
+                          "#0f172a",
+                      }}
+                    >
+                      Create New Beat
+                    </h2>
+                  </div>
+
+                  <BeatForm
+                    onSuccess={() => {
+                      loadBeats();
+
+                      setShowCreateBeat(
+                        false
+                      );
+                    }}
+                    geoVersion={
+                      geoVersion
+                    }
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+          {/* =================================================
+              REGISTERED BEATS TABLE
+          ================================================= */}
 
           <section>
             {loading ? (
               <div
                 style={{
-                  padding: "40px",
-                  textAlign: "center",
-                  backgroundColor: "white",
-                  borderRadius: "20px",
-                  border: "1px solid #e2e8f0",
+                  padding:
+                    "40px",
+                  textAlign:
+                    "center",
+                  backgroundColor:
+                    "white",
+                  borderRadius:
+                    "20px",
+                  border:
+                    "1px solid #e2e8f0",
                 }}
               >
                 <div
                   className="animate-spin"
                   style={{
-                    width: "32px",
-                    height: "32px",
-                    border: "4px solid #f3f3f3",
-                    borderTop: "4px solid #2563eb",
-                    borderRadius: "50%",
-                    margin: "0 auto",
+                    width:
+                      "32px",
+                    height:
+                      "32px",
+                    border:
+                      "4px solid #f3f3f3",
+                    borderTop:
+                      "4px solid #2563eb",
+                    borderRadius:
+                      "50%",
+                    margin:
+                      "0 auto",
                   }}
                 />
 
                 <p
                   style={{
-                    marginTop: "16px",
-                    marginBottom: 0,
-                    color: "#64748b",
-                    fontWeight: 600,
+                    marginTop:
+                      "16px",
+                    marginBottom:
+                      0,
+                    color:
+                      "#64748b",
+                    fontWeight:
+                      600,
                   }}
                 >
                   Loading beats...
                 </p>
               </div>
             ) : (
-              <BeatTable
-                beats={filteredBeats}
-                onRefresh={loadBeats}
-                onView={setViewingBeat}
-                onEdit={setEditingBeat}
-                onViewData={setInspectingBeat}
-                onAssign={setAssigningBeat}
-                onAssignEmployees={setDeployingBeat}
-                onViewUser={(beat) => setDeployingBeat(beat)}
-                assignmentActionLabel="Assign Supervisor"
-                isReadOnly={isReadOnly}
-              />
+              <div
+                style={{
+                  backgroundColor:
+                    "white",
+                  border:
+                    "1px solid #e2e8f0",
+                  borderRadius:
+                    "20px",
+                  overflow:
+                    "hidden",
+                  boxShadow:
+                    "0 2px 4px rgba(0,0,0,0.02)",
+                }}
+              >
+                <div
+                  style={{
+                    padding:
+                      "18px 24px",
+                    borderBottom:
+                      "1px solid #f1f5f9",
+                    backgroundColor:
+                      "#fcfdfe",
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin:
+                        0,
+                      fontSize:
+                        "0.95rem",
+                      fontWeight:
+                        900,
+                      color:
+                        "#0f172a",
+                      textTransform:
+                        "uppercase",
+                      letterSpacing:
+                        "0.04em",
+                    }}
+                  >
+                    Registered Beats (
+                    {
+                      filteredBeats.length
+                    }
+                    )
+                  </h3>
+                </div>
+
+                <BeatTable
+                  beats={
+                    filteredBeats
+                  }
+                  onRefresh={
+                    loadBeats
+                  }
+                  onView={
+                    setViewingBeat
+                  }
+                  onEdit={
+                    setEditingBeat
+                  }
+                  onViewData={
+                    setInspectingBeat
+                  }
+                  onAssign={
+                    setAssigningBeat
+                  }
+                  onAssignEmployees={
+                    setDeployingBeat
+                  }
+                  onViewUser={(
+                    beat
+                  ) =>
+                    setDeployingBeat(
+                      beat
+                    )
+                  }
+                  assignmentActionLabel="Assign Supervisor"
+                  isReadOnly={
+                    isReadOnly
+                  }
+                />
+              </div>
             )}
           </section>
         </div>
 
+        {/* ===================================================
+            EXISTING BEAT MODALS
+        =================================================== */}
+
         {viewingBeat && (
           <BeatMapView
-            beat={viewingBeat}
-            onClose={() => setViewingBeat(null)}
-            onEdit={(beat: any) => {
-              setViewingBeat(null);
-              setEditingBeat(beat);
+            beat={
+              viewingBeat
+            }
+            onClose={() =>
+              setViewingBeat(
+                null
+              )
+            }
+            onEdit={(b: any) => {
+              setViewingBeat(
+                null
+              );
+
+              setEditingBeat(
+                b
+              );
             }}
-            onRefresh={loadBeats}
+            onRefresh={
+              loadBeats
+            }
           />
         )}
 
         {editingBeat && (
           <EditBeatModal
-            beat={editingBeat}
-            onClose={() => setEditingBeat(null)}
-            onSuccess={loadBeats}
+            beat={
+              editingBeat
+            }
+            onClose={() =>
+              setEditingBeat(
+                null
+              )
+            }
+            onSuccess={
+              loadBeats
+            }
           />
         )}
 
         {inspectingBeat && (
           <KMLDataViewer
-            beat={inspectingBeat}
-            onClose={() => setInspectingBeat(null)}
+            beat={
+              inspectingBeat
+            }
+            onClose={() =>
+              setInspectingBeat(
+                null
+              )
+            }
           />
         )}
 
         {assigningBeat && (
           <AssignBeatModal
-            beat={assigningBeat}
+            beat={
+              assigningBeat
+            }
             mode="SUPERVISOR"
-            onClose={() => setAssigningBeat(null)}
-            onSuccess={loadBeats}
+            onClose={() =>
+              setAssigningBeat(
+                null
+              )
+            }
+            onSuccess={
+              loadBeats
+            }
           />
         )}
 
         {deployingBeat && (
           <AssignBeatModal
-            beat={deployingBeat}
+            beat={
+              deployingBeat
+            }
             mode="EMPLOYEE"
-            onClose={() => setDeployingBeat(null)}
-            onSuccess={loadBeats}
+            onClose={() =>
+              setDeployingBeat(
+                null
+              )
+            }
+            onSuccess={
+              loadBeats
+            }
           />
         )}
 
@@ -758,14 +1428,9 @@ export default function BeatsPage() {
             from {
               transform: rotate(0deg);
             }
+
             to {
               transform: rotate(360deg);
-            }
-          }
-
-          @media (max-width: 1350px) {
-            .beat-stats-grid {
-              grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             }
           }
 
@@ -773,15 +1438,10 @@ export default function BeatsPage() {
             .beat-filter-grid {
               grid-template-columns: 1fr 1fr !important;
             }
-
-            .beat-stats-grid {
-              grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            }
           }
 
           @media (max-width: 650px) {
-            .beat-filter-grid,
-            .beat-stats-grid {
+            .beat-filter-grid {
               grid-template-columns: 1fr !important;
             }
           }
@@ -791,282 +1451,28 @@ export default function BeatsPage() {
   );
 }
 
-function getRegisteredPointCount(beat: any): number {
-  if (typeof beat?.totalPoints === "number") {
-    return Math.max(0, beat.totalPoints);
-  }
+/* ===========================================================
+   FILTER STYLE
+=========================================================== */
 
-  if (Array.isArray(beat?.points)) {
-    return beat.points.length;
-  }
-
-  return getGeometryPointCount(beat?.geometry);
-}
-
-function getSupervisorCount(beat: any): number {
-  const ids = new Set<string>();
-
-  if (Array.isArray(beat?.supervisorsSummary)) {
-    beat.supervisorsSummary.forEach((item: any) => {
-      const value = item?.id ?? item?.name;
-      if (value) ids.add(String(value));
-    });
-  }
-
-  if (beat?.assignedToId) ids.add(String(beat.assignedToId));
-  if (beat?.supervisorId) ids.add(String(beat.supervisorId));
-
-  return ids.size;
-}
-
-function getEmployeeCount(beat: any): number {
-  const ids = new Set<string>();
-
-  if (Array.isArray(beat?.employeesSummary)) {
-    beat.employeesSummary.forEach((item: any) => {
-      const value = item?.id ?? item?.name;
-      if (value) ids.add(String(value));
-    });
-  }
-
-  if (beat?.employeeAssignedToId) ids.add(String(beat.employeeAssignedToId));
-  if (beat?.employeeId) ids.add(String(beat.employeeId));
-
-  if (Array.isArray(beat?.segments)) {
-    beat.segments.forEach((item: any) => {
-      const value =
-        item?.employeeAssignedToId ??
-        item?.employee?.id ??
-        item?.employeeAssignedToName ??
-        item?.employee?.name;
-
-      if (value) ids.add(String(value));
-    });
-  }
-
-  return ids.size;
-}
-
-function getGeometryPointCount(geometry: any): number {
-  if (!geometry) return 0;
-
-  let parsed = geometry;
-
-  if (typeof geometry === "string") {
-    try {
-      parsed = JSON.parse(geometry);
-    } catch {
-      return 0;
-    }
-  }
-
-  if (parsed?.type === "Feature") {
-    return getGeometryPointCount(parsed.geometry);
-  }
-
-  if (parsed?.type === "FeatureCollection") {
-    return (parsed.features || []).reduce(
-      (sum: number, feature: any) => sum + getGeometryPointCount(feature?.geometry),
-      0
-    );
-  }
-
-  if (parsed?.type === "Point") return 1;
-
-  if (parsed?.type === "LineString") {
-    return Array.isArray(parsed.coordinates) ? parsed.coordinates.length : 0;
-  }
-
-  if (parsed?.type === "MultiLineString" || parsed?.type === "Polygon") {
-    return (parsed.coordinates || []).reduce(
-      (sum: number, line: any[]) => sum + (Array.isArray(line) ? line.length : 0),
-      0
-    );
-  }
-
-  if (parsed?.type === "MultiPolygon") {
-    return (parsed.coordinates || []).reduce(
-      (sum: number, polygon: any[]) =>
-        sum +
-        (polygon || []).reduce(
-          (inner: number, line: any[]) =>
-            inner + (Array.isArray(line) ? line.length : 0),
-          0
-        ),
-      0
-    );
-  }
-
-  return 0;
-}
-
-function StatCard({
-  label,
-  value,
-  helper,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: number;
-  helper: string;
-  icon: React.ReactNode;
-  tone: "blue" | "green" | "orange" | "violet" | "cyan";
-}) {
-  const tones = {
-    blue: {
-      color: "#2563eb",
-      bg: "#eff6ff",
-      border: "#dbeafe",
-    },
-    green: {
-      color: "#059669",
-      bg: "#ecfdf5",
-      border: "#d1fae5",
-    },
-    orange: {
-      color: "#d97706",
-      bg: "#fff7ed",
-      border: "#fed7aa",
-    },
-    violet: {
-      color: "#7c3aed",
-      bg: "#f5f3ff",
-      border: "#ddd6fe",
-    },
-    cyan: {
-      color: "#0891b2",
-      bg: "#ecfeff",
-      border: "#cffafe",
-    },
+const filterSelectStyle:
+  React.CSSProperties = {
+    width: "100%",
+    height: "42px",
+    padding: "0 12px",
+    borderRadius: "11px",
+    border:
+      "1px solid #cbd5e1",
+    backgroundColor:
+      "white",
+    color:
+      "#334155",
+    fontSize:
+      "0.8rem",
+    fontWeight:
+      700,
+    outline:
+      "none",
+    cursor:
+      "pointer",
   };
-
-  const selected = tones[tone];
-
-  return (
-    <div
-      style={{
-        backgroundColor: "white",
-        padding: "14px 15px",
-        borderRadius: "15px",
-        border: "1px solid #e2e8f0",
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-        minWidth: 0,
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: selected.bg,
-          color: selected.color,
-          width: "40px",
-          height: "40px",
-          borderRadius: "11px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          border: `1px solid ${selected.border}`,
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
-
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: "0.62rem",
-            fontWeight: 850,
-            color: "#64748b",
-            textTransform: "uppercase",
-            letterSpacing: "0.045em",
-            lineHeight: 1.25,
-          }}
-        >
-          {label}
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: "7px",
-            marginTop: "3px",
-            minWidth: 0,
-          }}
-        >
-          <strong
-            style={{
-              fontSize: "1.18rem",
-              color: "#0f172a",
-              lineHeight: 1,
-            }}
-          >
-            {value}
-          </strong>
-
-          <span
-            style={{
-              color: "#94a3b8",
-              fontSize: "0.62rem",
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-            title={helper}
-          >
-            {helper}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const primaryButton: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-  height: "40px",
-  padding: "0 16px",
-  borderRadius: "10px",
-  backgroundColor: "#2563eb",
-  border: "none",
-  color: "white",
-  fontWeight: 700,
-  fontSize: "0.8rem",
-  cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(37,99,235,0.2)",
-};
-
-const secondaryLinkButton: React.CSSProperties = {
-  height: "40px",
-  borderRadius: "10px",
-  display: "flex",
-  alignItems: "center",
-  gap: "6px",
-  fontWeight: 700,
-  padding: "0 14px",
-  backgroundColor: "white",
-  border: "1px solid #cbd5e1",
-  color: "#0f172a",
-  textDecoration: "none",
-  fontSize: "0.8rem",
-};
-
-const filterSelectStyle: React.CSSProperties = {
-  width: "100%",
-  height: "42px",
-  padding: "0 12px",
-  borderRadius: "11px",
-  border: "1px solid #cbd5e1",
-  backgroundColor: "white",
-  color: "#334155",
-  fontSize: "0.8rem",
-  fontWeight: 700,
-  outline: "none",
-  cursor: "pointer",
-};

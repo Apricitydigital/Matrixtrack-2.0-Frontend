@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
-  CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, ChevronDown, X, Lock, Activity,
+  CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, X, Lock, Activity,
   Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical
 } from "lucide-react";
 import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch } from "@lib/apiClient";
@@ -43,7 +43,6 @@ type UserRecord = {
   wardName?: string;
   zoneIds?: string[];
   wardIds?: string[];
-  areaIds?: string[];
   city?: any;
   zone?: any;
   ward?: any;
@@ -601,7 +600,13 @@ export default function RegisteredUsersPage() {
                               >
                                 <Edit2 size={13} /> Edit User
                               </button>
-                              
+                              <button
+                                type="button"
+                                onClick={() => { setActiveMenuUserId(null); showToast({ title: u.name, description: `Email: ${u.email} | Role: ${u.role}`, tone: "info" }); }}
+                                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition w-full text-left cursor-pointer"
+                              >
+                                <Eye size={13} /> View Details
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => { setDeleteTarget(u); setActiveMenuUserId(null); }}
@@ -693,6 +698,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [assignedModules, setAssignedModules] = useState<string[]>(user.assignedModules || []);
   const [zoneIds, setZoneIds] = useState<string[]>(user.zoneIds || (user.zoneId ? [user.zoneId] : []));
   const [wardIds, setWardIds] = useState<string[]>(user.wardIds || (user.wardId ? [user.wardId] : []));
+
   const [zones, setZones] = useState<any[]>([]);
   const [wards, setWards] = useState<any[]>([]);
   const [modules, setModules] = useState<any[]>([]);
@@ -731,32 +737,12 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   };
 
   const toggleZone = (zId: string) => {
-    const removing = zoneIds.includes(zId);
-    setZoneIds(prev => removing ? prev.filter(id => id !== zId) : [...prev, zId]);
-
-    if (removing) {
-      const wardIdsInZone = new Set(
-        wards.filter((w: any) => String(w.parentId || w.zoneId || "") === zId).map((w: any) => w.id)
-      );
-      setWardIds(prev => prev.filter(id => !wardIdsInZone.has(id)));
-    }
+    setZoneIds(prev => prev.includes(zId) ? prev.filter(id => id !== zId) : [...prev, zId]);
   };
 
   const toggleWard = (wId: string) => {
     setWardIds(prev => prev.includes(wId) ? prev.filter(id => id !== wId) : [...prev, wId]);
   };
-
-  const visibleWards = zoneIds.length
-    ? wards.filter((w: any) => zoneIds.includes(String(w.parentId || w.zoneId || "")))
-    : wards;
-
-  const selectedZoneLabel = zoneIds.length
-    ? zones.filter((z: any) => zoneIds.includes(z.id)).map((z: any) => z.name).join(", ")
-    : "Select zone";
-
-  const selectedWardLabel = wardIds.length
-    ? wards.filter((w: any) => wardIds.includes(w.id)).map((w: any) => w.name).join(", ")
-    : "Select ward";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -783,33 +769,8 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   };
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Edit User & Access Permissions"
-      subtitle={user.email}
-      size="lg"
-      footer={
-  <div className="flex items-center justify-end gap-3">
-    <button
-      type="button"
-onClick={onClose}
-      className="rounded-xl border border-slate-200 px-5 py-3"
-    >
-      Cancel
-    </button>
-
-    <button
-      type="submit"
-      form="edit-user-form"
-      className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white"
-    >
-      Save Access Permissions
-    </button>
-  </div>
-}
-    >
-      <form id="edit-user-access-form" onSubmit={handleSubmit} className="space-y-5 pb-2">
+    <Modal open onClose={onClose} title="Edit User & Access Permissions" subtitle={user.email} size="lg">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
@@ -995,84 +956,86 @@ onClick={onClose}
           </div>
         </div>
 
-        {/* Geographic Access Control */}
-        <div>
-          <div className="mb-2 flex items-end justify-between gap-3">
-            <label className="block text-xs font-bold text-slate-700">Geographic Access</label>
-            <span className="text-[10px] font-semibold text-slate-400">Zone &rarr; Ward</span>
+        {/* Geographic Access Control (Zones & Wards) */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Assigned Zones <span className="text-slate-400 font-normal">({zoneIds.length} selected)</span>
+            </label>
+            <div className="h-32 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
+              {zones.length === 0 ? (
+                <span className="text-xs text-slate-400 p-2 block">No zones available</span>
+              ) : zones.map(z => {
+                const isSelected = zoneIds.includes(z.id);
+                return (
+                  <label
+                    key={z.id}
+                    onClick={() => toggleZone(z.id)}
+                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                      isSelected ? 'bg-blue-100 text-blue-800 font-bold' : 'hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <span>{z.name}</span>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => {}}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Assign Zone</label>
-              <details className="group rounded-xl border border-slate-200 bg-white">
-                <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-xs font-semibold text-slate-700">
-                  <span className="truncate">{selectedZoneLabel}</span>
-                  <ChevronDown size={15} className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="max-h-44 space-y-1 overflow-y-auto border-t border-slate-100 p-2">
-                  {zones.length === 0 ? (
-                    <span className="block p-2 text-xs text-slate-400">No zones available</span>
-                  ) : zones.map((z: any) => {
-                    const isSelected = zoneIds.includes(z.id);
-                    return (
-                      <label
-                        key={z.id}
-                        className={`flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs transition ${
-                          isSelected ? 'bg-blue-50 font-bold text-blue-700' : 'text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="truncate pr-2">{z.name}</span>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleZone(z.id)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              </details>
-              <p className="mt-1 text-[10px] font-semibold text-slate-400">{zoneIds.length} selected</p>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Assign Ward</label>
-              <details className="group rounded-xl border border-slate-200 bg-white">
-                <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-xs font-semibold text-slate-700">
-                  <span className="truncate">{selectedWardLabel}</span>
-                  <ChevronDown size={15} className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="max-h-44 space-y-1 overflow-y-auto border-t border-slate-100 p-2">
-                  {visibleWards.length === 0 ? (
-                    <span className="block p-2 text-xs text-slate-400">{zoneIds.length ? 'No wards in selected zone' : 'No wards available'}</span>
-                  ) : visibleWards.map((w: any) => {
-                    const isSelected = wardIds.includes(w.id);
-                    return (
-                      <label
-                        key={w.id}
-                        className={`flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-xs transition ${
-                          isSelected ? 'bg-indigo-50 font-bold text-indigo-700' : 'text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="truncate pr-2">{w.name}</span>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleWard(w.id)}
-                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-              </details>
-              <p className="mt-1 text-[10px] font-semibold text-slate-400">{wardIds.length} selected</p>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Assigned Wards <span className="text-slate-400 font-normal">({wardIds.length} selected)</span>
+            </label>
+            <div className="h-32 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
+              {wards.length === 0 ? (
+                <span className="text-xs text-slate-400 p-2 block">No wards available</span>
+              ) : wards.map(w => {
+                const isSelected = wardIds.includes(w.id);
+                return (
+                  <label
+                    key={w.id}
+                    onClick={() => toggleWard(w.id)}
+                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                      isSelected ? 'bg-indigo-100 text-indigo-800 font-bold' : 'hover:bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    <span>{w.name}</span>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => {}}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>
 
+        <div className="pt-3 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors"
+          >
+            {loading ? "Saving access..." : "Save Access Permissions"}
+          </button>
+        </div>
       </form>
     </Modal>
   );
