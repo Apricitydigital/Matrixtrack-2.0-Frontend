@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from "react";
-import { ApiError, apiFetch } from "@lib/apiClient";
+import { ApiError, apiFetch, CityApi } from "@lib/apiClient";
 
 import { Edit2, Trash2, Check, X, Loader2, Map, Plus, Search, Download, FileText, FileSpreadsheet, RefreshCw } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
@@ -20,6 +20,7 @@ export default function WardManagementPage() {
 
   const [zones, setZones] = useState<GeoNode[]>([]);
   const [wards, setWards] = useState<GeoNode[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -32,16 +33,42 @@ export default function WardManagementPage() {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [selectedCity, setSelectedCity] = useState("ALL");
+  const [filterZoneId, setFilterZoneId] = useState<string>("ALL");
+
+  const isSuperAdmin =
+    user?.role === "SUPER_ADMIN" ||
+    user?.role === "HMS_SUPER_ADMIN" ||
+    user?.roles?.some((r) => ["SUPER_ADMIN", "HMS_SUPER_ADMIN"].includes(r));
+
+  const assignedCityName = user?.city?.name || user?.cityName;
+
+  // Set default city if user is City Admin
+  useEffect(() => {
+    if (!isSuperAdmin && assignedCityName) {
+      setSelectedCity(assignedCityName);
+    }
+  }, [isSuperAdmin, assignedCityName]);
+
   const loadData = async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true); else setLoading(true);
       setError("");
-      const [zoneRes, wardRes] = await Promise.all([
+      const [zoneRes, wardRes, cityRes] = await Promise.allSettled([
         apiFetch<{ nodes: GeoNode[] }>("/city/geo?level=ZONE"),
-        apiFetch<{ nodes: GeoNode[] }>("/city/geo?level=WARD")
+        apiFetch<{ nodes: GeoNode[] }>("/city/geo?level=WARD"),
+        CityApi.list()
       ]);
-      setZones((zoneRes as any).nodes ?? []);
-      setWards((wardRes as any).nodes ?? []);
+
+      if (zoneRes.status === "fulfilled") {
+        setZones((zoneRes.value as any).nodes ?? []);
+      }
+      if (wardRes.status === "fulfilled") {
+        setWards((wardRes.value as any).nodes ?? []);
+      }
+      if (cityRes.status === "fulfilled") {
+        setCities((cityRes.value as any)?.cities || []);
+      }
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to load zones/wards";
       setError(msg);
@@ -95,7 +122,6 @@ export default function WardManagementPage() {
   };
 
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; name: string } | null>(null);
-  const [filterZoneId, setFilterZoneId] = useState<string>("ALL");
 
   const zoneMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -103,16 +129,58 @@ export default function WardManagementPage() {
     return map;
   }, [zones]);
 
+  // Unique cities list:
+  const cityOptions = useMemo(() => {
+    if (!isSuperAdmin && assignedCityName) {
+      return [assignedCityName];
+    }
+    const set = new Set<string>();
+    zones.forEach(z => {
+      const zCity = (z as any).city?.name || user?.city?.name || "Indore";
+      if (zCity) set.add(zCity);
+    });
+    cities.forEach(c => {
+      if (c.name) set.add(c.name);
+    });
+    return Array.from(set);
+  }, [zones, cities, isSuperAdmin, assignedCityName, user?.city?.name]);
+
+  // Unique zones options based on selected city:
+  const zoneOptions = useMemo(() => {
+    if (selectedCity === "ALL") return zones;
+    return zones.filter(z => {
+      const zCity = (z as any).city?.name || user?.city?.name || "Indore";
+      return zCity.toLowerCase() === selectedCity.toLowerCase();
+    });
+  }, [zones, selectedCity, user?.city?.name]);
+
+  // Reset zone filter if city changes
+  useEffect(() => {
+    if (selectedCity !== "ALL") {
+      const validZoneIds = new Set(zoneOptions.map(z => z.id));
+      if (filterZoneId !== "ALL" && !validZoneIds.has(filterZoneId)) {
+        setFilterZoneId("ALL");
+      }
+    }
+  }, [selectedCity, zoneOptions, filterZoneId]);
+
   const filteredWards = useMemo(() => {
     return wards.filter(w => {
       const parentZoneName = zoneMap[w.parentId || ''] || '';
+      
+      const parentZone = zones.find(z => z.id === w.parentId);
+      const wardCityName = (parentZone as any)?.city?.name || user?.city?.name || "Indore";
+
+      const matchesCity = selectedCity === "ALL" || wardCityName.toLowerCase() === selectedCity.toLowerCase();
+      const matchesZone = filterZoneId === "ALL" || w.parentId === filterZoneId;
       const matchesSearch = !searchTerm ||
         w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        parentZoneName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesZone = filterZoneId === "ALL" || w.parentId === filterZoneId;
-      return matchesSearch && matchesZone;
+        parentZoneName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        wardCityName.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchesCity && matchesZone && matchesSearch;
     });
-  }, [wards, zoneMap, searchTerm, filterZoneId]);
+  }, [wards, zoneMap, searchTerm, filterZoneId, selectedCity, zones, user?.city?.name]);
 
   const confirmDeleteWard = async () => {
     if (!deleteConfirmTarget || isReadOnly) return;
@@ -308,46 +376,107 @@ export default function WardManagementPage() {
           )}
 
           {/* Stats & Search Toolbar */}
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "16px", marginBottom: "20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ backgroundColor: "white", padding: "10px 16px", borderRadius: "14px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 1px 2px rgba(0,0,0,0.02)" }}>
-                <div style={{ backgroundColor: "#eff6ff", padding: "6px", borderRadius: "8px", color: "#2563eb" }}>
-                  <Map size={16} />
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.625rem", fontWeight: 900, color: "#64748b", textTransform: "uppercase" }}>Total Wards</div>
-                  <div style={{ fontSize: "1.2rem", fontWeight: 950, color: "#0f172a", lineHeight: 1 }}>{wards.length}</div>
-                </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "16px",
+              backgroundColor: "white",
+              padding: "20px 24px",
+              borderRadius: "16px",
+              border: "1px solid #e2e8f0",
+              marginBottom: "20px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+              width: "100%",
+            }}
+          >
+            {/* Total Wards KPI Card inside Grid */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ backgroundColor: "#eff6ff", padding: "8px", borderRadius: "10px", color: "#2563eb" }}>
+                <Map size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: "0.625rem", fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>Total Wards</div>
+                <div style={{ fontSize: "1.2rem", fontWeight: 950, color: "#0f172a", lineHeight: 1 }}>{wards.length}</div>
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              {/* Zone Filter Dropdown */}
+            {/* City Filter */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>City</span>
+              <select
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                disabled={!isSuperAdmin && !!assignedCityName}
+                style={{
+                  width: "100%",
+                  height: "38px",
+                  padding: "0 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "0.8125rem",
+                  fontWeight: 700,
+                  backgroundColor: !isSuperAdmin && !!assignedCityName ? "#f1f5f9" : "white",
+                  color: "#334155",
+                  outline: "none",
+                  cursor: !isSuperAdmin && !!assignedCityName ? "not-allowed" : "pointer",
+                }}
+              >
+                {isSuperAdmin && <option value="ALL">All Cities</option>}
+                {cityOptions.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Zone Filter */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Zone</span>
               <select
                 value={filterZoneId}
                 onChange={(e) => setFilterZoneId(e.target.value)}
                 style={{
-                  height: "38px", padding: "0 12px", borderRadius: "12px", border: "1px solid #cbd5e1",
-                  fontSize: "0.8125rem", fontWeight: 700, outline: "none", backgroundColor: "white"
+                  width: "100%",
+                  height: "38px",
+                  padding: "0 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "0.8125rem",
+                  fontWeight: 700,
+                  backgroundColor: "white",
+                  color: "#334155",
+                  outline: "none",
+                  cursor: "pointer",
                 }}
               >
                 <option value="ALL">All Zones</option>
-                {zones.map((z) => (
+                {zoneOptions.map((z) => (
                   <option key={z.id} value={z.id}>{z.name}</option>
                 ))}
               </select>
+            </div>
 
-              {/* Search Box */}
-              <div style={{ position: "relative", minWidth: "240px" }}>
-                <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
+            {/* Search Box */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Search</span>
+              <div style={{ position: "relative", width: "100%" }}>
+                <Search size={15} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
                 <input
                   type="text"
                   placeholder="Search ward or zone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
-                    width: "100%", padding: "8px 12px 8px 36px", borderRadius: "12px", border: "1px solid #cbd5e1",
-                    fontSize: "0.8125rem", fontWeight: 700, outline: "none", backgroundColor: "white"
+                    width: "100%",
+                    height: "38px",
+                    padding: "0 12px 0 36px",
+                    borderRadius: "10px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    outline: "none",
+                    backgroundColor: "white",
+                    color: "#334155",
                   }}
                 />
               </div>
