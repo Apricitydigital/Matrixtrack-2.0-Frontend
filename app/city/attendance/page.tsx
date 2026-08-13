@@ -150,18 +150,16 @@ function StatusPill({ status }: { status: string }) {
   const absent = status === "A";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-        present
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${present
           ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
           : absent
             ? "bg-rose-50 text-rose-700 ring-1 ring-rose-100"
             : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
-      }`}
+        }`}
     >
       <span
-        className={`h-1.5 w-1.5 rounded-full ${
-          present ? "bg-emerald-500" : absent ? "bg-rose-500" : "bg-slate-400"
-        }`}
+        className={`h-1.5 w-1.5 rounded-full ${present ? "bg-emerald-500" : absent ? "bg-rose-500" : "bg-slate-400"
+          }`}
       />
       {statusLabel(status)}
     </span>
@@ -253,11 +251,10 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex min-h-[224px] w-full flex-col overflow-hidden rounded-[18px] border bg-white px-4 pb-3 pt-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.065)] transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 ${
-        active
+      className={`group relative flex min-h-[224px] w-full flex-col overflow-hidden rounded-[18px] border bg-white px-4 pb-3 pt-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.065)] transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 ${active
           ? "-translate-y-1 border-blue-300 shadow-[0_16px_38px_rgba(37,99,235,0.14)] ring-2 ring-blue-100"
           : "border-slate-200/90 hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_16px_38px_rgba(15,23,42,0.11)]"
-      }`}
+        }`}
       aria-label={`View ${label} records`}
     >
       <div className="flex min-h-[50px] items-start gap-2.5">
@@ -350,134 +347,268 @@ function UploadModal({
   open: boolean;
   uploading: boolean;
   onClose: () => void;
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (files: File[]) => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
     if (!open) {
-      setFile(null);
+      setFiles([]);
       setDragging(false);
+      return;
     }
+
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  const acceptFile = (nextFile?: File) => {
-    if (!nextFile) return;
-    setFile(nextFile);
+  const acceptFiles = (nextFiles: File[]) => {
+    const csvFiles = nextFiles.filter((file) =>
+      file.name.toLowerCase().endsWith(".csv")
+    );
+
+    if (!csvFiles.length) return;
+
+    setFiles((current) => {
+      const merged = [...current];
+
+      csvFiles.forEach((file) => {
+        if (
+          !merged.some(
+            (item) =>
+              item.name === file.name &&
+              item.size === file.size
+          )
+        ) {
+          merged.push(file);
+        }
+      });
+
+      return merged;
+    });
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xl overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.28)]">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/20">
-              <UploadCloud size={20} />
+  const removeFile = (index: number) => {
+    setFiles((current) =>
+      current.filter(
+        (_, itemIndex) => itemIndex !== index
+      )
+    );
+  };
+
+  return createPortal(
+    <div
+      className="z-[9999] bg-slate-950/40 backdrop-blur-[2px]"
+      style={{
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100dvh",
+      }}
+      onMouseDown={() => {
+        if (!uploading) onClose();
+      }}
+    >
+      <div
+        className="flex flex-col overflow-hidden rounded-[22px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.28)]"
+        style={{
+          position: "fixed",
+          left: "50vw",
+          top: "50dvh",
+          transform: "translate(-50%, -50%)",
+          width: "min(580px, calc(100vw - 28px))",
+          maxHeight: "min(610px, calc(100dvh - 56px))",
+          margin: 0,
+        }}
+        onMouseDown={(event) =>
+          event.stopPropagation()
+        }
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50 via-white to-violet-50 px-4 py-3.5 sm:px-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/20">
+              <UploadCloud size={18} />
             </div>
-            <div>
-              <h2 className="text-lg font-black tracking-tight text-slate-900">Upload attendance CSV</h2>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">Validated, normalized and saved to PostgreSQL</p>
+
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-black tracking-tight text-slate-900">
+                Upload attendance CSVs
+              </h2>
+
+              <p className="mt-0.5 text-[10.5px] font-semibold text-slate-500">
+                Upload Present and Absent exports together or separately
+              </p>
             </div>
           </div>
+
           <button
             type="button"
             onClick={onClose}
             disabled={uploading}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40"
+            aria-label="Close upload attendance modal"
           >
-            <X size={18} />
+            <X size={15} />
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
           <input
             ref={inputRef}
             type="file"
+            multiple
             accept=".csv,text/csv"
             className="hidden"
-            onChange={(event) => acceptFile(event.target.files?.[0])}
+            onChange={(event) =>
+              acceptFiles(
+                Array.from(
+                  event.target.files || []
+                )
+              )
+            }
           />
 
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
+            onClick={() =>
+              inputRef.current?.click()
+            }
             onDragOver={(event) => {
               event.preventDefault();
               setDragging(true);
             }}
-            onDragLeave={() => setDragging(false)}
+            onDragLeave={() =>
+              setDragging(false)
+            }
             onDrop={(event) => {
               event.preventDefault();
               setDragging(false);
-              acceptFile(event.dataTransfer.files?.[0]);
+
+              acceptFiles(
+                Array.from(
+                  event.dataTransfer.files || []
+                )
+              );
             }}
-            className={`flex w-full flex-col items-center justify-center rounded-3xl border-2 border-dashed px-6 py-10 text-center transition ${
-              dragging
+            className={`flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-6 text-center transition ${dragging
                 ? "border-blue-500 bg-blue-50"
                 : "border-slate-200 bg-slate-50/70 hover:border-blue-300 hover:bg-blue-50/40"
-            }`}
+              }`}
           >
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
-              <FileSpreadsheet size={25} />
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
+              <FileSpreadsheet size={22} />
             </div>
-            <p className="text-sm font-black text-slate-800">Drop CSV here or choose a file</p>
-            <p className="mt-1 text-xs font-medium text-slate-500">Maximum file size 15 MB</p>
+
+            <p className="text-xs font-black text-slate-800">
+              Drop Present + Absent CSVs here
+            </p>
+
+            <p className="mt-1 text-[10.5px] font-medium text-slate-500">
+              Select multiple CSV files · maximum 15 MB each
+            </p>
           </button>
 
-          {file && (
-            <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3.5">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 ring-1 ring-emerald-100">
-                  <CheckCircle2 size={18} />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-slate-800">{file.name}</p>
-                  <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-                    {(file.size / 1024).toFixed(1)} KB · ready to import
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFile(null)}
-                disabled={uploading}
-                className="text-xs font-bold text-slate-500 hover:text-rose-600"
-              >
-                Remove
-              </button>
+          {files.length > 0 && (
+            <div className="mt-3 max-h-44 space-y-2 overflow-y-auto pr-1">
+              {files.map(
+                (file, index) => (
+                  <div
+                    key={`${file.name}-${file.size}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-600 ring-1 ring-emerald-100">
+                        <CheckCircle2 size={15} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <p
+                          className="truncate text-[11px] font-bold text-slate-800"
+                          title={file.name}
+                        >
+                          {file.name}
+                        </p>
+
+                        <p className="mt-0.5 text-[9.5px] font-medium text-slate-500">
+                          {(file.size / 1024).toFixed(1)} KB · ready
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeFile(index)
+                      }
+                      disabled={uploading}
+                      className="shrink-0 text-[10px] font-bold text-slate-500 hover:text-rose-600 disabled:opacity-40"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )
+              )}
             </div>
           )}
 
-          <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs font-medium leading-5 text-blue-800">
-            Re-uploading the same attendance date updates matching employee records instead of creating duplicates.
+          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 py-2.5 text-[10.5px] font-medium leading-4 text-blue-800">
+            Detailed View exports are supported, including
+            <b> Emp Id</b>, Present files without Status,
+            Absent files with Status A, and
+            <b> 0000-00-00 00:00:00</b> Punch Out values.
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-5">
           <button
             type="button"
             onClick={onClose}
             disabled={uploading}
-            className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-white disabled:opacity-40"
+            className="rounded-xl px-3.5 py-2 text-xs font-bold text-slate-600 transition hover:bg-white disabled:opacity-40"
           >
             Cancel
           </button>
+
           <button
             type="button"
-            onClick={() => file && onUpload(file)}
-            disabled={!file || uploading}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            onClick={() =>
+              files.length &&
+              onUpload(files)
+            }
+            disabled={
+              !files.length ||
+              uploading
+            }
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
-            {uploading ? <RefreshCw size={16} className="animate-spin" /> : <ArrowDownToLine size={16} />}
-            {uploading ? "Importing..." : "Import attendance"}
+            {uploading ? (
+              <RefreshCw
+                size={14}
+                className="animate-spin"
+              />
+            ) : (
+              <ArrowDownToLine size={14} />
+            )}
+
+            {uploading
+              ? "Importing..."
+              : `Import ${files.length} ${files.length === 1
+                ? "file"
+                : "files"
+              }`}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -531,10 +662,13 @@ function KpiRecordsDrawer({
   const total = data?.pagination.total || 0;
   const totalPages = Math.max(data?.pagination.totalPages || 0, 1);
 
-  return (
-    <div className="fixed inset-0 z-[110] bg-slate-950/45 backdrop-blur-[2px]" onMouseDown={onClose}>
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[35] bg-slate-950/35 backdrop-blur-[2px]"
+      onMouseDown={onClose}
+    >
       <aside
-        className="absolute inset-y-0 right-0 flex w-full max-w-[1120px] flex-col overflow-hidden border-l border-white/70 bg-white shadow-[-28px_0_90px_rgba(15,23,42,0.22)] animate-[attendanceDrawer_.3s_cubic-bezier(.2,.8,.2,1)]"
+        className="fixed bottom-5 left-4 right-4 top-[124px] flex flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)] animate-[attendanceDrawer_.3s_cubic-bezier(.2,.8,.2,1)] sm:left-5 sm:right-5 lg:left-[calc(18rem+1.25rem)] lg:top-[136px]"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 px-5 py-5 text-white sm:px-7">
@@ -542,7 +676,7 @@ function KpiRecordsDrawer({
           <div className="relative flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className={`inline-flex rounded-full bg-gradient-to-r px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white ${toneClasses[config.tone].split(' ').slice(0,2).join(' ')}`}>
+                <span className={`inline-flex rounded-full bg-gradient-to-r px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white ${toneClasses[config.tone].split(' ').slice(0, 2).join(' ')}`}>
                   KPI drill-down
                 </span>
                 <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-blue-100">
@@ -639,7 +773,8 @@ function KpiRecordsDrawer({
           )}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1058,6 +1193,19 @@ function AttendanceDashboard() {
     return (data?.designationBreakdown || []).reduce<any>((best, item) => !best || item.rate > best.rate ? item : best, null);
   }, [data?.designationBreakdown]);
 
+  const updateFilter = (patch: Partial<FilterState>) => {
+    const next = { ...draftFilters, ...patch };
+    if (next.from && next.to && next.from > next.to) {
+      setDraftFilters(next);
+      setError("From date cannot be after To date");
+      return;
+    }
+    setError("");
+    setDraftFilters(next);
+    setPage(1);
+    setAppliedFilters(next);
+  };
+
   const applyFilters = () => {
     if (draftFilters.from && draftFilters.to && draftFilters.from > draftFilters.to) {
       setError("From date cannot be after To date");
@@ -1088,26 +1236,36 @@ function AttendanceDashboard() {
     setAppliedFilters(next);
   };
 
-  const handleUpload = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setError("Please choose a CSV file");
+  const handleUpload = async (files: File[]) => {
+    const csvFiles = files.filter((file) => file.name.toLowerCase().endsWith(".csv"));
+    if (!csvFiles.length) {
+      setError("Please choose at least one CSV file");
       return;
     }
 
     setUploading(true);
     setError("");
     setNotice("");
+
     try {
-      const result: AttendanceUploadResponse = await AttendanceApi.upload(
-        file,
-        hmsSuperAdmin ? selectedCityId : undefined
-      );
+      const results: AttendanceUploadResponse[] = [];
+
+      for (const file of csvFiles) {
+        const result = await AttendanceApi.upload(
+          file,
+          hmsSuperAdmin ? selectedCityId : undefined
+        );
+        results.push(result);
+      }
+
+      const insertedRows = results.reduce((sum, result) => sum + result.batch.insertedRows, 0);
+      const updatedRows = results.reduce((sum, result) => sum + result.batch.updatedRows, 0);
+      const invalidRows = results.reduce((sum, result) => sum + result.batch.invalidRows, 0);
+      const dates = Array.from(new Set(results.map((result) => formatShortDate(result.batch.attendanceDate))));
+
       setUploadOpen(false);
       setNotice(
-        `Attendance imported for ${formatShortDate(result.batch.attendanceDate)} · ${numberFormatter.format(
-          result.batch.insertedRows
-        )} new · ${numberFormatter.format(result.batch.updatedRows)} updated${
-          result.batch.invalidRows ? ` · ${result.batch.invalidRows} rejected` : ""
+        `${results.length} CSV ${results.length === 1 ? "file" : "files"} imported for ${dates.join(", ")} · ${numberFormatter.format(insertedRows)} new · ${numberFormatter.format(updatedRows)} updated${invalidRows ? ` · ${numberFormatter.format(invalidRows)} rejected` : ""
         }`
       );
       setPage(1);
@@ -1246,18 +1404,17 @@ function AttendanceDashboard() {
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-blue-600/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
             <UploadCloud size={14} />
-            Upload CSV
+            Upload CSVs
           </button>
         </div>
       </section>
 
       {(error || notice) && (
         <div
-          className={`flex items-start justify-between gap-4 rounded-2xl border px-4 py-3.5 ${
-            error
+          className={`flex items-start justify-between gap-4 rounded-2xl border px-4 py-3.5 ${error
               ? "border-rose-200 bg-rose-50 text-rose-800"
               : "border-emerald-200 bg-emerald-50 text-emerald-800"
-          }`}
+            }`}
         >
           <div className="flex items-start gap-2.5">
             {error ? <AlertCircle size={18} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={18} className="mt-0.5 shrink-0" />}
@@ -1300,7 +1457,7 @@ function AttendanceDashboard() {
             <input
               type="date"
               value={draftFilters.from}
-              onChange={(e) => setDraftFilters((current) => ({ ...current, from: e.target.value }))}
+              onChange={(e) => updateFilter({ from: e.target.value })}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             />
           </label>
@@ -1309,7 +1466,7 @@ function AttendanceDashboard() {
             <input
               type="date"
               value={draftFilters.to}
-              onChange={(e) => setDraftFilters((current) => ({ ...current, to: e.target.value }))}
+              onChange={(e) => updateFilter({ to: e.target.value })}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             />
           </label>
@@ -1317,7 +1474,7 @@ function AttendanceDashboard() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendence</span>
             <select
               value={draftFilters.status}
-              onChange={(e) => setDraftFilters((current) => ({ ...current, status: e.target.value }))}
+              onChange={(e) => updateFilter({ status: e.target.value })}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             >
               <option value="ALL">All</option>
@@ -1329,7 +1486,7 @@ function AttendanceDashboard() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Punch status</span>
             <select
               value={draftFilters.checkoutState}
-              onChange={(e) => setDraftFilters((current) => ({ ...current, checkoutState: e.target.value }))}
+              onChange={(e) => updateFilter({ checkoutState: e.target.value })}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             >
               <option value="ALL">All punches</option>
@@ -1342,7 +1499,7 @@ function AttendanceDashboard() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Designation</span>
             <select
               value={draftFilters.designation}
-              onChange={(e) => setDraftFilters((current) => ({ ...current, designation: e.target.value }))}
+              onChange={(e) => updateFilter({ designation: e.target.value })}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             >
               <option value="">All designations</option>
@@ -1355,7 +1512,7 @@ function AttendanceDashboard() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Office</span>
             <select
               value={draftFilters.officeLocation}
-              onChange={(e) => setDraftFilters((current) => ({ ...current, officeLocation: e.target.value }))}
+              onChange={(e) => updateFilter({ officeLocation: e.target.value })}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             >
               <option value="">All offices</option>
@@ -1368,7 +1525,7 @@ function AttendanceDashboard() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Division</span>
             <select
               value={draftFilters.divisionUnit}
-              onChange={(e) => setDraftFilters((current) => ({ ...current, divisionUnit: e.target.value }))}
+              onChange={(e) => updateFilter({ divisionUnit: e.target.value })}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             >
               <option value="">All divisions</option>
@@ -1879,8 +2036,8 @@ function AttendanceDashboard() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100"><UsersRound size={18} /></div>
                   <div>
-                  <h2 className="text-base font-black tracking-tight text-slate-950">Employee attendance records</h2>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">{numberFormatter.format(data.pagination.total)} records match the current filters</p>
+                    <h2 className="text-base font-black tracking-tight text-slate-950">Employee attendance records</h2>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">{numberFormatter.format(data.pagination.total)} records match the current filters</p>
                   </div>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[11px] font-black text-blue-700 shadow-sm ring-1 ring-blue-100">
