@@ -15,6 +15,7 @@ const STANDALONE_PATHS = [
   "/portal-home",
   "/city",
   "/ward-ranking",
+  "/ward-ranking-system",
   "/workforce-monitoring",
   "/admin-management",
   "/employees",
