@@ -692,7 +692,8 @@ export const CityUserApi = {
       users: {
         id: string;
         name: string;
-        email: string;
+        email: string | null;
+        phone: string | null;
         role: string;
         createdAt: string;
         modules: { id: string; key: string; name: string; canWrite: boolean; zoneIds?: string[]; wardIds?: string[] }[];
