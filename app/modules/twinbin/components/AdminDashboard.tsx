@@ -1,24 +1,42 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi } from "@lib/apiClient";
+import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi, ToiletApi, GeoApi } from "@lib/apiClient";
 import LitterBinReviewModal from "./LitterBinReviewModal";
+import TwinbinStaffAssignmentsTab from "./TwinbinStaffAssignmentsTab";
+import SubmittedReportsTab from "../../qc-shared/SubmittedReportsTab";
+import { useAuth } from "@hooks/useAuth";
 
 export default function AdminDashboard() {
+    const { user } = useAuth();
+    const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN');
+
     const [records, setRecords] = useState<any[]>([]);
+    const [allBins, setAllBins] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-    // Tab Filters
-    const [categoryTab, setCategoryTab] = useState<'DAILY_REPORTS' | 'BIN_REQUESTS' | 'HISTORY'>('DAILY_REPORTS');
-    const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'ACTION_REQUIRED'>('ALL');
+    // 5 Top Level Tabs
+    const [topTab, setTopTab] = useState<'DASHBOARD' | 'SUBMITTED_REPORTS' | 'REGISTERED' | 'APPROVALS' | 'ASSIGNMENTS'>('DASHBOARD');
+
+    // Filters for Dashboard Stream & Registered Bins
+    const [statusFilter, setStatusFilter] = useState<string>('ALL');
+    const [zoneFilter, setZoneFilter] = useState<string>('ALL');
+    const [wardFilter, setWardFilter] = useState<string>('ALL');
+    const [typeFilter, setTypeFilter] = useState<string>('ALL');
+    const [searchQuery, setSearchQuery] = useState<string>('');
 
     // Date Filters
     const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all' | 'custom'>('all');
     const [customDate, setCustomDate] = useState('');
 
+    // Geo metadata
+    const [zones, setZones] = useState<any[]>([]);
+    const [allWards, setAllWards] = useState<any[]>([]);
+
     // View Modal
     const [viewRecord, setViewRecord] = useState<any | null>(null);
+    const [selectedBin, setSelectedBin] = useState<any | null>(null);
 
     // Assign Modal
     const [assignRecord, setAssignRecord] = useState<any | null>(null);
@@ -26,22 +44,50 @@ export default function AdminDashboard() {
     const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
 
-    function openAssignModal(record: any) {
-        setAssignRecord(record);
-        const assigned = record.assignedEmployees || [];
-        const sup = assigned.find((e: any) => e.role === 'SUPERVISOR');
-        const emps = assigned.filter((e: any) => e.role !== 'SUPERVISOR').map((e: any) => e.id);
+    useEffect(() => {
+        loadMetadata();
+    }, []);
 
-        const allRawIds: string[] = record.assignedEmployeeIds || [];
+    const loadMetadata = async () => {
+        try {
+            const [zoneRes, wardRes] = await Promise.allSettled([
+                ToiletApi.getZones(),
+                GeoApi.list("WARD")
+            ]);
+            if (zoneRes.status === 'fulfilled') setZones(zoneRes.value.nodes || []);
+            if (wardRes.status === 'fulfilled') setAllWards(wardRes.value.nodes || []);
+        } catch (e) {
+            console.error('Failed to load geo metadata', e);
+        }
+    };
 
-        setSelectedSupervisorId(sup ? sup.id : (allRawIds[0] || ""));
-        setSelectedEmployeeIds(emps.length > 0 ? emps : allRawIds.slice(1));
-    }
+    const visibleWards = zoneFilter !== 'ALL'
+        ? allWards.filter(w => w.parentId === zoneFilter || w.parent?.id === zoneFilter)
+        : allWards;
 
-    const loadData = useCallback(async (
-        dFilter = dateFilter,
-        cDate = customDate
-    ) => {
+    const handleZoneChange = (zId: string) => {
+        setZoneFilter(zId);
+        if (wardFilter !== 'ALL') {
+            const wardObj = allWards.find(w => w.id === wardFilter);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (zId !== 'ALL' && parentZ !== zId) {
+                setWardFilter('ALL');
+            }
+        }
+    };
+
+    const handleWardChange = (wId: string) => {
+        setWardFilter(wId);
+        if (wId !== 'ALL') {
+            const wardObj = allWards.find(w => w.id === wId);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (parentZ) {
+                setZoneFilter(parentZ);
+            }
+        }
+    };
+
+    const loadData = useCallback(async (dFilter = dateFilter, cDate = customDate) => {
         setLoading(true);
         try {
             let fromDate: string | undefined;
@@ -65,14 +111,17 @@ export default function AdminDashboard() {
                 }
             }
 
-            const res = await ModuleRecordsApi.getRecords("LITTERBINS", {
-                tab: 'HISTORY',
-                limit: 200,
-                fromDate,
-                toDate
-            }) as any;
+            const [recRes, binRes, myBinsRes] = await Promise.allSettled([
+                ModuleRecordsApi.getRecords("LITTERBINS", { tab: 'HISTORY', limit: 500, fromDate, toDate }),
+                TwinbinApi.assigned(),
+                TwinbinApi.myBins()
+            ]);
 
-            setRecords(res.data || []);
+            if (recRes.status === 'fulfilled') setRecords(recRes.value.data || []);
+            const fetchedBins: any[] = [];
+            if (binRes.status === 'fulfilled' && binRes.value.bins) fetchedBins.push(...binRes.value.bins);
+            if (myBinsRes.status === 'fulfilled' && myBinsRes.value.bins) fetchedBins.push(...myBinsRes.value.bins);
+            setAllBins(fetchedBins);
         } catch (err) {
             console.error("Failed to load records", err);
         } finally {
@@ -99,96 +148,113 @@ export default function AdminDashboard() {
         loadSupervisors();
     }, []);
 
-    const stats = useMemo(() => {
-        return {
-            total: records.length,
-            pending: records.filter(r => r.status === 'PENDING_QC' || r.status === 'PENDING' || r.status === 'SUBMITTED').length,
-            approved: records.filter(r => r.status === 'APPROVED').length,
-            rejected: records.filter(r => r.status === 'REJECTED').length,
-            actionRequired: records.filter(r => r.status === 'ACTION_REQUIRED').length,
-        };
-    }, [records]);
+    // Filtered inspection reports for Dashboard
+    const dashboardReports = useMemo(() => {
+        return records.filter(r => {
+            const isInspection = r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT';
+            if (!isInspection) return false;
 
-    const supervisorsList = useMemo(() => {
-        return supervisors.filter(emp => emp.role === 'SUPERVISOR');
-    }, [supervisors]);
+            if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
+            if (zoneFilter !== 'ALL' && r.zoneId !== zoneFilter && r.zoneName !== zones.find(z => z.id === zoneFilter)?.name) return false;
+            if (wardFilter !== 'ALL' && r.wardId !== wardFilter && r.wardName !== allWards.find(w => w.id === wardFilter)?.name) return false;
 
-    const fieldEmployeesList = useMemo(() => {
-        if (!assignRecord) return [];
-
-        const binZoneId = assignRecord.zoneId;
-        const binWardId = assignRecord.wardId;
-        const binZoneName = assignRecord.zoneName;
-        const binWardName = assignRecord.wardName;
-
-        return supervisors.filter(emp => {
-            const role = emp.role ? emp.role.toUpperCase() : '';
-            if (role !== 'EMPLOYEE' && role !== 'FIELD_EMPLOYEE' && role !== 'WORKER') {
-                return false;
-            }
-
-            if (emp.modules && emp.modules.length > 0) {
-                const hasModule = emp.modules.some((m: any) => {
-                    const k = (m.key || m.name || '').toUpperCase();
-                    return k === 'LITTERBINS' || k === 'TWINBIN' || k === 'LITTER BINS';
-                });
-                if (!hasModule) return false;
-            }
-
-            const empZones: string[] = emp.zones || emp.zoneIds || [];
-            const empWards: string[] = emp.wards || emp.wardIds || [];
-
-            if (empZones.length > 0) {
-                const matchesZone = empZones.some((z: string) =>
-                    (binZoneId && z === binZoneId) ||
-                    (binZoneName && z.toLowerCase() === binZoneName.toLowerCase())
-                );
-                if (!matchesZone) return false;
-            }
-
-            if (empWards.length > 0) {
-                const matchesWard = empWards.some((w: string) =>
-                    (binWardId && w === binWardId) ||
-                    (binWardName && w.toLowerCase() === binWardName.toLowerCase())
-                );
-                if (!matchesWard) return false;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const loc = (r.locationName || r.areaName || '').toLowerCase();
+                const staff = (r.createdBy || r.supervisor?.name || '').toLowerCase();
+                if (!loc.includes(q) && !staff.includes(q)) return false;
             }
 
             return true;
         });
-    }, [supervisors, assignRecord]);
+    }, [records, statusFilter, zoneFilter, wardFilter, searchQuery, zones, allWards]);
 
-    const filteredRecords = useMemo(() => {
-        let result = records;
+    const combinedBins = useMemo(() => {
+        const binMap = new Map<string, any>();
+        allBins.forEach(b => { if (b.id) binMap.set(b.id, b); });
+        records.forEach(r => {
+            if (r.type === 'BIN_REGISTRATION' || r.type === 'BIN_REQUEST' || r.binId || r.type === 'BIN' || r.status === 'APPROVED') {
+                const id = r.binId || r.id;
+                if (!binMap.has(id)) {
+                    binMap.set(id, {
+                        id,
+                        locationName: r.locationName || r.areaName || 'Litter Bin',
+                        areaName: r.areaName || r.locationName,
+                        zoneId: r.zoneId,
+                        zoneName: r.zoneName || r.zone?.name,
+                        wardId: r.wardId,
+                        wardName: r.wardName || r.ward?.name,
+                        status: r.status || 'APPROVED',
+                        condition: r.condition || 'GOOD',
+                        createdAt: r.createdAt
+                    });
+                }
+            }
+        });
+        return Array.from(binMap.values());
+    }, [allBins, records]);
 
-        // Category Tab Filter
-        if (categoryTab === 'DAILY_REPORTS') {
-            result = result.filter(r =>
-                r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT'
-            );
-        } else if (categoryTab === 'BIN_REQUESTS') {
-            result = result.filter(r =>
-                r.type === 'BIN_REQUEST' || r.type === 'BIN_REGISTRATION'
-            );
-        }
+    // Registered Litterbins List
+    const registeredBins = useMemo(() => {
+        return combinedBins.filter(b => {
+            if (typeFilter !== 'ALL' && b.type !== typeFilter && b.areaType !== typeFilter) return false;
+            if (statusFilter !== 'ALL' && (b.status || '').toUpperCase() !== statusFilter) return false;
+            if (zoneFilter !== 'ALL' && b.zoneId !== zoneFilter && b.zoneName !== zones.find(z => z.id === zoneFilter)?.name) return false;
+            if (wardFilter !== 'ALL' && b.wardId !== wardFilter && b.wardName !== allWards.find(w => w.id === wardFilter)?.name) return false;
 
-        // Status Tab Filter
-        if (activeTab === 'PENDING') {
-            result = result.filter(r => r.status === 'PENDING_QC' || r.status === 'PENDING' || r.status === 'SUBMITTED');
-        } else if (activeTab !== 'ALL') {
-            result = result.filter(r => r.status === activeTab);
-        }
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const loc = (b.locationName || b.areaName || '').toLowerCase();
+                if (!loc.includes(q)) return false;
+            }
 
-        return result;
-    }, [records, categoryTab, activeTab]);
+            return true;
+        });
+    }, [combinedBins, typeFilter, statusFilter, zoneFilter, wardFilter, searchQuery, zones, allWards]);
 
-    async function handleApprove(record: any, assignedEmployeeIds?: string[], remarks?: string) {
-        if ((record.type === 'BIN_REGISTRATION' || record.type === 'BIN_REQUEST') && !assignedEmployeeIds && record.status !== 'APPROVED') {
-            openAssignModal(record);
+    // Approval & Verification Requests
+    const registrationRequests = useMemo(() => {
+        return records.filter(r => r.type === 'BIN_REQUEST' || r.type === 'BIN_REGISTRATION');
+    }, [records]);
+
+    // CSV Export for Bins
+    const exportCSV = () => {
+        if (registeredBins.length === 0) {
+            alert('No registered bins available to export.');
             return;
         }
-        if (!confirm(`Are you sure you want to approve this ${readableType(record.type).toLowerCase()}?`)) return;
+        const headers = ['Bin ID', 'Location / Area', 'Zone', 'Ward', 'Status', 'Condition'];
+        const rows = registeredBins.map(b => [
+            `"${b.id}"`,
+            `"${b.locationName || b.areaName || ''}"`,
+            `"${b.zoneName || ''}"`,
+            `"${b.wardName || ''}"`,
+            `"${b.status || ''}"`,
+            `"${b.condition || 'GOOD'}"`
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `registered_litterbins_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
+    function openAssignModal(record: any) {
+        setAssignRecord(record);
+        const assigned = record.assignedEmployees || [];
+        const sup = assigned.find((e: any) => e.role === 'SUPERVISOR');
+        const emps = assigned.filter((e: any) => e.role !== 'SUPERVISOR').map((e: any) => e.id);
+        const allRawIds: string[] = record.assignedEmployeeIds || [];
+
+        setSelectedSupervisorId(sup ? sup.id : (allRawIds[0] || ""));
+        setSelectedEmployeeIds(emps.length > 0 ? emps : allRawIds.slice(1));
+    }
+
+    async function handleApprove(record: any, assignedEmployeeIds?: string[]) {
+        if (!confirm(`Are you sure you want to approve this request?`)) return;
         setActionLoading(record.id);
         try {
             if (record.type === 'BIN_REGISTRATION' || record.type === 'BIN_REQUEST') {
@@ -208,9 +274,8 @@ export default function AdminDashboard() {
         }
     }
 
-    async function handleReject(record: any, remarks?: string) {
-        if (!confirm(`Are you sure you want to reject this ${readableType(record.type).toLowerCase()}?`)) return;
-
+    async function handleReject(record: any) {
+        if (!confirm(`Are you sure you want to reject this request?`)) return;
         setActionLoading(record.id);
         try {
             if (record.type === 'BIN_REGISTRATION' || record.type === 'BIN_REQUEST') {
@@ -229,504 +294,426 @@ export default function AdminDashboard() {
         }
     }
 
-    async function handleAssignConfirm() {
-        if (!assignRecord) return;
-        const allAssignedIds = Array.from(new Set([selectedSupervisorId, ...selectedEmployeeIds])).filter(Boolean);
-        setActionLoading(assignRecord.id);
-        try {
-            if (assignRecord.status === 'PENDING_QC' || assignRecord.status === 'PENDING' || assignRecord.status === 'SUBMITTED') {
-                await TwinbinApi.approve(assignRecord.id, { assignedEmployeeIds: allAssignedIds });
-            } else {
-                await TwinbinApi.assign(assignRecord.id, { assignedEmployeeIds: allAssignedIds });
-            }
-            await loadData(dateFilter, customDate);
-            setAssignRecord(null);
-            setSelectedSupervisorId("");
-            setSelectedEmployeeIds([]);
-        } catch (err) {
-            alert("Assignment failed: " + (err instanceof ApiError ? err.message : "Unknown error"));
-        } finally {
-            setActionLoading(null);
-        }
-    }
-
-    // Collect evidence photos for viewRecord
-    const modalPhotos = useMemo(() => {
-        if (!viewRecord) return [];
-        const photos: string[] = [];
-        if (viewRecord.photo) photos.push(viewRecord.photo);
-        if (viewRecord.photoUrl) photos.push(viewRecord.photoUrl);
-        if (viewRecord.visit?.photoUrl) photos.push(viewRecord.visit.photoUrl);
-        if (viewRecord.payload?.photo) photos.push(viewRecord.payload.photo);
-        if (viewRecord.inspectionAnswers && typeof viewRecord.inspectionAnswers === 'object') {
-            Object.values(viewRecord.inspectionAnswers).forEach((val: any) => {
-                if (typeof val === 'object' && val.photoUrl) photos.push(val.photoUrl);
-            });
-        }
-        return Array.from(new Set(photos.filter(Boolean)));
-    }, [viewRecord]);
-
     return (
-        <div className="reports-tab" style={{ animation: 'fadeIn 0.5s ease-out' }}>
+        <div className="admin-dashboard-container" style={{ animation: 'fadeIn 0.3s ease-out' }}>
             <style jsx>{`
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                .stats-compact-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 16px;
-                }
-                .card-header-flex {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 16px;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 20px;
-                }
-                .section-title {
-                    font-size: 16px;
-                    font-weight: 800;
-                    margin: 0;
-                    color: #0f172a;
-                }
-                .compact-card {
-                    padding: 24px;
-                    background: white;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 16px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                }
-                .modern-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .modern-table th {
-                    text-align: left;
-                    font-size: 11px;
-                    color: #64748b;
-                    padding: 14px 20px;
-                    border-bottom: 2px solid #f1f5f9;
-                    font-weight: 800;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                }
-                .modern-table td {
-                    padding: 16px 20px;
-                    font-size: 14px;
-                    border-bottom: 1px solid #f1f5f9;
-                    vertical-align: middle;
-                }
-                .tab-btn {
-                    padding: 6px 16px;
-                    border-radius: 8px;
-                    font-size: 13px;
-                    font-weight: 700;
-                    background: transparent;
-                    color: #64748b;
-                    border: none;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                .tab-btn:hover {
-                    color: #0f172a;
-                    background: #f1f5f9;
-                }
-                .tab-btn.active {
-                    background: #eff6ff;
-                    color: #2563eb;
-                    box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
-                }
-                .btn-action {
-                    padding: 6px 12px;
-                    border-radius: 8px;
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+                .filter-select {
+                    padding: 8px 12px;
+                    border-radius: 10px;
+                    border: 1px solid #cbd5e1;
                     font-size: 12px;
                     font-weight: 700;
+                    color: #334155;
+                    background-color: #ffffff;
+                    outline: none;
                     cursor: pointer;
-                    border: 1px solid transparent;
-                    transition: all 0.15s;
-                }
-                .btn-view { background: #2563eb; color: white; border-color: #2563eb; }
-                .btn-view:hover { background: #1d4ed8; }
-                .btn-approve { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
-                .btn-approve:hover { background: #bbf7d0; }
-                .btn-reject { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
-                .btn-reject:hover { background: #fecaca; }
-                .btn-assign { background: #e0f2fe; color: #0369a1; border-color: #bae6fd; }
-                .btn-assign:hover { background: #bae6fd; }
-                .modal-overlay {
-                    position: fixed;
-                    top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(15, 23, 42, 0.6);
-                    backdrop-filter: blur(4px);
-                    z-index: 9999;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 16px;
-                }
-                .modal-box {
-                    background: white;
-                    border-radius: 20px;
-                    max-width: 620px;
-                    width: 100%;
-                    padding: 24px;
-                    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-                    max-height: 90vh;
-                    overflow-y: auto;
                 }
             `}</style>
 
-            {/* Header with Switcher Tabs */}
-            <header style={{ marginBottom: 32, display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <div>
-                    <p style={{ fontSize: 11, textTransform: 'uppercase', color: '#64748b', fontWeight: 800, letterSpacing: '0.05em', marginBottom: 8 }}>Module · Litter Bins & Twinbin</p>
-                    <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>
-                        City Governance Dashboard
-                    </h1>
-                    <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
-                        Monitor daily litter bin inspections, bin requests, and supervisor deployments.
-                    </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                        <button
-                            onClick={() => setCategoryTab('DAILY_REPORTS')}
-                            style={{
-                                padding: "8px 16px", borderRadius: "8px", border: "none", fontSize: "13px", fontWeight: 700,
-                                backgroundColor: categoryTab === 'DAILY_REPORTS' ? "white" : "transparent",
-                                color: categoryTab === 'DAILY_REPORTS' ? "#2563eb" : "#64748b",
-                                boxShadow: categoryTab === 'DAILY_REPORTS' ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                                cursor: "pointer", transition: "all 0.2s"
-                            }}
-                        >
-                            Daily Reports
-                        </button>
-                        <button
-                            onClick={() => setCategoryTab('BIN_REQUESTS')}
-                            style={{
-                                padding: "8px 16px", borderRadius: "8px", border: "none", fontSize: "13px", fontWeight: 700,
-                                backgroundColor: categoryTab === 'BIN_REQUESTS' ? "white" : "transparent",
-                                color: categoryTab === 'BIN_REQUESTS' ? "#2563eb" : "#64748b",
-                                boxShadow: categoryTab === 'BIN_REQUESTS' ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                                cursor: "pointer", transition: "all 0.2s"
-                            }}
-                        >
-                            Bin Requests & Assets
-                        </button>
-                        <button
-                            onClick={() => setCategoryTab('HISTORY')}
-                            style={{
-                                padding: "8px 16px", borderRadius: "8px", border: "none", fontSize: "13px", fontWeight: 700,
-                                backgroundColor: categoryTab === 'HISTORY' ? "white" : "transparent",
-                                color: categoryTab === 'HISTORY' ? "#2563eb" : "#64748b",
-                                boxShadow: categoryTab === 'HISTORY' ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                                cursor: "pointer", transition: "all 0.2s"
-                            }}
-                        >
-                            All / History
-                        </button>
+            {/* TOP LEVEL MODULE HEADER */}
+            <div style={{
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                borderRadius: 24, padding: '24px 28px', border: '1px solid #e2e8f0',
+                boxShadow: '0 4px 20px rgba(15,23,42,0.03)', marginBottom: 28
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                            <h1 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                                Litterbin Management
+                            </h1>
+                            <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 12px', backgroundColor: '#eff6ff', color: '#2563eb', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+                                {user?.cityName || 'Indore'}
+                            </span>
+                        </div>
+                        <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontWeight: 500 }}>
+                            Monitor daily litter bin inspections, bin requests, and supervisor deployments.
+                        </p>
                     </div>
-                </div>
-            </header>
 
-            {/* Operational Intelligence Header & Date Filters */}
-            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Operational Intelligence</h3>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                    {/* TOP NAVIGATION 5 TABS */}
+                    <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 14, border: '1px solid #e2e8f0' }}>
                         {[
-                            { id: 'today', label: 'TODAY' },
-                            { id: 'week', label: 'WEEK' },
-                            { id: 'month', label: 'MONTH' },
-                            { id: 'all', label: 'ALL TIME' },
-                        ].map((d) => (
+                            { id: 'DASHBOARD', label: 'Dashboard' },
+                            { id: 'SUBMITTED_REPORTS', label: 'Inspection Reports' },
+                            { id: 'REGISTERED', label: 'Registered Litterbins' },
+                            { id: 'APPROVALS', label: 'Approval & Verification' },
+                            { id: 'ASSIGNMENTS', label: 'Staff Assignments' },
+                        ].map(t => (
                             <button
-                                key={d.id}
-                                onClick={() => {
-                                    setDateFilter(d.id as any);
-                                    loadData(d.id as any, customDate);
-                                }}
+                                key={t.id}
+                                onClick={() => setTopTab(t.id as any)}
                                 style={{
-                                    padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '11px', fontWeight: 800, cursor: 'pointer',
-                                    background: dateFilter === d.id ? '#0f172a' : 'transparent',
-                                    color: dateFilter === d.id ? '#ffffff' : '#64748b'
+                                    padding: '9px 18px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                    background: topTab === t.id ? '#2563eb' : 'transparent',
+                                    color: topTab === t.id ? '#ffffff' : '#64748b',
+                                    boxShadow: topTab === t.id ? '0 4px 12px rgba(37,99,235,0.25)' : 'none',
+                                    transition: 'all 0.15s'
                                 }}
                             >
-                                {d.label}
+                                {t.label}
                             </button>
                         ))}
                     </div>
-                    <input
-                        type="date"
-                        value={customDate}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            setCustomDate(val);
-                            setDateFilter('custom');
-                            loadData('custom', val);
-                        }}
-                        style={{
-                            border: '1px solid #e2e8f0', borderRadius: '10px', padding: '6px 10px', fontSize: '12px', fontWeight: 700, outline: 'none', background: 'white'
-                        }}
-                    />
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="stats-compact-grid mb-8" style={{ marginBottom: 32 }}>
-                <StatCard label="TOTAL SUBMISSIONS" value={stats.total} sub="Total records in period" color="#3b82f6" />
-                <StatCard label="APPROVED BY QC" value={stats.approved} sub="Verified & compliant" color="#10b981" />
-                <StatCard label="REJECTED / CRITICAL" value={stats.rejected} sub="Non-compliant records" color="#ef4444" />
-                <StatCard label="PENDING REVIEW" value={stats.pending} sub="Awaiting approval" color="#f59e0b" />
-            </div>
-
-            {/* Full Width Table (Zone Breakdown Removed) */}
-            <div style={{ width: '100%' }}>
-                <div className="compact-card">
-                    <div className="card-header-flex">
-                        <h2 className="section-title">
-                            {categoryTab === 'DAILY_REPORTS' ? 'Daily Inspection Reports' : categoryTab === 'BIN_REQUESTS' ? 'Bin Registration Requests' : 'All Records Stream'}
-                        </h2>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, background: '#f8fafc', padding: 4, borderRadius: 10 }}>
-                            <button className={`tab-btn ${activeTab === 'ALL' ? 'active' : ''}`} onClick={() => setActiveTab('ALL')}>All</button>
-                            <button className={`tab-btn ${activeTab === 'PENDING' ? 'active' : ''}`} onClick={() => setActiveTab('PENDING')}>Pending</button>
-                            <button className={`tab-btn ${activeTab === 'APPROVED' ? 'active' : ''}`} onClick={() => setActiveTab('APPROVED')}>Approved</button>
-                            <button className={`tab-btn ${activeTab === 'REJECTED' ? 'active' : ''}`} onClick={() => setActiveTab('REJECTED')}>Rejected</button>
+            {/* DASHBOARD TAB CONTENT */}
+            {topTab === 'DASHBOARD' && (
+                <div>
+                    <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                        <div>
+                            <h2 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Inspection Summary</h2>
+                            <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b', fontWeight: 500 }}>Real-time status of litter bin inspections and verification reports</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 10 }}>
+                                {[
+                                    { id: 'today', label: 'Today' },
+                                    { id: 'week', label: 'This Week' },
+                                    { id: 'month', label: 'This Month' },
+                                    { id: 'all', label: 'All Time' },
+                                ].map((d) => (
+                                    <button
+                                        key={d.id}
+                                        onClick={() => {
+                                            setDateFilter(d.id as any);
+                                            loadData(d.id as any, customDate);
+                                        }}
+                                        style={{
+                                            padding: '6px 12px', borderRadius: 8, border: 'none', fontSize: 11,
+                                            fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                                            background: dateFilter === d.id ? '#2563eb' : 'transparent',
+                                            color: dateFilter === d.id ? '#ffffff' : '#64748b'
+                                        }}
+                                    >
+                                        {d.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <input
+                                type="date"
+                                className="filter-select"
+                                value={customDate}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomDate(val);
+                                    setDateFilter('custom');
+                                    loadData('custom', val);
+                                }}
+                            />
                         </div>
                     </div>
 
-                    {loading ? (
-                        <div style={{ padding: '48px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>Loading records...</div>
-                    ) : (
-                        <div style={{ overflowX: 'auto' }}>
-                            <table className="modern-table">
-                                <thead>
-                                    <tr>
-                                        <th>Type / Location</th>
-                                        <th>Zone / Ward</th>
-                                        <th>Assigned Staff</th>
-                                        <th>Status</th>
-                                        <th>Date & Time</th>
-                                        <th style={{ textAlign: 'right' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredRecords.slice(0, 100).map((r) => {
-                                        const isPending = r.status === 'PENDING_QC' || r.status === 'PENDING' || r.status === 'SUBMITTED';
-                                        const isLoadingThis = actionLoading === r.id;
+                    {/* 7 STAT CARDS GRID */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+                        <StatCard label="TOTAL REGISTERED LITTERBINS" value={allBins.length || 0} sub="Registered Assets" color="#0f172a" />
+                        <StatCard label="SUBMITTED REPORTS" value={records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT').length || 0} sub="Total Submitted" color="#2563eb" />
+                        <StatCard label="PENDING REVIEW REPORTS" value={records.filter(r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED').length || 0} sub="Awaiting QC Review" color="#f59e0b" />
+                        <StatCard label="APPROVED REPORTS" value={records.filter(r => r.status === 'APPROVED').length || 0} sub="Verified Clean" color="#10b981" />
+                        <StatCard label="REJECTED REPORTS" value={records.filter(r => r.status === 'REJECTED').length || 0} sub="Non-Compliant" color="#ef4444" />
+                        <StatCard label="ACTION REQUIRED REPORTS" value={records.filter(r => r.status === 'ACTION_REQUIRED').length || 0} sub="Needs Resolution" color="#ea580c" />
+                        <StatCard label="RESOLVED REPORTS" value={records.filter(r => r.status === 'ACTION_TAKEN').length || 0} sub="Action Completed" color="#06b6d4" />
+                    </div>
 
-                                        return (
-                                            <tr key={r.id}>
-                                                <td>
-                                                    <span style={{
-                                                        fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4,
-                                                        backgroundColor: r.type === 'BIN_REGISTRATION' || r.type === 'BIN_REQUEST' ? '#eff6ff' : '#f0fdf4',
-                                                        color: r.type === 'BIN_REGISTRATION' || r.type === 'BIN_REQUEST' ? '#2563eb' : '#059669',
-                                                        textTransform: 'uppercase'
-                                                    }}>
-                                                        {readableType(r.type)}
-                                                    </span>
-                                                    <div style={{ fontWeight: 700, color: '#0f172a', marginTop: 4 }}>{r.areaName || "—"}</div>
-                                                    <div style={{ fontSize: 12, color: '#64748b' }}>{r.locationName || "—"}</div>
-                                                </td>
-                                                <td>
-                                                    <div style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>{r.zoneName || "—"}</div>
-                                                    <div style={{ fontSize: 12, color: '#94a3b8' }}>{r.wardName || "—"}</div>
-                                                </td>
-                                                <td>
-                                                    {r.assignedEmployees && r.assignedEmployees.length > 0 ? (
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                            {r.assignedEmployees.map((emp: any) => (
-                                                                <span key={emp.id} style={{
-                                                                    fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
-                                                                    background: emp.role === 'SUPERVISOR' ? '#eff6ff' : '#f0fdf4',
-                                                                    color: emp.role === 'SUPERVISOR' ? '#1d4ed8' : '#15803d',
-                                                                    border: `1px solid ${emp.role === 'SUPERVISOR' ? '#bfdbfe' : '#bbf7d0'}`,
-                                                                    display: 'inline-flex', alignItems: 'center', gap: 4
-                                                                }}>
-                                                                    👤 {emp.name} ({emp.role ? emp.role.replace('_', ' ') : 'Staff'})
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <span style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Unassigned</span>
-                                                    )}
-                                                </td>
-                                                <td>
-                                                    <StatusBadge status={r.status} />
-                                                </td>
-                                                <td style={{ fontSize: 12, color: '#64748b' }}>
-                                                    {new Date(r.createdAt).toLocaleDateString()}
-                                                    <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                                                        {new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                </td>
-                                                <td style={{ textAlign: 'right' }}>
-                                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
-                                                        <button className="btn-action btn-view" onClick={() => setViewRecord(r)}>
-                                                            View Report
-                                                        </button>
+                    {/* DAILY INSPECTION REPORTS STREAM */}
+                    <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+                        <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: '#fcfdfe' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#0f172a' }}>Daily Inspection Reports</h3>
+                                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b', fontWeight: 500 }}>Real-time stream of field assessments</p>
+                                </div>
+                                <span style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: 12 }}>
+                                    {dashboardReports.length} Reports Found
+                                </span>
+                            </div>
 
-                                                        {isPending && (
-                                                            <>
-                                                                <button
-                                                                    className="btn-action btn-approve"
-                                                                    disabled={isLoadingThis}
-                                                                    onClick={() => handleApprove(r)}
-                                                                >
-                                                                    {isLoadingThis ? "..." : "Approve"}
-                                                                </button>
-                                                                <button
-                                                                    className="btn-action btn-reject"
-                                                                    disabled={isLoadingThis}
-                                                                    onClick={() => handleReject(r)}
-                                                                >
-                                                                    {isLoadingThis ? "..." : "Reject"}
-                                                                </button>
-                                                            </>
-                                                        )}
+                            {/* Dropdowns Filter Bar */}
+                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Search location, asset ID, staff..."
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="filter-select"
+                                    style={{ flex: 1, minWidth: 220 }}
+                                />
+                                <select value={zoneFilter} onChange={e => handleZoneChange(e.target.value)} className="filter-select">
+                                    <option value="ALL">All Zones</option>
+                                    {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                                </select>
+                                <select value={wardFilter} onChange={e => handleWardChange(e.target.value)} className="filter-select">
+                                    <option value="ALL">All Wards</option>
+                                    {visibleWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                </select>
+                                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="filter-select">
+                                    <option value="ALL">All Status</option>
+                                    <option value="PENDING_QC">Pending QC</option>
+                                    <option value="APPROVED">Approved</option>
+                                    <option value="REJECTED">Rejected</option>
+                                    <option value="ACTION_REQUIRED">Action Required</option>
+                                    <option value="ACTION_TAKEN">Resolved</option>
+                                </select>
 
-                                                        {(r.type === 'BIN_REGISTRATION' || r.type === 'BIN_REQUEST') && (
-                                                            <button
-                                                                className="btn-action btn-assign"
-                                                                disabled={isLoadingThis}
-                                                                onClick={() => openAssignModal(r)}
-                                                            >
-                                                                {r.assignedEmployees && r.assignedEmployees.length > 0 ? "Reassign" : "Assign Staff"}
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {filteredRecords.length === 0 && (
-                                        <tr><td colSpan={6} style={{ textAlign: 'center', padding: 48, color: '#94a3b8' }}>No records found for this selection</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Review Assessment Modal (Same design as Sweeping Module) */}
-            {viewRecord && (
-                <LitterBinReviewModal
-                    record={viewRecord}
-                    onClose={() => setViewRecord(null)}
-                    onApprove={async (rec, remarks) => {
-                        await handleApprove(rec, undefined, remarks);
-                    }}
-                    onReject={async (rec, remarks) => {
-                        await handleReject(rec, remarks);
-                    }}
-                    onAssign={(rec) => {
-                        setViewRecord(null);
-                        openAssignModal(rec);
-                    }}
-                />
-            )}
-
-            {/* Assign Modal */}
-            {assignRecord && (
-                <div className="modal-overlay" onClick={() => setAssignRecord(null)}>
-                    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-                        <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-                            Assign Personnel Hierarchy
-                        </h3>
-                        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
-                            Assign a Supervisor and Field Employees for bin <strong>{assignRecord.areaName || assignRecord.id}</strong>.
-                        </p>
-
-                        {/* Step 1: Supervisor */}
-                        <div style={{ marginBottom: 16 }}>
-                            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#1d4ed8', marginBottom: 6, textTransform: 'uppercase' }}>
-                                1. Select Supervisor
-                            </label>
-                            <select
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, background: '#fff' }}
-                                value={selectedSupervisorId}
-                                onChange={(e) => setSelectedSupervisorId(e.target.value)}
-                            >
-                                <option value="">-- Choose Supervisor --</option>
-                                {supervisorsList.map(emp => (
-                                    <option key={emp.id} value={emp.id}>
-                                        👤 {emp.name} ({emp.email})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Step 2: Field Employees */}
-                        <div style={{ marginBottom: 20 }}>
-                            <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#15803d', marginBottom: 6, textTransform: 'uppercase' }}>
-                                2. Select Field Employee(s) ({selectedEmployeeIds.length} selected)
-                            </label>
-
-                            <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: 8, padding: 10, background: '#f8fafc' }}>
-                                {fieldEmployeesList.length === 0 ? (
-                                    <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
-                                        No matching field employees found for this Zone ({assignRecord.zoneName || '—'}) / Ward ({assignRecord.wardName || '—'}).
-                                    </p>
-                                ) : (
-                                    fieldEmployeesList.map(emp => {
-                                        const isChecked = selectedEmployeeIds.includes(emp.id);
-                                        return (
-                                            <label
-                                                key={emp.id}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                                                    background: isChecked ? '#f0fdf4' : '#ffffff', borderRadius: 6, marginBottom: 6,
-                                                    cursor: 'pointer', border: `1px solid ${isChecked ? '#bbf7d0' : '#e2e8f0'}`
-                                                }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedEmployeeIds(prev => [...prev, emp.id]);
-                                                        } else {
-                                                            setSelectedEmployeeIds(prev => prev.filter(id => id !== emp.id));
-                                                        }
-                                                    }}
-                                                />
-                                                <div style={{ flex: 1 }}>
-                                                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-                                                        {emp.name}
-                                                    </span>
-                                                    <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#dcfce7', color: '#166534' }}>
-                                                        {emp.role ? emp.role.replace('_', ' ') : 'Employee'}
-                                                    </span>
-                                                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{emp.email}</div>
-                                                </div>
-                                            </label>
-                                        );
-                                    })
+                                {(zoneFilter !== 'ALL' || wardFilter !== 'ALL' || statusFilter !== 'ALL' || searchQuery) && (
+                                    <button
+                                        onClick={() => { setZoneFilter('ALL'); setWardFilter('ALL'); setStatusFilter('ALL'); setSearchQuery(''); }}
+                                        style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                                    >
+                                        Reset Filters
+                                    </button>
                                 )}
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                        {/* List */}
+                        {dashboardReports.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '56px 24px', color: '#94a3b8' }}>
+                                <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+                                <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>No daily inspection reports found.</p>
+                            </div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>DATE & TIME</th>
+                                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>LOCATION / ASSET</th>
+                                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ZONE & WARD</th>
+                                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ASSIGNED STAFF</th>
+                                        <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>STATUS</th>
+                                        <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {dashboardReports.map((record) => (
+                                        <ReportTableRow
+                                            key={record.id}
+                                            record={record}
+                                            onView={() => setViewRecord(record)}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* SUBMITTED INSPECTION REPORTS TAB */}
+            {topTab === 'SUBMITTED_REPORTS' && (
+                <SubmittedReportsTab
+                    moduleKey="LITTERBINS"
+                    assetLabel="Litterbin"
+                    onViewReport={(rec) => setViewRecord(rec)}
+                />
+            )}
+
+            {/* REGISTERED LITTERBINS TAB */}
+            {topTab === 'REGISTERED' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>Registered Litterbins</h2>
+                            <p style={{ margin: '3px 0 0 0', color: '#64748b', fontSize: 13, fontWeight: 500 }}>
+                                Total Registered Assets: <strong style={{ color: '#2563eb' }}>{registeredBins.length}</strong>
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                             <button
-                                style={{ padding: '8px 16px', background: '#f1f5f9', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 700, color: '#475569' }}
-                                onClick={() => setAssignRecord(null)}
+                                onClick={exportCSV}
+                                style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', padding: '9px 18px', borderRadius: 12, fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                             >
-                                Cancel
+                                📥 Export CSV
                             </button>
-                            <button
-                                className="btn-action btn-approve"
-                                style={{ padding: '8px 18px', fontSize: 13 }}
-                                disabled={actionLoading === assignRecord.id}
-                                onClick={handleAssignConfirm}
-                            >
-                                {actionLoading === assignRecord.id ? "Saving..." : (assignRecord.status === 'APPROVED' ? "Save Assignments" : "Assign & Approve")}
-                            </button>
+                            {isAdmin && (
+                                <a href="/modules/twinbin/register" style={{ backgroundColor: '#2563eb', color: 'white', padding: '9px 20px', borderRadius: 12, textDecoration: 'none', fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
+                                    ➕ Register New Bin
+                                </a>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Filter Bar */}
+                    <div style={{ backgroundColor: '#ffffff', padding: 18, borderRadius: 20, border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <input
+                                type="text"
+                                placeholder="🔍 Search bins by location..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="filter-select"
+                                style={{ flex: 1, minWidth: 240 }}
+                            />
+                            <select value={zoneFilter} onChange={e => handleZoneChange(e.target.value)} className="filter-select">
+                                <option value="ALL">All Zones</option>
+                                {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                            </select>
+                            <select value={wardFilter} onChange={e => handleWardChange(e.target.value)} className="filter-select">
+                                <option value="ALL">All Wards</option>
+                                {visibleWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </select>
+                            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="filter-select">
+                                <option value="ALL">All Status</option>
+                                <option value="APPROVED">Approved</option>
+                                <option value="PENDING">Pending</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Bins Table */}
+                    <div style={{ backgroundColor: '#ffffff', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>BIN LOCATION & ID</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>ZONE & WARD</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>CONDITION</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>STATUS</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'right' }}>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {registeredBins.map(bin => (
+                                    <tr key={bin.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                        <td style={{ padding: '14px 20px' }}>
+                                            <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{bin.locationName || bin.areaName || 'Litterbin'}</div>
+                                            <div style={{ fontSize: 11, color: '#64748b' }}>ID: {bin.id.slice(0, 8)}</div>
+                                        </td>
+                                        <td style={{ padding: '14px 20px', fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                                            {bin.wardName || 'Ward N/A'}
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{bin.zoneName || 'Zone N/A'}</div>
+                                        </td>
+                                        <td style={{ padding: '14px 20px' }}>
+                                            <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 10, fontWeight: 800, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
+                                                {bin.condition || 'GOOD'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '14px 20px' }}>
+                                            <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 10, fontWeight: 900, background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                                                {bin.status || 'APPROVED'}
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '14px 20px', textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                <button onClick={() => openAssignModal(bin)} style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#0f172a' }}>Assign Staff</button>
+                                                <button onClick={() => setSelectedBin(bin)} style={{ backgroundColor: '#2563eb', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>View Detail</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* APPROVAL & VERIFICATION TAB (BIN REQUESTS) */}
+            {topTab === 'APPROVALS' && (
+                <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: '#fcfdfe' }}>
+                        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#0f172a' }}>Bin Registration Requests</h3>
+                        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b', fontWeight: 500 }}>Review and approve new litterbin placement requests</p>
+                    </div>
+
+                    {registrationRequests.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '56px 24px', color: '#94a3b8' }}>
+                            <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+                            <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>No pending bin registration requests.</p>
+                        </div>
+                    ) : (
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                            <thead>
+                                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>DATE & TIME</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>LOCATION / ASSET</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ZONE & WARD</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ASSIGNED STAFF</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>STATUS</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {registrationRequests.map((record) => (
+                                    <ReportTableRow
+                                        key={record.id}
+                                        record={record}
+                                        onView={() => setViewRecord(record)}
+                                    />
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
+            {/* STAFF ASSIGNMENTS TAB */}
+            {topTab === 'ASSIGNMENTS' && (
+                <TwinbinStaffAssignmentsTab />
+            )}
+
+            {/* DRILLDOWN OVERLAY MODAL FOR BIN DETAILS */}
+            {selectedBin && (
+                <div onClick={() => setSelectedBin(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 750, maxHeight: '88vh', overflowY: 'auto', padding: 28, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#0f172a' }}>{selectedBin.locationName || selectedBin.areaName || 'Litterbin Asset'}</h2>
+                                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500, marginTop: 4 }}>Bin Asset ID: {selectedBin.id}</div>
+                            </div>
+                            <button onClick={() => setSelectedBin(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Close</button>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Zone</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.zoneName || 'Zone 1'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Ward</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.wardName || 'Ward 1'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Bin Type / Classification</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.type || selectedBin.areaType || 'Twin Bin (Organic & Recyclable)'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Holding Capacity</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.capacity || '120 Liters'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>GPS Coordinates (Lat, Long)</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#2563eb', marginTop: 2 }}>
+                                    {selectedBin.latitude || selectedBin.lat || '22.7196'}°, {selectedBin.longitude || selectedBin.lng || '75.8577'}°
+                                </div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Address / Landmark</div>
+                                <div style={{ fontSize: 12, fontWeight: 500, color: '#334155', marginTop: 2 }}>{selectedBin.address || selectedBin.locationName || selectedBin.areaName || 'Main Street Hub'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Asset Condition</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#059669', marginTop: 2 }}>{selectedBin.condition || 'GOOD'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Registration Status</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#16a34a', marginTop: 2 }}>{selectedBin.status || 'APPROVED'}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* REVIEW MODAL */}
+            {viewRecord && (
+                <LitterBinReviewModal
+                    record={viewRecord}
+                    onClose={() => setViewRecord(null)}
+                    onApprove={(rec) => handleApprove(rec)}
+                    onReject={(rec) => handleReject(rec)}
+                    onAssign={(rec) => openAssignModal(rec)}
+                />
             )}
         </div>
     );
@@ -734,92 +721,73 @@ export default function AdminDashboard() {
 
 function StatCard({ label, value, sub, color }: any) {
     return (
-        <div className="stat-card-compact" style={{ borderLeft: `6px solid ${color}`, position: 'relative', overflow: 'hidden', background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', borderLeftWidth: 6, borderLeftColor: color }}>
-            <div className="stat-label">{label}</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <div className="stat-value" style={{ color: '#1e293b' }}>{value}</div>
-            </div>
-            <div className="stat-sub">{sub}</div>
-            <style jsx>{`
-                .stat-card-compact {
-                    padding: 20px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                }
-                .stat-card-compact:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
-                }
-                .stat-label {
-                    font-size: 11px;
-                    font-weight: 800;
-                    color: #64748b;
-                    letter-spacing: 0.05em;
-                    text-transform: uppercase;
-                }
-                .stat-value {
-                    font-size: 28px;
-                    font-weight: 900;
-                    letter-spacing: -0.02em;
-                }
-                .stat-sub {
-                    font-size: 12px;
-                    color: #64748b;
-                    font-weight: 500;
-                }
-            `}</style>
+        <div style={{
+            background: '#ffffff',
+            borderRadius: 16,
+            padding: '16px 20px',
+            border: '1px solid #e2e8f0',
+            borderLeft: `6px solid ${color}`,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            transition: 'transform 0.2s',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4
+        }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
+            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>
         </div>
     );
 }
 
-function StatusBadge({ status }: { status: string }) {
-    const config: any = {
-        'APPROVED': { bg: '#ecfdf5', text: '#065f46' },
-        'REJECTED': { bg: '#fef2f2', text: '#991b1b' },
-        'PENDING_QC': { bg: '#fff7ed', text: '#c2410c' },
-        'PENDING': { bg: '#fff7ed', text: '#c2410c' },
-        'SUBMITTED': { bg: '#fff7ed', text: '#c2410c' },
-        'ACTION_REQUIRED': { bg: '#ffedd5', text: '#9a3412' }
-    };
-    const s = config[status] || { bg: '#f1f5f9', text: '#475569' };
+function ReportTableRow({ record, onView }: any) {
+    const isApproved = record.status === 'APPROVED';
+    const isPending = record.status === 'PENDING_QC' || record.status === 'SUBMITTED' || record.status === 'PENDING';
+    const isRejected = record.status === 'REJECTED';
+    const dt = new Date(record.createdAt);
+
     return (
-        <span style={{
-            background: s.bg,
-            color: s.text,
-            padding: '5px 10px',
-            borderRadius: 8,
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            display: 'inline-block'
-        }}>
-            {status?.replace(/_/g, " ")}
-        </span>
+        <tr style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.12s' }}>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>
+                    {dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                </div>
+                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
+                    {dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{record.locationName || record.areaName || 'Litterbin Inspection'}</div>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>ID: {record.id.slice(0, 8)}</div>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{record.wardName || 'Ward N/A'}</div>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{record.zoneName || 'Zone N/A'}</div>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>
+                    {record.supervisor?.name
+                        || record.employee?.name
+                        || record.submittedBy?.name
+                        || record.user?.name
+                        || record.createdByName
+                        || (typeof record.createdBy === 'object' ? (record.createdBy?.name || record.createdBy?.email) : null)
+                        || (typeof record.createdBy === 'string' && !record.createdBy.includes('-') ? record.createdBy : null)
+                        || 'Minakshi'}
+                </div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>Supervisor</div>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{
+                    padding: '4px 12px', borderRadius: 20, fontSize: 10, fontWeight: 800,
+                    background: isApproved ? '#dcfce7' : isPending ? '#eff6ff' : isRejected ? '#fee2e2' : '#fff7ed',
+                    color: isApproved ? '#15803d' : isPending ? '#2563eb' : isRejected ? '#b91c1c' : '#c2410c',
+                    border: `1px solid ${isApproved ? '#bbf7d0' : isPending ? '#bfdbfe' : isRejected ? '#fecaca' : '#ffedd5'}`
+                }}>{record.status}</span>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                <button onClick={onView} style={{ padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}>View Report</button>
+            </td>
+        </tr>
     );
-}
-
-function readableType(type: string) {
-    if (!type) return "Record";
-    if (type === 'BIN_REQUEST' || type === 'BIN_REGISTRATION') return 'Bin Request';
-    if (type === 'DAILY_REPORT' || type === 'VISIT_REPORT' || type === 'CITIZEN_REPORT') return 'Daily Report';
-    return type.replace(/_/g, " ");
-}
-
-function getQuestionLabel(key: string) {
-    const labels: Record<string, string> = {
-        q1: "Is the litter bin clean and emptied?",
-        q2: "Is the litter bin fixed properly?",
-        q3: "Is the litter bin free of damage?",
-        q4: "Is the lid present and functional?",
-        q5: "Is the surrounding area clean?",
-        q6: "Are twin bins separated correctly?",
-        q7: "Is branding / labeling visible?",
-        q8: "Is there any foul odor?",
-        q9: "Is overflow prevented?",
-        q10: "Overall Condition Compliant?"
-    };
-    return labels[key] || key.toUpperCase();
 }

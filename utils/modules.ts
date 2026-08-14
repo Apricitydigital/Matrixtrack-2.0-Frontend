@@ -46,13 +46,9 @@ export function moduleEmployeePath(key: CanonicalModuleKey) {
 
 export function moduleQcPath(key: CanonicalModuleKey) {
   const base = routeForModule(key);
-  // Modules with dedicated QC sub-routes
-  if (key === "LITTERBINS" || key === "TASKFORCE") {
-    return `/modules/${base}/qc`;
-  }
-  // QC see their beats in the sweeping module page
+  if (key === "LITTERBINS") return "/modules/litterbins/admin";
+  if (key === "TASKFORCE") return `/modules/${base}/qc`;
   if (key === "SWEEPING") return "/modules/sweeping";
-  // Others (like TOILET) use the main module page which handles roles with tabs
   return `/modules/${base}`;
 }
 

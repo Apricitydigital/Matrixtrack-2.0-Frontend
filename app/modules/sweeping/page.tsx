@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Protected, ModuleGuard } from "@components/Guards";
-import { AreaBeatApi, ModuleRecordsApi } from "@lib/apiClient";
+import { AreaBeatApi, ModuleRecordsApi, GeoApi } from "@lib/apiClient";
 import BeatTable from "../../city/areas/components/BeatTable";
 import EditBeatModal from "../../city/areas/components/EditBeatModal";
 import KMLDataViewer from "../../city/areas/components/KMLDataViewer";
@@ -11,6 +11,8 @@ import AssignBeatModal from "../../city/areas/components/AssignBeatModal";
 import dynamic from "next/dynamic";
 import { useAuth } from "@hooks/useAuth";
 import AssessmentReviewModal from "./components/AssessmentReviewModal";
+import BeatStaffAssignmentsTab from "./components/BeatStaffAssignmentsTab";
+import SubmittedReportsTab from "../qc-shared/SubmittedReportsTab";
 
 const BeatMapView = dynamic(() => import("../../city/areas/components/BeatMapView"), { ssr: false });
 const GlobalBeatMapView = dynamic(() => import("../../city/areas/components/GlobalBeatMapView"), { ssr: false });
@@ -28,18 +30,78 @@ export default function SweepingModulePage() {
     const [pendingBeatCount, setPendingBeatCount] = useState(0);
 
     const [viewMode, setViewMode] = useState<"table" | "map">("table");
-    const [activeTab, setActiveTab] = useState<"beats" | "assessments">("assessments");
+    const [activeTab, setActiveTab] = useState<"assessments" | "submitted_reports" | "beats" | "assignments">("assessments");
     const [assessments, setAssessments] = useState<any[]>([]);
     const [assessmentsLoading, setAssessmentsLoading] = useState(false);
     const [stats, setStats] = useState<{ pending: number; approved: number; total: number; actionRequired: number; actionTaken: number }>({ pending: 0, approved: 0, total: 0, actionRequired: 0, actionTaken: 0 });
-    const [assessmentTab, setAssessmentTab] = useState('PENDING_QC');
+
+    // Date Filters
+    const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'custom'>('today');
+    const [customDate, setCustomDate] = useState('');
+
+    // Dropdown Filters for Inspection List
+    const [selectedZone, setSelectedZone] = useState('');
+    const [selectedWard, setSelectedWard] = useState('');
+    const [selectedArea, setSelectedArea] = useState('');
+    const [selectedAreaType, setSelectedAreaType] = useState('');
+    const [selectedStatus, setSelectedStatus] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Geo metadata
+    const [zones, setZones] = useState<any[]>([]);
+    const [allWards, setAllWards] = useState<any[]>([]);
 
     const isQC = user?.roles?.includes("QC");
     const isAO = user?.roles?.includes("ACTION_OFFICER");
     const isReadOnly = user?.roles?.includes("COMMISSIONER");
 
-    const [dateFilter, setDateFilter] = useState('today');
-    const [customDate, setCustomDate] = useState('');
+    useEffect(() => {
+        loadMetadata();
+    }, []);
+
+    const loadMetadata = async () => {
+        try {
+            const [zRes, wRes] = await Promise.allSettled([
+                GeoApi.list("ZONE"),
+                GeoApi.list("WARD")
+            ]);
+            if (zRes.status === 'fulfilled') setZones(zRes.value.nodes || []);
+            if (wRes.status === 'fulfilled') setAllWards(wRes.value.nodes || []);
+        } catch (e) {
+            console.error('Failed to load geo metadata', e);
+        }
+    };
+
+    const visibleWards = selectedZone
+        ? allWards.filter(w => w.parentId === selectedZone || w.parent?.id === selectedZone)
+        : allWards;
+
+    const handleZoneChange = (zoneId: string) => {
+        setSelectedZone(zoneId);
+        if (selectedWard) {
+            const wardObj = allWards.find(w => w.id === selectedWard);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (zoneId && parentZ !== zoneId) {
+                setSelectedWard('');
+            }
+        }
+    };
+
+    const handleWardChange = (wardId: string) => {
+        setSelectedWard(wardId);
+        if (wardId) {
+            const wardObj = allWards.find(w => w.id === wardId);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (parentZ) {
+                setSelectedZone(parentZ);
+            }
+        }
+    };
+
+    const handleViewUser = (beat: any, userId: string) => {
+        setFilteredUserId(userId);
+        setViewingBeat(beat);
+    };
 
     const loadBeats = useCallback(async () => {
         try {
@@ -61,11 +123,9 @@ export default function SweepingModulePage() {
         }
     }, [isQC, isAO]);
 
-    const loadAssessments = useCallback(async (tab = assessmentTab, dFilter = dateFilter, cDate = customDate) => {
+    const loadAssessments = useCallback(async (dFilter = dateFilter, cDate = customDate) => {
         try {
             setAssessmentsLoading(true);
-            setAssessmentTab(tab);
-
             let fromDate: string | undefined;
             let toDate: string | undefined;
             const now = new Date();
@@ -86,7 +146,7 @@ export default function SweepingModulePage() {
                 }
             }
 
-            const res = await ModuleRecordsApi.getRecords("SWEEPING", { tab, limit: 100, fromDate, toDate });
+            const res = await ModuleRecordsApi.getRecords("SWEEPING", { limit: 100, fromDate, toDate });
             setAssessments(res.data || []);
             if (res.stats) setStats(res.stats);
         } catch (err) {
@@ -94,181 +154,200 @@ export default function SweepingModulePage() {
         } finally {
             setAssessmentsLoading(false);
         }
-    }, [assessmentTab, dateFilter, customDate]);
-
-    const handleViewUser = (beat: any, userId: string) => {
-        setFilteredUserId(userId);
-        setViewingBeat(beat);
-    };
+    }, [dateFilter, customDate]);
 
     useEffect(() => {
         loadBeats();
-        loadAssessments(isAO ? 'ACTION_REQUIRED' : 'PENDING_QC', dateFilter, customDate);
+        loadAssessments(dateFilter, customDate);
     }, []);
 
-    const refreshAll = () => {
-        loadBeats();
-        loadAssessments(assessmentTab || (isAO ? 'ACTION_REQUIRED' : 'PENDING_QC'));
-    };
+    // Filtered inspection reports
+    const filteredAssessments = assessments.filter(rec => {
+        if (selectedStatus && (rec.status || '').toUpperCase() !== selectedStatus) return false;
+
+        if (selectedZone) {
+            const selectedZoneObj = zones.find(z => z.id === selectedZone);
+            const zName = selectedZoneObj?.name?.toLowerCase() || '';
+            const recZone = (rec.zoneName || rec.zone?.name || '').toLowerCase();
+            if (zName && !recZone.includes(zName)) return false;
+        }
+
+        if (selectedWard) {
+            const selectedWardObj = allWards.find(w => w.id === selectedWard);
+            const wName = selectedWardObj?.name?.toLowerCase() || '';
+            const recWard = (rec.wardName || rec.ward?.name || '').toLowerCase();
+            if (wName && !recWard.includes(wName)) return false;
+        }
+
+        if (selectedArea && (rec.areaName || rec.area?.name) !== selectedArea) return false;
+        if (selectedAreaType && (rec.areaType || rec.type) !== selectedAreaType) return false;
+
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            const bName = (rec.beatName || '').toLowerCase();
+            const supName = (rec.createdBy || rec.supervisor?.name || '').toLowerCase();
+            if (!bName.includes(q) && !supName.includes(q)) return false;
+        }
+
+        return true;
+    });
+
+    // Unique Areas and Area Types for Dropdowns
+    const uniqueAreas = Array.from(new Set(assessments.map(a => a.areaName || a.area?.name).filter(Boolean))).sort();
+    const uniqueAreaTypes = Array.from(new Set(assessments.map(a => a.areaType || a.type).filter(Boolean))).sort();
 
     return (
         <Protected>
             <ModuleGuard module="SWEEPING" roles={["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN", "COMMISSIONER"]}>
-                <div className="page" style={{ padding: "24px" }}>
-                    <div style={{ marginBottom: "32px", display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "space-between", alignItems: "flex-end" }}>
-                        <div>
-                            <p className="eyebrow" style={{ textTransform: 'uppercase', fontSize: '10px', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>
-                                Module · Sweeping & Sanitation
-                            </p>
-                            <h1 style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "12px" }}>
-                                Sweeping & Sanitation {user?.cityName && <span style={{ color: '#64748b', fontWeight: 400 }}>| {user.cityName}</span>}
-                            </h1>
-                            <p style={{ color: "#64748b", fontSize: "14px", marginTop: "4px" }}>
-                                Manage street beats, daily inspection reports, and quality control.
-                            </p>
-                        </div>
+                <div className="page" style={{ padding: "24px 28px", animation: 'fadeIn 0.3s ease-out' }}>
+                    <style jsx>{`
+                        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+                        .date-picker-input {
+                            border: 1px solid #cbd5e1;
+                            border-radius: 10px;
+                            padding: 7px 12px;
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: #0f172a;
+                            outline: none;
+                            cursor: pointer;
+                            background: #ffffff;
+                            transition: all 0.2s;
+                        }
+                        .filter-select {
+                            padding: 8px 14px;
+                            border-radius: 10px;
+                            border: 1px solid #cbd5e1;
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: #334155;
+                            background-color: #ffffff;
+                            outline: none;
+                            cursor: pointer;
+                            transition: border-color 0.15s, box-shadow 0.15s;
+                        }
+                        .filter-select:focus {
+                            border-color: #2563eb;
+                            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+                        }
+                    `}</style>
 
-                        <div style={{ display: "flex", gap: "12px" }}>
-                            <div style={{
-                                display: "flex",
-                                backgroundColor: "#f1f5f9",
-                                padding: "4px",
-                                borderRadius: "12px",
-                                border: "1px solid #e2e8f0"
-                            }}>
+                    {/* TOP HEADER CONTAINER */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                        borderRadius: 24, padding: '24px 28px', border: '1px solid #e2e8f0',
+                        boxShadow: '0 4px 20px rgba(15,23,42,0.03)', marginBottom: 28
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                                    <h1 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                                        Sweeping - Beat Management
+                                    </h1>
+                                    <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 12px', backgroundColor: '#eff6ff', color: '#2563eb', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+                                        {user?.cityName || 'Indore'}
+                                    </span>
+                                </div>
+                                <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontWeight: 500 }}>
+                                    Manage street beats, daily inspection reports, and quality control assignments.
+                                </p>
+                            </div>
+
+                            {/* TOP NAVIGATION TABS */}
+                            <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 14, border: '1px solid #e2e8f0' }}>
                                 <button
                                     onClick={() => setActiveTab("assessments")}
                                     style={{
-                                        padding: "8px 16px",
-                                        borderRadius: "8px",
-                                        border: "none",
-                                        fontSize: "13px",
-                                        fontWeight: 700,
-                                        backgroundColor: activeTab === "assessments" ? "white" : "transparent",
-                                        color: activeTab === "assessments" ? "#2563eb" : "#64748b",
-                                        boxShadow: activeTab === "assessments" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                                        cursor: "pointer",
-                                        transition: "all 0.2s"
+                                        padding: '9px 18px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                        background: activeTab === "assessments" ? "#2563eb" : "transparent",
+                                        color: activeTab === "assessments" ? "#ffffff" : "#64748b",
+                                        boxShadow: activeTab === "assessments" ? "0 4px 12px rgba(37,99,235,0.25)" : "none",
+                                        transition: "all 0.15s"
                                     }}
                                 >
-                                    Dashboard & Daily Reports {stats.pending > 0 && <span style={{ marginLeft: "6px", backgroundColor: "#ef4444", color: "white", padding: "2px 6px", borderRadius: "10px", fontSize: "10px" }}>{stats.pending}</span>}
+                                    Dashboard {stats.pending > 0 && <span style={{ marginLeft: 6, background: "#ef4444", color: "#ffffff", padding: "2px 7px", borderRadius: 10, fontSize: 10 }}>{stats.pending}</span>}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("submitted_reports")}
+                                    style={{
+                                        padding: '9px 18px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                        background: activeTab === "submitted_reports" ? "#2563eb" : "transparent",
+                                        color: activeTab === "submitted_reports" ? "#ffffff" : "#64748b",
+                                        boxShadow: activeTab === "submitted_reports" ? "0 4px 12px rgba(37,99,235,0.25)" : "none",
+                                        transition: "all 0.15s"
+                                    }}
+                                >
+                                    Inspection Reports
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("beats")}
                                     style={{
-                                        padding: "8px 16px",
-                                        borderRadius: "8px",
-                                        border: "none",
-                                        fontSize: "13px",
-                                        fontWeight: 700,
-                                        backgroundColor: activeTab === "beats" ? "white" : "transparent",
-                                        color: activeTab === "beats" ? "#2563eb" : "#64748b",
-                                        boxShadow: activeTab === "beats" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                                        cursor: "pointer",
-                                        transition: "all 0.2s"
+                                        padding: '9px 18px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                        background: activeTab === "beats" ? "#2563eb" : "transparent",
+                                        color: activeTab === "beats" ? "#ffffff" : "#64748b",
+                                        boxShadow: activeTab === "beats" ? "0 4px 12px rgba(37,99,235,0.25)" : "none",
+                                        transition: "all 0.15s"
                                     }}
                                 >
-                                    Beat Management ({beats.length})
+                                    Registered Beats ({beats.length})
                                 </button>
                                 <Link
                                     href="/city/beat-requests"
                                     style={{
-                                        padding: "8px 16px",
-                                        borderRadius: "8px",
-                                        fontSize: "13px",
-                                        fontWeight: 700,
-                                        backgroundColor: pendingBeatCount > 0 ? "#fef3c7" : "transparent",
-                                        color: pendingBeatCount > 0 ? "#b45309" : "#64748b",
-                                        textDecoration: "none",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        transition: "all 0.2s"
+                                        padding: '9px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800, textDecoration: 'none',
+                                        background: pendingBeatCount > 0 ? '#fef3c7' : 'transparent',
+                                        color: pendingBeatCount > 0 ? '#b45309' : '#64748b',
+                                        display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s'
                                     }}
                                 >
                                     Beat Requests
                                     {pendingBeatCount > 0 && (
-                                        <span style={{ backgroundColor: "#d97706", color: "white", padding: "2px 6px", borderRadius: "10px", fontSize: "10px", fontWeight: 800 }}>
+                                        <span style={{ background: "#d97706", color: "#ffffff", padding: "2px 6px", borderRadius: 10, fontSize: 10 }}>
                                             {pendingBeatCount}
                                         </span>
                                     )}
                                 </Link>
+                                <button
+                                    onClick={() => setActiveTab("assignments")}
+                                    style={{
+                                        padding: '9px 18px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                        background: activeTab === "assignments" ? "#2563eb" : "transparent",
+                                        color: activeTab === "assignments" ? "#ffffff" : "#64748b",
+                                        boxShadow: activeTab === "assignments" ? "0 4px 12px rgba(37,99,235,0.25)" : "none",
+                                        transition: "all 0.15s"
+                                    }}
+                                >
+                                    Beat Staff Assignments
+                                </button>
                             </div>
-
-                            {activeTab === "beats" && (
-                                <div style={{
-                                    display: "flex",
-                                    backgroundColor: "#f1f5f9",
-                                    padding: "4px",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e2e8f0"
-                                }}>
-                                    <button
-                                        onClick={() => setViewMode("table")}
-                                        style={{
-                                            padding: "8px 16px",
-                                            borderRadius: "8px",
-                                            border: "none",
-                                            fontSize: "13px",
-                                            fontWeight: 700,
-                                            backgroundColor: viewMode === "table" ? "white" : "transparent",
-                                            color: viewMode === "table" ? "#2563eb" : "#64748b",
-                                            boxShadow: viewMode === "table" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                                            cursor: "pointer",
-                                            transition: "all 0.2s"
-                                        }}
-                                    >
-                                        Table View
-                                    </button>
-                                    <button
-                                        onClick={() => setViewMode("map")}
-                                        style={{
-                                            padding: "8px 16px",
-                                            borderRadius: "8px",
-                                            border: "none",
-                                            fontSize: "13px",
-                                            fontWeight: 700,
-                                            backgroundColor: viewMode === "map" ? "white" : "transparent",
-                                            color: viewMode === "map" ? "#2563eb" : "#64748b",
-                                            boxShadow: viewMode === "map" ? "0 2px 4px rgba(0,0,0,0.05)" : "none",
-                                            cursor: "pointer",
-                                            transition: "all 0.2s"
-                                        }}
-                                    >
-                                        Map View
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
 
-                    {/* Operational Intelligence Cards (Shown when activeTab === "assessments") */}
+                    {/* OPERATIONAL INTELLIGENCE & STATS (Only on Dashboard Tab) */}
                     {activeTab === "assessments" && (
-                        <div>
-                            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Operational Intelligence</h3>
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+                        <div style={{ marginBottom: 28 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+                                <div>
+                                    <h2 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Inspection Summary</h2>
+                                    <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b', fontWeight: 500 }}>Real-time status of beat inspections and verification reports</p>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 10 }}>
                                         {[
-                                            { id: 'today', label: 'TODAY' },
-                                            { id: 'week', label: 'WEEK' },
-                                            { id: 'month', label: 'MONTH' },
-                                            { id: 'all', label: 'ALL TIME' },
+                                            { id: 'today', label: 'Today' },
+                                            { id: 'week', label: 'This Week' },
+                                            { id: 'month', label: 'This Month' },
                                         ].map((d) => (
                                             <button
                                                 key={d.id}
                                                 onClick={() => {
-                                                    setDateFilter(d.id);
-                                                    loadAssessments(assessmentTab, d.id, customDate);
+                                                    setDateFilter(d.id as any);
+                                                    loadAssessments(d.id as any, customDate);
                                                 }}
                                                 style={{
-                                                    padding: '6px 12px',
-                                                    borderRadius: '8px',
-                                                    border: 'none',
-                                                    fontSize: '11px',
-                                                    fontWeight: 800,
-                                                    cursor: 'pointer',
-                                                    background: dateFilter === d.id ? '#0f172a' : 'transparent',
+                                                    padding: '6px 14px', borderRadius: 8, border: 'none', fontSize: 11,
+                                                    fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                                                    background: dateFilter === d.id ? '#2563eb' : 'transparent',
                                                     color: dateFilter === d.id ? '#ffffff' : '#64748b'
                                                 }}
                                             >
@@ -278,208 +357,183 @@ export default function SweepingModulePage() {
                                     </div>
                                     <input
                                         type="date"
+                                        className="date-picker-input"
                                         value={customDate}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             setCustomDate(val);
                                             setDateFilter('custom');
-                                            loadAssessments(assessmentTab, 'custom', val);
-                                        }}
-                                        style={{
-                                            border: '1px solid #e2e8f0',
-                                            borderRadius: '10px',
-                                            padding: '6px 10px',
-                                            fontSize: '12px',
-                                            fontWeight: 700,
-                                            outline: 'none',
-                                            background: 'white'
+                                            loadAssessments('custom', val);
                                         }}
                                     />
                                 </div>
                             </div>
 
-                            {/* 4 Stat Cards */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-                                <div style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', borderLeft: '4px solid #2563eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TOTAL SUBMISSIONS</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', marginTop: '6px' }}>{stats.total || 0}</div>
-                                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Total reports in period</div>
-                                </div>
-                                <div style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', borderLeft: '4px solid #10b981', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>APPROVED BY QC</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#10b981', marginTop: '6px' }}>{stats.approved || 0}</div>
-                                    <div style={{ fontSize: '12px', color: '#059669', marginTop: '4px' }}>Status: Verified Clean</div>
-                                </div>
-                                <div style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', borderLeft: '4px solid #ef4444', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>REJECTED / ACTION REQ.</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#ef4444', marginTop: '6px' }}>{stats.actionRequired || 0}</div>
-                                    <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px' }}>Status: Non-Compliant</div>
-                                </div>
-                                <div style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #e2e8f0', borderLeft: '4px solid #f59e0b', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PENDING REVIEW</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 900, color: '#f59e0b', marginTop: '6px' }}>{stats.pending || 0}</div>
-                                    <div style={{ fontSize: '12px', color: '#d97706', marginTop: '4px' }}>Awaiting QC inspection</div>
-                                </div>
+                            {/* 7 STAT CARDS GRID */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16 }}>
+                                <StatCard label="TOTAL REGISTERED BEATS" value={beats.length || 0} sub="Registered Assets" color="#0f172a" />
+                                <StatCard label="SUBMITTED REPORTS" value={stats.total || 0} sub="Total Submitted" color="#2563eb" />
+                                <StatCard label="PENDING REPORTS" value={stats.pending || 0} sub="Awaiting QC Review" color="#f59e0b" />
+                                <StatCard label="APPROVED REPORTS" value={stats.approved || 0} sub="Verified Clean" color="#10b981" />
+                                <StatCard label="REJECTED REPORTS" value={stats.actionRequired || 0} sub="Non-Compliant" color="#ef4444" />
+                                <StatCard label="ACTION REQUIRED REPORTS" value={stats.actionRequired || 0} sub="Needs Resolution" color="#ea580c" />
+                                <StatCard label="RESOLVED REPORTS" value={stats.actionTaken || 0} sub="Action Completed" color="#06b6d4" />
                             </div>
                         </div>
                     )}
 
-                    {/* Main Content Area */}
+                    {/* MAIN CONTENT AREA */}
                     {loading || assessmentsLoading ? (
-                        <div className="card" style={{ padding: "48px", textAlign: "center", backgroundColor: "white", borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-                            <div className="animate-spin" style={{ width: "28px", height: "28px", border: "3px solid #f3f3f3", borderTop: "3px solid #2563eb", borderRadius: "50%", margin: "0 auto" }}></div>
-                            <p style={{ marginTop: "16px", color: "#64748b", fontSize: "14px" }}>Loading data...</p>
+                        <div style={{ padding: 48, textAlign: 'center', background: '#ffffff', borderRadius: 20, border: '1px solid #e2e8f0' }}>
+                            <div className="animate-spin" style={{ width: 32, height: 32, border: '3px solid #f3f3f3', borderTop: '3px solid #2563eb', borderRadius: '50%', margin: '0 auto' }} />
+                            <p style={{ marginTop: 14, color: '#64748b', fontSize: 13, fontWeight: 600 }}>Syncing sweeping workspace...</p>
                         </div>
                     ) : (
-                        <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-                            {activeTab === "beats" ? (
-                                viewMode === "table" ? (
-                                    <BeatTable
-                                        beats={beats}
-                                        onRefresh={loadBeats}
-                                        onView={setViewingBeat}
-                                        onEdit={setEditingBeat}
-                                        onViewData={setInspectingBeat}
-                                        onAssign={setAssigningBeat}
-                                        onAssignEmployees={setDeployingBeat}
-                                        onViewUser={handleViewUser}
-                                        isQC={isQC || isAO}
-                                        isAO={isAO}
-                                        isReadOnly={isReadOnly}
-                                    />
-                                ) : (
-                                    <GlobalBeatMapView beats={beats} />
-                                )
-                            ) : (
-                                <div style={{ backgroundColor: 'white', borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                                    <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                                        <div>
-                                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
-                                                Latest Sweeping Inspections & Reports
-                                            </h3>
-                                            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-                                                Real-time stream of employee sweeping submissions and QC assessments.
-                                            </p>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                            <button
-                                                onClick={() => loadAssessments('PENDING_QC')}
-                                                style={{
-                                                    padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
-                                                    border: assessmentTab === 'PENDING_QC' ? 'none' : '1px solid #e2e8f0',
-                                                    backgroundColor: assessmentTab === 'PENDING_QC' ? '#2563eb' : 'white',
-                                                    color: assessmentTab === 'PENDING_QC' ? 'white' : '#64748b', cursor: 'pointer'
-                                                }}
-                                            >
-                                                Pending QC
-                                            </button>
-                                            <button
-                                                onClick={() => loadAssessments('ACTION_REQUIRED')}
-                                                style={{
-                                                    padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
-                                                    border: assessmentTab === 'ACTION_REQUIRED' ? 'none' : '1px solid #e2e8f0',
-                                                    backgroundColor: assessmentTab === 'ACTION_REQUIRED' ? '#ef4444' : 'white',
-                                                    color: assessmentTab === 'ACTION_REQUIRED' ? 'white' : '#64748b', cursor: 'pointer'
-                                                }}
-                                            >
-                                                Action Required
-                                            </button>
-                                            <button
-                                                onClick={() => loadAssessments('ACTION_TAKEN')}
-                                                style={{
-                                                    padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
-                                                    border: assessmentTab === 'ACTION_TAKEN' ? 'none' : '1px solid #e2e8f0',
-                                                    backgroundColor: assessmentTab === 'ACTION_TAKEN' ? '#059669' : 'white',
-                                                    color: assessmentTab === 'ACTION_TAKEN' ? 'white' : '#64748b', cursor: 'pointer'
-                                                }}
-                                            >
-                                                AO Action Taken ({stats.actionTaken || 0})
-                                            </button>
-                                            <button
-                                                onClick={() => loadAssessments('HISTORY')}
-                                                style={{
-                                                    padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
-                                                    border: assessmentTab === 'HISTORY' ? 'none' : '1px solid #e2e8f0',
-                                                    backgroundColor: assessmentTab === 'HISTORY' ? '#0f172a' : 'white',
-                                                    color: assessmentTab === 'HISTORY' ? 'white' : '#64748b', cursor: 'pointer'
-                                                }}
-                                            >
-                                                All Reports / History
-                                            </button>
+                        <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                            {activeTab === 'submitted_reports' ? (
+                                <SubmittedReportsTab
+                                    moduleKey="SWEEPING"
+                                    assetLabel="Beat"
+                                    onViewReport={(rec) => setInspectingBeat({ ...rec, isAssessmentReview: true })}
+                                />
+                            ) : activeTab === 'assignments' ? (
+                                <BeatStaffAssignmentsTab />
+                            ) : activeTab === 'beats' ? (
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                                        <div style={{ display: 'flex', background: '#f1f5f9', padding: 3, borderRadius: 10 }}>
+                                            <button onClick={() => setViewMode('table')} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: viewMode === 'table' ? '#ffffff' : 'transparent', color: viewMode === 'table' ? '#2563eb' : '#64748b' }}>Table View</button>
+                                            <button onClick={() => setViewMode('map')} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: viewMode === 'map' ? '#ffffff' : 'transparent', color: viewMode === 'map' ? '#2563eb' : '#64748b' }}>Map View</button>
                                         </div>
                                     </div>
-                                    <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
-                                                <th style={{ padding: '14px 24px', fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Date & Time</th>
-                                                <th style={{ padding: '14px 24px', fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Beat / Segment</th>
-                                                <th style={{ padding: '14px 24px', fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Submitted By</th>
-                                                <th style={{ padding: '14px 24px', fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Status</th>
-                                                <th style={{ padding: '14px 24px', fontSize: '12px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {assessments.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={5} style={{ textAlign: 'center', padding: '48px', color: '#64748b', fontSize: '14px' }}>
-                                                        No sweeping reports found for this period.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                assessments.map((record) => (
-                                                    <tr key={record.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                        <td style={{ padding: '16px 24px', fontSize: '13px', color: '#334155', fontWeight: 600 }}>
-                                                            {new Date(record.createdAt).toLocaleDateString()}
-                                                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                                                                {new Date(record.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                            </div>
-                                                        </td>
-                                                        <td style={{ padding: '16px 24px' }}>
-                                                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{record.beatName || "Street Beat"}</div>
-                                                            <div style={{ fontSize: '12px', color: '#64748b' }}>Segment: {record.segmentId?.split('-')[0]}</div>
-                                                        </td>
-                                                        <td style={{ padding: '16px 24px' }}>
-                                                            <div style={{ fontWeight: 700, color: '#1e293b', fontSize: '13px' }}>{record.createdBy || "Field Employee"}</div>
-                                                            <div style={{ fontSize: '12px', color: '#64748b' }}>{record.phone || "—"}</div>
-                                                        </td>
-                                                        <td style={{ padding: '16px 24px' }}>
-                                                            <span style={{
-                                                                padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 800,
-                                                                backgroundColor: record.status === 'PENDING_QC' || record.status === 'SUBMITTED' ? '#fff7ed' :
-                                                                    record.status === 'APPROVED' ? '#ecfdf5' :
-                                                                        record.status === 'ACTION_REQUIRED' ? '#fef2f2' :
-                                                                            record.status === 'ACTION_TAKEN' ? '#eff6ff' : '#f1f5f9',
-                                                                color: record.status === 'PENDING_QC' || record.status === 'SUBMITTED' ? '#c2410c' :
-                                                                    record.status === 'APPROVED' ? '#065f46' :
-                                                                        record.status === 'ACTION_REQUIRED' ? '#991b1b' :
-                                                                            record.status === 'ACTION_TAKEN' ? '#2563eb' : '#64748b'
-                                                            }}>
-                                                                {record.status}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                                                            <button
-                                                                onClick={() => setInspectingBeat({ ...record, isAssessmentReview: true })}
-                                                                style={{
-                                                                    backgroundColor: '#2563eb', color: 'white', border: 'none',
-                                                                    padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
-                                                                    cursor: 'pointer', boxShadow: '0 1px 2px rgba(37,99,235,0.2)'
-                                                                }}
-                                                            >
-                                                                View Report
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                    {viewMode === 'table' ? (
+                                        <BeatTable
+                                            beats={beats}
+                                            onRefresh={loadBeats}
+                                            onView={setViewingBeat}
+                                            onEdit={setEditingBeat}
+                                            onViewData={setInspectingBeat}
+                                            onAssign={setAssigningBeat}
+                                            onAssignEmployees={setDeployingBeat}
+                                            onViewUser={handleViewUser}
+                                            isQC={isQC || isAO}
+                                            isAO={isAO}
+                                            isReadOnly={isReadOnly}
+                                        />
+                                    ) : (
+                                        <GlobalBeatMapView beats={beats} />
+                                    )}
+                                </div>
+                            ) : (
+                                /* DASHBOARD INSPECTION REPORTS STREAM TABLE */
+                                <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+                                    {/* Header Controls with Dropdowns */}
+                                    <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9', background: '#fcfdfe' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+                                            <div>
+                                                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#0f172a' }}>Sweeping Inspection Reports</h3>
+                                                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b', fontWeight: 500 }}>Real-time stream of field assessments</p>
+                                            </div>
+                                            <span style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '4px 12px', borderRadius: 12 }}>
+                                                {filteredAssessments.length} Reports Found
+                                            </span>
+                                        </div>
+
+                                        {/* Dropdowns Filter Bar */}
+                                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                                            {/* Search Input */}
+                                            <input
+                                                type="text"
+                                                placeholder="🔍 Search by beat, supervisor..."
+                                                value={searchQuery}
+                                                onChange={e => setSearchQuery(e.target.value)}
+                                                className="filter-select"
+                                                style={{ flex: 1, minWidth: 220 }}
+                                            />
+
+                                            {/* Zone Dropdown */}
+                                            <select value={selectedZone} onChange={e => handleZoneChange(e.target.value)} className="filter-select">
+                                                <option value="">All Zones</option>
+                                                {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                                            </select>
+
+                                            {/* Ward Dropdown */}
+                                            <select value={selectedWard} onChange={e => handleWardChange(e.target.value)} className="filter-select">
+                                                <option value="">All Wards</option>
+                                                {visibleWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                            </select>
+
+                                            {/* Area Dropdown */}
+                                            <select value={selectedArea} onChange={e => setSelectedArea(e.target.value)} className="filter-select">
+                                                <option value="">All Areas</option>
+                                                {uniqueAreas.map((area: any) => <option key={area} value={area}>{area}</option>)}
+                                            </select>
+
+                                            {/* Area Type Dropdown */}
+                                            <select value={selectedAreaType} onChange={e => setSelectedAreaType(e.target.value)} className="filter-select">
+                                                <option value="">All Area Types</option>
+                                                {uniqueAreaTypes.map((type: any) => <option key={type} value={type}>{type}</option>)}
+                                            </select>
+
+                                            {/* Status Dropdown */}
+                                            <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} className="filter-select">
+                                                <option value="">All Status</option>
+                                                <option value="PENDING_QC">Pending QC</option>
+                                                <option value="APPROVED">Approved</option>
+                                                <option value="REJECTED">Rejected</option>
+                                                <option value="ACTION_REQUIRED">Action Required</option>
+                                                <option value="ACTION_TAKEN">Resolved (Action Taken)</option>
+                                            </select>
+
+                                            {(selectedZone || selectedWard || selectedArea || selectedAreaType || selectedStatus || searchQuery) && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedZone(''); setSelectedWard(''); setSelectedArea('');
+                                                        setSelectedAreaType(''); setSelectedStatus(''); setSearchQuery('');
+                                                    }}
+                                                    style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                                                >
+                                                    Reset Filters
+                                                </button>
                                             )}
-                                        </tbody>
-                                    </table>
+                                        </div>
+                                    </div>
+
+                                    {/* Records Table */}
+                                    {filteredAssessments.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: '56px 24px', color: '#94a3b8' }}>
+                                            <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+                                            <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>No sweeping reports found for this selection.</p>
+                                        </div>
+                                    ) : (
+                                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                                            <thead>
+                                                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>DATE & TIME</th>
+                                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>BEAT & LOCATION</th>
+                                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ZONE & WARD</th>
+                                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>SUBMITTED BY</th>
+                                                    <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>STATUS</th>
+                                                    <th style={{ padding: '14px 20px', textAlign: 'right', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase' }}>ACTIONS</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {filteredAssessments.map((record) => (
+                                                    <ReportTableRow
+                                                        key={record.id}
+                                                        record={record}
+                                                        onView={() => setInspectingBeat({ ...record, isAssessmentReview: true })}
+                                                    />
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Modals */}
+                    {/* MODALS */}
                     {viewingBeat && (
                         <BeatMapView
                             beat={viewingBeat}
@@ -505,7 +559,7 @@ export default function SweepingModulePage() {
                             <AssessmentReviewModal
                                 record={inspectingBeat}
                                 onClose={() => setInspectingBeat(null)}
-                                onRefresh={refreshAll}
+                                onRefresh={() => loadAssessments(dateFilter, customDate)}
                             />
                         ) : (
                             <KMLDataViewer
@@ -518,34 +572,91 @@ export default function SweepingModulePage() {
                     {assigningBeat && (
                         <AssignBeatModal
                             beat={assigningBeat}
-                            mode="SUPERVISOR"
                             onClose={() => setAssigningBeat(null)}
-                            onSuccess={() => {
-                                setAssigningBeat(null);
-                                loadBeats();
-                            }}
+                            onSuccess={loadBeats}
                         />
                     )}
-
-                    {deployingBeat && (
-                        <AssignBeatModal
-                            beat={deployingBeat}
-                            mode="EMPLOYEE"
-                            onClose={() => setDeployingBeat(null)}
-                            onSuccess={() => {
-                                setDeployingBeat(null);
-                                loadBeats();
-                            }}
-                        />
-                    )}
-
-                    <style jsx>{`
-                        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                        .animate-spin { animation: spin 1s linear infinite; }
-                        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                    `}</style>
                 </div>
             </ModuleGuard>
         </Protected>
+    );
+}
+
+function StatCard({ label, value, sub, color }: any) {
+    return (
+        <div style={{
+            background: '#ffffff',
+            borderRadius: 16,
+            padding: '18px 22px',
+            border: '1px solid #e2e8f0',
+            borderLeft: `6px solid ${color}`,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4
+        }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
+            <div style={{ fontSize: 30, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
+            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>
+        </div>
+    );
+}
+
+function ReportTableRow({ record, onView }: any) {
+    const st = (record.status || 'SUBMITTED').toUpperCase();
+    const statusConfig: Record<string, { bg: string; color: string; label: string }> = {
+        PENDING_QC: { bg: '#eff6ff', color: '#2563eb', label: 'PENDING QC' },
+        SUBMITTED: { bg: '#eff6ff', color: '#2563eb', label: 'SUBMITTED' },
+        APPROVED: { bg: '#ecfdf5', color: '#059669', label: 'APPROVED' },
+        REJECTED: { bg: '#fef2f2', color: '#dc2626', label: 'REJECTED' },
+        ACTION_REQUIRED: { bg: '#fff7ed', color: '#c2410c', label: 'ACTION REQ.' },
+        ACTION_TAKEN: { bg: '#f0fdf4', color: '#15803d', label: 'RESOLVED' },
+    };
+    const sc = statusConfig[st] || { bg: '#f1f5f9', color: '#64748b', label: st };
+    const dt = new Date(record.createdAt);
+
+    return (
+        <tr style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.12s' }}>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>
+                    {dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                </div>
+                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>
+                    {dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{record.beatName || 'Street Beat'}</div>
+                {record.segmentId && <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Seg: <strong>{String(record.segmentId).split('-')[0]}</strong></div>}
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{record.wardName || 'Ward N/A'}</div>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{record.zoneName || 'Zone N/A'}</div>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>{record.createdBy || record.supervisor?.name || 'Field Employee'}</div>
+                {record.phone && <div style={{ fontSize: 10, color: '#94a3b8' }}>{record.phone}</div>}
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{
+                    padding: '4px 12px', borderRadius: 20, fontSize: 10, fontWeight: 800,
+                    background: sc.bg, color: sc.color, letterSpacing: '0.04em',
+                    border: `1px solid ${sc.color}22`
+                }}>{sc.label}</span>
+            </td>
+            <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                <button
+                    onClick={onView}
+                    style={{
+                        padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                        background: '#2563eb', color: 'white', border: 'none',
+                        cursor: 'pointer', boxShadow: '0 2px 8px rgba(37,99,235,0.25)', transition: 'all 0.15s'
+                    }}
+                >
+                    📋 View Report
+                </button>
+            </td>
+        </tr>
     );
 }

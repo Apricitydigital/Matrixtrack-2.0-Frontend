@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { ModuleRecordsApi, TwinbinApi, ApiError, AuthApi, EmployeesApi, apiFetch } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
+import UniversalReportModal from "@components/UniversalReportModal";
 
 export default function QCDashboard() {
     const { user: authUser } = useAuth();
@@ -430,93 +431,19 @@ export default function QCDashboard() {
                 </div>
             </div>
 
-            {/* VIEW MODAL (unchanged logic, just re-rendering) */}
             {viewRecord && (
-                <div className="modal modal-open">
-                    <div className="modal-box w-11/12 max-w-3xl">
-                        <h3 className="font-bold text-lg mb-4 flex justify-between">
-                            <span>{getRecordLabel(viewRecord.type)} Details</span>
-                            <StatusBadge status={viewRecord.status} />
-                        </h3>
-
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <h4 className="font-semibold text-sm muted mb-1">Location</h4>
-                                <p>{viewRecord.areaName}</p>
-                                <p className="text-sm">{viewRecord.locationName}</p>
-                                <p className="text-xs muted">{viewRecord.zoneName} / {viewRecord.wardName}</p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-sm muted mb-1">Metadata</h4>
-                                <p className="text-sm">Created: {new Date(viewRecord.createdAt).toLocaleString()}</p>
-                                <p className="text-sm">ID: <span className="font-mono text-xs">{viewRecord.id}</span></p>
-                            </div>
-                        </div>
-
-                        {/* TYPE SPECIFIC DETAILS */}
-                        {viewRecord.type === 'VISIT_REPORT' && (
-                            <div className="bg-base-200 p-4 rounded-lg">
-                                <h4 className="font-bold mb-4">Daily Report Details</h4>
-
-                                {viewRecord.questionnaire ? (
-                                    <div className="flex flex-col gap-3 mb-4">
-                                        {Object.entries(viewRecord.questionnaire).map(([key, val]: any, idx) => (
-                                            <div key={idx} className="border-b border-base-300/50 pb-2 last:border-0">
-                                                <p className="font-medium text-sm text-base-content/70">{val?.question || key}</p>
-                                                <p className="text-sm font-semibold">{val?.answer || (typeof val === 'string' ? val : JSON.stringify(val))}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm muted italic mb-4">No questionnaire data available.</p>
-                                )}
-
-                                {/* IMAGE GALLERY */}
-                                {(viewRecord.images || viewRecord.photos) && (
-                                    <div>
-                                        <h5 className="font-bold text-xs uppercase muted mb-2">Attached Images</h5>
-                                        <div className="flex gap-2 flex-wrap">
-                                            {(viewRecord.images || viewRecord.photos).map((img: string, idx: number) => (
-                                                <a key={idx} href={img} target="_blank" rel="noopener noreferrer" className="group relative">
-                                                    <img
-                                                        src={img}
-                                                        alt={`Evidence ${idx + 1}`}
-                                                        className="w-24 h-24 object-cover rounded-lg border border-base-300 shadow-sm transition-transform group-hover:scale-105"
-                                                    />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {viewRecord.distanceMeters && (
-                                    <div className="mt-4 pt-2 border-t border-base-300/50">
-                                        <p className="text-xs muted">Distance from bin: <span className="font-mono">{Math.round(viewRecord.distanceMeters)}m</span></p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {viewRecord.type === 'BIN_REGISTRATION' && (
-                            <div className="bg-base-200 p-4 rounded-lg">
-                                <h4 className="font-bold mb-2">Bin Request Details</h4>
-                                <p className="text-sm">Road Type: {viewRecord.roadType || 'N/A'}</p>
-                                <p className="text-sm">Condition: {viewRecord.condition || 'N/A'}</p>
-                            </div>
-                        )}
-
-                        <div className="modal-action justify-between">
-                            <button className="btn" onClick={() => setViewRecord(null)}>Close</button>
-                            <div className="flex gap-2">
-                                {(viewRecord.status === 'PENDING_QC' || viewRecord.status === 'PENDING') && (
-                                    <>
-                                        <button className="btn btn-error" onClick={() => handleReject(viewRecord)}>Reject</button>
-                                        <button className="btn btn-success" onClick={() => handleApprove(viewRecord)}>Approve</button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <UniversalReportModal
+                    moduleTitle={viewRecord.type === 'BIN_REGISTRATION' ? 'Litter Bin Request' : viewRecord.type === 'CITIZEN_REPORT' ? 'Citizen Complaint' : 'Daily Report'}
+                    moduleBadge="TWIN BIN AUDIT"
+                    record={viewRecord}
+                    onClose={() => setViewRecord(null)}
+                    onApprove={viewRecord.status === 'PENDING_QC' || viewRecord.status === 'PENDING' ? async (rec, remarks) => {
+                        await handleApprove(rec);
+                    } : undefined}
+                    onReject={viewRecord.status === 'PENDING_QC' || viewRecord.status === 'PENDING' ? async (rec, remarks) => {
+                        await handleReject(rec);
+                    } : undefined}
+                />
             )}
 
             {/* ASSIGN MODAL (unchanged) */}

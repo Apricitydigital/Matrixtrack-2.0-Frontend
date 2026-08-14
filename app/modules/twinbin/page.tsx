@@ -22,10 +22,8 @@ export default function TwinbinPage() {
             <h3>Unauthorized for this module</h3>
             <p className="muted">Action Officer access is not allowed on Employee or QC workspaces.</p>
           </div>
-        ) : isAdmin ? (
+        ) : (isAdmin || isQC || roles.includes("HMS_SUPER_ADMIN")) ? (
           <AdminDashboard />
-        ) : isQC ? (
-          <QCDashboard />
         ) : (
           <EmployeeDashboard />
         )}

@@ -1,25 +1,83 @@
 import { useEffect, useState } from 'react';
-import { ApiError, ToiletApi } from '@lib/apiClient';
+import { ApiError, ToiletApi, GeoApi } from '@lib/apiClient';
 import Link from 'next/link';
 import { FilterTabs } from "../qc-shared";
+import UniversalReportModal from '@components/UniversalReportModal';
 
 export default function ReportsTab() {
     const [stats, setStats] = useState<any>(null);
+    const [totalToiletsCount, setTotalToiletsCount] = useState<number>(0);
     const [reports, setReports] = useState<any[]>([]);
+    const [selectedReport, setSelectedReport] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [reportsError, setReportsError] = useState('');
-    const [dateMode, setDateMode] = useState<'today' | 'single' | 'range'>('today');
-    const [singleDate, setSingleDate] = useState('');
-    const [rangeStartDate, setRangeStartDate] = useState('');
-    const [rangeEndDate, setRangeEndDate] = useState('');
     const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'custom'>('today');
     const [customDate, setCustomDate] = useState('');
-    const [statusTab, setStatusTab] = useState('');
+
+    // List Filters
+    const [selectedStatus, setSelectedStatus] = useState<string>('');
+    const [selectedZone, setSelectedZone] = useState<string>('');
+    const [selectedWard, setSelectedWard] = useState<string>('');
+    const [selectedSupervisor, setSelectedSupervisor] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState<string>('');
+
+    // Metadata for dropdowns
+    const [zones, setZones] = useState<any[]>([]);
+    const [allWards, setAllWards] = useState<any[]>([]);
+    const [supervisors, setSupervisors] = useState<any[]>([]);
+
+    useEffect(() => {
+        loadMetadata();
+    }, []);
+
+    const loadMetadata = async () => {
+        try {
+            const [zoneRes, empRes, toiRes, wardRes] = await Promise.allSettled([
+                ToiletApi.getZones(),
+                ToiletApi.listEmployees(),
+                ToiletApi.listAllToilets(),
+                GeoApi.list("WARD")
+            ]);
+            if (zoneRes.status === 'fulfilled') setZones(zoneRes.value.nodes || []);
+            if (empRes.status === 'fulfilled') setSupervisors((empRes.value.employees || []).filter((e: any) => e.role === 'SUPERVISOR'));
+            if (toiRes.status === 'fulfilled') setTotalToiletsCount(toiRes.value.toilets?.length || 0);
+            if (wardRes.status === 'fulfilled') setAllWards(wardRes.value.nodes || []);
+        } catch (e) {
+            console.error('Failed to load metadata', e);
+        }
+    };
+
+    // Filtered wards based on selectedZone
+    const visibleWards = selectedZone
+        ? allWards.filter(w => w.parentId === selectedZone || w.parent?.id === selectedZone)
+        : allWards;
+
+    const handleZoneChange = (zoneId: string) => {
+        setSelectedZone(zoneId);
+        if (selectedWard) {
+            const wardObj = allWards.find(w => w.id === selectedWard);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (zoneId && parentZ !== zoneId) {
+                setSelectedWard('');
+            }
+        }
+    };
+
+    const handleWardChange = (wardId: string) => {
+        setSelectedWard(wardId);
+        if (wardId) {
+            const wardObj = allWards.find(w => w.id === wardId);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (parentZ) {
+                setSelectedZone(parentZ);
+            }
+        }
+    };
 
     useEffect(() => {
         loadReports();
-    }, [dateMode, singleDate, rangeStartDate, rangeEndDate, statusTab, dateFilter, customDate]);
+    }, [dateFilter, customDate, selectedStatus]);
 
     const loadReports = async () => {
         setLoading(true);
@@ -30,25 +88,16 @@ export default function ReportsTab() {
         let endDate: string | undefined;
 
         const now = new Date();
-        if (dateMode === 'today') {
+        if (dateFilter === 'today') {
             const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
             const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
             startDate = start.toISOString();
             endDate = end.toISOString();
-        } else if (dateMode === 'single' && singleDate) {
-            const [year, month, day] = singleDate.split('-').map(Number);
+        } else if (dateFilter === 'custom' && customDate) {
+            const [year, month, day] = customDate.split('-').map(Number);
             if (year && month && day) {
                 const start = new Date(year, month - 1, day, 0, 0, 0, 0);
                 const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-                startDate = start.toISOString();
-                endDate = end.toISOString();
-            }
-        } else if (dateMode === 'range' && rangeStartDate && rangeEndDate) {
-            const [sY, sM, sD] = rangeStartDate.split('-').map(Number);
-            const [eY, eM, eD] = rangeEndDate.split('-').map(Number);
-            if (sY && sM && sD && eY && eM && eD) {
-                const start = new Date(sY, sM - 1, sD, 0, 0, 0, 0);
-                const end = new Date(eY, eM - 1, eD, 23, 59, 59, 999);
                 startDate = start.toISOString();
                 endDate = end.toISOString();
             }
@@ -70,8 +119,8 @@ export default function ReportsTab() {
 
         try {
             const inspectionsRes = await ToiletApi.listInspections({
-                pageSize: 10,
-                status: statusTab || undefined,
+                pageSize: 100,
+                status: selectedStatus || undefined,
                 startDate,
                 endDate
             });
@@ -85,265 +134,302 @@ export default function ReportsTab() {
         }
     };
 
-    const isAdmin = stats && 'todayInspections' in stats;
+    const statusMap: Record<string, { bg: string; color: string; label: string }> = {
+        SUBMITTED: { bg: '#eff6ff', color: '#2563eb', label: 'SUBMITTED' },
+        APPROVED: { bg: '#ecfdf5', color: '#059669', label: 'APPROVED' },
+        REJECTED: { bg: '#fef2f2', color: '#dc2626', label: 'REJECTED' },
+        ACTION_REQUIRED: { bg: '#fff7ed', color: '#c2410c', label: 'ACTION REQ.' },
+        ACTION_TAKEN: { bg: '#f0fdf4', color: '#15803d', label: 'RESOLVED' },
+    };
+
+    // Client-side filtering by Zone, Ward, Supervisor
+    const filteredReports = reports.filter(r => {
+        if (selectedZone) {
+            const zId = r.toilet?.ward?.parentId || r.toilet?.zoneId || r.zoneId;
+            if (zId !== selectedZone) return false;
+        }
+        if (selectedWard) {
+            const wId = r.toilet?.wardId || r.wardId;
+            if (wId !== selectedWard) return false;
+        }
+        if (selectedSupervisor) {
+            const supId = r.supervisorId || r.supervisor?.id;
+            if (supId !== selectedSupervisor) return false;
+        }
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            const tName = (r.toilet?.name || '').toLowerCase();
+            const tType = (r.toilet?.type || '').toLowerCase();
+            const sName = (r.supervisor?.name || r.employee?.name || r.submittedBy?.name || '').toLowerCase();
+            const wName = (r.toilet?.ward?.name || r.wardName || '').toLowerCase();
+            if (!tName.includes(q) && !tType.includes(q) && !sName.includes(q) && !wName.includes(q)) return false;
+        }
+        return true;
+    });
+
+    const activeStats = stats ? (stats[dateFilter] || stats.today || {}) : {};
 
     return (
-        <div className="reports-tab" style={{ animation: 'fadeIn 0.5s ease-out' }}>
+        <div className="reports-tab" style={{ animation: 'fadeIn 0.4s ease-out' }}>
             <style jsx>{`
-                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
                 .date-picker-input {
-                    border: 1px solid #e2e8f0;
+                    border: 1px solid #cbd5e1;
                     border-radius: 10px;
                     padding: 6px 12px;
-                    font-size: 11px;
-                    font-weight: 800;
-                    color: #1e293b;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #0f172a;
                     outline: none;
                     cursor: pointer;
-                    background: #f8fafc;
+                    background: #ffffff;
                     transition: all 0.2s;
                 }
                 .date-picker-input:focus {
-                    border-color: #3b82f6;
-                    background: #fff;
+                    border-color: #2563eb;
+                }
+                .filter-select {
+                    padding: 8px 12px;
+                    border-radius: 10px;
+                    border: 1px solid #cbd5e1;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #334155;
+                    background-color: #ffffff;
+                    outline: none;
+                    cursor: pointer;
                 }
             `}</style>
 
-            {isAdmin ? (
-                <div className="admin-dashboard">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                        <h2 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Operational Intelligence</h2>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <FilterTabs
-                                tabs={[
-                                    { id: 'today', label: 'TODAY' },
-                                    { id: 'single', label: 'SPECIFIC DATE' },
-                                    { id: 'range', label: 'DATE RANGE' }
-                                ]}
-                                activeTab={dateMode}
-                                onChange={(id: any) => setDateMode(id)}
-                            />
-
-                            {dateMode === 'single' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, backgroundColor: '#f1f5f9', padding: '4px 10px', borderRadius: 12 }}>
-                                    <span style={{ fontSize: 11, fontWeight: 900, color: '#64748b' }}>📅 Date:</span>
-                                    <input
-                                        type="date"
-                                        className="date-picker-input"
-                                        value={singleDate}
-                                        onChange={(e) => setSingleDate(e.target.value)}
-                                    />
-                                </div>
-                            )}
-
-                            {dateMode === 'range' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: '#f1f5f9', padding: '4px 10px', borderRadius: 12 }}>
-                                    <span style={{ fontSize: 11, fontWeight: 900, color: '#64748b' }}>From:</span>
-                                    <input
-                                        type="date"
-                                        className="date-picker-input"
-                                        value={rangeStartDate}
-                                        onChange={(e) => setRangeStartDate(e.target.value)}
-                                    />
-                                    <span style={{ fontSize: 11, fontWeight: 900, color: '#64748b' }}>To:</span>
-                                    <input
-                                        type="date"
-                                        className="date-picker-input"
-                                        value={rangeEndDate}
-                                        onChange={(e) => setRangeEndDate(e.target.value)}
-                                    />
-                                </div>
-                            )}
-                        </div>
+            <div className="admin-dashboard">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                        <h2 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0 }}>Inspection Summary</h2>
+                        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b', fontWeight: 500 }}>Real-time status of toilet inspections and verification reports</p>
                     </div>
-
-                    {stats[dateMode] ? (
-                        <div className="stats-compact-grid">
-                            <StatCard label={`${dateMode.toUpperCase()} SUBMISSIONS`} value={stats[dateMode].submitted} sub="Total reports" color="#3b82f6" />
-                            <StatCard label="APPROVED BY QC" value={stats[dateMode].approved} sub="Status: Verified" color="#059669" />
-                            <StatCard label="REJECTED BY QC" value={stats[dateMode].rejected} sub="Status: Non-Compliant" color="#ef4444" />
-                            <StatCard label="PENDING REVIEW" value={stats[dateMode].actionRequired} sub="Status: Action Required" color="#f59e0b" />
-                        </div>
-                    ) : (
-                        <div className="stats-compact-grid">
-                            <StatCard label="INSPECTIONS TODAY" value={stats.todayInspections} sub="Total submissions" color="#3b82f6" />
-                            <StatCard label="NEW ASSETS TODAY" value={stats.todayRegistrations} sub="Asset registration" color="#10b981" />
-                            <StatCard label="ASSIGNED QC" value={stats.qcCount || 0} sub="Quality Control Team" color="#8b5cf6" />
-                            <StatCard label="ASSIGNED AO" value={stats.aoCount || 0} sub="Action Officers" color="#f43f5e" />
-                        </div>
-                    )}
-
-                    <div className="stats-compact-grid mt-4">
-                        <StatCard label="TOTAL INFRASTRUCTURE" value={stats.totalToilets} sub="Registered assets" color="#6366f1" />
-                        <StatCard label="STAFF ON DUTY" value={stats.onDutyEmployees} sub="Active Personnel" color="#f59e0b" />
-                        <StatCard label="TOTAL APPROVED" value={stats.approvedToilets ?? stats.approvedInspections} sub="Approved assets" color="#059669" />
-                        <StatCard label="PENDING VERIFICATION" value={stats.pendingToilets ?? stats.pendingReview} sub="Pending assets" color="#d97706" />
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <FilterTabs
+                            tabs={[
+                                { id: 'today', label: 'Today' },
+                                { id: 'week', label: 'This Week' },
+                                { id: 'month', label: 'This Month' },
+                            ]}
+                            activeTab={dateFilter}
+                            onChange={(id: any) => setDateFilter(id)}
+                        />
+                        <input
+                            type="date"
+                            className="date-picker-input"
+                            value={customDate}
+                            onChange={(e) => {
+                                setCustomDate(e.target.value);
+                                setDateFilter('custom');
+                            }}
+                        />
                     </div>
                 </div>
-            ) : (
-                <div className="supervisor-dashboard">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                        <div className="tab-filters">
-                            <FilterTabs
-                                tabs={[
-                                    { id: 'today', label: 'TODAY' },
-                                    { id: 'week', label: 'WEEK' },
-                                    { id: 'month', label: 'MONTH' }
-                                ]}
-                                activeTab={dateFilter}
-                                onChange={(id) => setDateFilter(id)}
-                            />
+
+                {/* 7 STAT CARDS IN A GRID */}
+                <div className="stats-compact-grid" style={{ marginBottom: 24 }}>
+                    <StatCard label="TOTAL TOILETS" value={totalToiletsCount} sub="Registered Assets" color="#0f172a" />
+                    <StatCard label="SUBMITTED REPORTS" value={activeStats.submitted || 0} sub="Total Submitted" color="#2563eb" />
+                    <StatCard label="PENDING REPORTS" value={(activeStats.submitted || 0) - (activeStats.approved || 0) - (activeStats.rejected || 0)} sub="Pending Review" color="#f59e0b" />
+                    <StatCard label="APPROVED REPORTS" value={activeStats.approved || 0} sub="Approved by QC" color="#10b981" />
+                    <StatCard label="REJECTED REPORTS" value={activeStats.rejected || 0} sub="Rejected by QC" color="#ef4444" />
+                    <StatCard label="ACTION REQUIRED" value={activeStats.actionRequired || 0} sub="Needs Resolution" color="#ea580c" />
+                    <StatCard label="RESOLVED REPORTS" value={activeStats.actionTaken || 0} sub="Action Completed" color="#06b6d4" />
+                </div>
+            </div>
+
+            {loading && <div className="loading-state" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}><p>Syncing dashboard...</p></div>}
+            {error && <div className="alert error" style={{ padding: 12, borderRadius: 10, background: '#fee2e2', color: '#b91c1c', marginBottom: 16 }}>{error}</div>}
+            {!error && reportsError && <div className="alert error" style={{ padding: 12, borderRadius: 10, background: '#fee2e2', color: '#b91c1c', marginBottom: 16 }}>{reportsError}</div>}
+
+            {!loading && !error && (
+                <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+                    {/* Header Controls with Dropdown Filters */}
+                    <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: '#fcfdfe' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#0f172a' }}>Latest Cleanliness Inspections</h3>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: 12 }}>
+                                {filteredReports.length} Reports Found
+                            </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+                        {/* Dropdowns & Search Filter Bar */}
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                             <input
-                                type="date"
-                                className="date-picker-input"
-                                value={customDate}
-                                onChange={(e) => {
-                                    setCustomDate(e.target.value);
-                                    setDateFilter('custom');
-                                }}
+                                type="text"
+                                placeholder="Search toilet name, ID, ward, supervisor..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="filter-select"
+                                style={{ flex: 1, minWidth: 220 }}
                             />
+
+                            {/* Zone Dropdown */}
+                            <select value={selectedZone} onChange={e => handleZoneChange(e.target.value)} className="filter-select">
+                                <option value="">All Zones</option>
+                                {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                            </select>
+
+                            {/* Ward Dropdown (Always enabled, auto-selects zone) */}
+                            <select value={selectedWard} onChange={e => handleWardChange(e.target.value)} className="filter-select">
+                                <option value="">All Wards</option>
+                                {visibleWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                            </select>
+
+                            {/* Supervisor Dropdown */}
+                            <select value={selectedSupervisor} onChange={e => setSelectedSupervisor(e.target.value)} className="filter-select">
+                                <option value="">All Supervisors</option>
+                                {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+
+                            {/* Status Dropdown */}
+                            <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} className="filter-select">
+                                <option value="">All Status</option>
+                                <option value="SUBMITTED">Submitted</option>
+                                <option value="APPROVED">Approved</option>
+                                <option value="REJECTED">Rejected</option>
+                                <option value="ACTION_REQUIRED">Action Required</option>
+                                <option value="ACTION_TAKEN">Resolved (Action Taken)</option>
+                            </select>
+
+                            {(selectedZone || selectedWard || selectedSupervisor || selectedStatus) && (
+                                <button
+                                    onClick={() => { setSelectedZone(''); setSelectedWard(''); setSelectedSupervisor(''); setSelectedStatus(''); }}
+                                    style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                                >
+                                    Reset Filters
+                                </button>
+                            )}
                         </div>
                     </div>
 
-                    {stats && (stats[dateFilter] || stats.today) && (
-                        <div className="stats-compact-grid">
-                            <StatCard label="SUBMITTED" value={(stats[dateFilter] || stats.today).submitted} sub="Reports" color="#3b82f6" />
-                            <StatCard label="APPROVED" value={(stats[dateFilter] || stats.today).approved} sub="By QC" color="#10b981" />
-                            <StatCard label="REJECTED" value={(stats[dateFilter] || stats.today).rejected} sub="By QC" color="#ef4444" />
-                            <StatCard label="PENDING" value={(stats[dateFilter] || stats.today).actionRequired} sub="Needs Review" color="#f59e0b" />
+                    {/* Records Table */}
+                    {filteredReports.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '56px 24px', color: '#94a3b8' }}>
+                            <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+                            <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>No inspections found for this selection.</p>
+                        </div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                                <thead>
+                                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                        <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase', width: 45 }}>S.NO</th>
+                                        <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>SUBMISSION DATE & TIME</th>
+                                        <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>TOILET NAME & TYPE </th>
+                                        <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LOCATION</th>
+                                        <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>SUBMITTED BY</th>
+                                        <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>STATUS</th>
+                                        <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredReports.slice(0, 15).map((report, idx) => {
+                                        const st = (report.status || 'SUBMITTED').toUpperCase();
+                                        const sc = statusMap[st] || { bg: '#f1f5f9', color: '#64748b', label: st };
+                                        const dt = new Date(report.createdAt);
+
+                                        const submitterName = report.supervisor?.name
+                                            || report.employee?.name
+                                            || report.submittedBy?.name
+                                            || report.user?.name
+                                            || report.createdByName
+                                            || (typeof report.supervisor === 'string' && !report.supervisor.includes('-') ? report.supervisor : 'Minakshi');
+
+                                        return (
+                                            <tr key={report.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.12s' }}>
+                                                {/* S.NO */}
+                                                <td style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#64748b' }}>
+                                                    {idx + 1}
+                                                </td>
+
+                                                {/* Date & Time */}
+                                                <td style={{ padding: '12px 14px' }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>
+                                                        {dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
+                                                        {dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                </td>
+
+                                                {/* Toilet Name & Type */}
+                                                <td style={{ padding: '12px 14px' }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{report.toilet?.name || 'Public Toilet Asset'}</div>
+                                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{report.toilet?.type || 'PT / CT Toilet'}</div>
+                                                </td>
+
+                                                {/* Location (Zone & Ward) */}
+                                                <td style={{ padding: '12px 14px' }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{report.toilet?.ward?.name || report.wardName || 'Ward 1'}</div>
+                                                    <div style={{ fontSize: 11, color: '#64748b' }}>{report.toilet?.ward?.parent?.name || report.zoneName || 'Zone 1'}</div>
+                                                </td>
+
+                                                {/* Submitted By */}
+                                                <td style={{ padding: '12px 14px' }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>{submitterName}</div>
+                                                    <div style={{ fontSize: 11, color: '#64748b' }}>Supervisor</div>
+                                                </td>
+
+                                                {/* Status */}
+                                                <td style={{ padding: '12px 14px' }}>
+                                                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: sc.bg, color: sc.color, border: `1px solid ${sc.color}22` }}>
+                                                        {sc.label}
+                                                    </span>
+                                                </td>
+
+                                                {/* Actions */}
+                                                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                                    <button
+                                                        onClick={() => setSelectedReport(report)}
+                                                        style={{
+                                                            padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                                                            background: '#2563eb', color: '#fff', border: 'none',
+                                                            cursor: 'pointer', boxShadow: '0 2px 8px rgba(37,99,235,0.2)'
+                                                        }}
+                                                    >
+                                                        View Report
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>
             )}
 
-            <div className="section-divider my-6"></div>
-
-            {loading && <div className="loading-state"><p>Syncing dashboard...</p></div>}
-            {error && <div className="alert error">{error}</div>}
-            {!error && reportsError && <div className="alert error">{reportsError}</div>}
-
-            {!loading && !error && (
-                <div className="card compact-card">
-                    <div className="card-header-flex" style={{ flexWrap: 'wrap', gap: 12 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                            <h3 className="section-title">Latest Cleanliness Inspections</h3>
-                            <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 10 }}>
-                                {[
-                                    { id: '', label: 'ALL' },
-                                    { id: 'SUBMITTED', label: 'PENDING' },
-                                    { id: 'APPROVED', label: 'APPROVED' },
-                                    { id: 'REJECTED', label: 'REJECTED' },
-                                    { id: 'ACTION_REQUIRED', label: 'ACTION REQ' }
-                                ].map((t) => (
-                                    <button
-                                        key={t.id}
-                                        onClick={() => setStatusTab(t.id)}
-                                        style={{
-                                            padding: '4px 10px',
-                                            borderRadius: 8,
-                                            border: 'none',
-                                            fontSize: 10,
-                                            fontWeight: 800,
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            background: statusTab === t.id ? '#3b82f6' : 'transparent',
-                                            color: statusTab === t.id ? '#ffffff' : '#64748b'
-                                        }}
-                                    >
-                                        {t.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <Link href="/modules/toilet/inspection" className="text-link text-sm font-bold">View All →</Link>
-                    </div>
-
-                    <div className="table-responsive">
-                        <table className="modern-table">
-                            <thead>
-                                <tr>
-                                    <th>Asset Name</th>
-                                    <th>Employee</th>
-                                    <th>Date & Time</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {reports.length > 0 ? reports.slice(0, 10).map((report) => (
-                                    <tr key={report.id}>
-                                        <td className="font-bold">{report.toilet?.name || '---'}</td>
-                                        <td>{report.supervisor?.name || '---'}</td>
-                                        <td className="muted text-xs">
-                                            {new Date(report.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} • {new Date(report.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                        </td>
-                                        <td>
-                                            <StatusBadge status={report.status} />
-                                        </td>
-                                        <td>
-                                            <Link href={`/modules/toilet/inspection/${report.id}`} target="_blank" className="btn btn-xs btn-outline">
-                                                📄 Full Report
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr><td colSpan={5} className="text-center py-8 muted">No inspections found for this period.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            {selectedReport && (
+                <UniversalReportModal
+                    moduleTitle="Cleanliness of Toilet"
+                    moduleBadge="HMS TOILET AUDIT"
+                    record={selectedReport}
+                    onClose={() => setSelectedReport(null)}
+                    onApprove={async (rec, comment) => {
+                        await ToiletApi.reviewInspection(rec.id, { status: 'APPROVED', comment });
+                        loadReports();
+                    }}
+                    onReject={async (rec, comment) => {
+                        await ToiletApi.reviewInspection(rec.id, { status: 'REJECTED', comment });
+                        loadReports();
+                    }}
+                    onActionRequired={async (rec, comment) => {
+                        await ToiletApi.reviewInspection(rec.id, { status: 'ACTION_REQUIRED', comment });
+                        loadReports();
+                    }}
+                />
             )}
 
             <style jsx>{`
                 .stats-compact-grid {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 16px;
-                }
-                .section-divider {
-                    height: 1px;
-                    background: #e2e8f0;
-                }
-                .card-header-flex {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 20px;
-                }
-                .section-title {
-                    font-size: 16px;
-                    font-weight: 800;
-                    margin: 0;
-                }
-                .compact-card {
-                    padding: 20px;
-                }
-                .tab-filters {
-                    display: flex;
-                    gap: 8px;
-                }
-                .text-link {
-                    color: #3b82f6;
-                    text-decoration: none;
-                }
-                .modern-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .modern-table th {
-                    text-align: left;
-                    font-size: 12px;
-                    color: #0f172a;
-                    padding: 12px 8px;
-                    border-bottom: 2px solid #f1f5f9;
-                }
-                .modern-table td {
-                    padding: 12px 8px;
-                    font-size: 14px;
-                    border-bottom: 1px solid #f1f5f9;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: 14px;
                 }
             `}</style>
         </div>
@@ -392,26 +478,3 @@ function StatCard({ label, value, sub, color }: any) {
         </div>
     );
 }
-
-function StatusBadge({ status }: { status: string }) {
-    const config: any = {
-        'APPROVED': { bg: '#dcfce7', text: '#166534' },
-        'REJECTED': { bg: '#fee2e2', text: '#991b1b' },
-        'SUBMITTED': { bg: '#dbeafe', text: '#1e40af' },
-        'ACTION_REQUIRED': { bg: '#ffedd5', text: '#9a3412' }
-    };
-    const s = config[status] || { bg: '#f1f5f9', text: '#475569' };
-    return (
-        <span style={{
-            padding: '4px 10px',
-            borderRadius: 6,
-            fontSize: 10,
-            fontWeight: 800,
-            backgroundColor: s.bg,
-            color: s.text
-        }}>
-            {status}
-        </span>
-    );
-}
-

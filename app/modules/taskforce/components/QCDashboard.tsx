@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { TaskforceApi, ApiError, AuthApi, apiFetch, EmployeesApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import { StatsCard, RecordsTable, StatusBadge, ActionButtons, TableColumn, FilterTabs } from "../../qc-shared";
+import UniversalReportModal from "@components/UniversalReportModal";
 
 type TaskforceRecord = {
     id: string;
@@ -523,40 +524,21 @@ export default function TaskforceQCDashboard() {
                 </section>
             )}
 
-            {viewTab === 'verification' && selectedRecord && (
-                <section className="card mt-6" style={{ borderLeft: '4px solid #1d4ed8' }}>
-                    <div className="flex justify-between items-start mb-3">
-                        <div>
-                            <p className="muted text-xs">Selected Record</p>
-                            <h3 className="text-lg font-semibold mb-1">
-                                {selectedRecord.type === 'FEEDER_POINT' ? 'Feeder Point' : 'Feeder Report'}
-                            </h3>
-                            <p className="muted text-sm mb-0">{selectedRecord.areaName || selectedRecord.locationName || '—'}</p>
-                        </div>
-                        <button className="btn btn-sm" onClick={() => setSelectedRecord(null)}>×</button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                        <InfoItem label="Zone" value={selectedRecord.zoneName || '—'} />
-                        <InfoItem label="Ward" value={selectedRecord.wardName || '—'} />
-                        <InfoItem label="Status" value={<StatusBadge status={selectedRecord.status} />} />
-                        <InfoItem
-                            label="Submitted"
-                            value={`${new Date(selectedRecord.createdAt).toLocaleDateString()} ${new Date(selectedRecord.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
-                        />
-                    </div>
-
-                    <ActionButtons
-                        status={selectedRecord.status}
-                        onApprove={() => handleAction(selectedRecord, 'APPROVE')}
-                        onReject={() => handleAction(selectedRecord, 'REJECT')}
-                        onAssign={(empId) => handleAssign(selectedRecord, empId)}
-                        assignOptions={supervisors}
-                        assignValue={assignSelection[selectedRecord.id] || ""}
-                        onAssignChange={(val) => setAssignSelection(prev => ({ ...prev, [selectedRecord.id]: val }))}
-                        loading={actionLoading === selectedRecord.id}
-                    />
-                </section>
+            {selectedRecord && (
+                <UniversalReportModal
+                    moduleTitle="CTU / GVP Transformation"
+                    moduleBadge="TASKFORCE AUDIT LOG"
+                    record={selectedRecord}
+                    onClose={() => setSelectedRecord(null)}
+                    onApprove={async (rec) => {
+                        await handleAction(rec, 'APPROVE');
+                        setSelectedRecord(null);
+                    }}
+                    onReject={async (rec) => {
+                        await handleAction(rec, 'REJECT');
+                        setSelectedRecord(null);
+                    }}
+                />
             )}
         </div>
     );
