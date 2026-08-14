@@ -1,0 +1,2286 @@
+"use client";
+
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
+
+import {
+    Download,
+    FileSpreadsheet,
+    RefreshCw,
+    Search,
+    UserPlus,
+    Users,
+    X,
+} from "lucide-react";
+
+import { RoleGuard } from "@components/Guards";
+import {
+    CityUserApi,
+    apiFetch,
+} from "@lib/apiClient";
+
+import * as XLSX from "xlsx";
+
+
+type GeoNode = {
+    id: string;
+    name: string;
+    parentId?: string | null;
+};
+
+type EmployeeRow = {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    role: string;
+    createdAt: string;
+    zoneIds?: string[];
+    wardIds?: string[];
+    modules?: {
+        id: string;
+        key: string;
+        name: string;
+        canWrite: boolean;
+        zoneIds?: string[];
+        wardIds?: string[];
+    }[];
+};
+
+type EmployeeImportStatus =
+    | "READY"
+    | "ALREADY_EXISTS"
+    | "INVALID_ZONE"
+    | "INVALID_WARD"
+    | "INVALID_MOBILE"
+    | "INVALID_DATA"
+    | "DUPLICATE_ROW";
+
+type EmployeeImportRow = {
+    rowNumber: number;
+    employeeName: string;
+    mobileNumber: string;
+    zoneName: string;
+    wardName: string;
+    zoneId?: string;
+    wardId?: string;
+    status: EmployeeImportStatus;
+    message: string;
+};
+
+
+export default function EmployeesPage() {
+
+    /* =========================================================
+       DATA
+    ========================================================= */
+
+    const [employees, setEmployees] =
+        useState<EmployeeRow[]>([]);
+
+    const [zones, setZones] =
+        useState<GeoNode[]>([]);
+
+    const [wards, setWards] =
+        useState<GeoNode[]>([]);
+
+    const [loading, setLoading] =
+        useState(true);
+
+    const [error, setError] =
+        useState("");
+
+
+    /* =========================================================
+       FILTERS
+    ========================================================= */
+
+    const [searchQuery, setSearchQuery] =
+        useState("");
+
+    const [selectedZoneId, setSelectedZoneId] =
+        useState("");
+
+    const [selectedWardId, setSelectedWardId] =
+        useState("");
+
+    /* =========================================================
+REGISTER EMPLOYEE
+========================================================= */
+
+    const [showRegisterEmployee, setShowRegisterEmployee] =
+        useState(false);
+
+    const [employeeName, setEmployeeName] =
+        useState("");
+
+    const [employeePhone, setEmployeePhone] =
+        useState("");
+
+    const [employeeZoneId, setEmployeeZoneId] =
+        useState("");
+
+    const [employeeWardId, setEmployeeWardId] =
+        useState("");
+
+    const [registeringEmployee, setRegisteringEmployee] =
+        useState(false);
+
+    const [registrationError, setRegistrationError] =
+        useState("");
+
+
+    /* =========================================================
+EMPLOYEE EXCEL IMPORT
+========================================================= */
+
+    const [showEmployeeImport, setShowEmployeeImport] =
+        useState(false);
+
+    const [employeeImportRows, setEmployeeImportRows] =
+        useState<EmployeeImportRow[]>([]);
+
+    const [employeeImportFileName, setEmployeeImportFileName] =
+        useState("");
+
+    const [employeeImportError, setEmployeeImportError] =
+        useState("");
+
+    const [importingEmployees, setImportingEmployees] =
+        useState(false);
+
+    const [employeeImportProgress, setEmployeeImportProgress] =
+        useState("");
+
+
+    /* =========================================================
+       LOAD EXISTING EMPLOYEES + GEO
+    ========================================================= */
+
+    const loadData = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError("");
+
+            const [
+                usersResult,
+                zonesResult,
+                wardsResult,
+            ] = await Promise.all([
+                CityUserApi.list(),
+
+                apiFetch<{
+                    nodes: GeoNode[];
+                }>("/city/geo?level=ZONE"),
+
+                apiFetch<{
+                    nodes: GeoNode[];
+                }>("/city/geo?level=WARD"),
+            ]);
+
+            const employeeRows =
+                (usersResult.users || []).filter(
+                    (user) =>
+                        String(user.role || "")
+                            .toUpperCase() === "EMPLOYEE"
+                );
+
+            setEmployees(employeeRows);
+            setZones(zonesResult.nodes || []);
+            setWards(wardsResult.nodes || []);
+
+        } catch (err: any) {
+            console.error(
+                "Failed to load employee master",
+                err
+            );
+
+            setError(
+                err?.message ||
+                "Unable to load employees."
+            );
+
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+
+    /* =========================================================
+       GEO MAPS
+    ========================================================= */
+
+    const zoneNameMap = useMemo(
+        () =>
+            Object.fromEntries(
+                zones.map((zone) => [
+                    zone.id,
+                    zone.name,
+                ])
+            ),
+        [zones]
+    );
+
+    const wardNameMap = useMemo(
+        () =>
+            Object.fromEntries(
+                wards.map((ward) => [
+                    ward.id,
+                    ward.name,
+                ])
+            ),
+        [wards]
+    );
+
+
+    /* =========================================================
+       WARD FILTER OPTIONS
+    ========================================================= */
+
+    const availableWards = useMemo(() => {
+        if (!selectedZoneId) {
+            return wards;
+        }
+
+        const children = wards.filter(
+            (ward) =>
+                !ward.parentId ||
+                ward.parentId === selectedZoneId
+        );
+
+        const resetRegistrationForm = () => {
+            setEmployeeName("");
+            setEmployeePhone("");
+            setEmployeeZoneId("");
+            setEmployeeWardId("");
+            setRegistrationError("");
+        };
+
+
+        const closeRegistrationModal = () => {
+            if (registeringEmployee) return;
+
+            setShowRegisterEmployee(false);
+            resetRegistrationForm();
+        };
+
+
+        const handleRegisterEmployee = async (
+            e: React.FormEvent
+        ) => {
+            e.preventDefault();
+
+            const cleanName =
+                employeeName
+                    .trim()
+                    .replace(/\s+/g, " ");
+
+            const cleanPhone =
+                employeePhone.replace(/\D/g, "");
+
+
+            if (!cleanName) {
+                setRegistrationError(
+                    "Employee name is required."
+                );
+                return;
+            }
+
+
+            if (!/^\d{10}$/.test(cleanPhone)) {
+                setRegistrationError(
+                    "Mobile number must be exactly 10 digits."
+                );
+                return;
+            }
+
+
+            if (!employeeZoneId) {
+                setRegistrationError(
+                    "Please select a Zone."
+                );
+                return;
+            }
+
+
+            if (!employeeWardId) {
+                setRegistrationError(
+                    "Please select a Ward."
+                );
+                return;
+            }
+
+
+            try {
+                setRegisteringEmployee(true);
+                setRegistrationError("");
+
+
+                await apiFetch(
+                    "/city/areas/import-register-employee",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({
+                            name: cleanName,
+                            phone: cleanPhone,
+                            zoneId: employeeZoneId,
+                            wardId: employeeWardId,
+                        }),
+                    }
+                );
+
+
+                await loadData();
+
+                setShowRegisterEmployee(false);
+                resetRegistrationForm();
+
+            } catch (err: any) {
+                console.error(
+                    "Employee registration failed",
+                    err
+                );
+
+                setRegistrationError(
+                    err?.message ||
+                    "Failed to register employee."
+                );
+
+            } finally {
+                setRegisteringEmployee(false);
+            }
+        };
+
+        return children;
+    }, [
+        wards,
+        selectedZoneId,
+    ]);
+
+    const registrationWards = useMemo(() => {
+        if (!employeeZoneId) return [];
+
+        return wards.filter(
+            (ward) =>
+                ward.parentId === employeeZoneId
+        );
+    }, [wards, employeeZoneId]);
+
+    /* =========================================================
+       FILTER EMPLOYEES
+    ========================================================= */
+
+    const filteredEmployees = useMemo(() => {
+        const query =
+            searchQuery
+                .trim()
+                .toLowerCase();
+
+        return employees.filter((employee) => {
+
+            const employeeZoneIds =
+                employee.zoneIds || [];
+
+            const employeeWardIds =
+                employee.wardIds || [];
+
+
+            if (
+                selectedZoneId &&
+                !employeeZoneIds.includes(
+                    selectedZoneId
+                )
+            ) {
+                return false;
+            }
+
+
+            if (
+                selectedWardId &&
+                !employeeWardIds.includes(
+                    selectedWardId
+                )
+            ) {
+                return false;
+            }
+
+
+            if (!query) {
+                return true;
+            }
+
+
+            const searchableText = [
+                employee.name,
+                employee.phone || "",
+                ...employeeZoneIds.map(
+                    (id) =>
+                        zoneNameMap[id] || ""
+                ),
+                ...employeeWardIds.map(
+                    (id) =>
+                        wardNameMap[id] || ""
+                ),
+            ]
+                .join(" ")
+                .toLowerCase();
+
+
+            return searchableText.includes(
+                query
+            );
+        });
+
+    }, [
+        employees,
+        searchQuery,
+        selectedZoneId,
+        selectedWardId,
+        zoneNameMap,
+        wardNameMap,
+    ]);
+
+    const handleEmployeeExcelFile = async (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const file =
+            e.target.files?.[0];
+
+        e.target.value = "";
+
+        if (!file) return;
+
+        try {
+            setEmployeeImportError("");
+            setEmployeeImportRows([]);
+            setEmployeeImportFileName(
+                file.name
+            );
+
+            const buffer =
+                await file.arrayBuffer();
+
+            const workbook =
+                XLSX.read(buffer, {
+                    type: "array",
+                });
+
+            const sheetName =
+                workbook.SheetNames[0];
+
+            if (!sheetName) {
+                throw new Error(
+                    "Excel file does not contain a worksheet."
+                );
+            }
+
+            const worksheet =
+                workbook.Sheets[
+                sheetName
+                ];
+
+            const rows =
+                XLSX.utils.sheet_to_json<any[]>(
+                    worksheet,
+                    {
+                        header: 1,
+                        defval: "",
+                    }
+                );
+
+
+            if (!rows.length) {
+                throw new Error(
+                    "Excel file is empty."
+                );
+            }
+
+
+            /* =============================================
+               EXACT HEADER FORMAT
+            ============================================= */
+
+            const headers =
+                (rows[0] || []).map(
+                    (value: unknown) =>
+                        String(value ?? "")
+                            .trim()
+                );
+
+            const expectedHeaders = [
+                "S.No",
+                "Employee Name",
+                "Mobile Number",
+                "Zone Name",
+                "Ward Name",
+            ];
+
+            const headerValid =
+                expectedHeaders.every(
+                    (header, index) =>
+                        headers[index] ===
+                        header
+                );
+
+            if (!headerValid) {
+                throw new Error(
+                    'Invalid Excel format. Required columns are exactly: "S.No", "Employee Name", "Mobile Number", "Zone Name", "Ward Name". Please use the downloaded template.'
+                );
+            }
+
+
+            /* =============================================
+               ZONE LOOKUP
+            ============================================= */
+
+            const zonesByName =
+                new globalThis.Map<
+                    string,
+                    GeoNode[]
+                >();
+
+            zones.forEach((zone) => {
+                const key =
+                    normalizeEmployeeImportValue(
+                        zone.name
+                    );
+
+                const current =
+                    zonesByName.get(key) || [];
+
+                current.push(zone);
+
+                zonesByName.set(
+                    key,
+                    current
+                );
+            });
+
+
+            /* =============================================
+               WARD LOOKUP
+            ============================================= */
+
+            const wardsByZoneAndName =
+                new globalThis.Map<
+                    string,
+                    GeoNode[]
+                >();
+
+            wards.forEach((ward) => {
+                const key =
+                    `${ward.parentId || ""}::${normalizeEmployeeImportValue(
+                        ward.name
+                    )}`;
+
+                const current =
+                    wardsByZoneAndName.get(
+                        key
+                    ) || [];
+
+                current.push(ward);
+
+                wardsByZoneAndName.set(
+                    key,
+                    current
+                );
+            });
+
+
+            /* =============================================
+               EXISTING EMPLOYEE LOOKUP
+            ============================================= */
+
+            const existingEmployeeNames =
+                new Set(
+                    employees.map(
+                        (employee) =>
+                            normalizeEmployeeImportValue(
+                                employee.name
+                            )
+                    )
+                );
+
+
+            const uploadedEmployeeKeys =
+                new Set<string>();
+
+
+            const parsedRows: EmployeeImportRow[] =
+                [];
+
+
+            rows
+                .slice(1)
+                .forEach(
+                    (
+                        rawRow: any[],
+                        index
+                    ) => {
+
+                        const rowNumber =
+                            index + 2;
+
+                        const employeeName =
+                            String(
+                                rawRow?.[1] ?? ""
+                            )
+                                .trim()
+                                .replace(
+                                    /\s+/g,
+                                    " "
+                                );
+
+                        const mobileNumber =
+                            String(
+                                rawRow?.[2] ?? ""
+                            )
+                                .replace(
+                                    /\D/g,
+                                    ""
+                                )
+                                .trim();
+
+                        const zoneName =
+                            String(
+                                rawRow?.[3] ?? ""
+                            )
+                                .trim()
+                                .replace(
+                                    /\s+/g,
+                                    " "
+                                );
+
+                        const wardName =
+                            String(
+                                rawRow?.[4] ?? ""
+                            )
+                                .trim()
+                                .replace(
+                                    /\s+/g,
+                                    " "
+                                );
+
+
+                        /* Completely blank rows */
+
+                        if (
+                            !employeeName &&
+                            !mobileNumber &&
+                            !zoneName &&
+                            !wardName
+                        ) {
+                            return;
+                        }
+
+
+                        if (
+                            !employeeName ||
+                            !zoneName ||
+                            !wardName
+                        ) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                zoneName,
+                                wardName,
+                                status:
+                                    "INVALID_DATA",
+                                message:
+                                    "Employee Name, Zone Name and Ward Name are required.",
+                            });
+
+                            return;
+                        }
+
+
+                        if (
+                            !/^\d{10}$/.test(
+                                mobileNumber
+                            )
+                        ) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                zoneName,
+                                wardName,
+                                status:
+                                    "INVALID_MOBILE",
+                                message:
+                                    "Mobile Number must contain exactly 10 digits.",
+                            });
+
+                            return;
+                        }
+
+
+                        /* Find Zone */
+
+                        const matchingZones =
+                            zonesByName.get(
+                                normalizeEmployeeImportValue(
+                                    zoneName
+                                )
+                            ) || [];
+
+
+                        if (
+                            matchingZones.length !==
+                            1
+                        ) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                zoneName,
+                                wardName,
+                                status:
+                                    "INVALID_ZONE",
+                                message:
+                                    `Zone "${zoneName}" could not be matched.`,
+                            });
+
+                            return;
+                        }
+
+
+                        const zone =
+                            matchingZones[0];
+
+
+                        /* Find Ward under Zone */
+
+                        const wardKey =
+                            `${zone.id}::${normalizeEmployeeImportValue(
+                                wardName
+                            )}`;
+
+                        const matchingWards =
+                            wardsByZoneAndName.get(
+                                wardKey
+                            ) || [];
+
+
+                        if (
+                            matchingWards.length !==
+                            1
+                        ) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                zoneName:
+                                    zone.name,
+                                wardName,
+                                zoneId:
+                                    zone.id,
+                                status:
+                                    "INVALID_WARD",
+                                message:
+                                    `"${wardName}" is not a valid Ward under ${zone.name}.`,
+                            });
+
+                            return;
+                        }
+
+
+                        const ward =
+                            matchingWards[0];
+
+
+                        /* Existing Employee */
+
+                        const normalizedName =
+                            normalizeEmployeeImportValue(
+                                employeeName
+                            );
+
+
+                        if (
+                            existingEmployeeNames.has(
+                                normalizedName
+                            )
+                        ) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                zoneName:
+                                    zone.name,
+                                wardName:
+                                    ward.name,
+                                zoneId:
+                                    zone.id,
+                                wardId:
+                                    ward.id,
+                                status:
+                                    "ALREADY_EXISTS",
+                                message:
+                                    "Employee is already registered.",
+                            });
+
+                            return;
+                        }
+
+
+                        /*
+                         * Duplicate inside same uploaded file.
+                         * Name + Zone + Ward are used.
+                         */
+
+                        const employeeKey =
+                            `${normalizedName}::${zone.id}::${ward.id}`;
+
+
+                        if (
+                            uploadedEmployeeKeys.has(
+                                employeeKey
+                            )
+                        ) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                zoneName:
+                                    zone.name,
+                                wardName:
+                                    ward.name,
+                                zoneId:
+                                    zone.id,
+                                wardId:
+                                    ward.id,
+                                status:
+                                    "DUPLICATE_ROW",
+                                message:
+                                    "Duplicate employee row in uploaded Excel.",
+                            });
+
+                            return;
+                        }
+
+
+                        uploadedEmployeeKeys.add(
+                            employeeKey
+                        );
+
+
+                        parsedRows.push({
+                            rowNumber,
+                            employeeName,
+                            mobileNumber,
+                            zoneName:
+                                zone.name,
+                            wardName:
+                                ward.name,
+                            zoneId:
+                                zone.id,
+                            wardId:
+                                ward.id,
+                            status:
+                                "READY",
+                            message:
+                                "Ready to import.",
+                        });
+                    }
+                );
+
+
+            if (!parsedRows.length) {
+                throw new Error(
+                    "No employee records were found."
+                );
+            }
+
+
+            setEmployeeImportRows(
+                parsedRows
+            );
+
+        } catch (err: any) {
+            console.error(
+                "Employee Excel validation failed",
+                err
+            );
+
+            setEmployeeImportError(
+                err?.message ||
+                "Unable to read Employee Excel."
+            );
+        }
+    };
+
+    const importReadyEmployees =
+        async () => {
+
+            const readyRows =
+                employeeImportRows.filter(
+                    (row) =>
+                        row.status ===
+                        "READY"
+                );
+
+
+            if (!readyRows.length) {
+                setEmployeeImportError(
+                    "There are no valid employees ready to import."
+                );
+
+                return;
+            }
+
+
+            try {
+                setImportingEmployees(true);
+                setEmployeeImportError("");
+
+
+                let imported = 0;
+
+                const failed: string[] =
+                    [];
+
+
+                /*
+                 * Sequential import is intentional.
+                 * It avoids sending dozens of employee
+                 * creation requests to the backend at once.
+                 */
+
+                for (
+                    let index = 0;
+                    index < readyRows.length;
+                    index++
+                ) {
+                    const row =
+                        readyRows[index];
+
+                    setEmployeeImportProgress(
+                        `Importing ${index + 1} of ${readyRows.length}...`
+                    );
+
+
+                    try {
+
+                        await apiFetch(
+                            "/city/areas/import-register-employee",
+                            {
+                                method:
+                                    "POST",
+
+                                body:
+                                    JSON.stringify({
+                                        name:
+                                            row.employeeName,
+
+                                        phone:
+                                            row.mobileNumber,
+
+                                        zoneId:
+                                            row.zoneId,
+
+                                        wardId:
+                                            row.wardId,
+                                    }),
+                            }
+                        );
+
+
+                        imported++;
+
+                    } catch (err: any) {
+
+                        failed.push(
+                            `${row.employeeName}: ${err?.message ||
+                            "Import failed"
+                            }`
+                        );
+                    }
+                }
+
+
+                await loadData();
+
+
+                if (failed.length) {
+
+                    setEmployeeImportError(
+                        `${imported} employee(s) imported. ${failed.length} row(s) failed: ${failed.join(
+                            " | "
+                        )}`
+                    );
+
+                    setEmployeeImportProgress("");
+
+                    return;
+                }
+
+
+                setShowEmployeeImport(
+                    false
+                );
+
+                setEmployeeImportRows(
+                    []
+                );
+
+                setEmployeeImportFileName(
+                    ""
+                );
+
+                setEmployeeImportProgress(
+                    ""
+                );
+
+
+            } finally {
+                setImportingEmployees(
+                    false
+                );
+            }
+        };
+
+    /* =========================================================
+       RESET WARD WHEN ZONE CHANGES
+    ========================================================= */
+
+    const handleZoneChange = (
+        zoneId: string
+    ) => {
+        setSelectedZoneId(zoneId);
+        setSelectedWardId("");
+    };
+
+    /* =========================================================
+   REGISTER EMPLOYEE HELPERS
+========================================================= */
+
+
+
+
+    const resetRegistrationForm = () => {
+        setEmployeeName("");
+        setEmployeePhone("");
+        setEmployeeZoneId("");
+        setEmployeeWardId("");
+        setRegistrationError("");
+    };
+
+
+    const closeRegistrationModal = () => {
+        if (registeringEmployee) return;
+
+        setShowRegisterEmployee(false);
+        resetRegistrationForm();
+    };
+
+
+    const handleRegisterEmployee = async (
+        e: React.FormEvent
+    ) => {
+        e.preventDefault();
+
+        const cleanName =
+            employeeName
+                .trim()
+                .replace(/\s+/g, " ");
+
+        const cleanPhone =
+            employeePhone.replace(/\D/g, "");
+
+
+        if (!cleanName) {
+            setRegistrationError(
+                "Employee name is required."
+            );
+            return;
+        }
+
+
+        if (!/^\d{10}$/.test(cleanPhone)) {
+            setRegistrationError(
+                "Mobile number must be exactly 10 digits."
+            );
+            return;
+        }
+
+
+        if (!employeeZoneId) {
+            setRegistrationError(
+                "Please select a Zone."
+            );
+            return;
+        }
+
+
+        if (!employeeWardId) {
+            setRegistrationError(
+                "Please select a Ward."
+            );
+            return;
+        }
+
+
+        try {
+            setRegisteringEmployee(true);
+            setRegistrationError("");
+
+
+            await apiFetch(
+                "/city/areas/import-register-employee",
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        name: cleanName,
+                        phone: cleanPhone,
+                        zoneId: employeeZoneId,
+                        wardId: employeeWardId,
+                    }),
+                }
+            );
+
+
+            await loadData();
+
+            setShowRegisterEmployee(false);
+            resetRegistrationForm();
+
+        } catch (err: any) {
+            console.error(
+                "Employee registration failed",
+                err
+            );
+
+            setRegistrationError(
+                err?.message ||
+                "Failed to register employee."
+            );
+
+        } finally {
+            setRegisteringEmployee(false);
+        }
+    };
+
+    const normalizeEmployeeImportValue = (
+        value: unknown
+    ) =>
+        String(value ?? "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .toLowerCase();
+
+    const downloadEmployeeTemplate = () => {
+        const templateRows = [
+            [
+                "S.No",
+                "Employee Name",
+                "Mobile Number",
+                "Zone Name",
+                "Ward Name",
+            ],
+            [
+                1,
+                "Raisa Bai Aslam",
+                "9876543210",
+                "Zone 1",
+                "1 - Bhairavgarh",
+            ],
+            [
+                2,
+                "Sanjay",
+                "9876543211",
+                "Zone 1",
+                "2 - Gadhkalika",
+            ],
+        ];
+
+        const worksheet =
+            XLSX.utils.aoa_to_sheet(
+                templateRows
+            );
+
+        worksheet["!cols"] = [
+            { wch: 10 },
+            { wch: 28 },
+            { wch: 18 },
+            { wch: 20 },
+            { wch: 30 },
+        ];
+
+        const workbook =
+            XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(
+            workbook,
+            worksheet,
+            "Employees"
+        );
+
+        XLSX.writeFile(
+            workbook,
+            "Employee_Import_Template.xlsx"
+        );
+    };
+
+    return (
+        <RoleGuard
+            roles={[
+                "CITY_ADMIN",
+                "HMS_SUPER_ADMIN",
+            ]}
+        >
+            <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+
+                <div className="mx-auto max-w-7xl">
+
+
+                    {/* =================================================
+              HEADER
+          ================================================= */}
+
+                    <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+
+                        <div className="flex items-center gap-3">
+
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                                <Users size={21} />
+                            </div>
+
+                            <div>
+                                <h1 className="text-2xl font-bold text-slate-900">
+                                    Employee Master
+                                </h1>
+
+                                <p className="mt-0.5 text-sm text-slate-500">
+                                    Employees available for beat assignment.
+                                </p>
+                            </div>
+
+                        </div>
+
+
+                        <div className="flex flex-wrap gap-2">
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEmployeeImportRows([]);
+                                    setEmployeeImportFileName("");
+                                    setEmployeeImportError("");
+                                    setEmployeeImportProgress("");
+                                    setShowEmployeeImport(true);
+                                }}
+                                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                            >
+                                <FileSpreadsheet size={17} />
+                                Import Excel
+                            </button>
+
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    resetRegistrationForm();
+                                    setShowRegisterEmployee(true);
+                                }}
+                                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                            >
+                                <UserPlus size={17} />
+                                Register Employee
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                    {/* =================================================
+              SUMMARY
+          ================================================= */}
+
+                    <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                Registered Employees
+                            </p>
+
+                            <p className="mt-1 text-2xl font-bold text-slate-900">
+                                {employees.length}
+                            </p>
+                        </div>
+
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                Filtered Results
+                            </p>
+
+                            <p className="mt-1 text-2xl font-bold text-blue-600">
+                                {filteredEmployees.length}
+                            </p>
+                        </div>
+
+
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                Wards Covered
+                            </p>
+
+                            <p className="mt-1 text-2xl font-bold text-slate-900">
+                                {
+                                    new Set(
+                                        employees.flatMap(
+                                            (employee) =>
+                                                employee.wardIds || []
+                                        )
+                                    ).size
+                                }
+                            </p>
+                        </div>
+
+                    </div>
+
+
+                    {/* =================================================
+              FILTERS
+          ================================================= */}
+
+                    <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+
+                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px_220px_auto]">
+
+                            <div className="relative">
+
+                                <Search
+                                    size={17}
+                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                />
+
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) =>
+                                        setSearchQuery(
+                                            e.target.value
+                                        )
+                                    }
+                                    placeholder="Search name, mobile, zone or ward..."
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+
+                            </div>
+
+
+                            <select
+                                value={selectedZoneId}
+                                onChange={(e) =>
+                                    handleZoneChange(
+                                        e.target.value
+                                    )
+                                }
+                                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            >
+                                <option value="">
+                                    All Zones
+                                </option>
+
+                                {zones.map((zone) => (
+                                    <option
+                                        key={zone.id}
+                                        value={zone.id}
+                                    >
+                                        {zone.name}
+                                    </option>
+                                ))}
+
+                            </select>
+
+
+                            <select
+                                value={selectedWardId}
+                                onChange={(e) =>
+                                    setSelectedWardId(
+                                        e.target.value
+                                    )
+                                }
+                                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            >
+                                <option value="">
+                                    All Wards
+                                </option>
+
+                                {availableWards.map(
+                                    (ward) => (
+                                        <option
+                                            key={ward.id}
+                                            value={ward.id}
+                                        >
+                                            {ward.name}
+                                        </option>
+                                    )
+                                )}
+
+                            </select>
+
+
+                            <button
+                                type="button"
+                                onClick={loadData}
+                                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            >
+                                <RefreshCw size={16} />
+                                Refresh
+                            </button>
+
+                        </div>
+
+                    </div>
+
+
+                    {/* =================================================
+              ERROR
+          ================================================= */}
+
+                    {error && (
+                        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                            {error}
+                        </div>
+                    )}
+
+
+                    {/* =================================================
+              TABLE
+          ================================================= */}
+
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+                        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+
+                            <div className="flex items-center gap-2">
+                                <Users
+                                    size={18}
+                                    className="text-blue-600"
+                                />
+
+                                <h2 className="font-semibold text-slate-900">
+                                    Registered Employees
+                                </h2>
+                            </div>
+
+
+                            {!loading && (
+                                <span className="text-xs font-semibold text-slate-400">
+                                    {filteredEmployees.length} employee
+                                    {filteredEmployees.length === 1
+                                        ? ""
+                                        : "s"}
+                                </span>
+                            )}
+
+                        </div>
+
+
+                        <div className="overflow-x-auto">
+
+                            <table className="min-w-full">
+
+                                <thead className="bg-slate-50">
+
+                                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+
+                                        <th className="px-5 py-3">
+                                            Employee Name
+                                        </th>
+
+                                        <th className="px-5 py-3">
+                                            Mobile Number
+                                        </th>
+
+                                        <th className="px-5 py-3">
+                                            Zone
+                                        </th>
+
+                                        <th className="px-5 py-3">
+                                            Ward
+                                        </th>
+
+                                        <th className="px-5 py-3">
+                                            Status
+                                        </th>
+
+                                    </tr>
+
+                                </thead>
+
+
+                                <tbody className="divide-y divide-slate-100">
+
+                                    {loading ? (
+
+                                        <tr>
+                                            <td
+                                                colSpan={5}
+                                                className="px-5 py-14 text-center text-sm text-slate-500"
+                                            >
+                                                Loading employees...
+                                            </td>
+                                        </tr>
+
+                                    ) : filteredEmployees.length === 0 ? (
+
+                                        <tr>
+                                            <td
+                                                colSpan={5}
+                                                className="px-5 py-14 text-center"
+                                            >
+
+                                                <div className="mx-auto flex max-w-sm flex-col items-center">
+
+                                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                                                        <Users size={21} />
+                                                    </div>
+
+                                                    <p className="font-semibold text-slate-700">
+                                                        No employees found
+                                                    </p>
+
+                                                    <p className="mt-1 text-sm text-slate-500">
+                                                        Change the filters or register employees for beat assignment.
+                                                    </p>
+
+                                                </div>
+
+                                            </td>
+                                        </tr>
+
+                                    ) : (
+
+                                        filteredEmployees.map(
+                                            (employee) => {
+
+                                                const employeeZones =
+                                                    (employee.zoneIds || [])
+                                                        .map(
+                                                            (id) =>
+                                                                zoneNameMap[id]
+                                                        )
+                                                        .filter(Boolean);
+
+                                                const employeeWards =
+                                                    (employee.wardIds || [])
+                                                        .map(
+                                                            (id) =>
+                                                                wardNameMap[id]
+                                                        )
+                                                        .filter(Boolean);
+
+
+                                                return (
+                                                    <tr
+                                                        key={employee.id}
+                                                        className="transition hover:bg-slate-50/70"
+                                                    >
+
+                                                        <td className="px-5 py-4">
+
+                                                            <div className="flex items-center gap-3">
+
+                                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">
+                                                                    {employee.name
+                                                                        ?.trim()
+                                                                        ?.charAt(0)
+                                                                        ?.toUpperCase() ||
+                                                                        "E"}
+                                                                </div>
+
+                                                                <div>
+                                                                    <p className="font-semibold text-slate-900">
+                                                                        {employee.name}
+                                                                    </p>
+
+                                                                    <p className="mt-0.5 text-xs text-slate-400">
+                                                                        Beat assignment employee
+                                                                    </p>
+                                                                </div>
+
+                                                            </div>
+
+                                                        </td>
+
+
+                                                        <td className="px-5 py-4 text-sm font-medium text-slate-700">
+                                                            {employee.phone ||
+                                                                "Not added"}
+                                                        </td>
+
+
+                                                        <td className="px-5 py-4">
+
+                                                            <div className="flex max-w-xs flex-wrap gap-1.5">
+
+                                                                {employeeZones.length ? (
+                                                                    employeeZones.map(
+                                                                        (name) => (
+                                                                            <span
+                                                                                key={name}
+                                                                                className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700"
+                                                                            >
+                                                                                {name}
+                                                                            </span>
+                                                                        )
+                                                                    )
+                                                                ) : (
+                                                                    <span className="text-sm text-slate-400">
+                                                                        —
+                                                                    </span>
+                                                                )}
+
+                                                            </div>
+
+                                                        </td>
+
+
+                                                        <td className="px-5 py-4">
+
+                                                            <div className="flex max-w-xs flex-wrap gap-1.5">
+
+                                                                {employeeWards.length ? (
+                                                                    employeeWards.map(
+                                                                        (name) => (
+                                                                            <span
+                                                                                key={name}
+                                                                                className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                                                                            >
+                                                                                {name}
+                                                                            </span>
+                                                                        )
+                                                                    )
+                                                                ) : (
+                                                                    <span className="text-sm text-slate-400">
+                                                                        —
+                                                                    </span>
+                                                                )}
+
+                                                            </div>
+
+                                                        </td>
+
+
+                                                        <td className="px-5 py-4">
+
+                                                            <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                                                Registered
+                                                            </span>
+
+                                                        </td>
+
+                                                    </tr>
+                                                );
+                                            }
+                                        )
+
+                                    )}
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+            {showRegisterEmployee && (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                    onClick={closeRegistrationModal}
+                >
+                    <form
+                        onSubmit={handleRegisterEmployee}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                    >
+
+                        {/* HEADER */}
+                        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
+                                    Employee Master
+                                </p>
+
+                                <h2 className="mt-1 text-xl font-bold text-slate-900">
+                                    Register Employee
+                                </h2>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Add an employee for beat assignment.
+                                </p>
+                            </div>
+
+
+                            <button
+                                type="button"
+                                disabled={registeringEmployee}
+                                onClick={closeRegistrationModal}
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                            >
+                                <X size={18} />
+                            </button>
+
+                        </div>
+
+
+                        {/* FORM */}
+                        <div className="space-y-5 px-6 py-5">
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Employee Name *
+                                </label>
+
+                                <input
+                                    value={employeeName}
+                                    onChange={(e) =>
+                                        setEmployeeName(e.target.value)
+                                    }
+                                    placeholder="Enter employee name"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Mobile Number *
+                                </label>
+
+                                <input
+                                    type="tel"
+                                    inputMode="numeric"
+                                    value={employeePhone}
+                                    maxLength={10}
+                                    onChange={(e) => {
+                                        const value =
+                                            e.target.value
+                                                .replace(/\D/g, "")
+                                                .slice(0, 10);
+
+                                        setEmployeePhone(value);
+                                    }}
+                                    placeholder="Enter 10 digit mobile number"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Zone *
+                                    </label>
+
+                                    <select
+                                        value={employeeZoneId}
+                                        onChange={(e) => {
+                                            setEmployeeZoneId(
+                                                e.target.value
+                                            );
+                                            setEmployeeWardId("");
+                                        }}
+                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
+                                    >
+                                        <option value="">
+                                            Select Zone
+                                        </option>
+
+                                        {zones.map((zone) => (
+                                            <option
+                                                key={zone.id}
+                                                value={zone.id}
+                                            >
+                                                {zone.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Ward *
+                                    </label>
+
+                                    <select
+                                        value={employeeWardId}
+                                        disabled={!employeeZoneId}
+                                        onChange={(e) =>
+                                            setEmployeeWardId(
+                                                e.target.value
+                                            )
+                                        }
+                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100"
+                                    >
+                                        <option value="">
+                                            {employeeZoneId
+                                                ? "Select Ward"
+                                                : "Select Zone first"}
+                                        </option>
+
+                                        {registrationWards.map(
+                                            (ward) => (
+                                                <option
+                                                    key={ward.id}
+                                                    value={ward.id}
+                                                >
+                                                    {ward.name}
+                                                </option>
+                                            )
+                                        )}
+                                    </select>
+                                </div>
+
+                            </div>
+
+
+                            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-700">
+                                This employee is registered only for beat assignment. No email or login access is created.
+                            </div>
+
+
+                            {registrationError && (
+                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                    {registrationError}
+                                </div>
+                            )}
+
+                        </div>
+
+
+                        {/* FOOTER */}
+                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+
+                            <button
+                                type="button"
+                                disabled={registeringEmployee}
+                                onClick={closeRegistrationModal}
+                                className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+                            >
+                                Cancel
+                            </button>
+
+
+                            <button
+                                type="submit"
+                                disabled={registeringEmployee}
+                                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:bg-blue-300"
+                            >
+                                <UserPlus size={17} />
+
+                                {registeringEmployee
+                                    ? "Registering..."
+                                    : "Register Employee"}
+                            </button>
+
+                        </div>
+
+                    </form>
+                </div>
+            )}
+
+            {showEmployeeImport && (
+
+                <div
+                    className="fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                    onClick={() => {
+                        if (
+                            !importingEmployees
+                        ) {
+                            setShowEmployeeImport(
+                                false
+                            );
+                        }
+                    }}
+                >
+
+                    <div
+                        onClick={(e) =>
+                            e.stopPropagation()
+                        }
+                        className="max-h-[calc(100vh-32px)] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                    >
+
+                        {/* HEADER */}
+
+                        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+
+                            <div>
+
+                                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
+                                    Employee Master
+                                </p>
+
+                                <h2 className="mt-1 text-xl font-bold text-slate-900">
+                                    Import Employees
+                                </h2>
+
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Upload employees for beat assignment using the required Excel format.
+                                </p>
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                disabled={
+                                    importingEmployees
+                                }
+                                onClick={() =>
+                                    setShowEmployeeImport(
+                                        false
+                                    )
+                                }
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500"
+                            >
+                                <X size={18} />
+                            </button>
+
+                        </div>
+
+
+                        <div className="space-y-5 px-6 py-5">
+
+
+                            {/* TEMPLATE */}
+
+                            <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+
+                                <div>
+
+                                    <p className="font-semibold text-blue-900">
+                                        Required Excel Format
+                                    </p>
+
+                                    <p className="mt-1 text-xs text-blue-700">
+                                        S.No | Employee Name | Mobile Number | Zone Name | Ward Name
+                                    </p>
+
+                                </div>
+
+
+                                <button
+                                    type="button"
+                                    onClick={
+                                        downloadEmployeeTemplate
+                                    }
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700"
+                                >
+                                    <Download size={16} />
+                                    Download Template
+                                </button>
+
+                            </div>
+
+
+                            {/* UPLOAD */}
+
+                            <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+
+                                <input
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    onChange={
+                                        handleEmployeeExcelFile
+                                    }
+                                    className="hidden"
+                                />
+
+                                <FileSpreadsheet
+                                    size={28}
+                                    className="text-blue-600"
+                                />
+
+                                <p className="mt-2 font-semibold text-slate-800">
+                                    {employeeImportFileName ||
+                                        "Select Employee Excel File"}
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-400">
+                                    .xlsx or .xls
+                                </p>
+
+                            </label>
+
+
+                            {/* SUMMARY */}
+
+                            {employeeImportRows.length >
+                                0 && (
+
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+
+                                        <div className="rounded-xl border border-slate-200 p-3">
+                                            <p className="text-xs text-slate-500">
+                                                Total Rows
+                                            </p>
+
+                                            <p className="mt-1 text-xl font-bold text-slate-900">
+                                                {
+                                                    employeeImportRows.length
+                                                }
+                                            </p>
+                                        </div>
+
+
+                                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                                            <p className="text-xs text-emerald-700">
+                                                Ready
+                                            </p>
+
+                                            <p className="mt-1 text-xl font-bold text-emerald-700">
+                                                {
+                                                    employeeImportRows.filter(
+                                                        (row) =>
+                                                            row.status ===
+                                                            "READY"
+                                                    ).length
+                                                }
+                                            </p>
+                                        </div>
+
+
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                            <p className="text-xs text-amber-700">
+                                                Existing
+                                            </p>
+
+                                            <p className="mt-1 text-xl font-bold text-amber-700">
+                                                {
+                                                    employeeImportRows.filter(
+                                                        (row) =>
+                                                            row.status ===
+                                                            "ALREADY_EXISTS"
+                                                    ).length
+                                                }
+                                            </p>
+                                        </div>
+
+
+                                        <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                                            <p className="text-xs text-red-700">
+                                                Need Action
+                                            </p>
+
+                                            <p className="mt-1 text-xl font-bold text-red-700">
+                                                {
+                                                    employeeImportRows.filter(
+                                                        (row) =>
+                                                            row.status !==
+                                                            "READY" &&
+                                                            row.status !==
+                                                            "ALREADY_EXISTS"
+                                                    ).length
+                                                }
+                                            </p>
+                                        </div>
+
+                                    </div>
+
+                                )}
+
+
+                            {/* PREVIEW */}
+
+                            {employeeImportRows.length >
+                                0 && (
+
+                                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+
+                                        <table className="min-w-full text-sm">
+
+                                            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+
+                                                <tr>
+                                                    <th className="px-3 py-3">
+                                                        Row
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
+                                                        Employee
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
+                                                        Mobile
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
+                                                        Zone
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
+                                                        Ward
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
+                                                        Status
+                                                    </th>
+                                                </tr>
+
+                                            </thead>
+
+
+                                            <tbody className="divide-y divide-slate-100">
+
+                                                {employeeImportRows.map(
+                                                    (row) => (
+
+                                                        <tr
+                                                            key={
+                                                                row.rowNumber
+                                                            }
+                                                        >
+
+                                                            <td className="px-3 py-3">
+                                                                {row.rowNumber}
+                                                            </td>
+
+                                                            <td className="px-3 py-3 font-semibold">
+                                                                {row.employeeName ||
+                                                                    "—"}
+                                                            </td>
+
+                                                            <td className="px-3 py-3">
+                                                                {row.mobileNumber ||
+                                                                    "—"}
+                                                            </td>
+
+                                                            <td className="px-3 py-3">
+                                                                {row.zoneName ||
+                                                                    "—"}
+                                                            </td>
+
+                                                            <td className="px-3 py-3">
+                                                                {row.wardName ||
+                                                                    "—"}
+                                                            </td>
+
+                                                            <td className="px-3 py-3">
+
+                                                                <span
+                                                                    className={
+                                                                        row.status ===
+                                                                            "READY"
+                                                                            ? "font-semibold text-emerald-700"
+                                                                            : row.status ===
+                                                                                "ALREADY_EXISTS"
+                                                                                ? "font-semibold text-amber-700"
+                                                                                : "font-semibold text-red-600"
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        row.status
+                                                                    }
+                                                                </span>
+
+                                                            </td>
+
+                                                        </tr>
+
+                                                    ))}
+
+                                            </tbody>
+
+                                        </table>
+
+                                    </div>
+
+                                )}
+
+
+                            {employeeImportProgress && (
+                                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                                    {employeeImportProgress}
+                                </div>
+                            )}
+
+
+                            {employeeImportError && (
+                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                    {employeeImportError}
+                                </div>
+                            )}
+
+                        </div>
+
+
+                        {/* FOOTER */}
+
+                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+
+                            <button
+                                type="button"
+                                disabled={
+                                    importingEmployees
+                                }
+                                onClick={() =>
+                                    setShowEmployeeImport(
+                                        false
+                                    )
+                                }
+                                className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+                            >
+                                Cancel
+                            </button>
+
+
+                            <button
+                                type="button"
+                                onClick={
+                                    importReadyEmployees
+                                }
+                                disabled={
+                                    importingEmployees ||
+                                    !employeeImportRows.some(
+                                        (row) =>
+                                            row.status ===
+                                            "READY"
+                                    )
+                                }
+                                className="h-11 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:bg-blue-300"
+                            >
+                                {importingEmployees
+                                    ? "Importing..."
+                                    : `Import ${employeeImportRows.filter(
+                                        (row) =>
+                                            row.status ===
+                                            "READY"
+                                    ).length
+                                    } Valid Employee(s)`}
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            )}
+
+        </RoleGuard>
+    );
+}

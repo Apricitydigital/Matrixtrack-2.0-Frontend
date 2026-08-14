@@ -7,8 +7,27 @@ import { Edit2, Trash2, Check, X, Loader2, Map, Plus, Search, Download, FileText
 import { useAuth } from "@hooks/useAuth";
 import { RoleGuard } from "@components/Guards";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
+import * as XLSX from "xlsx";
 
 type GeoNode = { id: string; name: string; parentId?: string };
+
+
+type WardImportStatus =
+  | "READY"
+  | "ALREADY_EXISTS"
+  | "INVALID_ZONE"
+  | "AMBIGUOUS_ZONE"
+  | "INVALID_DATA"
+  | "DUPLICATE_ROW";
+
+type WardImportRow = {
+  rowNumber: number;
+  zoneName: string;
+  wardName: string;
+  status: WardImportStatus;
+  message: string;
+  zoneId?: string;
+};
 
 export default function WardManagementPage() {
   const { user } = useAuth();
@@ -42,23 +61,71 @@ export default function WardManagementPage() {
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [selectedCity, setSelectedCity] = useState("ALL");
-  const [filterZoneId, setFilterZoneId] = useState<string>("ALL");
+  /* =========================================================
+     WARD EXCEL IMPORT
+  ========================================================= */
+
+  const [isImportOpen, setIsImportOpen] =
+    useState(false);
+
+  const [importRows, setImportRows] =
+    useState<WardImportRow[]>([]);
+
+  const [importFileName, setImportFileName] =
+    useState("");
+
+  const [importError, setImportError] =
+    useState("");
+
+  const [importing, setImporting] =
+    useState(false);
+
+
+  /* =========================================================
+     CITY / ZONE FILTERS
+  ========================================================= */
+
+  const [selectedCity, setSelectedCity] =
+    useState("ALL");
+
+  const [filterZoneId, setFilterZoneId] =
+    useState<string>("ALL");
+
 
   const isSuperAdmin =
     user?.role === "SUPER_ADMIN" ||
     user?.role === "HMS_SUPER_ADMIN" ||
-    user?.roles?.some((r) => ["SUPER_ADMIN", "HMS_SUPER_ADMIN"].includes(r));
+    user?.roles?.some((r) =>
+      [
+        "SUPER_ADMIN",
+        "HMS_SUPER_ADMIN",
+      ].includes(r)
+    );
 
-  const assignedCityName = user?.city?.name || user?.cityName;
 
-  // Set default city if user is City Admin
+  const assignedCityName =
+    user?.city?.name ||
+    user?.cityName;
+
+
+  /*
+   * Keep latest main behaviour:
+   * City Admin automatically stays on
+   * the city assigned to their account.
+   */
   useEffect(() => {
-    if (!isSuperAdmin && assignedCityName) {
-      setSelectedCity(assignedCityName);
+    if (
+      !isSuperAdmin &&
+      assignedCityName
+    ) {
+      setSelectedCity(
+        assignedCityName
+      );
     }
-  }, [isSuperAdmin, assignedCityName]);
-
+  }, [
+    isSuperAdmin,
+    assignedCityName,
+  ]);
   const loadData = async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -311,7 +378,7 @@ export default function WardManagementPage() {
   const filteredWards = useMemo(() => {
     return wards.filter(w => {
       const parentZoneName = zoneMap[w.parentId || ''] || '';
-      
+
       const parentZone = zones.find(z => z.id === w.parentId);
       const wardCityName = (parentZone as any)?.city?.name || user?.city?.name || "Indore";
 
@@ -341,6 +408,520 @@ export default function WardManagementPage() {
     }
   };
 
+  /* =========================================================
+   NORMALIZE EXCEL VALUES
+========================================================= */
+
+  const normalizeImportValue = (
+    value: unknown
+  ) =>
+    String(value ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+
+
+  /* =========================================================
+     DOWNLOAD EXACT WARD TEMPLATE
+  ========================================================= */
+
+  const downloadWardTemplate = () => {
+    const rows = [
+      [
+        "S.No",
+        "Zone Name",
+        "Ward Name",
+      ],
+      [
+        1,
+        "Zone 1",
+        "Ward 1",
+      ],
+      [
+        2,
+        "Zone 1",
+        "Ward 2",
+      ],
+      [
+        3,
+        "Zone 2",
+        "Ward 3",
+      ],
+    ];
+
+    const worksheet =
+      XLSX.utils.aoa_to_sheet(rows);
+
+    worksheet["!cols"] = [
+      { wch: 10 },
+      { wch: 24 },
+      { wch: 24 },
+    ];
+
+    const workbook =
+      XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Wards"
+    );
+
+    XLSX.writeFile(
+      workbook,
+      "Ward_Import_Template.xlsx"
+    );
+  };
+
+
+  /* =========================================================
+     READ + VALIDATE EXCEL
+  ========================================================= */
+
+  const handleWardExcelFile =
+    async (
+      e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+      const file =
+        e.target.files?.[0];
+
+      e.target.value = "";
+
+      if (!file) {
+        return;
+      }
+
+      try {
+        setImportError("");
+        setImportRows([]);
+        setImportFileName(
+          file.name
+        );
+
+        const buffer =
+          await file.arrayBuffer();
+
+        const workbook =
+          XLSX.read(buffer, {
+            type: "array",
+          });
+
+        const firstSheetName =
+          workbook.SheetNames[0];
+
+        if (!firstSheetName) {
+          throw new Error(
+            "Excel file does not contain a worksheet."
+          );
+        }
+
+        const worksheet =
+          workbook.Sheets[
+          firstSheetName
+          ];
+
+        const sheetRows =
+          XLSX.utils.sheet_to_json<any[]>(
+            worksheet,
+            {
+              header: 1,
+              defval: "",
+            }
+          );
+
+
+        if (!sheetRows.length) {
+          throw new Error(
+            "Excel file is empty."
+          );
+        }
+
+
+        /* =============================================
+           EXACT HEADER CHECK
+        ============================================= */
+
+        const header =
+          (sheetRows[0] || []).map(
+            (value: unknown) =>
+              String(value ?? "")
+                .trim()
+          );
+
+        const expectedHeaders = [
+          "S.No",
+          "Zone Name",
+          "Ward Name",
+        ];
+
+
+        const validHeader =
+          expectedHeaders.every(
+            (expected, index) =>
+              header[index] ===
+              expected
+          );
+
+
+        if (!validHeader) {
+          throw new Error(
+            'Invalid Excel format. Required columns are exactly: "S.No", "Zone Name", "Ward Name". Please use the downloaded template.'
+          );
+        }
+
+
+        /* =============================================
+           EXISTING GEO LOOKUPS
+        ============================================= */
+
+        const zonesByName =
+          new globalThis.Map<
+            string,
+            GeoNode[]
+          >();
+
+        zones.forEach((zone) => {
+          const key =
+            normalizeImportValue(
+              zone.name
+            );
+
+          const current =
+            zonesByName.get(key) ||
+            [];
+
+          current.push(zone);
+
+          zonesByName.set(
+            key,
+            current
+          );
+        });
+
+
+        const existingWardKeys =
+          new Set(
+            wards.map(
+              (ward) =>
+                `${ward.parentId || ""
+                }::${normalizeImportValue(
+                  ward.name
+                )}`
+            )
+          );
+
+
+        const uploadedWardKeys =
+          new Set<string>();
+
+
+        /* =============================================
+           VALIDATE ROWS
+        ============================================= */
+
+        const parsedRows: WardImportRow[] =
+          [];
+
+
+        sheetRows
+          .slice(1)
+          .forEach(
+            (
+              rawRow: any[],
+              index
+            ) => {
+
+              const rowNumber =
+                index + 2;
+
+              const zoneName =
+                String(
+                  rawRow?.[1] ?? ""
+                )
+                  .trim()
+                  .replace(
+                    /\s+/g,
+                    " "
+                  );
+
+              const wardName =
+                String(
+                  rawRow?.[2] ?? ""
+                )
+                  .trim()
+                  .replace(
+                    /\s+/g,
+                    " "
+                  );
+
+
+              /*
+               * Completely blank rows are ignored.
+               */
+              if (
+                !zoneName &&
+                !wardName
+              ) {
+                return;
+              }
+
+
+              if (
+                !zoneName ||
+                !wardName
+              ) {
+                parsedRows.push({
+                  rowNumber,
+                  zoneName,
+                  wardName,
+                  status:
+                    "INVALID_DATA",
+                  message:
+                    "Zone Name and Ward Name are required.",
+                });
+
+                return;
+              }
+
+
+              const matchingZones =
+                zonesByName.get(
+                  normalizeImportValue(
+                    zoneName
+                  )
+                ) || [];
+
+
+              if (
+                matchingZones.length ===
+                0
+              ) {
+                parsedRows.push({
+                  rowNumber,
+                  zoneName,
+                  wardName,
+                  status:
+                    "INVALID_ZONE",
+                  message:
+                    `Zone "${zoneName}" does not exist.`,
+                });
+
+                return;
+              }
+
+
+              if (
+                matchingZones.length >
+                1
+              ) {
+                parsedRows.push({
+                  rowNumber,
+                  zoneName,
+                  wardName,
+                  status:
+                    "AMBIGUOUS_ZONE",
+                  message:
+                    `Multiple zones named "${zoneName}" exist.`,
+                });
+
+                return;
+              }
+
+
+              const zone =
+                matchingZones[0];
+
+              const wardKey =
+                `${zone.id
+                }::${normalizeImportValue(
+                  wardName
+                )}`;
+
+
+              if (
+                existingWardKeys.has(
+                  wardKey
+                )
+              ) {
+                parsedRows.push({
+                  rowNumber,
+                  zoneName:
+                    zone.name,
+                  wardName,
+                  zoneId:
+                    zone.id,
+                  status:
+                    "ALREADY_EXISTS",
+                  message:
+                    "Ward already exists under this zone.",
+                });
+
+                return;
+              }
+
+
+              if (
+                uploadedWardKeys.has(
+                  wardKey
+                )
+              ) {
+                parsedRows.push({
+                  rowNumber,
+                  zoneName:
+                    zone.name,
+                  wardName,
+                  zoneId:
+                    zone.id,
+                  status:
+                    "DUPLICATE_ROW",
+                  message:
+                    "Duplicate ward in uploaded Excel.",
+                });
+
+                return;
+              }
+
+
+              uploadedWardKeys.add(
+                wardKey
+              );
+
+
+              parsedRows.push({
+                rowNumber,
+                zoneName:
+                  zone.name,
+                wardName,
+                zoneId:
+                  zone.id,
+                status:
+                  "READY",
+                message:
+                  "Ready to import.",
+              });
+            }
+          );
+
+
+        if (!parsedRows.length) {
+          throw new Error(
+            "No ward records were found in the Excel file."
+          );
+        }
+
+
+        setImportRows(
+          parsedRows
+        );
+
+      } catch (err: any) {
+        console.error(
+          "Ward Excel validation failed",
+          err
+        );
+
+        setImportError(
+          err?.message ||
+          "Unable to read Excel file."
+        );
+      }
+    };
+
+
+  /* =========================================================
+     IMPORT READY WARDS
+  ========================================================= */
+
+  const importReadyWards =
+    async () => {
+
+      const readyRows =
+        importRows.filter(
+          (row) =>
+            row.status ===
+            "READY"
+        );
+
+
+      if (!readyRows.length) {
+        setImportError(
+          "There are no valid wards ready to import."
+        );
+
+        return;
+      }
+
+
+      try {
+        setImporting(true);
+        setImportError("");
+
+
+        const response =
+          await apiFetch<{
+            success: boolean;
+
+            summary: {
+              total: number;
+              imported: number;
+              alreadyExists: number;
+              invalidZone: number;
+              ambiguousZone: number;
+              invalidData: number;
+              duplicateRows: number;
+            };
+          }>(
+            "/city/geo/wards/bulk",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  rows:
+                    readyRows.map(
+                      (row) => ({
+                        rowNumber:
+                          row.rowNumber,
+
+                        zoneName:
+                          row.zoneName,
+
+                        wardName:
+                          row.wardName,
+                      })
+                    ),
+                }),
+            }
+          );
+
+
+        await loadData(true);
+
+
+        setStatus(
+          `${response.summary.imported} ward(s) imported successfully`
+        );
+
+        setIsImportOpen(
+          false
+        );
+
+        setImportRows([]);
+        setImportFileName("");
+
+      } catch (err) {
+
+        setImportError(
+          err instanceof ApiError
+            ? err.message
+            : "Failed to import wards."
+        );
+
+      } finally {
+        setImporting(false);
+      }
+    };
+
   return (
     <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "COMMISSIONER", "ULB_OFFICER"]}>
       <div className="page" style={{ padding: "28px 36px", backgroundColor: "#f8fafc", minHeight: "100vh" }}>
@@ -363,7 +944,7 @@ export default function WardManagementPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <TableExportDropdown 
+              <TableExportDropdown
                 data={filteredWards.map(w => ({
                   WardID: w.id,
                   WardName: w.name,
@@ -372,6 +953,89 @@ export default function WardManagementPage() {
                 filename="Registered_Wards"
                 title="Registered Wards Report"
               />
+              <button
+                type="button"
+                onClick={
+                  downloadWardTemplate
+                }
+                title="Download Ward Import Template"
+                style={{
+                  height: "44px",
+                  borderRadius: "12px",
+                  border:
+                    "1px solid #cbd5e1",
+                  backgroundColor:
+                    "white",
+                  display: "flex",
+                  alignItems:
+                    "center",
+                  gap: "8px",
+                  padding:
+                    "0 16px",
+                  color:
+                    "#334155",
+                  fontWeight:
+                    800,
+                  cursor:
+                    "pointer",
+                  whiteSpace:
+                    "nowrap",
+                }}
+              >
+                <Download size={16} />
+
+                <span>
+                  Template
+                </span>
+              </button>
+
+
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportRows([]);
+                    setImportFileName("");
+                    setImportError("");
+                    setIsImportOpen(true);
+                  }}
+                  title="Import Wards from Excel"
+                  style={{
+                    height:
+                      "44px",
+                    borderRadius:
+                      "12px",
+                    border:
+                      "1px solid #bfdbfe",
+                    backgroundColor:
+                      "#eff6ff",
+                    color:
+                      "#1d4ed8",
+                    display:
+                      "flex",
+                    alignItems:
+                      "center",
+                    gap:
+                      "8px",
+                    padding:
+                      "0 16px",
+                    fontWeight:
+                      800,
+                    cursor:
+                      "pointer",
+                    whiteSpace:
+                      "nowrap",
+                  }}
+                >
+                  <FileSpreadsheet
+                    size={17}
+                  />
+
+                  <span>
+                    Import Excel
+                  </span>
+                </button>
+              )}
               <button
                 onClick={() => loadData(true)}
                 title="Refresh Wards"
@@ -399,6 +1063,725 @@ export default function WardManagementPage() {
               )}
             </div>
           </div>
+
+          {/* =========================================================
+    IMPORT WARDS EXCEL MODAL
+========================================================= */}
+
+          {isImportOpen && !isReadOnly && (
+
+            <div
+              onClick={() => {
+                if (!importing) {
+                  setIsImportOpen(
+                    false
+                  );
+                }
+              }}
+              style={{
+                position:
+                  "fixed",
+                inset:
+                  0,
+                zIndex:
+                  120,
+                background:
+                  "rgba(15,23,42,0.48)",
+                backdropFilter:
+                  "blur(4px)",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "center",
+                padding:
+                  "24px",
+                overflowY:
+                  "auto",
+              }}
+            >
+
+              <div
+                onClick={(e) =>
+                  e.stopPropagation()
+                }
+                style={{
+                  width:
+                    "100%",
+                  maxWidth:
+                    "900px",
+                  maxHeight:
+                    "calc(100vh - 48px)",
+                  overflowY:
+                    "auto",
+                  background:
+                    "#fff",
+                  borderRadius:
+                    "20px",
+                  border:
+                    "1px solid #e2e8f0",
+                  boxShadow:
+                    "0 25px 60px rgba(15,23,42,.25)",
+                }}
+              >
+
+                {/* HEADER */}
+
+                <div
+                  style={{
+                    padding:
+                      "20px 24px",
+                    borderBottom:
+                      "1px solid #e2e8f0",
+                    display:
+                      "flex",
+                    justifyContent:
+                      "space-between",
+                    alignItems:
+                      "flex-start",
+                    gap:
+                      "16px",
+                  }}
+                >
+
+                  <div>
+
+                    <div
+                      style={{
+                        color:
+                          "#2563eb",
+                        fontSize:
+                          "0.68rem",
+                        fontWeight:
+                          900,
+                        textTransform:
+                          "uppercase",
+                        letterSpacing:
+                          ".05em",
+                      }}
+                    >
+                      Ward Management
+                    </div>
+
+                    <h2
+                      style={{
+                        margin:
+                          "4px 0 0",
+                        fontSize:
+                          "1.2rem",
+                        color:
+                          "#0f172a",
+                        fontWeight:
+                          900,
+                      }}
+                    >
+                      Import Wards from Excel
+                    </h2>
+
+                    <p
+                      style={{
+                        margin:
+                          "5px 0 0",
+                        color:
+                          "#64748b",
+                        fontSize:
+                          "0.8rem",
+                      }}
+                    >
+                      Upload wards using the required template format.
+                    </p>
+
+                  </div>
+
+
+                  <button
+                    type="button"
+                    disabled={
+                      importing
+                    }
+                    onClick={() =>
+                      setIsImportOpen(
+                        false
+                      )
+                    }
+                    style={{
+                      width:
+                        "36px",
+                      height:
+                        "36px",
+                      borderRadius:
+                        "10px",
+                      border:
+                        "1px solid #e2e8f0",
+                      background:
+                        "#fff",
+                      cursor:
+                        "pointer",
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+
+                </div>
+
+
+                <div
+                  style={{
+                    padding:
+                      "24px",
+                  }}
+                >
+
+                  {/* REQUIRED FORMAT */}
+
+                  <div
+                    style={{
+                      padding:
+                        "14px",
+                      borderRadius:
+                        "14px",
+                      background:
+                        "#eff6ff",
+                      border:
+                        "1px solid #bfdbfe",
+                      marginBottom:
+                        "18px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display:
+                          "flex",
+                        alignItems:
+                          "center",
+                        justifyContent:
+                          "space-between",
+                        gap:
+                          "12px",
+                        flexWrap:
+                          "wrap",
+                      }}
+                    >
+
+                      <div>
+
+                        <strong
+                          style={{
+                            color:
+                              "#1e3a8a",
+                          }}
+                        >
+                          Required Excel Format
+                        </strong>
+
+                        <div
+                          style={{
+                            marginTop:
+                              "5px",
+                            color:
+                              "#475569",
+                            fontSize:
+                              "0.78rem",
+                          }}
+                        >
+                          S.No | Zone Name | Ward Name
+                        </div>
+
+                      </div>
+
+
+                      <button
+                        type="button"
+                        onClick={
+                          downloadWardTemplate
+                        }
+                        style={{
+                          height:
+                            "38px",
+                          padding:
+                            "0 14px",
+                          borderRadius:
+                            "10px",
+                          background:
+                            "#fff",
+                          border:
+                            "1px solid #93c5fd",
+                          color:
+                            "#1d4ed8",
+                          fontWeight:
+                            800,
+                          cursor:
+                            "pointer",
+                          display:
+                            "flex",
+                          alignItems:
+                            "center",
+                          gap:
+                            "7px",
+                        }}
+                      >
+                        <Download
+                          size={15}
+                        />
+
+                        Download Template
+                      </button>
+
+                    </div>
+                  </div>
+
+
+                  {/* FILE */}
+
+                  <label
+                    style={{
+                      display:
+                        "flex",
+                      minHeight:
+                        "110px",
+                      border:
+                        "2px dashed #cbd5e1",
+                      borderRadius:
+                        "14px",
+                      alignItems:
+                        "center",
+                      justifyContent:
+                        "center",
+                      textAlign:
+                        "center",
+                      cursor:
+                        "pointer",
+                      background:
+                        "#f8fafc",
+                      padding:
+                        "16px",
+                    }}
+                  >
+
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={
+                        handleWardExcelFile
+                      }
+                      style={{
+                        display:
+                          "none",
+                      }}
+                    />
+
+                    <div>
+
+                      <FileSpreadsheet
+                        size={26}
+                        color="#2563eb"
+                      />
+
+                      <div
+                        style={{
+                          marginTop:
+                            "7px",
+                          fontWeight:
+                            800,
+                          color:
+                            "#334155",
+                        }}
+                      >
+                        {importFileName ||
+                          "Select Excel File"}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop:
+                            "3px",
+                          color:
+                            "#94a3b8",
+                          fontSize:
+                            "0.72rem",
+                        }}
+                      >
+                        .xlsx or .xls
+                      </div>
+
+                    </div>
+
+                  </label>
+
+
+                  {importError && (
+                    <div
+                      style={{
+                        marginTop:
+                          "14px",
+                        padding:
+                          "10px 12px",
+                        borderRadius:
+                          "10px",
+                        background:
+                          "#fef2f2",
+                        border:
+                          "1px solid #fecaca",
+                        color:
+                          "#b91c1c",
+                        fontWeight:
+                          700,
+                        fontSize:
+                          "0.78rem",
+                      }}
+                    >
+                      {importError}
+                    </div>
+                  )}
+
+
+                  {/* PREVIEW */}
+
+                  {importRows.length >
+                    0 && (
+                      <>
+                        <div
+                          style={{
+                            display:
+                              "grid",
+                            gridTemplateColumns:
+                              "repeat(4,minmax(0,1fr))",
+                            gap:
+                              "10px",
+                            marginTop:
+                              "18px",
+                          }}
+                        >
+
+                          <div
+                            style={{
+                              padding: "13px",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "12px",
+                              background: "#fff",
+                              fontSize: "0.75rem",
+                              color: "#64748b",
+                            }}
+                          >
+                            <strong>
+                              {importRows.length}
+                            </strong>
+                            <div>Total Rows</div>
+                          </div>
+
+                          <div
+                            style={{
+                              padding: "13px",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "12px",
+                              background: "#fff",
+                              fontSize: "0.75rem",
+                              color: "#64748b",
+                            }}
+                          >
+                            <strong
+                              style={{
+                                color:
+                                  "#15803d",
+                              }}
+                            >
+                              {
+                                importRows.filter(
+                                  (r) =>
+                                    r.status ===
+                                    "READY"
+                                ).length
+                              }
+                            </strong>
+                            <div>Ready</div>
+                          </div>
+
+                          <div
+                            style={{
+                              padding: "13px",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "12px",
+                              background: "#fff",
+                              fontSize: "0.75rem",
+                              color: "#64748b",
+                            }}
+                          >
+                            <strong
+                              style={{
+                                color:
+                                  "#b45309",
+                              }}
+                            >
+                              {
+                                importRows.filter(
+                                  (r) =>
+                                    r.status ===
+                                    "ALREADY_EXISTS"
+                                ).length
+                              }
+                            </strong>
+                            <div>Existing</div>
+                          </div>
+
+                          <div
+                            style={{
+                              padding: "13px",
+                              border: "1px solid #e2e8f0",
+                              borderRadius: "12px",
+                              background: "#fff",
+                              fontSize: "0.75rem",
+                              color: "#64748b",
+                            }}
+                          >
+                            <strong
+                              style={{
+                                color:
+                                  "#dc2626",
+                              }}
+                            >
+                              {
+                                importRows.filter(
+                                  (r) =>
+                                    r.status !==
+                                    "READY" &&
+                                    r.status !==
+                                    "ALREADY_EXISTS"
+                                ).length
+                              }
+                            </strong>
+                            <div>Need Action</div>
+                          </div>
+
+                        </div>
+
+
+                        <div
+                          style={{
+                            marginTop:
+                              "16px",
+                            overflowX:
+                              "auto",
+                            border:
+                              "1px solid #e2e8f0",
+                            borderRadius:
+                              "12px",
+                          }}
+                        >
+                          <table
+                            style={{
+                              width:
+                                "100%",
+                              borderCollapse:
+                                "collapse",
+                              fontSize:
+                                "0.76rem",
+                            }}
+                          >
+
+                            <thead
+                              style={{
+                                background:
+                                  "#f8fafc",
+                              }}
+                            >
+                              <tr>
+                                <th style={{ padding: 10 }}>
+                                  Row
+                                </th>
+
+                                <th style={{ padding: 10 }}>
+                                  Zone
+                                </th>
+
+                                <th style={{ padding: 10 }}>
+                                  Ward
+                                </th>
+
+                                <th style={{ padding: 10 }}>
+                                  Status
+                                </th>
+
+                                <th style={{ padding: 10 }}>
+                                  Message
+                                </th>
+                              </tr>
+                            </thead>
+
+
+                            <tbody>
+                              {importRows.map(
+                                (row) => (
+                                  <tr
+                                    key={
+                                      row.rowNumber
+                                    }
+                                    style={{
+                                      borderTop:
+                                        "1px solid #f1f5f9",
+                                    }}
+                                  >
+                                    <td style={{ padding: 10 }}>
+                                      {row.rowNumber}
+                                    </td>
+
+                                    <td style={{ padding: 10 }}>
+                                      {row.zoneName || "—"}
+                                    </td>
+
+                                    <td style={{ padding: 10, fontWeight: 700 }}>
+                                      {row.wardName || "—"}
+                                    </td>
+
+                                    <td style={{ padding: 10 }}>
+                                      <span
+                                        style={{
+                                          fontWeight:
+                                            800,
+
+                                          color:
+                                            row.status ===
+                                              "READY"
+                                              ? "#15803d"
+                                              : row.status ===
+                                                "ALREADY_EXISTS"
+                                                ? "#b45309"
+                                                : "#dc2626",
+                                        }}
+                                      >
+                                        {
+                                          row.status
+                                        }
+                                      </span>
+                                    </td>
+
+                                    <td
+                                      style={{
+                                        padding:
+                                          10,
+                                        color:
+                                          "#64748b",
+                                      }}
+                                    >
+                                      {row.message}
+                                    </td>
+
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+
+                          </table>
+                        </div>
+                      </>
+                    )}
+
+                </div>
+
+
+                {/* FOOTER */}
+
+                <div
+                  style={{
+                    padding:
+                      "16px 24px",
+                    borderTop:
+                      "1px solid #e2e8f0",
+                    background:
+                      "#f8fafc",
+                    display:
+                      "flex",
+                    justifyContent:
+                      "flex-end",
+                    gap:
+                      "10px",
+                  }}
+                >
+
+                  <button
+                    type="button"
+                    disabled={
+                      importing
+                    }
+                    onClick={() =>
+                      setIsImportOpen(
+                        false
+                      )
+                    }
+                    style={{
+                      height:
+                        "42px",
+                      padding:
+                        "0 18px",
+                      borderRadius:
+                        "10px",
+                      background:
+                        "#fff",
+                      border:
+                        "1px solid #cbd5e1",
+                      fontWeight:
+                        800,
+                      cursor:
+                        "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+
+                  <button
+                    type="button"
+                    disabled={
+                      importing ||
+                      !importRows.some(
+                        (row) =>
+                          row.status ===
+                          "READY"
+                      )
+                    }
+                    onClick={
+                      importReadyWards
+                    }
+                    style={{
+                      height:
+                        "42px",
+                      padding:
+                        "0 18px",
+                      borderRadius:
+                        "10px",
+                      border:
+                        "none",
+                      background:
+                        importing
+                          ? "#93c5fd"
+                          : "#2563eb",
+                      color:
+                        "#fff",
+                      fontWeight:
+                        800,
+                      cursor:
+                        importing
+                          ? "wait"
+                          : "pointer",
+                    }}
+                  >
+                    {importing
+                      ? "Importing..."
+                      : `Import ${importRows.filter(
+                        (row) =>
+                          row.status ===
+                          "READY"
+                      ).length
+                      } Valid Ward(s)`}
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          )}
 
           {/* Create Ward Modal */}
           {isModalOpen && !isReadOnly && (
@@ -868,18 +2251,22 @@ export default function WardManagementPage() {
                     </tr>
                   ) : (
                     filteredWards.map((w, idx) => {
-                      const cleanLabel = (val: any, prefix: string) => {
-                        if (!val) return `${prefix} ${idx + 1}`;
-                        const str = String(val).trim();
-                        if (str.length > 20 || str.includes('-') || str.startsWith('PT')) {
-                          return `${prefix} ${idx + 1}`;
-                        }
-                        return str;
+                      const cleanLabel = (
+                        val: any,
+                        prefix: string
+                      ) => {
+                        const str =
+                          String(val ?? "").trim();
+
+                        return (
+                          str ||
+                          `${prefix} ${idx + 1}`
+                        );
                       };
                       const rawZone = zoneMap[w.parentId || ''];
                       const zoneName = cleanLabel(rawZone || 'Zone 1', 'Zone');
                       const wardName = cleanLabel(w.name, 'Ward');
-                      
+
                       const createdDate = (w as any).createdAt
                         ? new Date((w as any).createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                         : '06 Aug 2026';

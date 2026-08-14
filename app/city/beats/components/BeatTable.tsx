@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { AreaBeatApi } from "@lib/apiClient";
-import { Eye, Edit2, Trash2, Loader2, FileText, UserPlus, MoreVertical, Users } from "lucide-react";
+import { Eye, Edit2, Trash2, Loader2, FileText, UserPlus, MoreVertical, Users, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface BeatTableProps {
     beats: any[];
@@ -59,8 +59,8 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                             <th style={headCell()}>Created On</th>
                             <th style={headCell()}>Location</th>
                             <th style={headCell()}>Beat Name</th>
-                            <th style={headCell()}>Supervisors</th>
-                            <th style={headCell()}>Employees</th>
+                            <th style={headCell()}>Supervisor</th>
+                            <th style={headCell()}>Employee</th>
                             <th style={headCell()}>Status</th>
                             <th style={{ ...headCell(), textAlign: "right" }}>Actions</th>
                         </tr>
@@ -68,26 +68,71 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                     <tbody style={{ backgroundColor: "white" }}>
                         {beats.length === 0 ? (
                             <tr>
-                                <td colSpan={9} style={{ padding: "60px 24px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>No results found</td>
+                                <td colSpan={8} style={{ padding: "60px 24px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>No results found</td>
                             </tr>
                         ) : beats.map((beat, index) => {
-                            const supervisors = beat.supervisorsSummary || (beat.assignedToName ? [{ id: beat.assignedToId, name: beat.assignedToName, count: beat.totalSegments || beat.segments?.length || 0 }] : []);
-                            const employees = new Map<string, { id: string; name: string; count: number }>();
-                            let unassignedEmployees = 0;
-                            (beat.segments || []).forEach((segment: any) => {
-                                if (!segment.employeeAssignedToId || !segment.employeeAssignedToName) {
-                                    unassignedEmployees += 1;
-                                    return;
+                            const supervisors =
+                                beat.supervisorsSummary ||
+                                (
+                                    beat.assignedToName
+                                        ? [
+                                            {
+                                                id: beat.assignedToId,
+                                                name: beat.assignedToName,
+                                            },
+                                        ]
+                                        : []
+                                );
+
+                            const employees =
+                                new Map<
+                                    string,
+                                    {
+                                        id: string;
+                                        name: string;
+                                    }
+                                >();
+
+                            (beat.segments || []).forEach(
+                                (segment: any) => {
+                                    if (
+                                        segment.employeeAssignedToId &&
+                                        segment.employeeAssignedToName
+                                    ) {
+                                        employees.set(
+                                            segment.employeeAssignedToId,
+                                            {
+                                                id:
+                                                    segment.employeeAssignedToId,
+                                                name:
+                                                    segment.employeeAssignedToName,
+                                            }
+                                        );
+                                    }
                                 }
-                                const existing = employees.get(segment.employeeAssignedToId);
-                                if (existing) existing.count += 1;
-                                else employees.set(segment.employeeAssignedToId, { id: segment.employeeAssignedToId, name: segment.employeeAssignedToName, count: 1 });
-                            });
-                            const employeeList = Array.from(employees.values());
-                            const totalSegments = beat.totalSegments || beat.segments?.length || 0;
-                            const assignedSegments = (beat.segments || []).filter((segment: any) => !!segment.employeeAssignedToId).length;
-                            const percentage = totalSegments > 0 ? (assignedSegments / totalSegments) * 100 : 0;
-                            const isFullyAssigned = totalSegments > 0 && assignedSegments === totalSegments;
+                            );
+
+                            const employeeList =
+                                Array.from(
+                                    employees.values()
+                                );
+
+                            const beatPoints =
+                                Array.isArray(beat.points)
+                                    ? beat.points
+                                    : [];
+
+                            const hasSupervisor =
+                                supervisors.length > 0 ||
+                                !!beat.assignedToId;
+
+                            const hasEmployee =
+                                employeeList.length > 0;
+
+                            const isConfigured =
+                                hasSupervisor &&
+                                hasEmployee &&
+                                beatPoints.length === 5;
 
                             return (
                                 <tr key={beat.id} style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer", transition: "all 0.2s" }} onClick={() => onView(beat)}>
@@ -129,7 +174,11 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                                                 title="Click to manage supervisor"
                                             >
-                                                <PersonRow name={supervisors[0].name} subtitle={`Supervisor • ${supervisors[0].count} Beats`} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
+                                                <PersonRow
+                                                    name={supervisors[0].name}
+                                                    subtitle="Supervisor"
+                                                    gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
+                                                />
                                             </div>
                                         ) : (
                                             <div
@@ -140,85 +189,158 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                 title="Click to manage supervisors"
                                             >
                                                 {supervisors.slice(0, 2).map((supervisor: any) => (
-                                                    <PersonRow key={supervisor.id} name={supervisor.name} subtitle={`Supervisor • ${supervisor.count} Beats`} gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
+                                                    <PersonRow key={supervisor.id} name={supervisor.name} subtitle="Supervisor" gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
                                                 ))}
                                                 {supervisors.length > 2 && <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 700 }}>+{supervisors.length - 2} more</span>}
                                             </div>
                                         )}
                                     </td>
-                                    <td style={{ ...bodyCell(), verticalAlign: "top" }}>
-                                        {employeeList.length === 0 && unassignedEmployees === 0 ? (
-                                            !isReadOnly && (onAssignEmployees || onViewUser) ? (
+                                    <td
+                                        style={{
+                                            ...bodyCell(),
+                                            verticalAlign: "middle",
+                                        }}
+                                    >
+                                        {employeeList.length === 0 ? (
+                                            !isReadOnly &&
+                                                onAssignEmployees ? (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (onAssignEmployees) onAssignEmployees(beat);
-                                                        else if (onViewUser) onViewUser(beat, "");
+
+                                                        onAssignEmployees(
+                                                            beat
+                                                        );
                                                     }}
-                                                    style={{ background: "none", border: "1px dashed #cbd5e1", padding: "6px 12px", borderRadius: "8px", color: "#64748b", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", transition: "all 0.15s ease" }}
-                                                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#059669"; e.currentTarget.style.color = "#059669"; e.currentTarget.style.backgroundColor = "#ecfdf5"; }}
-                                                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#cbd5e1"; e.currentTarget.style.color = "#64748b"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                    title="Click to open Employee Deployment"
+                                                    style={{
+                                                        background:
+                                                            "none",
+                                                        border:
+                                                            "1px dashed #cbd5e1",
+                                                        padding:
+                                                            "6px 12px",
+                                                        borderRadius:
+                                                            "8px",
+                                                        color:
+                                                            "#64748b",
+                                                        fontSize:
+                                                            "0.75rem",
+                                                        fontWeight:
+                                                            700,
+                                                        cursor:
+                                                            "pointer",
+                                                    }}
                                                 >
-                                                    + Deploy Employee
+                                                    + Assign Employee
                                                 </button>
                                             ) : (
-                                                <span style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.8rem" }}>No employees assigned</span>
+                                                <span
+                                                    style={{
+                                                        color:
+                                                            "#d97706",
+                                                        fontSize:
+                                                            "0.8rem",
+                                                        fontWeight:
+                                                            600,
+                                                    }}
+                                                >
+                                                    Employee pending
+                                                </span>
                                             )
                                         ) : (
-                                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                                {employeeList.map((employee) => (
-                                                    <div
-                                                        key={employee.id}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (onAssignEmployees) onAssignEmployees(beat);
-                                                            else if (onViewUser) onViewUser(beat, employee.id);
-                                                        }}
-                                                        style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "4px 8px", borderRadius: "8px", transition: "all 0.15s ease" }}
-                                                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#fdf2f8"; }}
-                                                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                    >
-                                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                            <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1e293b" }}>{employee.name}</span>
-                                                            <span style={{ fontSize: "0.7rem", backgroundColor: "#fdf2f8", color: "#db2777", padding: "1px 6px", borderRadius: 100, fontWeight: 700, border: "1px solid #fbcfe8" }}>
-                                                                {employee.count} {employee.count === 1 ? "segment" : "segments"}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                                {unassignedEmployees > 0 && (
-                                                    <div
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (onAssignEmployees) onAssignEmployees(beat);
-                                                            else if (onViewUser) onViewUser(beat, "");
-                                                        }}
-                                                        style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "4px 8px", borderRadius: "8px", transition: "all 0.15s ease" }}
-                                                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#fffbeb"; }}
-                                                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                    >
-                                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                                            <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "#d97706", fontStyle: "italic" }}>Employees Pending</span>
-                                                            <span style={{ fontSize: "0.7rem", backgroundColor: "#fffbeb", color: "#d97706", padding: "1px 6px", borderRadius: 100, fontWeight: 700, border: "1px solid #fef3c7" }}>
-                                                                {unassignedEmployees} {unassignedEmployees === 1 ? "segment" : "segments"}
-                                                            </span>
-                                                        </div>
-                                                    </div>
+                                            <div
+                                                style={{
+                                                    display:
+                                                        "flex",
+                                                    flexDirection:
+                                                        "column",
+                                                    gap: 4,
+                                                }}
+                                            >
+                                                {employeeList.map(
+                                                    (employee) => (
+                                                        <span
+                                                            key={
+                                                                employee.id
+                                                            }
+                                                            style={{
+                                                                fontSize:
+                                                                    "0.875rem",
+                                                                fontWeight:
+                                                                    600,
+                                                                color:
+                                                                    "#1e293b",
+                                                            }}
+                                                        >
+                                                            {
+                                                                employee.name
+                                                            }
+                                                        </span>
+                                                    )
                                                 )}
                                             </div>
                                         )}
                                     </td>
                                     <td style={bodyCell()}>
-                                        <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 120 }}>
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                <span style={{ fontSize: "0.75rem", fontWeight: 800, color: isFullyAssigned ? "#10b981" : "#4b5563" }}>{Math.round(percentage)}%</span>
-                                                <span style={{ fontSize: "0.6rem", color: "#94a3b8", fontWeight: 600 }}>{assignedSegments}/{totalSegments}</span>
-                                            </div>
-                                            <div style={{ width: "100%", height: 6, backgroundColor: "#f1f5f9", borderRadius: 100, overflow: "hidden" }}>
-                                                <div style={{ width: `${percentage}%`, height: "100%", background: isFullyAssigned ? "linear-gradient(90deg, #10b981 0%, #34d399 100%)" : "linear-gradient(90deg, #2563eb 0%, #60a5fa 100%)", borderRadius: 100, transition: "width 0.5s ease-out" }} />
-                                            </div>
-                                        </div>
+                                        {isConfigured ? (
+                                            <span
+                                                style={{
+                                                    display:
+                                                        "inline-flex",
+                                                    alignItems:
+                                                        "center",
+                                                    gap: 6,
+                                                    padding:
+                                                        "6px 10px",
+                                                    borderRadius:
+                                                        "999px",
+                                                    backgroundColor:
+                                                        "#ecfdf5",
+                                                    color:
+                                                        "#047857",
+                                                    fontSize:
+                                                        "0.75rem",
+                                                    fontWeight:
+                                                        800,
+                                                    whiteSpace:
+                                                        "nowrap",
+                                                }}
+                                            >
+                                                <CheckCircle2
+                                                    size={14}
+                                                />
+                                                Configured
+                                            </span>
+                                        ) : (
+                                            <span
+                                                style={{
+                                                    display:
+                                                        "inline-flex",
+                                                    alignItems:
+                                                        "center",
+                                                    gap: 6,
+                                                    padding:
+                                                        "6px 10px",
+                                                    borderRadius:
+                                                        "999px",
+                                                    backgroundColor:
+                                                        "#fff7ed",
+                                                    color:
+                                                        "#c2410c",
+                                                    fontSize:
+                                                        "0.75rem",
+                                                    fontWeight:
+                                                        800,
+                                                    whiteSpace:
+                                                        "nowrap",
+                                                }}
+                                            >
+                                                <AlertTriangle
+                                                    size={14}
+                                                />
+                                                Needs Setup
+                                            </span>
+                                        )}
                                     </td>
                                     <td style={{ ...bodyCell(), textAlign: "right", position: "relative" }}>
                                         <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -230,7 +352,7 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                         {openActionId === beat.id && (
                                             <div style={{ position: "absolute", right: 40, top: 0, width: 220, backgroundColor: "white", borderRadius: 12, boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)", border: "1px solid #f1f5f9", zIndex: 100, overflow: "hidden", display: "flex", flexDirection: "column", padding: 6 }}>
                                                 <MenuBtn icon={<Eye size={16} />} label="View on Map" onClick={() => { onView(beat); setOpenActionId(null); }} />
-                                                <MenuBtn icon={<FileText size={16} />} label="View KML Data" onClick={() => { onViewData(beat); setOpenActionId(null); }} />
+                                                <MenuBtn icon={<FileText size={16} />} label="View Beat Details" onClick={() => { onViewData(beat); setOpenActionId(null); }} />
                                                 {!isAO && !isReadOnly && <MenuBtn icon={<UserPlus size={16} />} label={assignmentActionLabel} color="#2563eb" hover="#eff6ff" onClick={() => { onAssign(beat); setOpenActionId(null); }} />}
                                                 {!isAO && !isReadOnly && onAssignEmployees && <MenuBtn icon={<Users size={16} />} label="Deploy Employees" color="#059669" hover="#ecfdf5" onClick={() => { onAssignEmployees(beat); setOpenActionId(null); }} />}
                                                 {!isQC && !isReadOnly && <MenuBtn icon={<Edit2 size={16} />} label="Edit Beat" onClick={() => { onEdit(beat); setOpenActionId(null); }} />}
