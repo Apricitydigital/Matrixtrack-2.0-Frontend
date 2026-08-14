@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ToiletApi, GeoApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 
-export default function AllToiletsTab() {
+export default function AllToiletsTab({ cityId }: { cityId?: string }) {
     const { user } = useAuth();
     const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN');
 
@@ -34,7 +34,7 @@ export default function AllToiletsTab() {
 
     useEffect(() => {
         applyFilters();
-    }, [searchQuery, typeFilter, statusFilter, zoneFilter, wardFilter, toilets]);
+    }, [searchQuery, typeFilter, statusFilter, zoneFilter, wardFilter, toilets, cityId]);
 
     const loadData = async () => {
         try {
@@ -100,6 +100,9 @@ export default function AllToiletsTab() {
 
     const applyFilters = () => {
         let filtered = [...toilets];
+        if (cityId && cityId !== 'ALL') {
+            filtered = filtered.filter(t => t.cityId === cityId || t.city?.id === cityId || t.location?.cityId === cityId);
+        }
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(t =>

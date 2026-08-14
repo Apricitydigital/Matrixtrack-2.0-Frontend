@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { ToiletApi, GeoApi } from "@lib/apiClient";
 
-export default function AssignmentsTab() {
+export default function AssignmentsTab({ cityId }: { cityId?: string }) {
     const [supervisors, setEmployees] = useState<any[]>([]);
     const [toilets, setToilets] = useState<any[]>([]);
     const [zones, setZones] = useState<any[]>([]);

@@ -55,8 +55,11 @@ export function parseReportAnswer(val: any): { answerText: string; photos: strin
                 val = parsed;
                 answerVal = parsed;
             } catch (e) {
-                // Not JSON, keep as raw string
+                // Not JSON
             }
+        } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/') || trimmed.startsWith('/uploads/') || /\.(jpeg|jpg|png|gif|webp)$/i.test(trimmed)) {
+            photos.push(trimmed);
+            answerVal = "Photo Attached";
         }
     }
 
@@ -71,7 +74,7 @@ export function parseReportAnswer(val: any): { answerText: string; photos: strin
                     val.status !== undefined ? val.status : val;
 
         // Extract photos
-        const rawPhotos = [val.photos, val.photoUrl, val.photo, val.image, val.url, val.actionPhotoUrl].flat().filter(Boolean);
+        const rawPhotos = [val.photos, val.images, val.photoUrl, val.photo_url, val.photo, val.image, val.imageUrl, val.image_url, val.url, val.actionPhotoUrl].flat().filter(Boolean);
         photos = rawPhotos.filter((p): p is string => typeof p === 'string' && p.length > 5);
     }
 

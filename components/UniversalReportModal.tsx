@@ -139,23 +139,85 @@ export default function UniversalReportModal({
     // Parse Q&A
     const parsedAnswers: NormalizedAnswer[] = normalizeInspectionAnswers(record);
 
-    // Standalone evidence photos
-    const answerPhotoSet = new Set<string>();
-    parsedAnswers.forEach(a => a.photos.forEach(p => { const u = resolveUrl(p); if (u) answerPhotoSet.add(u); }));
-
-    const rawStandalone: string[] = [];
-    const addS = (p: any) => { const u = resolveUrl(p); if (u && !answerPhotoSet.has(u) && !rawStandalone.includes(u)) rawStandalone.push(u); };
-    addS(record.photo); addS(record.photoUrl); addS(record.actionPhotoUrl);
-    addS(record.visit?.photoUrl); addS(record.visit?.photo);
-    addS(record.payload?.photo); addS(record.payload?.photoUrl);
-    if (Array.isArray(record.payload?.photos)) record.payload.photos.forEach(addS);
-    const standalonePhotos = rawStandalone;
-
     // Resolve answer photo URLs
     const resolvedAnswers = parsedAnswers.map(a => ({
         ...a,
         photos: a.photos.map(p => resolveUrl(p)).filter(Boolean) as string[]
     }));
+
+    // Gather ALL evidence photos from record fields & Q&A responses
+    const allEvidencePhotos: string[] = [];
+    const addPhoto = (p: any) => {
+        if (!p) return;
+        if (Array.isArray(p)) {
+            p.forEach(addPhoto);
+            return;
+        }
+        const resolved = resolveUrl(p);
+        if (resolved && !allEvidencePhotos.includes(resolved)) {
+            allEvidencePhotos.push(resolved);
+        }
+    };
+
+    // Direct record fields
+    addPhoto(record.photo);
+    addPhoto(record.photoUrl);
+    addPhoto(record.photos);
+    addPhoto(record.images);
+    addPhoto(record.actionPhotoUrl);
+    addPhoto(record.aoPhoto);
+
+    // Visit / Bin / Payload nested objects
+    addPhoto(record.visit?.photoUrl);
+    addPhoto(record.visit?.photo);
+    addPhoto(record.visit?.photos);
+    addPhoto(record.visit?.images);
+
+    addPhoto(record.binReport?.photoUrl);
+    addPhoto(record.binReport?.photo);
+    addPhoto(record.binReport?.photos);
+    addPhoto(record.binReport?.images);
+
+    addPhoto(record.payload?.photo);
+    addPhoto(record.payload?.photoUrl);
+    addPhoto(record.payload?.photos);
+    addPhoto(record.payload?.images);
+
+    addPhoto(record.questionnaire?.photo);
+    addPhoto(record.questionnaire?.photoUrl);
+    addPhoto(record.questionnaire?.photos);
+    addPhoto(record.questionnaire?.images);
+
+    addPhoto(record.inspectionAnswers?.photo);
+    addPhoto(record.inspectionAnswers?.photoUrl);
+    addPhoto(record.inspectionAnswers?.photos);
+    addPhoto(record.inspectionAnswers?.images);
+
+    addPhoto(record.answers?.photo);
+    addPhoto(record.answers?.photoUrl);
+    addPhoto(record.answers?.photos);
+    addPhoto(record.answers?.images);
+
+    // Deep scan questionnaire, inspectionAnswers & answers object values for image URLs
+    const scanObjectPhotos = (obj: any) => {
+        if (!obj || typeof obj !== 'object') return;
+        Object.values(obj).forEach(val => {
+            if (!val) return;
+            if (typeof val === 'string') addPhoto(val);
+            else if (typeof val === 'object') {
+                addPhoto((val as any).photoUrl || (val as any).photo_url || (val as any).photo || (val as any).image || (val as any).imageUrl || (val as any).image_url || (val as any).photos || (val as any).images || (val as any).url);
+            }
+        });
+    };
+    scanObjectPhotos(record.questionnaire);
+    scanObjectPhotos(record.inspectionAnswers);
+    scanObjectPhotos(record.answers);
+    scanObjectPhotos(record.payload?.questionnaire);
+    scanObjectPhotos(record.payload?.inspectionAnswers);
+    scanObjectPhotos(record.payload?.answers);
+
+    // Question answers photos
+    resolvedAnswers.forEach(a => a.photos.forEach(addPhoto));
 
     // Action handlers
     const wrap = (fn: () => Promise<void>) => async () => {
@@ -264,21 +326,25 @@ export default function UniversalReportModal({
                                 </div>
                             </div>
 
-                            {/* Inline Standalone Evidence Photos (Small Thumbnails) */}
-                            {standalonePhotos.length > 0 && (
+                            {/* Evidence Photos (Small Thumbnails Box) */}
+                            {allEvidencePhotos.length > 0 && (
                                 <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '12px 14px', border: '1px solid #e2e8f0' }}>
                                     <div style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-                                        Evidence Photos ({standalonePhotos.length})
+                                        Evidence Photos ({allEvidencePhotos.length})
                                     </div>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                        {standalonePhotos.map((url, i) => (
+                                        {allEvidencePhotos.map((url, i) => (
                                             <div
                                                 key={i}
                                                 onClick={() => setPreviewPhoto(url)}
                                                 style={{
-                                                    width: 60, height: 60, borderRadius: '8px', overflow: 'hidden', cursor: 'pointer',
-                                                    border: '1px solid #cbd5e1', position: 'relative'
+                                                    width: 64, height: 64, borderRadius: '8px', overflow: 'hidden', cursor: 'pointer',
+                                                    border: '1.5px solid #cbd5e1', position: 'relative', background: '#e2e8f0',
+                                                    transition: 'transform 0.15s, border-color 0.15s'
                                                 }}
+                                                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.borderColor = '#2563eb'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                                                title="Click to view full image"
                                             >
                                                 <img src={url} alt={`Evidence ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             </div>
@@ -337,17 +403,39 @@ export default function UniversalReportModal({
                                             const isYes = upper === 'YES' || upper === 'TRUE';
                                             const isNo = upper === 'NO' || upper === 'FALSE';
                                             return (
-                                                <div key={idx} style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px 12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                                                    <div style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>
-                                                        {item.questionText}
+                                                <div key={idx} style={{ background: '#f8fafc', borderRadius: '10px', padding: '10px 12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                                                        <div style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>
+                                                            {item.questionText}
+                                                        </div>
+                                                        <span style={{
+                                                            padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, flexShrink: 0,
+                                                            background: isYes ? '#dcfce7' : isNo ? '#fee2e2' : '#eff6ff',
+                                                            color: isYes ? '#15803d' : isNo ? '#b91c1c' : '#2563eb'
+                                                        }}>
+                                                            {item.answerText}
+                                                        </span>
                                                     </div>
-                                                    <span style={{
-                                                        padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700, flexShrink: 0,
-                                                        background: isYes ? '#dcfce7' : isNo ? '#fee2e2' : '#eff6ff',
-                                                        color: isYes ? '#15803d' : isNo ? '#b91c1c' : '#2563eb'
-                                                    }}>
-                                                        {item.answerText}
-                                                    </span>
+
+                                                    {item.photos && item.photos.length > 0 && (
+                                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px dashed #cbd5e1' }}>
+                                                            {item.photos.map((photoUrl, pIdx) => (
+                                                                <div
+                                                                    key={pIdx}
+                                                                    onClick={() => setPreviewPhoto(photoUrl)}
+                                                                    style={{
+                                                                        width: 50, height: 50, borderRadius: '6px', overflow: 'hidden', cursor: 'pointer',
+                                                                        border: '1px solid #cbd5e1', background: '#e2e8f0', transition: 'transform 0.15s'
+                                                                    }}
+                                                                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                                                                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                                                                    title="Click to view full photo"
+                                                                >
+                                                                    <img src={photoUrl} alt={`Q Answer Photo ${pIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}

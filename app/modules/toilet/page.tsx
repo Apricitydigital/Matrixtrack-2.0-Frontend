@@ -3,6 +3,7 @@
 import { useAuth } from "@hooks/useAuth";
 import { ModuleGuard } from "@components/Guards";
 import { useState, useEffect } from "react";
+import { CityApi } from "@lib/apiClient";
 import ReportsTab from "./ReportsTab";
 import AllToiletsTab from "./AllToiletsTab";
 import ApprovalsTab from "./ApprovalsTab";
@@ -17,6 +18,26 @@ export default function ToiletModulePage() {
   const [activeTab, setActiveTab] = useState("reports");
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
 
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string>("ALL");
+
+  const isSuperAdmin =
+    user?.role === 'super_admin' ||
+    user?.role === 'hms_super_admin' ||
+    user?.role === 'SUPER_ADMIN' ||
+    (user?.roles || []).includes('hms_super_admin') ||
+    (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
+    (user?.roles || []).includes('SUPER_ADMIN') ||
+    (user?.roles || []).includes('super_admin');
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      CityApi.list().then(res => {
+        setCities(res.cities || []);
+      }).catch(console.error);
+    }
+  }, [isSuperAdmin]);
+
   const tabs: { id: string; label: string; roles: Role[] }[] = [
     { id: "reports", label: "Dashboard", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
     { id: "submitted_reports", label: "Inspection Reports", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
@@ -26,7 +47,7 @@ export default function ToiletModulePage() {
   ];
 
   const visibleTabs = tabs.filter(tab =>
-    tab.roles.some(role => user?.roles?.includes(role))
+    isSuperAdmin || tab.roles.some(role => user?.roles?.includes(role))
   );
 
   useEffect(() => {
@@ -57,10 +78,36 @@ export default function ToiletModulePage() {
               <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
                 Cleanliness of Toilets
               </h1>
-              {user?.cityName && (
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: 20 }}>
-                  {user.cityName}
-                </span>
+              {isSuperAdmin ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>City:</span>
+                  <select
+                    value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      borderRadius: 10,
+                      border: '1px solid #93c5fd',
+                      background: '#eff6ff',
+                      color: '#1d4ed8',
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="ALL">All Cities</option>
+                    {cities.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                user?.cityName && (
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: 20 }}>
+                    {user.cityName}
+                  </span>
+                )
               )}
             </div>
             <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: 13, fontWeight: 500 }}>
@@ -95,17 +142,18 @@ export default function ToiletModulePage() {
         </div>
 
         <div className="tab-container">
-          {activeTab === "reports" && <ReportsTab />}
+          {activeTab === "reports" && <ReportsTab cityId={selectedCity} />}
           {activeTab === "submitted_reports" && (
             <SubmittedReportsTab
               moduleKey="TOILET"
               assetLabel="Toilet"
+              cityId={selectedCity}
               onViewReport={(rec) => setSelectedReport(rec)}
             />
           )}
-          {activeTab === "all" && <AllToiletsTab />}
-          {activeTab === "approvals" && <ApprovalsTab />}
-          {activeTab === "assignments" && <AssignmentsTab />}
+          {activeTab === "all" && <AllToiletsTab cityId={selectedCity} />}
+          {activeTab === "approvals" && <ApprovalsTab cityId={selectedCity} />}
+          {activeTab === "assignments" && <AssignmentsTab cityId={selectedCity} />}
         </div>
 
         {selectedReport && (

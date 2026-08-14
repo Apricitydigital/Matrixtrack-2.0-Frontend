@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Protected, ModuleGuard } from "@components/Guards";
-import { AreaBeatApi, ModuleRecordsApi, GeoApi } from "@lib/apiClient";
+import { AreaBeatApi, ModuleRecordsApi, GeoApi, CityApi } from "@lib/apiClient";
 import BeatTable from "../../city/areas/components/BeatTable";
 import EditBeatModal from "../../city/areas/components/EditBeatModal";
 import KMLDataViewer from "../../city/areas/components/KMLDataViewer";
@@ -28,6 +28,24 @@ export default function SweepingModulePage() {
     const [deployingBeat, setDeployingBeat] = useState<any | null>(null);
     const [filteredUserId, setFilteredUserId] = useState<string | null>(null);
     const [pendingBeatCount, setPendingBeatCount] = useState(0);
+
+    const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+    const [selectedCity, setSelectedCity] = useState<string>("ALL");
+
+    const isSuperAdmin =
+        user?.role === 'super_admin' ||
+        user?.role === 'hms_super_admin' ||
+        user?.role === 'SUPER_ADMIN' ||
+        (user?.roles || []).includes('hms_super_admin') ||
+        (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
+        (user?.roles || []).includes('SUPER_ADMIN') ||
+        (user?.roles || []).includes('super_admin');
+
+    useEffect(() => {
+        if (isSuperAdmin) {
+            CityApi.list().then(res => setCities(res.cities || [])).catch(console.error);
+        }
+    }, [isSuperAdmin]);
 
     const [viewMode, setViewMode] = useState<"table" | "map">("table");
     const [activeTab, setActiveTab] = useState<"assessments" | "submitted_reports" | "beats" | "assignments">("assessments");
@@ -146,7 +164,12 @@ export default function SweepingModulePage() {
                 }
             }
 
-            const res = await ModuleRecordsApi.getRecords("SWEEPING", { limit: 100, fromDate, toDate });
+            const res = await ModuleRecordsApi.getRecords("SWEEPING", {
+                limit: 100,
+                fromDate,
+                toDate,
+                cityId: selectedCity !== 'ALL' ? selectedCity : undefined
+            });
             setAssessments(res.data || []);
             if (res.stats) setStats(res.stats);
         } catch (err) {
@@ -154,7 +177,7 @@ export default function SweepingModulePage() {
         } finally {
             setAssessmentsLoading(false);
         }
-    }, [dateFilter, customDate]);
+    }, [dateFilter, customDate, selectedCity]);
 
     useEffect(() => {
         loadBeats();
@@ -244,9 +267,35 @@ export default function SweepingModulePage() {
                                     <h1 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
                                         Sweeping - Beat Management
                                     </h1>
-                                    <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 12px', backgroundColor: '#eff6ff', color: '#2563eb', borderRadius: 12, border: '1px solid #bfdbfe' }}>
-                                        {user?.cityName || 'Indore'}
-                                    </span>
+                                    {isSuperAdmin ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>City:</span>
+                                            <select
+                                                value={selectedCity}
+                                                onChange={(e) => setSelectedCity(e.target.value)}
+                                                style={{
+                                                    padding: '4px 10px',
+                                                    fontSize: 12,
+                                                    fontWeight: 700,
+                                                    borderRadius: 10,
+                                                    border: '1px solid #93c5fd',
+                                                    background: '#eff6ff',
+                                                    color: '#1d4ed8',
+                                                    cursor: 'pointer',
+                                                    outline: 'none'
+                                                }}
+                                            >
+                                                <option value="ALL">All Cities</option>
+                                                {cities.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 12px', backgroundColor: '#eff6ff', color: '#2563eb', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+                                            {user?.cityName || 'Indore'}
+                                        </span>
+                                    )}
                                 </div>
                                 <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontWeight: 500 }}>
                                     Manage street beats, daily inspection reports, and quality control assignments.
@@ -394,6 +443,7 @@ export default function SweepingModulePage() {
                                 <SubmittedReportsTab
                                     moduleKey="SWEEPING"
                                     assetLabel="Beat"
+                                    cityId={selectedCity}
                                     onViewReport={(rec) => setInspectingBeat({ ...rec, isAssessmentReview: true })}
                                 />
                             ) : activeTab === 'assignments' ? (

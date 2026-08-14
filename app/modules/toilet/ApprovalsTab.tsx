@@ -4,7 +4,7 @@ import { useAuth } from "@hooks/useAuth";
 import { FilterTabs } from "../qc-shared";
 import UniversalReportModal from "@components/UniversalReportModal";
 
-export default function ApprovalsTab() {
+export default function ApprovalsTab({ cityId }: { cityId?: string }) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
@@ -15,7 +15,7 @@ export default function ApprovalsTab() {
 
     useEffect(() => {
         loadData();
-    }, [user, activeTab]);
+    }, [user, activeTab, cityId]);
 
     // Pre-fetch ward names for better display
     useEffect(() => {

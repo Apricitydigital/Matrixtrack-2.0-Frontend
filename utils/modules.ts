@@ -68,7 +68,16 @@ export function moduleEntryPath(user: AuthUser | null, key: CanonicalModuleKey) 
     return `/modules/${routeForModule(key)}`;
   }
   if (user.roles.includes("QC" as Role)) return moduleQcPath(key);
-  if (user.roles.includes("CITY_ADMIN" as Role) || user.roles.includes("COMMISSIONER" as Role)) {
+  if (
+    user.roles.includes("CITY_ADMIN" as Role) ||
+    user.roles.includes("COMMISSIONER" as Role) ||
+    user.roles.includes("HMS_SUPER_ADMIN" as Role) ||
+    user.roles.includes("SUPER_ADMIN" as Role) ||
+    user.role === "super_admin" ||
+    user.role === "hms_super_admin" ||
+    user.role === "SUPER_ADMIN" ||
+    user.role === "HMS_SUPER_ADMIN"
+  ) {
     return moduleAdminPath(key);
   }
   return moduleEmployeePath(key);

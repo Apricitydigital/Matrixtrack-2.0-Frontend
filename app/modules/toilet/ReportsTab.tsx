@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { FilterTabs } from "../qc-shared";
 import UniversalReportModal from '@components/UniversalReportModal';
 
-export default function ReportsTab() {
+export default function ReportsTab({ cityId }: { cityId?: string }) {
     const [stats, setStats] = useState<any>(null);
     const [totalToiletsCount, setTotalToiletsCount] = useState<number>(0);
     const [reports, setReports] = useState<any[]>([]);
@@ -41,7 +41,11 @@ export default function ReportsTab() {
             ]);
             if (zoneRes.status === 'fulfilled') setZones(zoneRes.value.nodes || []);
             if (empRes.status === 'fulfilled') setSupervisors((empRes.value.employees || []).filter((e: any) => e.role === 'SUPERVISOR'));
-            if (toiRes.status === 'fulfilled') setTotalToiletsCount(toiRes.value.toilets?.length || 0);
+            if (toiRes.status === 'fulfilled') {
+                const list = toiRes.value.toilets || [];
+                const filtered = cityId && cityId !== 'ALL' ? list.filter((t: any) => t.cityId === cityId || t.city?.id === cityId) : list;
+                setTotalToiletsCount(filtered.length);
+            }
             if (wardRes.status === 'fulfilled') setAllWards(wardRes.value.nodes || []);
         } catch (e) {
             console.error('Failed to load metadata', e);
@@ -77,7 +81,7 @@ export default function ReportsTab() {
 
     useEffect(() => {
         loadReports();
-    }, [dateFilter, customDate, selectedStatus]);
+    }, [dateFilter, customDate, selectedStatus, cityId]);
 
     const loadReports = async () => {
         setLoading(true);

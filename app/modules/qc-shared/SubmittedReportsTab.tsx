@@ -6,6 +6,7 @@ import { ModuleRecordsApi, GeoApi } from '@lib/apiClient';
 interface SubmittedReportsTabProps {
     moduleKey: 'TOILET' | 'SWEEPING' | 'LITTERBINS';
     assetLabel: string;
+    cityId?: string;
     onViewReport: (record: any) => void;
 }
 
@@ -21,7 +22,7 @@ const getStaffName = (val: any): string => {
     return '';
 };
 
-export default function SubmittedReportsTab({ moduleKey, assetLabel, onViewReport }: SubmittedReportsTabProps) {
+export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onViewReport }: SubmittedReportsTabProps) {
     const [reports, setReports] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -153,15 +154,22 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, onViewRepor
             const res = await ModuleRecordsApi.getRecords(moduleKey, {
                 limit: 500,
                 fromDate: startDate,
-                toDate: endDate
+                toDate: endDate,
+                cityId: cityId && cityId !== 'ALL' ? cityId : undefined,
+                tab: 'DAILY_REPORTS'
             });
-            setReports(res.data || []);
+            const rawList = res.data || [];
+            const inspectionOnly = rawList.filter((r: any) => {
+                const t = (r.type || '').toUpperCase();
+                return t !== 'BIN_REGISTRATION' && t !== 'ASSET_REGISTRATION' && t !== 'TOILET_REGISTRATION' && t !== 'BIN_REQUEST';
+            });
+            setReports(inspectionOnly);
         } catch (err) {
             console.error('Failed to load submitted reports', err);
         } finally {
             setLoading(false);
         }
-    }, [moduleKey, dateFilter, fromDate, toDate]);
+    }, [moduleKey, dateFilter, fromDate, toDate, cityId]);
 
     useEffect(() => {
         loadReports();

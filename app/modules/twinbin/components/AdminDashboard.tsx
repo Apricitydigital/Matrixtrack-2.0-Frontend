@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi, ToiletApi, GeoApi } from "@lib/apiClient";
+import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi, ToiletApi, GeoApi, CityApi } from "@lib/apiClient";
 import LitterBinReviewModal from "./LitterBinReviewModal";
 import TwinbinStaffAssignmentsTab from "./TwinbinStaffAssignmentsTab";
 import SubmittedReportsTab from "../../qc-shared/SubmittedReportsTab";
@@ -9,7 +9,26 @@ import { useAuth } from "@hooks/useAuth";
 
 export default function AdminDashboard() {
     const { user } = useAuth();
-    const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN');
+    
+    const isSuperAdmin =
+        user?.role === 'super_admin' ||
+        user?.role === 'hms_super_admin' ||
+        user?.role === 'SUPER_ADMIN' ||
+        (user?.roles || []).includes('hms_super_admin') ||
+        (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
+        (user?.roles || []).includes('SUPER_ADMIN') ||
+        (user?.roles || []).includes('super_admin');
+
+    const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN') || isSuperAdmin;
+
+    const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+    const [selectedCity, setSelectedCity] = useState<string>("ALL");
+
+    useEffect(() => {
+        if (isSuperAdmin) {
+            CityApi.list().then(res => setCities(res.cities || [])).catch(console.error);
+        }
+    }, [isSuperAdmin]);
 
     const [records, setRecords] = useState<any[]>([]);
     const [allBins, setAllBins] = useState<any[]>([]);
@@ -112,7 +131,7 @@ export default function AdminDashboard() {
             }
 
             const [recRes, binRes, myBinsRes] = await Promise.allSettled([
-                ModuleRecordsApi.getRecords("LITTERBINS", { tab: 'HISTORY', limit: 500, fromDate, toDate }),
+                ModuleRecordsApi.getRecords("LITTERBINS", { tab: 'HISTORY', limit: 500, fromDate, toDate, cityId: selectedCity !== 'ALL' ? selectedCity : undefined }),
                 TwinbinApi.assigned(),
                 TwinbinApi.myBins()
             ]);
@@ -127,7 +146,7 @@ export default function AdminDashboard() {
         } finally {
             setLoading(false);
         }
-    }, [dateFilter, customDate]);
+    }, [dateFilter, customDate, selectedCity]);
 
     async function loadSupervisors() {
         try {
@@ -323,9 +342,35 @@ export default function AdminDashboard() {
                             <h1 style={{ fontSize: 24, fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
                                 Litterbin Management
                             </h1>
-                            <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 12px', backgroundColor: '#eff6ff', color: '#2563eb', borderRadius: 12, border: '1px solid #bfdbfe' }}>
-                                {user?.cityName || 'Indore'}
-                            </span>
+                            {isSuperAdmin ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>City:</span>
+                                    <select
+                                        value={selectedCity}
+                                        onChange={(e) => setSelectedCity(e.target.value)}
+                                        style={{
+                                            padding: '4px 10px',
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            borderRadius: 10,
+                                            border: '1px solid #93c5fd',
+                                            background: '#eff6ff',
+                                            color: '#1d4ed8',
+                                            cursor: 'pointer',
+                                            outline: 'none'
+                                        }}
+                                    >
+                                        <option value="ALL">All Cities</option>
+                                        {cities.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ) : (
+                                <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 12px', backgroundColor: '#eff6ff', color: '#2563eb', borderRadius: 12, border: '1px solid #bfdbfe' }}>
+                                    {user?.cityName || 'Indore'}
+                                </span>
+                            )}
                         </div>
                         <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontWeight: 500 }}>
                             Monitor daily litter bin inspections, bin requests, and supervisor deployments.
@@ -408,8 +453,8 @@ export default function AdminDashboard() {
 
                     {/* 7 STAT CARDS GRID */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-                        <StatCard label="TOTAL REGISTERED LITTERBINS" value={allBins.length || 0} sub="Registered Assets" color="#0f172a" />
-                        <StatCard label="SUBMITTED REPORTS" value={records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT').length || 0} sub="Total Submitted" color="#2563eb" />
+                        <StatCard label="TOTAL REGISTERED LITTERBINS" value={registeredBins.length || combinedBins.length || 0} sub="Registered Assets" color="#0f172a" />
+                        <StatCard label="SUBMITTED REPORTS" value={records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT').length || records.length || 0} sub="Total Submitted" color="#2563eb" />
                         <StatCard label="PENDING REVIEW REPORTS" value={records.filter(r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED').length || 0} sub="Awaiting QC Review" color="#f59e0b" />
                         <StatCard label="APPROVED REPORTS" value={records.filter(r => r.status === 'APPROVED').length || 0} sub="Verified Clean" color="#10b981" />
                         <StatCard label="REJECTED REPORTS" value={records.filter(r => r.status === 'REJECTED').length || 0} sub="Non-Compliant" color="#ef4444" />
@@ -506,6 +551,7 @@ export default function AdminDashboard() {
                 <SubmittedReportsTab
                     moduleKey="LITTERBINS"
                     assetLabel="Litterbin"
+                    cityId={selectedCity}
                     onViewReport={(rec) => setViewRecord(rec)}
                 />
             )}
