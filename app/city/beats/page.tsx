@@ -389,7 +389,7 @@ export default function BeatsPage() {
                   fontSize: "1.5rem",
                   fontWeight: 800,
                   color: "#0f172a",
-                  margin: 0,
+
                   letterSpacing:
                     "-0.01em",
                 }}
@@ -557,27 +557,27 @@ export default function BeatsPage() {
 
                     {pendingCount >
                       0 && (
-                      <span
-                        style={{
-                          backgroundColor:
-                            "#d97706",
-                          color:
-                            "white",
-                          borderRadius:
-                            "9999px",
-                          padding:
-                            "1px 6px",
-                          fontSize:
-                            "0.65rem",
-                          fontWeight:
-                            800,
-                        }}
-                      >
-                        {
-                          pendingCount
-                        }
-                      </span>
-                    )}
+                        <span
+                          style={{
+                            backgroundColor:
+                              "#d97706",
+                            color:
+                              "white",
+                            borderRadius:
+                              "9999px",
+                            padding:
+                              "1px 6px",
+                            fontSize:
+                              "0.65rem",
+                            fontWeight:
+                              800,
+                          }}
+                        >
+                          {
+                            pendingCount
+                          }
+                        </span>
+                      )}
                   </Link>
 
                   {/* EXISTING EMPLOYEE DEPLOYMENT */}
@@ -1054,30 +1054,20 @@ export default function BeatsPage() {
             showCreateBeat && (
               <div
                 style={{
-                  position:
-                    "fixed",
-                  top:
-                    0,
-                  left:
-                    0,
-                  right:
-                    0,
-                  bottom:
-                    0,
-                  backgroundColor:
-                    "rgba(15,23,42,0.4)",
-                  backdropFilter:
-                    "blur(4px)",
-                  zIndex:
-                    100,
-                  display:
-                    "flex",
-                  alignItems:
-                    "center",
-                  justifyContent:
-                    "center",
-                  padding:
-                    "24px",
+                  position: "fixed",
+                  inset: 0,
+                  backgroundColor: "rgba(15,23,42,0.4)",
+                  backdropFilter: "blur(4px)",
+                  zIndex: 1000,
+
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+
+                  padding: "24px 16px",
+                  boxSizing: "border-box",
+
+                  overflowY: "auto",
                 }}
               >
                 <div
@@ -1457,22 +1447,22 @@ export default function BeatsPage() {
 
 const filterSelectStyle:
   React.CSSProperties = {
-    width: "100%",
-    height: "42px",
-    padding: "0 12px",
-    borderRadius: "11px",
-    border:
-      "1px solid #cbd5e1",
-    backgroundColor:
-      "white",
-    color:
-      "#334155",
-    fontSize:
-      "0.8rem",
-    fontWeight:
-      700,
-    outline:
-      "none",
-    cursor:
-      "pointer",
-  };
+  width: "100%",
+  height: "42px",
+  padding: "0 12px",
+  borderRadius: "11px",
+  border:
+    "1px solid #cbd5e1",
+  backgroundColor:
+    "white",
+  color:
+    "#334155",
+  fontSize:
+    "0.8rem",
+  fontWeight:
+    700,
+  outline:
+    "none",
+  cursor:
+    "pointer",
+};

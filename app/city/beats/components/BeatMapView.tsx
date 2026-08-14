@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import type { LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -31,8 +32,10 @@ const Popup = dynamic<PopupProps>(
 function FitBounds({ beat }: { beat: any }) {
     const { useMap } = require("react-leaflet");
     const map = useMap();
+
     useEffect(() => {
         if (!map || !beat) return;
+
         const L = require("leaflet");
 
         map.invalidateSize();
@@ -40,36 +43,105 @@ function FitBounds({ beat }: { beat: any }) {
         const timer = setTimeout(() => {
             const group = new L.FeatureGroup();
 
-            let geom = beat.geometry;
-            if (typeof geom === "string") {
-                try { geom = JSON.parse(geom); } catch {}
-            }
-            if (geom) {
-                try { group.addLayer(L.geoJSON(geom)); } catch {}
-            }
+            /* ================================
+               ORIGINAL IMPORTED BEAT GEOMETRY
+            ================================= */
 
-            if (beat.segments && Array.isArray(beat.segments)) {
-                beat.segments.forEach((seg: any) => {
-                    let segGeom = seg.geometry;
-                    if (typeof segGeom === "string") {
-                        try { segGeom = JSON.parse(segGeom); } catch {}
-                    }
-                    if (segGeom) {
-                        try { group.addLayer(L.geoJSON(segGeom)); } catch {}
-                    }
-                });
-            }
+            let geometry = beat.geometry;
 
-            if (group.getLayers().length > 0) {
-                const bounds = group.getBounds();
-                if (bounds.isValid()) {
-                    map.fitBounds(bounds, { padding: [50, 50] });
+            if (typeof geometry === "string") {
+                try {
+                    geometry = JSON.parse(geometry);
+                } catch {
+                    geometry = null;
                 }
             }
-        }, 100);
 
-        return () => clearTimeout(timer);
-    }, [beat, map]);
+            if (geometry) {
+                try {
+                    group.addLayer(
+                        L.geoJSON(geometry)
+                    );
+                } catch { }
+            }
+
+
+            /* ================================
+               SAVED P1 - P5
+            ================================= */
+
+            const points =
+                Array.isArray(beat.points)
+                    ? beat.points
+                    : [];
+
+            points.forEach((point: any) => {
+                const lat =
+                    Number(
+                        point?.latitude ??
+                        point?.lat
+                    );
+
+                const lng =
+                    Number(
+                        point?.longitude ??
+                        point?.lng ??
+                        point?.lon
+                    );
+
+                if (
+                    Number.isFinite(lat) &&
+                    Number.isFinite(lng)
+                ) {
+                    group.addLayer(
+                        L.circleMarker(
+                            [lat, lng],
+                            {
+                                radius: 1,
+                            }
+                        )
+                    );
+                }
+            });
+
+
+            /* ================================
+               FIT BEAT + ALL FIVE POINTS
+            ================================= */
+
+            if (
+                group.getLayers().length >
+                0
+            ) {
+                const bounds =
+                    group.getBounds();
+
+                if (bounds.isValid()) {
+                    map.fitBounds(
+                        bounds,
+                        {
+                            padding: [
+                                70,
+                                70,
+                            ],
+                            maxZoom: 18,
+                        }
+                    );
+                }
+            }
+
+        }, 150);
+
+        return () =>
+            clearTimeout(timer);
+
+    }, [
+        beat?.id,
+        beat?.geometry,
+        beat?.points,
+        map,
+    ]);
+
     return null;
 }
 
@@ -90,10 +162,10 @@ function FitSupervisorBounds({ beat, selectedSupervisorId }: { beat: any; select
                 if (supId === selectedSupervisorId) {
                     let segGeom = seg.geometry;
                     if (typeof segGeom === "string") {
-                        try { segGeom = JSON.parse(segGeom); } catch {}
+                        try { segGeom = JSON.parse(segGeom); } catch { }
                     }
                     if (segGeom) {
-                        try { group.addLayer(L.geoJSON(segGeom)); } catch {}
+                        try { group.addLayer(L.geoJSON(segGeom)); } catch { }
                     }
                 }
             });
@@ -138,6 +210,150 @@ const getFeatureColor = (feature: any) => {
         }
     }
     return VIBRANT_COLORS[Math.abs(hash) % VIBRANT_COLORS.length];
+};
+
+const parseGeoJSON = (value: any) => {
+    if (!value) return null;
+
+    if (typeof value === "string") {
+        try {
+            return JSON.parse(value);
+        } catch {
+            return null;
+        }
+    }
+
+    return value;
+};
+
+const readProperty = (properties: any, keys: string[]) => {
+    if (!properties || typeof properties !== "object") return null;
+
+    const actualKeys = Object.keys(properties);
+
+    for (const wantedKey of keys) {
+        const exact = properties[wantedKey];
+
+        if (
+            exact !== undefined &&
+            exact !== null &&
+            String(exact).trim() !== ""
+        ) {
+            return String(exact).trim();
+        }
+
+        const matchingKey = actualKeys.find(
+            key => key.toLowerCase() === wantedKey.toLowerCase()
+        );
+
+        if (matchingKey) {
+            const value = properties[matchingKey];
+
+            if (
+                value !== undefined &&
+                value !== null &&
+                String(value).trim() !== ""
+            ) {
+                return String(value).trim();
+            }
+        }
+    }
+
+    return null;
+};
+
+const collectGeometryFeatures = (geometry: any) => {
+    const parsed = parseGeoJSON(geometry);
+
+    if (!parsed) return [];
+
+    const collected: any[] = [];
+
+    const walk = (value: any, inheritedProperties: any = {}) => {
+        if (!value) return;
+
+        if (value.type === "FeatureCollection") {
+            (value.features || []).forEach((feature: any) =>
+                walk(feature, inheritedProperties)
+            );
+            return;
+        }
+
+        if (value.type === "Feature") {
+            const properties = {
+                ...inheritedProperties,
+                ...(value.properties || {})
+            };
+
+            if (value.geometry) {
+                collected.push({
+                    type: "Feature",
+                    geometry: value.geometry,
+                    properties
+                });
+            }
+
+            return;
+        }
+
+        if (value.type === "GeometryCollection") {
+            (value.geometries || []).forEach((item: any) =>
+                walk(item, inheritedProperties)
+            );
+            return;
+        }
+
+        if (value.type) {
+            collected.push({
+                type: "Feature",
+                geometry: value,
+                properties: inheritedProperties
+            });
+        }
+    };
+
+    walk(parsed);
+
+    return collected;
+};
+
+const getImportedBeatName = (beat: any) => {
+    const candidates = [
+        beat?.importedBeatName,
+        beat?.kmlBeatName,
+        beat?.kmzBeatName,
+        beat?.documentName,
+        beat?.folderName,
+        beat?.sourceName,
+        beat?.kmlMetadata?.beatName,
+        beat?.kmlMetadata?.documentName,
+        beat?.kmlMetadata?.folderName,
+        beat?.kmzMetadata?.beatName,
+        beat?.kmzMetadata?.documentName,
+        beat?.kmzMetadata?.folderName
+    ];
+
+    const geometry = parseGeoJSON(beat?.geometry);
+
+    return candidates.find(
+        value => value && String(value).trim()
+    ) || null;
+};
+
+const getFeatureDisplayName = (
+    feature: any,
+    index: number,
+    fallbackPrefix = "Point"
+) => {
+    const name =
+        feature?.properties?.name ||
+        feature?.properties?.importedName;
+
+    if (name && String(name).trim()) {
+        return String(name).trim();
+    }
+
+    return `${fallbackPrefix} ${index + 1}`;
 };
 
 // Map Controller for panned navigation
@@ -191,7 +407,25 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
     const [selectedSupervisorId, setSelectedSupervisorId] = useState<string | null>(filterUserId || null);
     const [searchQuery, setSearchQuery] = useState("");
     const [showAssignModal, setShowAssignModal] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
+    useEffect(() => {
+        setMounted(true);
+        return () => setMounted(false);
+    }, []);
+
+    useEffect(() => {
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousHtmlOverflow = document.documentElement.style.overflow;
+
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = previousBodyOverflow;
+            document.documentElement.style.overflow = previousHtmlOverflow;
+        };
+    }, []);
 
     const toggleSegmentSelection = (segmentId: string) => {
         setSelectedSegmentIds((prev) =>
@@ -268,96 +502,323 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         return { id: selectedSupervisorId, name: "Selected Supervisor", count: 0 };
     }, [selectedSupervisorId, availableSupervisors, beat]);
 
-    const explodedGeoJSON = React.useMemo(() => {
-        // Option 1: Use backend-provided segments (best for assignment)
-        if (beat.segments && beat.segments.length > 0) {
-            return {
-                type: "FeatureCollection",
-                features: beat.segments.map((seg: any, i: number) => {
-                    const points = Array.isArray(beat.points) ? beat.points : [];
-                    const p1 = points[i];
-                    const p2 = points[i + 1];
-                    let segName = seg.name;
-                    if (!segName || segName === `Beat ${i + 1}`) {
-                        if (p1?.name && p2?.name) segName = `${p1.name} → ${p2.name}`;
-                        else if (p1?.name) segName = p1.name;
-                        else if (p2?.name) segName = p2.name;
-                        else segName = `Sub-Beat ${i + 1}`;
-                    }
+    const importedGeometryFeatures = React.useMemo(
+        () => collectGeometryFeatures(beat.geometry),
+        [beat.geometry]
+    );
 
-                    return {
-                        type: "Feature",
-                        geometry: seg.geometry,
-                        properties: {
-                            id: seg.id,
-                            index: i,
-                            isSegment: true,
-                            name: segName,
-                            assignedToName: seg.employeeAssignedToName || seg.supervisorAssignedToName || beat.assignedToName,
-                            assignedToId: seg.employeeAssignedToId || seg.supervisorAssignedToId || beat.assignedToId,
-                            supervisorAssignedToName: seg.supervisorAssignedToName || beat.assignedToName,
-                            supervisorAssignedToId: seg.supervisorAssignedToId || beat.assignedToId,
-                            employeeAssignedToName: seg.employeeAssignedToName || null,
-                            employeeAssignedToId: seg.employeeAssignedToId || null,
-                            isUnassigned: assignmentMode === "SUPERVISOR" ? !(seg.supervisorAssignedToId || beat.assignedToId) : !seg.employeeAssignedToId
-                        }
-                    };
-                })
+    const importedBeatName = React.useMemo(
+        () => getImportedBeatName(beat),
+        [beat]
+    );
+
+    const displayBeatName =
+        beat.beatName ||
+        "Unnamed Beat";
+
+    const explodedGeoJSON = React.useMemo(() => {
+        const geometry =
+            parseGeoJSON(
+                beat?.geometry
+            );
+
+        if (!geometry) {
+            return {
+                type:
+                    "FeatureCollection",
+                features:
+                    [],
             };
         }
 
-        // Option 2: Fallback to raw geometry (explode on the fly)
-        if (!beat.geometry) return { type: "FeatureCollection", features: [] };
 
-        const geom = beat.geometry;
-        const features: any[] = [];
+        const supervisorName =
+            beat?.supervisorsSummary?.[0]?.name ||
+            beat?.assignedToName ||
+            beat?.segments?.[0]
+                ?.supervisorAssignedToName ||
+            null;
 
-        const process = (g: any, props: any = {}) => {
-            if (!g) return;
-            if (g.type === "FeatureCollection") {
-                g.features.forEach((f: any) => process(f.geometry, f.properties));
-            } else if (g.type === "Feature") {
-                process(g.geometry, g.properties);
-            } else if (g.type === "LineString") {
-                features.push({
-                    type: "Feature", geometry: g,
-                    properties: { ...props, isSegment: true, id: props.id || props.name || `line-${features.length}` }
-                });
-            } else if (g.type === "MultiLineString") {
-                g.coordinates.forEach((coords: any, idx: number) => {
-                    features.push({
-                        type: "Feature", geometry: { type: "LineString", coordinates: coords },
-                        properties: { ...props, isSegment: true, id: `${props.id || props.name || 'mline'}-${idx}` }
-                    });
-                });
-            } else if (g.type === "Polygon") {
-                features.push({
-                    type: "Feature", geometry: g,
-                    properties: { ...props, isSegment: true, id: props.id || props.name || `poly-${features.length}` }
-                });
-            } else if (g.type === "MultiPolygon") {
-                g.coordinates.forEach((coords: any, idx: number) => {
-                    features.push({
-                        type: "Feature", geometry: { type: "Polygon", coordinates: coords },
-                        properties: { ...props, isSegment: true, id: `${props.id || props.name || 'mpoly'}-${idx}` }
-                    });
-                });
-            } else if (g.type === "GeometryCollection") {
-                g.geometries.forEach((geom: any) => process(geom, props));
-            } else {
-                // Points, etc. - still keep them for visual context but maybe not marked as segments
-                features.push({ type: "Feature", geometry: g, properties: { ...props, isSegment: false } });
-            }
+
+        const supervisorId =
+            beat?.supervisorsSummary?.[0]?.id ||
+            beat?.assignedToId ||
+            beat?.segments?.[0]
+                ?.supervisorAssignedToId ||
+            null;
+
+
+        const employeeName =
+            beat?.employeesSummary?.[0]?.name ||
+            beat?.segments?.[0]
+                ?.employeeAssignedToName ||
+            null;
+
+
+        const employeeId =
+            beat?.employeesSummary?.[0]?.id ||
+            beat?.segments?.[0]
+                ?.employeeAssignedToId ||
+            null;
+
+
+        const baseProperties = {
+            id:
+                beat?.id,
+
+            name:
+                beat?.beatName ||
+                "Unnamed Beat",
+
+            isBeat:
+                true,
+
+            supervisorAssignedToName:
+                supervisorName,
+
+            supervisorAssignedToId:
+                supervisorId,
+
+            employeeAssignedToName:
+                employeeName,
+
+            employeeAssignedToId:
+                employeeId,
+
+            isUnassigned:
+                !supervisorId ||
+                !employeeId,
         };
 
-        process(geom);
-        return { type: "FeatureCollection", features };
-    }, [assignmentMode, beat.geometry, beat.segments, beat.assignedToName, beat.assignedToId]);
+
+        /* ================================
+           FEATURE COLLECTION
+        ================================= */
+
+        if (
+            geometry.type ===
+            "FeatureCollection"
+        ) {
+            return {
+                type:
+                    "FeatureCollection",
+
+                features:
+                    (
+                        geometry.features ||
+                        []
+                    ).map(
+                        (
+                            feature: any,
+                            index: number
+                        ) => ({
+                            ...feature,
+
+                            properties: {
+                                ...(
+                                    feature.properties ||
+                                    {}
+                                ),
+
+                                ...baseProperties,
+
+                                id:
+                                    `${beat?.id || "beat"}-${index}`,
+                            },
+                        })
+                    ),
+            };
+        }
+
+
+        /* ================================
+           FEATURE
+        ================================= */
+
+        if (
+            geometry.type ===
+            "Feature"
+        ) {
+            return {
+                type:
+                    "FeatureCollection",
+
+                features: [
+                    {
+                        ...geometry,
+
+                        properties: {
+                            ...(
+                                geometry.properties ||
+                                {}
+                            ),
+
+                            ...baseProperties,
+                        },
+                    },
+                ],
+            };
+        }
+
+
+        /* ================================
+           RAW GEOJSON GEOMETRY
+        ================================= */
+
+        return {
+            type:
+                "FeatureCollection",
+
+            features: [
+                {
+                    type:
+                        "Feature",
+
+                    geometry,
+
+                    properties:
+                        baseProperties,
+                },
+            ],
+        };
+
+    }, [
+        beat?.id,
+        beat?.beatName,
+        beat?.geometry,
+        beat?.assignedToId,
+        beat?.assignedToName,
+        beat?.supervisorsSummary,
+        beat?.employeesSummary,
+        beat?.segments,
+    ]);
+
+    const pointGeoJSON =
+        React.useMemo(() => {
+
+            const points =
+                Array.isArray(
+                    beat?.points
+                )
+                    ? beat.points
+                    : [];
+
+
+            return {
+                type:
+                    "FeatureCollection",
+
+                features:
+                    points
+                        .map(
+                            (
+                                point: any,
+                                index: number
+                            ) => {
+
+                                const lat =
+                                    Number(
+                                        point?.latitude ??
+                                        point?.lat
+                                    );
+
+                                const lng =
+                                    Number(
+                                        point?.longitude ??
+                                        point?.lng ??
+                                        point?.lon
+                                    );
+
+
+                                if (
+                                    !Number.isFinite(
+                                        lat
+                                    ) ||
+                                    !Number.isFinite(
+                                        lng
+                                    )
+                                ) {
+                                    return null;
+                                }
+
+
+                                return {
+                                    type:
+                                        "Feature",
+
+                                    geometry: {
+                                        type:
+                                            "Point",
+
+                                        coordinates: [
+                                            lng,
+                                            lat,
+                                        ],
+                                    },
+
+                                    properties: {
+                                        code:
+                                            point?.code ||
+                                            `P${index + 1}`,
+
+                                        name:
+                                            point?.name ||
+                                            `Point ${index + 1}`,
+
+                                        pointType:
+                                            point?.type ||
+                                            (
+                                                index === 0
+                                                    ? "START"
+                                                    : index ===
+                                                        points.length -
+                                                        1
+                                                        ? "END"
+                                                        : "ROUTE"
+                                            ),
+
+                                        index,
+                                    },
+                                };
+                            }
+                        )
+                        .filter(
+                            Boolean
+                        ),
+            };
+
+        }, [
+            beat?.points,
+        ]);
 
     const features = explodedGeoJSON?.features || [];
     const filteredFeatures = features.filter((f: any) => {
-        const matchesSearch = (f.properties?.name || f.properties?.index || "").toString().toLowerCase().includes(searchQuery.toLowerCase());
-        const isSupported = f.geometry?.type === "LineString" || f.geometry?.type === "MultiLineString" || f.geometry?.type === "Polygon" || f.geometry?.type === "MultiPolygon";
+        const props = f.properties || {};
+
+        const searchableText = [
+            props.name,
+            props.importedName,
+            props.supervisorAssignedToName,
+            props.employeeAssignedToName,
+            props.importedSupervisorName,
+            props.importedEmployeeName,
+            props.description,
+            props.index
+        ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+        const matchesSearch = searchableText.includes(
+            searchQuery.trim().toLowerCase()
+        );
+
+        const isSupported =
+            f.geometry?.type === "LineString" ||
+            f.geometry?.type === "MultiLineString" ||
+            f.geometry?.type === "Polygon" ||
+            f.geometry?.type === "MultiPolygon";
+
         return matchesSearch && isSupported;
     });
 
@@ -366,36 +827,121 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
     // handling zoom out func map controller
     const handleZoomOut = () => window.dispatchEvent(new CustomEvent("map-zoom-out"));
 
-    return (
-        <div style={{
-            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-            backgroundColor: "rgba(15, 23, 42, 0.85)", zIndex: 1000,
-            display: "flex", justifyContent: "center", alignItems: "center",
-            backdropFilter: "blur(12px)"
-        }}>
-            <div style={{
-                width: "98%", maxWidth: "1600px", height: "94vh",
-                backgroundColor: "white", borderRadius: "28px", overflow: "hidden",
-                position: "relative", display: "flex", flexDirection: "column",
-                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-                border: "1px solid rgba(255,255,255,0.1)"
-            }}>
+    if (typeof document === "undefined") {
+        return null;
+    }
+
+    return createPortal(
+        <div
+            className="beat-map-overlay"
+            style={{
+                position: "fixed",
+                inset: 0,
+                width: "100vw",
+                height: "100dvh",
+
+                zIndex: 99999,
+
+                backgroundColor:
+                    "rgba(15, 23, 42, 0.72)",
+
+                backdropFilter:
+                    "blur(8px)",
+
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+
+                padding: "12px",
+
+                boxSizing: "border-box",
+                overflow: "hidden",
+            }}
+        >
+            <div
+                className="beat-map-shell"
+                style={{
+                    width: "100%",
+                    maxWidth: "1600px",
+
+                    height:
+                        "calc(100dvh - 24px)",
+
+                    maxHeight:
+                        "calc(100dvh - 24px)",
+
+                    minWidth: 0,
+                    minHeight: 0,
+
+                    backgroundColor: "#ffffff",
+
+                    borderRadius: "22px",
+
+                    overflow: "hidden",
+
+                    position: "relative",
+
+                    display: "flex",
+                    flexDirection: "column",
+
+                    boxShadow:
+                        "0 25px 60px rgba(15,23,42,0.32)",
+
+                    border:
+                        "1px solid rgba(255,255,255,0.2)",
+                }}
+            >
                 {/* Pro Header */}
-                <div style={{
-                    padding: "16px 32px",
-                    borderBottom: "1px solid #f1f5f9",
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    backgroundColor: "#fff",
-                    zIndex: 10
-                }}>
+                <div
+                    className="beat-map-header"
+                    style={{
+                        padding: "16px 24px",
+
+                        flexShrink: 0,
+
+                        borderBottom:
+                            "1px solid #f1f5f9",
+
+                        display: "flex",
+
+                        justifyContent:
+                            "space-between",
+
+                        alignItems:
+                            "center",
+
+                        gap: "16px",
+
+                        backgroundColor:
+                            "#ffffff",
+
+                        zIndex: 10,
+
+                        minWidth: 0,
+                    }}
+                >
                     <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                         <div style={{ display: "flex", flexDirection: "column" }}>
                             <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
                                 <MapPin size={24} color="#2563eb" fill="#dbeafe" />
-                                {beat.beatName}
+                                {displayBeatName}
                             </h3>
                             <div style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: "2px" }}>
                                 {[beat.zoneName, beat.wardName, beat.areaName].filter(Boolean).join(" | ")}
+                                {importedBeatName &&
+                                    importedBeatName !== beat.beatName &&
+                                    beat.beatName && (
+                                        <div
+                                            style={{
+                                                fontSize: "0.68rem",
+                                                color: "#94a3b8",
+                                                fontWeight: 600,
+                                                marginTop: "3px"
+                                            }}
+                                        >
+                                            MatrixTrack Beat: {beat.beatName}
+                                        </div>
+                                    )}
                             </div>
                         </div>
                     </div>
@@ -410,26 +956,8 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                             transition: "all 0.2s",
                             boxShadow: selectedSupervisorId ? "0 4px 12px rgba(37, 99, 235, 0.15)" : "none"
                         }}>
-                            <User size={16} color={selectedSupervisorId ? "#2563eb" : "#64748b"} />
-                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: selectedSupervisorId ? "#1e40af" : "#475569", whiteSpace: "nowrap" }}>
-                                Supervisor:
-                            </span>
-                            <select
-                                value={selectedSupervisorId || ""}
-                                onChange={(e) => setSelectedSupervisorId(e.target.value || null)}
-                                style={{
-                                    padding: "5px 10px", borderRadius: "10px", border: "1px solid #cbd5e1",
-                                    backgroundColor: "white", color: selectedSupervisorId ? "#1d4ed8" : "#0f172a",
-                                    fontWeight: 700, fontSize: "0.75rem", cursor: "pointer", outline: "none"
-                                }}
-                            >
-                                <option value="">All Supervisors ({availableSupervisors.reduce((acc, s) => acc + s.count, 0)})</option>
-                                {availableSupervisors.map(sup => (
-                                    <option key={sup.id} value={sup.id}>
-                                        {sup.name} ({sup.count} beat{sup.count === 1 ? '' : 's'})
-                                    </option>
-                                ))}
-                            </select>
+
+
                             {selectedSupervisorId && (
                                 <button
                                     onClick={() => setSelectedSupervisorId(null)}
@@ -482,7 +1010,21 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                     </div>
                 </div>
 
-                <div style={{ flex: 1, display: "flex", overflow: "hidden", backgroundColor: "#f8fafc" }}>
+                <div
+                    className="beat-map-content"
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        minWidth: 0,
+
+                        display: "flex",
+
+                        overflow: "hidden",
+
+                        backgroundColor:
+                            "#f8fafc",
+                    }}
+                >
                     {/* Side Explorer */}
                     <div style={{
                         width: "360px",
@@ -490,174 +1032,543 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                         flexDirection: "column",
                         backgroundColor: "#fff",
                         boxShadow: "10px 0 15px -10px rgba(0,0,0,0.05)",
-                        zIndex: 5
+                        zIndex: 5,
+                        minHeight: 0,
+                        overflow: "hidden",
                     }}>
-                        <div style={{ padding: "24px 20px" }}>
-                            <div style={{ position: "relative" }}>
-                                <Search size={18} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
-                                <input
-                                    type="text"
-                                    placeholder="Search placemarks..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    style={{
-                                        width: "100%", padding: "12px 12px 12px 42px", borderRadius: "16px",
-                                        border: "1px solid #e2e8f0", backgroundColor: "#f8fafc", fontSize: "0.875rem",
-                                        transition: "border-color 0.2s"
-                                    }}
-                                />
-                            </div>
-                        </div>
+                        {/* =========================================
+    NEW BEAT SUMMARY
+========================================= */}
 
-                        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
-                            <button
-                                onClick={() => setShowAssignModal(true)}
+                        <div
+                            style={{
+                                flex: 1,
+                                minHeight: 0,
+                                overflowY: "auto",
+                                padding: "18px",
+                            }}
+                        >
+                            {/* BEAT STATUS */}
+
+                            <div
                                 style={{
-                                    width: "100%", padding: "14px", borderRadius: "16px",
-                                    border: "none", backgroundColor: "#2563eb", color: "white",
-                                    fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
-                                    display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                                    boxShadow: "0 10px 15px -3px rgba(37, 99, 235, 0.25)",
-                                    marginBottom: "12px"
+                                    padding: "16px",
+                                    borderRadius: "16px",
+                                    background:
+                                        Array.isArray(beat?.points) &&
+                                            beat.points.length === 5
+                                            ? "#ecfdf5"
+                                            : "#fff7ed",
+                                    border:
+                                        Array.isArray(beat?.points) &&
+                                            beat.points.length === 5
+                                            ? "1px solid #a7f3d0"
+                                            : "1px solid #fed7aa",
+                                    marginBottom: "16px",
                                 }}
                             >
-                                {selectedSegmentIds.length > 0 ? `${assignmentMode === "EMPLOYEE" ? "Deploy" : "Assign"} ${selectedSegmentIds.length} Segments` : (assignmentMode === "EMPLOYEE" ? "Deploy Employees" : "Assign Supervisor")}
-                            </button>
-
-                            {onEdit && (
-                                <button
-                                    onClick={() => onEdit(beat)}
+                                <div
                                     style={{
-                                        width: "100%", padding: "12px", borderRadius: "16px",
-                                        border: "1px solid #e2e8f0", backgroundColor: "#fff", color: "#475569",
-                                        fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
-                                        display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                                        marginBottom: "12px", transition: "all 0.2s"
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f8fafc"}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#fff"}
-                                >
-                                    <Edit2 size={18} />
-                                    Edit Beat Details
-                                </button>
-                            )}
-
-                            {selectedSegmentIds.length > 0 && (
-                                <button
-                                    onClick={() => setSelectedSegmentIds([])}
-                                    style={{
-                                        width: "100%", padding: "10px", borderRadius: "12px",
-                                        border: "1px dashed #ef4444", backgroundColor: "white", color: "#ef4444",
-                                        fontWeight: 600, fontSize: "0.75rem", cursor: "pointer",
-                                        marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px"
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        gap: "10px",
                                     }}
                                 >
-                                    <X size={14} /> Clear Selection
-                                </button>
-                            )}
+                                    <div>
+                                        <div
+                                            style={{
+                                                fontSize: "10px",
+                                                fontWeight: 900,
+                                                color: "#64748b",
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.08em",
+                                            }}
+                                        >
+                                            Beat Configuration
+                                        </div>
 
-                            <div style={{ padding: "0 8px 12px", fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <span>Found {filteredFeatures.length} Results</span>
-                                {activeSupervisor && (
-                                    <span style={{ color: "#2563eb", fontWeight: 800 }}>
-                                        {activeSupervisor.name}
-                                    </span>
-                                )}
-                            </div>
-                            {filteredFeatures.map((f: any, i: number) => {
-                                const featureId = f.properties?.name || `feat-${i}`;
-                                const color = getFeatureColor(f);
-                                const isActive = selectedFeature?.properties?.name === featureId;
-                                const segSupId = f.properties?.supervisorAssignedToId || f.properties?.assignedToId || beat.assignedToId;
-                                const isSupMatch = selectedSupervisorId ? segSupId === selectedSupervisorId : true;
+                                        <div
+                                            style={{
+                                                marginTop: "4px",
+                                                fontSize: "15px",
+                                                fontWeight: 800,
+                                                color: "#0f172a",
+                                            }}
+                                        >
+                                            {beat?.beatName || "Unnamed Beat"}
+                                        </div>
+                                    </div>
 
-                                return (
                                     <div
-                                        key={i}
-                                        onClick={() => { setSelectedFeature(f); if (f.properties?.isSegment) toggleSegmentSelection(f.properties.id); }}
-                                        onMouseEnter={() => setHoveredFeature(featureId)}
-                                        onMouseLeave={() => setHoveredFeature(null)}
                                         style={{
-                                            padding: "16px",
-                                            borderRadius: "18px",
-                                            marginBottom: "10px",
-                                            cursor: "pointer",
-                                            backgroundColor: isActive ? "#eff6ff" : (selectedSupervisorId && isSupMatch ? "#f0f9ff" : (hoveredFeature === featureId ? "#f8fafc" : "transparent")),
-                                            border: "2px solid",
-                                            borderColor: f.properties?.isSegment && selectedSegmentIds.includes(f.properties.id) ? "#2563eb" : (selectedSupervisorId && isSupMatch ? "#3b82f6" : (isActive ? "#3b82f6" : "transparent")),
-                                            opacity: selectedSupervisorId && !isSupMatch ? 0.45 : 1,
-                                            transition: "all 0.2s",
-                                            boxShadow: isActive || (selectedSupervisorId && isSupMatch) ? "0 4px 12px rgba(59, 130, 246, 0.15)" : "none",
-                                            position: "relative"
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "5px",
+                                            borderRadius: "999px",
+                                            padding: "5px 9px",
+                                            background: "#ffffff",
+                                            fontSize: "10px",
+                                            fontWeight: 900,
+                                            color:
+                                                Array.isArray(beat?.points) &&
+                                                    beat.points.length === 5
+                                                    ? "#047857"
+                                                    : "#c2410c",
                                         }}
                                     >
-                                        {f.properties?.isSegment && selectedSegmentIds.includes(f.properties.id) && (
-                                            <div style={{ position: "absolute", top: "10px", right: "10px", backgroundColor: "#2563eb", color: "white", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                <UserPlus size={12} />
-                                            </div>
+                                        {Array.isArray(beat?.points) &&
+                                            beat.points.length === 5 ? (
+                                            <CheckCircle2 size={13} />
+                                        ) : (
+                                            <MapPin size={13} />
                                         )}
-                                        <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                                            <div style={{
-                                                width: "40px", height: "40px", borderRadius: "12px",
-                                                backgroundColor: selectedSupervisorId && isSupMatch ? "#dbeafe" : `${color}15`,
-                                                color: selectedSupervisorId && isSupMatch ? "#2563eb" : color,
-                                                display: "flex", alignItems: "center", justifyContent: "center",
-                                                flexShrink: 0
-                                            }}>
-                                                {f.geometry?.type === "Point" ? <MapPin size={20} /> : <FileText size={20} />}
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontSize: "0.935rem", fontWeight: 700, color: "#0f172a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                                    <span>{f.properties?.name || `Feature #${i + 1}`}</span>
-                                                    {selectedSupervisorId && isSupMatch && (
-                                                        <span style={{ fontSize: "10px", backgroundColor: "#2563eb", color: "white", padding: "2px 6px", borderRadius: "4px", fontWeight: 800 }}>Assigned</span>
-                                                    )}
-                                                </div>
-                                                <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                                    <span style={{ padding: "2px 6px", backgroundColor: "#f1f5f9", borderRadius: "4px" }}>{f.geometry?.type === "LineString" ? "Segment" : f.geometry?.type}</span>
-                                                    <span>{f.properties?.supervisorAssignedToName || beat.assignedToName || "Street path"}</span>
-                                                </div>
+
+                                        {Array.isArray(beat?.points)
+                                            ? `${beat.points.length}/5`
+                                            : "0/5"}
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            {/* LOCATION */}
+
+                            <div
+                                style={{
+                                    marginBottom: "18px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        marginBottom: "8px",
+                                        fontSize: "10px",
+                                        color: "#94a3b8",
+                                        fontWeight: 900,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.08em",
+                                    }}
+                                >
+                                    Location
+                                </div>
+
+                                <div
+                                    style={{
+                                        padding: "13px",
+                                        borderRadius: "14px",
+                                        border: "1px solid #e2e8f0",
+                                        background: "#f8fafc",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "flex-start",
+                                            gap: "9px",
+                                        }}
+                                    >
+                                        <MapPin
+                                            size={16}
+                                            color="#2563eb"
+                                            style={{
+                                                flexShrink: 0,
+                                                marginTop: "2px",
+                                            }}
+                                        />
+
+                                        <div
+                                            style={{
+                                                minWidth: 0,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    fontSize: "12px",
+                                                    lineHeight: "18px",
+                                                    fontWeight: 700,
+                                                    color: "#334155",
+                                                }}
+                                            >
+                                                {[
+                                                    beat?.zoneName,
+                                                    beat?.wardName,
+                                                    beat?.areaName,
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(" • ") || "-"}
                                             </div>
                                         </div>
                                     </div>
-                                );
-                            })}
+                                </div>
+                            </div>
+
+
+                            {/* ASSIGNMENT */}
+
+                            <div
+                                style={{
+                                    marginBottom: "18px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        marginBottom: "8px",
+                                        fontSize: "10px",
+                                        color: "#94a3b8",
+                                        fontWeight: 900,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.08em",
+                                    }}
+                                >
+                                    Assignment
+                                </div>
+
+
+                                {/* EMPLOYEE */}
+
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "11px",
+                                        padding: "12px",
+                                        border: "1px solid #e2e8f0",
+                                        borderRadius: "14px",
+                                        background: "#ffffff",
+                                        marginBottom: "8px",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: "35px",
+                                            height: "35px",
+                                            borderRadius: "11px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            background: "#eff6ff",
+                                            color: "#2563eb",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <User size={16} />
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            minWidth: 0,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "9px",
+                                                color: "#94a3b8",
+                                                fontWeight: 900,
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.06em",
+                                            }}
+                                        >
+                                            Employee
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                marginTop: "2px",
+                                                fontSize: "12px",
+                                                fontWeight: 800,
+                                                color: "#0f172a",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {beat?.employeesSummary?.[0]?.name ||
+                                                beat?.segments?.find(
+                                                    (segment: any) =>
+                                                        segment?.employeeAssignedToName
+                                                )?.employeeAssignedToName ||
+                                                "Not assigned"}
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                {/* SUPERVISOR */}
+
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "11px",
+                                        padding: "12px",
+                                        border: "1px solid #e2e8f0",
+                                        borderRadius: "14px",
+                                        background: "#ffffff",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: "35px",
+                                            height: "35px",
+                                            borderRadius: "11px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            background: "#ecfdf5",
+                                            color: "#059669",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <Users size={16} />
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            minWidth: 0,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "9px",
+                                                color: "#94a3b8",
+                                                fontWeight: 900,
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.06em",
+                                            }}
+                                        >
+                                            Supervisor
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                marginTop: "2px",
+                                                fontSize: "12px",
+                                                fontWeight: 800,
+                                                color: "#0f172a",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                            }}
+                                        >
+                                            {beat?.supervisorsSummary?.[0]?.name ||
+                                                beat?.assignedToName ||
+                                                beat?.segments?.find(
+                                                    (segment: any) =>
+                                                        segment?.supervisorAssignedToName
+                                                )?.supervisorAssignedToName ||
+                                                "Not assigned"}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            {/* CONFIGURED POINTS */}
+
+                            <div
+                                style={{
+                                    marginBottom: "18px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        marginBottom: "8px",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: "10px",
+                                            color: "#94a3b8",
+                                            fontWeight: 900,
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.08em",
+                                        }}
+                                    >
+                                        Configured Points
+                                    </div>
+
+                                    <span
+                                        style={{
+                                            fontSize: "10px",
+                                            fontWeight: 900,
+                                            color:
+                                                beat?.points?.length === 5
+                                                    ? "#047857"
+                                                    : "#c2410c",
+                                        }}
+                                    >
+                                        {Array.isArray(beat?.points)
+                                            ? beat.points.length
+                                            : 0}
+                                        /5
+                                    </span>
+                                </div>
+
+
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gap: "7px",
+                                    }}
+                                >
+                                    {(Array.isArray(beat?.points)
+                                        ? beat.points
+                                        : []
+                                    ).map(
+                                        (
+                                            point: any,
+                                            index: number
+                                        ) => {
+                                            const pointType =
+                                                point?.type ||
+                                                (index === 0
+                                                    ? "START"
+                                                    : index ===
+                                                        beat.points.length -
+                                                        1
+                                                        ? "END"
+                                                        : "ROUTE");
+
+                                            return (
+                                                <div
+                                                    key={
+                                                        point?.code ||
+                                                        index
+                                                    }
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "10px",
+                                                        padding: "10px",
+                                                        borderRadius: "12px",
+                                                        background: "#f8fafc",
+                                                        border:
+                                                            "1px solid #e2e8f0",
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            width: "32px",
+                                                            height: "32px",
+                                                            borderRadius:
+                                                                "50%",
+                                                            background:
+                                                                "#2563eb",
+                                                            color: "#ffffff",
+                                                            display:
+                                                                "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            justifyContent:
+                                                                "center",
+                                                            fontSize:
+                                                                "10px",
+                                                            fontWeight:
+                                                                900,
+                                                            flexShrink:
+                                                                0,
+                                                        }}
+                                                    >
+                                                        {point?.code ||
+                                                            `P${index + 1}`}
+                                                    </div>
+
+                                                    <div
+                                                        style={{
+                                                            flex: 1,
+                                                            minWidth: 0,
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                fontSize:
+                                                                    "11px",
+                                                                fontWeight:
+                                                                    800,
+                                                                color:
+                                                                    "#0f172a",
+                                                            }}
+                                                        >
+                                                            {point?.name ||
+                                                                `Point ${index + 1}`}
+                                                        </div>
+
+                                                        <div
+                                                            style={{
+                                                                marginTop:
+                                                                    "2px",
+                                                                fontSize:
+                                                                    "9px",
+                                                                fontWeight:
+                                                                    800,
+                                                                color:
+                                                                    pointType ===
+                                                                        "START"
+                                                                        ? "#047857"
+                                                                        : pointType ===
+                                                                            "END"
+                                                                            ? "#dc2626"
+                                                                            : "#64748b",
+                                                            }}
+                                                        >
+                                                            {pointType}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                    )}
+                                </div>
+                            </div>
+
+
+                            {/* EDIT */}
+
+                            {onEdit && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        onEdit(beat)
+                                    }
+                                    style={{
+                                        width: "100%",
+                                        padding: "12px",
+                                        borderRadius: "13px",
+                                        border:
+                                            "1px solid #cbd5e1",
+                                        backgroundColor:
+                                            "#ffffff",
+                                        color: "#334155",
+                                        fontWeight: 800,
+                                        fontSize: "12px",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent:
+                                            "center",
+                                        gap: "8px",
+                                    }}
+                                >
+                                    <Edit2 size={15} />
+
+                                    Edit Beat Details
+                                </button>
+                            )}
                         </div>
+
+
                     </div>
 
                     {/* Premium Map Canvas */}
-                    <div style={{ flex: 1, position: "relative" }}>
-                        {activeSupervisor && (
-                            <div style={{
-                                position: "absolute", top: "20px", left: "50%", transform: "translateX(-50%)",
-                                backgroundColor: "rgba(15, 23, 42, 0.92)", backdropFilter: "blur(12px)",
-                                color: "white", padding: "8px 16px 8px 20px", borderRadius: "999px",
-                                boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.5)",
-                                display: "flex", alignItems: "center", gap: "12px", zIndex: 1000,
-                                border: "1px solid rgba(255, 255, 255, 0.15)",
-                                maxWidth: "90%"
-                            }}>
-                                <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#3b82f6", boxShadow: "0 0 10px #3b82f6", flexShrink: 0, animation: "pulse 2s infinite" }} />
-                                <span style={{ fontSize: "0.85rem", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    Highlighting beats for <strong style={{ color: "#60a5fa" }}>{activeSupervisor.name}</strong> ({activeSupervisor.count} Beat{activeSupervisor.count === 1 ? '' : 's'})
-                                </span>
-                                <button
-                                    onClick={() => setSelectedSupervisorId(null)}
-                                    style={{
-                                        backgroundColor: "#ef4444", border: "none", color: "white",
-                                        borderRadius: "50%", width: "24px", height: "24px", display: "flex",
-                                        alignItems: "center", justifyContent: "center", cursor: "pointer",
-                                        flexShrink: 0, transition: "transform 0.2s, background-color 0.2s",
-                                        boxShadow: "0 2px 6px rgba(239, 68, 68, 0.4)"
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"}
-                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                                    title="Clear Supervisor Filter"
-                                >
-                                    <X size={14} strokeWidth={2.5} />
-                                </button>
-                            </div>
-                        )}
+                    <div style={{
+                        flex: 1,
+                        minWidth: 0,
+                        minHeight: 0,
+                        position: "relative",
+                        overflow: "hidden"
+                    }}>
+
 
                         <MapContainer
                             key={beat?.id || "beat-map"}
@@ -688,232 +1599,228 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                             )}
 
                             <GeoJSON
-                                key={`${mapType}-${hoveredFeature}-${searchQuery}-${selectedSupervisorId}-${JSON.stringify(explodedGeoJSON)}`}
-                                data={explodedGeoJSON as any}
-                                style={(feature: any) => {
-                                    const props = feature?.properties;
-                                    const featureId = props?.name || props?.id || "";
-                                    const color = getFeatureColor(feature);
-                                    const isHovered = hoveredFeature === featureId;
-                                    const isSelected = selectedFeature?.properties?.name === featureId || selectedFeature?.properties?.id === props?.id;
-                                    const isSelectedOnMap = props?.isSegment && selectedSegmentIds.includes(props.id);
-                                    const isUnassigned = props?.isUnassigned;
-                                    const segSupervisorId = props?.supervisorAssignedToId || props?.assignedToId || beat.assignedToId;
+                                key={`beat-${beat?.id}-${mapType}-${JSON.stringify(explodedGeoJSON)}`}
 
-                                    if (selectedSupervisorId) {
-                                        const isMatchedSup = segSupervisorId === selectedSupervisorId;
-                                        if (isMatchedSup) {
-                                            return {
-                                                color: "#2563eb",
-                                                weight: (isHovered || isSelected) ? 10 : 8,
-                                                fillOpacity: 0.85,
-                                                fillColor: "#3b82f6",
-                                                opacity: 1,
-                                                dashArray: ""
-                                            };
-                                        } else {
-                                            return {
-                                                color: "#94a3b8",
-                                                weight: 2,
-                                                fillOpacity: 0.05,
-                                                fillColor: "#cbd5e1",
-                                                opacity: 0.18,
-                                                dashArray: "4, 6"
-                                            };
-                                        }
-                                    }
+                                data={
+                                    explodedGeoJSON as any
+                                }
 
-                                    return {
-                                        color: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#f59e0b" : color),
-                                        weight: (isHovered || isSelected || isSelectedOnMap) ? 7 : (isUnassigned ? 4 : 4),
-                                        fillOpacity: (isHovered || isSelected || isSelectedOnMap) ? 0.6 : 0.25,
-                                        fillColor: isSelectedOnMap ? "#2563eb" : (isUnassigned ? "#fbbf24" : color),
-                                        opacity: isSelectedOnMap ? 1 : (isUnassigned ? 0.95 : 1),
-                                        dashArray: isSelectedOnMap ? "" : (isUnassigned ? "8, 6" : (isHovered ? "5, 5" : ""))
-                                    };
-                                }}
-                                pointToLayer={(feature: any, latlng: any) => {
-                                    const L = require("leaflet");
-                                    const color = getFeatureColor(feature);
-                                    const icon = L.divIcon({
-                                        html: `
-                                            <div style="position: relative; width: 32px; height: 32px; background: white; border: 3px solid ${color}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 4px 6px rgba(0,0,0,0.2)">
-                                                <div style="position: absolute; width: 10px; height: 10px; background: ${color}; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);"></div>
-                                            </div>
-                                        `,
-                                        className: "",
-                                        iconSize: [32, 32],
-                                        iconAnchor: [16, 32]
-                                    });
-                                    return L.marker(latlng, { icon });
-                                }}
-                                onEachFeature={(feature, layer) => {
-                                    const props = feature?.properties;
-                                    const name = props?.name || (props?.isSegment ? `Beat ${props.index + 1}` : "Unnamed");
-                                    const color = getFeatureColor(feature);
-                                    const supervisorName = props?.supervisorAssignedToName || beat.assignedToName || "Unassigned";
-                                    const employeeName = props?.employeeAssignedToName || "Unassigned";
-                                    const assignedToName = assignmentMode === "EMPLOYEE" ? employeeName : supervisorName;
-                                    const isUnassigned = props?.isUnassigned;
+                                style={() => ({
+                                    color:
+                                        "#2563eb",
 
-                                    if (layer && typeof layer.on === "function") {
-                                        layer.on({
-                                            mouseover: () => setHoveredFeature(name),
-                                            mouseout: () => setHoveredFeature(null),
-                                            click: (e: any) => {
-                                                const L = require("leaflet");
-                                                L.DomEvent.stopPropagation(e);
-                                                setSelectedFeature(feature);
-                                                if (props?.isSegment) {
-                                                    toggleSegmentSelection(props.id);
-                                                }
+                                    weight:
+                                        6,
+
+                                    opacity:
+                                        1,
+
+                                    fillColor:
+                                        "#3b82f6",
+
+                                    fillOpacity:
+                                        0.12,
+
+                                    lineCap:
+                                        "round",
+
+                                    lineJoin:
+                                        "round",
+                                })}
+
+                                onEachFeature={(
+                                    _feature,
+                                    layer
+                                ) => {
+
+                                    const supervisorName =
+                                        beat?.supervisorsSummary?.[0]?.name ||
+                                        beat?.assignedToName ||
+                                        beat?.segments?.[0]
+                                            ?.supervisorAssignedToName ||
+                                        "Not assigned";
+
+
+                                    const employeeName =
+                                        beat?.employeesSummary?.[0]?.name ||
+                                        beat?.segments?.[0]
+                                            ?.employeeAssignedToName ||
+                                        "Not assigned";
+
+
+                                    if (
+                                        layer &&
+                                        typeof layer.bindPopup ===
+                                        "function"
+                                    ) {
+                                        layer.bindPopup(
+                                            `
+                <div style="
+                    min-width:220px;
+                    font-family:Inter,Arial,sans-serif;
+                    padding:8px;
+                ">
+                    <div style="
+                        font-size:16px;
+                        font-weight:800;
+                        color:#0f172a;
+                        margin-bottom:8px;
+                    ">
+                        ${beat?.beatName || "Beat"}
+                    </div>
+
+                    <div style="
+                        font-size:12px;
+                        color:#64748b;
+                        margin-bottom:10px;
+                    ">
+                        ${[
+                                                beat?.zoneName,
+                                                beat?.wardName,
+                                                beat?.areaName
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" • ")}
+                    </div>
+
+                    <div style="
+                        border-top:1px solid #e2e8f0;
+                        padding-top:9px;
+                        display:grid;
+                        gap:5px;
+                        font-size:12px;
+                    ">
+                        <div>
+                            <b>Employee:</b>
+                            ${employeeName}
+                        </div>
+
+                        <div>
+                            <b>Supervisor:</b>
+                            ${supervisorName}
+                        </div>
+
+                        <div>
+                            <b>Points:</b>
+                            ${Array.isArray(
+                                                    beat?.points
+                                                )
+                                                ? beat.points.length
+                                                : 0
+                                            }/5
+                        </div>
+                    </div>
+                </div>
+                `,
+                                            {
+                                                className:
+                                                    "modern-popup",
                                             }
-                                        });
+                                        );
                                     }
+                                }}
+                            />
+                            <GeoJSON
+                                key={`beat-points-${beat?.id}-${JSON.stringify(pointGeoJSON)}`}
 
-                                    if (layer && typeof layer.bindPopup === "function") {
-                                        const popupRoleColor = assignmentMode === "EMPLOYEE" ? "#db2777" : "#6366f1";
-                                        const popupRoleLabel = assignmentMode === "EMPLOYEE" ? "Employee" : "Supervisor";
-                                        const avatarBg = assignmentMode === "EMPLOYEE" ? "linear-gradient(135deg, #ec4899 0%, #be185d 100%)" : "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)";
+                                data={
+                                    pointGeoJSON as any
+                                }
 
-                                        layer.bindPopup(`
-                                            <div style="font-family: 'Inter', sans-serif; padding: 16px; min-width: 260px;">
-                                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-                                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                                        <div style="width: 10px; height: 10px; border-radius: 50%; background: ${isUnassigned ? '#f59e0b' : '#10b981'}; box-shadow: 0 0 10px ${isUnassigned ? 'rgba(245, 158, 11, 0.35)' : 'rgba(16, 185, 129, 0.4)'}"></div>
-                                                        <div style="font-weight: 800; color: #1e293b; font-size: 16px;">${name}</div>
-                                                    </div>
-                                                    ${props?.isSegment ? `<span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:6px; font-size:10px; font-weight: 700;">Beat ${props.index + 1}</span>` : ''}
-                                                </div>
+                                pointToLayer={(
+                                    feature: any,
+                                    latlng: any
+                                ) => {
 
-                                                <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
-                                                     <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:6px; font-size:10px; font-weight: 800;">Z - ${beat.zoneName}</span>
-                                                     <span style="background:#f0fdf4; color:#166534; padding:2px 8px; border-radius:6px; font-size:10px; font-weight: 800;">W - ${beat.wardName}</span>
-                                                </div>
+                                    const L =
+                                        require("leaflet");
 
-                                                <div style="background: #f8fafc; padding: 14px; border-radius: 16px; border: 1px solid #f1f5f9;">
-                                                    <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 800; margin-bottom: 10px; letter-spacing: 0.05em;">Current Assignment</div>
-                                                    <div style="display: flex; align-items: center; gap: 12px;">
-                                                        <div style="width: 36px; height: 36px; border-radius: 10px; background: ${isUnassigned ? '#cbd5e1' : avatarBg}; color: white; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; box-shadow: ${isUnassigned ? 'none' : '0 4px 10px rgba(0,0,0,0.1)'}">
-                                                            ${(assignedToName || 'U')[0]}
-                                                        </div>
-                                                        <div style="display: flex; flex-direction: column;">
-                                                            <div style="font-weight: 700; color: #1e293b; font-size: 14px; line-height: 1.2;">${assignedToName}</div>
-                                                            <div style="font-size: 11px; color: ${isUnassigned ? '#94a3b8' : popupRoleColor}; font-weight: 700;">
-                                                                ${isUnassigned ? "Pending Assignment" : popupRoleLabel}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        `, { className: 'modern-popup' });
+                                    const code =
+                                        feature?.properties?.code ||
+                                        "P";
+
+
+                                    const icon =
+                                        L.divIcon({
+                                            className:
+                                                "beat-point-marker",
+
+                                            html: `
+                    <div class="beat-point-marker-inner">
+                        ${code}
+                    </div>
+                `,
+
+                                            iconSize: [
+                                                36,
+                                                36,
+                                            ],
+
+                                            iconAnchor: [
+                                                18,
+                                                18,
+                                            ],
+                                        });
+
+
+                                    return L.marker(
+                                        latlng,
+                                        {
+                                            icon,
+                                            interactive:
+                                                true,
+                                        }
+                                    );
+                                }}
+
+                                onEachFeature={(
+                                    feature,
+                                    layer
+                                ) => {
+
+                                    const props =
+                                        feature?.properties ||
+                                        {};
+
+
+                                    if (
+                                        layer &&
+                                        typeof layer.bindTooltip ===
+                                        "function"
+                                    ) {
+                                        layer.bindTooltip(
+                                            `
+                    <strong>
+                        ${props.code}
+                    </strong>
+                    &nbsp;
+                    ${props.name}
+                    <br/>
+                    <span style="color:#64748b;">
+                        ${props.pointType}
+                    </span>
+                `,
+                                            {
+                                                direction:
+                                                    "top",
+
+                                                offset: [
+                                                    0,
+                                                    -12,
+                                                ],
+
+                                                className:
+                                                    "beat-point-tooltip",
+                                            }
+                                        );
                                     }
                                 }}
                             />
                             <MapController targetFeature={selectedFeature} />
                             <FitBounds beat={beat} />
-                            <FitSupervisorBounds beat={beat} selectedSupervisorId={selectedSupervisorId} />
+
                             <ZoomHandler />
                         </MapContainer>
-
-                        {selectedFeature && (() => {
-                            const props = selectedFeature.properties || {};
-                            const selectedName = props.name || (props.isSegment ? `Beat Segment ${(props.index ?? 0) + 1}` : "Selected feature");
-                            const supervisorName = props.supervisorAssignedToName || beat.assignedToName || "Unassigned";
-                            const employeeName = props.employeeAssignedToName || "Unassigned";
-                            const isSegment = !!props.isSegment;
-                            const segmentSelected = isSegment && selectedSegmentIds.includes(props.id);
-                            return (
-                                <div style={{
-                                    position: "absolute", top: "28px", left: "50%", transform: "translateX(-50%)",
-                                    width: "340px", backgroundColor: "white", borderRadius: "24px", padding: "20px",
-                                    boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.22)", border: "1px solid #e2e8f0", zIndex: 1000
-                                }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#1e293b" }}>{selectedName}</div>
-                                            <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
-                                                <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 800 }}>Z - {beat.zoneName}</span>
-                                                <span style={{ background: "#f0fdf4", color: "#166534", padding: "2px 8px", borderRadius: "999px", fontSize: "10px", fontWeight: 800 }}>W - {beat.wardName}</span>
-                                            </div>
-                                        </div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                            {isSegment && (
-                                                <button
-                                                    onClick={() => toggleSegmentSelection(props.id)}
-                                                    style={{
-                                                        border: segmentSelected ? "none" : "1px solid #cbd5e1",
-                                                        backgroundColor: segmentSelected ? "#2563eb" : "white",
-                                                        color: segmentSelected ? "white" : "#334155",
-                                                        borderRadius: "12px", padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize: "0.75rem"
-                                                    }}
-                                                >
-                                                    {segmentSelected ? "Selected" : "Select Segment"}
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => setSelectedFeature(null)}
-                                                style={{
-                                                    width: "32px", height: "32px", borderRadius: "10px",
-                                                    backgroundColor: "#f1f5f9", color: "#64748b",
-                                                    border: "none", cursor: "pointer",
-                                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                                    transition: "all 0.2s", flexShrink: 0
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.backgroundColor = "#fef2f2";
-                                                    e.currentTarget.style.color = "#ef4444";
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.backgroundColor = "#f1f5f9";
-                                                    e.currentTarget.style.color = "#64748b";
-                                                }}
-                                                title="Close Details"
-                                            >
-                                                <X size={18} strokeWidth={2.5} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div style={{ marginTop: "16px", display: "grid", gap: "12px" }}>
-                                        <div style={{ background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: "16px", padding: "14px" }}>
-                                            <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Supervisor</div>
-                                            <div style={{ fontWeight: 700, color: "#1e293b" }}>{supervisorName}</div>
-                                        </div>
-                                        <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: "16px", padding: "14px" }}>
-                                            <div style={{ fontSize: "10px", color: "#9d174d", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Employee</div>
-                                            <div style={{ fontWeight: 700, color: "#831843" }}>{employeeName}</div>
-                                        </div>
-                                    </div>
-                                    {isSegment && (
-                                        <button
-                                            onClick={() => setShowAssignModal(true)}
-                                            style={{ marginTop: "16px", width: "100%", padding: "12px 14px", borderRadius: "14px", border: "none", backgroundColor: "#0f172a", color: "white", fontWeight: 700, cursor: "pointer" }}
-                                        >
-                                            {assignmentMode === "EMPLOYEE" ? "Assign Beat Segment" : "Assign Supervisor Segment"}
-                                        </button>
-                                    )}
-                                </div>
-                            );
-                        })()}
-
-                        {/* Float HUD */}
-                        <div style={{
-                            position: "absolute", bottom: "40px", right: "40px",
-                            backgroundColor: "white", padding: "12px 24px", borderRadius: "20px",
-                            boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                            display: "flex", gap: "24px", alignItems: "center",
-                            zIndex: 1000, border: "1px solid #f1f5f9"
-                        }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <div style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#10b981", animation: "pulse 2s infinite" }} />
-                                <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#1e293b" }}>Real-time GIS Sync</span>
-                            </div>
-                            <div style={{ width: "1px", height: "24px", backgroundColor: "#f1f5f9" }} />
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#64748b" }}>Projection:</span>
-                                <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#3b82f6" }}>EPSG 4326</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -941,7 +1848,46 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         .leaflet-container { background: #f8fafc !important; }
         .modern-popup .leaflet-popup-content-wrapper { border-radius: 20px; border: 1px solid #f1f5f9; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); }
         .modern-popup .leaflet-popup-tip-container { display: none; }
+        .beat-point-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.beat-point-marker-inner {
+    width: 34px;
+    height: 34px;
+
+    border-radius: 50%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: #2563eb;
+    color: white;
+
+    border: 3px solid white;
+
+    font-size: 11px;
+    font-weight: 900;
+
+    box-shadow:
+        0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.beat-point-tooltip {
+    border: none !important;
+    border-radius: 10px !important;
+
+    box-shadow:
+        0 6px 18px rgba(15, 23, 42, 0.16) !important;
+
+    color: #0f172a !important;
+
+    font-size: 11px !important;
+}
       `}</style>
-        </div>
+        </div>,
+        document.body
     );
 }
