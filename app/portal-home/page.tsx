@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -19,6 +21,7 @@ import {
   ChevronRight,
   ArrowRight,
   UserPlus,
+  Bell,
   Clock,
   CheckCircle2,
   Zap,
@@ -36,6 +39,7 @@ export default function PortalHomePage() {
   const [cityUsers, setCityUsers] = useState<any[]>([]);
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [loadingCities, setLoadingCities] = useState(false);
+  const [headerNotificationCount, setHeaderNotificationCount] = useState(0);
 
   const isSuperAdmin =
     user?.role === 'super_admin' ||
@@ -102,6 +106,30 @@ export default function PortalHomePage() {
     return null;
   }
 
+
+  useEffect(() => {
+    const handleNotificationCount = (event: Event) => {
+      const customEvent = event as CustomEvent<{ count?: number }>;
+      setHeaderNotificationCount(Number(customEvent.detail?.count || 0));
+    };
+
+    window.addEventListener(
+      "matrixtrack:city-notifications",
+      handleNotificationCount as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "matrixtrack:city-notifications",
+        handleNotificationCount as EventListener
+      );
+    };
+  }, []);
+
+  const openCityNotifications = () => {
+    window.dispatchEvent(new CustomEvent("matrixtrack:open-city-notifications"));
+  };
+
   return (
     <div className="space-y-6">
       {/* 1. GRAND DASHBOARD HERO HEADER (AT VERY TOP ABOVE STATS) */}
@@ -115,7 +143,7 @@ export default function PortalHomePage() {
           </div>
 
           <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.02em' }}>
-            {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Admin'} <span style={{ fontSize: '22px' }}>👋</span>
+            {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Admin'} 
           </h1>
 
           <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
@@ -133,6 +161,54 @@ export default function PortalHomePage() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1, flexWrap: 'wrap' }}>
+          {isCityAdmin && !isSuperAdmin && (
+            <button
+              type="button"
+              onClick={openCityNotifications}
+              title="Open City Notification Center"
+              style={{
+                position: 'relative',
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.14)',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <Bell size={17} />
+
+              {headerNotificationCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-7px',
+                    right: '-7px',
+                    minWidth: '20px',
+                    height: '20px',
+                    padding: '0 5px',
+                    borderRadius: '999px',
+                    background: '#f43f5e',
+                    color: '#ffffff',
+                    border: '2px solid #172052',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '9px',
+                    lineHeight: 1,
+                    fontWeight: 900,
+                  }}
+                >
+                  {headerNotificationCount > 99 ? '99+' : headerNotificationCount}
+                </span>
+              )}
+            </button>
+          )}
+
           <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '12px', padding: '8px 14px', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Clock size={15} color="#94a3b8" />
             <span style={{ color: '#fff', fontSize: '12px', fontWeight: 700 }}>{new Date().toISOString().split('T')[0]}</span>
@@ -166,8 +242,12 @@ export default function PortalHomePage() {
         </div>
       </section>
 
-      {/* 2. TOP FAST KPI CARDS (BELOW HERO HEADER) */}
-      <HmsKpiCards isSuperAdmin={isSuperAdmin} userCityName={userCityName} />
+      {/* 2. TOP FAST KPI CARDS
+          City Admin KPI strip is rendered inside CityAdminDashboard so filters stay directly below the hero.
+          Super Admin / other portal views keep the existing KPI strip here. */}
+      {(!isCityAdmin || isSuperAdmin) && (
+        <HmsKpiCards isSuperAdmin={isSuperAdmin} userCityName={userCityName} />
+      )}
 
       {/* 2. SUPER ADMIN HORIZONTAL CITIES ROW & CITY ADMIN DIRECTORY */}
       {isSuperAdmin && (
@@ -260,16 +340,7 @@ export default function PortalHomePage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <TableExportDropdown tableId="city-admin-table" filename="City_Admins_List" title="City Admin Overview Table" />
-                <button
-                  type="button"
-                  onClick={() => router.push('/portal-home/admin-management')}
-                  className="text-xs font-extrabold text-blue-600 hover:text-blue-800 transition flex items-center gap-1"
-                >
-                  Manage Access <ArrowRight size={14} />
-                </button>
-              </div>
+              
             </div>
 
             <div className="overflow-x-auto">
@@ -278,6 +349,7 @@ export default function PortalHomePage() {
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                     <th className="py-3 px-4">User Name</th>
                     <th className="py-3 px-4">Email Address</th>
+                    <th className="py-3 px-4">City</th>
                     <th className="py-3 px-4">Role</th>
                     <th className="py-3 px-4">Status</th>
                   </tr>
@@ -291,6 +363,15 @@ export default function PortalHomePage() {
                       <tr key={u.id || u.email} className="hover:bg-slate-50/50 transition">
                         <td className="py-3 px-4 font-bold text-slate-900">{u.name}</td>
                         <td className="py-3 px-4 text-slate-500">{u.email}</td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-extrabold whitespace-nowrap">
+                            <MapPin size={12} />
+                            {u.cityName ||
+                              u.city?.name ||
+                              cities.find((city) => city.id === (u.cityId || u.city_id))?.name ||
+                              'Not Assigned'}
+                          </span>
+                        </td>
                         <td className="py-3 px-4">
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-violet-50 text-violet-700 border border-violet-200">
                             {u.role}
@@ -315,7 +396,7 @@ export default function PortalHomePage() {
       {/* 4. EXECUTIVE ANALYTICS DASHBOARD (CHARTS & WORKSPACE PERFORMANCE) */}
       <div className="px-4 sm:px-5 lg:px-6">
         {isCityAdmin && !isSuperAdmin ? (
-          <CityAdminDashboard />
+          <CityAdminDashboard userCityName={userCityName} />
         ) : (
           <UnifiedExecutiveDashboard
             isSuperAdmin={isSuperAdmin}
