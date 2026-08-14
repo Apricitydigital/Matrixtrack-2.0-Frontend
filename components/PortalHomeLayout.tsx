@@ -34,7 +34,8 @@ import {
   Trash2,
   Activity,
   PlusCircle,
-  CheckCircle2
+  CheckCircle2,
+  ChartNoAxesCombined
 } from 'lucide-react';
 
 import { moduleEntryPath } from '@utils/modules';
@@ -542,6 +543,13 @@ function PortalHomeLayoutContent({
 
   if (isTaskforceActive) {
     if (
+      pathname.startsWith('/city/attendance')
+    ) {
+      pageTitle =
+        'Attendance Analytics';
+    }
+
+    else if (
       pathname.includes('/modules')
     ) {
       pageTitle =
@@ -1730,9 +1738,7 @@ function PortalHomeLayoutContent({
 
                   <div className="flex flex-col gap-1 mt-1">
 
-
                     {/* HOME */}
-
                     <Link
                       href="/portal-home"
                       className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname ===
@@ -1755,6 +1761,34 @@ function PortalHomeLayoutContent({
                         Home
                       </span>
                     </Link>
+
+
+                    {/* =================================================
+                        ATTENDANCE ANALYTICS - CITY ADMIN
+                    ================================================= */}
+
+                    {isCityAdmin && (
+                      <Link
+                        href="/city/attendance"
+                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                            ? 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-600/25'
+                            : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-700'
+                          }`}
+                      >
+                        <ChartNoAxesCombined
+                          size={16}
+                          className={
+                            pathname.startsWith('/city/attendance')
+                              ? 'text-white'
+                              : 'text-cyan-600'
+                          }
+                        />
+
+                        <span>
+                          Attendance Analytics
+                        </span>
+                      </Link>
+                    )}
 
 
                     {/* =================================================
