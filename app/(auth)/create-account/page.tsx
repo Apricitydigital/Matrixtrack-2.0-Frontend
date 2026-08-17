@@ -803,7 +803,7 @@ export default function CreateAccountPage() {
                 </div>
             </section>
 
-            <style>{`
+            <style dangerouslySetInnerHTML={{ __html: `
         * {
           box-sizing: border-box;
         }
@@ -1326,7 +1326,7 @@ export default function CreateAccountPage() {
             grid-template-columns: 1fr;
           }
         }
-      `}</style>
+      ` }} />
         </main>
     );
 }

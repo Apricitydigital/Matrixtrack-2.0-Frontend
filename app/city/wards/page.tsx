@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, apiFetch, CityApi } from "@lib/apiClient";
 
-import { Edit2, Trash2, Check, X, Loader2, Map, Plus, Search, Download, FileText, FileSpreadsheet, RefreshCw } from "lucide-react";
+import { Edit2, Trash2, Check, X, Loader2, Map, Plus, Search, Download, FileText, FileSpreadsheet, RefreshCw, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 import { RoleGuard } from "@components/Guards";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
@@ -36,6 +36,15 @@ export default function WardManagementPage() {
   const [zoneId, setZoneId] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Bulk upload modal states
+  const [modalTab, setModalTab] = useState<'SINGLE' | 'BULK'>('SINGLE');
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkZoneId, setBulkZoneId] = useState<string>("");
+  const [bulkParsedWards, setBulkParsedWards] = useState<{ name: string; zoneName?: string; status?: 'pending' | 'success' | 'error'; errorMsg?: string }[]>([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
 
   const [zones, setZones] = useState<GeoNode[]>([]);
   const [wards, setWards] = useState<GeoNode[]>([]);
@@ -147,6 +156,20 @@ export default function WardManagementPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setModalTab('SINGLE');
+    setName("");
+    setZoneId("");
+    setStatus("");
+    setBulkFile(null);
+    setBulkZoneId("");
+    setBulkParsedWards([]);
+    setBulkStatus("");
+    setBulkUploading(false);
+    setBulkProgress({ current: 0, total: 0 });
+  };
+
   const createWard = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = name.trim();
@@ -159,11 +182,132 @@ export default function WardManagementPage() {
     try {
       await apiFetch("/city/geo", { method: "POST", body: JSON.stringify({ name, level: "WARD", parentId: zoneId }) });
       setStatus("Ward created successfully");
-      setIsModalOpen(false); setName(""); setZoneId("");
+      closeModal();
       await loadData();
     } catch (err) {
       setStatus(err instanceof ApiError ? err.message : "Failed to create ward");
     } finally { setSaving(false); }
+  };
+
+  const downloadSampleTemplate = () => {
+    const csvContent = "Ward Name,Zone Name\nWard 101,Zone 1\nWard 102,Zone 1\nWard 103,Zone 2\nWard 104,Zone 2";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "ward_bulk_upload_sample.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const parseCSV = (text: string) => {
+    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+    if (lines.length === 0) return [];
+
+    const firstLineLower = lines[0].toLowerCase();
+    const hasHeaders = firstLineLower.includes("ward") || firstLineLower.includes("zone") || firstLineLower.includes("name");
+
+    const startIndex = hasHeaders ? 1 : 0;
+    const parsed: { name: string; zoneName?: string }[] = [];
+
+    for (let i = startIndex; i < lines.length; i++) {
+      const parts = lines[i].split(/[,;\t]+/).map(p => p.trim().replace(/^["']|["']$/g, ''));
+      if (parts.length >= 1 && parts[0]) {
+        const wardName = parts[0];
+        const zoneName = parts[1] || undefined;
+        parsed.push({ name: wardName, zoneName });
+      }
+    }
+    return parsed;
+  };
+
+  const handleBulkFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setBulkFile(file);
+      setBulkStatus("");
+      try {
+        const text = await file.text();
+        const parsed = parseCSV(text);
+        if (parsed.length === 0) {
+          setBulkStatus("Error: File is empty or no valid ward rows found.");
+          setBulkParsedWards([]);
+        } else {
+          setBulkParsedWards(parsed.map(p => ({ ...p, status: 'pending' })));
+        }
+      } catch (err) {
+        setBulkStatus("Error reading file. Please check file format.");
+        setBulkParsedWards([]);
+      }
+    }
+  };
+
+  const handleBulkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (bulkParsedWards.length === 0) {
+      setBulkStatus("Error: No valid wards to import!");
+      return;
+    }
+
+    setBulkUploading(true);
+    setBulkStatus("Starting bulk import...");
+    let successCount = 0;
+    let failCount = 0;
+
+    const updatedList = [...bulkParsedWards];
+    setBulkProgress({ current: 0, total: updatedList.length });
+
+    for (let i = 0; i < updatedList.length; i++) {
+      const item = updatedList[i];
+      let targetZoneId = bulkZoneId;
+
+      if (item.zoneName) {
+        const matchedZone = zones.find(z => z.name.toLowerCase() === item.zoneName?.toLowerCase());
+        if (matchedZone) {
+          targetZoneId = matchedZone.id;
+        }
+      }
+
+      if (!targetZoneId) {
+        updatedList[i].status = 'error';
+        updatedList[i].errorMsg = 'No zone specified';
+        failCount++;
+        setBulkProgress({ current: i + 1, total: updatedList.length });
+        setBulkParsedWards([...updatedList]);
+        continue;
+      }
+
+      const cleanWardName = item.name.trim();
+      if (wards.some(w => w.name.toLowerCase() === cleanWardName.toLowerCase() && w.parentId === targetZoneId)) {
+        updatedList[i].status = 'error';
+        updatedList[i].errorMsg = 'Already exists in zone';
+        failCount++;
+        setBulkProgress({ current: i + 1, total: updatedList.length });
+        setBulkParsedWards([...updatedList]);
+        continue;
+      }
+
+      try {
+        await apiFetch("/city/geo", {
+          method: "POST",
+          body: JSON.stringify({ name: cleanWardName, level: "WARD", parentId: targetZoneId })
+        });
+        updatedList[i].status = 'success';
+        successCount++;
+      } catch (err) {
+        updatedList[i].status = 'error';
+        updatedList[i].errorMsg = err instanceof ApiError ? err.message : 'Failed to create';
+        failCount++;
+      }
+
+      setBulkProgress({ current: i + 1, total: updatedList.length });
+      setBulkParsedWards([...updatedList]);
+    }
+
+    setBulkUploading(false);
+    setBulkStatus(`Import Finished: ${successCount} Created successfully, ${failCount} Failed.`);
+    await loadData();
   };
 
   const updateWard = async (id: string) => {
@@ -1649,10 +1793,12 @@ export default function WardManagementPage() {
               <div style={{
                 padding: 0, overflow: "hidden", border: "1px solid #e2e8f0",
                 borderRadius: "20px", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                width: "100%", maxWidth: "480px", backgroundColor: "white"
+                width: "100%", maxWidth: modalTab === 'BULK' ? "560px" : "480px", backgroundColor: "white",
+                transition: "all 0.2s ease"
               }}>
+                {/* Modal Header */}
                 <div style={{
-                  padding: "20px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe",
+                  padding: "20px 24px 16px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe",
                   display: "flex", alignItems: "center", justifyContent: "space-between"
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1660,62 +1806,269 @@ export default function WardManagementPage() {
                     <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>Create New Ward</h2>
                   </div>
                   <button
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={closeModal}
                     style={{ border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
                   >
                     <X size={20} />
                   </button>
                 </div>
 
-                <form onSubmit={createWard} style={{ padding: "24px" }}>
-                  <div style={{ marginBottom: "16px" }}>
-                    <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
-                      Select Zone <span style={{ color: "#ef4444" }}>*</span>
-                    </label>
-                    <select
-                      value={zoneId}
-                      onChange={(e) => setZoneId(e.target.value)}
-                      required
-                      style={{
-                        width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
-                        border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
-                      }}
-                    >
-                      <option value="">-- Select Zone --</option>
-                      {zones.map((z) => (
-                        <option key={z.id} value={z.id}>{z.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
-                      Ward Name <span style={{ color: "#ef4444" }}>*</span>
-                    </label>
-                    <input
-                      placeholder="e.g. Ward 1 or Ward 22"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      style={{
-                        width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
-                        border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
-                      }}
-                    />
-                  </div>
-
+                {/* Option Tabs */}
+                <div style={{
+                  display: "flex", padding: "6px 24px 0 24px", gap: "8px", borderBottom: "1px solid #f1f5f9",
+                  backgroundColor: "#fcfdfe"
+                }}>
                   <button
-                    type="submit"
-                    disabled={saving || !name.trim() || !zoneId}
+                    type="button"
+                    onClick={() => setModalTab('SINGLE')}
                     style={{
-                      width: "100%", height: "44px", borderRadius: "10px", backgroundColor: "#2563eb",
-                      color: "white", fontWeight: 800, fontSize: "0.875rem", border: "none", cursor: "pointer"
+                      flex: 1, padding: "10px 14px", borderRadius: "10px 10px 0 0", border: "none",
+                      backgroundColor: modalTab === 'SINGLE' ? "#ffffff" : "transparent",
+                      color: modalTab === 'SINGLE' ? "#2563eb" : "#64748b",
+                      fontWeight: modalTab === 'SINGLE' ? 800 : 600,
+                      fontSize: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center",
+                      justifyContent: "center", gap: "6px",
+                      borderBottom: modalTab === 'SINGLE' ? "2px solid #2563eb" : "2px solid transparent"
                     }}
                   >
-                    {saving ? "Creating..." : "Create Ward"}
+                    <Plus size={15} />
+                    <span>Single Ward</span>
                   </button>
-                  {status && <div style={{ marginTop: "12px", textAlign: "center", fontSize: "0.8125rem", fontWeight: 700, color: status.startsWith("Error") ? "#dc2626" : "#16a34a" }}>{status}</div>}
-                </form>
+                  <button
+                    type="button"
+                    onClick={() => setModalTab('BULK')}
+                    style={{
+                      flex: 1, padding: "10px 14px", borderRadius: "10px 10px 0 0", border: "none",
+                      backgroundColor: modalTab === 'BULK' ? "#ffffff" : "transparent",
+                      color: modalTab === 'BULK' ? "#2563eb" : "#64748b",
+                      fontWeight: modalTab === 'BULK' ? 800 : 600,
+                      fontSize: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center",
+                      justifyContent: "center", gap: "6px",
+                      borderBottom: modalTab === 'BULK' ? "2px solid #2563eb" : "2px solid transparent"
+                    }}
+                  >
+                    <FileSpreadsheet size={15} />
+                    <span>Bulk Upload (CSV)</span>
+                  </button>
+                </div>
+
+                {/* Tab 1: Single Ward Entry */}
+                {modalTab === 'SINGLE' && (
+                  <form onSubmit={createWard} style={{ padding: "24px" }}>
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
+                        Select Zone <span style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <select
+                        value={zoneId}
+                        onChange={(e) => setZoneId(e.target.value)}
+                        required
+                        style={{
+                          width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
+                          border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                        }}
+                      >
+                        <option value="">-- Select Zone --</option>
+                        {zones.map((z) => (
+                          <option key={z.id} value={z.id}>{z.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
+                        Ward Name <span style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <input
+                        placeholder="e.g. Ward 1 or Ward 22"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        style={{
+                          width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
+                          border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={saving || !name.trim() || !zoneId}
+                      style={{
+                        width: "100%", height: "44px", borderRadius: "10px", backgroundColor: "#2563eb",
+                        color: "white", fontWeight: 800, fontSize: "0.875rem", border: "none", cursor: "pointer",
+                        opacity: (saving || !name.trim() || !zoneId) ? 0.7 : 1
+                      }}
+                    >
+                      {saving ? "Creating..." : "Create Ward"}
+                    </button>
+                    {status && (
+                      <div style={{
+                        marginTop: "12px", textAlign: "center", fontSize: "0.8125rem", fontWeight: 700,
+                        color: status.startsWith("Error") ? "#dc2626" : "#16a34a"
+                      }}>
+                        {status}
+                      </div>
+                    )}
+                  </form>
+                )}
+
+                {/* Tab 2: Bulk Ward Upload */}
+                {modalTab === 'BULK' && (
+                  <form onSubmit={handleBulkSubmit} style={{ padding: "20px 24px 24px 24px" }}>
+                    {/* Sample Format Banner */}
+                    <div style={{
+                      backgroundColor: "#f0f7ff", border: "1px solid #bae6fd", borderRadius: "12px",
+                      padding: "12px 16px", marginBottom: "18px", display: "flex", alignItems: "center",
+                      justifyContent: "space-between", gap: "12px"
+                    }}>
+                      <div>
+                        <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#0369a1" }}>
+                          Excel / CSV Template Format
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "#0284c7", fontWeight: 600, marginTop: "2px" }}>
+                          Headers: <code style={{ backgroundColor: "#e0f2fe", padding: "2px 6px", borderRadius: "4px" }}>Ward Name, Zone Name</code>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={downloadSampleTemplate}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "6px", padding: "8px 12px",
+                          backgroundColor: "#0284c7", color: "white", borderRadius: "8px", border: "none",
+                          fontSize: "0.75rem", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+                          boxShadow: "0 2px 4px rgba(2,132,199,0.2)"
+                        }}
+                      >
+                        <Download size={14} />
+                        <span>Sample Format</span>
+                      </button>
+                    </div>
+
+                    {/* Zone Dropdown (Default zone fallback) */}
+                    <div style={{ marginBottom: "16px" }}>
+                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "6px" }}>
+                        Default Zone (Fallback if Zone Name missing in file)
+                      </label>
+                      <select
+                        value={bulkZoneId}
+                        onChange={(e) => setBulkZoneId(e.target.value)}
+                        style={{
+                          width: "100%", height: "40px", padding: "0 14px", borderRadius: "10px",
+                          border: "1px solid #cbd5e1", fontSize: "0.85rem", fontWeight: 700, outline: "none"
+                        }}
+                      >
+                        <option value="">-- Auto Match Zone from CSV or Select Default Zone --</option>
+                        {zones.map((z) => (
+                          <option key={z.id} value={z.id}>{z.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* File Upload Drop Area */}
+                    <div style={{ marginBottom: "18px" }}>
+                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "6px" }}>
+                        Upload CSV / Excel File <span style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <div style={{
+                        border: "2px dashed #cbd5e1", borderRadius: "14px", padding: "20px 16px",
+                        textAlign: "center", backgroundColor: bulkFile ? "#f8fafc" : "#fafafa",
+                        position: "relative", cursor: "pointer", transition: "all 0.2s"
+                      }}>
+                        <Upload size={28} color="#0284c7" style={{ marginBottom: "8px" }} />
+                        <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#334155" }}>
+                          {bulkFile ? bulkFile.name : "Click to choose CSV file"}
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, marginTop: "4px" }}>
+                          Supports .csv formats (e.g. Ward Name, Zone Name)
+                        </div>
+                        <input
+                          type="file"
+                          accept=".csv,.txt"
+                          onChange={handleBulkFileChange}
+                          style={{
+                            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                            opacity: 0, cursor: "pointer", width: "100%", height: "100%"
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Parsed Preview Table */}
+                    {bulkParsedWards.length > 0 && (
+                      <div style={{ marginBottom: "18px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <span style={{ fontSize: "0.75rem", fontWeight: 900, color: "#475569", textTransform: "uppercase" }}>
+                            Found {bulkParsedWards.length} Wards to Import
+                          </span>
+                        </div>
+                        <div style={{ maxHeight: "160px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "10px" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", textAlign: "left" }}>
+                            <thead style={{ backgroundColor: "#f1f5f9" }}>
+                              <tr>
+                                <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>#</th>
+                                <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Ward Name</th>
+                                <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Target Zone</th>
+                                <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800, textAlign: "right" }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {bulkParsedWards.map((item, idx) => {
+                                const targetZoneName = item.zoneName || zones.find(z => z.id === bulkZoneId)?.name || 'Default / Unmatched';
+                                return (
+                                  <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                    <td style={{ padding: "6px 12px", color: "#64748b", fontWeight: 700 }}>{idx + 1}</td>
+                                    <td style={{ padding: "6px 12px", fontWeight: 800, color: "#0f172a" }}>{item.name}</td>
+                                    <td style={{ padding: "6px 12px", fontWeight: 700, color: "#2563eb" }}>{targetZoneName}</td>
+                                    <td style={{ padding: "6px 12px", textAlign: "right" }}>
+                                      {item.status === 'success' && <span style={{ color: "#16a34a", fontWeight: 800 }}>✓ Done</span>}
+                                      {item.status === 'error' && <span style={{ color: "#dc2626", fontWeight: 800 }}>✕ {item.errorMsg || 'Failed'}</span>}
+                                      {item.status === 'pending' && <span style={{ color: "#64748b", fontWeight: 600 }}>Ready</span>}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submit Button */}
+                    <button
+                      type="submit"
+                      disabled={bulkUploading || bulkParsedWards.length === 0}
+                      style={{
+                        width: "100%", height: "44px", borderRadius: "10px", backgroundColor: "#2563eb",
+                        color: "white", fontWeight: 800, fontSize: "0.875rem", border: "none", cursor: "pointer",
+                        opacity: (bulkUploading || bulkParsedWards.length === 0) ? 0.6 : 1,
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
+                      }}
+                    >
+                      {bulkUploading ? (
+                        <>
+                          <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                          <span>Importing ({bulkProgress.current} / {bulkProgress.total})...</span>
+                        </>
+                      ) : (
+                        <span>Upload {bulkParsedWards.length > 0 ? `${bulkParsedWards.length} Wards` : "Bulk Wards"}</span>
+                      )}
+                    </button>
+
+                    {/* Status Message */}
+                    {bulkStatus && (
+                      <div style={{
+                        marginTop: "12px", padding: "10px 14px", borderRadius: "8px",
+                        fontSize: "0.8125rem", fontWeight: 700, textAlign: "center",
+                        backgroundColor: bulkStatus.startsWith("Error") ? "#fef2f2" : "#f0fdf4",
+                        color: bulkStatus.startsWith("Error") ? "#dc2626" : "#16a34a",
+                        border: bulkStatus.startsWith("Error") ? "1px solid #fecaca" : "1px solid #bbf7d0"
+                      }}>
+                        {bulkStatus}
+                      </div>
+                    )}
+                  </form>
+                )}
               </div>
             </div>
           )}

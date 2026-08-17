@@ -143,7 +143,7 @@ const extractLineCoords = (beat: any): [number, number][] => {
     if (typeof geom === "string") {
       try {
         geom = JSON.parse(geom);
-      } catch {}
+      } catch { }
     }
     const extractFromGeo = (g: any) => {
       if (!g) return;
@@ -170,7 +170,7 @@ const extractLineCoords = (beat: any): [number, number][] => {
       if (typeof segGeom === "string") {
         try {
           segGeom = JSON.parse(segGeom);
-        } catch {}
+        } catch { }
       }
       if (segGeom && segGeom.type === "LineString") {
         segGeom.coordinates?.forEach((c: any) => coords.push([c[1], c[0]]));
@@ -271,266 +271,135 @@ export default function BeatRequestsPage() {
   return (
     <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "QC", "COMMISSIONER"]}>
       <div
-        className="page"
         style={{
-          padding: "32px 40px",
-          backgroundColor: "#f8fafc",
-          minHeight: "100vh",
-          fontFamily: "'Inter', sans-serif"
+          padding: "20px 24px",
+          width: "100%",
+          boxSizing: "border-box",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
         }}
       >
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          {/* Header */}
-          <div
-            style={{
-              marginBottom: "24px",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "16px",
-              justifyContent: "space-between",
-              alignItems: "flex-end"
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "0.875rem",
-                  color: "#64748b",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px"
-                }}
-              >
-                <Link
-                  href="/city/areas"
-                  style={{
-                    color: "#2563eb",
-                    textDecoration: "none",
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px"
-                  }}
-                >
-                  <ArrowLeft size={16} /> Area & Beat Management
-                </Link>
-                <span>/</span>
-                <span style={{ color: "#1e293b", fontWeight: 500 }}>
-                  Beat Requests & History
-                </span>
+        <div style={{ width: "100%" }}>
+          {/* UNIFIED HEADER & TOOLBAR CARD */}
+          <div style={{ background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '16px 20px', marginBottom: 16 }}>
+            {/* Top Row: Title & Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>
+                  <Link href="/modules/sweeping" style={{ color: '#64748b', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}>
+                    <ArrowLeft size={13} /> Area & Beat Management
+                  </Link>
+                  <span>/</span>
+                  <span style={{ color: '#0f172a', fontWeight: 600 }}>Beat Requests & History</span>
+                </div>
+                <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  Beat Approval & History
+                  {counts.pending > 0 && (
+                    <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px', backgroundColor: '#fef3c7', color: '#d97706', border: '1px solid #fde68a' }}>
+                      {counts.pending} Pending
+                    </span>
+                  )}
+                </h1>
               </div>
-              <h1
-                style={{
-                  fontSize: "1.875rem",
-                  fontWeight: 800,
-                  color: "#0f172a",
-                  margin: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px"
-                }}
-              >
-                Beat Approval & History
-                {counts.pending > 0 && (
-                  <span
-                    style={{
-                      fontSize: "0.875rem",
-                      fontWeight: 700,
-                      padding: "4px 12px",
-                      borderRadius: "9999px",
-                      backgroundColor: "#fef3c7",
-                      color: "#d97706",
-                      border: "1px solid #fde68a"
-                    }}
-                  >
-                    {counts.pending} Pending
-                  </span>
-                )}
-              </h1>
-              <p
-                style={{
-                  marginTop: "8px",
-                  color: "#64748b",
-                  fontSize: "1rem"
-                }}
-              >
-                Review beat registration requests and inspect past approval/rejection history.
-              </p>
-            </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <TableExportDropdown 
-                data={filteredRequests.map(r => ({
-                  BeatName: r.beatName,
-                  BeatCode: r.beatCode || '-',
-                  Zone: r.zoneName || '-',
-                  Ward: r.wardName || '-',
-                  Area: r.areaName || '-',
-                  RequestedBy: r.requestedBy?.name || '-',
-                  Role: r.requestedByRole || '-',
-                  Status: r.status || 'PENDING'
-                }))}
-                filename="Beat_Requests_History"
-                title="Beat Requests & History Report"
-              />
-              <button
-                onClick={loadRequests}
-                style={{
-                  height: "44px",
-                  padding: "0 16px",
-                  borderRadius: "12px",
-                  border: "1px solid #e2e8f0",
-                  backgroundColor: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: "0.875rem",
-                  color: "#475569",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                }}
-              >
-                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                Refresh
-              </button>
-            </div>
-          </div>
-
-          {/* Status Tabs Navigation */}
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              marginBottom: "28px",
-              overflowX: "auto",
-              paddingBottom: "8px",
-              scrollbarWidth: "none"
-            }}
-          >
-            {[
-              { id: "PENDING_QC", label: "Pending Requests", count: counts.pending, icon: <Clock size={16} />, color: "#eab308", bg: "#fefce8" },
-              { id: "APPROVED", label: "Approved History", count: counts.approved, icon: <CheckCircle2 size={16} />, color: "#10b981", bg: "#ecfdf5" },
-              { id: "REJECTED", label: "Rejected History", count: counts.rejected, icon: <XCircle size={16} />, color: "#ef4444", bg: "#fef2f2" },
-              { id: "ALL", label: "All Records", count: counts.all, icon: <History size={16} />, color: "#6366f1", bg: "#eef2ff" }
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <TableExportDropdown
+                  data={filteredRequests.map(r => ({
+                    BeatName: r.beatName,
+                    BeatCode: r.beatCode || '-',
+                    Zone: r.zoneName || '-',
+                    Ward: r.wardName || '-',
+                    Area: r.areaName || '-',
+                    RequestedBy: r.requestedBy?.name || '-',
+                    Role: r.requestedByRole || '-',
+                    Status: r.status || 'PENDING'
+                  }))}
+                  filename="Beat_Requests_History"
+                  title="Beat Requests & History Report"
+                />
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={loadRequests}
                   style={{
-                    padding: "10px 20px",
-                    borderRadius: "9999px",
-                    border: isActive ? `1.5px solid ${tab.color}` : "1.5px solid transparent",
-                    fontSize: "0.9rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    backgroundColor: isActive ? tab.bg : "rgba(255, 255, 255, 0.6)",
-                    color: isActive ? tab.color : "#64748b",
-                    boxShadow: isActive ? `0 4px 12px ${tab.color}30` : "0 2px 4px rgba(0,0,0,0.02)",
-                    backdropFilter: "blur(12px)",
-                    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                    transform: isActive ? "scale(1.02)" : "scale(1)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = "white";
-                      e.currentTarget.style.color = "#334155";
-                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.05)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.6)";
-                      e.currentTarget.style.color = "#64748b";
-                      e.currentTarget.style.boxShadow = "0 2px 4px rgba(0,0,0,0.02)";
-                    }
+                    height: '34px', padding: '0 14px', borderRadius: '8px', border: '1px solid #e2e8f0',
+                    backgroundColor: 'white', display: 'flex', alignItems: 'center', gap: '6px',
+                    cursor: 'pointer', fontWeight: 600, fontSize: '12px', color: '#475569'
                   }}
                 >
-                  {React.cloneElement(tab.icon, { color: isActive ? tab.color : "currentColor" })}
-                  {tab.label}
-                  <span
-                    style={{
-                      backgroundColor: isActive ? tab.color : "#e2e8f0",
-                      color: isActive ? "white" : "#475569",
-                      padding: "2px 8px",
-                      borderRadius: "999px",
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      marginLeft: "4px"
-                    }}
-                  >
-                    {tab.count}
-                  </span>
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                  Refresh
                 </button>
-              );
-            })}
+              </div>
+            </div>
+
+            {/* Bottom Row: Tabs & Search Input */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+              {/* Status Tabs Navigation */}
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+                {[
+                  { id: 'PENDING_QC', label: 'Pending Requests', count: counts.pending, icon: <Clock size={14} />, color: '#d97706', bg: '#fef3c7' },
+                  { id: 'APPROVED', label: 'Approved History', count: counts.approved, icon: <CheckCircle2 size={14} />, color: '#16a34a', bg: '#dcfce7' },
+                  { id: 'REJECTED', label: 'Rejected History', count: counts.rejected, icon: <XCircle size={14} />, color: '#dc2626', bg: '#fee2e2' },
+                  { id: 'ALL', label: 'All Records', count: counts.all, icon: <History size={14} />, color: '#2563eb', bg: '#eff6ff' }
+                ].map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      style={{
+                        padding: '6px 14px', borderRadius: '8px',
+                        border: isActive ? `1px solid ${tab.color}` : '1px solid #e2e8f0',
+                        fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        backgroundColor: isActive ? tab.bg : '#ffffff',
+                        color: isActive ? tab.color : '#475569', transition: 'all 0.15s'
+                      }}
+                    >
+                      {React.cloneElement(tab.icon, { color: isActive ? tab.color : 'currentColor' })}
+                      {tab.label}
+                      <span style={{
+                        backgroundColor: isActive ? tab.color : '#f1f5f9',
+                        color: isActive ? 'white' : '#475569',
+                        padding: '1px 6px', borderRadius: '10px', fontSize: '10px',
+                        fontWeight: 700, marginLeft: '4px'
+                      }}>
+                        {tab.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Search bar */}
+              <div style={{ position: 'relative', minWidth: '260px' }}>
+                <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Search beat name, zone, ward..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%', height: '34px', paddingLeft: '34px', paddingRight: '12px',
+                    borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px',
+                    fontWeight: 500, outline: 'none', backgroundColor: 'white'
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Action Success Alert Banner */}
           {actionSuccessMessage && (
             <div
               style={{
-                marginBottom: "24px",
-                padding: "16px 20px",
-                borderRadius: "16px",
-                backgroundColor: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                color: "#166534",
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                fontWeight: 600,
-                fontSize: "0.95rem"
+                marginBottom: '16px', padding: '12px 16px', borderRadius: '10px',
+                backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534',
+                display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600, fontSize: '12px'
               }}
             >
-              <CheckCircle2 size={20} color="#16a34a" />
+              <CheckCircle2 size={16} color="#16a34a" />
               {actionSuccessMessage}
             </div>
           )}
-
-          {/* Search bar */}
-          <div
-            style={{
-              marginBottom: "24px",
-              position: "relative",
-              maxWidth: "480px"
-            }}
-          >
-            <Search
-              size={18}
-              color="#94a3b8"
-              style={{
-                position: "absolute",
-                left: "16px",
-                top: "50%",
-                transform: "translateY(-50%)"
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search beat name, zone, ward or requester..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: "100%",
-                height: "48px",
-                padding: "0 16px 0 48px",
-                borderRadius: "14px",
-                border: "1.5px solid #e2e8f0",
-                fontSize: "0.925rem",
-                fontWeight: 500,
-                outline: "none",
-                backgroundColor: "white",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-              }}
-            />
-          </div>
 
           {/* Content */}
           {loading ? (
@@ -589,341 +458,111 @@ export default function BeatRequestsPage() {
                 {activeTab === "PENDING_QC"
                   ? "All beat requests have been reviewed and processed."
                   : activeTab === "APPROVED"
-                  ? "No approved beat request history found."
-                  : activeTab === "REJECTED"
-                  ? "No rejected beat request history found."
-                  : "No beat requests match the criteria."}
+                    ? "No approved beat request history found."
+                    : activeTab === "REJECTED"
+                      ? "No rejected beat request history found."
+                      : "No beat requests match the criteria."}
               </p>
             </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(420px, 1fr))",
-                gap: "24px"
-              }}
-            >
-              {filteredRequests.map((req) => {
-                const isPending = req.status === "PENDING_QC";
-                const isApproved = req.status === "APPROVED";
-                const isRejected = req.status === "REJECTED";
+            <div style={{ width: '100%' }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 8px', marginTop: '-8px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase', width: 45 }}>S.NO</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>BEAT NAME & CODE</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LOCATION</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>REQUESTED BY</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ROUTE SEGMENTS</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>SUBMISSION DATE</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>STATUS</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRequests.map((req, idx) => {
+                    const isPending = req.status === "PENDING_QC";
+                    const isApproved = req.status === "APPROVED";
+                    const isRejected = req.status === "REJECTED";
+                    const dateObj = new Date(req.createdAt || Date.now());
 
-                return (
-                  <div
-                    key={req.id}
-                    style={{
-                      backgroundColor: "rgba(255, 255, 255, 0.8)",
-                      backdropFilter: "blur(12px)",
-                      borderRadius: "24px",
-                      border: "1px solid",
-                      borderColor: isApproved ? "rgba(16, 185, 129, 0.3)" : isRejected ? "rgba(239, 68, 68, 0.3)" : "rgba(226, 232, 240, 0.8)",
-                      padding: "24px",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                      position: "relative",
-                      overflow: "hidden"
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-4px)";
-                      e.currentTarget.style.boxShadow = "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.01)";
-                    }}
-                  >
-                    {/* Decorative Gradient Background */}
-                    <div style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: "4px",
-                      background: isApproved ? "linear-gradient(90deg, #10b981, #34d399)" : isRejected ? "linear-gradient(90deg, #ef4444, #f87171)" : "linear-gradient(90deg, #3b82f6, #60a5fa)",
-                    }} />
-                    <div>
-                      {/* Top Row */}
-                      <div
+                    return (
+                      <tr
+                        key={req.id}
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          marginBottom: "12px"
+                          background: '#ffffff',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                          borderRadius: 12,
+                          transition: 'all 0.15s ease'
                         }}
                       >
-                        <div>
-                          <span
-                            style={{
-                              fontSize: "0.75rem",
-                              fontWeight: 800,
-                              color: isApproved ? "#10b981" : isRejected ? "#ef4444" : "#3b82f6",
-                              backgroundColor: isApproved ? "#ecfdf5" : isRejected ? "#fef2f2" : "#eff6ff",
-                              padding: "4px 10px",
-                              borderRadius: "6px",
-                              letterSpacing: "0.05em",
-                              border: `1px solid ${isApproved ? "#a7f3d0" : isRejected ? "#fecaca" : "#bfdbfe"}`
-                            }}
-                          >
-                            {req.beatCode || "BEAT"}
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#64748b', borderTopLeftRadius: 12, borderBottomLeftRadius: 12, borderLeft: '1px solid #e2e8f0', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          {idx + 1}
+                        </td>
+                        <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{req.beatName}</div>
+                          <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>{req.beatCode || 'BEAT'}</div>
+                        </td>
+                        <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{req.wardName || 'Ward 1'}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{req.zoneName || 'Zone 1'} • {req.areaName || 'Area 1'}</div>
+                        </td>
+                        <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>{req.requestedBy?.name || 'Field User'}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{req.requestedByRole || 'Supervisor'}</div>
+                        </td>
+                        <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#2563eb' }}>
+                            📍 {req.totalSegments || (req.segments || []).length || (req.points || []).length || 0} points
                           </span>
-                          <h3
-                            style={{
-                              fontSize: "1.35rem",
-                              fontWeight: 800,
-                              color: "#0f172a",
-                              margin: "12px 0 0",
-                              lineHeight: 1.2
-                            }}
-                          >
-                            {req.beatName}
-                          </h3>
-                        </div>
-
-                        {/* Status Badge */}
-                        {isPending && (
-                          <span
-                            style={{
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
-                              padding: "4px 10px",
-                              borderRadius: "9999px",
-                              backgroundColor: "#fef3c7",
-                              color: "#b45309",
-                              border: "1px solid #fde68a",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            <Clock size={12} /> Pending QC
+                        </td>
+                        <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{dateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+                        </td>
+                        <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: 700,
+                            background: isApproved ? '#dcfce7' : isRejected ? '#fee2e2' : '#fef3c7',
+                            color: isApproved ? '#15803d' : isRejected ? '#b91c1c' : '#b45309',
+                            border: `1px solid ${isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a'}`
+                          }}>
+                            {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending QC'}
                           </span>
-                        )}
-
-                        {isApproved && (
-                          <span
-                            style={{
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
-                              padding: "4px 10px",
-                              borderRadius: "9999px",
-                              backgroundColor: "#f0fdf4",
-                              color: "#166534",
-                              border: "1px solid #bbf7d0",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            <CheckCircle2 size={12} /> Approved
-                          </span>
-                        )}
-
-                        {isRejected && (
-                          <span
-                            style={{
-                              fontSize: "0.75rem",
-                              fontWeight: 700,
-                              padding: "4px 10px",
-                              borderRadius: "9999px",
-                              backgroundColor: "#fef2f2",
-                              color: "#991b1b",
-                              border: "1px solid #fecaca",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            <XCircle size={12} /> Rejected
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Location Badges */}
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: "6px",
-                          marginBottom: "16px"
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            backgroundColor: "#f1f5f9",
-                            color: "#475569",
-                            padding: "4px 10px",
-                            borderRadius: "8px"
-                          }}
-                        >
-                          {req.zoneName}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            backgroundColor: "#f1f5f9",
-                            color: "#475569",
-                            padding: "4px 10px",
-                            borderRadius: "8px"
-                          }}
-                        >
-                          {req.wardName}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            backgroundColor: "#f1f5f9",
-                            color: "#475569",
-                            padding: "4px 10px",
-                            borderRadius: "8px"
-                          }}
-                        >
-                          {req.areaName}
-                        </span>
-                      </div>
-
-                      {/* Requester & Segments Info */}
-                      <div
-                        style={{
-                          backgroundColor: "#f8fafc",
-                          borderRadius: "14px",
-                          padding: "14px",
-                          marginBottom: isRejected && req.rejectionReason ? "12px" : "20px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "8px",
-                          border: "1px solid #f1f5f9"
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem", color: "#334155" }}>
-                          <User size={16} color="#64748b" />
-                          <span>Requested By: <strong>{req.requestedBy?.name || "Field User"}</strong></span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem", color: "#334155" }}>
-                          <MapPin size={16} color="#64748b" />
-                          <span>Route Segments: <strong>{req.totalSegments || (req.segments || []).length || (req.points || []).length || "N/A"} points</strong></span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.75rem", color: "#64748b" }}>
-                          <Clock size={14} color="#94a3b8" />
-                          <span>Submitted on: {new Date(req.createdAt).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Rejection Reason Banner if Rejected */}
-                      {isRejected && req.rejectionReason && (
-                        <div
-                          style={{
-                            padding: "12px 14px",
-                            borderRadius: "12px",
-                            backgroundColor: "#fef2f2",
-                            border: "1px solid #fecaca",
-                            marginBottom: "20px"
-                          }}
-                        >
-                          <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "#991b1b", textTransform: "uppercase" }}>
-                            Rejection Reason:
-                          </div>
-                          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#7f1d1d", marginTop: "2px" }}>
-                            {req.rejectionReason}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions Row */}
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                        paddingTop: "16px",
-                        borderTop: "1px solid #f1f5f9"
-                      }}
-                    >
-                      <button
-                        onClick={() => { setSelectedPointIdx(null); setViewingMapBeat(req); }}
-                        style={{
-                          flex: 1,
-                          height: "42px",
-                          borderRadius: "10px",
-                          border: "1px solid #cbd5e1",
-                          backgroundColor: "white",
-                          color: "#334155",
-                          fontWeight: 700,
-                          fontSize: "0.85rem",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "6px",
-                          cursor: "pointer"
-                        }}
-                      >
-                        <Eye size={16} /> View Map
-                      </button>
-
-                      {isPending && (
-                        <>
-                          <button
-                            onClick={() => setRejectingBeat(req)}
-                            disabled={processingId === req.id}
-                            style={{
-                              height: "42px",
-                              padding: "0 16px",
-                              borderRadius: "10px",
-                              border: "none",
-                              backgroundColor: "#fef2f2",
-                              color: "#dc2626",
-                              fontWeight: 700,
-                              fontSize: "0.85rem",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                              cursor: "pointer"
-                            }}
-                          >
-                            <XCircle size={16} /> Reject
-                          </button>
-
-                          <button
-                            onClick={() => handleApprove(req.id, req.beatName)}
-                            disabled={processingId === req.id}
-                            style={{
-                              flex: 1,
-                              height: "42px",
-                              borderRadius: "10px",
-                              border: "none",
-                              backgroundColor: "#16a34a",
-                              color: "white",
-                              fontWeight: 700,
-                              fontSize: "0.85rem",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "6px",
-                              cursor: "pointer",
-                              boxShadow: "0 2px 4px rgba(22, 163, 74, 0.2)"
-                            }}
-                          >
-                            {processingId === req.id ? (
-                              <div className="animate-spin" style={{ width: "16px", height: "16px", border: "2px solid white", borderTop: "2px solid transparent", borderRadius: "50%" }} />
-                            ) : (
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'right', borderTopRightRadius: 12, borderBottomRightRadius: 12, borderRight: '1px solid #e2e8f0', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <button
+                              onClick={() => { setSelectedPointIdx(null); setViewingMapBeat(req); }}
+                              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              View Map
+                            </button>
+                            {isPending && (
                               <>
-                                <CheckCircle2 size={16} /> Approve
+                                <button
+                                  onClick={() => setRejectingBeat(req)}
+                                  disabled={processingId === req.id}
+                                  style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#fee2e2', color: '#b91c1c', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                                >
+                                  Reject
+                                </button>
+                                <button
+                                  onClick={() => handleApprove(req.id, req.beatName)}
+                                  disabled={processingId === req.id}
+                                  style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#ffffff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                                >
+                                  Approve
+                                </button>
                               </>
                             )}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

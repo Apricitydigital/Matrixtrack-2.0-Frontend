@@ -264,7 +264,7 @@ export default function RegisteredUsersPage() {
               "
             >
               <UserPlus size={16} />
-              Register New Employee
+              Register New User
             </button>
           </div>
         </div>

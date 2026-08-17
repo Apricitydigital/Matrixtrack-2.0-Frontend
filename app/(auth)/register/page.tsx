@@ -259,7 +259,7 @@ export default function RegisterPage() {
                 </div>
             </div>
 
-            <style>{`
+            <style dangerouslySetInnerHTML={{ __html: `
         .premium-label {
             display: flex;
             align-items: center;
@@ -333,7 +333,7 @@ export default function RegisterPage() {
         @media (max-width: 1024px) {
           .auth-left-panel { display: none !important; }
         }
-      `}</style>
+      ` }} />
         </div>
     );
 }

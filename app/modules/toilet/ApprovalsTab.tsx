@@ -2,18 +2,20 @@ import { useEffect, useState } from "react";
 import { ToiletApi, GeoApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import { FilterTabs } from "../qc-shared";
+import UniversalReportModal from "@components/UniversalReportModal";
 
-export default function ApprovalsTab() {
+export default function ApprovalsTab({ cityId }: { cityId?: string }) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'PENDING' | 'COMPLETED'>('PENDING');
     const [items, setItems] = useState<any[]>([]);
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
+    const [fullReportModalItem, setFullReportModalItem] = useState<any>(null);
     const [wardMap, setWardMap] = useState<Record<string, { name: string, zoneName?: string }>>({});
 
     useEffect(() => {
         loadData();
-    }, [user, activeTab]);
+    }, [user, activeTab, cityId]);
 
     // Pre-fetch ward names for better display
     useEffect(() => {
@@ -219,7 +221,11 @@ export default function ApprovalsTab() {
                                         </td>
                                         <td style={{ textAlign: 'right' }}>
                                             <div className="flex gap-2 justify-end">
-                                                <button className="btn btn-sm btn-outline" style={{ fontSize: 12, padding: '4px 10px' }}>
+                                                <button
+                                                    className="btn btn-sm btn-outline"
+                                                    style={{ fontSize: 12, padding: '4px 10px' }}
+                                                    onClick={() => setSelectedRequest(req)}
+                                                >
                                                     View
                                                 </button>
                                             </div>
@@ -241,10 +247,10 @@ export default function ApprovalsTab() {
 
             {/* Sidebar Inspector */}
             {selectedRequest && (
-                <div className="card" style={{ borderLeft: '4px solid #2563eb', position: 'sticky', top: 20, maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                        <h4 style={{ margin: 0 }}>{isRegistration(selectedRequest) ? 'Registration Request' : 'Inspection Report'}</h4>
-                        <button className="btn btn-sm" onClick={() => setSelectedRequest(null)}>✕</button>
+                <div className="card" style={{ borderLeft: '4px solid #2563eb', position: 'sticky', top: 96, maxHeight: 'calc(100vh - 116px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', zIndex: 20 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: '#ffffff', zIndex: 10, paddingTop: 4, paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
+                        <h4 style={{ margin: 0, fontWeight: 800, color: '#0f172a' }}>{isRegistration(selectedRequest) ? 'Registration Request' : 'Inspection Report'}</h4>
+                        <button className="btn btn-sm" style={{ borderRadius: '50%', width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedRequest(null)}>✕</button>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -311,19 +317,36 @@ export default function ApprovalsTab() {
                                         {selectedRequest.answers && Object.entries(selectedRequest.answers).map(([qId, val]: [string, any]) => {
                                             const isNewFormat = val && typeof val === 'object' && 'answer' in val;
                                             const displayVal = isNewFormat ? val.answer : val;
+                                            const isYes = displayVal === true || String(displayVal).toUpperCase() === 'YES';
+                                            const isNo = displayVal === false || String(displayVal).toUpperCase() === 'NO';
+
                                             return (
-                                                <div key={qId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, paddingBottom: 6, borderBottom: '1px solid #f8fafc' }}>
-                                                    <span style={{ color: '#334155', maxWidth: '70%' }}>{qId}</span>
-                                                    <span style={{ fontWeight: 700 }}>
-                                                        {displayVal === true || displayVal === 'YES' ? '✅ YES' :
-                                                            displayVal === false || displayVal === 'NO' ? '❌ NO' : String(displayVal)}
+                                                <div key={qId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '8px 10px', backgroundColor: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9', gap: 8 }}>
+                                                    <span style={{ color: '#334155', fontWeight: 600, maxWidth: '72%', lineHeight: 1.3 }}>{qId}</span>
+                                                    <span style={{
+                                                        fontWeight: 800,
+                                                        fontSize: 11,
+                                                        padding: '3px 8px',
+                                                        borderRadius: 12,
+                                                        backgroundColor: isYes ? '#dcfce7' : isNo ? '#fee2e2' : '#eff6ff',
+                                                        color: isYes ? '#15803d' : isNo ? '#b91c1c' : '#1d4ed8',
+                                                        border: `1px solid ${isYes ? '#bbf7d0' : isNo ? '#fecaca' : '#bfdbfe'}`,
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {isYes ? 'YES' : isNo ? 'NO' : String(displayVal)}
                                                     </span>
                                                 </div>
                                             );
                                         })}
                                     </div>
                                     <div style={{ marginTop: 12 }}>
-                                        <a href={`/modules/toilet/inspection/${selectedRequest.id}`} target="_blank" className="btn btn-xs btn-outline" style={{ width: '100%' }}>View Full Report Document</a>
+                                        <button
+                                            onClick={() => setFullReportModalItem(selectedRequest)}
+                                            className="btn btn-xs btn-primary font-bold cursor-pointer"
+                                            style={{ width: '100%', backgroundColor: '#2563eb', color: '#fff', padding: '10px', borderRadius: '8px', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}
+                                        >
+                                            📄 Open Full Report Modal
+                                        </button>
                                     </div>
                                 </div>
 
@@ -367,6 +390,27 @@ export default function ApprovalsTab() {
 
                     </div>
                 </div>
+            )}
+
+            {fullReportModalItem && (
+                <UniversalReportModal
+                    moduleTitle={fullReportModalItem._type === 'REGISTRATION' ? "Toilet Registration" : "Cleanliness of Toilet"}
+                    moduleBadge="HMS TOILET AUDIT"
+                    record={fullReportModalItem}
+                    onClose={() => setFullReportModalItem(null)}
+                    onApprove={async (rec, comment) => {
+                        await handleAction(rec.id, 'APPROVED', rec._type !== 'REGISTRATION');
+                        setFullReportModalItem(null);
+                    }}
+                    onReject={async (rec, comment) => {
+                        await handleAction(rec.id, 'REJECTED', rec._type !== 'REGISTRATION');
+                        setFullReportModalItem(null);
+                    }}
+                    onActionRequired={async (rec, comment) => {
+                        await handleAction(rec.id, 'ACTION_REQUIRED', true);
+                        setFullReportModalItem(null);
+                    }}
+                />
             )}
 
             <style jsx>{`

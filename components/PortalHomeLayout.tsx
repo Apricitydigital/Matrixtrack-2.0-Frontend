@@ -418,9 +418,14 @@ function PortalHomeLayoutContent({
           'TASKFORCE_ADMIN',
           'CITY_ADMIN',
           'HMS_ADMIN',
+          'HMS_SUPER_ADMIN',
           'SWEEPING',
           'LITTERBINS',
           'TOILET',
+          'QC',
+          'ACTION_OFFICER',
+          'AO',
+          'SUPERVISOR',
         ].includes(r)
     );
 
@@ -873,6 +878,9 @@ function PortalHomeLayoutContent({
       isActive:
         pathname.startsWith(
           '/modules/litterbins'
+        ) ||
+        pathname.startsWith(
+          '/modules/litter'
         ),
 
       visible:
@@ -892,6 +900,12 @@ function PortalHomeLayoutContent({
       isActive:
         pathname.startsWith(
           '/modules/taskforce'
+        ) ||
+        pathname.startsWith(
+          '/modules/ctu'
+        ) ||
+        pathname.startsWith(
+          '/modules/gvp'
         ),
 
       visible:
@@ -2792,7 +2806,7 @@ function PortalHomeLayoutContent({
         {!isMainDashboard && (
 
           <div
-            className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-white px-6 py-3.5 rounded-2xl border border-slate-800/80 shadow-lg sticky top-3 z-40 transition-all overflow-hidden relative"
+            className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-white px-6 py-3.5 rounded-2xl border border-slate-800/80 shadow-lg sticky top-3 z-30 transition-all overflow-hidden relative"
             style={{
               background:
                 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
@@ -2900,7 +2914,7 @@ function PortalHomeLayoutContent({
           key={
             pathname
           }
-          className="animate-page-entrance"
+          className="relative z-10 animate-page-entrance"
         >
           {
             children

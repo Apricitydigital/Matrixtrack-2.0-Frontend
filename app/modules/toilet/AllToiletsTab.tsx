@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { ToiletApi } from "@lib/apiClient";
+import { ToiletApi, GeoApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 
-export default function AllToiletsTab() {
+export default function AllToiletsTab({ cityId }: { cityId?: string }) {
     const { user } = useAuth();
     const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN');
 
@@ -22,34 +22,27 @@ export default function AllToiletsTab() {
     // Search & Filter states
     const [searchQuery, setSearchQuery] = useState('');
     const [typeFilter, setTypeFilter] = useState<'ALL' | 'CT' | 'PT' | 'URINALS'>('ALL');
+    const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [zoneFilter, setZoneFilter] = useState('ALL');
     const [wardFilter, setWardFilter] = useState('ALL');
     const [zones, setZones] = useState<any[]>([]);
-    const [wards, setWards] = useState<any[]>([]);
+    const [allWards, setAllWards] = useState<any[]>([]);
 
     useEffect(() => {
         loadData();
     }, []);
 
     useEffect(() => {
-        if (zoneFilter === 'ALL') {
-            setWards([]);
-            setWardFilter('ALL');
-            return;
-        }
-        loadWards(zoneFilter);
-    }, [zoneFilter]);
-
-    useEffect(() => {
         applyFilters();
-    }, [searchQuery, typeFilter, zoneFilter, wardFilter, toilets]);
+    }, [searchQuery, typeFilter, statusFilter, zoneFilter, wardFilter, toilets, cityId]);
 
     const loadData = async () => {
         try {
-            const [toiRes, zoneRes, employeeRes] = await Promise.allSettled([
+            const [toiRes, zoneRes, employeeRes, wardRes] = await Promise.allSettled([
                 ToiletApi.listAllToilets(),
                 ToiletApi.getZones(),
-                ToiletApi.listEmployees()
+                ToiletApi.listEmployees(),
+                GeoApi.list("WARD")
             ]);
 
             if (toiRes.status === 'fulfilled') {
@@ -70,20 +63,46 @@ export default function AllToiletsTab() {
                 console.error('Failed to load employees', employeeRes.reason);
                 setEmployees([]);
             }
+
+            if (wardRes.status === 'fulfilled') {
+                setAllWards(wardRes.value.nodes || []);
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    const loadWards = async (zoneId: string) => {
-        try {
-            const res = await ToiletApi.getWardsByZone(zoneId);
-            setWards(res.nodes || []);
-        } catch (err) { console.error(err); }
+    const visibleWards = zoneFilter !== 'ALL'
+        ? allWards.filter(w => w.parentId === zoneFilter || w.parent?.id === zoneFilter)
+        : allWards;
+
+    const handleZoneChange = (zId: string) => {
+        setZoneFilter(zId);
+        if (wardFilter !== 'ALL') {
+            const wardObj = allWards.find(w => w.id === wardFilter);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (zId !== 'ALL' && parentZ !== zId) {
+                setWardFilter('ALL');
+            }
+        }
+    };
+
+    const handleWardChange = (wId: string) => {
+        setWardFilter(wId);
+        if (wId !== 'ALL') {
+            const wardObj = allWards.find(w => w.id === wId);
+            const parentZ = wardObj?.parentId || wardObj?.parent?.id;
+            if (parentZ) {
+                setZoneFilter(parentZ);
+            }
+        }
     };
 
     const applyFilters = () => {
         let filtered = [...toilets];
+        if (cityId && cityId !== 'ALL') {
+            filtered = filtered.filter(t => t.cityId === cityId || t.city?.id === cityId || t.location?.cityId === cityId);
+        }
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(t =>
@@ -93,6 +112,7 @@ export default function AllToiletsTab() {
             );
         }
         if (typeFilter !== 'ALL') filtered = filtered.filter(t => t.type === typeFilter);
+        if (statusFilter !== 'ALL') filtered = filtered.filter(t => (t.status || '').toUpperCase() === statusFilter);
         if (zoneFilter !== 'ALL' && wardFilter === 'ALL') filtered = filtered.filter(t => t.ward?.parentId === zoneFilter || t.ward?.id === zoneFilter);
         if (wardFilter !== 'ALL') filtered = filtered.filter(t => t.wardId === wardFilter || t.ward?.parentId === wardFilter);
         setFilteredToilets(filtered);
@@ -117,235 +137,330 @@ export default function AllToiletsTab() {
         }
     };
 
-    if (selectedToilet) {
-        return (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: 32, padding: 40, border: '1px solid #edf2f7', animation: 'fadeIn 0.3s' }}>
-                <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-                <button
-                    onClick={() => setSelectedToilet(null)}
-                    style={{ marginBottom: 32, padding: '10px 20px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#1e293b', borderRadius: 12, cursor: 'pointer', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}
-                >
-                    ← Return to Fleet List
-                </button>
+    const exportCSV = () => {
+        if (filteredToilets.length === 0) {
+            alert('No toilets available to export.');
+            return;
+        }
+        const headers = ['Toilet Name', 'Code', 'Category', 'Seats', 'Zone', 'Ward', 'Status', 'Assigned Supervisor'];
+        const rows = filteredToilets.map(t => [
+            `"${t.name || ''}"`,
+            `"${t.code || ''}"`,
+            `"${t.type || ''}"`,
+            t.numberOfSeats || 0,
+            `"${t.ward?.parent?.name || ''}"`,
+            `"${t.ward?.name || ''}"`,
+            `"${t.status || ''}"`,
+            `"${t.assignments?.[0]?.supervisor?.name || 'Unassigned'}"`
+        ]);
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 48 }}>
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-                            <h2 style={{ margin: 0, fontSize: 32, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em' }}>{selectedToilet.name}</h2>
-                            <span style={{ fontSize: 10, fontWeight: 800, padding: '4px 10px', backgroundColor: '#f1f5f9', color: '#64748b', borderRadius: 8 }}>{selectedToilet.status}</span>
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', letterSpacing: '0.05em' }}>ID: {selectedToilet.code || 'UNTAGGED_ASSET'}</span>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginTop: 48 }}>
-                            <div>
-                                <h3 style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', marginBottom: 20, textTransform: 'uppercase' }}>Technical Specifications</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                                    {[
-                                        { l: 'Category', v: selectedToilet.type, i: '🏢' },
-                                        { l: 'Intended Gender', v: selectedToilet.gender, i: '⚖️' },
-                                        { l: 'Seat Capacity', v: selectedToilet.numberOfSeats || 0, i: '🪑' },
-                                        { l: 'Compliance', v: 'Standard', i: '🛡️' }
-                                    ].map((item, i) => (
-                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, alignItems: 'center' }}>
-                                            <span style={{ color: '#64748b', fontWeight: 500 }}>{item.i} {item.l}</span>
-                                            <span style={{ fontWeight: 800, color: '#1e293b' }}>{item.v}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <h3 style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', marginBottom: 20, textTransform: 'uppercase' }}>Geographic Context</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                                    {[
-                                        { l: 'Location Ward', v: selectedToilet.ward?.name, i: '📍' },
-                                        { l: 'Primary Zone', v: selectedToilet.ward?.parent?.name || 'N/A', i: '🌐' },
-                                        { l: 'Positioning', v: `${selectedToilet.latitude.toFixed(4)}, ${selectedToilet.longitude.toFixed(4)}`, i: '🛰️' }
-                                    ].map((item, i) => (
-                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, alignItems: 'center' }}>
-                                            <span style={{ color: '#64748b', fontWeight: 500 }}>{item.i} {item.l}</span>
-                                            <span style={{ fontWeight: 800, color: '#1e293b' }}>{item.v}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ marginTop: 48 }}>
-                            <h3 style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', marginBottom: 20, textTransform: 'uppercase' }}>Operational Infrastructure</h3>
-                            <div style={{ display: 'flex', gap: 12 }}>
-                                {[
-                                    { k: 'Running Water', v: selectedToilet.hasWater, icon: '💧' },
-                                    { k: 'Power Grid', v: selectedToilet.hasElectricity, icon: '⚡' },
-                                    { k: 'Sanitation Area', v: selectedToilet.hasHandwash, icon: '🧼' }
-                                ].map((f, i) => (
-                                    <div key={i} style={{ padding: '12px 20px', borderRadius: 16, backgroundColor: f.v ? '#ffffff' : '#f8fafc', color: f.v ? '#0f172a' : '#cbd5e1', border: f.v ? '2px solid #e2e8f0' : '1px solid #f1f5f9', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <span style={{ opacity: f.v ? 1 : 0.4 }}>{f.icon}</span> {f.k}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ backgroundColor: '#f8fafc', padding: 32, borderRadius: 32, border: '1px solid #edf2f7' }}>
-                        <h3 style={{ fontSize: 12, fontWeight: 900, color: '#1e293b', marginBottom: 24, letterSpacing: '0.05em' }}>ASSIGNED COMMAND CENTER</h3>
-                        {selectedToilet.assignments?.map((a: any) => (
-                            <div key={a.id} style={{ padding: '16px 20px', backgroundColor: 'white', borderRadius: 20, marginBottom: 12, border: '1px solid #e2e8f0', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', display: 'flex', alignItems: 'center', gap: 14 }}>
-                                <div style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>👤</div>
-                                <div>
-                                    <div style={{ fontWeight: 800, fontSize: 14, color: '#1e293b' }}>{a.supervisor.name}</div>
-                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{a.supervisor.email}</div>
-                                </div>
-                            </div>
-                        ))}
-                        {!selectedToilet.assignments?.length && (
-                            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-                                <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>🚫</div>
-                                <p style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Currently Unassigned</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    }
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `registered_toilets_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     if (loading) return (
-        <div style={{ display: 'flex', height: '60vh', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-            <div className="spinner" style={{ width: 40, height: 40, border: '4px solid #f3f3f3', borderTop: '4px solid #1e293b', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <span style={{ color: '#64748b', fontSize: 14, fontWeight: 500 }}>Syncing Global Assets...</span>
+        <div style={{ display: 'flex', height: '50vh', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+            <div className="spinner" style={{ width: 36, height: 36, border: '3px solid #f3f3f3', borderTop: '3px solid #2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <span style={{ color: '#64748b', fontSize: 13, fontWeight: 600 }}>Syncing Registered Toilets...</span>
         </div>
     );
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* Header Title & Register New */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
                 <div>
-                    <h2 style={{ margin: 0, fontSize: 32, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em' }}>Asset Registry</h2>
-                    <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: 14, fontWeight: 500 }}>Total Registered Assets: {filteredToilets.length}</p>
+                    <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>Registered Toilets</h2>
+                    <p style={{ margin: '3px 0 0 0', color: '#64748b', fontSize: 13, fontWeight: 500 }}>
+                        Total Registered Assets: <strong style={{ color: '#2563eb' }}>{filteredToilets.length}</strong>
+                    </p>
                 </div>
-                {isAdmin && (
-                    <a href="/modules/toilet/bulk-import" style={{ backgroundColor: '#1e293b', color: 'white', padding: '14px 28px', borderRadius: 16, textDecoration: 'none', fontWeight: 800, fontSize: 14, boxShadow: '0 10px 15px -3px rgba(30,41,59,0.3)' }}>
-                        📥 Register New
-                    </a>
-                )}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button
+                        onClick={exportCSV}
+                        style={{
+                            backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', padding: '9px 18px', borderRadius: 12,
+                            fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                        }}
+                    >
+                        📥 Export CSV
+                    </button>
+                    {isAdmin && (
+                        <a href="/modules/toilet/bulk-import" style={{
+                            backgroundColor: '#2563eb', color: 'white', padding: '9px 20px', borderRadius: 12,
+                            textDecoration: 'none', fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px rgba(37,99,235,0.25)',
+                            display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s'
+                        }}>
+                            ➕ Register New Asset
+                        </a>
+                    )}
+                </div>
             </div>
 
-            {/* Premium Controls */}
-            <div style={{ backgroundColor: 'white', padding: 28, borderRadius: 28, border: '1px solid #edf2f7', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                <div style={{ marginBottom: 24 }}>
-                    <div style={{ position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', fontSize: 18, opacity: 0.3 }}>🔍</span>
-                        <input type="text" placeholder="Search assets..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', padding: '16px 16px 16px 48px', fontSize: 15, borderRadius: 16, border: '1px solid #e2e8f0', backgroundColor: '#fcfdfe', outline: 'none' }} />
+            {/* Controls Filter Bar */}
+            <div style={{ backgroundColor: '#ffffff', padding: 18, borderRadius: 20, border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
+                        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 14, opacity: 0.5 }}>🔍</span>
+                        <input
+                            type="text"
+                            placeholder="Search assets by name, code or ward..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{ width: '100%', padding: '9px 14px 9px 38px', fontSize: 13, borderRadius: 10, border: '1px solid #cbd5e1', backgroundColor: '#ffffff', outline: 'none', color: '#0f172a' }}
+                        />
                     </div>
-                </div>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} style={{ padding: '12px 20px', borderRadius: 14, border: '1px solid #e2e8f0', fontSize: 13, backgroundColor: '#ffffff', fontWeight: 700, color: '#475569', outline: 'none' }}>
+                    {/* Structure Type Filter */}
+                    <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 12, backgroundColor: '#ffffff', fontWeight: 700, color: '#334155', outline: 'none' }}>
                         <option value="ALL">All Structure Types</option>
                         <option value="CT">Community Toilet (CT)</option>
                         <option value="PT">Public Toilet (PT)</option>
                         <option value="URINALS">Urinals</option>
                     </select>
-                    <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} style={{ padding: '12px 20px', borderRadius: 14, border: '1px solid #e2e8f0', fontSize: 13, backgroundColor: '#ffffff', fontWeight: 700, color: '#475569', outline: 'none' }}>
+                    {/* Zone Filter */}
+                    <select value={zoneFilter} onChange={(e) => handleZoneChange(e.target.value)} style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 12, backgroundColor: '#ffffff', fontWeight: 700, color: '#334155', outline: 'none' }}>
                         <option value="ALL">All Zones</option>
                         {zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
                     </select>
-                    <select value={wardFilter} onChange={(e) => setWardFilter(e.target.value)} disabled={zoneFilter === 'ALL'} style={{ padding: '12px 20px', borderRadius: 14, border: '1px solid #e2e8f0', fontSize: 13, backgroundColor: zoneFilter === 'ALL' ? '#f8fafc' : '#ffffff', fontWeight: 700, color: '#475569', outline: 'none' }}>
+                    {/* Ward Filter (Always enabled, auto-selects zone) */}
+                    <select value={wardFilter} onChange={(e) => handleWardChange(e.target.value)} style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 12, backgroundColor: '#ffffff', fontWeight: 700, color: '#334155', outline: 'none' }}>
                         <option value="ALL">All Wards</option>
-                        {wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        {visibleWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                    {/* Status Filter */}
+                    <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '9px 14px', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: 12, backgroundColor: '#ffffff', fontWeight: 700, color: '#334155', outline: 'none' }}>
+                        <option value="ALL">All Status</option>
+                        <option value="APPROVED">Approved</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="REJECTED">Rejected</option>
                     </select>
                 </div>
             </div>
 
-            {/* High Density Table */}
-            <div style={{ backgroundColor: 'white', borderRadius: 28, border: '1px solid #edf2f7', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+            {/* High Density Asset Table */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
                     <thead>
-                        <tr style={{ backgroundColor: '#fcfdfe' }}>
+                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                             {['TOILET NAME & CODE', 'ZONE & WARD', 'TYPE & CAPACITY', 'STATUS', ''].map((h, i) => (
-                                <th key={i} style={{ padding: '20px 24px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#0f172a', letterSpacing: '0.1em', borderBottom: '1px solid #f1f5f9' }}>{h}</th>
+                                <th key={i} style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
                         {filteredToilets.map((toilet) => {
                             const currentOwner = toilet.assignments?.[0]?.supervisor?.name;
+                            const isApproved = toilet.status === 'APPROVED';
+                            const isRejected = toilet.status === 'REJECTED';
                             return (
-                            <tr key={toilet.id} style={{ transition: 'all 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
-                                <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc' }}>
-                                    <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>{toilet.name}</div>
-                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>{toilet.code || 'NO_ID'}</div>
-                                </td>
-                                <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc' }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{toilet.ward?.name || '---'}</div>
-                                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{toilet.ward?.parent?.name || '---'}</div>
-                                </td>
-                                <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <span style={{ fontSize: 10, fontWeight: 900, background: '#f1f5f9', color: '#475569', padding: '4px 8px', borderRadius: 8 }}>{toilet.type}</span>
-                                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{toilet.numberOfSeats || 0} Seats</span>
-                                    </div>
-                                </td>
-                                <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc' }}>
-                                    <span style={{ padding: '6px 14px', borderRadius: 10, fontSize: 10, fontWeight: 900, backgroundColor: toilet.status === 'APPROVED' ? '#ecfdf5' : '#fffbeb', color: toilet.status === 'APPROVED' ? '#059669' : '#d97706', textTransform: 'uppercase' }}>{toilet.status}</span>
-                                </td>
-                                <td style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc', textAlign: 'right' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                                        {currentOwner ? (
-                                            <div style={{ fontSize: 11, fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '6px 10px', borderRadius: 10 }}>Assigned: {currentOwner}</div>
-                                        ) : null}
-                                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                                            {isAdmin && toilet.status === 'APPROVED' && (
-                                                <button
-                                                    onClick={() => { setToiletToAssign(toilet); setShowAssignModal(true); }}
-                                                    style={{ backgroundColor: currentOwner ? '#f8fafc' : '#ffffff', border: '1px solid #e2e8f0', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#1e293b', transition: 'all 0.2s' }}
-                                                    onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
-                                                    onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}
-                                                >{currentOwner ? 'Reassign Staff' : 'Assign Staff'}</button>
-                                            )}
-                                            <button onClick={() => setSelectedToilet(toilet)} style={{ backgroundColor: '#1e293b', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>Profile</button>
+                                <tr key={toilet.id} style={{ transition: 'background 0.15s', borderBottom: '1px solid #f1f5f9' }}>
+                                    <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                                        <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{toilet.name}</div>
+                                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginTop: 2 }}>ID: {toilet.code || 'NO_ID'}</div>
+                                    </td>
+                                    <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{toilet.ward?.name || '—'}</div>
+                                        <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{toilet.ward?.parent?.name || '—'}</div>
+                                    </td>
+                                    <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontSize: 10, fontWeight: 900, background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: 8, border: '1px solid #bfdbfe' }}>{toilet.type}</span>
+                                            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{toilet.numberOfSeats || 0} Seats</span>
                                         </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        );
+                                    </td>
+                                    <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
+                                        <span style={{
+                                            padding: '4px 12px', borderRadius: 20, fontSize: 10, fontWeight: 900,
+                                            backgroundColor: isApproved ? '#dcfce7' : isRejected ? '#fee2e2' : '#fef3c7',
+                                            color: isApproved ? '#15803d' : isRejected ? '#b91c1c' : '#b45309',
+                                            border: `1px solid ${isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a'}`,
+                                            textTransform: 'uppercase', letterSpacing: '0.04em'
+                                        }}>{toilet.status}</span>
+                                    </td>
+                                    <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                                            {currentOwner && (
+                                                <div style={{ fontSize: 10, fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '3px 8px', borderRadius: 8 }}>
+                                                    Assigned: {currentOwner}
+                                                </div>
+                                            )}
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                {isAdmin && isApproved && (
+                                                    <button
+                                                        onClick={() => { setToiletToAssign(toilet); setShowAssignModal(true); }}
+                                                        style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#0f172a', transition: 'all 0.15s', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}
+                                                    >{currentOwner ? 'Reassign' : 'Assign Staff'}</button>
+                                                )}
+                                                <button onClick={() => setSelectedToilet(toilet)} style={{ backgroundColor: '#2563eb', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white', boxShadow: '0 2px 6px rgba(37,99,235,0.25)' }}>View Detail</button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
                         })}
                     </tbody>
                 </table>
             </div>
 
+            {/* Drilldown Modal Overlay Box (Screen-Aware) */}
+            {selectedToilet && (
+                <div onClick={() => setSelectedToilet(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 850, maxHeight: '88vh', overflowY: 'auto', padding: 28, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
+
+                        {/* Modal Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#0f172a' }}>{selectedToilet.name}</h2>
+                                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 12, backgroundColor: selectedToilet.status === 'APPROVED' ? '#dcfce7' : '#fee2e2', color: selectedToilet.status === 'APPROVED' ? '#15803d' : '#b91c1c' }}>
+                                        {selectedToilet.status}
+                                    </span>
+                                </div>
+                                <div style={{ fontSize: 12, fontWeight: 500, color: '#64748b', marginTop: 4 }}>Asset Code: {selectedToilet.code || selectedToilet.id}</div>
+                            </div>
+                            <button
+                                onClick={() => setSelectedToilet(null)}
+                                style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24 }}>
+                            {/* Left Column: Tech Specs & Location */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                {/* Technical Specs */}
+                                <div>
+                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Technical Specifications</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Category / Type</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.type || 'Public Toilet'}</div>
+                                        </div>
+                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Gender Scope</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.gender || 'Unisex'}</div>
+                                        </div>
+                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Seat Capacity</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.numberOfSeats || 0} Seats</div>
+                                        </div>
+                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Urinals Capacity</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.numberOfUrinals || 0} Units</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Location & GPS Co-ordinates */}
+                                <div>
+                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Location & GPS Coordinates</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Zone</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.ward?.parent?.name || selectedToilet.zoneName || 'Zone 1'}</div>
+                                        </div>
+                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Ward</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.ward?.name || selectedToilet.wardName || 'Ward 1'}</div>
+                                        </div>
+                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>GPS Coordinates (Lat, Long)</div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#2563eb', marginTop: 2 }}>
+                                                {selectedToilet.latitude || selectedToilet.lat || '22.7196'}°, {selectedToilet.longitude || selectedToilet.lng || '75.8577'}°
+                                            </div>
+                                        </div>
+                                        {selectedToilet.address && (
+                                            <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
+                                                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Address / Landmark</div>
+                                                <div style={{ fontSize: 12, fontWeight: 500, color: '#334155', marginTop: 2 }}>{selectedToilet.address}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Infrastructure & Utilities */}
+                                <div>
+                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Infrastructure Facilities</h3>
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                        <span style={{ padding: '6px 12px', borderRadius: 8, background: selectedToilet.hasWater ? '#eff6ff' : '#f1f5f9', color: selectedToilet.hasWater ? '#2563eb' : '#64748b', border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 600 }}>
+                                            {selectedToilet.hasWater ? 'Continuous Water Supply' : 'No Water Supply'}
+                                        </span>
+                                        <span style={{ padding: '6px 12px', borderRadius: 8, background: selectedToilet.hasElectricity ? '#eff6ff' : '#f1f5f9', color: selectedToilet.hasElectricity ? '#2563eb' : '#64748b', border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 600 }}>
+                                            {selectedToilet.hasElectricity ? 'Electricity Connection' : 'No Electricity'}
+                                        </span>
+                                        <span style={{ padding: '6px 12px', borderRadius: 8, background: selectedToilet.hasHandwash ? '#eff6ff' : '#f1f5f9', color: selectedToilet.hasHandwash ? '#2563eb' : '#64748b', border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 600 }}>
+                                            {selectedToilet.hasHandwash ? 'Hygiene & Handwash' : 'No Handwash Station'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Supervisor & Registration Metadata */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                <div style={{ background: '#f8fafc', padding: 18, borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>Assigned Supervisor</h3>
+                                    {selectedToilet.assignments?.map((a: any) => (
+                                        <div key={a.id} style={{ padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 8 }}>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{a.supervisor?.name || 'Supervisor'}</div>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{a.supervisor?.email || 'Field Staff'}</div>
+                                        </div>
+                                    ))}
+                                    {!selectedToilet.assignments?.length && (
+                                        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Currently Unassigned</div>
+                                    )}
+                                </div>
+
+                                <div style={{ background: '#f8fafc', padding: 18, borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>Registration Details</h3>
+                                    <div style={{ fontSize: 12, color: '#334155', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <div><span style={{ color: '#64748b' }}>Created Date:</span> <strong style={{ fontWeight: 600 }}>{new Date(selectedToilet.createdAt || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></div>
+                                        <div><span style={{ color: '#64748b' }}>Status:</span> <strong style={{ fontWeight: 600, color: selectedToilet.status === 'APPROVED' ? '#16a34a' : '#dc2626' }}>{selectedToilet.status}</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Quick Assign Modal */}
             {showAssignModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                    <div style={{ backgroundColor: 'white', borderRadius: 28, width: 440, padding: 32, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', animation: 'modalScale 0.2s ease-out' }}>
-                        <style>{`@keyframes modalScale { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }`}</style>
-                        <h3 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#0f172a' }}>Assign Field Associate</h3>
-                        <p style={{ margin: '8px 0 24px 0', fontSize: 14, color: '#64748b', fontWeight: 500 }}>Delegate responsibility for <strong>{toiletToAssign?.name}</strong></p>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+                    <div style={{ backgroundColor: 'white', borderRadius: 24, width: 440, padding: 28, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', animation: 'modalScale 0.2s ease-out' }}>
+                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Assign Field Supervisor</h3>
+                        <p style={{ margin: '6px 0 20px 0', fontSize: 13, color: '#64748b', fontWeight: 500 }}>Delegate responsibility for <strong>{toiletToAssign?.name}</strong></p>
 
-                        <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '4px' }}>
+                        <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '2px' }}>
                             {supervisors.map(emp => (
                                 <div
                                     key={emp.id}
                                     onClick={() => handleQuickAssign(emp.id)}
-                                    style={{ padding: '14px 16px', borderRadius: 16, border: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.2s' }}
-                                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                                    style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid #f1f5f9', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.15s' }}
+                                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#eff6ff'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
                                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#f1f5f9'; }}
                                 >
-                                    <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>👤</div>
+                                    <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>👤</div>
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontWeight: 800, fontSize: 13, color: '#1e293b' }}>{emp.name}</div>
-                                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{emp.phone || 'No phone'}</div>
+                                        <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{emp.name}</div>
+                                        <div style={{ fontSize: 11, color: '#64748b' }}>{emp.phone || 'No phone'}</div>
                                     </div>
                                     <div style={{ fontSize: 10, fontWeight: 800, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 6 }}>{emp.toiletsAssigned || 0} Assets</div>
                                 </div>
                             ))}
                         </div>
 
-                        <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
+                        <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
                             <button
                                 onClick={() => { setShowAssignModal(false); setToiletToAssign(null); }}
-                                style={{ flex: 1, padding: '12px', borderRadius: 12, border: '1px solid #e2e8f0', backgroundColor: 'transparent', fontWeight: 700, fontSize: 13, cursor: 'pointer', color: '#64748b' }}
+                                style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontWeight: 700, fontSize: 12, cursor: 'pointer', color: '#64748b' }}
                             >Cancel</button>
-                            {assigningLoading && <div style={{ flex: 1, textAlign: 'center', fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>Syncing...</div>}
                         </div>
                     </div>
                 </div>

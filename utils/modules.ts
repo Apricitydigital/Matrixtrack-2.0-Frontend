@@ -46,13 +46,9 @@ export function moduleEmployeePath(key: CanonicalModuleKey) {
 
 export function moduleQcPath(key: CanonicalModuleKey) {
   const base = routeForModule(key);
-  // Modules with dedicated QC sub-routes
-  if (key === "LITTERBINS" || key === "TASKFORCE") {
-    return `/modules/${base}/qc`;
-  }
-  // QC see their beats in the sweeping module page
+  if (key === "LITTERBINS") return "/modules/litterbins/admin";
+  if (key === "TASKFORCE") return `/modules/${base}/qc`;
   if (key === "SWEEPING") return "/modules/sweeping";
-  // Others (like TOILET) use the main module page which handles roles with tabs
   return `/modules/${base}`;
 }
 
@@ -72,7 +68,16 @@ export function moduleEntryPath(user: AuthUser | null, key: CanonicalModuleKey) 
     return `/modules/${routeForModule(key)}`;
   }
   if (user.roles.includes("QC" as Role)) return moduleQcPath(key);
-  if (user.roles.includes("CITY_ADMIN" as Role) || user.roles.includes("COMMISSIONER" as Role)) {
+  if (
+    user.roles.includes("CITY_ADMIN" as Role) ||
+    user.roles.includes("COMMISSIONER" as Role) ||
+    user.roles.includes("HMS_SUPER_ADMIN" as Role) ||
+    user.roles.includes("SUPER_ADMIN" as Role) ||
+    user.role === "super_admin" ||
+    user.role === "hms_super_admin" ||
+    user.role === "SUPER_ADMIN" ||
+    user.role === "HMS_SUPER_ADMIN"
+  ) {
     return moduleAdminPath(key);
   }
   return moduleEmployeePath(key);
