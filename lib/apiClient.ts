@@ -289,7 +289,7 @@ export const AuthApi = {
       body: JSON.stringify(body)
     }),
   unifiedLogin: async (body: {
-    email: string;
+    identifier: string;
     password: string;
     cityId?: string;
   }) =>
