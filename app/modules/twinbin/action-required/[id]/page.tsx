@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Protected, ModuleGuard } from "@components/Guards";
 import { ApiError, TwinbinApi } from "@lib/apiClient";
+import { normalizeInspectionAnswers } from "@lib/reportAnswers";
 
 export default function TwinbinActionRequiredDetailPage() {
   const params = useParams();
@@ -78,10 +79,21 @@ export default function TwinbinActionRequiredDetailPage() {
               </p>
               <p className="muted">QC Remark: {visit.qcRemark || "-"}</p>
               <div className="grid grid-2" style={{ gap: 12 }}>
-                {(visit.inspectionAnswers ? Object.entries(visit.inspectionAnswers) : []).map(([key, val]: any) => (
-                  <div key={key} className="card" style={{ padding: 10, border: "1px solid #e2e8f0" }}>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{questionText(key)}</div>
-                    <div className="muted">Answer: {val?.answer || "-"}</div>
+                {normalizeInspectionAnswers(visit.inspectionAnswers, {
+                  q1: "Are adequate litter bins provided in the area?",
+                  q2: "Are the litter bins properly fixed and securely installed?",
+                  q3: "Are the litter bins provided with lids/covers?",
+                  q4: "Is the ULB/Municipal logo or code clearly displayed?",
+                  q5: "Is waste found scattered around the litter bins?",
+                  q6: "Are any litter bins damaged or in poor condition?",
+                  q7: "Is an animal-proof locking mechanism provided?",
+                  q8: "Are the litter bins easily accessible to the public?",
+                  q9: "Are the litter bins being used properly by citizens?",
+                  q10: "Are the litter bins regularly cleaned and maintained?"
+                }).map((item, idx) => (
+                  <div key={idx} className="card" style={{ padding: 10, border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{item.questionText}</div>
+                    <div className="muted">Answer: <span style={{ fontWeight: 700, color: item.answerText === 'YES' ? '#059669' : item.answerText === 'NO' ? '#dc2626' : '#2563eb' }}>{item.answerText}</span></div>
                   </div>
                 ))}
               </div>

@@ -50,7 +50,7 @@ export default function TaskforceTasksPage() {
   const loadCases = async () => {
     try {
       setLoading(true);
-      const data = await TaskforceApi.listCases(selectedCity);
+      const data = await TaskforceApi.listCases(selectedCity === 'ALL' ? undefined : selectedCity);
       setCases(data.cases || []);
       setError("");
     } catch (err) {
@@ -67,7 +67,14 @@ export default function TaskforceTasksPage() {
   // Determine role for UI switching
   const { user } = useAuth();
 
-  const isSuperAdmin = user?.roles?.includes("HMS_SUPER_ADMIN");
+  const isSuperAdmin =
+    user?.role === 'super_admin' ||
+    user?.role === 'hms_super_admin' ||
+    user?.role === 'SUPER_ADMIN' ||
+    (user?.roles || []).includes('hms_super_admin') ||
+    (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
+    (user?.roles || []).includes('SUPER_ADMIN') ||
+    (user?.roles || []).includes('super_admin');
   const isCityAdmin = user?.roles?.includes("CITY_ADMIN") || isSuperAdmin;
 
   const loadCities = async () => {
@@ -75,8 +82,8 @@ export default function TaskforceTasksPage() {
       if (isSuperAdmin) {
         const { cities } = await CityApi.list();
         setCities(cities || []);
-        if (cities?.length > 0 && !selectedCity) {
-          setSelectedCity(cities[0].id);
+        if (!selectedCity) {
+          setSelectedCity("ALL");
         }
       } else if (user?.cityId) {
         // For regular City Admin, auto-select their city
@@ -89,10 +96,9 @@ export default function TaskforceTasksPage() {
   };
 
   const loadMetrics = async () => {
-    if (!selectedCity) return;
     try {
       // Fetch stats using getRecords which returns detailed stats
-      const { stats, data } = await TaskforceApi.getRecords({ cityId: selectedCity });
+      const { stats, data } = await TaskforceApi.getRecords({ cityId: selectedCity === 'ALL' ? undefined : selectedCity });
       setRecords(data || []); // Store the records
 
       // Calculate derived metrics
@@ -295,6 +301,7 @@ export default function TaskforceTasksPage() {
                       minWidth: 200
                     }}
                   >
+                    <option value="ALL">All Cities</option>
                     {cities.map(city => (
                       <option key={city.id} value={city.id}>{city.name}</option>
                     ))}

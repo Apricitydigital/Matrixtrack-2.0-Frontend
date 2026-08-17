@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
-  CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, X, Lock, Activity,
+  CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, ChevronDown, X, Lock, Activity,
   Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical
 } from "lucide-react";
 import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch } from "@lib/apiClient";
@@ -264,7 +264,7 @@ export default function RegisteredUsersPage() {
               "
             >
               <UserPlus size={16} />
-              Register New Employee
+              Register New User
             </button>
           </div>
         </div>
@@ -410,22 +410,23 @@ export default function RegisteredUsersPage() {
 
         {/* ── USERS TABLE ── */}
         <div className="overflow-x-auto">
-          <table id="registered-users-table" className="w-full min-w-[1280px] table-fixed">
+          <table id="registered-users-table" className="w-full min-w-[1380px] table-fixed">
             <colgroup>
               <col className="w-[4%]" />
-              <col className="w-[13%]" />
-              <col className="w-[15%]" />
-              <col className="w-[11%]" />
-              <col className="w-[14%]" />
-              <col className="w-[14%]" />
-              <col className="w-[14%]" />
               <col className="w-[12%]" />
-              <col className="w-[7%]" />
+              <col className="w-[13%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[12%]" />
+              <col className="w-[8%]" />
+              <col className="w-[5%]" />
             </colgroup>
 
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75">
-                {["SR. NO.", "USER NAME", "USER EMAIL", "USER ROLE", "STATE & CITY", "ZONE & WARD", "ASSIGNED MODULES", "CREATED ON", "ACTION"].map((h) => (
+                {["SR. NO.", "USER NAME", "USER EMAIL", "MOBILE NUMBER", "USER ROLE", "STATE & CITY", "ZONE & WARD", "ASSIGNED MODULES", "CREATED ON", "ACTION"].map((h) => (
                   <th key={h} className="px-3 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-[0.05em] text-slate-500 first:pl-5 last:pr-5">
                     {h}
                   </th>
@@ -436,11 +437,11 @@ export default function RegisteredUsersPage() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}><td colSpan={9} className="px-6 py-4"><div className="h-8 animate-pulse rounded-lg bg-slate-100" /></td></tr>
+                  <tr key={i}><td colSpan={10} className="px-6 py-4"><div className="h-8 animate-pulse rounded-lg bg-slate-100" /></td></tr>
                 ))
               ) : paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-xs font-semibold text-slate-400">
+                  <td colSpan={10} className="px-6 py-12 text-center text-xs font-semibold text-slate-400">
                     No registered users match your search and filter criteria.
                   </td>
                 </tr>
@@ -478,7 +479,7 @@ export default function RegisteredUsersPage() {
                         {srNo}
                       </td>
 
-                      {/* User Name (Avatar icon removed as requested) */}
+                      {/* User Name */}
                       <td className="px-3 py-3 align-middle">
                         <span className="truncate text-xs font-black text-slate-900 block">{u.name}</span>
                       </td>
@@ -486,6 +487,11 @@ export default function RegisteredUsersPage() {
                       {/* User Email */}
                       <td className="px-3 py-3 align-middle">
                         <span className="truncate text-xs font-semibold text-slate-600 block">{u.email}</span>
+                      </td>
+
+                      {/* Mobile Number */}
+                      <td className="px-3 py-3 align-middle">
+                        <span className="truncate text-xs font-semibold text-slate-700 block">{u.phone || '-'}</span>
                       </td>
 
                       {/* User Role */}
@@ -602,13 +608,6 @@ export default function RegisteredUsersPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => { setActiveMenuUserId(null); showToast({ title: u.name, description: `Email: ${u.email} | Role: ${u.role}`, tone: "info" }); }}
-                                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition w-full text-left cursor-pointer"
-                              >
-                                <Eye size={13} /> View Details
-                              </button>
-                              <button
-                                type="button"
                                 onClick={() => { setDeleteTarget(u); setActiveMenuUserId(null); }}
                                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition w-full text-left cursor-pointer"
                               >
@@ -689,6 +688,95 @@ export default function RegisteredUsersPage() {
   );
 }
 
+function MultiSelectDropdown({
+  label,
+  options,
+  selectedIds,
+  onChange,
+  placeholder = "Select..."
+}: {
+  label: string;
+  options: { id: string; name: string }[];
+  selectedIds: string[];
+  onChange: (newIds: string[]) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((item) => item !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const selectedNames = options
+    .filter((o) => selectedIds.includes(o.id))
+    .map((o) => o.name);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <label className="block text-xs font-bold text-slate-700 mb-1">
+        {label} <span className="text-slate-400 font-normal">({selectedIds.length} selected)</span>
+      </label>
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 flex items-center justify-between outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+      >
+        <span className="truncate text-left">
+          {selectedNames.length > 0
+            ? selectedNames.join(", ")
+            : placeholder}
+        </span>
+        <ChevronDown size={14} className={`shrink-0 ml-2 text-slate-400 transition-transform ${isOpen ? "rotate-180 text-blue-600" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-50 flex flex-col gap-1">
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-slate-400 font-medium">No options available</div>
+          ) : (
+            options.map((opt) => {
+              const isSelected = selectedIds.includes(opt.id);
+              return (
+                <button
+                  type="button"
+                  key={opt.id}
+                  onClick={() => toggleOption(opt.id)}
+                  className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between text-left transition-colors cursor-pointer ${
+                    isSelected ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  <span className="truncate">{opt.name}</span>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {}}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                  />
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: () => void; onSave: () => Promise<void> }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
@@ -696,8 +784,24 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [password, setPassword] = useState("");
   
   const [assignedModules, setAssignedModules] = useState<string[]>(user.assignedModules || []);
-  const [zoneIds, setZoneIds] = useState<string[]>(user.zoneIds || (user.zoneId ? [user.zoneId] : []));
-  const [wardIds, setWardIds] = useState<string[]>(user.wardIds || (user.wardId ? [user.wardId] : []));
+
+  const [zoneIds, setZoneIds] = useState<string[]>(() => {
+    const ids = [
+      ...(user.zoneIds || []),
+      ...(user.zoneId ? [user.zoneId] : []),
+      ...(user.modules || []).flatMap((m: any) => m.zoneIds || [])
+    ];
+    return Array.from(new Set(ids.filter(Boolean)));
+  });
+
+  const [wardIds, setWardIds] = useState<string[]>(() => {
+    const ids = [
+      ...(user.wardIds || []),
+      ...(user.wardId ? [user.wardId] : []),
+      ...(user.modules || []).flatMap((m: any) => m.wardIds || [])
+    ];
+    return Array.from(new Set(ids.filter(Boolean)));
+  });
 
   const [zones, setZones] = useState<any[]>([]);
   const [wards, setWards] = useState<any[]>([]);
@@ -732,18 +836,6 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
     fetchData();
   }, []);
 
-  const toggleModule = (modId: string) => {
-    setAssignedModules(prev => prev.includes(modId) ? prev.filter(id => id !== modId) : [...prev, modId]);
-  };
-
-  const toggleZone = (zId: string) => {
-    setZoneIds(prev => prev.includes(zId) ? prev.filter(id => id !== zId) : [...prev, zId]);
-  };
-
-  const toggleWard = (wId: string) => {
-    setWardIds(prev => prev.includes(wId) ? prev.filter(id => id !== wId) : [...prev, wId]);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -770,7 +862,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
   return (
     <Modal open onClose={onClose} title="Edit User & Access Permissions" subtitle={user.email} size="lg">
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="max-h-[75vh] overflow-y-auto pr-1.5 space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
@@ -958,65 +1050,21 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
         {/* Geographic Access Control (Zones & Wards) */}
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Assigned Zones <span className="text-slate-400 font-normal">({zoneIds.length} selected)</span>
-            </label>
-            <div className="h-32 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
-              {zones.length === 0 ? (
-                <span className="text-xs text-slate-400 p-2 block">No zones available</span>
-              ) : zones.map(z => {
-                const isSelected = zoneIds.includes(z.id);
-                return (
-                  <label
-                    key={z.id}
-                    onClick={() => toggleZone(z.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                      isSelected ? 'bg-blue-100 text-blue-800 font-bold' : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <span>{z.name}</span>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {}}
-                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </label>
-                );
-              })}
-            </div>
-          </div>
+          <MultiSelectDropdown
+            label="Assigned Zones"
+            options={zones.map(z => ({ id: z.id, name: z.name }))}
+            selectedIds={zoneIds}
+            onChange={setZoneIds}
+            placeholder="Select zones..."
+          />
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Assigned Wards <span className="text-slate-400 font-normal">({wardIds.length} selected)</span>
-            </label>
-            <div className="h-32 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2 space-y-1">
-              {wards.length === 0 ? (
-                <span className="text-xs text-slate-400 p-2 block">No wards available</span>
-              ) : wards.map(w => {
-                const isSelected = wardIds.includes(w.id);
-                return (
-                  <label
-                    key={w.id}
-                    onClick={() => toggleWard(w.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
-                      isSelected ? 'bg-indigo-100 text-indigo-800 font-bold' : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <span>{w.name}</span>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {}}
-                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                  </label>
-                );
-              })}
-            </div>
-          </div>
+          <MultiSelectDropdown
+            label="Assigned Wards"
+            options={wards.map(w => ({ id: w.id, name: w.name }))}
+            selectedIds={wardIds}
+            onChange={setWardIds}
+            placeholder="Select wards..."
+          />
         </div>
 
         <div className="pt-3 flex gap-3">

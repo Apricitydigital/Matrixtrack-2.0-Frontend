@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 
 import { RoleGuard } from "@components/Guards";
+import { useAuth } from "@hooks/useAuth";
+import { isHmsSuperAdmin } from "@utils/rbac";
 import {
     CityUserApi,
     apiFetch,
@@ -74,6 +76,8 @@ type EmployeeImportRow = {
 
 
 export default function EmployeesPage() {
+    const { user } = useAuth();
+    const isHmsAdmin = isHmsSuperAdmin(user);
 
     /* =========================================================
        DATA
@@ -1269,37 +1273,39 @@ EMPLOYEE EXCEL IMPORT
                         </div>
 
 
-                        <div className="flex flex-wrap gap-2">
+                        {!isHmsAdmin && (
+                            <div className="flex flex-wrap gap-2">
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setEmployeeImportRows([]);
-                                    setEmployeeImportFileName("");
-                                    setEmployeeImportError("");
-                                    setEmployeeImportProgress("");
-                                    setShowEmployeeImport(true);
-                                }}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                            >
-                                <FileSpreadsheet size={17} />
-                                Import Excel
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEmployeeImportRows([]);
+                                        setEmployeeImportFileName("");
+                                        setEmployeeImportError("");
+                                        setEmployeeImportProgress("");
+                                        setShowEmployeeImport(true);
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                >
+                                    <FileSpreadsheet size={17} />
+                                    Import Excel
+                                </button>
 
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    resetRegistrationForm();
-                                    setShowRegisterEmployee(true);
-                                }}
-                                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                            >
-                                <UserPlus size={17} />
-                                Register Employee
-                            </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        resetRegistrationForm();
+                                        setShowRegisterEmployee(true);
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                                >
+                                    <UserPlus size={17} />
+                                    Register Employee
+                                </button>
 
-                        </div>
+                            </div>
+                        )}
 
                     </div>
 

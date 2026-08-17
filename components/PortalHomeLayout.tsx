@@ -418,9 +418,14 @@ function PortalHomeLayoutContent({
           'TASKFORCE_ADMIN',
           'CITY_ADMIN',
           'HMS_ADMIN',
+          'HMS_SUPER_ADMIN',
           'SWEEPING',
           'LITTERBINS',
           'TOILET',
+          'QC',
+          'ACTION_OFFICER',
+          'AO',
+          'SUPERVISOR',
         ].includes(r)
     );
 
@@ -824,17 +829,20 @@ function PortalHomeLayoutContent({
   const userModuleItems = [
     {
       name:
-        'Cleanliness of Toilet',
+        'Litter Bins',
 
       href:
-        toiletHref,
+        litterbinsHref,
 
       icon:
-        <Info size={15} />,
+        <Trash2 size={15} />,
 
       isActive:
         pathname.startsWith(
-          '/modules/toilet'
+          '/modules/litterbins'
+        ) ||
+        pathname.startsWith(
+          '/modules/litter'
         ),
 
       visible:
@@ -862,17 +870,17 @@ function PortalHomeLayoutContent({
 
     {
       name:
-        'Litter Bins',
+        'Cleanliness of Toilet',
 
       href:
-        litterbinsHref,
+        toiletHref,
 
       icon:
-        <Trash2 size={15} />,
+        <Info size={15} />,
 
       isActive:
         pathname.startsWith(
-          '/modules/litterbins'
+          '/modules/toilet'
         ),
 
       visible:
@@ -892,6 +900,12 @@ function PortalHomeLayoutContent({
       isActive:
         pathname.startsWith(
           '/modules/taskforce'
+        ) ||
+        pathname.startsWith(
+          '/modules/ctu'
+        ) ||
+        pathname.startsWith(
+          '/modules/gvp'
         ),
 
       visible:
@@ -1738,9 +1752,7 @@ function PortalHomeLayoutContent({
 
                   <div className="flex flex-col gap-1 mt-1">
 
-
                     {/* HOME */}
-
                     <Link
                       href="/portal-home"
                       className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname ===
@@ -1765,39 +1777,32 @@ function PortalHomeLayoutContent({
                     </Link>
 
 
-                  {/* =================================================
-                      ATTENDANCE ANALYTICS - CITY ADMIN
-                  ================================================= */}
+                    {/* =================================================
+                        ATTENDANCE ANALYTICS - CITY ADMIN
+                    ================================================= */}
 
-                  {isCityAdmin && (
+                    {isCityAdmin && (
+                      <Link
+                        href="/city/attendance"
+                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                            ? 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-600/25'
+                            : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-700'
+                          }`}
+                      >
+                        <ChartNoAxesCombined
+                          size={16}
+                          className={
+                            pathname.startsWith('/city/attendance')
+                              ? 'text-white'
+                              : 'text-cyan-600'
+                          }
+                        />
 
-                    <Link
-                      href="/city/attendance"
-                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
-                        pathname.startsWith(
-                          '/city/attendance'
-                        )
-                          ? 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-600/25'
-                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-700'
-                      }`}
-                    >
-                      <ChartNoAxesCombined
-                        size={16}
-                        className={
-                          pathname.startsWith(
-                            '/city/attendance'
-                          )
-                            ? 'text-white'
-                            : 'text-cyan-600'
-                        }
-                      />
-
-                      <span>
-                        Attendance Analytics
-                      </span>
-                    </Link>
-
-                  )}
+                        <span>
+                          Attendance Analytics
+                        </span>
+                      </Link>
+                    )}
 
 
                     {/* =================================================
@@ -2801,7 +2806,7 @@ function PortalHomeLayoutContent({
         {!isMainDashboard && (
 
           <div
-            className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-white px-6 py-3.5 rounded-2xl border border-slate-800/80 shadow-lg sticky top-3 z-40 transition-all overflow-hidden relative"
+            className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-white px-6 py-3.5 rounded-2xl border border-slate-800/80 shadow-lg sticky top-3 z-30 transition-all overflow-hidden relative"
             style={{
               background:
                 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
@@ -2909,7 +2914,7 @@ function PortalHomeLayoutContent({
           key={
             pathname
           }
-          className="animate-page-entrance"
+          className="relative z-10 animate-page-entrance"
         >
           {
             children

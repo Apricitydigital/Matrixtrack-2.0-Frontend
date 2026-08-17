@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, useMemo } from "react";
-import { ToiletApi, GeoApi } from "@lib/apiClient";
+import { ToiletApi, GeoApi, EmployeesApi, TwinbinApi, ModuleRecordsApi } from "@lib/apiClient";
 
-export default function AssignmentsTab({ cityId }: { cityId?: string }) {
+export default function TwinbinStaffAssignmentsTab() {
     const [supervisors, setEmployees] = useState<any[]>([]);
-    const [toilets, setToilets] = useState<any[]>([]);
+    const [bins, setBins] = useState<any[]>([]);
     const [zones, setZones] = useState<any[]>([]);
     const [allWards, setAllWards] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -17,7 +17,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
 
     // Modal State
     const [showAssignModal, setShowAssignModal] = useState(false);
-    const [selectedToiletToAssign, setSelectedToiletToAssign] = useState<any | null>(null);
+    const [selectedBinToAssign, setSelectedBinToAssign] = useState<any | null>(null);
     const [targetSupervisorId, setTargetSupervisorId] = useState("");
     const [assigning, setAssigning] = useState(false);
 
@@ -31,9 +31,11 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [empRes, toiletRes, zoneRes, wardRes] = await Promise.allSettled([
-                ToiletApi.listEmployees(),
-                ToiletApi.listAllToilets(),
+            const [empRes, binAssignedRes, binMyRes, recRes, zoneRes, wardRes] = await Promise.allSettled([
+                EmployeesApi.list("LITTERBINS"),
+                TwinbinApi.assigned(),
+                TwinbinApi.myBins(),
+                ModuleRecordsApi.getRecords("LITTERBINS", { limit: 200 }),
                 ToiletApi.getZones(),
                 GeoApi.list("WARD")
             ]);
@@ -41,11 +43,37 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
             if (empRes.status === 'fulfilled') {
                 setEmployees((empRes.value.employees || []).filter((item: any) => item.role === "SUPERVISOR" || item.role === "QC" || item.role === "CITY_ADMIN"));
             }
-            if (toiletRes.status === 'fulfilled') setToilets(toiletRes.value.toilets || []);
+
+            const binMap = new Map<string, any>();
+            if (binAssignedRes.status === 'fulfilled' && binAssignedRes.value.bins) {
+                binAssignedRes.value.bins.forEach((b: any) => binMap.set(b.id, b));
+            }
+            if (binMyRes.status === 'fulfilled' && binMyRes.value.bins) {
+                binMyRes.value.bins.forEach((b: any) => binMap.set(b.id, b));
+            }
+            if (recRes.status === 'fulfilled' && recRes.value.data) {
+                recRes.value.data.forEach((r: any) => {
+                    if (!binMap.has(r.id)) {
+                        binMap.set(r.id, {
+                            id: r.id,
+                            locationName: r.locationName || r.areaName || r.name || 'Litterbin Asset',
+                            zoneId: r.zoneId,
+                            wardId: r.wardId,
+                            zoneName: r.zoneName || r.zone?.name,
+                            wardName: r.wardName || r.ward?.name,
+                            latitude: r.latitude || r.lat,
+                            longitude: r.longitude || r.lng,
+                            assignedSupervisorId: r.assignedSupervisorId || r.supervisorId
+                        });
+                    }
+                });
+            }
+
+            setBins(Array.from(binMap.values()));
             if (zoneRes.status === 'fulfilled') setZones(zoneRes.value.nodes || []);
             if (wardRes.status === 'fulfilled') setAllWards(wardRes.value.nodes || []);
         } catch (err) {
-            console.error('Failed to load assignments data', err);
+            console.error('Failed to load twinbin staff assignments data', err);
         } finally {
             setLoading(false);
         }
@@ -73,63 +101,94 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
         }
     };
 
-    // Flattened Assignment Rows
+    // Flattened Assignment Rows for Litterbins (Supervisor List + Bins List fallback)
     const assignmentRows = useMemo(() => {
         const rows: any[] = [];
-        toilets.forEach(t => {
-            const zName = t.ward?.parent?.name || t.zoneName || 'Zone 1';
-            const wName = t.ward?.name || t.wardName || 'Ward 1';
+        const mappedBinIds = new Set<string>();
 
-            if (t.assignments && t.assignments.length > 0) {
-                t.assignments.forEach((a: any) => {
+        // 1. Map supervisors with their assigned bins
+        supervisors.forEach(sup => {
+            const supBins = bins.filter(b => b.assignedSupervisorId === sup.id || b.assignedToId === sup.id || b.supervisorId === sup.id);
+            if (supBins.length > 0) {
+                supBins.forEach(b => {
+                    mappedBinIds.add(b.id);
+                    const zName = b.zoneName || b.zone?.name || 'Zone 1';
+                    const wName = b.wardName || b.ward?.name || 'Ward 1';
                     rows.push({
-                        id: `${t.id}-${a.id}`,
-                        toiletId: t.id,
-                        toiletName: t.name,
-                        toiletCode: t.code || t.id,
-                        toiletType: t.type || 'Public Toilet',
-                        lat: t.latitude || t.lat || '22.7196',
-                        lng: t.longitude || t.lng || '75.8577',
+                        id: `sup-bin-${sup.id}-${b.id}`,
+                        binId: b.id,
+                        binName: b.locationName || b.areaName || 'Litterbin Asset',
+                        binCode: b.id.slice(0, 8),
+                        lat: b.latitude || b.lat || '22.7196',
+                        lng: b.longitude || b.lng || '75.8577',
                         zoneName: zName,
                         wardName: wName,
-                        zoneId: t.zoneId || t.ward?.parent?.id,
-                        wardId: t.wardId || t.ward?.id,
-                        supervisorId: a.supervisor?.id,
-                        supervisorName: a.supervisor?.name || 'Supervisor',
-                        supervisorPhone: a.supervisor?.phone || a.supervisor?.mobile || '9893001122',
-                        supervisorEmail: a.supervisor?.email || 'supervisor@indore.gov.in',
-                        supervisorAadhar: a.supervisor?.aadhar || a.supervisor?.employeeCode || `EMP-${String(a.supervisor?.id || '101').slice(0, 6)}`,
-                        qcOfficer: t.qcOfficer?.name || t.qcName || 'QC Zone Team',
-                        actionOfficer: t.actionOfficer?.name || t.aoName || 'AO Division',
+                        zoneId: b.zoneId,
+                        wardId: b.wardId,
+                        supervisorId: sup.id,
+                        supervisorName: sup.name || 'Supervisor',
+                        supervisorPhone: sup.phone || sup.mobile || '9893001122',
+                        supervisorEmail: sup.email || 'supervisor@indore.gov.in',
+                        supervisorAadhar: sup.aadhar || sup.employeeCode || `EMP-${String(sup.id).slice(0, 6)}`,
+                        qcOfficer: b.qcOfficer?.name || 'QC Litterbin Team',
+                        actionOfficer: b.actionOfficer?.name || 'AO Division',
                         isAssigned: true
                     });
                 });
             } else {
                 rows.push({
-                    id: `unassigned-${t.id}`,
-                    toiletId: t.id,
-                    toiletName: t.name,
-                    toiletCode: t.code || t.id,
-                    toiletType: t.type || 'Public Toilet',
-                    lat: t.latitude || t.lat || '22.7196',
-                    lng: t.longitude || t.lng || '75.8577',
+                    id: `sup-unassigned-${sup.id}`,
+                    binId: null,
+                    binName: 'No Asset Assigned',
+                    binCode: '—',
+                    lat: '22.7196',
+                    lng: '75.8577',
+                    zoneName: 'Zone 1',
+                    wardName: 'Ward 1',
+                    zoneId: null,
+                    wardId: null,
+                    supervisorId: sup.id,
+                    supervisorName: sup.name || 'Supervisor',
+                    supervisorPhone: sup.phone || sup.mobile || '9893001122',
+                    supervisorEmail: sup.email || 'supervisor@indore.gov.in',
+                    supervisorAadhar: sup.aadhar || sup.employeeCode || `EMP-${String(sup.id).slice(0, 6)}`,
+                    qcOfficer: 'QC Litterbin Team',
+                    actionOfficer: 'AO Division',
+                    isAssigned: false
+                });
+            }
+        });
+
+        // 2. Map remaining unassigned bins
+        bins.forEach(b => {
+            if (!mappedBinIds.has(b.id)) {
+                const zName = b.zoneName || b.zone?.name || 'Zone 1';
+                const wName = b.wardName || b.ward?.name || 'Ward 1';
+                rows.push({
+                    id: `bin-unassigned-${b.id}`,
+                    binId: b.id,
+                    binName: b.locationName || b.areaName || 'Litterbin Asset',
+                    binCode: b.id.slice(0, 8),
+                    lat: b.latitude || b.lat || '22.7196',
+                    lng: b.longitude || b.lng || '75.8577',
                     zoneName: zName,
                     wardName: wName,
-                    zoneId: t.zoneId || t.ward?.parent?.id,
-                    wardId: t.wardId || t.ward?.id,
+                    zoneId: b.zoneId,
+                    wardId: b.wardId,
                     supervisorId: null,
                     supervisorName: 'Unassigned',
                     supervisorPhone: '—',
                     supervisorEmail: '—',
                     supervisorAadhar: '—',
-                    qcOfficer: t.qcOfficer?.name || t.qcName || 'QC Zone Team',
-                    actionOfficer: t.actionOfficer?.name || t.aoName || 'AO Division',
+                    qcOfficer: b.qcOfficer?.name || 'QC Litterbin Team',
+                    actionOfficer: b.actionOfficer?.name || 'AO Division',
                     isAssigned: false
                 });
             }
         });
+
         return rows;
-    }, [toilets]);
+    }, [bins, supervisors]);
 
     // Filtered Table Rows
     const filteredRows = useMemo(() => {
@@ -141,9 +200,9 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                 const q = searchQuery.toLowerCase();
                 const sName = r.supervisorName.toLowerCase();
                 const sPhone = r.supervisorPhone.toLowerCase();
-                const tName = r.toiletName.toLowerCase();
+                const bName = r.binName.toLowerCase();
                 const wName = r.wardName.toLowerCase();
-                if (!sName.includes(q) && !sPhone.includes(q) && !tName.includes(q) && !wName.includes(q)) return false;
+                if (!sName.includes(q) && !sPhone.includes(q) && !bName.includes(q) && !wName.includes(q)) return false;
             }
 
             return true;
@@ -151,12 +210,12 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
     }, [assignmentRows, selectedZone, selectedWard, searchQuery, zones, allWards]);
 
     const handleAssignSave = async () => {
-        if (!selectedToiletToAssign || !targetSupervisorId) return;
+        if (!selectedBinToAssign || !targetSupervisorId) return;
         setAssigning(true);
         try {
-            await ToiletApi.bulkAssignToilets(targetSupervisorId, [selectedToiletToAssign.id], selectedToiletToAssign.type || 'PT');
+            await TwinbinApi.assign(selectedBinToAssign.id, { assignedEmployeeIds: [targetSupervisorId] });
             setShowAssignModal(false);
-            setSelectedToiletToAssign(null);
+            setSelectedBinToAssign(null);
             setTargetSupervisorId("");
             await loadData();
         } catch (err: any) {
@@ -167,10 +226,10 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
     };
 
     const handleUnassign = async (row: any) => {
-        if (!row.supervisorId || !row.toiletId) return;
-        if (!confirm(`Are you sure you want to unassign ${row.supervisorName} from ${row.toiletName}?`)) return;
+        if (!row.binId) return;
+        if (!confirm(`Are you sure you want to unassign staff from ${row.binName}?`)) return;
         try {
-            await ToiletApi.unassignToilet(row.supervisorId, row.toiletId);
+            await TwinbinApi.assign(row.binId, { assignedEmployeeIds: [] });
             await loadData();
         } catch (err: any) {
             alert(err?.message || "Unassign failed");
@@ -179,15 +238,15 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
 
     const exportCSV = () => {
         if (filteredRows.length === 0) return;
-        const headers = ['S.No', 'Supervisor Name', 'Phone', 'Email', 'Aadhar/Emp Code', 'Toilet Name', 'Toilet ID', 'Zone', 'Ward', 'Latitude', 'Longitude', 'QC Officer', 'Action Officer'];
+        const headers = ['S.No', 'Supervisor Name', 'Phone', 'Email', 'Aadhar/Emp Code', 'Bin Location', 'Bin ID', 'Zone', 'Ward', 'Latitude', 'Longitude', 'QC Officer', 'Action Officer'];
         const rows = filteredRows.map((r, i) => [
             i + 1,
             `"${r.supervisorName}"`,
             `"${r.supervisorPhone}"`,
             `"${r.supervisorEmail}"`,
             `"${r.supervisorAadhar}"`,
-            `"${r.toiletName}"`,
-            `"${r.toiletCode}"`,
+            `"${r.binName}"`,
+            `"${r.binCode}"`,
             `"${r.zoneName}"`,
             `"${r.wardName}"`,
             `"${r.lat}"`,
@@ -199,7 +258,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
-        link.setAttribute('download', `toilet_staff_assignments_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute('download', `litterbin_staff_assignments_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -233,7 +292,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flex: 1, minWidth: 300 }}>
                         <input
                             type="text"
-                            placeholder="🔍 Search supervisor, phone, toilet..."
+                            placeholder="🔍 Search supervisor, phone, bin..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="filter-select"
@@ -274,7 +333,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                         </button>
 
                         <button
-                            onClick={() => { setSelectedToiletToAssign(toilets[0] || null); setShowAssignModal(true); }}
+                            onClick={() => { setSelectedBinToAssign(bins[0] || null); setShowAssignModal(true); }}
                             style={{
                                 padding: '0 14px', borderRadius: 8, border: 'none',
                                 background: '#2563eb', color: '#ffffff', fontSize: 12, fontWeight: 600,
@@ -288,7 +347,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                 </div>
 
                 <div style={{ marginTop: 6, fontSize: 11, color: '#64748b', fontWeight: 500 }}>
-                    Total Deployments: <strong style={{ color: '#2563eb', fontWeight: 600 }}>{filteredRows.length}</strong> Assigned Locations
+                    Total Deployments: <strong style={{ color: '#2563eb', fontWeight: 600 }}>{filteredRows.length}</strong> Staff Roster Items
                 </div>
             </div>
 
@@ -309,7 +368,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                         <thead>
                             <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>STAFF / SUPERVISOR</th>
-                                <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ASSIGNED ASSET & ID</th>
+                                <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ASSIGNED LITTERBIN & ID</th>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ZONE & WARD</th>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>GPS COORDINATES</th>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>QC & ACTION OFFICER</th>
@@ -321,20 +380,18 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                                 <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.12s' }}>
                                     {/* Staff / Supervisor Details */}
                                     <td style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
-                                        <div style={{ fontWeight: 600, fontSize: 13, color: row.isAssigned ? '#0f172a' : '#94a3b8' }}>{row.supervisorName}</div>
-                                        {row.isAssigned && (
-                                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                                <span>📞 {row.supervisorPhone}</span>
-                                                <span>•</span>
-                                                <span>Aadhar: {row.supervisorAadhar}</span>
-                                            </div>
-                                        )}
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: row.isAssigned ? '#0f172a' : '#334155' }}>{row.supervisorName}</div>
+                                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                            <span>📞 {row.supervisorPhone}</span>
+                                            <span>•</span>
+                                            <span>Aadhar: {row.supervisorAadhar}</span>
+                                        </div>
                                     </td>
 
-                                    {/* Toilet Asset & ID */}
+                                    {/* Litterbin Asset & ID */}
                                     <td style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
-                                        <div style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{row.toiletName}</div>
-                                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>ID: {row.toiletCode}</div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: row.binId ? '#0f172a' : '#94a3b8' }}>{row.binName}</div>
+                                        {row.binId && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>ID: {row.binCode}</div>}
                                     </td>
 
                                     {/* Zone & Ward */}
@@ -379,8 +436,8 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                                             >
                                                 <button
                                                     onClick={() => {
-                                                        const targetToilet = toilets.find(t => t.id === row.toiletId);
-                                                        setSelectedToiletToAssign(targetToilet || null);
+                                                        const targetBin = bins.find(b => b.id === row.binId) || bins[0];
+                                                        setSelectedBinToAssign(targetBin || null);
                                                         setTargetSupervisorId(row.supervisorId || '');
                                                         setShowAssignModal(true);
                                                     }}
@@ -419,21 +476,21 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                 <div onClick={() => setShowAssignModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
                     <div onClick={e => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 500, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Assign Field Staff to Toilet</h3>
+                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Assign Field Staff to Litterbin</h3>
                             <button onClick={() => setShowAssignModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Close</button>
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                             <div>
-                                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Select Toilet Asset</label>
+                                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Select Litterbin Location</label>
                                 <select
-                                    value={selectedToiletToAssign?.id || ''}
-                                    onChange={e => setSelectedToiletToAssign(toilets.find(t => t.id === e.target.value) || null)}
+                                    value={selectedBinToAssign?.id || ''}
+                                    onChange={e => setSelectedBinToAssign(bins.find(b => b.id === e.target.value) || null)}
                                     className="filter-select"
                                     style={{ width: '100%' }}
                                 >
-                                    <option value="">Choose Toilet...</option>
-                                    {toilets.map(t => <option key={t.id} value={t.id}>{t.name} ({t.ward?.name || 'Ward 1'})</option>)}
+                                    <option value="">Choose Litterbin...</option>
+                                    {bins.map(b => <option key={b.id} value={b.id}>{b.locationName || b.areaName || 'Litterbin'} ({b.wardName || 'Ward 1'})</option>)}
                                 </select>
                             </div>
 
@@ -454,16 +511,16 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                                 </select>
                             </div>
 
-                            {selectedToiletToAssign && (
+                            {selectedBinToAssign && (
                                 <div style={{ background: '#f8fafc', padding: 12, borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12, color: '#475569' }}>
-                                    <div><strong>Location:</strong> {selectedToiletToAssign.ward?.name || 'Ward 1'}, {selectedToiletToAssign.ward?.parent?.name || 'Zone 1'}</div>
-                                    <div><strong>GPS:</strong> {selectedToiletToAssign.latitude || '22.7196'}°, {selectedToiletToAssign.longitude || '75.8577'}°</div>
+                                    <div><strong>Location:</strong> {selectedBinToAssign.wardName || 'Ward 1'}, {selectedBinToAssign.zoneName || 'Zone 1'}</div>
+                                    <div><strong>GPS:</strong> {selectedBinToAssign.latitude || '22.7196'}°, {selectedBinToAssign.longitude || '75.8577'}°</div>
                                 </div>
                             )}
 
                             <button
                                 onClick={handleAssignSave}
-                                disabled={assigning || !selectedToiletToAssign || !targetSupervisorId}
+                                disabled={assigning || !selectedBinToAssign || !targetSupervisorId}
                                 style={{
                                     marginTop: 8, padding: '10px 16px', borderRadius: 8, border: 'none',
                                     background: assigning ? '#93c5fd' : '#2563eb', color: '#ffffff',

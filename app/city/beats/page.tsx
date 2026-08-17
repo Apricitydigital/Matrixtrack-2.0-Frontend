@@ -9,11 +9,7 @@ import React, {
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
-import BeatForm from "./components/BeatForm";
 import BeatTable from "./components/BeatTable";
-import EditBeatModal from "./components/EditBeatModal";
-import KMLDataViewer from "./components/KMLDataViewer";
-import AssignBeatModal from "./components/AssignBeatModal";
 
 import type { BeatMapViewProps } from "./components/BeatMapView";
 
@@ -32,6 +28,34 @@ import {
   Search,
   RotateCcw,
 } from "lucide-react";
+
+const BeatForm = dynamic(
+  () => import("./components/BeatForm"),
+  {
+    ssr: false,
+  }
+);
+
+const EditBeatModal = dynamic(
+  () => import("./components/EditBeatModal"),
+  {
+    ssr: false,
+  }
+);
+
+const KMLDataViewer = dynamic(
+  () => import("./components/KMLDataViewer"),
+  {
+    ssr: false,
+  }
+);
+
+const AssignBeatModal = dynamic(
+  () => import("./components/AssignBeatModal"),
+  {
+    ssr: false,
+  }
+);
 
 const BeatMapView = dynamic<BeatMapViewProps>(
   () => import("./components/BeatMapView"),
