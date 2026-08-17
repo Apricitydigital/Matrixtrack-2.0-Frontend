@@ -36,7 +36,9 @@ export default function ZoneManagementPage() {
     try {
       setLoading(true);
       setError("");
-      const data = await apiFetch<{ nodes: GeoNode[] }>("/city/geo?level=ZONE");
+      const userCityId = user?.city?.id || (user as any)?.cityId;
+      const url = userCityId ? `/city/geo?level=ZONE&cityId=${userCityId}` : "/city/geo?level=ZONE";
+      const data = await apiFetch<{ nodes: GeoNode[] }>(url);
       setZones((data as any).nodes ?? []);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Failed to load zones";
@@ -48,7 +50,7 @@ export default function ZoneManagementPage() {
 
   useEffect(() => {
     loadZones();
-  }, []);
+  }, [user?.city?.id]);
 
   const createZone = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -408,7 +410,7 @@ export default function ZoneManagementPage() {
                             </div>
                           </td>
                           <td style={{ padding: "14px 24px", fontSize: "0.8125rem", fontWeight: 700, color: "#475569" }}>
-                            {(z as any).creator?.name || (z as any).creatorName || user?.name || 'Admin'}
+                            {(z as any).creator?.name || (z as any).creatorName || (z as any).createdBy || (z as any).city?.users?.[0]?.user?.name || ((z as any).city?.name ? `${(z as any).city.name} Admin` : 'City Admin')}
                           </td>
                           <td style={{ padding: "14px 24px", textAlign: "right" }}>
                             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>

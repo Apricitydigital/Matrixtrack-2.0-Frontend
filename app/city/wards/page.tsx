@@ -130,9 +130,12 @@ export default function WardManagementPage() {
     try {
       if (isRefresh) setRefreshing(true); else setLoading(true);
       setError("");
+      const userCityId = user?.city?.id || (user as any)?.cityId;
+      const zoneUrl = userCityId ? `/city/geo?level=ZONE&cityId=${userCityId}` : "/city/geo?level=ZONE";
+      const wardUrl = userCityId ? `/city/geo?level=WARD&cityId=${userCityId}` : "/city/geo?level=WARD";
       const [zoneRes, wardRes, cityRes] = await Promise.allSettled([
-        apiFetch<{ nodes: GeoNode[] }>("/city/geo?level=ZONE"),
-        apiFetch<{ nodes: GeoNode[] }>("/city/geo?level=WARD"),
+        apiFetch<{ nodes: GeoNode[] }>(zoneUrl),
+        apiFetch<{ nodes: GeoNode[] }>(wardUrl),
         CityApi.list()
       ]);
 
@@ -154,7 +157,7 @@ export default function WardManagementPage() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [user?.city?.id]);
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -2318,7 +2321,7 @@ export default function WardManagementPage() {
                             </div>
                           </td>
                           <td style={{ padding: "14px 24px", fontSize: "0.8125rem", fontWeight: 700, color: "#475569" }}>
-                            {(w as any).creator?.name || (w as any).creatorName || user?.name || 'Admin'}
+                            {(w as any).creator?.name || (w as any).creatorName || (w as any).createdBy || (w as any).city?.users?.[0]?.user?.name || ((w as any).city?.name ? `${(w as any).city.name} Admin` : 'City Admin')}
                           </td>
                           <td style={{ padding: "14px 24px", textAlign: "right" }}>
                             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
