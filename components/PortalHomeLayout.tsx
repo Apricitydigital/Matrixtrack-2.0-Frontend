@@ -829,17 +829,20 @@ function PortalHomeLayoutContent({
   const userModuleItems = [
     {
       name:
-        'Cleanliness of Toilet',
+        'Litter Bins',
 
       href:
-        toiletHref,
+        litterbinsHref,
 
       icon:
-        <Info size={15} />,
+        <Trash2 size={15} />,
 
       isActive:
         pathname.startsWith(
-          '/modules/toilet'
+          '/modules/litterbins'
+        ) ||
+        pathname.startsWith(
+          '/modules/litter'
         ),
 
       visible:
@@ -867,20 +870,17 @@ function PortalHomeLayoutContent({
 
     {
       name:
-        'Litter Bins',
+        'Cleanliness of Toilet',
 
       href:
-        litterbinsHref,
+        toiletHref,
 
       icon:
-        <Trash2 size={15} />,
+        <Info size={15} />,
 
       isActive:
         pathname.startsWith(
-          '/modules/litterbins'
-        ) ||
-        pathname.startsWith(
-          '/modules/litter'
+          '/modules/toilet'
         ),
 
       visible:
