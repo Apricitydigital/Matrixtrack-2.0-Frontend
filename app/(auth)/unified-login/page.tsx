@@ -581,6 +581,8 @@ export default function LoginPage() {
         await AuthApi.unifiedVerifyMatrixTrackOtp({
           email: otpEmail,
           otp: normalizedOtp,
+          cityId:
+            pendingLogin?.pendingOtp?.cityId,
         });
 
       const mergedApplications =
