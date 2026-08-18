@@ -418,16 +418,9 @@ function PortalHomeLayoutContent({
           'TASKFORCE',
           'TASKFORCE_20',
           'TASKFORCE_ADMIN',
-          'CITY_ADMIN',
-          'HMS_ADMIN',
-          'HMS_SUPER_ADMIN',
           'SWEEPING',
           'LITTERBINS',
           'TOILET',
-          'QC',
-          'ACTION_OFFICER',
-          'AO',
-          'SUPERVISOR',
         ].includes(r)
     );
 
@@ -1791,8 +1784,8 @@ function PortalHomeLayoutContent({
                       <Link
                         href="/city/attendance"
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
-                            ? 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-600/25'
-                            : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-700'
+                          ? 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-600/25'
+                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-700'
                           }`}
                       >
                         <ChartNoAxesCombined

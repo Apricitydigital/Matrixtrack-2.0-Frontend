@@ -206,6 +206,7 @@ export interface UnifiedLoginResponse {
   pendingOtp?: {
     provider: "MATRIX_TRACK";
     email: string;
+    cityId?: string;
     message: string;
   } | null;
 
@@ -289,7 +290,7 @@ export const AuthApi = {
       body: JSON.stringify(body)
     }),
   unifiedLogin: async (body: {
-    email: string;
+    identifier: string;
     password: string;
     cityId?: string;
   }) =>
@@ -304,6 +305,7 @@ export const AuthApi = {
   unifiedVerifyMatrixTrackOtp: async (body: {
     email: string;
     otp: string;
+    cityId?: string;
   }) =>
     apiFetch<UnifiedLoginResponse>(
       "/auth/unified-login/verify-matrixtrack-otp",
@@ -695,6 +697,7 @@ export const CityUserApi = {
         email: string | null;
         phone: string | null;
         role: string;
+        cityId?: string;
         createdAt: string;
         modules: { id: string; key: string; name: string; canWrite: boolean; zoneIds?: string[]; wardIds?: string[] }[];
         zoneIds?: string[];
@@ -708,6 +711,11 @@ export const CityUserApi = {
     role: string;
     zoneIds?: string[];
     wardIds?: string[];
+    cityId?: string;
+    cityName?: string;
+    stateName?: string;
+    divisionName?: string;
+    districtName?: string;
     modules: { moduleId: string; canWrite: boolean; zoneIds?: string[]; wardIds?: string[] }[];
   }) => apiFetch("/city/users", { method: "POST", body: JSON.stringify(body) }),
   update: (
@@ -958,6 +966,7 @@ export const EmployeesApi = {
         modules: user.modules || [],
         zones: user.zoneIds || [],
         wards: user.wardIds || [],
+
         createdAt: user.createdAt
       }));
 

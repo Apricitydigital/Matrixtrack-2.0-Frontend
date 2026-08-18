@@ -498,11 +498,11 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const normalizedEmail =
-        loginIdentifier.trim().toLowerCase();
+      const normalizedIdentifier =
+        loginIdentifier.trim();
 
       const response = await AuthApi.unifiedLogin({
-        email: normalizedEmail,
+        identifier: normalizedIdentifier,
         password,
       });
 
@@ -512,7 +512,7 @@ export default function LoginPage() {
         setOtpEmail(
           response.pendingOtp?.email ||
           response.email ||
-          normalizedEmail,
+          "",
         );
 
         setOtp("");
@@ -535,7 +535,7 @@ export default function LoginPage() {
         err.status === 401
       ) {
         setError(
-          "Invalid email or password. Please try again.",
+          "Invalid email, mobile number or password. Please try again.",
         );
       } else if (err instanceof ApiError) {
         setError(
@@ -581,6 +581,8 @@ export default function LoginPage() {
         await AuthApi.unifiedVerifyMatrixTrackOtp({
           email: otpEmail,
           otp: normalizedOtp,
+          cityId:
+            pendingLogin?.pendingOtp?.cityId,
         });
 
       const mergedApplications =
@@ -796,7 +798,8 @@ export default function LoginPage() {
 
   return (
     <div className="mt-page">
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         :root {
           --mt-navy-950: #050b16;
           --mt-navy-900: #071225;

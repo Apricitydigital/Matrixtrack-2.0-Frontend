@@ -82,7 +82,7 @@ export default function RegisteredUsersPage() {
 
   // Pagination State
   const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const pageSize = 20;
 
   // Edit / Delete Modal State
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
@@ -120,7 +120,31 @@ export default function RegisteredUsersPage() {
         if (n.id && n.name) gMap[n.id] = n.name;
       });
 
-      setUsers(rawUsers as any[]);
+      const enrichedUsers = rawUsers.map((u: any) => {
+        const city = fCityMap[u.cityId] || null;
+
+        return {
+          ...u,
+          cityName:
+            u.cityName ||
+            city?.name ||
+            "",
+          stateName:
+            u.stateName ||
+            city?.state?.name ||
+            "",
+          divisionName:
+            u.divisionName ||
+            city?.division?.name ||
+            "",
+          districtName:
+            u.districtName ||
+            city?.district?.name ||
+            ""
+        };
+      });
+
+      setUsers(enrichedUsers as any[]);
       setCities(fetchedCities);
       setCityMap(cMap);
       setFullCityMap(fCityMap);
@@ -455,6 +479,9 @@ export default function RegisteredUsersPage() {
                     ? new Date(u.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
                     : '12:45 PM';
 
+                  const openActionMenuUpward =
+                    index >= paginatedUsers.length - 2;
+
                   const cleanGeoLabel = (val: any, prefix: string, idx: number) => {
                     if (!val) return `${prefix} ${idx + 1}`;
                     const str = String(val).trim();
@@ -467,10 +494,31 @@ export default function RegisteredUsersPage() {
 
                   const stateText = u.stateName || 'Madhya Pradesh';
                   const cityText = u.cityName || u.city?.name || cityMap[u.cityId || ''] || 'Indore';
-                  const rawZone = u.zoneName || u.zone?.name || (u.zoneIds && u.zoneIds.length > 0 ? u.zoneIds.map((id: string, i: number) => cleanGeoLabel(id, 'Zone', i)).join(', ') : 'Zone 1');
-                  const rawWard = u.wardName || u.ward?.name || (u.wardIds && u.wardIds.length > 0 ? u.wardIds.map((id: string, i: number) => cleanGeoLabel(id, 'Ward', i)).join(', ') : 'Ward 1');
-                  const zoneText = cleanGeoLabel(rawZone, 'Zone', index);
-                  const wardText = cleanGeoLabel(rawWard, 'Ward', index);
+                  const zoneText =
+                    u.zoneName ||
+                    u.zone?.name ||
+                    (
+                      u.zoneIds && u.zoneIds.length > 0
+                        ? u.zoneIds
+                          .map((id: string, i: number) =>
+                            cleanGeoLabel(id, 'Zone', i)
+                          )
+                          .join(', ')
+                        : 'Zone 1'
+                    );
+
+                  const wardText =
+                    u.wardName ||
+                    u.ward?.name ||
+                    (
+                      u.wardIds && u.wardIds.length > 0
+                        ? u.wardIds
+                          .map((id: string, i: number) =>
+                            cleanGeoLabel(id, 'Ward', i)
+                          )
+                          .join(', ')
+                        : 'Ward 1'
+                    );
 
                   return (
                     <tr key={u.id} className="group hover:bg-blue-50/20 transition">
@@ -531,50 +579,50 @@ export default function RegisteredUsersPage() {
 
                       {/* Assigned Modules - Inspection & Performance System Modules only */}
                       <td className="px-3 py-3 align-middle">
-                         <div className="flex flex-wrap items-center gap-1">
-                           {(() => {
-                             // Collect only Inspection & Performance System (Taskforce) modules
-                             const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN"];
-                             const mods: string[] = [];
-                             if (u.modules && u.modules.length > 0) {
-                               u.modules.forEach((m: any) => {
-                                 const keyUpper = String(m.key || m.id || m.name || '').toUpperCase();
-                                 if (allowedTaskforceKeys.some(tk => keyUpper.includes(tk))) {
-                                   mods.push(m.name || m.key);
-                                 }
-                               });
-                             } else if (u.assignedModules && u.assignedModules.length > 0) {
-                               u.assignedModules.forEach((mKey: string) => {
-                                 const keyUpper = String(mKey).toUpperCase();
-                                 if (allowedTaskforceKeys.some(tk => keyUpper.includes(tk))) {
-                                   mods.push(mKey);
-                                 }
-                               });
-                             }
-                             if (mods.length === 0) {
-                               return <span className="text-[10px] font-semibold text-slate-400 italic">None</span>;
-                             }
-                             const colors = ['blue', 'emerald', 'purple', 'orange', 'amber'];
-                             return mods.slice(0, 3).map((mod, mi) => {
-                               const c = colors[mi % colors.length];
-                               // Display labels cleanly
-                               let displayLabel = mod;
-                               if (mod.toUpperCase() === "SWEEPING") displayLabel = "Sweeping";
-                               if (mod.toUpperCase().includes("LITTER")) displayLabel = "Litter Bins";
-                               if (mod.toUpperCase().includes("TOILET")) displayLabel = "Cleanliness of Toilets";
-                               if (mod.toUpperCase() === "TASKFORCE" || mod.toUpperCase().includes("CTU")) displayLabel = "CTU / GVP Transformation";
-                               return (
-                                 <span key={mi} className={`inline-flex items-center rounded-md border border-${c}-200 bg-${c}-50 px-2 py-0.5 text-[10px] font-bold text-${c}-700`}>
-                                   {displayLabel}
-                                 </span>
-                               );
-                             }).concat(mods.length > 3 ? [
-                               <span key="more" className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                                 +{mods.length - 3}
-                               </span>
-                             ] : []);
-                           })()}
-                         </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {(() => {
+                            // Collect only Inspection & Performance System (Taskforce) modules
+                            const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN"];
+                            const mods: string[] = [];
+                            if (u.modules && u.modules.length > 0) {
+                              u.modules.forEach((m: any) => {
+                                const keyUpper = String(m.key || m.id || m.name || '').toUpperCase();
+                                if (allowedTaskforceKeys.some(tk => keyUpper.includes(tk))) {
+                                  mods.push(m.name || m.key);
+                                }
+                              });
+                            } else if (u.assignedModules && u.assignedModules.length > 0) {
+                              u.assignedModules.forEach((mKey: string) => {
+                                const keyUpper = String(mKey).toUpperCase();
+                                if (allowedTaskforceKeys.some(tk => keyUpper.includes(tk))) {
+                                  mods.push(mKey);
+                                }
+                              });
+                            }
+                            if (mods.length === 0) {
+                              return <span className="text-[10px] font-semibold text-slate-400 italic">None</span>;
+                            }
+                            const colors = ['blue', 'emerald', 'purple', 'orange', 'amber'];
+                            return mods.slice(0, 3).map((mod, mi) => {
+                              const c = colors[mi % colors.length];
+                              // Display labels cleanly
+                              let displayLabel = mod;
+                              if (mod.toUpperCase() === "SWEEPING") displayLabel = "Sweeping";
+                              if (mod.toUpperCase().includes("LITTER")) displayLabel = "Litter Bins";
+                              if (mod.toUpperCase().includes("TOILET")) displayLabel = "Cleanliness of Toilets";
+                              if (mod.toUpperCase() === "TASKFORCE" || mod.toUpperCase().includes("CTU")) displayLabel = "CTU / GVP Transformation";
+                              return (
+                                <span key={mi} className={`inline-flex items-center rounded-md border border-${c}-200 bg-${c}-50 px-2 py-0.5 text-[10px] font-bold text-${c}-700`}>
+                                  {displayLabel}
+                                </span>
+                              );
+                            }).concat(mods.length > 3 ? [
+                              <span key="more" className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                +{mods.length - 3}
+                              </span>
+                            ] : []);
+                          })()}
+                        </div>
                       </td>
 
                       {/* Date Created On (Date + Time) */}
@@ -598,7 +646,12 @@ export default function RegisteredUsersPage() {
                           </button>
 
                           {activeMenuUserId === u.id && (
-                            <div className="absolute right-0 top-full mt-1 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-50 flex flex-col gap-1">
+                            <div
+                              className={`absolute right-0 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-[100] flex flex-col gap-1 ${openActionMenuUpward
+                                ? "bottom-full mb-1"
+                                : "top-full mt-1"
+                                }`}
+                            >
                               <button
                                 type="button"
                                 onClick={() => { setEditingUser(u); setActiveMenuUserId(null); }}
@@ -693,13 +746,15 @@ function MultiSelectDropdown({
   options,
   selectedIds,
   onChange,
-  placeholder = "Select..."
+  placeholder = "Select...",
+  openUpward = false
 }: {
   label: string;
   options: { id: string; name: string }[];
   selectedIds: string[];
   onChange: (newIds: string[]) => void;
   placeholder?: string;
+  openUpward?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -745,7 +800,12 @@ function MultiSelectDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-50 flex flex-col gap-1">
+        <div
+          className={`absolute left-0 right-0 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-[100] flex flex-col gap-1 ${openUpward
+            ? "bottom-full mb-1"
+            : "top-full mt-1"
+            }`}
+        >
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-slate-400 font-medium">No options available</div>
           ) : (
@@ -756,15 +816,14 @@ function MultiSelectDropdown({
                   type="button"
                   key={opt.id}
                   onClick={() => toggleOption(opt.id)}
-                  className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between text-left transition-colors cursor-pointer ${
-                    isSelected ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-slate-50 text-slate-700"
-                  }`}
+                  className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between text-left transition-colors cursor-pointer ${isSelected ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                    }`}
                 >
                   <span className="truncate">{opt.name}</span>
                   <input
                     type="checkbox"
                     checked={isSelected}
-                    onChange={() => {}}
+                    onChange={() => { }}
                     className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
                   />
                 </button>
@@ -782,25 +841,83 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState(user.role);
   const [password, setPassword] = useState("");
-  
-  const [assignedModules, setAssignedModules] = useState<string[]>(user.assignedModules || []);
+
+  const [assignedModules, setAssignedModules] =
+    useState<string[]>(() => {
+      const moduleKeys = (user.modules || [])
+        .map((m: any) => m.key || "")
+        .filter(Boolean);
+
+      return moduleKeys.length
+        ? moduleKeys
+        : (user.assignedModules || []);
+    });
+
+  const normalizeAssignedModuleKey = (value: string) => {
+    const key = String(value || "")
+      .trim()
+      .toUpperCase();
+
+    const aliases: Record<string, string> = {
+      TASKFORCE_20: "TASKFORCE",
+
+      LITTERBIN: "LITTERBINS",
+      TWINBIN: "LITTERBINS",
+
+      SWACHH: "SWACHH_RANKING",
+      WARD_RANKING: "SWACHH_RANKING",
+
+      WORKFORCE: "WORKFORCE_MONITORING",
+      MATRIX: "WORKFORCE_MONITORING",
+      MATRIXTRACK: "WORKFORCE_MONITORING",
+      MATRIX_TRACK: "WORKFORCE_MONITORING",
+
+      PROCESSING: "MRF",
+      PROCESSING_MRF: "MRF",
+      PROCESSING_PLANT: "MRF"
+    };
+
+    return aliases[key] || key;
+  };
 
   const [zoneIds, setZoneIds] = useState<string[]>(() => {
-    const ids = [
+    const cityScope = [
       ...(user.zoneIds || []),
-      ...(user.zoneId ? [user.zoneId] : []),
-      ...(user.modules || []).flatMap((m: any) => m.zoneIds || [])
-    ];
-    return Array.from(new Set(ids.filter(Boolean)));
+      ...(user.zoneId ? [user.zoneId] : [])
+    ].filter(Boolean);
+
+    // City-level scope is the source of truth.
+    if (cityScope.length > 0) {
+      return Array.from(new Set(cityScope));
+    }
+
+    // Legacy fallback only when old users have no UserCity scope.
+    return Array.from(
+      new Set(
+        (user.modules || [])
+          .flatMap((m: any) => m.zoneIds || [])
+          .filter(Boolean)
+      )
+    );
   });
 
   const [wardIds, setWardIds] = useState<string[]>(() => {
-    const ids = [
+    const cityScope = [
       ...(user.wardIds || []),
-      ...(user.wardId ? [user.wardId] : []),
-      ...(user.modules || []).flatMap((m: any) => m.wardIds || [])
-    ];
-    return Array.from(new Set(ids.filter(Boolean)));
+      ...(user.wardId ? [user.wardId] : [])
+    ].filter(Boolean);
+
+    if (cityScope.length > 0) {
+      return Array.from(new Set(cityScope));
+    }
+
+    return Array.from(
+      new Set(
+        (user.modules || [])
+          .flatMap((m: any) => m.wardIds || [])
+          .filter(Boolean)
+      )
+    );
   });
 
   const [zones, setZones] = useState<any[]>([]);
@@ -812,21 +929,89 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   useEffect(() => {
     async function fetchData() {
       try {
-        const [zonesRes, wardsRes, modsRes] = await Promise.all([
-          apiFetch<{ nodes: any[] }>("/city/geo?level=ZONE").catch(() => ({ nodes: [] })),
-          apiFetch<{ nodes: any[] }>("/city/geo?level=WARD").catch(() => ({ nodes: [] })),
-          CityModulesApi.list().catch(() => [])
+        const [
+          zonesRes,
+          wardsRes,
+          modsRes,
+          meRes
+        ] = await Promise.all([
+          apiFetch<{ nodes: any[] }>(
+            "/city/geo?level=ZONE"
+          ).catch(() => ({ nodes: [] })),
+
+          apiFetch<{ nodes: any[] }>(
+            "/city/geo?level=WARD"
+          ).catch(() => ({ nodes: [] })),
+
+          CityModulesApi.list().catch(() => []),
+
+          apiFetch<{
+            user: {
+              role?: string;
+              roles?: string[];
+              modules?: Array<{
+                id?: string;
+                key?: string;
+                name?: string;
+              }>;
+            };
+          }>("/auth/me").catch(() => ({
+            user: {
+              role: "",
+              roles: [],
+              modules: []
+            }
+          }))
         ]);
         setZones(zonesRes.nodes || []);
         setWards(wardsRes.nodes || []);
-        
+
         const fetchedMods = modsRes || [];
-        setModules(fetchedMods.length > 0 ? fetchedMods : [
-          { id: 'TASKFORCE', name: 'CTU / GVP Transformation' },
-          { id: 'LITTERBINS', name: 'Litterbin Inspection' },
-          { id: 'TOILET', name: 'Cleanliness of Toilet' },
-          { id: 'SWEEPING', name: 'Sweeping Management' }
-        ]);
+
+        const currentUser =
+          (meRes as any)?.user || {};
+
+        const currentRoles = [
+          currentUser.role,
+          ...(currentUser.roles || [])
+        ]
+          .filter(Boolean)
+          .map((role) =>
+            String(role).trim().toUpperCase()
+          );
+
+        const isHmsSuperAdmin =
+          currentRoles.includes(
+            "HMS_SUPER_ADMIN"
+          );
+
+        const myModuleKeys = new Set(
+          (currentUser.modules || [])
+            .map((module: any) =>
+              normalizeAssignedModuleKey(
+                module.key ||
+                module.name ||
+                ""
+              )
+            )
+            .filter(Boolean)
+        );
+
+        const visibleModules =
+          isHmsSuperAdmin
+            ? fetchedMods
+            : fetchedMods.filter(
+              (module: any) =>
+                myModuleKeys.has(
+                  normalizeAssignedModuleKey(
+                    module.key ||
+                    module.name ||
+                    ""
+                  )
+                )
+            );
+
+        setModules(visibleModules);
       } catch (err) {
         console.error("Failed to load options", err);
       } finally {
@@ -836,19 +1021,94 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
     fetchData();
   }, []);
 
+  const availableWards = useMemo(() => {
+    if (!zoneIds.length) {
+      return [];
+    }
+
+    return wards.filter((ward: any) => {
+      const parentZoneId =
+        ward.parentId ||
+        ward.parent?.id;
+
+      return (
+        parentZoneId &&
+        zoneIds.includes(parentZoneId)
+      );
+    });
+  }, [wards, zoneIds]);
+
+  const handleZoneChange = (
+    newZoneIds: string[]
+  ) => {
+    setZoneIds(newZoneIds);
+
+    setWardIds((currentWardIds) =>
+      currentWardIds.filter((wardId) => {
+        const ward = wards.find(
+          (item: any) =>
+            item.id === wardId
+        );
+
+        if (!ward) return false;
+
+        const parentZoneId =
+          ward.parentId ||
+          ward.parent?.id;
+
+        return (
+          parentZoneId &&
+          newZoneIds.includes(
+            parentZoneId
+          )
+        );
+      })
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const mappedModules = assignedModules.map(modId => ({
-        moduleId: modId,
-        canWrite: true,
-        zoneIds,
-        wardIds
-      }));
+      if (!modules.length) {
+        setLoading(false);
+        return;
+      }
+
+      const enabledModuleKeys = new Set(
+        modules
+          .filter((m: any) => m.enabled)
+          .map((m: any) =>
+            String(m.key || "")
+              .trim()
+              .toUpperCase()
+          )
+      );
+
+      const safeAssignedModules = Array.from(
+        new Set(
+          assignedModules
+            .map(normalizeAssignedModuleKey)
+            .filter((key) =>
+              enabledModuleKeys.has(key)
+            )
+        )
+      );
+
+      const mappedModules = safeAssignedModules.map(
+        (modId) => ({
+          moduleId: modId,
+          canWrite: true,
+          zoneIds,
+          wardIds
+        })
+      );
 
       await CityUserApi.update(user.id, {
         name,
+        ...(password.trim()
+          ? { password: password.trim() }
+          : {}),
         role: role as any,
         modules: mappedModules,
         zoneIds,
@@ -862,227 +1122,507 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
   return (
     <Modal open onClose={onClose} title="Edit User & Access Permissions" subtitle={user.email} size="lg">
-      <form onSubmit={handleSubmit} className="max-h-[75vh] overflow-y-auto pr-1.5 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
-            <input
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
+      <form
+        onSubmit={handleSubmit}
+        className="flex max-h-[75vh] flex-col"
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1.5">
+          <div className="space-y-4 pb-4">
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Email Address (Read-only)</label>
-            <input
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-semibold text-slate-500 outline-none cursor-not-allowed"
-              value={email}
-              disabled
-            />
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">System Role</label>
-            <select
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
-              value={role}
-              onChange={(e) => setRole(e.target.value as any)}
-            >
-              <option value="HMS_SUPER_ADMIN">Super Admin</option>
-              <option value="COMMISSIONER">Commissioner</option>
-              <option value="CITY_ADMIN">City Admin</option>
-              <option value="QC">Quality Controller (QC)</option>
-              <option value="ACTION_OFFICER">Action Officer</option>
-              <option value="SUPERVISOR">Supervisor</option>
-              <option value="EMPLOYEE">Field Employee</option>
-            </select>
-          </div>
+            {/* User Details */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Users size={16} className="text-blue-600" />
+                <div>
+                  <div className="text-xs font-black text-slate-800">
+                    User Details
+                  </div>
+                  <div className="text-[10px] font-medium text-slate-400">
+                    Basic account and location information
+                  </div>
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Reset Password (Optional)</label>
-            <input
-              type="password"
-              placeholder="Leave blank to keep current password"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
 
-        {/* Assigned Workspace Modules Selection */}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-2">
-            Assigned Workspace Modules <span className="text-slate-400 font-normal">(Click to toggle access)</span>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {/* Primary Modules list */}
-            {(() => {
-              // Primary Main Systems
-              const mainSystems = [
-                { id: "TASKFORCE_20", name: "Inspection & Performance System" },
-                { id: "SWACHH_RANKING", name: "Ward Ranking System" },
-                { id: "WORKFORCE_MONITORING", name: "Workforce Attendance System" },
-                { id: "PROCESSING_MRF", name: "Processing Plant System" }
-              ];
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-semibold text-slate-500"
+                    value={email}
+                    disabled
+                  />
+                </div>
 
-              // Check which systems are currently selected. We map base modules inside matching roles.
-              // If TASKFORCE (ctu/sweeping/litter/toilet) are checked, TASKFORCE_20 system is active.
-              const isTaskforceActive = assignedModules.some(m => ["TASKFORCE", "LITTERBINS", "TOILET", "SWEEPING", "LITTERBIN"].includes(m.toUpperCase()));
-              const isSwachhActive = assignedModules.some(m => ["SWACHH", "SWACHH_RANKING", "WARD_RANKING"].includes(m.toUpperCase()));
-              const isWorkforceActive = assignedModules.some(m => ["WORKFORCE", "MATRIX"].includes(m.toUpperCase()));
-              const isProcessingActive = assignedModules.some(m => ["PROCESSING"].includes(m.toUpperCase()));
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    Mobile Number
+                  </label>
+                  <input
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-semibold text-slate-500"
+                    value={user.phone || "-"}
+                    disabled
+                  />
+                </div>
 
-              const toggleMainSystem = (sysId: string) => {
-                if (sysId === "TASKFORCE_20") {
-                  if (isTaskforceActive) {
-                    // Turn off all taskforce sub-modules
-                    setAssignedModules(prev => prev.filter(m => !["TASKFORCE", "LITTERBINS", "TOILET", "SWEEPING", "LITTERBIN"].includes(m.toUpperCase())));
-                  } else {
-                    // Turn on default taskforce modules
-                    setAssignedModules(prev => [...prev, "TASKFORCE", "LITTERBINS", "TOILET", "SWEEPING"]);
-                  }
-                } else if (sysId === "SWACHH_RANKING") {
-                  if (isSwachhActive) {
-                    setAssignedModules(prev => prev.filter(m => !["SWACHH", "SWACHH_RANKING", "WARD_RANKING"].includes(m.toUpperCase())));
-                  } else {
-                    setAssignedModules(prev => [...prev, "SWACHH_RANKING"]);
-                  }
-                } else if (sysId === "WORKFORCE_MONITORING") {
-                  if (isWorkforceActive) {
-                    setAssignedModules(prev => prev.filter(m => !["WORKFORCE", "MATRIX"].includes(m.toUpperCase())));
-                  } else {
-                    setAssignedModules(prev => [...prev, "WORKFORCE"]);
-                  }
-                } else if (sysId === "PROCESSING_MRF") {
-                  if (isProcessingActive) {
-                    setAssignedModules(prev => prev.filter(m => !["PROCESSING"].includes(m.toUpperCase())));
-                  } else {
-                    setAssignedModules(prev => [...prev, "PROCESSING"]);
-                  }
-                }
-              };
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    System Role
+                  </label>
+                  <select
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as any)}
+                  >
+                    <option value="HMS_SUPER_ADMIN">Super Admin</option>
+                    <option value="COMMISSIONER">Commissioner</option>
+                    <option value="CITY_ADMIN">City Admin</option>
+                    <option value="QC">Quality Controller (QC)</option>
+                    <option value="ACTION_OFFICER">Action Officer</option>
+                    <option value="SUPERVISOR">Supervisor</option>
+                    <option value="EMPLOYEE">Field Employee</option>
+                  </select>
+                </div>
 
-              return (
-                <>
-                  {mainSystems.map(sys => {
-                    let isSelected = false;
-                    if (sys.id === "TASKFORCE_20") isSelected = isTaskforceActive;
-                    if (sys.id === "SWACHH_RANKING") isSelected = isSwachhActive;
-                    if (sys.id === "WORKFORCE_MONITORING") isSelected = isWorkforceActive;
-                    if (sys.id === "PROCESSING_MRF") isSelected = isProcessingActive;
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    City
+                  </label>
+                  <div className="h-10 flex items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-semibold text-slate-600">
+                    <Building2 size={13} className="mr-2 text-blue-500" />
+                    {user.cityName || user.city?.name || "-"}
+                  </div>
+                </div>
 
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    State
+                  </label>
+                  <div className="h-10 flex items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-xs font-semibold text-slate-600">
+                    <Globe size={13} className="mr-2 text-emerald-500" />
+                    {user.stateName || user.city?.state?.name || "-"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+
+            {/* Assigned Workspace Modules Selection */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-2">
+                Assigned Workspace Modules <span className="text-slate-400 font-normal">(Click to toggle access)</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Primary Modules list */}
+                {(() => {
+                  if (fetchingData) {
                     return (
-                      <div key={sys.id} className="col-span-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-3">
-                        <button
-                          type="button"
-                          onClick={() => toggleMainSystem(sys.id)}
-                          className={`w-full px-3 py-2.5 rounded-xl border text-xs font-black flex items-center justify-between transition-all ${
-                            isSelected
-                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                          }`}
-                        >
-                          <span>{sys.name}</span>
-                          <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
-                            isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
-                          }`}>
-                            {isSelected && '✓'}
-                          </span>
-                        </button>
-
-                        {/* If Inspection & Performance System is checked, show sub-modules */}
-                        {sys.id === "TASKFORCE_20" && isSelected && (
-                          <div className="pl-4 pt-1 border-l-2 border-blue-200 grid grid-cols-2 gap-2">
-                            {[
-                              { id: "LITTERBINS", name: "Litter Bins" },
-                              { id: "SWEEPING", name: "Sweeping" },
-                              { id: "TOILET", name: "Cleanliness of Toilets" },
-                              { id: "TASKFORCE", name: "CTU / GVP Transformation" }
-                            ].map(sub => {
-                              const isSubSelected = assignedModules.some(m => String(m).toUpperCase().includes(sub.id));
-                              const toggleSub = () => {
-                                setAssignedModules(prev => {
-                                  // Find any match in array regardless of casing
-                                  const exists = prev.some(m => String(m).toUpperCase().includes(sub.id));
-                                  if (exists) {
-                                    return prev.filter(m => !String(m).toUpperCase().includes(sub.id));
-                                  } else {
-                                    return [...prev, sub.id];
-                                  }
-                                });
-                              };
-                              return (
-                                <button
-                                  type="button"
-                                  key={sub.id}
-                                  onClick={toggleSub}
-                                  className={`px-3 py-2 rounded-lg border text-[11px] font-bold flex items-center justify-between transition-all ${
-                                    isSubSelected
-                                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  <span>{sub.name}</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={isSubSelected}
-                                    onChange={() => {}}
-                                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
-                                  />
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
+                      <div className="col-span-2 py-5 text-center text-xs font-semibold text-slate-400">
+                        Loading available systems...
                       </div>
                     );
-                  })}
-                </>
-              );
-            })()}
+                  }
+
+                  const enabledKeys = new Set(
+                    modules
+                      .filter((m: any) => m.enabled)
+                      .map((m: any) =>
+                        String(m.key || "")
+                          .trim()
+                          .toUpperCase()
+                      )
+                  );
+
+                  const taskforceSubModules = [
+                    {
+                      id: "LITTERBINS",
+                      name: "Litter Bins"
+                    },
+                    {
+                      id: "SWEEPING",
+                      name: "Sweeping"
+                    },
+                    {
+                      id: "TOILET",
+                      name: "Cleanliness of Toilets"
+                    },
+                    {
+                      id: "TASKFORCE",
+                      name: "CTU / GVP Transformation"
+                    }
+                  ].filter((sub) =>
+                    enabledKeys.has(sub.id)
+                  );
+
+                  const mainSystems: {
+                    id: string;
+                    name: string;
+                  }[] = [];
+
+                  if (taskforceSubModules.length > 0) {
+                    mainSystems.push({
+                      id: "TASKFORCE_20",
+                      name: "Inspection & Performance System"
+                    });
+                  }
+
+                  if (
+                    enabledKeys.has("SWACHH_RANKING")
+                  ) {
+                    mainSystems.push({
+                      id: "SWACHH_RANKING",
+                      name: "Ward Ranking System"
+                    });
+                  }
+
+                  if (
+                    enabledKeys.has(
+                      "WORKFORCE_MONITORING"
+                    )
+                  ) {
+                    mainSystems.push({
+                      id: "WORKFORCE_MONITORING",
+                      name: "Workforce Attendance System"
+                    });
+                  }
+
+                  if (enabledKeys.has("MRF")) {
+                    mainSystems.push({
+                      id: "MRF",
+                      name: "Processing Plant System"
+                    });
+                  }
+
+                  const selectedKeys = new Set(
+                    assignedModules.map(
+                      normalizeAssignedModuleKey
+                    )
+                  );
+
+                  const taskforceKeys = [
+                    "TASKFORCE",
+                    "LITTERBINS",
+                    "TOILET",
+                    "SWEEPING"
+                  ];
+
+                  const isTaskforceActive =
+                    taskforceKeys.some((key) =>
+                      selectedKeys.has(key)
+                    );
+
+                  const isSwachhActive =
+                    selectedKeys.has(
+                      "SWACHH_RANKING"
+                    );
+
+                  const isWorkforceActive =
+                    selectedKeys.has(
+                      "WORKFORCE_MONITORING"
+                    );
+
+                  const isProcessingActive =
+                    selectedKeys.has("MRF");
+
+                  const removeKeys = (
+                    current: string[],
+                    keys: string[]
+                  ) =>
+                    current.filter(
+                      (item) =>
+                        !keys.includes(
+                          normalizeAssignedModuleKey(
+                            item
+                          )
+                        )
+                    );
+
+                  const addKeys = (
+                    current: string[],
+                    keys: string[]
+                  ) =>
+                    Array.from(
+                      new Set([
+                        ...current.map(
+                          normalizeAssignedModuleKey
+                        ),
+                        ...keys
+                      ])
+                    );
+
+                  const toggleMainSystem = (
+                    sysId: string
+                  ) => {
+                    if (sysId === "TASKFORCE_20") {
+                      setAssignedModules((prev) =>
+                        isTaskforceActive
+                          ? removeKeys(
+                            prev,
+                            taskforceKeys
+                          )
+                          : addKeys(
+                            prev,
+                            taskforceSubModules.map(
+                              (sub) => sub.id
+                            )
+                          )
+                      );
+
+                      return;
+                    }
+
+                    if (
+                      sysId === "SWACHH_RANKING"
+                    ) {
+                      setAssignedModules((prev) =>
+                        isSwachhActive
+                          ? removeKeys(prev, [
+                            "SWACHH_RANKING"
+                          ])
+                          : addKeys(prev, [
+                            "SWACHH_RANKING"
+                          ])
+                      );
+
+                      return;
+                    }
+
+                    if (
+                      sysId ===
+                      "WORKFORCE_MONITORING"
+                    ) {
+                      setAssignedModules((prev) =>
+                        isWorkforceActive
+                          ? removeKeys(prev, [
+                            "WORKFORCE_MONITORING"
+                          ])
+                          : addKeys(prev, [
+                            "WORKFORCE_MONITORING"
+                          ])
+                      );
+
+                      return;
+                    }
+
+                    if (sysId === "MRF") {
+                      setAssignedModules((prev) =>
+                        isProcessingActive
+                          ? removeKeys(prev, [
+                            "MRF"
+                          ])
+                          : addKeys(prev, [
+                            "MRF"
+                          ])
+                      );
+                    }
+                  };
+
+                  if (!mainSystems.length) {
+                    return (
+                      <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-center text-xs font-semibold text-slate-500">
+                        No systems are enabled for this city.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      {mainSystems.map((sys) => {
+                        let isSelected = false;
+
+                        if (
+                          sys.id === "TASKFORCE_20"
+                        ) {
+                          isSelected =
+                            isTaskforceActive;
+                        }
+
+                        if (
+                          sys.id ===
+                          "SWACHH_RANKING"
+                        ) {
+                          isSelected =
+                            isSwachhActive;
+                        }
+
+                        if (
+                          sys.id ===
+                          "WORKFORCE_MONITORING"
+                        ) {
+                          isSelected =
+                            isWorkforceActive;
+                        }
+
+                        if (sys.id === "MRF") {
+                          isSelected =
+                            isProcessingActive;
+                        }
+
+                        return (
+                          <div
+                            key={sys.id}
+                            className="col-span-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-3"
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleMainSystem(
+                                  sys.id
+                                )
+                              }
+                              className={`w-full px-3 py-2.5 rounded-xl border text-xs font-black flex items-center justify-between transition-all ${isSelected
+                                ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
+                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                                }`}
+                            >
+                              <span>
+                                {sys.name}
+                              </span>
+
+                              <span
+                                className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${isSelected
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "border-slate-300 bg-white"
+                                  }`}
+                              >
+                                {isSelected && "✓"}
+                              </span>
+                            </button>
+
+                            {sys.id ===
+                              "TASKFORCE_20" &&
+                              isSelected && (
+                                <div className="pl-4 pt-1 border-l-2 border-blue-200 grid grid-cols-2 gap-2">
+                                  {taskforceSubModules.map(
+                                    (sub) => {
+                                      const isSubSelected =
+                                        selectedKeys.has(
+                                          sub.id
+                                        );
+
+                                      const toggleSub =
+                                        () => {
+                                          setAssignedModules(
+                                            (prev) =>
+                                              isSubSelected
+                                                ? removeKeys(
+                                                  prev,
+                                                  [
+                                                    sub.id
+                                                  ]
+                                                )
+                                                : addKeys(
+                                                  prev,
+                                                  [
+                                                    sub.id
+                                                  ]
+                                                )
+                                          );
+                                        };
+
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={sub.id}
+                                          onClick={
+                                            toggleSub
+                                          }
+                                          className={`px-3 py-2 rounded-lg border text-[11px] font-bold flex items-center justify-between transition-all ${isSubSelected
+                                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                            }`}
+                                        >
+                                          <span>
+                                            {sub.name}
+                                          </span>
+
+                                          <input
+                                            type="checkbox"
+                                            checked={
+                                              isSubSelected
+                                            }
+                                            readOnly
+                                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5"
+                                          />
+                                        </button>
+                                      );
+                                    }
+                                  )}
+                                </div>
+                              )}
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Geographic Access Control (Zones & Wards) */}
+            <div className="grid grid-cols-2 gap-4">
+              <MultiSelectDropdown
+                label="Assigned Zones"
+                options={zones.map((z) => ({
+                  id: z.id,
+                  name: z.name
+                }))}
+                selectedIds={zoneIds}
+                onChange={handleZoneChange}
+                placeholder="Select zones..."
+                openUpward
+              />
+
+              <MultiSelectDropdown
+                label="Assigned Wards"
+                options={availableWards.map((w) => ({
+                  id: w.id,
+                  name: w.name
+                }))}
+                selectedIds={wardIds}
+                onChange={setWardIds}
+                placeholder={
+                  zoneIds.length
+                    ? "Select wards..."
+                    : "Select zone first..."
+                }
+                openUpward
+              />
+            </div>
+
+            <div className="shrink-0 flex gap-3 border-t border-slate-200 bg-white pt-3 mt-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors"
+              >
+                {loading ? "Saving access..." : "Save Access Permissions"}
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Geographic Access Control (Zones & Wards) */}
-        <div className="grid grid-cols-2 gap-4">
-          <MultiSelectDropdown
-            label="Assigned Zones"
-            options={zones.map(z => ({ id: z.id, name: z.name }))}
-            selectedIds={zoneIds}
-            onChange={setZoneIds}
-            placeholder="Select zones..."
-          />
-
-          <MultiSelectDropdown
-            label="Assigned Wards"
-            options={wards.map(w => ({ id: w.id, name: w.name }))}
-            selectedIds={wardIds}
-            onChange={setWardIds}
-            placeholder="Select wards..."
-          />
-        </div>
-
-        <div className="pt-3 flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors"
-          >
-            {loading ? "Saving access..." : "Save Access Permissions"}
-          </button>
         </div>
       </form>
     </Modal>
