@@ -11,6 +11,7 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -84,6 +85,96 @@ const emptyFilters: FilterState = {
   checkoutState: "ALL",
   search: "",
 };
+
+type SearchableOption = { value: string; label: string };
+
+function SearchableSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: SearchableOption[];
+  onChange: (value: string) => void;
+}) {
+  const selectedLabel = options.find((option) => option.value === value)?.label || "";
+  const [query, setQuery] = useState(selectedLabel);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) setQuery(selectedLabel);
+  }, [selectedLabel, open]);
+
+  const filteredOptions = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    if (!needle || query === selectedLabel) return options;
+    return options.filter((option) => option.label.toLocaleLowerCase().includes(needle));
+  }, [options, query, selectedLabel]);
+
+  const choose = (option: SearchableOption) => {
+    setQuery(option.label);
+    setOpen(false);
+    onChange(option.value);
+  };
+
+  return (
+    <div className="relative">
+      <Search size={13} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400" />
+      <input
+        value={query}
+        onFocus={(event) => {
+          setOpen(true);
+          event.currentTarget.select();
+        }}
+        onClick={() => setOpen(true)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && filteredOptions[0]) {
+            event.preventDefault();
+            choose(filteredOptions[0]);
+          } else if (event.key === "Escape") {
+            setQuery(selectedLabel);
+            setOpen(false);
+          }
+        }}
+        onBlur={() => {
+          window.setTimeout(() => {
+            setQuery(selectedLabel);
+            setOpen(false);
+          }, 120);
+        }}
+        className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-8 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+      />
+      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+          {filteredOptions.length ? (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value || option.label}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(option)}
+                className={`block w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${
+                  option.value === value
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))
+          ) : (
+            <p className="px-2.5 py-2 text-xs font-semibold text-slate-400">No matching option</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatShortDate(value: string) {
   if (!value) return "—";
@@ -1450,17 +1541,21 @@ function AttendanceDashboard() {
     return checkInDistribution.reduce((best, item) => item.count > best.count ? item : best, checkInDistribution[0] || { hour: 0, label: "—", count: 0 });
   }, [checkInDistribution]);
 
-  const bestDesignation = useMemo(() => {
-    return (data?.designationBreakdown || []).reduce<any>((best, item) => !best || item.rate > best.rate ? item : best, null);
+  const sortedDesignationBreakdown = useMemo(() => {
+    return [...(data?.designationBreakdown || [])].sort(
+      (a, b) => b.rate - a.rate || b.present - a.present || a.designation.localeCompare(b.designation)
+    );
   }, [data?.designationBreakdown]);
 
+  const bestDesignation = sortedDesignationBreakdown[0] || null;
+
   const designationPageSize = 8;
-  const designationTotal = data?.designationBreakdown.length || 0;
+  const designationTotal = sortedDesignationBreakdown.length;
   const designationTotalPages = Math.max(1, Math.ceil(designationTotal / designationPageSize));
   const designationPageItems = useMemo(() => {
     const start = (designationPage - 1) * designationPageSize;
-    return (data?.designationBreakdown || []).slice(start, start + designationPageSize);
-  }, [data?.designationBreakdown, designationPage]);
+    return sortedDesignationBreakdown.slice(start, start + designationPageSize);
+  }, [sortedDesignationBreakdown, designationPage]);
   const designationStart = designationTotal ? (designationPage - 1) * designationPageSize + 1 : 0;
   const designationEnd = Math.min(designationPage * designationPageSize, designationTotal);
 
@@ -1848,41 +1943,39 @@ function AttendanceDashboard() {
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance</span>
-            <select
+            <SearchableSelect
               value={draftFilters.status}
-              onChange={(e) => updateFilter({ status: e.target.value })}
-              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="ALL">All</option>
-              <option value="P">Present</option>
-              <option value="A">Absent</option>
-            </select>
+              onChange={(status) => updateFilter({ status })}
+              options={[
+                { value: "ALL", label: "All" },
+                { value: "P", label: "Present" },
+                { value: "A", label: "Absent" },
+              ]}
+            />
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Punch status</span>
-            <select
+            <SearchableSelect
               value={draftFilters.checkoutState}
-              onChange={(e) => updateFilter({ checkoutState: e.target.value })}
-              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="ALL">All punches</option>
-              <option value="CHECKED_OUT">Punch Out</option>
-              <option value="OPEN_CHECKIN">Punch In</option>
-              <option value="NO_PUNCH">No punch</option>
-            </select>
+              onChange={(checkoutState) => updateFilter({ checkoutState })}
+              options={[
+                { value: "ALL", label: "All punches" },
+                { value: "CHECKED_OUT", label: "Punch Out" },
+                { value: "OPEN_CHECKIN", label: "Punch In" },
+                { value: "NO_PUNCH", label: "No punch" },
+              ]}
+            />
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Designation</span>
-            <select
+            <SearchableSelect
               value={draftFilters.designation}
-              onChange={(e) => updateFilter({ designation: e.target.value })}
-              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="">All designations</option>
-              {(data?.filters.designations || []).map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
+              onChange={(designation) => updateFilter({ designation })}
+              options={[
+                { value: "", label: "All designations" },
+                ...(data?.filters.designations || []).map((value) => ({ value, label: value })),
+              ]}
+            />
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee search</span>
