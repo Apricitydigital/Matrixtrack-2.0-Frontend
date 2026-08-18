@@ -767,21 +767,6 @@ export default function HmsDashboardPage() {
               ))}
             </select>
           </div>
-
-          {/* Status Filter */}
-          <div className="relative min-w-[130px]">
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value as any); setTablePage(1); }}
-              className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
-            >
-              <option value="all">All Status</option>
-              <option value="live">Live</option>
-              <option value="dormant">Dormant</option>
-              <option value="managed">Managed</option>
-              <option value="unmanaged">Needs Admin</option>
-            </select>
-          </div>
         </div>
 
         {/* Active Filter Summary Pills */}

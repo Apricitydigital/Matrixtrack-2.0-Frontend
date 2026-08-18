@@ -42,12 +42,23 @@ export interface AuthUser {
   id: string;
   name?: string;
   email?: string;
+  phone?: string;
   cityId?: string;
   cityName?: string;
+  cityCode?: string;
+  stateName?: string;
+  divisionName?: string;
+  districtName?: string;
+  aadhaar?: string;
   role?: string;
   city?: any;
   roles: Role[];
   roleLabels?: string[];
   modules: ModuleAssignment[];
   token?: string;
+  zoneIds?: string[];
+  wardIds?: string[];
+  zoneDetails?: Array<{ id: string; name: string }>;
+  wardDetails?: Array<{ id: string; name: string }>;
+  assignedBeats?: Array<{ id: string; beatName: string; beatCode?: string }>;
 }

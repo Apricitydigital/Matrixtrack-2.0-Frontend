@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Protected, ModuleGuard } from "@components/Guards";
 import { AreaBeatApi, ModuleRecordsApi, GeoApi, CityApi } from "@lib/apiClient";
@@ -19,6 +19,7 @@ const GlobalBeatMapView = dynamic(() => import("../../city/areas/components/Glob
 
 export default function SweepingModulePage() {
     const { user } = useAuth();
+    const mainSectionRef = useRef<HTMLDivElement>(null);
     const [beats, setBeats] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewingBeat, setViewingBeat] = useState<any | null>(null);
@@ -419,15 +420,33 @@ export default function SweepingModulePage() {
                             </div>
 
                             {/* 7 STAT CARDS GRID */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16 }}>
-                                <StatCard label="TOTAL REGISTERED BEATS" value={beats.length || 0} sub="Registered Assets" color="#0f172a" />
-                                <StatCard label="SUBMITTED REPORTS" value={stats.total || 0} sub="Total Submitted" color="#2563eb" />
-                                <StatCard label="PENDING REPORTS" value={stats.pending || 0} sub="Awaiting QC Review" color="#f59e0b" />
-                                <StatCard label="APPROVED REPORTS" value={stats.approved || 0} sub="Verified Clean" color="#10b981" />
-                                <StatCard label="REJECTED REPORTS" value={stats.actionRequired || 0} sub="Non-Compliant" color="#ef4444" />
-                                <StatCard label="ACTION REQUIRED REPORTS" value={stats.actionRequired || 0} sub="Needs Resolution" color="#ea580c" />
-                                <StatCard label="RESOLVED REPORTS" value={stats.actionTaken || 0} sub="Action Completed" color="#06b6d4" />
-                            </div>
+                            {(() => {
+                                const handleStatClick = (statusKey: string) => {
+                                    if (statusKey === 'TOTAL') {
+                                        setSelectedStatus('');
+                                    } else if (selectedStatus === statusKey) {
+                                        setSelectedStatus('');
+                                    } else {
+                                        setSelectedStatus(statusKey);
+                                        setActiveTab('submitted_reports');
+                                    }
+                                    setTimeout(() => {
+                                        mainSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }, 80);
+                                };
+
+                                return (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16 }}>
+                                        <StatCard label="TOTAL REGISTERED BEATS" value={beats.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatus === ''} />
+                                        <StatCard label="SUBMITTED REPORTS" value={stats.total || 0} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
+                                        <StatCard label="PENDING REPORTS" value={stats.pending || 0} sub="Awaiting QC Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
+                                        <StatCard label="APPROVED REPORTS" value={stats.approved || 0} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatus === 'APPROVED'} />
+                                        <StatCard label="REJECTED REPORTS" value={stats.actionRequired || 0} sub="Non-Compliant" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatus === 'REJECTED'} />
+                                        <StatCard label="ACTION REQUIRED REPORTS" value={stats.actionRequired || 0} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatus === 'ACTION_REQUIRED'} />
+                                        <StatCard label="ACTION TAKEN REPORTS" value={stats.actionTaken || 0} sub="Action Completed" color="#06b6d4" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={selectedStatus === 'ACTION_TAKEN'} />
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
 
@@ -438,12 +457,13 @@ export default function SweepingModulePage() {
                             <p style={{ marginTop: 14, color: '#64748b', fontSize: 13, fontWeight: 600 }}>Syncing sweeping workspace...</p>
                         </div>
                     ) : (
-                        <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                        <div ref={mainSectionRef} style={{ animation: 'fadeIn 0.3s ease-out' }}>
                             {activeTab === 'submitted_reports' ? (
                                 <SubmittedReportsTab
                                     moduleKey="SWEEPING"
                                     assetLabel="Beat"
                                     cityId={selectedCity}
+                                    initialStatus={selectedStatus}
                                     onViewReport={(rec) => setInspectingBeat({ ...rec, isAssessmentReview: true })}
                                 />
                             ) : activeTab === 'assignments' ? (
@@ -632,20 +652,26 @@ export default function SweepingModulePage() {
     );
 }
 
-function StatCard({ label, value, sub, color }: any) {
+function StatCard({ label, value, sub, color, onClick }: any) {
     return (
-        <div style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: '18px 22px',
-            border: '1px solid #e2e8f0',
-            borderLeft: `6px solid ${color}`,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4
-        }}>
+        <div
+            onClick={onClick}
+            style={{
+                background: '#ffffff',
+                borderRadius: 16,
+                padding: '18px 22px',
+                border: '1px solid #e2e8f0',
+                borderLeft: `6px solid ${color}`,
+                cursor: onClick ? 'pointer' : 'default',
+                position: 'relative',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+            }}
+        >
             <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
             <div style={{ fontSize: 30, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
             <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>

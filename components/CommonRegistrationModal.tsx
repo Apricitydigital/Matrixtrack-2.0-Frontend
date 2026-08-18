@@ -831,10 +831,14 @@ export default function CommonRegistrationModal({
                   <label className="form-label">Mobile Number</label>
                   <input
                     type="text"
-                    placeholder="+91 98765 43210"
+                    placeholder="10-digit Mobile Number"
+                    maxLength={10}
                     className="form-input"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setForm({ ...form, phone: val });
+                    }}
                   />
                 </div>
                 <div>
@@ -851,10 +855,14 @@ export default function CommonRegistrationModal({
                   <label className="form-label">Aadhaar Number</label>
                   <input
                     type="text"
-                    placeholder="12-digit Aadhaar"
+                    placeholder="12-digit Aadhaar Number"
+                    maxLength={12}
                     className="form-input"
                     value={form.aadharNumber}
-                    onChange={(e) => setForm({ ...form, aadharNumber: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 12);
+                      setForm({ ...form, aadharNumber: val });
+                    }}
                   />
                 </div>
               </div>
@@ -969,7 +977,7 @@ export default function CommonRegistrationModal({
                           if (nameUpper.includes("SWEEPING")) displayName = "Sweeping";
                           if (nameUpper.includes("LITTER")) displayName = "Litter Bins";
                           if (nameUpper.includes("TOILET")) displayName = "Cleanliness of Toilets";
-                          if (nameUpper.includes("TASKFORCE") || nameUpper.includes("CTU")) displayName = "CTU / GVP Transformation";
+                          if (nameUpper.includes("TASKFORCE") || nameUpper.includes("CTU") || nameUpper.includes("GVP")) displayName = "GVP";
 
                           return (
                             <button

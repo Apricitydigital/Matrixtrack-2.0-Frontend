@@ -99,8 +99,8 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                         supervisorPhone: a.supervisor?.phone || a.supervisor?.mobile || '9893001122',
                         supervisorEmail: a.supervisor?.email || 'supervisor@indore.gov.in',
                         supervisorAadhar: a.supervisor?.aadhar || a.supervisor?.employeeCode || `EMP-${String(a.supervisor?.id || '101').slice(0, 6)}`,
-                        qcOfficer: t.qcOfficer?.name || t.qcName || 'QC Zone Team',
-                        actionOfficer: t.actionOfficer?.name || t.aoName || 'AO Division',
+                        qcOfficer: t.qcOfficer?.name || t.qcName || 'Unassigned',
+                        actionOfficer: t.actionOfficer?.name || t.aoName || 'Unassigned',
                         isAssigned: true
                     });
                 });
@@ -122,8 +122,8 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                     supervisorPhone: '—',
                     supervisorEmail: '—',
                     supervisorAadhar: '—',
-                    qcOfficer: t.qcOfficer?.name || t.qcName || 'QC Zone Team',
-                    actionOfficer: t.actionOfficer?.name || t.aoName || 'AO Division',
+                    qcOfficer: t.qcOfficer?.name || t.qcName || 'Unassigned',
+                    actionOfficer: t.actionOfficer?.name || t.aoName || 'Unassigned',
                     isAssigned: false
                 });
             }

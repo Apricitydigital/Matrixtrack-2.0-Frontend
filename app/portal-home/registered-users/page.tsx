@@ -87,6 +87,7 @@ export default function RegisteredUsersPage() {
   // Edit / Delete Modal State
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
+  const [selectedUserGeoModal, setSelectedUserGeoModal] = useState<{ user: UserRecord; zoneList: string[]; wardList: string[] } | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -183,8 +184,8 @@ export default function RegisteredUsersPage() {
         const q = searchQuery.toLowerCase().trim();
         const matchesSearch =
           !q ||
-          u.name.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q) ||
+          (u.name && u.name.toLowerCase().includes(q)) ||
+          (u.email && u.email.toLowerCase().includes(q)) ||
           (uCityName && uCityName.toLowerCase().includes(q)) ||
           (u.role && u.role.toLowerCase().includes(q));
 
@@ -494,31 +495,18 @@ export default function RegisteredUsersPage() {
 
                   const stateText = u.stateName || 'Madhya Pradesh';
                   const cityText = u.cityName || u.city?.name || cityMap[u.cityId || ''] || 'Indore';
-                  const zoneText =
-                    u.zoneName ||
-                    u.zone?.name ||
-                    (
-                      u.zoneIds && u.zoneIds.length > 0
-                        ? u.zoneIds
-                          .map((id: string, i: number) =>
-                            cleanGeoLabel(id, 'Zone', i)
-                          )
-                          .join(', ')
-                        : 'Zone 1'
-                    );
+                  // Process Zones and Wards as clean arrays
+                  const zoneList: string[] = u.zoneIds && u.zoneIds.length > 0
+                    ? u.zoneIds.map((id: string, i: number) => cleanGeoLabel(id, 'Zone', i))
+                    : u.zoneName || u.zone?.name
+                      ? [u.zoneName || u.zone?.name]
+                      : ['Zone 1'];
 
-                  const wardText =
-                    u.wardName ||
-                    u.ward?.name ||
-                    (
-                      u.wardIds && u.wardIds.length > 0
-                        ? u.wardIds
-                          .map((id: string, i: number) =>
-                            cleanGeoLabel(id, 'Ward', i)
-                          )
-                          .join(', ')
-                        : 'Ward 1'
-                    );
+                  const wardList: string[] = u.wardIds && u.wardIds.length > 0
+                    ? u.wardIds.map((id: string, i: number) => cleanGeoLabel(id, 'Ward', i))
+                    : u.wardName || u.ward?.name
+                      ? [u.wardName || u.ward?.name]
+                      : ['Ward 1'];
 
                   return (
                     <tr key={u.id} className="group hover:bg-blue-50/20 transition">
@@ -534,7 +522,15 @@ export default function RegisteredUsersPage() {
 
                       {/* User Email */}
                       <td className="px-3 py-3 align-middle">
-                        <span className="truncate text-xs font-semibold text-slate-600 block">{u.email}</span>
+                        {(!u.email || u.email.trim() === '' || u.email.includes('@internal.')) ? (
+                          <span className="truncate text-xs font-semibold text-slate-400 block">
+                            N/A
+                          </span>
+                        ) : (
+                          <span className="truncate text-xs font-semibold text-slate-600 block">
+                            {u.email}
+                          </span>
+                        )}
                       </td>
 
                       {/* Mobile Number */}
@@ -565,16 +561,47 @@ export default function RegisteredUsersPage() {
 
                       {/* Zone & Ward */}
                       <td className="px-3 py-3 align-middle">
-                        <div className="flex flex-col gap-0.5 text-xs">
-                          <span className="font-semibold text-slate-600 flex items-center gap-1 text-[11px]">
-                            <Map size={11} className="text-indigo-500 shrink-0" />
-                            {zoneText}
-                          </span>
-                          <span className="font-semibold text-slate-600 flex items-center gap-1 text-[11px]">
-                            <MapPin size={11} className="text-amber-500 shrink-0" />
-                            {wardText}
-                          </span>
-                        </div>
+                        {(() => {
+                          const totalZones = zoneList.length;
+                          const totalWards = wardList.length;
+
+                          return (
+                            <div className="flex flex-col gap-1 items-start text-xs min-w-[130px]">
+                              {/* Primary Zone & Ward Labels */}
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-bold text-slate-700 text-[11px] flex items-center gap-1">
+                                  <Map size={11} className="text-slate-400 shrink-0" />
+                                  {zoneList[0] || 'Zone 1'}
+                                  {totalZones > 1 && (
+                                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 rounded px-1">
+                                      +{totalZones - 1}
+                                    </span>
+                                  )}
+                                </span>
+
+                                <span className="font-semibold text-slate-600 text-[11px] flex items-center gap-1">
+                                  <MapPin size={11} className="text-slate-400 shrink-0" />
+                                  {wardList[0] || 'Ward 1'}
+                                  {totalWards > 1 && (
+                                    <span className="text-[10px] font-bold text-slate-600 bg-slate-100 rounded px-1">
+                                      +{totalWards - 1}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+
+                              {/* View Details Button */}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUserGeoModal({ user: u, zoneList, wardList })}
+                                className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:text-blue-600 hover:underline cursor-pointer transition"
+                              >
+                                <Eye size={10} />
+                                View All ({totalZones} Z, {totalWards} W)
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Assigned Modules - Inspection & Performance System Modules only */}
@@ -610,7 +637,7 @@ export default function RegisteredUsersPage() {
                               if (mod.toUpperCase() === "SWEEPING") displayLabel = "Sweeping";
                               if (mod.toUpperCase().includes("LITTER")) displayLabel = "Litter Bins";
                               if (mod.toUpperCase().includes("TOILET")) displayLabel = "Cleanliness of Toilets";
-                              if (mod.toUpperCase() === "TASKFORCE" || mod.toUpperCase().includes("CTU")) displayLabel = "CTU / GVP Transformation";
+                              if (mod.toUpperCase() === "TASKFORCE" || mod.toUpperCase().includes("CTU") || mod.toUpperCase().includes("GVP")) displayLabel = "GVP";
                               return (
                                 <span key={mi} className={`inline-flex items-center rounded-md border border-${c}-200 bg-${c}-50 px-2 py-0.5 text-[10px] font-bold text-${c}-700`}>
                                   {displayLabel}
@@ -736,6 +763,84 @@ export default function RegisteredUsersPage() {
             showToast({ title: "User updated", description: "User configuration saved successfully.", tone: "success" });
           }}
         />
+      )}
+
+      {/* ── ASSIGNED ZONE & WARD DETAILS MODAL ── */}
+      {selectedUserGeoModal && (
+        <Modal
+          open={!!selectedUserGeoModal}
+          onClose={() => setSelectedUserGeoModal(null)}
+          title={`Assigned Zones & Wards - ${selectedUserGeoModal.user.name}`}
+          size="md"
+        >
+          <div className="flex flex-col gap-6 py-1">
+            {/* Header info card */}
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-extrabold">
+                {selectedUserGeoModal.user.name?.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black text-slate-900 truncate">{selectedUserGeoModal.user.name}</h4>
+                  <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[9.5px] font-black uppercase ${getRoleBadgeStyle(selectedUserGeoModal.user.role)}`}>
+                    {selectedUserGeoModal.user.role}
+                  </span>
+                </div>
+                <p className="text-[11px] font-semibold text-slate-500 truncate">
+                  {selectedUserGeoModal.user.email?.includes('@internal.')
+                    ? (selectedUserGeoModal.user.phone ? `Mobile: ${selectedUserGeoModal.user.phone}` : 'Registered Field Staff')
+                    : selectedUserGeoModal.user.email}
+                </p>
+              </div>
+            </div>
+
+            {/* Assigned Zones Box */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Map size={15} className="text-indigo-600" />
+                <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                  Assigned Zones ({selectedUserGeoModal.zoneList.length})
+                </h5>
+              </div>
+              <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-xl flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
+                {selectedUserGeoModal.zoneList.map((z, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-800 text-xs font-bold px-2.5 py-1 rounded-lg shadow-xs">
+                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                    {z}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Assigned Wards Box */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <MapPin size={15} className="text-amber-600" />
+                <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                  Assigned Wards ({selectedUserGeoModal.wardList.length})
+                </h5>
+              </div>
+              <div className="p-3 bg-amber-50/40 border border-amber-100 rounded-xl flex flex-wrap gap-1.5 max-h-52 overflow-y-auto">
+                {selectedUserGeoModal.wardList.map((w, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1 bg-white border border-amber-200 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-lg shadow-xs">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                    {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSelectedUserGeoModal(null)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from '../react-router-shim';
 import { LogOut, Bell, Search, ShieldCheck, Menu } from 'lucide-react';
 import PmcLogo from './PmcLogo';
+import { UserProfileModal } from '@components/ui/UserProfileModal';
 
 interface HeaderProps {
     onMenuToggle?: () => void;
@@ -20,6 +21,7 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
 
     const [imageVersion, setImageVersion] = useState(Date.now());
     const [navbarSearch, setNavbarSearch] = useState('');
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const debounceRef = useRef<number | null>(null);
 
     const isUsersRoute = location.pathname.startsWith('/admin/users');
@@ -186,7 +188,11 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
 
                 <div className="header-divider" style={{ height: '28px', width: '1px', backgroundColor: 'var(--border)' }} />
 
-                <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', textDecoration: 'none', cursor: 'pointer' }}>
+                <div
+                    onClick={() => setIsProfileModalOpen(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', textDecoration: 'none', cursor: 'pointer' }}
+                    title="Click to view profile"
+                >
 
                     <div className="header-user-text" style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
 
@@ -264,7 +270,12 @@ const Header = ({ onMenuToggle }: HeaderProps) => {
                         )}
                     </div>
 
-                </Link>
+                </div>
+
+                <UserProfileModal
+                    isOpen={isProfileModalOpen}
+                    onClose={() => setIsProfileModalOpen(false)}
+                />
 
                 <Link to="/portal-home" style={{ textDecoration: 'none' }}>
                     <button

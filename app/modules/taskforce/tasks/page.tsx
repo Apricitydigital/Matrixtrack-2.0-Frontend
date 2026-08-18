@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { ModuleGuard } from "@components/Guards";
 import { TaskforceApi, ApiError, CityApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
@@ -15,6 +15,8 @@ type Case = {
 };
 
 export default function TaskforceTasksPage() {
+  const tableSectionRef = useRef<HTMLDivElement>(null);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('');
   const [cases, setCases] = useState<Case[]>([]);
   const [records, setRecords] = useState<any[]>([]); // New records state
   const [error, setError] = useState("");
@@ -332,21 +334,38 @@ export default function TaskforceTasksPage() {
           </header>
 
           {/* New Expanded Metrics Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
-            <StatCard label="Total Feeder Points" value={metrics.total} sub="Identified Points" color="#3b82f6" />
-            <StatCard label="In Progress" value={metrics.inProgress} sub="Surveys Running" color="#8b5cf6" />
-            <StatCard label="Action Required" value={metrics.actionRequired} sub="Needs Attention" color="#f59e0b" />
-            <StatCard label="QC Approved Reports" value={metrics.approved} sub="Verified Clean" color="#10b981" />
+          {(() => {
+            const handleStatClick = (statusKey: string) => {
+              if (statusKey === 'TOTAL') {
+                setSelectedStatusFilter('');
+              } else if (selectedStatusFilter === statusKey) {
+                setSelectedStatusFilter('');
+              } else {
+                setSelectedStatusFilter(statusKey);
+              }
+              setTimeout(() => {
+                tableSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 80);
+            };
 
-            <StatCard label="QC Rejected Reports" value={metrics.rejected} sub="Issues Found" color="#ef4444" />
-            <StatCard label="Action Taken" value={metrics.actionTaken} sub="Resolved Items" color="#0ea5e9" />
-            <StatCard label="Eliminated Points" value={metrics.eliminated} sub="Permanent Fix" color="#6366f1" />
-            <StatCard label="System Performance" value={`${metrics.systemPerformance}%`} sub="Efficiency Score" color="#f43f5e" />
-          </div>
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
+                <StatCard label="Total Feeder Points" value={metrics.total} sub="Identified Points" color="#3b82f6" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatusFilter === ''} />
+                <StatCard label="In Progress" value={metrics.inProgress} sub="Surveys Running" color="#8b5cf6" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatusFilter === 'SUBMITTED'} />
+                <StatCard label="Action Required" value={metrics.actionRequired} sub="Needs Attention" color="#f59e0b" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatusFilter === 'ACTION_REQUIRED'} />
+                <StatCard label="QC Approved Reports" value={metrics.approved} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatusFilter === 'APPROVED'} />
 
-          <div className="compact-card">
+                <StatCard label="QC Rejected Reports" value={metrics.rejected} sub="Issues Found" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatusFilter === 'REJECTED'} />
+                <StatCard label="Action Taken" value={metrics.actionTaken} sub="Resolved Items" color="#0ea5e9" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={selectedStatusFilter === 'ACTION_TAKEN'} />
+                <StatCard label="Eliminated Points" value={metrics.eliminated} sub="Permanent Fix" color="#6366f1" onClick={() => handleStatClick('ELIMINATED')} isActive={selectedStatusFilter === 'ELIMINATED'} />
+                <StatCard label="System Performance" value={`${metrics.systemPerformance}%`} sub="Efficiency Score" color="#f43f5e" onClick={() => handleStatClick('TOTAL')} isActive={false} />
+              </div>
+            );
+          })()}
+
+          <div ref={tableSectionRef} className="compact-card">
             <div className="card-header-flex">
-              <h2 className="section-title">Recent Feeder Points</h2>
+              <h2 className="section-title">Recent Feeder Points {selectedStatusFilter && `(${selectedStatusFilter})`}</h2>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
@@ -360,7 +379,7 @@ export default function TaskforceTasksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((r) => (
+                  {(selectedStatusFilter ? records.filter(r => (r.status || '').toUpperCase() === selectedStatusFilter) : records).map((r) => (
                     <tr key={r.id}>
                       <td>
                         <div style={{ fontWeight: 700, color: '#0f172a' }}>{r.name || r.id}</div>
@@ -614,44 +633,31 @@ export default function TaskforceTasksPage() {
   );
 }
 
-function StatCard({ label, value, sub, color }: any) {
+function StatCard({ label, value, sub, color, onClick }: any) {
   return (
-    <div className="stat-card-compact" style={{ borderLeft: `6px solid ${color}`, position: 'relative', overflow: 'hidden', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', borderLeftWidth: 6, borderLeftColor: color }}>
-      <div className="stat-label">{label}</div>
+    <div
+      onClick={onClick}
+      style={{
+        background: '#ffffff',
+        borderRadius: '12px',
+        padding: '16px 18px',
+        border: '1px solid #e2e8f0',
+        borderLeft: `6px solid ${color}`,
+        cursor: onClick ? 'pointer' : 'default',
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        transition: 'transform 0.2s, box-shadow 0.2s'
+      }}
+    >
+      <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div className="stat-value" style={{ color: '#1e293b' }}>{value}</div>
+        <div style={{ fontSize: 26, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
       </div>
-      <div className="stat-sub">{sub}</div>
-      <style jsx>{`
-                .stat-card-compact {
-                    padding: 16px 20px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                }
-                .stat-card-compact:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
-                }
-                .stat-label {
-                    font-size: 10px;
-                    font-weight: 900;
-                    color: #94a3b8;
-                    letter-spacing: 0.1em;
-                    text-transform: uppercase;
-                }
-                .stat-value {
-                    font-size: 28px;
-                    font-weight: 900;
-                    letter-spacing: -0.02em;
-                }
-                .stat-sub {
-                    font-size: 12px;
-                    color: #64748b;
-                    font-weight: 500;
-                }
-            `}</style>
+      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>
     </div>
   );
 }

@@ -173,12 +173,23 @@ export function normalizeAuthUser(
     id: user.id,
     email: user.email,
     name: user.name,
+    phone: user.phone || (user as any).mobileNumber || (user as any).mobile || "",
     cityId: user.cityId,
     cityName: user.cityName,
+    cityCode: user.cityCode || (user as any).cityCode,
+    stateName: user.stateName || (user as any).stateName,
+    divisionName: user.divisionName || (user as any).divisionName,
+    districtName: user.districtName || (user as any).districtName,
+    aadhaar: (user as any).aadhaar || (user as any).aadhaarNumber || "",
     roles,
     roleLabels: Array.isArray(user.roleLabels) ? user.roleLabels : [],
     modules: normalizeModules(user.modules),
-    token: user.token
+    token: user.token,
+    zoneIds: Array.isArray(user.zoneIds) ? user.zoneIds : [],
+    wardIds: Array.isArray(user.wardIds) ? user.wardIds : [],
+    zoneDetails: Array.isArray(user.zoneDetails) ? user.zoneDetails : [],
+    wardDetails: Array.isArray(user.wardDetails) ? user.wardDetails : [],
+    assignedBeats: Array.isArray(user.assignedBeats) ? user.assignedBeats : []
   };
 }
 

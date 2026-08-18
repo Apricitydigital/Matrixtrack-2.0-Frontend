@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ModuleRecordsApi, GeoApi } from '@lib/apiClient';
+import { useAuth } from '@hooks/useAuth';
+import { isReportVisibleToAO } from '@lib/aoScope';
 
 interface SubmittedReportsTabProps {
     moduleKey: 'TOILET' | 'SWEEPING' | 'LITTERBINS';
@@ -22,7 +24,8 @@ const getStaffName = (val: any): string => {
     return '';
 };
 
-export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onViewReport }: SubmittedReportsTabProps) {
+export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onViewReport, initialStatus }: SubmittedReportsTabProps) {
+    const { user } = useAuth();
     const [reports, setReports] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -34,8 +37,14 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
     const [selectedZone, setSelectedZone] = useState('');
     const [selectedWard, setSelectedWard] = useState('');
     const [selectedArea, setSelectedArea] = useState('');
-    const [selectedStatus, setSelectedStatus] = useState('');
+    const [selectedStatus, setSelectedStatus] = useState(initialStatus || '');
     const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        if (initialStatus !== undefined) {
+            setSelectedStatus(initialStatus);
+        }
+    }, [initialStatus]);
 
     // Geo Metadata
     const [zones, setZones] = useState<any[]>([]);
@@ -178,6 +187,8 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
     // Filtered Reports
     const filteredReports = useMemo(() => {
         return reports.filter(rec => {
+            if (!isReportVisibleToAO(user, rec, moduleKey)) return false;
+
             if (selectedStatus && (rec.status || '').toUpperCase() !== selectedStatus) return false;
 
             if (selectedZone) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi, ToiletApi, GeoApi, CityApi } from "@lib/apiClient";
 import LitterBinReviewModal from "./LitterBinReviewModal";
 import TwinbinStaffAssignmentsTab from "./TwinbinStaffAssignmentsTab";
@@ -9,6 +9,7 @@ import { useAuth } from "@hooks/useAuth";
 
 export default function AdminDashboard() {
     const { user } = useAuth();
+    const tableSectionRef = useRef<HTMLDivElement>(null);
     const isSuperAdmin =
         user?.role === 'super_admin' ||
         user?.role === 'hms_super_admin' ||
@@ -451,18 +452,42 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* 7 STAT CARDS GRID */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-                        <StatCard label="TOTAL REGISTERED LITTERBINS" value={registeredBins.length || combinedBins.length || 0} sub="Registered Assets" color="#0f172a" />
-                        <StatCard label="SUBMITTED REPORTS" value={records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT').length || records.length || 0} sub="Total Submitted" color="#2563eb" />
-                        <StatCard label="PENDING REVIEW REPORTS" value={records.filter(r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED').length || 0} sub="Awaiting QC Review" color="#f59e0b" />
-                        <StatCard label="APPROVED REPORTS" value={records.filter(r => r.status === 'APPROVED').length || 0} sub="Verified Clean" color="#10b981" />
-                        <StatCard label="REJECTED REPORTS" value={records.filter(r => r.status === 'REJECTED').length || 0} sub="Non-Compliant" color="#ef4444" />
-                        <StatCard label="ACTION REQUIRED REPORTS" value={records.filter(r => r.status === 'ACTION_REQUIRED').length || 0} sub="Needs Resolution" color="#ea580c" />
-                        <StatCard label="RESOLVED REPORTS" value={records.filter(r => r.status === 'ACTION_TAKEN').length || 0} sub="Action Completed" color="#06b6d4" />
-                    </div>
+                    {(() => {
+                        const handleStatClick = (statusKey: string) => {
+                            if (statusKey === 'TOTAL') {
+                                setStatusFilter('ALL');
+                            } else if (statusFilter === statusKey) {
+                                setStatusFilter('ALL');
+                            } else {
+                                setStatusFilter(statusKey);
+                            }
+                            setTimeout(() => {
+                                tableSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }, 80);
+                        };
+
+                        const totalSubmitted = records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT').length || records.length || 0;
+                        const pendingCount = records.filter(r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED').length || 0;
+                        const approvedCount = records.filter(r => r.status === 'APPROVED').length || 0;
+                        const rejectedCount = records.filter(r => r.status === 'REJECTED').length || 0;
+                        const actionReqCount = records.filter(r => r.status === 'ACTION_REQUIRED').length || 0;
+                        const actionTakenCount = records.filter(r => r.status === 'ACTION_TAKEN').length || 0;
+
+                        return (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+                                <StatCard label="TOTAL REGISTERED LITTERBINS" value={registeredBins.length || combinedBins.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={statusFilter === 'ALL'} />
+                                <StatCard label="SUBMITTED REPORTS" value={totalSubmitted} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
+                                <StatCard label="PENDING REVIEW REPORTS" value={pendingCount} sub="Awaiting QC Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
+                                <StatCard label="APPROVED REPORTS" value={approvedCount} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={statusFilter === 'APPROVED'} />
+                                <StatCard label="REJECTED REPORTS" value={rejectedCount} sub="Non-Compliant" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={statusFilter === 'REJECTED'} />
+                                <StatCard label="ACTION REQUIRED REPORTS" value={actionReqCount} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={statusFilter === 'ACTION_REQUIRED'} />
+                                <StatCard label="ACTION TAKEN REPORTS" value={actionTakenCount} sub="Action Completed" color="#06b6d4" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={statusFilter === 'ACTION_TAKEN'} />
+                            </div>
+                        );
+                    })()}
 
                     {/* DAILY INSPECTION REPORTS STREAM */}
-                    <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+                    <div ref={tableSectionRef} style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
                         <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: '#fcfdfe' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                                 <div>
@@ -764,20 +789,26 @@ export default function AdminDashboard() {
     );
 }
 
-function StatCard({ label, value, sub, color }: any) {
+function StatCard({ label, value, sub, color, onClick }: any) {
     return (
-        <div style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: '16px 20px',
-            border: '1px solid #e2e8f0',
-            borderLeft: `6px solid ${color}`,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            transition: 'transform 0.2s',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4
-        }}>
+        <div
+            onClick={onClick}
+            style={{
+                background: '#ffffff',
+                borderRadius: 16,
+                padding: '16px 20px',
+                border: '1px solid #e2e8f0',
+                borderLeft: `6px solid ${color}`,
+                cursor: onClick ? 'pointer' : 'default',
+                position: 'relative',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+            }}
+        >
             <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
             <div style={{ fontSize: 28, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
             <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>
