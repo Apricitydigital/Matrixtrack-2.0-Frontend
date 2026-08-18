@@ -43,7 +43,7 @@ export default function ToiletModulePage() {
     { id: "submitted_reports", label: "Inspection Reports", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
     { id: "all", label: "All Registered Toilets", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
     { id: "approvals", label: "Verification & Approvals", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
-    { id: "assignments", label: "Staff Assignments", roles: ["CITY_ADMIN", "HMS_SUPER_ADMIN"] },
+    { id: "assignments", label: "Staff Assignments", roles: ["QC", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
   ];
 
   const visibleTabs = tabs.filter(tab =>

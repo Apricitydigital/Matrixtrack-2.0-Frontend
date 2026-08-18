@@ -1,12 +1,12 @@
+'use client';
+
 import React from 'react';
 import { UserProfileCard } from '@components/ui/UserProfileCard';
 
-const Profile = () => {
+export default function ProfilePage() {
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="max-w-6xl mx-auto py-2">
       <UserProfileCard />
     </div>
   );
-};
-
-export default Profile;
+}

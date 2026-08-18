@@ -40,6 +40,7 @@ import {
 
 import { moduleEntryPath } from '@utils/modules';
 import { setAuthCookie } from '@lib/auth';
+import { UserProfileModal } from '@components/ui/UserProfileModal';
 
 
 function PortalHomeLayoutContent({
@@ -48,6 +49,7 @@ function PortalHomeLayoutContent({
   children: React.ReactNode;
 }) {
   const { user } = useAuth();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const router = useRouter();
 
@@ -826,6 +828,10 @@ function PortalHomeLayoutContent({
     );
 
 
+  const activeModuleKeys = (userModules || []).map((m: any) => (m.key || m.name || '').toUpperCase());
+  const hasSubModule = (key: string) =>
+    isCityAdmin || activeModuleKeys.some((k: string) => k.includes(key));
+
   const userModuleItems = [
     {
       name:
@@ -846,7 +852,7 @@ function PortalHomeLayoutContent({
         ),
 
       visible:
-        true,
+        hasSubModule('LITTER'),
     },
 
     {
@@ -865,7 +871,7 @@ function PortalHomeLayoutContent({
         ),
 
       visible:
-        true,
+        hasSubModule('SWEEP'),
     },
 
     {
@@ -884,7 +890,7 @@ function PortalHomeLayoutContent({
         ),
 
       visible:
-        true,
+        hasSubModule('TOILET'),
     },
 
     {
@@ -909,9 +915,9 @@ function PortalHomeLayoutContent({
         ),
 
       visible:
-        true,
+        hasSubModule('TASKFORCE') || hasSubModule('GVP'),
     },
-  ];
+  ].filter((item) => item.visible);
 
 
   /* =========================================================
@@ -2772,10 +2778,22 @@ function PortalHomeLayoutContent({
 
 
         {/* =====================================================
-            LOGOUT
+            LOGOUT & PROFILE
         ===================================================== */}
 
-        <div className="flex flex-col gap-4 border-t border-slate-200 pt-4 mt-6">
+        <div className="flex flex-col gap-2.5 border-t border-slate-200 pt-4 mt-6">
+
+          <Link
+            href="/portal-home/profile"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
+              pathname === '/portal-home/profile' || pathname === '/profile'
+                ? 'bg-blue-600 text-white shadow-blue-500/20'
+                : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <UserCheck size={16} />
+            My Profile
+          </Link>
 
           <button
             onClick={
@@ -2874,7 +2892,11 @@ function PortalHomeLayoutContent({
 
                 {/* USER */}
 
-                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/10 shadow-sm px-3.5 py-1.5 rounded-[16px] shrink-0 hover:bg-white/15 transition-all">
+                <Link
+                  href="/portal-home/profile"
+                  className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/10 shadow-sm px-3.5 py-1.5 rounded-[16px] shrink-0 hover:bg-white/15 transition-all cursor-pointer text-left no-underline"
+                  title="Click to view user profile"
+                >
 
                   <div className="w-8 h-8 rounded-[10px] bg-blue-600 text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
                     {
@@ -2899,7 +2921,7 @@ function PortalHomeLayoutContent({
 
                   </div>
 
-                </div>
+                </Link>
 
               </div>
 
