@@ -890,10 +890,10 @@ function KpiRecordsDrawer({
             <div className="p-4 sm:p-6">
               <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[960px] border-collapse">
+                  <table className="w-full min-w-[1180px] border-collapse">
                     <thead>
                       <tr className="bg-slate-50 text-left">
-                        {['Employee', 'Attendance ID', 'Designation', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
+                        {['Employee', 'Attendance ID', 'Designation', 'Zone', 'Ward', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
                           <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                         ))}
                       </tr>
@@ -916,6 +916,8 @@ function KpiRecordsDrawer({
                             </td>
                             <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.zones.length ? record.zones.join(", ") : "—"}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.wards.length ? record.wards.join(", ") : "—"}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                             <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                             <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>
@@ -1073,6 +1075,9 @@ function WorkDurationEmployeesPopup({
                     </div>
                     <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400">
                       {record.designation || "Employee"} · {record.attendanceId}
+                    </p>
+                    <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${record.zones.join(", ") || "—"} · Ward: ${record.wards.join(", ") || "—"}`}>
+                      Zone: {record.zones.join(", ") || "—"} · Ward: {record.wards.join(", ") || "—"}
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-bold">
                       <span className="rounded-md bg-white px-1.5 py-1 text-slate-600 ring-1 ring-slate-200">
@@ -2365,6 +2370,9 @@ function AttendanceDashboard() {
                           <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
                             {employee.designation || "Employee"} · {employee.attendanceId}
                           </p>
+                          <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${employee.zones.join(", ") || "—"} · Ward: ${employee.wards.join(", ") || "—"}`}>
+                            Zone: {employee.zones.join(", ") || "—"} · Ward: {employee.wards.join(", ") || "—"}
+                          </p>
                         </div>
                       </div>
 
@@ -2479,10 +2487,10 @@ function AttendanceDashboard() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1050px] border-collapse">
+                <table className="w-full min-w-[1270px] border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50/95 text-left backdrop-blur">
-                      {['Employee', 'Attendance ID', 'Designation', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
+                      {['Employee', 'Attendance ID', 'Designation', 'Zone', 'Ward', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
                         <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                       ))}
                     </tr>
@@ -2505,6 +2513,8 @@ function AttendanceDashboard() {
                           </td>
                           <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.zones.length ? record.zones.join(", ") : "—"}</td>
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.wards.length ? record.wards.join(", ") : "—"}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                           <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                           <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>

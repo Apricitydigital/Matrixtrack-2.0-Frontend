@@ -21,6 +21,9 @@ export type AttendanceRecord = {
   designation: string | null;
   officeLocation: string | null;
   divisionUnit: string | null;
+  matrixTrackUserId: string | null;
+  zones: string[];
+  wards: string[];
   attendanceDate: string;
   inTime: string | null;
   outTime: string | null;
@@ -74,6 +77,9 @@ export type AttendanceDashboardResponse = {
     employeeName: string;
     designation: string | null;
     officeLocation: string | null;
+    matrixTrackUserId: string | null;
+    zones: string[];
+    wards: string[];
     totalDays: number;
     presentDays: number;
     absentDays: number;
