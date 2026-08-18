@@ -929,16 +929,89 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   useEffect(() => {
     async function fetchData() {
       try {
-        const [zonesRes, wardsRes, modsRes] = await Promise.all([
-          apiFetch<{ nodes: any[] }>("/city/geo?level=ZONE").catch(() => ({ nodes: [] })),
-          apiFetch<{ nodes: any[] }>("/city/geo?level=WARD").catch(() => ({ nodes: [] })),
-          CityModulesApi.list().catch(() => [])
+        const [
+          zonesRes,
+          wardsRes,
+          modsRes,
+          meRes
+        ] = await Promise.all([
+          apiFetch<{ nodes: any[] }>(
+            "/city/geo?level=ZONE"
+          ).catch(() => ({ nodes: [] })),
+
+          apiFetch<{ nodes: any[] }>(
+            "/city/geo?level=WARD"
+          ).catch(() => ({ nodes: [] })),
+
+          CityModulesApi.list().catch(() => []),
+
+          apiFetch<{
+            user: {
+              role?: string;
+              roles?: string[];
+              modules?: Array<{
+                id?: string;
+                key?: string;
+                name?: string;
+              }>;
+            };
+          }>("/auth/me").catch(() => ({
+            user: {
+              role: "",
+              roles: [],
+              modules: []
+            }
+          }))
         ]);
         setZones(zonesRes.nodes || []);
         setWards(wardsRes.nodes || []);
 
         const fetchedMods = modsRes || [];
-        setModules(fetchedMods);
+
+        const currentUser =
+          (meRes as any)?.user || {};
+
+        const currentRoles = [
+          currentUser.role,
+          ...(currentUser.roles || [])
+        ]
+          .filter(Boolean)
+          .map((role) =>
+            String(role).trim().toUpperCase()
+          );
+
+        const isHmsSuperAdmin =
+          currentRoles.includes(
+            "HMS_SUPER_ADMIN"
+          );
+
+        const myModuleKeys = new Set(
+          (currentUser.modules || [])
+            .map((module: any) =>
+              normalizeAssignedModuleKey(
+                module.key ||
+                module.name ||
+                ""
+              )
+            )
+            .filter(Boolean)
+        );
+
+        const visibleModules =
+          isHmsSuperAdmin
+            ? fetchedMods
+            : fetchedMods.filter(
+              (module: any) =>
+                myModuleKeys.has(
+                  normalizeAssignedModuleKey(
+                    module.key ||
+                    module.name ||
+                    ""
+                  )
+                )
+            );
+
+        setModules(visibleModules);
       } catch (err) {
         console.error("Failed to load options", err);
       } finally {
