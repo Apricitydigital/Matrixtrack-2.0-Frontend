@@ -65,6 +65,13 @@ export default function PortalHomePage() {
   const userCityName = user?.city ? user.city.name : 'Indore';
   const userRoles = user?.roles || [];
 
+  const isUlbOfficer =
+    userRoles.some(
+      (role) =>
+        String(role).toUpperCase() ===
+        "ULB_OFFICER"
+    );
+
   useEffect(() => {
     if (isCommissioner && !isSuperAdmin) {
       router.replace('/municipal/commissioner');
@@ -72,8 +79,19 @@ export default function PortalHomePage() {
   }, [isCommissioner, isSuperAdmin, router]);
 
   useEffect(() => {
+    if (isUlbOfficer) {
+      router.replace("/ulb/dashboard");
+    }
+  }, [isUlbOfficer, router]);
+
+  useEffect(() => {
     async function loadData() {
-      if (isCommissioner && !isSuperAdmin) return;
+      if (
+        (isCommissioner && !isSuperAdmin) ||
+        isUlbOfficer
+      ) {
+        return;
+      }
       setLoadingCities(true);
       try {
         if (isSuperAdmin) {
@@ -143,7 +161,7 @@ export default function PortalHomePage() {
           </div>
 
           <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.02em' }}>
-            {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Admin'} 
+            {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Admin'}
           </h1>
 
           <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
@@ -340,7 +358,7 @@ export default function PortalHomePage() {
                 </p>
               </div>
 
-              
+
             </div>
 
             <div className="overflow-x-auto">
