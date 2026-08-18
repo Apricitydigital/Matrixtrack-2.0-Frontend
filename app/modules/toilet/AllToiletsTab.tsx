@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ToiletApi, GeoApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 
@@ -309,9 +310,9 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
             </div>
 
             {/* Drilldown Modal Overlay Box (Screen-Aware) */}
-            {selectedToilet && (
-                <div onClick={() => setSelectedToilet(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                    <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 850, maxHeight: '88vh', overflowY: 'auto', padding: 28, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
+            {selectedToilet && typeof document !== 'undefined' && createPortal(
+                <div onClick={() => setSelectedToilet(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 850, maxHeight: '88vh', overflowY: 'auto', padding: 28, boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
 
                         {/* Modal Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
@@ -370,12 +371,12 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                                             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Ward</div>
                                             <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.ward?.name || selectedToilet.wardName || 'Ward 1'}</div>
                                         </div>
-                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
-                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>GPS Coordinates (Lat, Long)</div>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#2563eb', marginTop: 2 }}>
-                                                {selectedToilet.latitude || selectedToilet.lat || '22.7196'}°, {selectedToilet.longitude || selectedToilet.lng || '75.8577'}°
+                                            <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
+                                                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>GPS Coordinates (Lat, Long)</div>
+                                                <div style={{ fontSize: 13, fontWeight: 600, color: '#2563eb', marginTop: 2 }}>
+                                                    {(selectedToilet.latitude || selectedToilet.lat) && (selectedToilet.longitude || selectedToilet.lng) ? `${selectedToilet.latitude || selectedToilet.lat}°, ${selectedToilet.longitude || selectedToilet.lng}°` : 'N/A'}
+                                                </div>
                                             </div>
-                                        </div>
                                         {selectedToilet.address && (
                                             <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
                                                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Address / Landmark</div>
@@ -386,20 +387,28 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                                 </div>
 
                                 {/* Infrastructure & Utilities */}
-                                <div>
-                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Infrastructure Facilities</h3>
-                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                        <span style={{ padding: '6px 12px', borderRadius: 8, background: selectedToilet.hasWater ? '#eff6ff' : '#f1f5f9', color: selectedToilet.hasWater ? '#2563eb' : '#64748b', border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 600 }}>
-                                            {selectedToilet.hasWater ? 'Continuous Water Supply' : 'No Water Supply'}
-                                        </span>
-                                        <span style={{ padding: '6px 12px', borderRadius: 8, background: selectedToilet.hasElectricity ? '#eff6ff' : '#f1f5f9', color: selectedToilet.hasElectricity ? '#2563eb' : '#64748b', border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 600 }}>
-                                            {selectedToilet.hasElectricity ? 'Electricity Connection' : 'No Electricity'}
-                                        </span>
-                                        <span style={{ padding: '6px 12px', borderRadius: 8, background: selectedToilet.hasHandwash ? '#eff6ff' : '#f1f5f9', color: selectedToilet.hasHandwash ? '#2563eb' : '#64748b', border: '1px solid #cbd5e1', fontSize: 12, fontWeight: 600 }}>
-                                            {selectedToilet.hasHandwash ? 'Hygiene & Handwash' : 'No Handwash Station'}
-                                        </span>
+                                {(selectedToilet.hasWater || selectedToilet.hasElectricity || selectedToilet.hasHandwash) && (
+                                    <div>
+                                        <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Infrastructure Facilities</h3>
+                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                            {selectedToilet.hasWater && (
+                                                <span style={{ padding: '6px 12px', borderRadius: 8, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 600 }}>
+                                                    Continuous Water Supply
+                                                </span>
+                                            )}
+                                            {selectedToilet.hasElectricity && (
+                                                <span style={{ padding: '6px 12px', borderRadius: 8, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 600 }}>
+                                                    Electricity Connection
+                                                </span>
+                                            )}
+                                            {selectedToilet.hasHandwash && (
+                                                <span style={{ padding: '6px 12px', borderRadius: 8, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 600 }}>
+                                                    Hygiene & Handwash
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
 
                             {/* Right Column: Supervisor & Registration Metadata */}
@@ -427,12 +436,13 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Quick Assign Modal */}
-            {showAssignModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000 }}>
+            {showAssignModal && typeof document !== 'undefined' && createPortal(
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
                     <div style={{ backgroundColor: 'white', borderRadius: 24, width: 440, padding: 28, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', animation: 'modalScale 0.2s ease-out' }}>
                         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Assign Field Supervisor</h3>
                         <p style={{ margin: '6px 0 20px 0', fontSize: 13, color: '#64748b', fontWeight: 500 }}>Delegate responsibility for <strong>{toiletToAssign?.name}</strong></p>
@@ -463,7 +473,8 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                             >Cancel</button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

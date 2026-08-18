@@ -950,27 +950,14 @@ export const RegistrationApi = {
 
 export const EmployeesApi = {
   list: async (moduleKey?: string) => {
-    const res = await CityUserApi.list();
-    const normalizedModuleKey = moduleKey?.trim().toUpperCase();
-    const employees = (res.users || [])
-      .filter((user) =>
-        normalizedModuleKey
-          ? (user.modules || []).some((module) => module.key?.toUpperCase() === normalizedModuleKey)
-          : true
-      )
-      .map((user) => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        modules: user.modules || [],
-        zones: user.zoneIds || [],
-        wards: user.wardIds || [],
-
-        createdAt: user.createdAt
-      }));
-
-    return { employees };
+    try {
+      const res = await apiFetch<{ employees?: any[]; users?: any[] }>("/modules/toilet/staff");
+      const list = res.employees || res.users || [];
+      return { employees: list };
+    } catch (e) {
+      console.error("EmployeesApi.list failed:", e);
+      return { employees: [] };
+    }
   }
 };
 
@@ -1023,7 +1010,8 @@ export const TwinbinApi = {
     apiFetch<{ bin: any }>(`/modules/twinbin/bins/${id}/approve`, { method: "POST", body: JSON.stringify(body) }),
   assign: (id: string, body: { assignedEmployeeIds: string[] }) =>
     apiFetch<{ bin: any }>(`/modules/twinbin/bins/${id}/assign`, { method: "POST", body: JSON.stringify(body) }),
-  reject: (id: string) => apiFetch<{ bin: any }>(`/modules/twinbin/bins/${id}/reject`, { method: "POST" }),
+  reject: (id: string, comment?: string | { qcRemark?: string }) =>
+    apiFetch<{ bin: any }>(`/modules/twinbin/bins/${id}/reject`, { method: "POST", body: typeof comment === 'string' ? JSON.stringify({ qcRemark: comment }) : comment ? JSON.stringify(comment) : undefined }),
   submitVisit: (binId: string, body: { latitude: number; longitude: number; inspectionAnswers: Record<string, { answer: "YES" | "NO"; photoUrl: string }> }) =>
     apiFetch<{ report: any }>(`/modules/twinbin/bins/${binId}/visit`, { method: "POST", body: JSON.stringify(body) }),
   submitReport: (binId: string, body: { latitude: number; longitude: number; questionnaire: any; proximityToken: string }) =>
@@ -1043,8 +1031,8 @@ export const TwinbinApi = {
     apiFetch<{ data: any[], meta: any }>(`/modules/twinbin/visits/pending?page=${page}&limit=${limit}`),
   approveVisit: (id: string) =>
     apiFetch<{ visit: any }>(`/modules/twinbin/visits/${id}/approve`, { method: "POST" }),
-  rejectVisit: (id: string) =>
-    apiFetch<{ visit: any }>(`/modules/twinbin/visits/${id}/reject`, { method: "POST" }),
+  rejectVisit: (id: string, comment?: string | { qcRemark?: string }) =>
+    apiFetch<{ visit: any }>(`/modules/twinbin/visits/${id}/reject`, { method: "POST", body: typeof comment === 'string' ? JSON.stringify({ qcRemark: comment }) : comment ? JSON.stringify(comment) : undefined }),
   markActionRequired: (id: string, body: { qcRemark: string }) =>
     apiFetch<{ visit: any }>(`/modules/twinbin/visits/${id}/action-required`, { method: "POST", body: JSON.stringify(body) }),
   listActionRequired: () =>
@@ -1056,7 +1044,7 @@ export const TwinbinApi = {
   rejectedReports: (page = 1, limit = 20) => apiFetch<{ data: any[], meta: any }>(`/modules/twinbin/reports/rejected?page=${page}&limit=${limit}`),
   actionRequiredReports: (page = 1, limit = 20) => apiFetch<{ data: any[], meta: any }>(`/modules/twinbin/reports/action-required?page=${page}&limit=${limit}`),
   approveReport: (id: string) => apiFetch<{ report: any }>(`/modules/twinbin/reports/${id}/approve`, { method: "POST" }),
-  rejectReport: (id: string) => apiFetch<{ report: any }>(`/modules/twinbin/reports/${id}/reject`, { method: "POST" }),
+  rejectReport: (id: string, comment?: string | { qcRemark?: string }) => apiFetch<{ report: any }>(`/modules/twinbin/reports/${id}/reject`, { method: "POST", body: typeof comment === 'string' ? JSON.stringify({ qcRemark: comment }) : comment ? JSON.stringify(comment) : undefined }),
   actionRequiredReport: (id: string) =>
     apiFetch<{ report: any }>(`/modules/twinbin/reports/${id}/action-required`, { method: "POST" }),
   actionOfficerPending: () => apiFetch<{ reports: any[] }>("/modules/twinbin/action-officer/pending"),

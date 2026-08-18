@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ToiletApi, GeoApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import { FilterTabs } from "../qc-shared";
@@ -88,29 +89,27 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
         }
     };
 
-    const handleAction = async (id: string, status: string, isInspection = false) => {
+    const [processingText, setProcessingText] = useState<string | null>(null);
+
+    const handleAction = async (id: string, status: string, isInspection = false, userComment?: string) => {
         try {
+            setProcessingText(status === 'APPROVED' ? 'Approving request...' : 'Rejecting request...');
             if (!isInspection) {
                 if (status === 'APPROVED') {
-                    await ToiletApi.approveToilet(id);
+                    await ToiletApi.approveToilet(id, { comment: userComment });
                 } else {
-                    const reason = prompt("Enter rejection reason:");
-                    if (reason === null) return;
-                    await ToiletApi.rejectToilet(id, reason || "Rejected by QC");
+                    await ToiletApi.rejectToilet(id, userComment || "Rejected by Reviewing Officer");
                 }
             } else {
-                let comment = '';
-                if (status === 'ACTION_REQUIRED' || status === 'REJECTED' || status === 'ACTION_TAKEN') {
-                    comment = prompt(status === 'ACTION_REQUIRED' ? "Enter instructions for Action Officer:" : "Enter resolution notes:") || '';
-                    if (comment === null) return;
-                }
-                await ToiletApi.reviewInspection(id, { status, comment });
+                await ToiletApi.reviewInspection(id, { status, comment: userComment || (status === 'APPROVED' ? 'Approved' : 'Rejected') });
             }
-            alert("Action successful");
             setSelectedRequest(null);
-            loadData();
+            setFullReportModalItem(null);
+            await loadData();
         } catch (err: any) {
-            alert(err.message || "Action failed");
+            console.error("Action failed:", err);
+        } finally {
+            setProcessingText(null);
         }
     };
 
@@ -164,50 +163,51 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                                     <tr
                                         key={req.id}
                                         className={selectedRequest?.id === req.id ? 'active-row' : ''}
-                                        onClick={() => setSelectedRequest(req)}
+                                        onClick={() => setFullReportModalItem(req)}
                                         style={{ cursor: 'pointer' }}
                                     >
-                                        <td>
-                                            <div style={{ fontWeight: 600, color: '#0f172a' }}>
-                                                {isRegistration(req) ? req.name : req.toilet?.name || 'Unknown Toilet'}
+                                        <td style={{ padding: '16px 16px', verticalAlign: 'middle' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                                <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
+                                                    {isRegistration(req) ? req.name : req.toilet?.name || 'Unknown Toilet'}
+                                                </span>
                                                 <span style={{
-                                                    marginLeft: 8,
                                                     fontSize: 10,
-                                                    padding: '2px 6px',
-                                                    borderRadius: 4,
+                                                    padding: '2px 8px',
+                                                    borderRadius: 6,
                                                     background: isRegistration(req) ? '#dcfce7' : '#eff6ff',
-                                                    color: isRegistration(req) ? '#166534' : '#1e40af',
-                                                    fontWeight: 800
+                                                    color: isRegistration(req) ? '#15803d' : '#1d4ed8',
+                                                    fontWeight: 800,
+                                                    display: 'inline-block',
+                                                    lineHeight: '1.2'
                                                 }}>
                                                     {isRegistration(req) ? 'REG' : 'INS'}
                                                 </span>
                                             </div>
-                                            <div style={{ fontSize: 12, color: '#64748b' }}>
-                                                {isRegistration(req) ? req.type : req.toilet?.type}
+                                            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>
+                                                {isRegistration(req) ? (req.type || 'Public Toilet') : (req.toilet?.type || 'Public Toilet')}
                                             </div>
                                         </td>
-                                        <td style={{ fontSize: 13, color: '#334155' }}>
+                                        <td style={{ fontSize: 13, color: '#334155', verticalAlign: 'middle' }}>
                                             {getZoneWard(req)}
                                         </td>
-                                        <td style={{ fontSize: 13, color: '#334155' }}>
+                                        <td style={{ fontSize: 13, color: '#334155', verticalAlign: 'middle', fontWeight: 500 }}>
                                             {getSubmittedBy(req)}
                                         </td>
-                                        <td>
+                                        <td style={{ verticalAlign: 'middle' }}>
                                             <StatusBadge status={req.status} />
                                         </td>
-                                        <td style={{ fontSize: 13, color: '#64748b' }}>
-                                            {new Date(req.createdAt).toLocaleDateString()} <span style={{ fontSize: 11 }}>{new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        <td style={{ fontSize: 13, color: '#64748b', verticalAlign: 'middle' }}>
+                                            <div style={{ fontWeight: 600, color: '#334155' }}>{new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{new Date(req.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
                                         </td>
-                                        <td style={{ textAlign: 'right' }}>
-                                            <div className="flex gap-2 justify-end">
-                                                <button
-                                                    className="btn btn-sm btn-outline"
-                                                    style={{ fontSize: 12, padding: '4px 10px' }}
-                                                    onClick={() => setSelectedRequest(req)}
-                                                >
-                                                    View
-                                                </button>
-                                            </div>
+                                        <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                                            <button
+                                                style={{ fontSize: 12, padding: '8px 16px', borderRadius: 8, fontWeight: 700, background: '#2563eb', color: '#ffffff', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}
+                                                onClick={(e) => { e.stopPropagation(); setFullReportModalItem(req); }}
+                                            >
+                                                View Report
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -224,178 +224,59 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                 )}
             </div>
 
-            {/* Sidebar Inspector */}
-            {selectedRequest && (
-                <div className="card" style={{ borderLeft: '4px solid #2563eb', position: 'sticky', top: 96, maxHeight: 'calc(100vh - 116px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', zIndex: 20 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, backgroundColor: '#ffffff', zIndex: 10, paddingTop: 4, paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
-                        <h4 style={{ margin: 0, fontWeight: 800, color: '#0f172a' }}>{isRegistration(selectedRequest) ? 'Registration Request' : 'Inspection Report'}</h4>
-                        <button className="btn btn-sm" style={{ borderRadius: '50%', width: 28, height: 28, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedRequest(null)}>✕</button>
-                    </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-                        {/* Common Header Info */}
-                        <div style={{ padding: 12, backgroundColor: '#f8fafc', borderRadius: 8 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Submission Details</div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                                <span style={{ color: '#64748b' }}>Submitted By:</span>
-                                <span style={{ fontWeight: 600 }}>{getSubmittedBy(selectedRequest)}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                                <span style={{ color: '#64748b' }}>Date:</span>
-                                <span>{new Date(selectedRequest.createdAt).toLocaleString()}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                                <span style={{ color: '#64748b' }}>Location:</span>
-                                <span>{getZoneWard(selectedRequest)}</span>
-                            </div>
-                        </div>
-
-                        {/* Registration Specifics */}
-                        {isRegistration(selectedRequest) && (
-                            <>
-                                <div>
-                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>Asset Details</div>
-                                    <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{selectedRequest.name}</div>
-                                    <div style={{ fontSize: 13, color: '#334155' }}>{selectedRequest.type} • {selectedRequest.gender}</div>
-                                    <div style={{ fontSize: 13, color: '#334155', marginTop: 4 }}>Seats: {selectedRequest.numberOfSeats || 'N/A'}</div>
-                                    {selectedRequest.address && <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>📍 {selectedRequest.address}</div>}
-                                </div>
-                                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
-                                    {/* Actions for QC and Admin */}
-                                    {(user?.roles.includes('QC') || user?.roles.includes('CITY_ADMIN') || user?.roles.includes('HMS_SUPER_ADMIN')) ? (
-                                        selectedRequest.status === 'PENDING' ? (
-                                            <div style={{ display: 'flex', gap: 8 }}>
-                                                <button className="btn btn-primary" style={{ flex: 1, backgroundColor: '#10b981', borderColor: '#10b981' }} onClick={() => handleAction(selectedRequest.id, 'APPROVED')}>
-                                                    Approve
-                                                </button>
-                                                <button className="btn btn-primary" style={{ flex: 1, backgroundColor: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleAction(selectedRequest.id, 'REJECTED')}>
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="badge" style={{ width: '100%', textAlign: 'center', backgroundColor: '#f1f5f9', color: '#64748b' }}>
-                                                Status: {selectedRequest.status}
-                                            </div>
-                                        )
-                                    ) : (
-                                        <div className="badge" style={{ width: '100%', textAlign: 'center', backgroundColor: '#f1f5f9', color: '#64748b' }}>
-                                            Read Only
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-
-                        {/* Inspection Specifics */}
-                        {!isRegistration(selectedRequest) && (
-                            <>
-                                <div>
-                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8 }}>Inspection Report</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        {selectedRequest.answers && Object.entries(selectedRequest.answers).map(([qId, val]: [string, any]) => {
-                                            const isNewFormat = val && typeof val === 'object' && 'answer' in val;
-                                            const displayVal = isNewFormat ? val.answer : val;
-                                            const isYes = displayVal === true || String(displayVal).toUpperCase() === 'YES';
-                                            const isNo = displayVal === false || String(displayVal).toUpperCase() === 'NO';
-
-                                            return (
-                                                <div key={qId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '8px 10px', backgroundColor: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9', gap: 8 }}>
-                                                    <span style={{ color: '#334155', fontWeight: 600, maxWidth: '72%', lineHeight: 1.3 }}>{qId}</span>
-                                                    <span style={{
-                                                        fontWeight: 800,
-                                                        fontSize: 11,
-                                                        padding: '3px 8px',
-                                                        borderRadius: 12,
-                                                        backgroundColor: isYes ? '#dcfce7' : isNo ? '#fee2e2' : '#eff6ff',
-                                                        color: isYes ? '#15803d' : isNo ? '#b91c1c' : '#1d4ed8',
-                                                        border: `1px solid ${isYes ? '#bbf7d0' : isNo ? '#fecaca' : '#bfdbfe'}`,
-                                                        whiteSpace: 'nowrap'
-                                                    }}>
-                                                        {isYes ? 'YES' : isNo ? 'NO' : String(displayVal)}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                    <div style={{ marginTop: 12 }}>
-                                        <button
-                                            onClick={() => { const target = selectedRequest; setSelectedRequest(null); setFullReportModalItem(target); }}
-                                            className="btn btn-xs btn-primary font-bold cursor-pointer"
-                                            style={{ width: '100%', backgroundColor: '#2563eb', color: '#fff', padding: '10px', borderRadius: '8px', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}
-                                        >
-                                            📄 Open Full Report Modal
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Audit Trail */}
-                                {(selectedRequest.reviewedByQc || selectedRequest.actionTakenBy) && (
-                                    <div style={{ backgroundColor: '#f0f9ff', padding: 12, borderRadius: 8, fontSize: 13 }}>
-                                        {selectedRequest.qcComment && (
-                                            <div style={{ marginBottom: 8 }}>
-                                                <div style={{ fontWeight: 700, color: '#0369a1' }}>QC Note:</div>
-                                                <div>{selectedRequest.qcComment}</div>
-                                            </div>
-                                        )}
-                                        {selectedRequest.actionNote && (
-                                            <div>
-                                                <div style={{ fontWeight: 700, color: '#15803d' }}>Action Note:</div>
-                                                <div>{selectedRequest.actionNote}</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
-                                    {/* Actions */}
-                                    {(user?.roles?.includes('QC') || user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN') || user?.role === 'CITY_ADMIN' || user?.role === 'QC' || user?.role === 'HMS_SUPER_ADMIN') && (selectedRequest.status === 'SUBMITTED' || selectedRequest.status === 'PENDING_QC') && (
-                                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                            <button className="btn btn-sm btn-primary" style={{ flex: 1, backgroundColor: '#10b981', borderColor: '#10b981' }} onClick={() => handleAction(selectedRequest.id, 'APPROVED', true)}>Approve</button>
-                                            <button className="btn btn-sm btn-primary" style={{ flex: 1, backgroundColor: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleAction(selectedRequest.id, 'REJECTED', true)}>Reject</button>
-                                            <button className="btn btn-sm btn-outline" style={{ width: '100%', borderColor: '#f59e0b', color: '#d97706' }} onClick={() => handleAction(selectedRequest.id, 'ACTION_REQUIRED', true)}>Action Required</button>
-                                        </div>
-                                    )}
-
-                                    {user?.roles.includes('ACTION_OFFICER') && selectedRequest.status === 'ACTION_REQUIRED' && (
-                                        <div style={{ display: 'flex', gap: 8 }}>
-                                            <button className="btn btn-sm btn-primary" style={{ flex: 1, backgroundColor: '#2563eb', borderColor: '#2563eb' }} onClick={() => handleAction(selectedRequest.id, 'ACTION_TAKEN', true)}>
-                                                Mark Action Taken
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-
-                    </div>
-                </div>
-            )}
 
             {fullReportModalItem && (
                 <UniversalReportModal
                     moduleTitle={fullReportModalItem._type === 'REGISTRATION' ? "Toilet Registration" : "Cleanliness of Toilet"}
                     moduleBadge="HMS TOILET AUDIT"
-                    record={fullReportModalItem}
+                    record={{
+                        ...fullReportModalItem,
+                        wardName: fullReportModalItem.wardName || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.name) || fullReportModalItem.ward?.name,
+                        zoneName: fullReportModalItem.zoneName || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.zoneName) || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.parent?.name) || fullReportModalItem.ward?.parent?.name,
+                    }}
                     onClose={() => setFullReportModalItem(null)}
                     onApprove={async (rec, comment) => {
-                        await handleAction(rec.id, 'APPROVED', rec._type !== 'REGISTRATION');
-                        setFullReportModalItem(null);
+                        await handleAction(rec.id, 'APPROVED', rec._type !== 'REGISTRATION', comment);
                     }}
                     onReject={async (rec, comment) => {
-                        await handleAction(rec.id, 'REJECTED', rec._type !== 'REGISTRATION');
-                        setFullReportModalItem(null);
+                        await handleAction(rec.id, 'REJECTED', rec._type !== 'REGISTRATION', comment);
                     }}
                     onActionRequired={async (rec, comment) => {
-                        await handleAction(rec.id, 'ACTION_REQUIRED', true);
-                        setFullReportModalItem(null);
+                        await handleAction(rec.id, 'ACTION_REQUIRED', true, comment);
                     }}
                     onActionTaken={async (rec, actionDescription, comment) => {
-                        await ToiletApi.reviewInspection(rec.id, { status: 'ACTION_TAKEN', comment: actionDescription || comment });
-                        setFullReportModalItem(null);
-                        loadData();
+                        setProcessingText('Updating report status...');
+                        try {
+                            await ToiletApi.reviewInspection(rec.id, { status: 'ACTION_TAKEN', comment: actionDescription || comment });
+                            setFullReportModalItem(null);
+                            await loadData();
+                        } finally {
+                            setProcessingText(null);
+                        }
                     }}
                 />
+            )}
+
+            {/* Processing Spinner Overlay */}
+            {processingText && typeof document !== 'undefined' && createPortal(
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 999999,
+                    backgroundColor: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(6px)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    color: '#ffffff', gap: 16
+                }}>
+                    <div style={{
+                        width: 48, height: 48, borderRadius: '50%',
+                        border: '4px solid rgba(255,255,255,0.2)',
+                        borderTop: '4px solid #2563eb',
+                        animation: 'spin 0.8s linear infinite'
+                    }} />
+                    <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '0.02em', color: '#f8fafc' }}>
+                        {processingText}
+                    </div>
+                </div>,
+                document.body
             )}
 
             <style jsx>{`

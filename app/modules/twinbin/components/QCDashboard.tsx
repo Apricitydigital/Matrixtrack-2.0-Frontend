@@ -134,7 +134,6 @@ export default function QCDashboard() {
     };
 
     async function handleApprove(record: any) {
-        if (!confirm("Are you sure you want to Approve this request?")) return;
         setActionLoading(record.id);
         try {
             if (record.type === 'BIN_REGISTRATION') {
@@ -145,25 +144,24 @@ export default function QCDashboard() {
             await loadData();
             setViewRecord(null);
         } catch (err) {
-            alert("Approval failed: " + (err instanceof ApiError ? err.message : "Error"));
+            console.error("Approval failed:", err);
         } finally {
             setActionLoading(null);
         }
     }
 
-    async function handleReject(record: any) {
-        if (!confirm("Are you sure you want to Reject this request?")) return;
+    async function handleReject(record: any, comment?: string) {
         setActionLoading(record.id);
         try {
             if (record.type === 'BIN_REGISTRATION') {
-                await TwinbinApi.reject(record.id);
+                await TwinbinApi.reject(record.id, comment);
             } else if (record.type === 'VISIT_REPORT') {
-                await TwinbinApi.rejectVisit(record.id);
+                await TwinbinApi.rejectVisit(record.id, comment);
             }
             await loadData();
             setViewRecord(null);
         } catch (err) {
-            alert("Rejection failed: " + (err instanceof ApiError ? err.message : "Error"));
+            console.error("Rejection failed:", err);
         } finally {
             setActionLoading(null);
         }

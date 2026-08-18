@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { normalizeInspectionAnswers, NormalizedAnswer } from '@lib/reportAnswers';
 import { useAuth } from '@hooks/useAuth';
 
@@ -106,18 +107,42 @@ export default function UniversalReportModal({
         || record.locationName || record.feederPointName || record.locationDescription
         || record.name || 'Inspection Report';
 
+    // Parse Q&A
+    const parsedAnswers: NormalizedAnswer[] = normalizeInspectionAnswers(record);
+
+    // Resolve answer photo URLs
+    const resolvedAnswers = parsedAnswers.map(a => ({
+        ...a,
+        photos: a.photos.map(p => resolveUrl(p)).filter(Boolean) as string[]
+    }));
+
+    const isRegistrationRequest = record._type === 'REGISTRATION' || record.isRegistration || (resolvedAnswers.length === 0 && !record.answers && !record.questionnaire);
+
     const assetType = record.toilet?.type || record.type || record.category || record.areaType || null;
 
-    // Zone / Ward
-    const zoneName = record.toilet?.zoneName || record.zoneName || record.zone?.name
-        || record.beat?.zoneName || record.beat?.zone?.name
-        || record.segment?.zoneName || record.payload?.zoneName
-        || (record.zoneId ? `Zone ${record.zoneId}` : null) || 'Zone 1';
+    const cleanGeoName = (val: any) => {
+        if (!val || typeof val !== 'string') return null;
+        const str = val.trim();
+        if (str.includes('-') && str.length > 20) return null;
+        return str;
+    };
 
-    const wardName = record.toilet?.wardName || record.wardName || record.ward?.name
+    // Zone / Ward
+    const rawZone = record.toilet?.ward?.parent?.name || record.toilet?.zoneName || record.zoneName || record.zone?.name
+        || record.ward?.parent?.name || record.beat?.zoneName || record.beat?.zone?.name
+        || record.segment?.zoneName || record.payload?.zoneName;
+
+    const zoneName = cleanGeoName(rawZone)
+        || (record.zoneId && !String(record.zoneId).includes('-') ? `Zone ${record.zoneId}` : null)
+        || 'Zone 1';
+
+    const rawWard = record.toilet?.ward?.name || record.toilet?.wardName || record.wardName || record.ward?.name
         || record.beat?.wardName || record.beat?.ward?.name
-        || record.segment?.wardName || record.payload?.wardName
-        || (record.wardId ? `Ward ${record.wardId}` : null) || 'Ward 1';
+        || record.segment?.wardName || record.payload?.wardName;
+
+    const wardName = cleanGeoName(rawWard)
+        || (record.wardId && !String(record.wardId).includes('-') ? `Ward ${record.wardId}` : null)
+        || 'Ward 1';
 
     const beatName = record.beatName || record.beat?.name || null;
     const areaDetail = (record.areaName !== beatName ? record.areaName : null) || record.locationDescription || null;
@@ -161,14 +186,7 @@ export default function UniversalReportModal({
     const isFinalized = status === 'APPROVED' || status === 'REJECTED' || status === 'ACTION_TAKEN';
     const isPending = !isActionRequired && !isFinalized;
 
-    // Parse Q&A
-    const parsedAnswers: NormalizedAnswer[] = normalizeInspectionAnswers(record);
 
-    // Resolve answer photo URLs
-    const resolvedAnswers = parsedAnswers.map(a => ({
-        ...a,
-        photos: a.photos.map(p => resolveUrl(p)).filter(Boolean) as string[]
-    }));
 
     // Gather ALL evidence photos from record fields & Q&A responses
     const allEvidencePhotos: string[] = [];
@@ -264,12 +282,35 @@ export default function UniversalReportModal({
         }
     });
 
+    const isCityAdminUser = allRoles.includes('CITY_ADMIN') || allRoles.includes('CITYADMIN');
+    const isQcUser = !isCityAdminUser && (allRoles.includes('QC') || allRoles.includes('QC_OFFICER'));
+
+    const actionPanelTitle = isUserAO 
+        ? 'AO Action Panel' 
+        : isCityAdminUser 
+            ? 'City Admin Review & Actions' 
+            : isQcUser 
+                ? 'QC Review & Actions' 
+                : 'Review & Actions';
+
+    const remarksLabel = isCityAdminUser 
+        ? 'City Admin Remarks / Reason' 
+        : isQcUser 
+            ? 'QC Remarks / Reason' 
+            : 'Review Remarks / Reason';
+
+    const remarksPlaceholder = isCityAdminUser 
+        ? 'Enter City Admin remarks...' 
+        : isQcUser 
+            ? 'Enter QC inspection feedback...' 
+            : 'Enter review feedback...';
+
     const qcComment = record.qcComment || record.comment || record.reviewerNote || null;
     const actionNote = record.actionNote || record.aoNote || record.aoRemark || null;
     const reviewerRaw = record.reviewedByQc?.name || record.qcReviewer?.name || record.approvedBy?.name
-        || (typeof record.reviewedBy === 'object' ? record.reviewedBy?.name : record.reviewedBy)
-        || (typeof record.approvedBy === 'object' ? record.approvedBy?.name : record.approvedBy)
-        || (typeof record.qcReviewer === 'object' ? record.qcReviewer?.name : record.qcReviewer)
+        || (typeof record.reviewedBy === 'object' ? (record.reviewedBy?.name || record.reviewedBy?.fullName || record.reviewedBy?.userName) : record.reviewedBy)
+        || (typeof record.approvedBy === 'object' ? (record.approvedBy?.name || record.approvedBy?.fullName || record.approvedBy?.userName) : record.approvedBy)
+        || (typeof record.qcReviewer === 'object' ? (record.qcReviewer?.name || record.qcReviewer?.fullName || record.qcReviewer?.userName) : record.qcReviewer)
         || record.actionTakenBy?.name || record.actionTakenBy
         || record.payload?.reviewedBy?.name || record.payload?.approvedBy?.name || null;
 
@@ -277,20 +318,41 @@ export default function UniversalReportModal({
     if (!reviewerName && typeof reviewerRaw === 'string' && !reviewerRaw.includes('-') && reviewerRaw.length < 40) {
         reviewerName = reviewerRaw;
     }
+
+    let reviewerRoleText = '';
+    const rawRole = record.reviewedByRole || record.approvedByRole || record.reviewedBy?.role || record.approvedBy?.role || null;
+    if (rawRole) {
+        reviewerRoleText = String(rawRole).toUpperCase() === 'CITY_ADMIN' ? 'City Admin' : String(rawRole).toUpperCase() === 'QC' ? 'QC Officer' : String(rawRole);
+    } else if (record.reviewedByQc || record.qcReviewer) {
+        reviewerRoleText = 'QC Officer';
+    }
+
     if (!reviewerName && (status === 'APPROVED' || status === 'REJECTED' || status === 'ACTION_TAKEN')) {
-        reviewerName = 'Indore QC Officer';
+        if (user?.name) {
+            reviewerName = user.name;
+            reviewerRoleText = isCityAdminUser ? 'City Admin' : isQcUser ? 'QC Officer' : '';
+        } else {
+            reviewerName = 'Reviewing Officer';
+        }
     }
 
     const reviewedAtRaw = record.reviewedAt || record.approvedAt || record.updatedAt || null;
     const formattedReviewedAt = reviewedAtRaw ? new Date(reviewedAtRaw).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
 
-    return (
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted || typeof document === 'undefined') return null;
+
+    return createPortal(
         <>
             {/* Backdrop */}
-            <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)' }} />
+            <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 99998, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)' }} />
 
             {/* Scroll Container */}
-            <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', overflowY: 'auto', pointerEvents: 'none' }}>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', overflowY: 'auto', pointerEvents: 'none' }}>
                 <div
                     onClick={(e) => e.stopPropagation()}
                     style={{
@@ -384,9 +446,13 @@ export default function UniversalReportModal({
                             {(qcComment || actionNote || reviewerName || formattedReviewedAt) && (
                                 <div style={{ background: '#eff6ff', borderRadius: '12px', padding: '12px 14px', border: '1px solid #bfdbfe' }}>
                                     <div style={{ fontSize: '11px', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase', marginBottom: 6 }}>Audit Review Notes</div>
-                                    {reviewerName && <div style={{ fontSize: '11px', color: '#475569', marginBottom: 2 }}>Reviewed By: <strong>{reviewerName}</strong></div>}
+                                    {reviewerName && (
+                                        <div style={{ fontSize: '11px', color: '#475569', marginBottom: 2 }}>
+                                            Reviewed By: <strong>{reviewerName}{reviewerRoleText ? ` (${reviewerRoleText})` : ''}</strong>
+                                        </div>
+                                    )}
                                     {formattedReviewedAt && <div style={{ fontSize: '11px', color: '#475569', marginBottom: 4 }}>Reviewed Date: <strong>{formattedReviewedAt}</strong></div>}
-                                    {qcComment && <div style={{ fontSize: '12px', color: '#1e293b', marginTop: 4 }}><strong>QC Remarks:</strong> {qcComment}</div>}
+                                    {qcComment && <div style={{ fontSize: '12px', color: '#1e293b', marginTop: 4 }}><strong>Review Remarks:</strong> {qcComment}</div>}
                                     {actionNote && <div style={{ fontSize: '12px', color: '#15803d', marginTop: 4 }}><strong>Action Description:</strong> {actionNote}</div>}
                                 </div>
                             )}
@@ -410,18 +476,20 @@ export default function UniversalReportModal({
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                                             <MetaRow label="Asset Name" value={assetName} />
                                             <MetaRow label="Asset ID" value={record.id || 'N/A'} />
-                                            <MetaRow label="Category / Type" value={assetType || record.areaType || 'Twin Bin Asset'} />
-                                            <MetaRow label="Capacity" value={record.capacity || record.holdingCapacity || '120L / 240L'} />
+                                            <MetaRow label="Area Name" value={record.areaName || record.area || 'N/A'} />
+                                            <MetaRow label="Location Name / Landmark" value={record.locationName || record.address || 'N/A'} />
                                             <MetaRow label="Zone" value={zoneName} />
                                             <MetaRow label="Ward" value={wardName} />
-                                            <MetaRow label="GPS Coordinates" value={`${record.latitude || record.lat || '22.7196'}°, ${record.longitude || record.lng || '75.8577'}°`} />
+                                            <MetaRow label="Area Type" value={record.areaType || 'N/A'} />
+                                            <MetaRow label="Road Type" value={record.roadType || 'N/A'} />
+                                            <MetaRow label="Fixed Properly" value={record.isFixedProperly !== undefined ? (record.isFixedProperly ? 'Yes' : 'No') : 'N/A'} />
+                                            <MetaRow label="Has Lid" value={record.hasLid !== undefined ? (record.hasLid ? 'Yes' : 'No') : 'N/A'} />
+                                            <MetaRow label="Asset Condition" value={record.condition || 'GOOD'} />
+                                            {(record.latitude || record.lat) && (record.longitude || record.lng) ? (
+                                                <MetaRow label="GPS Coordinates" value={`${record.latitude || record.lat}°, ${record.longitude || record.lng}°`} />
+                                            ) : null}
                                             <MetaRow label="Registration Status" value={status} />
                                         </div>
-                                        {record.address && (
-                                            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
-                                                <MetaRow label="Address / Landmark" value={record.address || record.locationName || 'Main Hub'} />
-                                            </div>
-                                        )}
                                     </div>
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -474,18 +542,18 @@ export default function UniversalReportModal({
                         {/* RIGHT COLUMN: QC Action Controls / AO Action Panel */}
                         <div style={{ background: '#f8fafc', padding: '20px 18px', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16, height: '100%', boxSizing: 'border-box', overflowY: 'auto' }}>
                             <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                                {isUserAO ? 'AO Action Panel' : 'QC Review & Actions'}
+                                {actionPanelTitle}
                             </h3>
 
                             {/* QC / Admin Action Form (Approve / Action Required / Reject) - strictly hidden for AO */}
                             {!isUserAO && (isPending || isActionRequired || !isFinalized) && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <div>
-                                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>QC Remarks / Reason</label>
+                                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>{remarksLabel}</label>
                                         <textarea
                                             value={remarks}
                                             onChange={e => setRemarks(e.target.value)}
-                                            placeholder="Enter inspection feedback..."
+                                            placeholder={remarksPlaceholder}
                                             rows={3}
                                             style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none', background: '#ffffff', resize: 'vertical' }}
                                         />
@@ -501,15 +569,7 @@ export default function UniversalReportModal({
                                         </button>
                                     )}
 
-                                    {onActionRequired && (
-                                        <button
-                                            onClick={handleActionReq}
-                                            disabled={submitting}
-                                            style={{ padding: '10px', borderRadius: '8px', border: 'none', background: '#ea580c', color: '#ffffff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-                                        >
-                                            Action Required
-                                        </button>
-                                    )}
+
 
                                     {onReject && (
                                         <button
@@ -583,6 +643,7 @@ export default function UniversalReportModal({
                     </div>
                 </div>
             )}
-        </>
+        </>,
+        document.body
     );
 }
