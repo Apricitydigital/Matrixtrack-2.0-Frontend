@@ -184,8 +184,8 @@ export default function RegisteredUsersPage() {
         const q = searchQuery.toLowerCase().trim();
         const matchesSearch =
           !q ||
-          u.name.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q) ||
+          (u.name && u.name.toLowerCase().includes(q)) ||
+          (u.email && u.email.toLowerCase().includes(q)) ||
           (uCityName && uCityName.toLowerCase().includes(q)) ||
           (u.role && u.role.toLowerCase().includes(q));
 

@@ -161,6 +161,18 @@ export default function ToiletModulePage() {
             moduleTitle="Toilet Cleanliness Inspection"
             record={selectedReport}
             onClose={() => setSelectedReport(null)}
+            onApprove={async (rec, comment) => {
+              await ToiletApi.reviewInspection(rec.id, { status: 'APPROVED', comment });
+              setSelectedReport(null);
+            }}
+            onReject={async (rec, comment) => {
+              await ToiletApi.reviewInspection(rec.id, { status: 'REJECTED', comment });
+              setSelectedReport(null);
+            }}
+            onActionRequired={async (rec, comment) => {
+              await ToiletApi.reviewInspection(rec.id, { status: 'ACTION_REQUIRED', comment });
+              setSelectedReport(null);
+            }}
           />
         )}
       </div>

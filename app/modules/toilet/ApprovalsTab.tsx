@@ -3,6 +3,7 @@ import { ToiletApi, GeoApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import { FilterTabs } from "../qc-shared";
 import UniversalReportModal from "@components/UniversalReportModal";
+import { isReportVisibleToAO } from "@lib/aoScope";
 
 export default function ApprovalsTab({ cityId }: { cityId?: string }) {
     const { user } = useAuth();
@@ -44,8 +45,6 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                     const res = await ToiletApi.listPendingToilets();
                     allItems.push(...(res.toilets || []).map((t: any) => ({ ...t, _type: 'REGISTRATION' })));
                 } else {
-                    // For completed, we try to fetch all and filter
-                    // Note: This fetches assigned toilets. Rejected ones might be missing if API doesn't return them.
                     try {
                         const res = await ToiletApi.listAllToilets();
                         const completed = (res.toilets || []).filter((t: any) => t.status !== 'PENDING').map((t: any) => ({ ...t, _type: 'REGISTRATION' }));
@@ -58,38 +57,27 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
             if (isQC || isCityAdmin || isAO) {
                 try {
                     const res = await ToiletApi.listInspections();
-                    // Client-side filtering as API returns paginated but usually sufficient for recent tasks
                     let inspections = res.inspections || [];
 
                     if (activeTab === 'PENDING') {
-                        if (isAO && !isQC) { // Pure AO
+                        if (isAO && !isQC) {
                             inspections = inspections.filter((i: any) => i.status === 'ACTION_REQUIRED');
                         } else {
-                            // QC / Admin sees SUBMITTED. AO also sees ACTION_REQUIRED? 
-                            // If user is both QC and AO, they see everything needing action.
                             const statusesRaw: string[] = [];
                             if (isQC || isCityAdmin) statusesRaw.push('SUBMITTED');
                             if (isAO) statusesRaw.push('ACTION_REQUIRED');
                             inspections = inspections.filter((i: any) => statusesRaw.includes(i.status));
                         }
                     } else {
-                        // Completed
                         const statusesRaw = ['APPROVED', 'REJECTED', 'ACTION_TAKEN'];
-                        if (isAO && !isQC) {
-                            // AO sees items that were Action Required but now resolved
-                            // Or items they acted on.
-                        }
                         inspections = inspections.filter((i: any) => statusesRaw.includes(i.status) || (isAO && i.actionTakenById));
                     }
-
+                    inspections = inspections.filter((i: any) => isReportVisibleToAO(user, i, 'TOILET'));
                     allItems.push(...inspections.map((i: any) => ({ ...i, _type: 'INSPECTION' })));
                 } catch (e) { console.error("Error fetching inspections", e); }
             }
 
-            // Sort by Date Desc
             allItems.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-            // Remove duplicates
             const unique = allItems.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
             setItems(unique);
 
@@ -112,19 +100,10 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                 }
             } else {
                 let comment = '';
-                if (status === 'ACTION_REQUIRED' || status === 'REJECTED') {
-                    comment = prompt(status === 'ACTION_REQUIRED' ? "Enter instructions for Action Officer:" : "Enter action taken notes:") || '';
+                if (status === 'ACTION_REQUIRED' || status === 'REJECTED' || status === 'ACTION_TAKEN') {
+                    comment = prompt(status === 'ACTION_REQUIRED' ? "Enter instructions for Action Officer:" : "Enter resolution notes:") || '';
                     if (comment === null) return;
                 }
-                // For AO 'APPROVED' on Action Required means "No Action Needed" or resolved without note? usually implies resolved.
-                // The API expects 'APPROVED', 'REJECTED' (AO takes action -> REJECTED logic in backend for AO?? wait check backend logic)
-
-                // Backend logic check:
-                // If AO reviews: 
-                //   UpdateData.actionTakenById = userId
-                //   If REJECTED -> update.actionNote = comment
-                //   Must be APPROVED or REJECTED.
-
                 await ToiletApi.reviewInspection(id, { status, comment });
             }
             alert("Action successful");
@@ -341,7 +320,7 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                                     </div>
                                     <div style={{ marginTop: 12 }}>
                                         <button
-                                            onClick={() => setFullReportModalItem(selectedRequest)}
+                                            onClick={() => { const target = selectedRequest; setSelectedRequest(null); setFullReportModalItem(target); }}
                                             className="btn btn-xs btn-primary font-bold cursor-pointer"
                                             style={{ width: '100%', backgroundColor: '#2563eb', color: '#fff', padding: '10px', borderRadius: '8px', boxShadow: '0 2px 6px rgba(37,99,235,0.2)' }}
                                         >
@@ -370,7 +349,7 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
 
                                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
                                     {/* Actions */}
-                                    {(user?.roles.includes('QC') || user?.roles.includes('CITY_ADMIN') || user?.roles.includes('HMS_SUPER_ADMIN')) && selectedRequest.status === 'SUBMITTED' && (
+                                    {(user?.roles?.includes('QC') || user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN') || user?.role === 'CITY_ADMIN' || user?.role === 'QC' || user?.role === 'HMS_SUPER_ADMIN') && (selectedRequest.status === 'SUBMITTED' || selectedRequest.status === 'PENDING_QC') && (
                                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                             <button className="btn btn-sm btn-primary" style={{ flex: 1, backgroundColor: '#10b981', borderColor: '#10b981' }} onClick={() => handleAction(selectedRequest.id, 'APPROVED', true)}>Approve</button>
                                             <button className="btn btn-sm btn-primary" style={{ flex: 1, backgroundColor: '#ef4444', borderColor: '#ef4444' }} onClick={() => handleAction(selectedRequest.id, 'REJECTED', true)}>Reject</button>
@@ -380,8 +359,9 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
 
                                     {user?.roles.includes('ACTION_OFFICER') && selectedRequest.status === 'ACTION_REQUIRED' && (
                                         <div style={{ display: 'flex', gap: 8 }}>
-                                            <button className="btn btn-sm btn-primary" style={{ flex: 1 }} onClick={() => handleAction(selectedRequest.id, 'APPROVED', true)}>No Issue</button>
-                                            <button className="btn btn-sm btn-secondary" style={{ flex: 1 }} onClick={() => handleAction(selectedRequest.id, 'REJECTED', true)}>Action Taken</button>
+                                            <button className="btn btn-sm btn-primary" style={{ flex: 1, backgroundColor: '#2563eb', borderColor: '#2563eb' }} onClick={() => handleAction(selectedRequest.id, 'ACTION_TAKEN', true)}>
+                                                Mark Action Taken
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -409,6 +389,11 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                     onActionRequired={async (rec, comment) => {
                         await handleAction(rec.id, 'ACTION_REQUIRED', true);
                         setFullReportModalItem(null);
+                    }}
+                    onActionTaken={async (rec, actionDescription, comment) => {
+                        await ToiletApi.reviewInspection(rec.id, { status: 'ACTION_TAKEN', comment: actionDescription || comment });
+                        setFullReportModalItem(null);
+                        loadData();
                     }}
                 />
             )}
