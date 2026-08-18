@@ -3,7 +3,7 @@
 import { useAuth } from "@hooks/useAuth";
 import { ModuleGuard } from "@components/Guards";
 import { useState, useEffect } from "react";
-import { CityApi } from "@lib/apiClient";
+import { CityApi, ToiletApi } from "@lib/apiClient";
 import ReportsTab from "./ReportsTab";
 import AllToiletsTab from "./AllToiletsTab";
 import ApprovalsTab from "./ApprovalsTab";

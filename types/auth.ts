@@ -58,6 +58,21 @@ export interface AuthUser {
   token?: string;
   zoneIds?: string[];
   wardIds?: string[];
+  zoneId?: string | null;
+  wardId?: string | null;
+
+  zoneName?: string | null;
+  wardName?: string | null;
+
+  zone?: {
+    id?: string;
+    name?: string;
+  } | null;
+
+  ward?: {
+    id?: string;
+    name?: string;
+  } | null;
   zoneDetails?: Array<{ id: string; name: string }>;
   wardDetails?: Array<{ id: string; name: string }>;
   assignedBeats?: Array<{ id: string; beatName: string; beatCode?: string }>;

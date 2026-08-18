@@ -9,6 +9,7 @@ interface SubmittedReportsTabProps {
     moduleKey: 'TOILET' | 'SWEEPING' | 'LITTERBINS';
     assetLabel: string;
     cityId?: string;
+    initialStatus?: string;
     onViewReport: (record: any) => void;
 }
 
