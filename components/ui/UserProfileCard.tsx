@@ -141,7 +141,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
     if (k.includes('TOILET')) return 'Cleanliness of Toilets';
     if (k.includes('LITTER')) return 'Litter Bins System';
     if (k.includes('SWEEP')) return 'Sweeping System';
-    if (k.includes('TASKFORCE') || k.includes('GVP')) return 'CTU / GVP Transformation';
+    if (k.includes('TASKFORCE') || k.includes('GVP') || k.includes('CTU')) return 'GVP';
     if (k.includes('WORKFORCE')) return 'Workforce Monitoring (MatrixTrack)';
     if (k.includes('SWACHH') || k.includes('RANKING')) return 'Ward Ranking System';
     if (k.includes('PROCESSING') || k.includes('MRF')) return 'Processing Plant System (MRF)';
@@ -168,7 +168,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
         
         {/* Soft Lavender Gradient Waves Cover Banner */}
-        <div className="h-44 sm:h-52 w-full bg-gradient-to-r from-indigo-200 via-purple-200 to-pink-200 relative overflow-hidden">
+        <div className="h-28 sm:h-32 w-full bg-gradient-to-r from-indigo-200 via-purple-200 to-pink-200 relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-300/40 via-purple-300/30 to-transparent pointer-events-none" />
           
           <svg className="absolute bottom-0 left-0 right-0 w-full text-white/40" viewBox="0 0 1440 120" fill="currentColor">
@@ -177,48 +177,48 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
         </div>
 
         {/* Profile Header Details (Avatar & Info) */}
-        <div className="px-6 pb-6 pt-0 relative">
+        <div className="px-6 pb-5 pt-0 relative">
           
           {/* Centered Overlapping Avatar */}
-          <div className="flex flex-col items-center text-center -mt-14 sm:-mt-16">
+          <div className="flex flex-col items-center text-center -mt-10 sm:-mt-12">
             <div className="relative">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-1 shadow-xl">
-                <div className="w-full h-full rounded-full bg-indigo-700 flex items-center justify-center text-3xl font-black text-white border-4 border-white">
+              <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-0.5 shadow-lg">
+                <div className="w-full h-full rounded-full bg-indigo-700 flex items-center justify-center text-xl font-black text-white border-2 border-white">
                   {userInitials}
                 </div>
               </div>
-              <div className="absolute bottom-1 right-1 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center shadow" title="Active Account">
-                <CheckCircle2 className="w-4 h-4 text-white stroke-[3]" />
+              <div className="absolute bottom-0 right-0 w-5 h-5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center shadow" title="Active Account">
+                <CheckCircle2 className="w-3 h-3 text-white stroke-[3]" />
               </div>
             </div>
 
             {/* Name & Role */}
-            <h2 className="mt-3 text-xl sm:text-2xl font-black text-slate-800 tracking-tight">{user.name || 'User Profile'}</h2>
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-0.5 rounded-full mt-1">
+            <h2 className="mt-2 text-lg sm:text-xl font-black text-slate-800 tracking-tight">{user.name || 'User Profile'}</h2>
+            <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full mt-0.5">
               {primaryRole}
             </span>
 
             {/* Quick Stat Bar */}
-            <div className="flex items-center gap-6 sm:gap-10 mt-5 pt-4 border-t border-slate-100 text-center">
+            <div className="flex items-center gap-6 sm:gap-10 mt-3 pt-3 border-t border-slate-100 text-center">
               <div>
-                <span className="text-lg font-black text-slate-800 block">{assignedModules.length}</span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Assigned Modules</span>
+                <span className="text-base font-black text-slate-800 block">{assignedModules.length}</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Assigned Modules</span>
               </div>
-              <div className="h-8 w-px bg-slate-200" />
+              <div className="h-6 w-px bg-slate-200" />
               <div>
-                <span className="text-lg font-black text-slate-800 block">{user.cityName || 'City Context'}</span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">ULB Jurisdiction</span>
+                <span className="text-base font-black text-slate-800 block">{user.cityName || 'City Context'}</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ULB Jurisdiction</span>
               </div>
-              <div className="h-8 w-px bg-slate-200" />
+              <div className="h-6 w-px bg-slate-200" />
               <div>
-                <span className="text-lg font-black text-emerald-600 block">ACTIVE</span>
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Account Status</span>
+                <span className="text-base font-black text-emerald-600 block">ACTIVE</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Account Status</span>
               </div>
             </div>
           </div>
 
           {/* Navigation Tab Bar */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100 flex-wrap gap-3">
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveTab('profile')}

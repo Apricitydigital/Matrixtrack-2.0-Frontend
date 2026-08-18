@@ -985,22 +985,6 @@ function PortalHomeLayoutContent({
         pathname ===
         '/city/areas',
     },
-
-    {
-      name:
-        'Employees',
-
-      href:
-        '/city/employees',
-
-      icon:
-        <Users size={15} />,
-
-      isActive:
-        pathname.startsWith(
-          '/city/employees'
-        ),
-    },
   ];
 
 
@@ -1776,32 +1760,7 @@ function PortalHomeLayoutContent({
                     </Link>
 
 
-                    {/* =================================================
-                        ATTENDANCE ANALYTICS - CITY ADMIN
-                    ================================================= */}
 
-                    {isCityAdmin && (
-                      <Link
-                        href="/city/attendance"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
-                          ? 'bg-gradient-to-r from-cyan-600 to-blue-700 text-white shadow-md shadow-cyan-600/25'
-                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-700'
-                          }`}
-                      >
-                        <ChartNoAxesCombined
-                          size={16}
-                          className={
-                            pathname.startsWith('/city/attendance')
-                              ? 'text-white'
-                              : 'text-cyan-600'
-                          }
-                        />
-
-                        <span>
-                          Attendance Analytics
-                        </span>
-                      </Link>
-                    )}
 
 
                     {/* =================================================
@@ -1931,6 +1890,32 @@ function PortalHomeLayoutContent({
 
                               <span>
                                 User Registration Requests
+                              </span>
+                            </Link>
+
+                            {/* Employees Tab */}
+                            <Link
+                              href="/city/employees"
+                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
+                                '/city/employees'
+                              )
+                                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                }`}
+                            >
+                              <Users
+                                size={15}
+                                className={
+                                  pathname.startsWith(
+                                    '/city/employees'
+                                  )
+                                    ? 'text-white'
+                                    : 'text-slate-400'
+                                }
+                              />
+
+                              <span>
+                                Employees
                               </span>
                             </Link>
 
@@ -2327,13 +2312,38 @@ function PortalHomeLayoutContent({
 
             {(hasTaskforceAccess ||
               hasSwachhAccess ||
-              hasWorkforceAccess) && (
+              hasWorkforceAccess ||
+              isCityAdmin) && (
 
                 <div className="px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 mb-1">
                   Active Module
                 </div>
 
               )}
+
+            {/* Attendance Analytics in Active Modules */}
+            {isCityAdmin && (
+              <Link
+                href="/city/attendance"
+                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                  ? 'bg-blue-600 text-white font-extrabold shadow-md shadow-blue-500/20'
+                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+              >
+                <ChartNoAxesCombined
+                  size={18}
+                  className={`shrink-0 ${
+                    pathname.startsWith('/city/attendance')
+                      ? 'text-white'
+                      : 'text-slate-500'
+                  }`}
+                />
+
+                <span className="text-left leading-snug">
+                  Attendance Analytics
+                </span>
+              </Link>
+            )}
 
 
             {/* =================================================
