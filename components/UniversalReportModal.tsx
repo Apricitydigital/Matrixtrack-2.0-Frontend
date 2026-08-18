@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { normalizeInspectionAnswers, NormalizedAnswer } from '@lib/reportAnswers';
+import { useAuth } from '@hooks/useAuth';
 
 export type UniversalReportModalProps = {
     moduleTitle: string;
@@ -69,10 +70,34 @@ export default function UniversalReportModal({
     isAO = false,
     userRoles = []
 }: UniversalReportModalProps) {
+    const { user } = useAuth();
     const [remarks, setRemarks] = useState('');
     const [actionTakenText, setActionTakenText] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+
+    // Determine role permissions accurately
+    const userRolesFromAuth = user?.roles || (user?.role ? [user.role] : []);
+    let userRolesFromStorage: string[] = [];
+    if (typeof window !== 'undefined') {
+        try {
+            const stored = localStorage.getItem('user') || localStorage.getItem('swachh_user');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed?.roles)) userRolesFromStorage = parsed.roles;
+                else if (parsed?.role) userRolesFromStorage = [parsed.role];
+            }
+        } catch (_) {}
+    }
+
+    const allRoles = Array.from(new Set([
+        ...userRoles,
+        ...userRolesFromAuth,
+        ...userRolesFromStorage
+    ].map(r => String(r).toUpperCase())));
+
+    const isAdminOrQC = allRoles.includes('CITY_ADMIN') || allRoles.includes('QC') || allRoles.includes('HMS_SUPER_ADMIN') || allRoles.includes('COMMISSIONER');
+    const isUserAO = !isAdminOrQC && (isAO || allRoles.includes('ACTION_OFFICER') || allRoles.includes('AO'));
 
     if (!record) return null;
 
@@ -229,9 +254,14 @@ export default function UniversalReportModal({
     const handleReject = wrap(async () => { if (onReject) await onReject(record, remarks); });
     const handleActionReq = wrap(async () => { if (onActionRequired) await onActionRequired(record, remarks); });
     const handleActionTaken = wrap(async () => {
-        if (!onActionTaken) return;
         if (!actionTakenText.trim()) throw new Error('Please describe the action taken.');
-        await onActionTaken(record, actionTakenText, remarks);
+        if (onActionTaken) {
+            await onActionTaken(record, actionTakenText, remarks);
+        } else if (onApprove) {
+            await onApprove(record, actionTakenText || remarks);
+        } else if (onReject) {
+            await onReject(record, actionTakenText || remarks);
+        }
     });
 
     const qcComment = record.qcComment || record.comment || record.reviewerNote || null;
@@ -265,23 +295,20 @@ export default function UniversalReportModal({
                     onClick={(e) => e.stopPropagation()}
                     style={{
                         pointerEvents: 'all', background: '#ffffff', borderRadius: '20px',
-                        width: '100%', maxWidth: '920px', maxHeight: '88vh',
+                        width: '900px', maxWidth: '94vw', maxHeight: '88vh',
                         display: 'flex', flexDirection: 'column',
-                        boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
-                        overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+                        boxSizing: 'border-box', overflow: 'hidden'
                     }}
                 >
-                    {/* MODAL HEADER */}
-                    <div style={{
-                        background: '#ffffff', borderBottom: '1px solid #f1f5f9',
-                        padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0
-                    }}>
+                    {/* HEADER */}
+                    <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', flexShrink: 0 }}>
                         <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2 }}>
-                                <h2 style={{ margin: 0, color: '#0f172a', fontSize: '18px', fontWeight: 700 }}>{assetName}</h2>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 800, color: '#0f172a' }}>{assetName}</h2>
                                 <StatusBadgeInline status={status} />
                             </div>
-                            <div style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>
+                            <div style={{ fontSize: '12px', fontWeight: 500, color: '#64748b', marginTop: 4 }}>
                                 {moduleTitle} • Report ID: {record.id.slice(0, 12)}
                             </div>
                         </div>
@@ -295,7 +322,7 @@ export default function UniversalReportModal({
                     </div>
 
                     {/* MODAL BODY */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 310px', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', width: '100%', flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
                         {/* LEFT COLUMN: Metadata & Question Responses */}
                         <div style={{ overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -444,11 +471,14 @@ export default function UniversalReportModal({
                             </div>
                         </div>
 
-                        {/* RIGHT COLUMN: QC Action Controls */}
-                        <div style={{ background: '#f8fafc', padding: '20px 18px', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>QC Review & Actions</h3>
+                        {/* RIGHT COLUMN: QC Action Controls / AO Action Panel */}
+                        <div style={{ background: '#f8fafc', padding: '20px 18px', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16, height: '100%', boxSizing: 'border-box', overflowY: 'auto' }}>
+                            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                                {isUserAO ? 'AO Action Panel' : 'QC Review & Actions'}
+                            </h3>
 
-                            {isPending && (
+                            {/* QC / Admin Action Form (Approve / Action Required / Reject) - strictly hidden for AO */}
+                            {!isUserAO && (isPending || isActionRequired || !isFinalized) && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <div>
                                         <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>QC Remarks / Reason</label>
@@ -493,7 +523,8 @@ export default function UniversalReportModal({
                                 </div>
                             )}
 
-                            {isActionRequired && isAO && onActionTaken && (
+                            {/* AO Action Form - strictly allowed ONLY when status is ACTION_REQUIRED */}
+                            {isUserAO && isActionRequired && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     <div>
                                         <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Action Taken Resolution Description</label>
@@ -511,12 +542,22 @@ export default function UniversalReportModal({
                                         disabled={submitting}
                                         style={{ padding: '10px', borderRadius: '8px', border: 'none', background: '#2563eb', color: '#ffffff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                                     >
-                                        Mark Action Taken
+                                        {submitting ? 'Submitting...' : 'Mark Action Taken'}
                                     </button>
                                 </div>
                             )}
 
-                            {isFinalized && (
+                            {/* Read-only status info for AO viewing non-ACTION_REQUIRED reports */}
+                            {isUserAO && !isActionRequired && (
+                                <div style={{ background: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>
+                                    Report Status: <strong style={{ color: '#0f172a' }}>{status}</strong>
+                                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#64748b' }}>
+                                        {isPending ? 'Pending review by QC / City Admin.' : 'Audit report finalized.'}
+                                    </p>
+                                </div>
+                            )}
+
+                            {!isUserAO && isFinalized && (
                                 <div style={{ background: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>
                                     Audit Record Finalized: <strong style={{ color: '#0f172a' }}>{status}</strong>
                                 </div>

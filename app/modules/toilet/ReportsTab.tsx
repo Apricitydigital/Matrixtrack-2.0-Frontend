@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ApiError, ToiletApi, GeoApi } from '@lib/apiClient';
 import Link from 'next/link';
 import { FilterTabs } from "../qc-shared";
 import UniversalReportModal from '@components/UniversalReportModal';
+import { useAuth } from '@hooks/useAuth';
+import { isReportVisibleToAO } from '@lib/aoScope';
 
 export default function ReportsTab({ cityId }: { cityId?: string }) {
+    const { user } = useAuth();
+    const tableSectionRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState<any>(null);
     const [totalToiletsCount, setTotalToiletsCount] = useState<number>(0);
     const [reports, setReports] = useState<any[]>([]);
@@ -146,8 +150,10 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
         ACTION_TAKEN: { bg: '#f0fdf4', color: '#15803d', label: 'RESOLVED' },
     };
 
-    // Client-side filtering by Zone, Ward, Supervisor
+    // Client-side filtering by Zone, Ward, Supervisor & AO Scope
     const filteredReports = reports.filter(r => {
+        if (!isReportVisibleToAO(user, r, 'TOILET')) return false;
+
         if (selectedZone) {
             const zId = r.toilet?.ward?.parentId || r.toilet?.zoneId || r.zoneId;
             if (zId !== selectedZone) return false;
@@ -234,15 +240,34 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
                 </div>
 
                 {/* 7 STAT CARDS IN A GRID */}
-                <div className="stats-compact-grid" style={{ marginBottom: 24 }}>
-                    <StatCard label="TOTAL TOILETS" value={totalToiletsCount} sub="Registered Assets" color="#0f172a" />
-                    <StatCard label="SUBMITTED REPORTS" value={activeStats.submitted || 0} sub="Total Submitted" color="#2563eb" />
-                    <StatCard label="PENDING REPORTS" value={(activeStats.submitted || 0) - (activeStats.approved || 0) - (activeStats.rejected || 0)} sub="Pending Review" color="#f59e0b" />
-                    <StatCard label="APPROVED REPORTS" value={activeStats.approved || 0} sub="Approved by QC" color="#10b981" />
-                    <StatCard label="REJECTED REPORTS" value={activeStats.rejected || 0} sub="Rejected by QC" color="#ef4444" />
-                    <StatCard label="ACTION REQUIRED" value={activeStats.actionRequired || 0} sub="Needs Resolution" color="#ea580c" />
-                    <StatCard label="RESOLVED REPORTS" value={activeStats.actionTaken || 0} sub="Action Completed" color="#06b6d4" />
-                </div>
+                {(() => {
+                    const handleStatClick = (statusKey: string) => {
+                        if (statusKey === 'TOTAL') {
+                            setSelectedStatus('');
+                        } else if (selectedStatus === statusKey) {
+                            setSelectedStatus('');
+                        } else {
+                            setSelectedStatus(statusKey);
+                        }
+                        setTimeout(() => {
+                            tableSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 80);
+                    };
+
+                    const pendingVal = (activeStats?.submitted || 0) - (activeStats?.approved || 0) - (activeStats?.rejected || 0);
+
+                    return (
+                        <div className="stats-compact-grid" style={{ marginBottom: 24 }}>
+                            <StatCard label="TOTAL TOILETS" value={totalToiletsCount} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatus === ''} />
+                            <StatCard label="SUBMITTED REPORTS" value={activeStats?.submitted || 0} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
+                            <StatCard label="PENDING REPORTS" value={pendingVal > 0 ? pendingVal : 0} sub="Pending Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
+                            <StatCard label="APPROVED REPORTS" value={activeStats?.approved || 0} sub="Approved by QC" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatus === 'APPROVED'} />
+                            <StatCard label="REJECTED REPORTS" value={activeStats?.rejected || 0} sub="Rejected by QC" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatus === 'REJECTED'} />
+                            <StatCard label="ACTION REQUIRED" value={activeStats?.actionRequired || 0} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatus === 'ACTION_REQUIRED'} />
+                            <StatCard label="ACTION TAKEN REPORTS" value={activeStats?.actionTaken || 0} sub="Action Completed" color="#06b6d4" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={selectedStatus === 'ACTION_TAKEN'} />
+                        </div>
+                    );
+                })()}
             </div>
 
             {loading && <div className="loading-state" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}><p>Syncing dashboard...</p></div>}
@@ -250,7 +275,7 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
             {!error && reportsError && <div className="alert error" style={{ padding: 12, borderRadius: 10, background: '#fee2e2', color: '#b91c1c', marginBottom: 16 }}>{reportsError}</div>}
 
             {!loading && !error && (
-                <div style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+                <div ref={tableSectionRef} style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
                     {/* Header Controls with Dropdown Filters */}
                     <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', background: '#fcfdfe' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
@@ -440,45 +465,31 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
     );
 }
 
-function StatCard({ label, value, sub, color }: any) {
+function StatCard({ label, value, sub, color, onClick }: any) {
     return (
-        <div className="card stat-card-compact" style={{ borderLeft: `6px solid ${color}`, position: 'relative', overflow: 'hidden' }}>
-            <div className="stat-label">{label}</div>
+        <div
+            onClick={onClick}
+            style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                padding: '16px 20px',
+                border: '1px solid #e2e8f0',
+                borderLeft: `6px solid ${color}`,
+                cursor: onClick ? 'pointer' : 'default',
+                position: 'relative',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                transition: 'transform 0.2s, box-shadow 0.2s'
+            }}
+        >
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <div className="stat-value" style={{ color: '#1e293b' }}>{value}</div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
             </div>
-            <div className="stat-sub">{sub}</div>
-            <style jsx>{`
-                .stat-card-compact {
-                    padding: 16px 20px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    background: #ffffff;
-                    transition: transform 0.2s, box-shadow 0.2s;
-                }
-                .stat-card-compact:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
-                }
-                .stat-label {
-                    font-size: 10px;
-                    font-weight: 900;
-                    color: #94a3b8;
-                    letter-spacing: 0.1em;
-                    text-transform: uppercase;
-                }
-                .stat-value {
-                    font-size: 28px;
-                    font-weight: 900;
-                    letter-spacing: -0.02em;
-                }
-                .stat-sub {
-                    font-size: 12px;
-                    color: #64748b;
-                    font-weight: 500;
-                }
-            `}</style>
+            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>
         </div>
     );
 }

@@ -43,7 +43,7 @@ export default function ToiletModulePage() {
     { id: "submitted_reports", label: "Inspection Reports", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
     { id: "all", label: "All Registered Toilets", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
     { id: "approvals", label: "Verification & Approvals", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
-    { id: "assignments", label: "Staff Assignments", roles: ["CITY_ADMIN", "HMS_SUPER_ADMIN"] },
+    { id: "assignments", label: "Staff Assignments", roles: ["QC", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
   ];
 
   const visibleTabs = tabs.filter(tab =>
@@ -161,6 +161,18 @@ export default function ToiletModulePage() {
             moduleTitle="Toilet Cleanliness Inspection"
             record={selectedReport}
             onClose={() => setSelectedReport(null)}
+            onApprove={async (rec, comment) => {
+              await ToiletApi.reviewInspection(rec.id, { status: 'APPROVED', comment });
+              setSelectedReport(null);
+            }}
+            onReject={async (rec, comment) => {
+              await ToiletApi.reviewInspection(rec.id, { status: 'REJECTED', comment });
+              setSelectedReport(null);
+            }}
+            onActionRequired={async (rec, comment) => {
+              await ToiletApi.reviewInspection(rec.id, { status: 'ACTION_REQUIRED', comment });
+              setSelectedReport(null);
+            }}
           />
         )}
       </div>

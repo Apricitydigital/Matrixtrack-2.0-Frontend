@@ -17,15 +17,14 @@ import {
 import { useAuth } from "@hooks/useAuth";
 import { roleLabel } from "@lib/labels";
 import { RefreshButton } from "./RefreshButton";
+import { UserProfileModal } from "./UserProfileModal";
 
 export function Topbar() {
   const { user, logout, loading } = useAuth();
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const [menuOpen, setMenuOpen] =
-    useState(false);
-
-  const menuRef =
-    useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function onClick(event: MouseEvent) {
@@ -57,7 +56,7 @@ export function Topbar() {
   };
 
   const displayRole = user?.roles?.length ? roleLabel(user.roles[0]) : "";
-  const initial = user?.name?.[0]?.toUpperCase() || "H";
+  const initial = user?.name?.[0]?.toUpperCase() || "U";
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-100 bg-white/80 px-6 backdrop-blur-md">
@@ -77,7 +76,7 @@ export function Topbar() {
       </div>
 
       {/* Right cluster */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         {loading ? (
           <div className="text-sm font-medium text-slate-400">Loading...</div>
         ) : user ? (
@@ -90,6 +89,25 @@ export function Topbar() {
               <Bell size={18} />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-danger" />
             </button>
+
+            {/* User Profile Pill Button */}
+            <Link
+              href="/portal-home/profile"
+              className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-1.5 pr-3 text-left transition-all hover:border-primary/40 hover:bg-slate-100 no-underline"
+              title="Click to view user profile"
+            >
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white shadow-sm">
+                {initial}
+              </div>
+              <div className="hidden md:block text-xs">
+                <div className="font-semibold text-slate-800 leading-tight truncate max-w-[120px]">
+                  {user.name || "User Profile"}
+                </div>
+                <div className="text-[10px] text-slate-500 leading-tight uppercase font-medium">
+                  {displayRole || user.role || "User"}
+                </div>
+              </div>
+            </Link>
           </>
         ) : (
           <Link

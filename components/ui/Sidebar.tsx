@@ -27,10 +27,12 @@ import {
   Database,
   Bell,
   LogOut,
+  User as UserIcon,
   Building2,
   CheckCircle2,
   ChartNoAxesCombined,
 } from "lucide-react";
+import { UserProfileModal } from "./UserProfileModal";
 
 const getModuleIcon = (key: string) => {
   const normalizedKey = key.toUpperCase();
@@ -181,6 +183,7 @@ export default function Sidebar() {
 
   const [modulesOpen, setModulesOpen] = useState(true);
   const [masterOpen, setMasterOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
 
   const isHmsSuperAdmin =
     user?.roles.includes("HMS_SUPER_ADMIN" as Role) ?? false;
@@ -488,16 +491,26 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-slate-100 p-4">
+      <div className="border-t border-slate-100 p-4 space-y-2">
         {!loading && user && (
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-danger/30 hover:bg-danger-bg hover:text-danger"
-          >
-            <LogOut size={15} />
-            Logout
-          </button>
+          <>
+            <Link
+              href="/portal-home/profile"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary no-underline"
+            >
+              <UserIcon size={16} />
+              My Profile
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 hover:border-danger/30 hover:bg-danger-bg hover:text-danger"
+            >
+              <LogOut size={15} />
+              Logout
+            </button>
+          </>
         )}
 
         {!loading && !user && (
