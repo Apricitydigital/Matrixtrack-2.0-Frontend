@@ -63,6 +63,7 @@ export default function CommonRegistrationModal({
       { key: "SUPERVISOR", label: "Supervisor" },
       { key: "EMPLOYEE", label: "Field Employee" },
       { key: "QC", label: "Quality Controller" },
+      { key: "ULB_OFFICER", label: "ULB Officer" },
       { key: "ACTION_OFFICER", label: "Action Officer" }
     ],
     swachhRoles: [
@@ -154,7 +155,7 @@ export default function CommonRegistrationModal({
             fetchedCities = res.cities.map((c) => ({ id: c.id, name: c.name, code: c.code || "" }));
             setConfig((prev) => ({ ...prev, cities: fetchedCities }));
           }
-        } catch {}
+        } catch { }
       };
       fetchGeoConfig();
     }
@@ -316,21 +317,21 @@ export default function CommonRegistrationModal({
         targetSystems: form.targetSystems,
         ...(form.targetSystems.includes("TASKFORCE_20")
           ? {
-              taskforceConfig: {
-                role: form.taskforceRole,
-                moduleKeys: form.taskforceModules
-              }
+            taskforceConfig: {
+              role: form.taskforceRole,
+              moduleKeys: form.taskforceModules
             }
+          }
           : {}),
         ...(form.targetSystems.includes("SWACHH_RANKING")
           ? {
-              swachhConfig: {
-                role: form.swachhRole,
-                accessorType: form.swachhAccessorType,
-                zone: form.zoneId,
-                ward: form.wardId
-              }
+            swachhConfig: {
+              role: form.swachhRole,
+              accessorType: form.swachhAccessorType,
+              zone: form.zoneId,
+              ward: form.wardId
             }
+          }
           : {})
       };
 
@@ -473,22 +474,22 @@ export default function CommonRegistrationModal({
       style={
         asPage
           ? {
-              display: "flex",
-              justifyContent: "center",
-              padding: "0",
-              width: "100%"
-            }
+            display: "flex",
+            justifyContent: "center",
+            padding: "0",
+            width: "100%"
+          }
           : {
-              position: "fixed",
-              inset: 0,
-              zIndex: 9999,
-              background: "rgba(15, 23, 42, 0.75)",
-              backdropFilter: "blur(8px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "20px"
-            }
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
+          }
       }
     >
       <div
@@ -702,12 +703,12 @@ export default function CommonRegistrationModal({
                       <input
                         type="checkbox"
                         checked={form.targetSystems.includes("TASKFORCE_20")}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         style={{ marginTop: "3px", accentColor: "#2563eb" }}
                       />
                       <div>
                         <div style={{ fontWeight: 800, fontSize: "15px", color: "#1e3a8a", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <ShieldCheck size={16} /> Inspection and performance system 
+                          <ShieldCheck size={16} /> Inspection and performance system
                         </div>
                         <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
                           Assign to Inspection and performance System's module - litterbin , sweeping , and toilets.
@@ -761,7 +762,7 @@ export default function CommonRegistrationModal({
                       <input
                         type="checkbox"
                         checked={form.targetSystems.includes("SWACHH_RANKING")}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         style={{ marginTop: "3px", accentColor: "#059669" }}
                       />
                       <div>
@@ -971,7 +972,7 @@ export default function CommonRegistrationModal({
                         })
                         .map((m) => {
                           const isSelected = form.taskforceModules.includes(m.key);
-                          
+
                           let displayName = m.name;
                           const nameUpper = String(m.name || '').toUpperCase();
                           if (nameUpper.includes("SWEEPING")) displayName = "Sweeping";

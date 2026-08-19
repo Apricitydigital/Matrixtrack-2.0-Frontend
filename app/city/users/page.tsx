@@ -39,7 +39,18 @@ type EditableUser = {
   wardIds: Set<string>;
 };
 
-const allowedRoles: Role[] = ["COMMISSIONER", "ACTION_OFFICER", "QC", "SUPERVISOR", "EMPLOYEE"];
+const allowedRoles: Role[] = [
+  "COMMISSIONER",
+  "ACTION_OFFICER",
+  "QC",
+  "ULB_OFFICER",
+  "SUPERVISOR",
+  "EMPLOYEE"
+];
+
+const usesGeoScope = (role: Role) =>
+  role === "QC" || role === "ULB_OFFICER";
+
 const enforceRoleWriteRules = (
   role: Role,
   modules: Record<string, { canWrite: boolean; zoneIds?: string[]; wardIds?: string[] }>
@@ -115,7 +126,15 @@ function CityUsersPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const counts: Record<string, number> = { ALL: users.length, QC: 0, ACTION_OFFICER: 0, COMMISSIONER: 0, EMPLOYEE: 0, CITY_ADMIN: 0 };
+    const counts: Record<string, number> = {
+      ALL: users.length,
+      QC: 0,
+      ULB_OFFICER: 0,
+      ACTION_OFFICER: 0,
+      COMMISSIONER: 0,
+      EMPLOYEE: 0,
+      CITY_ADMIN: 0
+    };
     users.forEach(u => {
       if (counts[u.role] !== undefined) counts[u.role]++;
     });
@@ -232,7 +251,7 @@ function CityUsersPage() {
         next.add(id);
       }
       setNewUserModules((mods) =>
-        role === "QC"
+        usesGeoScope(role)
           ? Object.fromEntries(
             Object.entries(mods).map(([mid, val]) => [
               mid,
@@ -254,7 +273,7 @@ function CityUsersPage() {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       setNewUserModules((mods) =>
-        role === "QC"
+        usesGeoScope(role)
           ? Object.fromEntries(
             Object.entries(mods).map(([mid, val]) => [
               mid,
@@ -272,9 +291,9 @@ function CityUsersPage() {
     setStatus("Saving...");
     setError("");
     try {
-      if (role === "QC" && (newZoneIds.size === 0 || newWardIds.size === 0)) {
+      if (usesGeoScope(role) && (newZoneIds.size === 0 || newWardIds.size === 0)) {
         setStatus("");
-        setError("QC users require at least one zone and ward");
+        setError("QC and ULB Officer users require at least one zone and ward");
         return;
       }
 
@@ -288,7 +307,12 @@ function CityUsersPage() {
       const modules = Object.entries(newUserModules).map(([moduleId, { canWrite, zoneIds, wardIds }]) => ({
         moduleId,
         canWrite,
-        ...(role === "QC" ? { zoneIds: zoneIds || Array.from(newZoneIds), wardIds: wardIds || Array.from(newWardIds) } : {})
+        ...(usesGeoScope(role)
+          ? {
+            zoneIds: zoneIds || Array.from(newZoneIds),
+            wardIds: wardIds || Array.from(newWardIds)
+          }
+          : {})
       }));
       await CityUserApi.create({
         email,
@@ -334,8 +358,8 @@ function CityUsersPage() {
       if (checked)
         modules[moduleId] = {
           canWrite: false,
-          zoneIds: current.role === "QC" ? Array.from(current.zoneIds) : [],
-          wardIds: current.role === "QC" ? Array.from(current.wardIds) : []
+          zoneIds: usesGeoScope(current.role) ? Array.from(current.zoneIds) : [],
+          wardIds: usesGeoScope(current.role) ? Array.from(current.wardIds) : []
         };
       else delete modules[moduleId];
       return { ...prev, [userId]: { ...current, modules: enforceRoleWriteRules(current.role, modules) } };
@@ -367,7 +391,7 @@ function CityUsersPage() {
       }
 
       const modules =
-        current.role === "QC"
+        usesGeoScope(current.role)
           ? Object.fromEntries(
             Object.entries(current.modules).map(([mid, val]) => [
               mid,
@@ -390,7 +414,7 @@ function CityUsersPage() {
       const nextWards = new Set(current.wardIds);
       nextWards.has(wardId) ? nextWards.delete(wardId) : nextWards.add(wardId);
       const modules =
-        current.role === "QC"
+        usesGeoScope(current.role)
           ? Object.fromEntries(
             Object.entries(current.modules).map(([mid, val]) => [
               mid,
@@ -414,8 +438,8 @@ function CityUsersPage() {
       const cleanZoneIds = Array.from(payload.zoneIds).filter((id) => validZoneIds.has(id));
       const cleanWardIds = Array.from(payload.wardIds).filter((id) => validWardIds.has(id));
 
-      if (payload.role === "QC" && (cleanZoneIds.length === 0 || cleanWardIds.length === 0)) {
-        setError("QC users require at least one zone and ward");
+      if (usesGeoScope(payload.role) && (cleanZoneIds.length === 0 || cleanWardIds.length === 0)) {
+        setError("QC and ULB Officer users require at least one zone and ward");
         setSavingUserId(null);
         return;
       }
@@ -445,10 +469,16 @@ function CityUsersPage() {
           return {
             moduleId: targetMod?.id || moduleId,
             canWrite,
-            ...(payload.role === "QC"
+            ...(usesGeoScope(payload.role)
               ? {
-                zoneIds: zoneIds && zoneIds.length ? zoneIds.filter((id) => validZoneIds.has(id)) : cleanZoneIds,
-                wardIds: wardIds && wardIds.length ? wardIds.filter((id) => validWardIds.has(id)) : cleanWardIds
+                zoneIds:
+                  zoneIds && zoneIds.length
+                    ? zoneIds.filter((id) => validZoneIds.has(id))
+                    : cleanZoneIds,
+                wardIds:
+                  wardIds && wardIds.length
+                    ? wardIds.filter((id) => validWardIds.has(id))
+                    : cleanWardIds
               }
               : {})
           };
@@ -882,7 +912,16 @@ function CityUsersPage() {
 
 
               <div style={{ display: "flex", backgroundColor: "#f1f5f9", padding: "4px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                {["ALL", "QC", "ACTION_OFFICER", "COMMISSIONER", "CITY_ADMIN", "SUPERVISOR", "EMPLOYEE"].map((t) => (
+                {[
+                  "ALL",
+                  "QC",
+                  "ULB_OFFICER",
+                  "ACTION_OFFICER",
+                  "COMMISSIONER",
+                  "CITY_ADMIN",
+                  "SUPERVISOR",
+                  "EMPLOYEE"
+                ].map((t) => (
                   <button
                     key={t}
                     onClick={() => setActiveTab(t as any)}
@@ -1067,6 +1106,13 @@ function UserRow({
   const getRoleStyle = (role: Role) => {
     switch (role) {
       case 'QC': return { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', label: 'Quality Control' };
+      case 'ULB_OFFICER':
+        return {
+          bg: '#ecfeff',
+          color: '#0e7490',
+          border: '#a5f3fc',
+          label: 'ULB Officer'
+        };
       case 'ACTION_OFFICER': return { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa', label: 'Action Officer' };
       case 'COMMISSIONER': return { bg: '#faf5ff', color: '#7e22ce', border: '#e9d5ff', label: 'Commissioner' };
       case 'CITY_ADMIN': return { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0', label: 'City Admin' };
@@ -1221,7 +1267,7 @@ function UserRow({
                   <div style={{ padding: "20px", backgroundColor: "white", borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                       <span style={{ fontSize: "0.7rem", fontWeight: 800, color: "#475569", textTransform: "uppercase" }}>Assigned Territory</span>
-                      {edit.role === 'QC' && <span style={{ fontSize: "10px", backgroundColor: "#fff7ed", color: "#c2410c", padding: "2px 8px", borderRadius: "6px", fontWeight: 800, border: "1px solid #ffedd5" }}>REQUIRED FOR QC</span>}
+                      {usesGeoScope(edit.role) && <span style={{ fontSize: "10px", backgroundColor: "#fff7ed", color: "#c2410c", padding: "2px 8px", borderRadius: "6px", fontWeight: 800, border: "1px solid #ffedd5" }}>ZONE / WARD REQUIRED</span>}
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -1260,7 +1306,7 @@ function UserRow({
                       <Settings size={18} color="#2563eb" />
                       <h4 style={{ fontSize: "0.85rem", fontWeight: 800, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.05em" }}>System Access</h4>
                     </div>
-                    {edit.role === "QC" && !isReadOnly && (
+                    {usesGeoScope(edit.role) && !isReadOnly && (
                       <button type="button" onClick={(e) => { e.stopPropagation(); setEditing((prev) => { const cur = prev[u.id]; if (!cur) return prev; const modules = { ...cur.modules }; Object.keys(modules).forEach(mid => { modules[mid] = { ...modules[mid], zoneIds: Array.from(cur.zoneIds), wardIds: Array.from(cur.wardIds) }; }); return { ...prev, [u.id]: { ...cur, modules } }; }); }} style={{ fontSize: "10px", padding: "6px 12px", borderRadius: "8px", border: "1px solid #e2e8f0", backgroundColor: "#f8fafc", fontWeight: 700, color: "#64748b", cursor: "pointer" }}>
                         Sync All Regions
                       </button>

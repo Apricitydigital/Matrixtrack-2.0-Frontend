@@ -35,7 +35,10 @@ import {
   Activity,
   PlusCircle,
   CheckCircle2,
-  ChartNoAxesCombined
+  ChartNoAxesCombined,
+  AlertTriangle,
+  FileCheck2,
+  XCircle
 } from 'lucide-react';
 
 import { moduleEntryPath } from '@utils/modules';
@@ -361,7 +364,6 @@ function PortalHomeLayoutContent({
         [
           'CITY_ADMIN',
           'COMMISSIONER',
-          'ULB_OFFICER',
           'HMS_SUPER_ADMIN',
           'HMS_ADMIN',
         ].includes(r)
@@ -387,6 +389,11 @@ function PortalHomeLayoutContent({
   const isQcUser =
     normalizedAllRoles.includes(
       'QC'
+    );
+
+  const isUlbUser =
+    normalizedAllRoles.includes(
+      'ULB_OFFICER'
     );
 
   const isAccessorUser =
@@ -912,6 +919,79 @@ function PortalHomeLayoutContent({
     },
   ].filter((item) => item.visible);
 
+  const ulbNavigationItems = [
+    {
+      name: 'Dashboard',
+
+      href:
+        '/ulb/dashboard',
+
+      icon:
+        <LayoutDashboard size={15} />,
+
+      isActive:
+        pathname === '/ulb/dashboard' ||
+        pathname === '/ulb',
+    },
+
+    {
+      name: 'Approved',
+
+      href:
+        '/ulb/reports/approved',
+
+      icon:
+        <CheckCircle2 size={15} />,
+
+      isActive:
+        pathname ===
+        '/ulb/reports/approved',
+    },
+
+    {
+      name: 'Rejected',
+
+      href:
+        '/ulb/reports/rejected',
+
+      icon:
+        <XCircle size={15} />,
+
+      isActive:
+        pathname ===
+        '/ulb/reports/rejected',
+    },
+
+    {
+      name:
+        'Action Required',
+
+      href:
+        '/ulb/reports/action-required',
+
+      icon:
+        <AlertTriangle size={15} />,
+
+      isActive:
+        pathname ===
+        '/ulb/reports/action-required',
+    },
+
+    {
+      name:
+        'Action Taken',
+
+      href:
+        '/ulb/reports/action-taken',
+
+      icon:
+        <FileCheck2 size={15} />,
+
+      isActive:
+        pathname ===
+        '/ulb/reports/action-taken',
+    },
+  ];
 
   /* =========================================================
      MASTER CONTROL
@@ -1676,7 +1756,7 @@ function PortalHomeLayoutContent({
           {/* LOGO */}
 
           <Link
-            href="/portal-home"
+            href={isUlbUser ? "/ulb/dashboard" : "/portal-home"}
             className="flex items-center gap-3 px-1 py-1 cursor-pointer group transition-all"
             title="Return to Main Portal Entrance"
           >
@@ -1736,28 +1816,26 @@ function PortalHomeLayoutContent({
                   <div className="flex flex-col gap-1 mt-1">
 
                     {/* HOME */}
-                    <Link
-                      href="/portal-home"
-                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname ===
-                        '/portal-home'
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                        }`}
-                    >
-                      <LayoutDashboard
-                        size={16}
-                        className={
-                          pathname ===
-                            '/portal-home'
-                            ? 'text-white'
-                            : 'text-slate-500'
-                        }
-                      />
+                    {!isUlbUser && (
+                      <Link
+                        href="/portal-home"
+                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname === '/portal-home'
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                          }`}
+                      >
+                        <LayoutDashboard
+                          size={16}
+                          className={
+                            pathname === '/portal-home'
+                              ? 'text-white'
+                              : 'text-slate-400'
+                          }
+                        />
 
-                      <span>
-                        Home
-                      </span>
-                    </Link>
+                        <span>Home</span>
+                      </Link>
+                    )}
 
 
 
@@ -2320,8 +2398,10 @@ function PortalHomeLayoutContent({
                 </div>
 
               )}
+            {/* =================================================
+    ATTENDANCE ANALYTICS - CITY ADMIN
+================================================= */}
 
-            {/* Attendance Analytics in Active Modules */}
             {isCityAdmin && (
               <Link
                 href="/city/attendance"
@@ -2332,11 +2412,10 @@ function PortalHomeLayoutContent({
               >
                 <ChartNoAxesCombined
                   size={18}
-                  className={`shrink-0 ${
-                    pathname.startsWith('/city/attendance')
-                      ? 'text-white'
-                      : 'text-slate-500'
-                  }`}
+                  className={`shrink-0 ${pathname.startsWith('/city/attendance')
+                    ? 'text-white'
+                    : 'text-slate-500'
+                    }`}
                 />
 
                 <span className="text-left leading-snug">
@@ -2347,10 +2426,112 @@ function PortalHomeLayoutContent({
 
 
             {/* =================================================
+    ULB OFFICER WORKSPACE
+================================================= */}
+
+            {isUlbUser && (
+              <div className="flex flex-col gap-1.5">
+
+                {/* DASHBOARD */}
+
+                <Link
+                  href="/ulb/dashboard"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname === '/ulb/dashboard'
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <LayoutDashboard size={15} />
+
+                  <span>
+                    Dashboard
+                  </span>
+                </Link>
+
+
+                {/* REPORTS */}
+
+                <div className="mt-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Reports
+                </div>
+
+
+                {/* APPROVED */}
+
+                <Link
+                  href="/ulb/reports/approved"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${pathname === '/ulb/reports/approved'
+                    ? 'bg-emerald-50 text-emerald-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <CheckCircle2 size={15} />
+
+                  <span>
+                    Approved
+                  </span>
+                </Link>
+
+
+                {/* REJECTED */}
+
+                <Link
+                  href="/ulb/reports/rejected"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${pathname === '/ulb/reports/rejected'
+                    ? 'bg-slate-100 text-slate-800 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <XCircle size={15} />
+
+                  <span>
+                    Rejected
+                  </span>
+                </Link>
+
+
+                {/* ACTION REQUIRED */}
+
+                <Link
+                  href="/ulb/reports/action-required"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${pathname === '/ulb/reports/action-required'
+                    ? 'bg-violet-50 text-violet-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <AlertTriangle size={15} />
+
+                  <span>
+                    Action Required
+                  </span>
+                </Link>
+
+
+                {/* ACTION TAKEN */}
+
+                <Link
+                  href="/ulb/reports/action-taken"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${pathname === '/ulb/reports/action-taken'
+                    ? 'bg-blue-50 text-blue-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <FileCheck2 size={15} />
+
+                  <span>
+                    Action Taken
+                  </span>
+                </Link>
+
+              </div>
+            )}
+
+
+            {/* =================================================
                 INSPECTION & PERFORMANCE SYSTEM
             ================================================= */}
 
-            {hasTaskforceAccess && (
+            {hasTaskforceAccess && !isUlbUser && (
 
               <div className="flex flex-col">
 
@@ -2788,11 +2969,10 @@ function PortalHomeLayoutContent({
 
           <Link
             href="/portal-home/profile"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
-              pathname === '/portal-home/profile' || pathname === '/profile'
-                ? 'bg-blue-600 text-white shadow-blue-500/20'
-                : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
-            }`}
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${pathname === '/portal-home/profile' || pathname === '/profile'
+              ? 'bg-blue-600 text-white shadow-blue-500/20'
+              : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
+              }`}
           >
             <UserCheck size={16} />
             My Profile
@@ -2821,9 +3001,12 @@ function PortalHomeLayoutContent({
           MAIN CONTENT
       ===================================================== */}
 
-      <main className="portal-main-content flex-1 ml-72 p-5 sm:p-6 min-w-0 min-h-screen text-slate-800">
-
-
+      <main
+        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser
+          ? 'ml-0 p-4 sm:p-5 lg:p-6'
+          : 'ml-72 p-5 sm:p-6'
+          }`}
+      >
         {!isMainDashboard && (
 
           <div

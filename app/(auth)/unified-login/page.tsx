@@ -462,6 +462,10 @@ export default function LoginPage() {
       .filter(Boolean)
       .map((role) => String(role).toUpperCase());
 
+    if (roles.includes("ULB_OFFICER")) {
+      return "/ulb/dashboard";
+    }
+
     if (roles.includes("COMMISSIONER")) {
       return "/municipal/commissioner";
     }

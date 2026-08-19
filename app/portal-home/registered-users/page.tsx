@@ -32,7 +32,7 @@ type UserModule = {
 type UserRecord = {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   phone?: string;
   role: Role;
   cityId?: string;
@@ -184,10 +184,11 @@ export default function RegisteredUsersPage() {
         const q = searchQuery.toLowerCase().trim();
         const matchesSearch =
           !q ||
-          (u.name && u.name.toLowerCase().includes(q)) ||
-          (u.email && u.email.toLowerCase().includes(q)) ||
-          (uCityName && uCityName.toLowerCase().includes(q)) ||
-          (u.role && u.role.toLowerCase().includes(q));
+          String(u.name || "").toLowerCase().includes(q) ||
+          String(u.email || "").toLowerCase().includes(q) ||
+          String(u.phone || "").toLowerCase().includes(q) ||
+          String(uCityName || "").toLowerCase().includes(q) ||
+          String(u.role || "").toLowerCase().includes(q);
 
         const matchesRole = filterRole === "ALL" || u.role === filterRole;
         const matchesCity = !filterCity || uCityName === filterCity;
@@ -536,22 +537,22 @@ export default function RegisteredUsersPage() {
                             {u.email}
                           </span>
                         )}
-                      </td>
+                      </td >
 
                       {/* Mobile Number */}
-                      <td className="px-3 py-3 align-middle">
+                      < td className="px-3 py-3 align-middle" >
                         <span className="truncate text-xs font-semibold text-slate-700 block">{u.phone || '-'}</span>
-                      </td>
+                      </td >
 
                       {/* User Role */}
-                      <td className="px-3 py-3 align-middle">
+                      < td className="px-3 py-3 align-middle" >
                         <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-black uppercase ${getRoleBadgeStyle(u.role)}`}>
                           {u.role}
                         </span>
-                      </td>
+                      </td >
 
                       {/* State & City */}
-                      <td className="px-3 py-3 align-middle">
+                      < td className="px-3 py-3 align-middle" >
                         <div className="flex flex-col gap-0.5 text-xs">
                           <span className="font-extrabold text-slate-800 flex items-center gap-1">
                             <Globe size={11} className="text-emerald-600 shrink-0" />
@@ -562,7 +563,7 @@ export default function RegisteredUsersPage() {
                             {cityText}
                           </span>
                         </div>
-                      </td>
+                      </td >
 
                       {/* Zone & Ward */}
                       <td className="px-3 py-3 align-middle">
@@ -616,11 +617,12 @@ export default function RegisteredUsersPage() {
                               </button>
                             </div>
                           );
-                        })()}
-                      </td>
+                        })()
+                        }
+                      </td >
 
                       {/* Assigned Modules - Inspection & Performance System Modules only */}
-                      <td className="px-3 py-3 align-middle">
+                      < td className="px-3 py-3 align-middle" >
                         <div className="flex flex-wrap items-center gap-1">
                           {(() => {
                             // Collect only Inspection & Performance System (Taskforce) modules
@@ -665,18 +667,18 @@ export default function RegisteredUsersPage() {
                             ] : []);
                           })()}
                         </div>
-                      </td>
+                      </td >
 
                       {/* Date Created On (Date + Time) */}
-                      <td className="px-3 py-3 align-middle">
+                      < td className="px-3 py-3 align-middle" >
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-slate-800">{createdDate}</span>
                           <span className="text-[10px] font-semibold text-slate-400">{createdTime}</span>
                         </div>
-                      </td>
+                      </td >
 
                       {/* Control (3-Dots Dropdown Menu - Fully visible) */}
-                      <td className="px-3 py-3 pr-5 align-middle relative">
+                      < td className="px-3 py-3 pr-5 align-middle relative" >
                         <div className="relative flex justify-end">
                           <button
                             type="button"
@@ -711,153 +713,161 @@ export default function RegisteredUsersPage() {
                             </div>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </td >
+                    </tr >
                   );
                 })
               )}
-            </tbody>
-          </table>
-        </div>
+            </tbody >
+          </table >
+        </div >
 
         {/* ── PAGINATION FOOTER ── */}
-        {filteredUsers.length > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-5 py-3.5 lg:px-7">
-            <div className="text-xs font-bold text-slate-500">
-              Showing {(safePage - 1) * pageSize + 1} to {Math.min(safePage * pageSize, filteredUsers.length)} of {filteredUsers.length} personnel
+        {
+          filteredUsers.length > 0 && (
+            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-5 py-3.5 lg:px-7">
+              <div className="text-xs font-bold text-slate-500">
+                Showing {(safePage - 1) * pageSize + 1} to {Math.min(safePage * pageSize, filteredUsers.length)} of {filteredUsers.length} personnel
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                >
+                  <ChevronLeft size={14} className="mr-1" /> Previous
+                </button>
+
+                <span className="text-xs font-extrabold text-slate-800 px-2">
+                  Page {safePage} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+                >
+                  Next <ChevronRight size={14} className="ml-1" />
+                </button>
+              </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-              >
-                <ChevronLeft size={14} className="mr-1" /> Previous
-              </button>
-
-              <span className="text-xs font-extrabold text-slate-800 px-2">
-                Page {safePage} of {totalPages}
-              </span>
-
-              <button
-                type="button"
-                disabled={safePage >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-              >
-                Next <ChevronRight size={14} className="ml-1" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+          )
+        }
+      </div >
 
       {/* ── DELETE USER CONFIRM DIALOG ── */}
-      {deleteTarget && (
-        <ConfirmDialog
-          open={!!deleteTarget}
-          title="Delete User"
-          message={`Are you sure you want to permanently delete registered user "${deleteTarget.name}"? This action cannot be undone.`}
-          confirmLabel="Delete User"
-          tone="danger"
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={confirmDeleteUser}
-        />
-      )}
+      {
+        deleteTarget && (
+          <ConfirmDialog
+            open={!!deleteTarget}
+            title="Delete User"
+            message={`Are you sure you want to permanently delete registered user "${deleteTarget.name}"? This action cannot be undone.`}
+            confirmLabel="Delete User"
+            tone="danger"
+            onCancel={() => setDeleteTarget(null)}
+            onConfirm={confirmDeleteUser}
+          />
+        )
+      }
 
       {/* ── EDIT USER CONFIGURATION MODAL ── */}
-      {editingUser && (
-        <EditUserModal
-          user={editingUser}
-          onClose={() => setEditingUser(null)}
-          onSave={async () => {
-            await loadData();
-            setEditingUser(null);
-            showToast({ title: "User updated", description: "User configuration saved successfully.", tone: "success" });
-          }}
-        />
-      )}
+      {
+        editingUser && (
+          <EditUserModal
+            user={editingUser}
+            onClose={() => setEditingUser(null)}
+            onSave={async () => {
+              await loadData();
+              setEditingUser(null);
+              showToast({ title: "User updated", description: "User configuration saved successfully.", tone: "success" });
+            }}
+          />
+        )
+      }
 
       {/* ── ASSIGNED ZONE & WARD DETAILS MODAL ── */}
-      {selectedUserGeoModal && (
-        <Modal
-          open={!!selectedUserGeoModal}
-          onClose={() => setSelectedUserGeoModal(null)}
-          title={`Assigned Zones & Wards - ${selectedUserGeoModal.user.name}`}
-          size="md"
-        >
-          <div className="flex flex-col gap-6 py-1">
-            {/* Header info card */}
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-extrabold">
-                {selectedUserGeoModal.user.name?.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-xs font-black text-slate-900 truncate">{selectedUserGeoModal.user.name}</h4>
-                  <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[9.5px] font-black uppercase ${getRoleBadgeStyle(selectedUserGeoModal.user.role)}`}>
-                    {selectedUserGeoModal.user.role}
-                  </span>
+      {
+        selectedUserGeoModal && (
+          <Modal
+            open={!!selectedUserGeoModal}
+            onClose={() => setSelectedUserGeoModal(null)}
+            title={`Assigned Zones & Wards - ${selectedUserGeoModal.user.name}`}
+            size="md"
+          >
+            <div className="flex flex-col gap-6 py-1">
+              {/* Header info card */}
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700 font-extrabold">
+                  {selectedUserGeoModal.user.name?.charAt(0).toUpperCase()}
                 </div>
-                <p className="text-[11px] font-semibold text-slate-500 truncate">
-                  {selectedUserGeoModal.user.email?.includes('@internal.')
-                    ? (selectedUserGeoModal.user.phone ? `Mobile: ${selectedUserGeoModal.user.phone}` : 'Registered Field Staff')
-                    : selectedUserGeoModal.user.email}
-                </p>
+                <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-black text-slate-900 truncate">{selectedUserGeoModal.user.name}</h4>
+                    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[9.5px] font-black uppercase ${getRoleBadgeStyle(selectedUserGeoModal.user.role)}`}>
+                      {selectedUserGeoModal.user.role}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-500 truncate">
+                    {selectedUserGeoModal.user.email?.includes('@internal.')
+                      ? (selectedUserGeoModal.user.phone ? `Mobile: ${selectedUserGeoModal.user.phone}` : 'Registered Field Staff')
+                      : selectedUserGeoModal.user.email}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {/* Assigned Zones Box */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <Map size={15} className="text-indigo-600" />
-                <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                  Assigned Zones ({selectedUserGeoModal.zoneList.length})
-                </h5>
+              {/* Assigned Zones Box */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Map size={15} className="text-indigo-600" />
+                  <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Assigned Zones ({selectedUserGeoModal.zoneList.length})
+                  </h5>
+                </div>
+                <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-xl flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
+                  {selectedUserGeoModal.zoneList.map((z, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-800 text-xs font-bold px-2.5 py-1 rounded-lg shadow-xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                      {z}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-xl flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
-                {selectedUserGeoModal.zoneList.map((z, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1 bg-white border border-indigo-200 text-indigo-800 text-xs font-bold px-2.5 py-1 rounded-lg shadow-xs">
-                    <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
-                    {z}
-                  </span>
-                ))}
-              </div>
-            </div>
 
-            {/* Assigned Wards Box */}
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <MapPin size={15} className="text-amber-600" />
-                <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                  Assigned Wards ({selectedUserGeoModal.wardList.length})
-                </h5>
+              {/* Assigned Wards Box */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <MapPin size={15} className="text-amber-600" />
+                  <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Assigned Wards ({selectedUserGeoModal.wardList.length})
+                  </h5>
+                </div>
+                <div className="p-3 bg-amber-50/40 border border-amber-100 rounded-xl flex flex-wrap gap-1.5 max-h-52 overflow-y-auto">
+                  {selectedUserGeoModal.wardList.map((w, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 bg-white border border-amber-200 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-lg shadow-xs">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                      {w}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="p-3 bg-amber-50/40 border border-amber-100 rounded-xl flex flex-wrap gap-1.5 max-h-52 overflow-y-auto">
-                {selectedUserGeoModal.wardList.map((w, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1 bg-white border border-amber-200 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-lg shadow-xs">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                    {w}
-                  </span>
-                ))}
-              </div>
-            </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setSelectedUserGeoModal(null)}
-                className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
-              >
-                Close
-              </button>
+              <div className="flex justify-end pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserGeoModal(null)}
+                  className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
-          </div>
-        </Modal>
-      )}
-    </div>
+          </Modal>
+        )
+      }
+    </div >
   );
 }
 
@@ -958,7 +968,7 @@ function MultiSelectDropdown({
 
 function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: () => void; onSave: () => Promise<void> }) {
   const [name, setName] = useState(user.name);
-  const [email, setEmail] = useState(user.email);
+  const [email] = useState(user.email || "");
   const [role, setRole] = useState(user.role);
   const [password, setPassword] = useState("");
 
@@ -1241,7 +1251,13 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   };
 
   return (
-    <Modal open onClose={onClose} title="Edit User & Access Permissions" subtitle={user.email} size="lg">
+    <Modal
+      open
+      onClose={onClose}
+      title="Edit User & Access Permissions"
+      subtitle={user.email || user.phone || "No login email"}
+      size="lg"
+    >
       <form
         onSubmit={handleSubmit}
         className="flex max-h-[75vh] flex-col"

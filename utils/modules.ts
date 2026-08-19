@@ -62,6 +62,10 @@ export function moduleAdminPath(key: CanonicalModuleKey) {
 export function moduleEntryPath(user: AuthUser | null, key: CanonicalModuleKey) {
   if (!user) return `/modules/${routeForModule(key)}`;
 
+  if (user.roles.includes("ULB_OFFICER" as Role)) {
+    return `/ulb/dashboard?module=${key}`;
+  }
+
   if (user.roles.includes("ACTION_OFFICER" as Role)) {
     if (key === "LITTERBINS") return "/modules/litterbins/action-officer";
     if (key === "TASKFORCE") return "/modules/taskforce/action-officer";
@@ -86,7 +90,9 @@ export function moduleEntryPath(user: AuthUser | null, key: CanonicalModuleKey) 
 export function getRoleDashboardRedirect(user: AuthUser | null) {
   if (!user) return "/unified-login";
   if (user.roles.includes("HMS_SUPER_ADMIN" as Role)) return "/hms";
-
+  if (user.roles.includes("ULB_OFFICER" as Role)) {
+    return "/ulb/dashboard";
+  }
   if (user.roles.includes("ACTION_OFFICER" as Role)) {
     const modules = canonicalizeModules(user.modules || []);
     const aoModule =
@@ -119,6 +125,11 @@ export function getRoleDashboardRedirect(user: AuthUser | null) {
 
 export function getPostLoginRedirect(user: AuthUser | null) {
   if (!user) return "/unified-login";
+
+  if (user.roles.includes("ULB_OFFICER" as Role)) {
+    return "/ulb/dashboard";
+  }
+
   return "/portal-home";
 }
 
