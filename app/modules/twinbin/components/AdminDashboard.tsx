@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi, ToiletApi, GeoApi, CityApi } from "@lib/apiClient";
+import { createPortal } from "react-dom";
+import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi, GeoApi, CityApi, ToiletApi } from "@lib/apiClient";
 import LitterBinReviewModal from "./LitterBinReviewModal";
 import TwinbinStaffAssignmentsTab from "./TwinbinStaffAssignmentsTab";
 import SubmittedReportsTab from "../../qc-shared/SubmittedReportsTab";
@@ -131,7 +132,7 @@ export default function AdminDashboard() {
             }
 
             const [recRes, binRes, myBinsRes] = await Promise.allSettled([
-                ModuleRecordsApi.getRecords("LITTERBINS", { tab: 'HISTORY', limit: 500, fromDate, toDate, cityId: selectedCity !== 'ALL' ? selectedCity : undefined }),
+                ModuleRecordsApi.getRecords("LITTERBINS", { tab: 'ALL', limit: 500, fromDate, toDate, cityId: selectedCity !== 'ALL' ? selectedCity : undefined }),
                 TwinbinApi.assigned(),
                 TwinbinApi.myBins()
             ]);
@@ -190,24 +191,30 @@ export default function AdminDashboard() {
 
     const combinedBins = useMemo(() => {
         const binMap = new Map<string, any>();
-        allBins.forEach(b => { if (b.id) binMap.set(b.id, b); });
         records.forEach(r => {
-            if (r.type === 'BIN_REGISTRATION' || r.type === 'BIN_REQUEST' || r.binId || r.type === 'BIN' || r.status === 'APPROVED') {
+            if (r.type === 'BIN_REGISTRATION' || r.type === 'BIN_REQUEST' || r.binId || r.type === 'BIN') {
                 const id = r.binId || r.id;
-                if (!binMap.has(id)) {
-                    binMap.set(id, {
-                        id,
-                        locationName: r.locationName || r.areaName || 'Litter Bin',
-                        areaName: r.areaName || r.locationName,
-                        zoneId: r.zoneId,
-                        zoneName: r.zoneName || r.zone?.name,
-                        wardId: r.wardId,
-                        wardName: r.wardName || r.ward?.name,
-                        status: r.status || 'APPROVED',
-                        condition: r.condition || 'GOOD',
-                        createdAt: r.createdAt
-                    });
-                }
+                binMap.set(id, {
+                    ...r,
+                    id,
+                    locationName: r.locationName || r.location || 'Litter Bin',
+                    areaName: r.areaName || r.area || r.locationName,
+                    zoneId: r.zoneId,
+                    zoneName: r.zoneName || r.zone?.name,
+                    wardId: r.wardId,
+                    wardName: r.wardName || r.ward?.name,
+                    status: r.status || 'APPROVED',
+                    condition: r.condition || 'GOOD',
+                    createdAt: r.createdAt
+                });
+            }
+        });
+        allBins.forEach(b => {
+            if (b.id && !binMap.has(b.id)) {
+                binMap.set(b.id, b);
+            } else if (b.id) {
+                const existing = binMap.get(b.id);
+                binMap.set(b.id, { ...b, ...existing });
             }
         });
         return Array.from(binMap.values());
@@ -231,6 +238,21 @@ export default function AdminDashboard() {
         });
     }, [combinedBins, typeFilter, statusFilter, zoneFilter, wardFilter, searchQuery, zones, allWards]);
 
+    // Registered Bins Pagination State
+    const [binPage, setBinPage] = useState(1);
+    const [binPageSize, setBinPageSize] = useState(10);
+
+    const paginatedRegisteredBins = useMemo(() => {
+        const start = (binPage - 1) * binPageSize;
+        return registeredBins.slice(start, start + binPageSize);
+    }, [registeredBins, binPage, binPageSize]);
+
+    const totalBinPages = useMemo(() => Math.ceil(registeredBins.length / binPageSize) || 1, [registeredBins.length, binPageSize]);
+
+    useEffect(() => {
+        setBinPage(1);
+    }, [typeFilter, statusFilter, zoneFilter, wardFilter, searchQuery]);
+
     // Approval & Verification Requests
     const registrationRequests = useMemo(() => {
         return records.filter(r => r.type === 'BIN_REQUEST' || r.type === 'BIN_REGISTRATION');
@@ -243,7 +265,7 @@ export default function AdminDashboard() {
             return;
         }
         const headers = ['Bin ID', 'Location / Area', 'Zone', 'Ward', 'Status', 'Condition'];
-        const rows = registeredBins.map(b => [
+        const rows = registeredBins.map((b: any) => [
             `"${b.id}"`,
             `"${b.locationName || b.areaName || ''}"`,
             `"${b.zoneName || ''}"`,
@@ -251,7 +273,7 @@ export default function AdminDashboard() {
             `"${b.status || ''}"`,
             `"${b.condition || 'GOOD'}"`
         ]);
-        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e: any) => e.join(','))].join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
         link.setAttribute('href', encodedUri);
@@ -273,7 +295,6 @@ export default function AdminDashboard() {
     }
 
     async function handleApprove(record: any, assignedEmployeeIds?: string[]) {
-        if (!confirm(`Are you sure you want to approve this request?`)) return;
         setActionLoading(record.id);
         try {
             if (record.type === 'BIN_REGISTRATION' || record.type === 'BIN_REQUEST') {
@@ -287,27 +308,26 @@ export default function AdminDashboard() {
             if (viewRecord?.id === record.id) setViewRecord(null);
             setAssignRecord(null);
         } catch (err) {
-            alert("Approval failed: " + (err instanceof ApiError ? err.message : "Unknown error"));
+            console.error("Approval failed:", err);
         } finally {
             setActionLoading(null);
         }
     }
 
-    async function handleReject(record: any) {
-        if (!confirm(`Are you sure you want to reject this request?`)) return;
+    async function handleReject(record: any, comment?: string) {
         setActionLoading(record.id);
         try {
             if (record.type === 'BIN_REGISTRATION' || record.type === 'BIN_REQUEST') {
-                await TwinbinApi.reject(record.id);
+                await TwinbinApi.reject(record.id, comment);
             } else if (record.type === 'VISIT_REPORT' || record.type === 'DAILY_REPORT') {
-                await TwinbinApi.rejectVisit(record.id);
+                await TwinbinApi.rejectVisit(record.id, comment);
             } else {
-                await TwinbinApi.rejectReport(record.id);
+                await TwinbinApi.rejectReport(record.id, comment);
             }
             await loadData(dateFilter, customDate);
             if (viewRecord?.id === record.id) setViewRecord(null);
         } catch (err) {
-            alert("Rejection failed: " + (err instanceof ApiError ? err.message : "Unknown error"));
+            console.error("Rejection failed:", err);
         } finally {
             setActionLoading(null);
         }
@@ -368,7 +388,7 @@ export default function AdminDashboard() {
                                 </div>
                             ) : (
                                 <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 12px', backgroundColor: '#eff6ff', color: '#2563eb', borderRadius: 12, border: '1px solid #bfdbfe' }}>
-                                    {user?.cityName || 'Indore'}
+                                    {user?.cityName ? user.cityName.split('(')[0].trim() : 'Indore'}
                                 </span>
                             )}
                         </div>
@@ -384,7 +404,7 @@ export default function AdminDashboard() {
                             { id: 'SUBMITTED_REPORTS', label: 'Inspection Reports' },
                             { id: 'REGISTERED', label: 'Registered Litterbins' },
                             { id: 'APPROVALS', label: 'Approval & Verification' },
-                            { id: 'ASSIGNMENTS', label: 'Staff Assignments' },
+                            { id: 'ASSIGNMENTS', label: 'Supervisor Assignments' },
                         ].map(t => (
                             <button
                                 key={t.id}
@@ -628,6 +648,7 @@ export default function AdminDashboard() {
                                 <option value="ALL">All Status</option>
                                 <option value="APPROVED">Approved</option>
                                 <option value="PENDING">Pending</option>
+                                <option value="REJECTED">Rejected</option>
                             </select>
                         </div>
                     </div>
@@ -637,7 +658,8 @@ export default function AdminDashboard() {
                         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
                             <thead>
                                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>
-                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>BIN LOCATION & ID</th>
+                                    <th style={{ padding: '14px 16px', textAlign: 'left', width: 60 }}>S.NO.</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>LITTERBIN AREA AND LOCATION</th>
                                     <th style={{ padding: '14px 20px', textAlign: 'left' }}>ZONE & WARD</th>
                                     <th style={{ padding: '14px 20px', textAlign: 'left' }}>CONDITION</th>
                                     <th style={{ padding: '14px 20px', textAlign: 'left' }}>STATUS</th>
@@ -645,11 +667,16 @@ export default function AdminDashboard() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {registeredBins.map(bin => (
+                                {paginatedRegisteredBins.map((bin: any, index: number) => (
                                     <tr key={bin.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                        <td style={{ padding: '14px 16px', fontSize: 12, fontWeight: 700, color: '#64748b' }}>
+                                            {(binPage - 1) * binPageSize + index + 1}
+                                        </td>
                                         <td style={{ padding: '14px 20px' }}>
-                                            <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{bin.locationName || bin.areaName || 'Litterbin'}</div>
-                                            <div style={{ fontSize: 11, color: '#64748b' }}>ID: {bin.id.slice(0, 8)}</div>
+                                            <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>{bin.areaName || bin.locationName || 'Litterbin'}</div>
+                                            {bin.locationName && bin.locationName !== bin.areaName ? (
+                                                <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>📍 Location: {bin.locationName}</div>
+                                            ) : null}
                                         </td>
                                         <td style={{ padding: '14px 20px', fontSize: 13, fontWeight: 700, color: '#334155' }}>
                                             {bin.wardName || 'Ward N/A'}
@@ -661,20 +688,46 @@ export default function AdminDashboard() {
                                             </span>
                                         </td>
                                         <td style={{ padding: '14px 20px' }}>
-                                            <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 10, fontWeight: 900, background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                                            <span style={{
+                                                padding: '4px 12px', borderRadius: 20, fontSize: 10, fontWeight: 900,
+                                                background: bin.status === 'REJECTED' ? '#fef2f2' : bin.status === 'PENDING_QC' ? '#fefce8' : '#dcfce7',
+                                                color: bin.status === 'REJECTED' ? '#dc2626' : bin.status === 'PENDING_QC' ? '#ca8a04' : '#15803d',
+                                                border: `1px solid ${bin.status === 'REJECTED' ? '#fecaca' : bin.status === 'PENDING_QC' ? '#fef08a' : '#bbf7d0'}`
+                                            }}>
                                                 {bin.status || 'APPROVED'}
                                             </span>
                                         </td>
                                         <td style={{ padding: '14px 20px', textAlign: 'right' }}>
                                             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                                <button onClick={() => openAssignModal(bin)} style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#0f172a' }}>Assign Staff</button>
-                                                <button onClick={() => setSelectedBin(bin)} style={{ backgroundColor: '#2563eb', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>View Detail</button>
+                                                <button onClick={() => setViewRecord(bin)} style={{ backgroundColor: '#2563eb', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>View Detail</button>
                                             </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+
+                        {/* PAGINATION FOOTER CONTROL BAR */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>
+                                Showing <strong style={{ color: '#0f172a' }}>{registeredBins.length > 0 ? (binPage - 1) * binPageSize + 1 : 0}</strong> to <strong style={{ color: '#0f172a' }}>{Math.min(binPage * binPageSize, registeredBins.length)}</strong> of <strong style={{ color: '#0f172a' }}>{registeredBins.length}</strong> registered bins
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b' }}>
+                                    <span>Rows per page:</span>
+                                    <select value={binPageSize} onChange={e => { setBinPageSize(Number(e.target.value)); setBinPage(1); }} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 12, background: '#fff', color: '#0f172a', fontWeight: 600 }}>
+                                        <option value={10}>10</option>
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                    </select>
+                                </div>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <button disabled={binPage <= 1} onClick={() => setBinPage(p => Math.max(1, p - 1))} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e1', background: binPage <= 1 ? '#f1f5f9' : '#fff', color: binPage <= 1 ? '#94a3b8' : '#0f172a', fontSize: 12, fontWeight: 600, cursor: binPage <= 1 ? 'not-allowed' : 'pointer' }}>Previous</button>
+                                    <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontSize: 12, fontWeight: 600, color: '#334155' }}>Page {binPage} of {totalBinPages}</span>
+                                    <button disabled={binPage >= totalBinPages} onClick={() => setBinPage(p => Math.min(totalBinPages, p + 1))} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e1', background: binPage >= totalBinPages ? '#f1f5f9' : '#fff', color: binPage >= totalBinPages ? '#94a3b8' : '#0f172a', fontSize: 12, fontWeight: 600, cursor: binPage >= totalBinPages ? 'not-allowed' : 'pointer' }}>Next</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -724,12 +777,12 @@ export default function AdminDashboard() {
             )}
 
             {/* DRILLDOWN OVERLAY MODAL FOR BIN DETAILS */}
-            {selectedBin && (
-                <div onClick={() => setSelectedBin(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-                    <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 750, maxHeight: '88vh', overflowY: 'auto', padding: 28, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
+            {selectedBin && typeof document !== 'undefined' && createPortal(
+                <div onClick={() => setSelectedBin(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 750, maxHeight: '88vh', overflowY: 'auto', padding: 28, boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
                             <div>
-                                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#0f172a' }}>{selectedBin.locationName || selectedBin.areaName || 'Litterbin Asset'}</h2>
+                                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#0f172a' }}>{selectedBin.areaName || selectedBin.locationName || 'Litterbin Asset'}</h2>
                                 <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500, marginTop: 4 }}>Bin Asset ID: {selectedBin.id}</div>
                             </div>
                             <button onClick={() => setSelectedBin(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#475569', cursor: 'pointer' }}>Close</button>
@@ -737,30 +790,42 @@ export default function AdminDashboard() {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Area Name</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.areaName || 'N/A'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Location Name / Landmark</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.locationName || 'N/A'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
                                 <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Zone</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.zoneName || 'Zone 1'}</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.zoneName || selectedBin.zone?.name || 'Zone 1'}</div>
                             </div>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
                                 <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Ward</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.wardName || 'Ward 1'}</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.wardName || selectedBin.ward?.name || 'Ward 1'}</div>
                             </div>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Bin Type / Classification</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.type || selectedBin.areaType || 'Twin Bin (Organic & Recyclable)'}</div>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Area Type</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.areaType || 'N/A'}</div>
                             </div>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Holding Capacity</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.capacity || '120 Liters'}</div>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Road Type</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.roadType || 'N/A'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Fixed Properly</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.isFixedProperly !== undefined ? (selectedBin.isFixedProperly ? 'Yes' : 'No') : 'N/A'}</div>
+                            </div>
+                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Has Lid</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.hasLid !== undefined ? (selectedBin.hasLid ? 'Yes' : 'No') : 'N/A'}</div>
                             </div>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
                                 <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>GPS Coordinates (Lat, Long)</div>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: '#2563eb', marginTop: 2 }}>
-                                    {selectedBin.latitude || selectedBin.lat || '22.7196'}°, {selectedBin.longitude || selectedBin.lng || '75.8577'}°
+                                    {(selectedBin.latitude || selectedBin.lat) && (selectedBin.longitude || selectedBin.lng) ? `${selectedBin.latitude || selectedBin.lat}°, ${selectedBin.longitude || selectedBin.lng}°` : 'N/A'}
                                 </div>
-                            </div>
-                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Address / Landmark</div>
-                                <div style={{ fontSize: 12, fontWeight: 500, color: '#334155', marginTop: 2 }}>{selectedBin.address || selectedBin.locationName || selectedBin.areaName || 'Main Street Hub'}</div>
                             </div>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
                                 <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Asset Condition</div>
@@ -772,7 +837,8 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* REVIEW MODAL */}
