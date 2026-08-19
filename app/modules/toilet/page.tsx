@@ -43,7 +43,7 @@ export default function ToiletModulePage() {
     { id: "submitted_reports", label: "Inspection Reports", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
     { id: "all", label: "All Registered Toilets", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
     { id: "approvals", label: "Verification & Approvals", roles: ["QC", "ACTION_OFFICER", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
-    { id: "assignments", label: "Staff Assignments", roles: ["QC", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
+    { id: "assignments", label: "Supervisor Assignments", roles: ["QC", "CITY_ADMIN", "HMS_SUPER_ADMIN"] },
   ];
 
   const visibleTabs = tabs.filter(tab =>
@@ -105,7 +105,7 @@ export default function ToiletModulePage() {
               ) : (
                 user?.cityName && (
                   <span style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '3px 10px', borderRadius: 20 }}>
-                    {user.cityName}
+                    {user.cityName.split('(')[0].trim()}
                   </span>
                 )
               )}
@@ -162,11 +162,19 @@ export default function ToiletModulePage() {
             record={selectedReport}
             onClose={() => setSelectedReport(null)}
             onApprove={async (rec, comment) => {
-              await ToiletApi.reviewInspection(rec.id, { status: 'APPROVED', comment });
+              if (rec.type === 'TOILET_REGISTRATION' || rec.type === 'TOILET_REQUEST' || rec.isRegistration) {
+                await ToiletApi.approveToilet(rec.id);
+              } else {
+                await ToiletApi.reviewInspection(rec.id, { status: 'APPROVED', comment });
+              }
               setSelectedReport(null);
             }}
             onReject={async (rec, comment) => {
-              await ToiletApi.reviewInspection(rec.id, { status: 'REJECTED', comment });
+              if (rec.type === 'TOILET_REGISTRATION' || rec.type === 'TOILET_REQUEST' || rec.isRegistration) {
+                await ToiletApi.rejectToilet(rec.id, comment || '');
+              } else {
+                await ToiletApi.reviewInspection(rec.id, { status: 'REJECTED', comment });
+              }
               setSelectedReport(null);
             }}
             onActionRequired={async (rec, comment) => {

@@ -106,6 +106,26 @@ export default function BeatStaffAssignmentsTab() {
 
     const isSupervisorView = viewMode === 'supervisor';
 
+    const totalSupervisors = useMemo(() => {
+        const supervisorKeys = new Set<string>();
+
+        beats.forEach((beat: any) => {
+            (beat.supervisorsSummary || []).forEach((supervisor: any) => {
+                const key = String(
+                    supervisor?.id ||
+                    supervisor?.userId ||
+                    supervisor?.name ||
+                    ""
+                ).trim();
+
+                if (key) {
+                    supervisorKeys.add(key);
+                }
+            });
+        });
+
+        return supervisorKeys.size;
+    }, [beats]);
     return (
         <div style={{ animation: 'fadeIn 0.3s ease-out', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
             <style jsx>{`
@@ -201,8 +221,13 @@ export default function BeatStaffAssignmentsTab() {
                     </div>
                 </div>
 
-                <div style={{ marginTop: 6, fontSize: 11, color: '#64748b', fontWeight: 500 }}>
-                    Total Beat Assignments: <strong style={{ color: '#2563eb', fontWeight: 600 }}>{filteredBeats.length}</strong> Street Beats
+                <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ background: '#eff6ff', padding: '6px 12px', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 600, color: '#1e40af' }}>
+                        👨‍💼 Total Supervisors: <strong>{totalSupervisors}</strong>
+                    </div>
+                    <div style={{ background: '#f8fafc', padding: '6px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                        📍 Total Beat Assignments: <strong>{filteredBeats.length}</strong> Street Beats
+                    </div>
                 </div>
             </div>
 
