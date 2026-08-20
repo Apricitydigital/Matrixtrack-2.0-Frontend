@@ -51,6 +51,9 @@ const allowedRoles: Role[] = [
 const usesGeoScope = (role: Role) =>
   role === "QC" || role === "ULB_OFFICER";
 
+const requiresModuleAssignment = (role: Role) =>
+  role === "ACTION_OFFICER";
+
 const enforceRoleWriteRules = (
   role: Role,
   modules: Record<string, { canWrite: boolean; zoneIds?: string[]; wardIds?: string[] }>
@@ -297,6 +300,12 @@ function CityUsersPage() {
         return;
       }
 
+      if (requiresModuleAssignment(role) && Object.keys(newUserModules).length === 0) {
+        setStatus("");
+        setError("Action Officer requires at least one module assignment");
+        return;
+      }
+
       const cleanEmail = email.trim().toLowerCase();
       const existingUser = users.find(u => u.email.toLowerCase() === cleanEmail);
       if (existingUser) {
@@ -440,6 +449,12 @@ function CityUsersPage() {
 
       if (usesGeoScope(payload.role) && (cleanZoneIds.length === 0 || cleanWardIds.length === 0)) {
         setError("QC and ULB Officer users require at least one zone and ward");
+        setSavingUserId(null);
+        return;
+      }
+
+      if (requiresModuleAssignment(payload.role) && Object.keys(payload.modules).length === 0) {
+        setError("Action Officer requires at least one module assignment");
         setSavingUserId(null);
         return;
       }

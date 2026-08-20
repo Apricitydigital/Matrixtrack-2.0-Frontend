@@ -496,18 +496,23 @@ export default function RegisteredUsersPage() {
 
                   const stateText = u.stateName || 'Madhya Pradesh';
                   const cityText = u.cityName || u.city?.name || cityMap[u.cityId || ''] || 'Indore';
-                  // Process Zones and Wards as clean arrays
-                  const zoneList: string[] = u.zoneIds && u.zoneIds.length > 0
-                    ? u.zoneIds.map((id: string, i: number) => cleanGeoLabel(id, 'Zone', i))
-                    : u.zoneName || u.zone?.name
-                      ? [u.zoneName || u.zone?.name]
-                      : ['Zone 1'];
+                  // City Admin has complete city access, so an empty geo scope is intentional.
+                  const isCityAdmin = u.role === 'CITY_ADMIN';
+                  const zoneList: string[] = isCityAdmin
+                    ? []
+                    : u.zoneIds && u.zoneIds.length > 0
+                      ? u.zoneIds.map((id: string, i: number) => cleanGeoLabel(id, 'Zone', i))
+                      : u.zoneName || u.zone?.name
+                        ? [u.zoneName || u.zone?.name]
+                        : ['Zone 1'];
 
-                  const wardList: string[] = u.wardIds && u.wardIds.length > 0
-                    ? u.wardIds.map((id: string, i: number) => cleanGeoLabel(id, 'Ward', i))
-                    : u.wardName || u.ward?.name
-                      ? [u.wardName || u.ward?.name]
-                      : ['Ward 1'];
+                  const wardList: string[] = isCityAdmin
+                    ? []
+                    : u.wardIds && u.wardIds.length > 0
+                      ? u.wardIds.map((id: string, i: number) => cleanGeoLabel(id, 'Ward', i))
+                      : u.wardName || u.ward?.name
+                        ? [u.wardName || u.ward?.name]
+                        : ['Ward 1'];
 
                   return (
                     <tr key={u.id} className="group hover:bg-blue-50/20 transition">
@@ -561,8 +566,18 @@ export default function RegisteredUsersPage() {
                       </td >
 
                       {/* Zone & Ward */}
-                      < td className="px-3 py-3 align-middle" >
-                        {(() => {
+                      <td className="px-3 py-3 align-middle">
+                        {isCityAdmin ? (
+                          <div className="flex flex-col gap-0.5 items-start text-xs min-w-[130px]">
+                            <span className="font-bold text-emerald-700 text-[11px] flex items-center gap-1">
+                              <Building2 size={11} className="text-emerald-600 shrink-0" />
+                              Complete City
+                            </span>
+                            <span className="font-semibold text-slate-500 text-[10px]">
+                              No Zone / Ward restriction
+                            </span>
+                          </div>
+                        ) : (() => {
                           const totalZones = zoneList.length;
                           const totalWards = wardList.length;
 

@@ -11,12 +11,12 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
   FileSpreadsheet,
   Filter,
-  History,
   RefreshCw,
   Search,
   Sparkles,
@@ -52,6 +52,7 @@ import {
   type AttendanceDashboardQuery,
   type AttendanceDashboardResponse,
   type AttendanceRecord,
+  type AttendanceUploadCalendarResponse,
   type AttendanceUploadResponse,
 } from "@lib/attendanceApi";
 
@@ -72,8 +73,6 @@ type FilterState = {
   to: string;
   status: string;
   designation: string;
-  officeLocation: string;
-  divisionUnit: string;
   checkoutState: string;
   search: string;
 };
@@ -83,17 +82,113 @@ const emptyFilters: FilterState = {
   to: "",
   status: "ALL",
   designation: "",
-  officeLocation: "",
-  divisionUnit: "",
   checkoutState: "ALL",
   search: "",
 };
+
+type SearchableOption = { value: string; label: string };
+
+function SearchableSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: SearchableOption[];
+  onChange: (value: string) => void;
+}) {
+  const selectedLabel = options.find((option) => option.value === value)?.label || "";
+  const [query, setQuery] = useState(selectedLabel);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) setQuery(selectedLabel);
+  }, [selectedLabel, open]);
+
+  const filteredOptions = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    if (!needle || query === selectedLabel) return options;
+    return options.filter((option) => option.label.toLocaleLowerCase().includes(needle));
+  }, [options, query, selectedLabel]);
+
+  const choose = (option: SearchableOption) => {
+    setQuery(option.label);
+    setOpen(false);
+    onChange(option.value);
+  };
+
+  return (
+    <div className="relative">
+      <Search size={13} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-slate-400" />
+      <input
+        value={query}
+        onFocus={(event) => {
+          setOpen(true);
+          event.currentTarget.select();
+        }}
+        onClick={() => setOpen(true)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && filteredOptions[0]) {
+            event.preventDefault();
+            choose(filteredOptions[0]);
+          } else if (event.key === "Escape") {
+            setQuery(selectedLabel);
+            setOpen(false);
+          }
+        }}
+        onBlur={() => {
+          window.setTimeout(() => {
+            setQuery(selectedLabel);
+            setOpen(false);
+          }, 120);
+        }}
+        className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-8 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+      />
+      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+          {filteredOptions.length ? (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value || option.label}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(option)}
+                className={`block w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${
+                  option.value === value
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))
+          ) : (
+            <p className="px-2.5 py-2 text-xs font-semibold text-slate-400">No matching option</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatShortDate(value: string) {
   if (!value) return "—";
   const [year, month, day] = value.slice(0, 10).split("-");
   if (!year || !month || !day) return value;
   return `${day}/${month}/${year}`;
+}
+
+function toLocalDateKey(value: Date) {
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, "0"),
+    String(value.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function formatTime(value: string | null) {
@@ -251,40 +346,40 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex min-h-[224px] w-full flex-col overflow-hidden rounded-[18px] border bg-white px-4 pb-3 pt-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.065)] transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 ${active
-          ? "-translate-y-1 border-blue-300 shadow-[0_16px_38px_rgba(37,99,235,0.14)] ring-2 ring-blue-100"
-          : "border-slate-200/90 hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_16px_38px_rgba(15,23,42,0.11)]"
+      className={`group relative flex min-h-[170px] w-full flex-col overflow-hidden rounded-[18px] border bg-white px-3.5 pb-2.5 pt-3.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.055)] transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 ${active
+          ? "-translate-y-0.5 border-blue-300 shadow-[0_14px_32px_rgba(37,99,235,0.12)] ring-2 ring-blue-100"
+          : "border-slate-200/90 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.09)]"
         }`}
       aria-label={`View ${label} records`}
     >
-      <div className="flex min-h-[50px] items-start gap-2.5">
+      <div className="flex items-start gap-2.5">
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center bg-gradient-to-br text-white shadow-lg transition-transform duration-300 group-hover:scale-105 ${toneStyle.badge} ${toneStyle.shadow}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center bg-gradient-to-br text-white shadow-md transition-transform duration-300 group-hover:scale-105 ${toneStyle.badge} ${toneStyle.shadow}`}
           style={{ clipPath: "polygon(25% 6%, 75% 6%, 100% 50%, 75% 94%, 25% 94%, 0 50%)" }}
         >
           {icon}
         </div>
-        <p className="min-h-[30px] pt-1 text-[10.5px] font-extrabold leading-[15px] tracking-[-0.01em] text-slate-800">
+        <p className="pt-0.5 text-[10.5px] font-extrabold leading-[14px] tracking-[-0.01em] text-slate-800">
           {label}
         </p>
       </div>
 
       <div className="mt-3">
-        <p className="whitespace-nowrap text-[27px] font-black tabular-nums leading-none tracking-[-0.04em] text-slate-950 2xl:text-[29px]">
+        <p className="whitespace-nowrap text-[24px] font-black tabular-nums leading-none tracking-[-0.04em] text-slate-950 2xl:text-[26px]">
           {value}
         </p>
-        <p className="mt-2 min-h-[30px] text-[9.5px] font-semibold leading-[15px] text-slate-500">
+        <p className="mt-1.5 min-h-[28px] text-[9.5px] font-semibold leading-[14px] text-slate-500">
           {detail}
         </p>
       </div>
 
-      <div className="mt-auto -mx-1 pt-2">
+      <div className="mt-auto -mx-1 pt-1.5">
         <KpiSparkline tone={tone} />
       </div>
 
-      <div className="mt-1 flex items-center justify-center border-t border-slate-100 pt-2.5">
-        <span className="inline-flex items-center gap-1 text-[9.5px] font-extrabold text-blue-600 transition-colors group-hover:text-blue-700">
-          View Records <ArrowUpRight size={11} strokeWidth={2.3} />
+      <div className="mt-1 flex items-center justify-center border-t border-slate-100 pt-2">
+        <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-blue-600 transition-colors group-hover:text-blue-700">
+          View records <ArrowUpRight size={10} strokeWidth={2.3} />
         </span>
       </div>
     </button>
@@ -612,6 +707,182 @@ function UploadModal({
   );
 }
 
+function UploadCalendarModal({
+  open,
+  monthDate,
+  data,
+  loading,
+  todayKey,
+  onPreviousMonth,
+  onNextMonth,
+  onClose,
+}: {
+  open: boolean;
+  monthDate: Date;
+  data: AttendanceUploadCalendarResponse | null;
+  loading: boolean;
+  todayKey: string;
+  onPreviousMonth: () => void;
+  onNextMonth: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const uploadedByDate = new Map((data?.days || []).map((item) => [item.date, item]));
+  const monthLabel = monthDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const cells = Array.from({ length: firstDay + daysInMonth }, (_, index) => {
+    if (index < firstDay) return null;
+    const day = index - firstDay + 1;
+    const date = new Date(year, month, day);
+    const dateKey = toLocalDateKey(date);
+    const upload = uploadedByDate.get(dateKey);
+    const uploaded = Boolean(upload?.completedUploads);
+    const future = dateKey > todayKey;
+    return { day, dateKey, upload, uploaded, future };
+  });
+
+  return createPortal(
+    <div
+      className="z-[9999] bg-slate-950/40 backdrop-blur-[2px]"
+      style={{ position: "fixed", inset: 0, width: "100vw", height: "100dvh" }}
+      onMouseDown={onClose}
+    >
+      <div
+        className="overflow-hidden rounded-[24px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.28)]"
+        style={{
+          position: "fixed",
+          left: "50vw",
+          top: "50dvh",
+          transform: "translate(-50%, -50%)",
+          width: "min(620px, calc(100vw - 28px))",
+          maxHeight: "calc(100dvh - 40px)",
+        }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50 via-white to-emerald-50 px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20">
+              <CalendarDays size={18} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-black tracking-tight text-slate-900">Attendance CSV calendar</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-slate-500">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 ring-1 ring-emerald-200">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Uploaded
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 ring-1 ring-rose-200">
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Not uploaded
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                  <span className="h-2.5 w-2.5 rounded-full border border-slate-300 bg-white" /> Future date
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Close attendance upload calendar"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onPreviousMonth}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              aria-label="Previous month"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div className="text-center">
+              <p className="text-sm font-black text-slate-900">{monthLabel}</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-slate-400">Daily upload status</p>
+            </div>
+            <button
+              type="button"
+              onClick={onNextMonth}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              aria-label="Next month"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <div key={day} className="py-1 text-[9px] font-black uppercase tracking-wider text-slate-400">{day}</div>
+            ))}
+            {cells.map((cell, index) => {
+              if (!cell) return <div key={`empty-${index}`} className="aspect-square" />;
+              const isToday = cell.dateKey === todayKey;
+              const className = loading
+                ? "border-slate-100 bg-slate-50/70 text-slate-400"
+                : cell.future
+                  ? "border-slate-100 bg-white text-slate-400"
+                  : cell.uploaded
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-rose-200 bg-rose-50 text-rose-700";
+              const title = loading
+                ? "Checking upload status"
+                : cell.future
+                  ? "Future date"
+                  : cell.uploaded
+                    ? `${cell.upload?.completedUploads || 0} CSV ${cell.upload?.completedUploads === 1 ? "file" : "files"} uploaded`
+                    : "CSV not uploaded";
+
+              return (
+                <div
+                  key={cell.dateKey}
+                  title={title}
+                  className={`relative flex aspect-square min-h-[42px] flex-col items-center justify-center rounded-lg border text-[11px] font-black transition ${className} ${isToday ? "ring-2 ring-blue-400 ring-offset-2" : ""}`}
+                >
+                  <span>{cell.day}</span>
+                  {!loading && !cell.future && (
+                    cell.uploaded
+                      ? <CheckCircle2 size={12} className="mt-1 text-emerald-600" />
+                      : <AlertCircle size={12} className="mt-1 text-rose-500" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {loading && (
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-[11px] font-bold text-slate-500">
+              <RefreshCw size={13} className="animate-spin" /> Loading upload status...
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 border-t border-slate-100 pt-4 text-[10px] font-bold text-slate-500">
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Uploaded</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Not uploaded</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full border border-slate-300 bg-white" /> Future</span>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 
 type KpiDrilldown = {
   key: "ALL" | "PRESENT" | "ABSENT" | "RATE" | "PUNCH_IN" | "PUNCH_OUT" | "OPEN_PUNCH_IN" | "AVG_PUNCH_IN" | "AVG_WORK";
@@ -710,10 +981,10 @@ function KpiRecordsDrawer({
             <div className="p-4 sm:p-6">
               <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[960px] border-collapse">
+                  <table className="w-full min-w-[1180px] border-collapse">
                     <thead>
                       <tr className="bg-slate-50 text-left">
-                        {['Employee', 'Attendance ID', 'Designation', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
+                        {['Employee', 'Attendance ID', 'Designation', 'Zone', 'Ward', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
                           <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                         ))}
                       </tr>
@@ -736,6 +1007,8 @@ function KpiRecordsDrawer({
                             </td>
                             <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.zones.length ? record.zones.join(", ") : "—"}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.wards.length ? record.wards.join(", ") : "—"}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                             <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                             <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>
@@ -894,6 +1167,9 @@ function WorkDurationEmployeesPopup({
                     <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400">
                       {record.designation || "Employee"} · {record.attendanceId}
                     </p>
+                    <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${record.zones.join(", ") || "—"} · Ward: ${record.wards.join(", ") || "—"}`}>
+                      Zone: {record.zones.join(", ") || "—"} · Ward: {record.wards.join(", ") || "—"}
+                    </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-bold">
                       <span className="rounded-md bg-white px-1.5 py-1 text-slate-600 ring-1 ring-slate-200">
                         {formatShortDate(record.attendanceDate)}
@@ -965,6 +1241,16 @@ function AttendanceDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonthDate, setCalendarMonthDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [calendarData, setCalendarData] = useState<AttendanceUploadCalendarResponse | null>(null);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [todayUploadData, setTodayUploadData] = useState<AttendanceUploadCalendarResponse | null>(null);
+  const [todayUploadLoading, setTodayUploadLoading] = useState(false);
+  const [uploadTrackingVersion, setUploadTrackingVersion] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -976,15 +1262,22 @@ function AttendanceDashboard() {
   const [workDurationData, setWorkDurationData] = useState<AttendanceDashboardResponse | null>(null);
   const [workDurationPage, setWorkDurationPage] = useState(1);
   const [workDurationLoading, setWorkDurationLoading] = useState(false);
+  const [designationPage, setDesignationPage] = useState(1);
+
+  const today = new Date();
+  const todayKey = toLocalDateKey(today);
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1;
+  const calendarYear = calendarMonthDate.getFullYear();
+  const calendarMonth = calendarMonthDate.getMonth() + 1;
+  const attendanceCityId = hmsSuperAdmin ? selectedCityId || undefined : undefined;
 
   const buildQuery = (filters: FilterState, requestedPage: number): AttendanceDashboardQuery => ({
-    cityId: hmsSuperAdmin ? selectedCityId || undefined : undefined,
+    cityId: attendanceCityId,
     from: filters.from || undefined,
     to: filters.to || undefined,
     status: filters.status === "ALL" ? undefined : filters.status,
     designation: filters.designation || undefined,
-    officeLocation: filters.officeLocation || undefined,
-    divisionUnit: filters.divisionUnit || undefined,
     checkoutState: filters.checkoutState === "ALL" ? undefined : filters.checkoutState,
     search: filters.search.trim() || undefined,
     page: requestedPage,
@@ -1022,6 +1315,59 @@ function AttendanceDashboard() {
       cancelled = true;
     };
   }, [hmsSuperAdmin, user?.cityId]);
+
+  useEffect(() => {
+    if (hmsSuperAdmin && !selectedCityId) {
+      setTodayUploadData(null);
+      setTodayUploadLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setTodayUploadLoading(true);
+
+    AttendanceApi.uploadCalendar(todayYear, todayMonth, attendanceCityId)
+      .then((result) => {
+        if (!cancelled) setTodayUploadData(result);
+      })
+      .catch(() => {
+        if (!cancelled) setTodayUploadData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTodayUploadLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attendanceCityId, hmsSuperAdmin, selectedCityId, todayMonth, todayYear, uploadTrackingVersion]);
+
+  useEffect(() => {
+    if (!calendarOpen) return;
+    if (hmsSuperAdmin && !selectedCityId) {
+      setCalendarData(null);
+      setCalendarLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCalendarLoading(true);
+
+    AttendanceApi.uploadCalendar(calendarYear, calendarMonth, attendanceCityId)
+      .then((result) => {
+        if (!cancelled) setCalendarData(result);
+      })
+      .catch(() => {
+        if (!cancelled) setCalendarData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCalendarLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attendanceCityId, calendarMonth, calendarOpen, calendarYear, hmsSuperAdmin, selectedCityId, uploadTrackingVersion]);
 
   const loadDashboard = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -1140,6 +1486,11 @@ function AttendanceDashboard() {
   const handleCityChange = (cityId: string) => {
     setSelectedCityId(cityId);
     setData(null);
+    setTodayUploadData(null);
+    setCalendarData(null);
+    setCalendarOpen(false);
+    const now = new Date();
+    setCalendarMonthDate(new Date(now.getFullYear(), now.getMonth(), 1));
     setDraftFilters({ ...emptyFilters });
     setAppliedFilters({ ...emptyFilters });
     setPage(1);
@@ -1147,6 +1498,7 @@ function AttendanceDashboard() {
     setKpiDrilldownData(null);
     setWorkDurationBucket(null);
     setWorkDurationData(null);
+    setDesignationPage(1);
     setNotice("");
     setError("");
   };
@@ -1189,9 +1541,27 @@ function AttendanceDashboard() {
     return checkInDistribution.reduce((best, item) => item.count > best.count ? item : best, checkInDistribution[0] || { hour: 0, label: "—", count: 0 });
   }, [checkInDistribution]);
 
-  const bestDesignation = useMemo(() => {
-    return (data?.designationBreakdown || []).reduce<any>((best, item) => !best || item.rate > best.rate ? item : best, null);
+  const sortedDesignationBreakdown = useMemo(() => {
+    return [...(data?.designationBreakdown || [])].sort(
+      (a, b) => b.rate - a.rate || b.present - a.present || a.designation.localeCompare(b.designation)
+    );
   }, [data?.designationBreakdown]);
+
+  const bestDesignation = sortedDesignationBreakdown[0] || null;
+
+  const designationPageSize = 8;
+  const designationTotal = sortedDesignationBreakdown.length;
+  const designationTotalPages = Math.max(1, Math.ceil(designationTotal / designationPageSize));
+  const designationPageItems = useMemo(() => {
+    const start = (designationPage - 1) * designationPageSize;
+    return sortedDesignationBreakdown.slice(start, start + designationPageSize);
+  }, [sortedDesignationBreakdown, designationPage]);
+  const designationStart = designationTotal ? (designationPage - 1) * designationPageSize + 1 : 0;
+  const designationEnd = Math.min(designationPage * designationPageSize, designationTotal);
+
+  useEffect(() => {
+    setDesignationPage((current) => Math.min(current, designationTotalPages));
+  }, [designationTotalPages]);
 
   const updateFilter = (patch: Partial<FilterState>) => {
     const next = { ...draftFilters, ...patch };
@@ -1203,6 +1573,7 @@ function AttendanceDashboard() {
     setError("");
     setDraftFilters(next);
     setPage(1);
+    setDesignationPage(1);
     setAppliedFilters(next);
   };
 
@@ -1213,12 +1584,14 @@ function AttendanceDashboard() {
     }
     setError("");
     setPage(1);
+    setDesignationPage(1);
     setAppliedFilters({ ...draftFilters });
   };
 
   const resetFilters = () => {
     setDraftFilters({ ...emptyFilters });
     setPage(1);
+    setDesignationPage(1);
     setAppliedFilters({ ...emptyFilters });
   };
 
@@ -1233,6 +1606,7 @@ function AttendanceDashboard() {
     const next = { ...draftFilters, from: toIso(start), to: toIso(end) };
     setDraftFilters(next);
     setPage(1);
+    setDesignationPage(1);
     setAppliedFilters(next);
   };
 
@@ -1271,12 +1645,16 @@ function AttendanceDashboard() {
       setPage(1);
       setDraftFilters({ ...emptyFilters });
       setAppliedFilters({ ...emptyFilters });
+      setUploadTrackingVersion((current) => current + 1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "CSV import failed");
     } finally {
       setUploading(false);
     }
   };
+
+  const todayUpload = todayUploadData?.days.find((item) => item.date === todayKey) || null;
+  const todayUploaded = Boolean(todayUpload?.completedUploads);
 
   const visibleRangeLabel = data?.range
     ? data.range.from === data.range.to
@@ -1302,12 +1680,22 @@ function AttendanceDashboard() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1780px] space-y-5 pb-10">
+    <div className="mx-auto w-full max-w-[1780px] space-y-4 pb-8">
       <UploadModal
         open={uploadOpen}
         uploading={uploading}
         onClose={() => !uploading && setUploadOpen(false)}
         onUpload={handleUpload}
+      />
+      <UploadCalendarModal
+        open={calendarOpen}
+        monthDate={calendarMonthDate}
+        data={calendarData}
+        loading={calendarLoading}
+        todayKey={todayKey}
+        onPreviousMonth={() => setCalendarMonthDate((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+        onNextMonth={() => setCalendarMonthDate((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+        onClose={() => setCalendarOpen(false)}
       />
       <KpiRecordsDrawer
         open={Boolean(kpiDrilldown)}
@@ -1346,7 +1734,7 @@ function AttendanceDashboard() {
         }
       `}</style>
 
-      <section className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700 ring-1 ring-blue-100">
             <Sparkles size={12} />
@@ -1388,12 +1776,29 @@ function AttendanceDashboard() {
 
           <button
             type="button"
-            onClick={() => void loadDashboard(true)}
+            onClick={() => {
+              setUploadTrackingVersion((current) => current + 1);
+              void loadDashboard(true);
+            }}
             disabled={refreshing || (hmsSuperAdmin && !selectedCityId)}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
           >
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
             Refresh
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const now = new Date();
+              setCalendarMonthDate(new Date(now.getFullYear(), now.getMonth(), 1));
+              setCalendarOpen(true);
+            }}
+            disabled={hmsSuperAdmin && !selectedCityId}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <CalendarDays size={14} />
+            Upload calendar
           </button>
 
           <button
@@ -1408,6 +1813,72 @@ function AttendanceDashboard() {
           </button>
         </div>
       </section>
+
+      {(!hmsSuperAdmin || selectedCityId) && (
+        <section
+          className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 shadow-[0_5px_16px_rgba(15,23,42,0.03)] ${todayUploadLoading
+              ? "border-slate-200 bg-white"
+              : todayUploadData && todayUploaded
+                ? "border-emerald-200 bg-emerald-50/75"
+                : todayUploadData
+                  ? "border-rose-200 bg-rose-50/75"
+                  : "border-amber-200 bg-amber-50/75"
+            }`}
+        >
+          <div
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${todayUploadLoading
+                ? "bg-slate-100 text-slate-500"
+                : todayUploadData && todayUploaded
+                  ? "bg-emerald-100 text-emerald-700"
+                  : todayUploadData
+                    ? "bg-rose-100 text-rose-700"
+                    : "bg-amber-100 text-amber-700"
+              }`}
+          >
+            {todayUploadLoading
+              ? <RefreshCw size={14} className="animate-spin" />
+              : todayUploadData && todayUploaded
+                ? <CheckCircle2 size={15} />
+                : <AlertCircle size={15} />}
+          </div>
+
+          <div className="min-w-0 flex flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+            <p
+              className={`shrink-0 text-xs font-black ${todayUploadLoading
+                  ? "text-slate-800"
+                  : todayUploadData && todayUploaded
+                    ? "text-emerald-900"
+                    : todayUploadData
+                      ? "text-rose-900"
+                      : "text-amber-900"
+                }`}
+            >
+              {todayUploadLoading
+                ? "Checking today's CSV upload..."
+                : todayUploadData && todayUploaded
+                  ? "Today's CSV uploaded"
+                  : todayUploadData
+                    ? "Today's CSV not uploaded"
+                    : "Today's CSV upload status unavailable"}
+            </p>
+            <span className="hidden h-1 w-1 shrink-0 rounded-full bg-current opacity-30 sm:block" />
+            <p
+              className={`truncate text-[10.5px] font-semibold ${todayUploadData && todayUploaded
+                  ? "text-emerald-700"
+                  : todayUploadData
+                    ? "text-rose-700"
+                    : "text-slate-500"
+                }`}
+            >
+              {todayUploadData && todayUploaded
+                ? `${todayUpload?.completedUploads || 0} CSV ${todayUpload?.completedUploads === 1 ? "file" : "files"} uploaded for ${formatShortDate(todayKey)}.`
+                : todayUploadData
+                  ? `No completed attendance CSV has been uploaded for ${formatShortDate(todayKey)}.`
+                  : `Attendance upload status for ${formatShortDate(todayKey)} could not be confirmed.`}
+            </p>
+          </div>
+        </section>
+      )}
 
       {(error || notice) && (
         <div
@@ -1433,8 +1904,8 @@ function AttendanceDashboard() {
         </div>
       )}
 
-      <section className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_32px_rgba(15,23,42,0.04)]">
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="rounded-3xl border border-slate-200/80 bg-white p-3.5 shadow-[0_10px_28px_rgba(15,23,42,0.04)]">
+        <div className="mb-2.5 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
               <Filter size={15} />
@@ -1451,14 +1922,14 @@ function AttendanceDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">From</span>
             <input
               type="date"
               value={draftFilters.from}
               onChange={(e) => updateFilter({ from: e.target.value })}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             />
           </label>
           <label className="space-y-1.5">
@@ -1467,72 +1938,44 @@ function AttendanceDashboard() {
               type="date"
               value={draftFilters.to}
               onChange={(e) => updateFilter({ to: e.target.value })}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             />
           </label>
           <label className="space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendence</span>
-            <select
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance</span>
+            <SearchableSelect
               value={draftFilters.status}
-              onChange={(e) => updateFilter({ status: e.target.value })}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="ALL">All</option>
-              <option value="P">Present</option>
-              <option value="A">Absent</option>
-            </select>
+              onChange={(status) => updateFilter({ status })}
+              options={[
+                { value: "ALL", label: "All" },
+                { value: "P", label: "Present" },
+                { value: "A", label: "Absent" },
+              ]}
+            />
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Punch status</span>
-            <select
+            <SearchableSelect
               value={draftFilters.checkoutState}
-              onChange={(e) => updateFilter({ checkoutState: e.target.value })}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="ALL">All punches</option>
-              <option value="CHECKED_OUT">Punch Out</option>
-              <option value="OPEN_CHECKIN">Punch In</option>
-              <option value="NO_PUNCH">No punch</option>
-            </select>
+              onChange={(checkoutState) => updateFilter({ checkoutState })}
+              options={[
+                { value: "ALL", label: "All punches" },
+                { value: "CHECKED_OUT", label: "Punch Out" },
+                { value: "OPEN_CHECKIN", label: "Punch In" },
+                { value: "NO_PUNCH", label: "No punch" },
+              ]}
+            />
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Designation</span>
-            <select
+            <SearchableSelect
               value={draftFilters.designation}
-              onChange={(e) => updateFilter({ designation: e.target.value })}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="">All designations</option>
-              {(data?.filters.designations || []).map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Office</span>
-            <select
-              value={draftFilters.officeLocation}
-              onChange={(e) => updateFilter({ officeLocation: e.target.value })}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="">All offices</option>
-              {(data?.filters.officeLocations || []).map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Division</span>
-            <select
-              value={draftFilters.divisionUnit}
-              onChange={(e) => updateFilter({ divisionUnit: e.target.value })}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-            >
-              <option value="">All divisions</option>
-              {(data?.filters.divisionUnits || []).map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
+              onChange={(designation) => updateFilter({ designation })}
+              options={[
+                { value: "", label: "All designations" },
+                ...(data?.filters.designations || []).map((value) => ({ value, label: value })),
+              ]}
+            />
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee search</span>
@@ -1543,13 +1986,13 @@ function AttendanceDashboard() {
                 onChange={(e) => setDraftFilters((current) => ({ ...current, search: e.target.value }))}
                 onKeyDown={(e) => e.key === "Enter" && applyFilters()}
                 placeholder="Name or attendance ID"
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
               />
             </div>
           </label>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
           <p className="text-[11px] font-medium text-slate-400">
             {lastUpdated ? `Last refreshed ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
           </p>
@@ -1591,9 +2034,9 @@ function AttendanceDashboard() {
         </section>
       ) : (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
+          <section className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
             <KpiCard
-              label="Unique employees"
+              label="Total employees"
               value={numberFormatter.format(summary.uniqueEmployees)}
               detail={`${numberFormatter.format(summary.totalRecords)} attendance records`}
               icon={<UsersRound size={18} />}
@@ -1601,7 +2044,7 @@ function AttendanceDashboard() {
               active={kpiDrilldown?.key === "ALL"}
               onClick={() => openKpiDrilldown({
                 key: "ALL",
-                title: "Unique employees",
+                title: "Total employees",
                 subtitle: "Underlying employee attendance records for the current dashboard filters.",
                 value: numberFormatter.format(summary.uniqueEmployees),
                 tone: "blue",
@@ -1784,19 +2227,107 @@ function AttendanceDashboard() {
               </div>
             </ChartCard>
 
-            <ChartCard title="Designation performance" subtitle="Attendance rate across major workforce groups" badge={bestDesignation ? `Best ${bestDesignation.rate.toFixed(1)}%` : "Top 12"} icon={<UsersRound size={18} />} tone="violet">
+            <ChartCard title="Designation performance" subtitle="Attendance rate across all workforce groups" badge={`${numberFormatter.format(designationTotal)} designations`} icon={<UsersRound size={18} />} tone="violet">
               <div className="h-[300px] w-full rounded-2xl bg-gradient-to-r from-violet-50/30 to-white px-2 py-2 ring-1 ring-violet-100/70">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.designationBreakdown} layout="vertical" margin={{ left: 18, right: 18, top: 0, bottom: 0 }}>
+                  <BarChart data={designationPageItems} layout="vertical" margin={{ left: 18, right: 18, top: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                     <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
                     <YAxis type="category" dataKey="designation" width={142} tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
-                    <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}%`, "Attendance rate"]} contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                    <Tooltip
+                      cursor={{ fill: "rgba(124,58,237,0.05)" }}
+                      content={({ active, payload }) => {
+                        const item = payload?.[0]?.payload as { designation: string; total: number; present: number; absent: number; rate: number } | undefined;
+                        if (!active || !item) return null;
+                        return (
+                          <div className="min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs shadow-lg">
+                            <p className="font-black text-slate-900">{item.designation}</p>
+                            <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                              <div className="flex items-center justify-between gap-4"><span>Attendance rate</span><strong className="text-violet-700">{item.rate.toFixed(1)}%</strong></div>
+                              <div className="flex items-center justify-between gap-4"><span>Total count</span><strong className="text-slate-900">{numberFormatter.format(item.total)}</strong></div>
+                              <div className="flex items-center justify-between gap-4"><span>Present</span><strong className="text-emerald-700">{numberFormatter.format(item.present)}</strong></div>
+                              <div className="flex items-center justify-between gap-4"><span>Absent</span><strong className="text-rose-700">{numberFormatter.format(item.absent)}</strong></div>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
                     <Bar dataKey="rate" radius={[0, 7, 7, 0]} maxBarSize={16} animationDuration={950}>
-                      {data.designationBreakdown.map((item, index) => <Cell key={`${item.designation}-${index}`} fill={item.rate >= 85 ? chartColors.emerald : item.rate >= 70 ? chartColors.violet : item.rate >= 50 ? chartColors.amber : chartColors.rose} />)}
+                      {designationPageItems.map((item, index) => <Cell key={`${item.designation}-${index}`} fill={item.rate >= 85 ? chartColors.emerald : item.rate >= 70 ? chartColors.violet : item.rate >= 50 ? chartColors.amber : chartColors.rose} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+
+              {/* Designation performance color meaning */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">
+                  Performance:
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: chartColors.emerald }}
+                  />
+                  85%
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: chartColors.violet }}
+                  />
+                  70%–84.9% 
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: chartColors.amber }}
+                  />
+                  50%–69.9% 
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: chartColors.rose }}
+                  />
+                  Below 50% 
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2 text-[10.5px] font-semibold text-slate-500">
+                  <span>{designationStart}-{designationEnd} of {numberFormatter.format(designationTotal)} designations</span>
+                  {bestDesignation && (
+                    <span className="hidden rounded-full bg-violet-50 px-2 py-1 font-bold text-violet-700 ring-1 ring-violet-100 sm:inline">
+                      Best: {bestDesignation.designation} · {bestDesignation.rate.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDesignationPage((current) => Math.max(1, current - 1))}
+                    disabled={designationPage <= 1}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft size={13} /> Previous
+                  </button>
+                  <span className="min-w-[58px] text-center text-[10.5px] font-black text-slate-600">
+                    {designationPage} / {designationTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDesignationPage((current) => Math.min(designationTotalPages, current + 1))}
+                    disabled={designationPage >= designationTotalPages}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next <ChevronRight size={13} />
+                  </button>
+                </div>
               </div>
             </ChartCard>
           </section>
@@ -1932,6 +2463,9 @@ function AttendanceDashboard() {
                           <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
                             {employee.designation || "Employee"} · {employee.attendanceId}
                           </p>
+                          <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${employee.zones.join(", ") || "—"} · Ward: ${employee.wards.join(", ") || "—"}`}>
+                            Zone: {employee.zones.join(", ") || "—"} · Ward: {employee.wards.join(", ") || "—"}
+                          </p>
                         </div>
                       </div>
 
@@ -2030,7 +2564,7 @@ function AttendanceDashboard() {
             </ChartCard>
           </section>
 
-          <section className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
+          <section>
             <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_14px_42px_rgba(15,23,42,0.055)]">
               <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/35 to-violet-50/35 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
@@ -2046,10 +2580,10 @@ function AttendanceDashboard() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1050px] border-collapse">
+                <table className="w-full min-w-[1270px] border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50/95 text-left backdrop-blur">
-                      {['Employee', 'Attendance ID', 'Designation', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
+                      {['Employee', 'Attendance ID', 'Designation', 'Zone', 'Ward', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
                         <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                       ))}
                     </tr>
@@ -2072,6 +2606,8 @@ function AttendanceDashboard() {
                           </td>
                           <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.zones.length ? record.zones.join(", ") : "—"}</td>
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.wards.length ? record.wards.join(", ") : "—"}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                           <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                           <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>
@@ -2119,51 +2655,6 @@ function AttendanceDashboard() {
               </div>
             </div>
 
-            <div className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-white via-white to-violet-50/30 p-5 shadow-[0_14px_42px_rgba(15,23,42,0.055)]">
-              <div className="absolute left-0 top-0 h-1 w-40 bg-gradient-to-r from-violet-500 via-fuchsia-400 to-transparent" />
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-black tracking-tight text-slate-900">Upload history</h2>
-                  <p className="mt-1 text-xs font-medium text-slate-500">Recent CSV imports for this city</p>
-                </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600 ring-1 ring-violet-100">
-                  <History size={17} />
-                </div>
-              </div>
-
-              <div className="space-y-2.5">
-                {data.uploads.length ? data.uploads.map((upload) => (
-                  <div key={upload.id} className="group/upload relative overflow-hidden rounded-2xl border border-slate-100 bg-white/90 p-3.5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-100 hover:shadow-md">
-                    <div className={`absolute inset-y-0 left-0 w-1 ${upload.status === "COMPLETED" ? "bg-emerald-500" : upload.status === "FAILED" ? "bg-rose-500" : "bg-amber-500"}`} />
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-bold text-slate-700" title={upload.fileName}>{upload.fileName}</p>
-                        <p className="mt-1 text-[10px] font-medium text-slate-400">{formatShortDate(upload.attendanceDate)} · {formatDateTime(upload.createdAt)}</p>
-                      </div>
-                      <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${upload.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700" : upload.status === "FAILED" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}>{upload.status}</span>
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-xl bg-white px-2 py-2 ring-1 ring-slate-100"><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Valid</p><p className="mt-0.5 text-xs font-black text-slate-800">{numberFormatter.format(upload.validRows)}</p></div>
-                      <div className="rounded-xl bg-white px-2 py-2 ring-1 ring-slate-100"><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">New</p><p className="mt-0.5 text-xs font-black text-blue-700">{numberFormatter.format(upload.insertedRows)}</p></div>
-                      <div className="rounded-xl bg-white px-2 py-2 ring-1 ring-slate-100"><p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Updated</p><p className="mt-0.5 text-xs font-black text-violet-700">{numberFormatter.format(upload.updatedRows)}</p></div>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 text-center">
-                    <UploadCloud size={22} className="mb-2 text-slate-300" />
-                    <p className="text-xs font-bold text-slate-500">No uploads yet</p>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setUploadOpen(true)}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-100"
-              >
-                <UploadCloud size={14} /> Upload another CSV <ArrowUpRight size={13} />
-              </button>
-            </div>
           </section>
         </>
       )}
