@@ -88,7 +88,7 @@ export default function UniversalReportModal({
                 if (Array.isArray(parsed?.roles)) userRolesFromStorage = parsed.roles;
                 else if (parsed?.role) userRolesFromStorage = [parsed.role];
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     const allRoles = Array.from(new Set([
