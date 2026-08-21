@@ -841,7 +841,7 @@ export const ToiletApi = {
 
   // Registration & Approval
   listPendingToilets: () => apiFetch<{ toilets: any[] }>("/modules/toilet/pending"),
-  approveToilet: (id: string, body: { assignedEmployeeIds?: string[] } = {}) =>
+  approveToilet: (id: string, body: { assignedEmployeeIds?: string[]; comment?: string } = {}) =>
     apiFetch(`/modules/toilet/${id}/approve`, { method: "POST", body: JSON.stringify(body) }),
   rejectToilet: (id: string, reason: string) =>
     apiFetch(`/modules/toilet/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
@@ -885,7 +885,8 @@ export const ToiletApi = {
     apiFetch("/modules/toilet/assignments/remove", {
       method: "POST",
       body: JSON.stringify({ supervisorId, toiletId })
-    })
+    }),
+  deleteToilet: (id: string) => apiFetch<{ success: boolean }>(`/modules/toilet/toilets/${id}`, { method: "DELETE" })
 };
 
 export const ModuleRecordsApi = {
@@ -962,6 +963,9 @@ export const EmployeesApi = {
 };
 
 export const TwinbinApi = {
+  deleteBin: (id: string) => apiFetch<{ success: boolean }>(`/modules/twinbin/bins/${id}`, { method: "DELETE" }),
+  bulkImport: (csvText: string) =>
+    apiFetch<{ count: number }>("/modules/twinbin/bulk-import", { method: "POST", body: JSON.stringify({ csvText }) }),
   requestBin: (body: {
     zoneId: string;
     wardId: string;

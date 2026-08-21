@@ -233,7 +233,7 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                     record={{
                         ...fullReportModalItem,
                         wardName: fullReportModalItem.wardName || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.name) || fullReportModalItem.ward?.name,
-                        zoneName: fullReportModalItem.zoneName || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.zoneName) || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.parent?.name) || fullReportModalItem.ward?.parent?.name,
+                        zoneName: fullReportModalItem.zoneName || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.zoneName) || (fullReportModalItem.wardId && (wardMap[fullReportModalItem.wardId] as any)?.parent?.name) || fullReportModalItem.ward?.parent?.name,
                     }}
                     onClose={() => setFullReportModalItem(null)}
                     onApprove={async (rec, comment) => {

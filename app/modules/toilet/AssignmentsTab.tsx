@@ -82,7 +82,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                     }
                 });
             }
-            setToilets(Array.from(toiletMap.values()).filter((t: any) => t.status !== 'REJECTED'));
+            setToilets(Array.from(toiletMap.values()).filter((t: any) => (t.status || '').toUpperCase() === 'APPROVED'));
 
             if (zoneRes.status === 'fulfilled') setZones(zoneRes.value.nodes || []);
             if (wardRes.status === 'fulfilled') setAllWards(wardRes.value.nodes || []);

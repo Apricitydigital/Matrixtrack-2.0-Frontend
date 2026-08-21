@@ -64,6 +64,25 @@ export default function AdminDashboard() {
     const [selectedSupervisorId, setSelectedSupervisorId] = useState<string>("");
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
 
+    // Delete Bin Modal State
+    const [deleteConfirmBin, setDeleteConfirmBin] = useState<any>(null);
+    const [deletingBin, setDeletingBin] = useState(false);
+
+    const handleConfirmDeleteBin = async () => {
+        if (!deleteConfirmBin) return;
+        setDeletingBin(true);
+        try {
+            await TwinbinApi.deleteBin(deleteConfirmBin.id);
+            setAllBins((prev: any[]) => prev.filter((b: any) => b.id !== deleteConfirmBin.id));
+            setDeleteConfirmBin(null);
+            loadData();
+        } catch (err: any) {
+            alert(err?.message || "Failed to delete litterbin asset");
+        } finally {
+            setDeletingBin(false);
+        }
+    };
+
     useEffect(() => {
         loadMetadata();
     }, []);
@@ -661,7 +680,7 @@ export default function AdminDashboard() {
                                     <th style={{ padding: '14px 16px', textAlign: 'left', width: 60 }}>S.NO.</th>
                                     <th style={{ padding: '14px 20px', textAlign: 'left' }}>LITTERBIN AREA AND LOCATION</th>
                                     <th style={{ padding: '14px 20px', textAlign: 'left' }}>ZONE & WARD</th>
-                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>CONDITION</th>
+                                    <th style={{ padding: '14px 20px', textAlign: 'left' }}>AREA TYPE</th>
                                     <th style={{ padding: '14px 20px', textAlign: 'left' }}>STATUS</th>
                                     <th style={{ padding: '14px 20px', textAlign: 'right' }}>ACTIONS</th>
                                 </tr>
@@ -683,8 +702,8 @@ export default function AdminDashboard() {
                                             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{bin.zoneName || 'Zone N/A'}</div>
                                         </td>
                                         <td style={{ padding: '14px 20px' }}>
-                                            <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 10, fontWeight: 800, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
-                                                {bin.condition || 'GOOD'}
+                                            <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 10, fontWeight: 800, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                                                {bin.areaType || 'N/A'}
                                             </span>
                                         </td>
                                         <td style={{ padding: '14px 20px' }}>
@@ -700,12 +719,39 @@ export default function AdminDashboard() {
                                         <td style={{ padding: '14px 20px', textAlign: 'right' }}>
                                             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                                 <button onClick={() => setViewRecord(bin)} style={{ backgroundColor: '#2563eb', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white' }}>View Detail</button>
+                                                <button onClick={() => setDeleteConfirmBin(bin)} style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#dc2626' }}>🗑️ Delete</button>
                                             </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+
+                        {/* Delete Bin Confirmation Modal */}
+                        {deleteConfirmBin && (
+                            <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 20 }}>
+                                <div style={{ backgroundColor: 'white', borderRadius: 24, padding: 32, maxWidth: 440, width: '100%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', animation: 'scaleIn 0.2s ease-out' }}>
+                                    <div style={{ fontSize: 36, marginBottom: 12, textAlign: 'center' }}>🗑️</div>
+                                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a', textAlign: 'center' }}>Delete Litterbin Asset?</h3>
+                                    <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, textAlign: 'center', lineHeight: 1.5 }}>
+                                        Are you sure you want to delete <strong style={{ color: '#0f172a' }}>{deleteConfirmBin.areaName || deleteConfirmBin.locationName || 'this litterbin'}</strong>? This action cannot be undone.
+                                    </p>
+                                    <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                                        <button
+                                            onClick={() => setDeleteConfirmBin(null)}
+                                            style={{ flex: 1, padding: '12px', border: '1px solid #e2e8f0', borderRadius: 12, background: 'white', color: '#64748b', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+                                        >Cancel</button>
+                                        <button
+                                            onClick={handleConfirmDeleteBin}
+                                            disabled={deletingBin}
+                                            style={{ flex: 1, padding: '12px', border: 'none', borderRadius: 12, background: '#dc2626', color: 'white', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }}
+                                        >
+                                            {deletingBin ? 'Deleting...' : 'Yes, Delete Asset'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* PAGINATION FOOTER CONTROL BAR */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
@@ -809,27 +855,11 @@ export default function AdminDashboard() {
                                 <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Area Type</div>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.areaType || 'N/A'}</div>
                             </div>
-                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Road Type</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.roadType || 'N/A'}</div>
-                            </div>
-                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Fixed Properly</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.isFixedProperly !== undefined ? (selectedBin.isFixedProperly ? 'Yes' : 'No') : 'N/A'}</div>
-                            </div>
-                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Has Lid</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedBin.hasLid !== undefined ? (selectedBin.hasLid ? 'Yes' : 'No') : 'N/A'}</div>
-                            </div>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0', gridColumn: 'span 2' }}>
                                 <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>GPS Coordinates (Lat, Long)</div>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: '#2563eb', marginTop: 2 }}>
                                     {(selectedBin.latitude || selectedBin.lat) && (selectedBin.longitude || selectedBin.lng) ? `${selectedBin.latitude || selectedBin.lat}°, ${selectedBin.longitude || selectedBin.lng}°` : 'N/A'}
                                 </div>
-                            </div>
-                            <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Asset Condition</div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#059669', marginTop: 2 }}>{selectedBin.condition || 'GOOD'}</div>
                             </div>
                             <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
                                 <div style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>Registration Status</div>

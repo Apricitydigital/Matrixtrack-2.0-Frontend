@@ -7,12 +7,28 @@ import { useAuth } from "@hooks/useAuth";
 
 export default function AllToiletsTab({ cityId }: { cityId?: string }) {
     const { user } = useAuth();
-    const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN');
+    const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN') || user?.role === 'CITY_ADMIN' || user?.role === 'CITY_ADMINISTRATOR';
 
     const [toilets, setToilets] = useState<any[]>([]);
     const [filteredToilets, setFilteredToilets] = useState<any[]>([]);
     const [selectedToilet, setSelectedToilet] = useState<any>(null);
+    const [deleteConfirmToilet, setDeleteConfirmToilet] = useState<any>(null);
+    const [deletingToilet, setDeletingToilet] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    const handleConfirmDeleteToilet = async () => {
+        if (!deleteConfirmToilet) return;
+        setDeletingToilet(true);
+        try {
+            await ToiletApi.deleteToilet(deleteConfirmToilet.id);
+            setToilets(prev => prev.filter(t => t.id !== deleteConfirmToilet.id));
+            setDeleteConfirmToilet(null);
+        } catch (err: any) {
+            alert(err?.message || "Failed to delete toilet asset");
+        } finally {
+            setDeletingToilet(false);
+        }
+    };
 
     // Assignment Modal State
     const [showAssignModal, setShowAssignModal] = useState(false);
@@ -249,7 +265,7 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
                     <thead>
                         <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                            {['TOILET NAME & CODE', 'ZONE & WARD', 'TYPE & CAPACITY', 'STATUS', ''].map((h, i) => (
+                            {['TOILET NAME & CODE', 'ZONE & WARD', 'TOILET TYPE', 'STATUS', ''].map((h, i) => (
                                 <th key={i} style={{ padding: '14px 20px', textAlign: 'left', fontSize: 11, fontWeight: 900, color: '#64748b', letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>{h}</th>
                             ))}
                         </tr>
@@ -270,10 +286,7 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                                         <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{toilet.ward?.parent?.name || '—'}</div>
                                     </td>
                                     <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <span style={{ fontSize: 10, fontWeight: 900, background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: 8, border: '1px solid #bfdbfe' }}>{toilet.type}</span>
-                                            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{toilet.numberOfSeats || 0} Seats</span>
-                                        </div>
+                                        <span style={{ fontSize: 10, fontWeight: 900, background: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: 8, border: '1px solid #bfdbfe' }}>{toilet.type}</span>
                                     </td>
                                     <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
                                         <span style={{
@@ -299,6 +312,9 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                                                     >{currentOwner ? 'Reassign' : 'Assign Staff'}</button>
                                                 )}
                                                 <button onClick={() => setSelectedToilet(toilet)} style={{ backgroundColor: '#2563eb', border: 'none', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'white', boxShadow: '0 2px 6px rgba(37,99,235,0.25)' }}>View Detail</button>
+                                                {isAdmin && (
+                                                    <button onClick={() => setDeleteConfirmToilet(toilet)} style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#dc2626' }}>🗑️ Delete</button>
+                                                )}
                                             </div>
                                         </div>
                                     </td>
@@ -308,6 +324,33 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                     </tbody>
                 </table>
             </div>
+
+            {/* Delete Toilet Confirmation Modal */}
+            {deleteConfirmToilet && typeof document !== 'undefined' && createPortal(
+                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 20 }}>
+                    <div style={{ backgroundColor: 'white', borderRadius: 24, padding: 32, maxWidth: 440, width: '100%', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', animation: 'scaleIn 0.2s ease-out' }}>
+                        <div style={{ fontSize: 36, marginBottom: 12, textAlign: 'center' }}>🗑️</div>
+                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a', textAlign: 'center' }}>Delete Toilet Asset?</h3>
+                        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, textAlign: 'center', lineHeight: 1.5 }}>
+                            Are you sure you want to delete <strong style={{ color: '#0f172a' }}>{deleteConfirmToilet.name || 'this toilet asset'}</strong>? This action cannot be undone and will remove associated inspection logs.
+                        </p>
+                        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                            <button
+                                onClick={() => setDeleteConfirmToilet(null)}
+                                style={{ flex: 1, padding: '12px', border: '1px solid #e2e8f0', borderRadius: 12, background: 'white', color: '#64748b', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+                            >Cancel</button>
+                            <button
+                                onClick={handleConfirmDeleteToilet}
+                                disabled={deletingToilet}
+                                style={{ flex: 1, padding: '12px', border: 'none', borderRadius: 12, background: '#dc2626', color: 'white', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }}
+                            >
+                                {deletingToilet ? 'Deleting...' : 'Yes, Delete Asset'}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
 
             {/* Drilldown Modal Overlay Box (Screen-Aware) */}
             {selectedToilet && typeof document !== 'undefined' && createPortal(
@@ -339,22 +382,10 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                                 {/* Technical Specs */}
                                 <div>
                                     <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>Technical Specifications</h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
                                         <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Category / Type</div>
+                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Category / Toilet Type</div>
                                             <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.type || 'Public Toilet'}</div>
-                                        </div>
-                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Gender Scope</div>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.gender || 'Unisex'}</div>
-                                        </div>
-                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Seat Capacity</div>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.numberOfSeats || 0} Seats</div>
-                                        </div>
-                                        <div style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                                            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Urinals Capacity</div>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginTop: 2 }}>{selectedToilet.numberOfUrinals || 0} Units</div>
                                         </div>
                                     </div>
                                 </div>

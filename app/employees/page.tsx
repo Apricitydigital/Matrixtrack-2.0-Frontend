@@ -169,7 +169,7 @@ export default function EmployeesPage() {
       label: 'Zone',
       render: (e) => (
         <div className="text-xs max-w-xs break-words font-medium">
-          {e.zones.length ? e.zones.join(", ") : <span className="muted">-</span>}
+          {(e.zones || []).length ? e.zones.join(", ") : <span className="muted">-</span>}
         </div>
       )
     },
@@ -178,7 +178,7 @@ export default function EmployeesPage() {
       label: 'Ward',
       render: (e) => (
         <div className="text-xs max-w-xs break-words font-medium">
-          {e.wards.length ? e.wards.join(", ") : <span className="muted">-</span>}
+          {(e.wards || []).length ? e.wards.join(", ") : <span className="muted">-</span>}
         </div>
       )
     }
