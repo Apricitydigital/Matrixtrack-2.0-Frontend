@@ -573,7 +573,7 @@ export default function BulkImportPage() {
                                                     <td style={{ padding: '12px 14px' }}>
                                                         {row.isValid ? (
                                                             <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>
-                                                                Registered
+                                                                Ready to Import
                                                             </span>
                                                         ) : (
                                                             <span style={{ fontSize: 12, fontWeight: 600, color: '#b91c1c' }} title={row.validationError}>
