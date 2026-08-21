@@ -1230,6 +1230,8 @@ function WorkDurationEmployeesPopup({
 function AttendanceDashboard() {
   const { user } = useAuth();
   const hmsSuperAdmin = isHmsSuperAdmin(user);
+  const isUlbOfficer =
+    user?.roles?.some((role) => String(role).toUpperCase() === "ULB_OFFICER") ?? false;
   const [cities, setCities] = useState<AttendanceCity[]>([]);
   const [selectedCityId, setSelectedCityId] = useState("");
   const [citiesLoading, setCitiesLoading] = useState(false);
@@ -1681,12 +1683,14 @@ function AttendanceDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-[1780px] space-y-4 pb-8">
-      <UploadModal
-        open={uploadOpen}
-        uploading={uploading}
-        onClose={() => !uploading && setUploadOpen(false)}
-        onUpload={handleUpload}
-      />
+      {!isUlbOfficer && (
+        <UploadModal
+          open={uploadOpen}
+          uploading={uploading}
+          onClose={() => !uploading && setUploadOpen(false)}
+          onUpload={handleUpload}
+        />
+      )}
       <UploadCalendarModal
         open={calendarOpen}
         monthDate={calendarMonthDate}
@@ -1801,16 +1805,18 @@ function AttendanceDashboard() {
             Upload calendar
           </button>
 
-          <button
-            type="button"
-            onClick={() => setUploadOpen(true)}
-            disabled={hmsSuperAdmin && !selectedCityId}
-            title={hmsSuperAdmin && selectedCity ? `Upload attendance for ${selectedCity.name}` : undefined}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-blue-600/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-          >
-            <UploadCloud size={14} />
-            Upload CSVs
-          </button>
+          {!isUlbOfficer && (
+            <button
+              type="button"
+              onClick={() => setUploadOpen(true)}
+              disabled={hmsSuperAdmin && !selectedCityId}
+              title={hmsSuperAdmin && selectedCity ? `Upload attendance for ${selectedCity.name}` : undefined}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-blue-600/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            >
+              <UploadCloud size={14} />
+              Upload CSVs
+            </button>
+          )}
         </div>
       </section>
 
@@ -2664,7 +2670,7 @@ function AttendanceDashboard() {
 
 export default function AttendanceAnalyticsPage() {
   return (
-    <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN"]}>
+    <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER"]}>
       <AttendanceDashboard />
     </RoleGuard>
   );
