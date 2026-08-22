@@ -543,6 +543,10 @@ function PortalHomeLayoutContent({
       'User & Admin Management';
   }
 
+  if (pathname.startsWith('/ulb/inspection-performance')) {
+    pageTitle = 'Inspection and Performance';
+  }
+
 
   /* =========================================================
      TASKFORCE TITLES
@@ -2449,7 +2453,58 @@ function PortalHomeLayoutContent({
                 </Link>
 
 
-                {/* REPORTS */}
+                {/* ATTENDANCE ANALYTICS */}
+
+                <Link
+                  href="/city/attendance"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <ChartNoAxesCombined size={15} />
+
+                  <span>
+                    Attendance Analytics
+                  </span>
+                </Link>
+
+
+                {/* INSPECTION AND PERFORMANCE */}
+
+                <Link
+                  href="/ulb/inspection-performance"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/inspection-performance')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <ShieldCheck size={15} />
+
+                  <span>
+                    Inspection and Performance
+                  </span>
+                </Link>
+
+
+                {/* WARD RANKING */}
+
+                <Link
+                  href="/ulb/ward-ranking"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/ward-ranking')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <Award size={15} />
+
+                  <span>
+                    Ward Ranking
+                  </span>
+                </Link>
+
+
+                {/* REMAINING CURRENT ULB REPORT TABS */}
 
                 <div className="mt-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   Reports
@@ -3002,9 +3057,11 @@ function PortalHomeLayoutContent({
       ===================================================== */}
 
       <main
-        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser
-          ? 'ml-0 p-4 sm:p-5 lg:p-6'
-          : 'ml-72 p-5 sm:p-6'
+        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && pathname.startsWith('/city/attendance')
+          ? 'ml-72 p-4 sm:p-5 lg:p-6'
+          : isUlbUser
+            ? 'ml-0 p-4 sm:p-5 lg:p-6'
+            : 'ml-72 p-5 sm:p-6'
           }`}
       >
         {!isMainDashboard && (
