@@ -5,7 +5,8 @@ import {
   CommonRegistrationApi,
   IntegratedRegistrationPayload,
   PublicGeoApi,
-  CityModulesApi
+  CityModulesApi,
+  CityUserApi
 } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import { getUserPermissions } from "@lib/userPermissions";
@@ -123,6 +124,8 @@ export default function CommonRegistrationModal({
   const [statusMsg, setStatusMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [cityModulesMap, setCityModulesMap] = useState<Record<string, boolean> | null>(null);
+  const [existingUserEmails, setExistingUserEmails] = useState<Set<string>>(new Set());
+  const [existingUserPhones, setExistingUserPhones] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen) {
@@ -133,6 +136,13 @@ export default function CommonRegistrationModal({
   const loadConfig = async () => {
     let fetchedCities: { id: string; name: string; code: string }[] = [];
     try {
+      const usersRes = await CityUserApi.list().catch(() => ({ users: [] }));
+      const rawUsers = usersRes.users || [];
+      const emails = new Set(rawUsers.map((u: any) => (u.email || "").toLowerCase()).filter(Boolean));
+      const phones = new Set(rawUsers.map((u: any) => (u.phone || "").replace(/\D/g, "")).filter(Boolean));
+      setExistingUserEmails(emails);
+      setExistingUserPhones(phones);
+
       const res = await CommonRegistrationApi.getConfig();
       if (res) {
         fetchedCities = res.cities || [];
@@ -233,7 +243,13 @@ export default function CommonRegistrationModal({
     setLoadingGeo(true);
     try {
       const res = await PublicGeoApi.zones(cityId);
-      setZones(res.zones || []);
+      const fetchedZones = res.zones || [];
+      setZones(fetchedZones);
+
+      const wardPromises = fetchedZones.map(z => PublicGeoApi.wards(z.id).catch(() => ({ wards: [] })));
+      const wardResults = await Promise.all(wardPromises);
+      const allCityWards = wardResults.flatMap(wRes => wRes.wards || []);
+      setWards(allCityWards);
     } finally {
       setLoadingGeo(false);
     }
@@ -241,12 +257,13 @@ export default function CommonRegistrationModal({
 
   const handleZoneChange = async (zoneId: string) => {
     setForm((f) => ({ ...f, zoneId, wardId: "" }));
-    setWards([]);
     if (!zoneId) return;
     setLoadingGeo(true);
     try {
       const res = await PublicGeoApi.wards(zoneId);
-      setWards(res.wards || []);
+      if (res.wards && res.wards.length > 0) {
+        setWards(res.wards);
+      }
     } finally {
       setLoadingGeo(false);
     }
@@ -357,13 +374,53 @@ export default function CommonRegistrationModal({
     }
   };
 
+  // Smart Auto-Password Generator: [Name_Prefix]@[Last_4_Mobile]
+  const generateAutoPassword = (name: string, phone: string) => {
+    const cleanName = (name || "").trim().replace(/[^a-zA-Z]/g, "");
+    const prefix = cleanName.length >= 4 
+      ? cleanName.slice(0, 4) 
+      : cleanName.length > 0 
+        ? cleanName 
+        : "User";
+    const capitalizedPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
+    const digits = (phone || "").replace(/\D/g, "");
+    const last4 = digits.length >= 4 ? digits.slice(-4) : "1234";
+    return `${capitalizedPrefix}@${last4}`;
+  };
+
+  // Detailed Row Item interface for Preview Table
+  interface ParsedBulkRow {
+    rowNum: number;
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    isAutoPassword: boolean;
+    zoneName: string;
+    wardName: string;
+    role: string;
+    modules: string[];
+    isValid: boolean;
+    validationError?: string;
+    payload: IntegratedRegistrationPayload;
+  }
+
+  const [parsedRows, setParsedRows] = useState<ParsedBulkRow[]>([]);
+  const [previewFilter, setPreviewFilter] = useState<"ALL" | "VALID" | "INVALID">("ALL");
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
   // CSV Parsing
-  const parseCsvData = (text: string) => {
+  const parseCsvData = (text: string): { records: IntegratedRegistrationPayload[]; rows: ParsedBulkRow[] } => {
     const lines = text.split("\n").filter((l) => l.trim());
-    if (lines.length <= 1) return [];
+    if (lines.length <= 1) return { records: [], rows: [] };
 
     const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
     const records: IntegratedRegistrationPayload[] = [];
+    const rows: ParsedBulkRow[] = [];
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const csvEmails = new Set<string>();
+    const csvPhones = new Set<string>();
 
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(",").map((c) => c.trim());
@@ -374,10 +431,23 @@ export default function CommonRegistrationModal({
         return idx !== -1 ? cols[idx] : "";
       };
 
-      const name = getCol("name") || cols[0];
+      const name = getCol("full_name") || getCol("name") || cols[0];
       const email = getCol("email") || cols[1];
-      const phone = getCol("phone") || cols[2];
-      const password = getCol("password") || "Matrix@2026";
+      const phone = getCol("mobile_number") || getCol("phone") || cols[2];
+      const rawPassword = getCol("password");
+
+      const isAutoPassword = !rawPassword || rawPassword.trim().length === 0;
+      const password = isAutoPassword ? generateAutoPassword(name, phone) : rawPassword.trim();
+
+      const zoneName = getCol("zone_name") || getCol("zone") || "";
+      const wardName = getCol("ward_name") || getCol("ward") || "";
+      const roleRaw = getCol("role") || getCol("taskforcerole") || "SUPERVISOR";
+      const modulesStr = getCol("modules") || "SWEEPING;LITTERBINS;TOILET;GVP";
+
+      const moduleKeys = modulesStr.toUpperCase() === "ALL" 
+        ? ["SWEEPING", "LITTERBINS", "TOILET", "TASKFORCE"]
+        : modulesStr.split(";").map((m) => m.trim().toUpperCase()).filter(Boolean);
+
       const systemsStr = getCol("targetsystems") || getCol("systems") || "BOTH";
 
       let targetSystems: ("TASKFORCE_20" | "SWACHH_RANKING")[] = ["TASKFORCE_20", "SWACHH_RANKING"];
@@ -387,41 +457,113 @@ export default function CommonRegistrationModal({
         targetSystems = ["SWACHH_RANKING"];
       }
 
-      const tfRole = getCol("taskforcerole") || "SUPERVISOR";
-      const modulesStr = getCol("modules") || "SWEEPING,LITTERBINS";
-      const moduleKeys = modulesStr.split(";").map((m) => m.trim()).filter(Boolean);
-
       const swachhRole = (getCol("swachhrole") || "accessor") as "accessor" | "qc" | "admin";
       const swachhAccessorType = (getCol("accessortype") || "hms") as "hms" | "pmc" | "janwani";
 
-      if (name && email && phone) {
-        records.push({
-          name,
-          email,
-          phone,
-          password,
-          targetSystems,
-          cityId: form.cityId || undefined,
-          zoneId: form.zoneId || undefined,
-          wardId: form.wardId || undefined,
-          taskforceConfig: {
-            role: tfRole,
-            moduleKeys
-          },
-          swachhConfig: {
-            role: swachhRole,
-            accessorType: swachhAccessorType
-          }
+      // Validation
+      let isValid = true;
+      let validationError: string | undefined = undefined;
+
+      const matchGeoNode = (nodes: any[], queryStr: string) => {
+        if (!queryStr || !nodes || nodes.length === 0) return null;
+        const q = queryStr.trim().toLowerCase();
+        const qNum = q.replace(/\D/g, "");
+        return nodes.find((n) => {
+          const nName = (n.name || "").trim().toLowerCase();
+          const nNum = nName.replace(/\D/g, "");
+          return nName === q || (qNum && nNum === qNum) || nName.includes(q) || q.includes(nName);
         });
+      };
+
+      const matchedZone = matchGeoNode(zones, zoneName);
+      const matchedWard = matchGeoNode(wards, wardName);
+      const phoneDigits = (phone || "").replace(/\D/g, "");
+      const emailLower = (email || "").toLowerCase().trim();
+
+      if (!name || name.length < 2) {
+        isValid = false;
+        validationError = "Invalid Name";
+      } else if (!emailRegex.test(email)) {
+        isValid = false;
+        validationError = "Invalid Email";
+      } else if (phoneDigits.length !== 10) {
+        isValid = false;
+        validationError = "Invalid Mobile Number";
+      } else if (existingUserEmails.has(emailLower)) {
+        isValid = false;
+        validationError = "Email Already Registered";
+      } else if (phoneDigits && existingUserPhones.has(phoneDigits)) {
+        isValid = false;
+        validationError = "Mobile Already Registered";
+      } else if (csvEmails.has(emailLower)) {
+        isValid = false;
+        validationError = "Duplicate Email in CSV";
+      } else if (phoneDigits && csvPhones.has(phoneDigits)) {
+        isValid = false;
+        validationError = "Duplicate Mobile in CSV";
+      } else if (zoneName || wardName) {
+        if (zones.length > 0 && zoneName && !matchedZone) {
+          isValid = false;
+          validationError = "Unregistered Zone";
+        } else if (wards.length > 0 && wardName && !matchedWard) {
+          isValid = false;
+          validationError = "Unregistered Ward";
+        }
       }
+
+      if (isValid) {
+        csvEmails.add(emailLower);
+        if (phoneDigits) csvPhones.add(phoneDigits);
+      }
+
+      const payload: IntegratedRegistrationPayload = {
+        name,
+        email,
+        phone,
+        password,
+        targetSystems,
+        cityId: form.cityId || undefined,
+        zoneId: matchedZone?.id || form.zoneId || undefined,
+        wardId: matchedWard?.id || form.wardId || undefined,
+        taskforceConfig: {
+          role: roleRaw,
+          moduleKeys
+        },
+        swachhConfig: {
+          role: swachhRole,
+          accessorType: swachhAccessorType
+        }
+      };
+
+      if (isValid) {
+        records.push(payload);
+      }
+
+      rows.push({
+        rowNum: i,
+        name,
+        email,
+        phone,
+        password,
+        isAutoPassword,
+        zoneName: zoneName || "—",
+        wardName: wardName || "—",
+        role: roleRaw,
+        modules: moduleKeys,
+        isValid,
+        validationError,
+        payload
+      });
     }
-    return records;
+
+    return { records, rows };
   };
 
   const handleBulkTextChange = (text: string) => {
     setBulkCsvText(text);
-    const parsed = parseCsvData(text);
-    setParsedEmployees(parsed);
+    const { records, rows } = parseCsvData(text);
+    setParsedEmployees(records);
+    setParsedRows(rows);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -447,7 +589,11 @@ export default function CommonRegistrationModal({
     try {
       const res = await CommonRegistrationApi.bulkImport(parsedEmployees);
       setBulkResults(res);
-      setStatusMsg(`Bulk import completed: ${res.successCount} succeeded, ${res.failCount} failed.`);
+      setStatusMsg(`Bulk import completed successfully! ${res.successCount} users created, ${res.failCount} failed.`);
+      setBulkCsvText("");
+      setParsedEmployees([]);
+      setParsedRows([]);
+      setShowConfirmDialog(false);
       if (onSuccess) onSuccess();
     } catch (err: any) {
       setErrorMsg(err?.message || "Failed to execute bulk import");
@@ -457,12 +603,15 @@ export default function CommonRegistrationModal({
   };
 
   const downloadSampleCsv = () => {
-    const sample = `name,email,phone,password,targetSystems,taskforceRole,modules,swachhRole,accessorType\nRahul Sharma,rahul.sharma@example.com,9876543210,Pass@1234,BOTH,SUPERVISOR,SWEEPING;LITTERBINS,accessor,hms\nPriya Patel,priya.patel@example.com,9812345678,Pass@1234,TASKFORCE_20,EMPLOYEE,TOILET,, \nAmit Kumar,amit.kumar@example.com,9765432109,Pass@1234,SWACHH_RANKING,,,accessor,pmc`;
+    const sample = `full_name,email,mobile_number,password,aadhaar_number,zone_name,ward_name,role,modules
+Ramesh Kumar,ramesh.kumar@example.com,9876543210,,123456789012,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP
+Priya Patel,priya.patel@example.com,9812345678,Pass@9876,,Zone 1,Ward 2,QUALITY_CONTROLLER,SWEEPING;LITTERBINS
+Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`;
     const blob = new Blob([sample], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "integrated_employee_registration_sample.csv";
+    a.download = "user_bulk_registration_sample.csv";
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -1195,94 +1344,245 @@ export default function CommonRegistrationModal({
                 />
               </div>
 
-              {/* Preview Table */}
-              {parsedEmployees.length > 0 && (
+              {/* Enhanced Data Table Preview */}
+              {parsedRows.length > 0 && (
                 <div style={{ marginBottom: "24px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#334155" }}>
-                      Preview Parsed Records ({parsedEmployees.length} valid)
-                    </span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <span style={{ fontSize: "14px", fontWeight: 800, color: "#1e293b" }}>
+                        Preview Parsed Users ({parsedRows.length} total, {parsedEmployees.length} valid)
+                      </span>
+                      <div style={{ display: "flex", gap: "4px", background: "#f1f5f9", padding: "3px", borderRadius: "8px" }}>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewFilter("ALL")}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            border: "none",
+                            borderRadius: "6px",
+                            background: previewFilter === "ALL" ? "#ffffff" : "transparent",
+                            color: previewFilter === "ALL" ? "#0f172a" : "#64748b",
+                            cursor: "pointer",
+                            boxShadow: previewFilter === "ALL" ? "0 1px 2px rgba(0,0,0,0.05)" : "none"
+                          }}
+                        >
+                          All ({parsedRows.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewFilter("VALID")}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            border: "none",
+                            borderRadius: "6px",
+                            background: previewFilter === "VALID" ? "#ffffff" : "transparent",
+                            color: previewFilter === "VALID" ? "#15803d" : "#64748b",
+                            cursor: "pointer",
+                            boxShadow: previewFilter === "VALID" ? "0 1px 2px rgba(0,0,0,0.05)" : "none"
+                          }}
+                        >
+                          Valid ({parsedEmployees.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewFilter("INVALID")}
+                          style={{
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            border: "none",
+                            borderRadius: "6px",
+                            background: previewFilter === "INVALID" ? "#ffffff" : "transparent",
+                            color: previewFilter === "INVALID" ? "#b91c1c" : "#64748b",
+                            cursor: "pointer",
+                            boxShadow: previewFilter === "INVALID" ? "0 1px 2px rgba(0,0,0,0.05)" : "none"
+                          }}
+                        >
+                          Unregistered ({parsedRows.length - parsedEmployees.length})
+                        </button>
+                      </div>
+                    </div>
+
                     <button
+                      type="button"
                       onClick={() => {
                         setBulkCsvText("");
                         setParsedEmployees([]);
+                        setParsedRows([]);
                       }}
                       style={{ background: "none", border: "none", color: "#ef4444", fontSize: "12px", cursor: "pointer", fontWeight: 700 }}
                     >
-                      Clear
+                      Clear File
                     </button>
                   </div>
+
                   <div
                     style={{
-                      maxHeight: "180px",
+                      maxHeight: "240px",
                       overflowY: "auto",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "12px"
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "12px",
+                      background: "#ffffff"
                     }}
                   >
                     <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
-                      <thead style={{ background: "#f1f5f9", textAlign: "left" }}>
+                      <thead style={{ background: "#f8fafc", textAlign: "left", position: "sticky", top: 0, borderBottom: "1px solid #e2e8f0" }}>
                         <tr>
-                          <th style={{ padding: "8px 12px" }}>#</th>
-                          <th style={{ padding: "8px 12px" }}>Name</th>
-                          <th style={{ padding: "8px 12px" }}>Email</th>
-                          <th style={{ padding: "8px 12px" }}>Phone</th>
-                          <th style={{ padding: "8px 12px" }}>Target Systems</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>#</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>STATUS</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>FULL NAME</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>EMAIL</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>MOBILE</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>PASSWORD</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>ZONE & WARD</th>
+                          <th style={{ padding: "10px 12px", fontWeight: 700, color: "#475569" }}>ROLE</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {parsedEmployees.map((emp, idx) => (
-                          <tr key={idx} style={{ borderTop: "1px solid #e2e8f0" }}>
-                            <td style={{ padding: "8px 12px", color: "#94a3b8" }}>{idx + 1}</td>
-                            <td style={{ padding: "8px 12px", fontWeight: 700 }}>{emp.name}</td>
-                            <td style={{ padding: "8px 12px" }}>{emp.email}</td>
-                            <td style={{ padding: "8px 12px" }}>{emp.phone}</td>
-                            <td style={{ padding: "8px 12px" }}>
-                              {emp.targetSystems.join(" & ")}
-                            </td>
-                          </tr>
-                        ))}
+                        {parsedRows
+                          .filter((row) => {
+                            if (previewFilter === "VALID") return row.isValid;
+                            if (previewFilter === "INVALID") return !row.isValid;
+                            return true;
+                          })
+                          .map((row) => (
+                            <tr
+                              key={row.rowNum}
+                              style={{
+                                borderTop: "1px solid #f1f5f9",
+                                background: row.isValid ? "#ffffff" : "#fef2f2"
+                              }}
+                            >
+                              <td style={{ padding: "8px 12px", color: "#94a3b8", fontWeight: 600 }}>{row.rowNum}</td>
+                              <td style={{ padding: "8px 12px" }}>
+                                {row.isValid ? (
+                                  <span style={{ color: "#15803d", fontWeight: 700, fontSize: "11px" }}>
+                                    Ready to Import
+                                  </span>
+                                ) : (
+                                  <span style={{ color: "#b91c1c", fontWeight: 700, fontSize: "11px" }}>
+                                    {row.validationError || "Unregistered"}
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{ padding: "8px 12px", fontWeight: 700, color: "#0f172a" }}>{row.name}</td>
+                              <td style={{ padding: "8px 12px", color: "#334155" }}>{row.email}</td>
+                              <td style={{ padding: "8px 12px", color: "#334155" }}>{row.phone}</td>
+                              <td style={{ padding: "8px 12px", fontFamily: "monospace", color: row.isAutoPassword ? "#2563eb" : "#0f172a" }}>
+                                {row.password} {row.isAutoPassword && <span style={{ fontSize: "10px", color: "#64748b" }}>(Auto)</span>}
+                              </td>
+                              <td style={{ padding: "8px 12px", color: "#334155" }}>
+                                {row.zoneName} / {row.wardName}
+                              </td>
+                              <td style={{ padding: "8px 12px", fontWeight: 600, color: "#475569" }}>{row.role}</td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
 
-              {/* Submit Bulk Import */}
-              <button
-                type="button"
-                onClick={handleBulkSubmit}
-                disabled={loading || !parsedEmployees.length}
-                style={{
-                  width: "100%",
-                  height: "50px",
-                  background: parsedEmployees.length
-                    ? "linear-gradient(135deg, #059669 0%, #10b981 100%)"
-                    : "#cbd5e1",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "14px",
-                  fontSize: "16px",
-                  fontWeight: 700,
-                  cursor: parsedEmployees.length ? "pointer" : "not-allowed",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "10px",
-                  boxShadow: parsedEmployees.length ? "0 4px 14px rgba(16, 185, 129, 0.3)" : "none",
-                  transition: "all 0.2s"
-                }}
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw className="animate-spin" size={18} /> Executing Bulk Import...
-                  </>
-                ) : (
-                  <>
-                    Import {parsedEmployees.length} Employees Now <FileSpreadsheet size={18} />
-                  </>
-                )}
-              </button>
+              {/* Confirmation Popup Box */}
+              {showConfirmDialog && (
+                <div
+                  style={{
+                    background: "#eff6ff",
+                    border: "1.5px solid #93c5fd",
+                    borderRadius: "14px",
+                    padding: "16px 20px",
+                    marginBottom: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px"
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: "14px", color: "#1e3a8a" }}>
+                    Confirm User Import
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#1e40af" }}>
+                    Are you sure you want to register <strong>{parsedEmployees.length} valid users</strong> into the active city system?
+                  </div>
+                  <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "4px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmDialog(false)}
+                      style={{
+                        padding: "8px 16px",
+                        background: "#ffffff",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#475569",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBulkSubmit}
+                      disabled={loading}
+                      style={{
+                        padding: "8px 18px",
+                        background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                        border: "none",
+                        borderRadius: "10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#ffffff",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}
+                    >
+                      {loading ? (
+                        <>
+                          <RefreshCw className="animate-spin" size={14} /> Executing...
+                        </>
+                      ) : (
+                        <>
+                          Yes, Register {parsedEmployees.length} Users <CheckCircle2 size={14} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Bulk Import Button */}
+              {parsedEmployees.length > 0 && !showConfirmDialog && (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmDialog(true)}
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    height: "50px",
+                    background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "14px",
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "10px",
+                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  Confirm & Import ({parsedEmployees.length} Valid Users) <FileSpreadsheet size={18} />
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -285,24 +285,24 @@ export default function UniversalReportModal({
     const isCityAdminUser = allRoles.includes('CITY_ADMIN') || allRoles.includes('CITYADMIN');
     const isQcUser = !isCityAdminUser && (allRoles.includes('QC') || allRoles.includes('QC_OFFICER'));
 
-    const actionPanelTitle = isUserAO
-        ? 'AO Action Panel'
-        : isCityAdminUser
-            ? 'City Admin Review & Actions'
-            : isQcUser
-                ? 'QC Review & Actions'
+    const actionPanelTitle = isUserAO 
+        ? 'AO Action Panel' 
+        : isCityAdminUser 
+            ? 'City Admin Review & Actions' 
+            : isQcUser 
+                ? 'QC Review & Actions' 
                 : 'Review & Actions';
 
-    const remarksLabel = isCityAdminUser
-        ? 'City Admin Remarks / Reason'
-        : isQcUser
-            ? 'QC Remarks / Reason'
+    const remarksLabel = isCityAdminUser 
+        ? 'City Admin Remarks / Reason' 
+        : isQcUser 
+            ? 'QC Remarks / Reason' 
             : 'Review Remarks / Reason';
 
-    const remarksPlaceholder = isCityAdminUser
-        ? 'Enter City Admin remarks...'
-        : isQcUser
-            ? 'Enter QC inspection feedback...'
+    const remarksPlaceholder = isCityAdminUser 
+        ? 'Enter City Admin remarks...' 
+        : isQcUser 
+            ? 'Enter QC inspection feedback...' 
             : 'Enter review feedback...';
 
     const qcComment = record.qcComment || record.comment || record.reviewerNote || null;
@@ -474,17 +474,13 @@ export default function UniversalReportModal({
                                             📋 Registered Asset Information
                                         </div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                            <MetaRow label="Asset Name" value={assetName} />
-                                            <MetaRow label="Asset ID" value={record.id || 'N/A'} />
-                                            <MetaRow label="Area Name" value={record.areaName || record.area || 'N/A'} />
-                                            <MetaRow label="Location Name / Landmark" value={record.locationName || record.address || 'N/A'} />
+                                            <MetaRow label="Asset / Toilet Name" value={assetName} />
+                                            <MetaRow label="Asset ID" value={record.id || record.code || 'N/A'} />
+                                            <MetaRow label="Area Name" value={record.areaName || record.area || record.toilet?.areaName || record.payload?.areaName || 'N/A'} />
+                                            <MetaRow label="Address / Location" value={record.address || record.locationName || record.toilet?.address || record.payload?.address || 'N/A'} />
                                             <MetaRow label="Zone" value={zoneName} />
                                             <MetaRow label="Ward" value={wardName} />
-                                            <MetaRow label="Area Type" value={record.areaType || 'N/A'} />
-                                            <MetaRow label="Road Type" value={record.roadType || 'N/A'} />
-                                            <MetaRow label="Fixed Properly" value={record.isFixedProperly !== undefined ? (record.isFixedProperly ? 'Yes' : 'No') : 'N/A'} />
-                                            <MetaRow label="Has Lid" value={record.hasLid !== undefined ? (record.hasLid ? 'Yes' : 'No') : 'N/A'} />
-                                            <MetaRow label="Asset Condition" value={record.condition || 'GOOD'} />
+                                            <MetaRow label="Area Type" value={record.areaType || record.toilet?.areaType || record.payload?.areaType || 'N/A'} />
                                             {(record.latitude || record.lat) && (record.longitude || record.lng) ? (
                                                 <MetaRow label="GPS Coordinates" value={`${record.latitude || record.lat}°, ${record.longitude || record.lng}°`} />
                                             ) : null}

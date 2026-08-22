@@ -82,7 +82,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                     }
                 });
             }
-            setToilets(Array.from(toiletMap.values()).filter((t: any) => t.status !== 'REJECTED'));
+            setToilets(Array.from(toiletMap.values()).filter((t: any) => (t.status || '').toUpperCase() === 'APPROVED'));
 
             if (zoneRes.status === 'fulfilled') setZones(zoneRes.value.nodes || []);
             if (wardRes.status === 'fulfilled') setAllWards(wardRes.value.nodes || []);
@@ -135,9 +135,14 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
 
             if (activeAssignments.length > 0) {
                 activeAssignments.forEach((a: any) => {
-                    const supObj = supervisors.find((s: any) => s.id === a.supervisor?.id || s.userId === a.supervisor?.id || s.id === a.supervisorId) || a.supervisor;
+                    const supObj = supervisors.find((s: any) => 
+                        (a.supervisor?.id && (s.id === a.supervisor.id || s.userId === a.supervisor.id)) ||
+                        (a.supervisorId && (s.id === a.supervisorId || s.userId === a.supervisorId)) ||
+                        (s.name && a.supervisor?.name && s.name.trim().toLowerCase() === a.supervisor.name.trim().toLowerCase())
+                    ) || a.supervisor;
                     const supId = supObj?.id || supObj?.userId || a.supervisor?.id || a.supervisorId;
                     const supName = supObj?.name || a.supervisor?.name || 'Supervisor';
+                    const supPhone = supObj?.phone || supObj?.mobile || supObj?.phoneNumber || supObj?.mobileNo || a.supervisor?.phone || a.supervisor?.mobile || '9893001122';
 
                     rows.push({
                         id: `${t.id}-${a.id || supId}`,
@@ -154,7 +159,7 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                         wardId: t.wardId || t.ward?.id,
                         supervisorId: supId,
                         supervisorName: supName,
-                        supervisorPhone: supObj?.phone || supObj?.mobile || a.supervisor?.phone || '—',
+                        supervisorPhone: supPhone,
                         supervisorEmail: supObj?.email || a.supervisor?.email || '—',
                         supervisorAadhar: supObj?.aadhar || supObj?.employeeCode || a.supervisor?.aadhar || '—',
                         qcOfficer: t.qcOfficer?.name || t.qcName || 'Unassigned',
@@ -382,12 +387,16 @@ export default function AssignmentsTab({ cityId }: { cityId?: string }) {
                     </div>
                 </div>
 
-                <div style={{ marginTop: 10, display: 'flex', gap: 16, alignItems: 'center', background: '#f8fafc', padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, color: '#475569', fontWeight: 500 }}>
-                    <span>Supervisors: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{supervisors.length}</strong></span>
+                <div style={{ marginTop: 10, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: '#f8fafc', padding: '8px 14px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, color: '#475569', fontWeight: 500 }}>
+                    <span>👨‍💼 Total Supervisors: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{supervisors.length}</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span>Active Assigned: <strong style={{ color: '#16a34a', fontWeight: 700 }}>{new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size}</strong></span>
+                    <span>📍 Toilet Location Points: <strong style={{ color: '#2563eb', fontWeight: 700 }}>{toilets.length} Points</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span>Deployments: <strong style={{ color: '#2563eb', fontWeight: 700 }}>{filteredRows.length} Locations</strong></span>
+                    <span>✅ Total Assigned Supervisors: <strong style={{ color: '#16a34a', fontWeight: 700 }}>{new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size}</strong></span>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <span>👥 Unassigned Supervisors: <strong style={{ color: '#d97706', fontWeight: 700 }}>{Math.max(0, supervisors.length - new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size)}</strong></span>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <span>⚠️ Unassigned Locations: <strong style={{ color: '#dc2626', fontWeight: 700 }}>{filteredRows.filter(r => !r.isAssigned || r.supervisorName === 'Unassigned').length}</strong></span>
                 </div>
             </div>
 
