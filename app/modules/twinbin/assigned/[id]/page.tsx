@@ -197,10 +197,7 @@ export default function AssignedBinDetailPage() {
                 <div className="grid grid-2 gap-y-4">
                   <Field label="Area Name" value={bin.areaName} />
                   <Field label="Location" value={bin.locationName} />
-                  <Field label="Type" value={`${bin.areaType || '-'} / ${bin.roadType || '-'}`} />
-                  <Field label="Condition" value={bin.condition || "-"} />
-                  <Field label="Fixed Properly" value={bin.isFixedProperly ? "Yes" : "No"} />
-                  <Field label="Has Lid" value={bin.hasLid ? "Yes" : "No"} />
+                  <Field label="Area Type" value={bin.areaType || '-'} />
                 </div>
               </div>
 

@@ -163,7 +163,7 @@ export default function ToiletModulePage() {
             onClose={() => setSelectedReport(null)}
             onApprove={async (rec, comment) => {
               if (rec.type === 'TOILET_REGISTRATION' || rec.type === 'TOILET_REQUEST' || rec.isRegistration) {
-                await ToiletApi.approveToilet(rec.id);
+                await ToiletApi.approveToilet(rec.id, { comment });
               } else {
                 await ToiletApi.reviewInspection(rec.id, { status: 'APPROVED', comment });
               }

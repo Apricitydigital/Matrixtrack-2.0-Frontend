@@ -128,7 +128,7 @@ export default function BeatStaffAssignmentsTab() {
     }, [beats]);
     return (
         <div style={{ animation: 'fadeIn 0.3s ease-out', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-            <style jsx>{`
+            <style>{`
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
                 .filter-select {
                     padding: 6px 12px;

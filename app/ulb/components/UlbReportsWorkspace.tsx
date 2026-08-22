@@ -18,6 +18,7 @@ import {
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     ClipboardCheck,
     Clock3,
     Eye,
@@ -330,6 +331,38 @@ function recordArea(
         item?.bin?.locationName ||
         'Assigned location'
     );
+}
+
+
+function getRecordZone(
+    item: any
+): string {
+    return String(
+        item?.zoneName ||
+        item?.bin?.zoneName ||
+        item?.toilet?.zoneName ||
+        item?.toilet?.ward?.parent?.name ||
+        item?.zone?.name ||
+        item?.bin?.zone?.name ||
+        (typeof item?.zone === 'string' ? item?.zone : '') ||
+        ''
+    ).trim();
+}
+
+
+function getRecordWard(
+    item: any
+): string {
+    return String(
+        item?.wardName ||
+        item?.bin?.wardName ||
+        item?.toilet?.wardName ||
+        item?.toilet?.ward?.name ||
+        item?.ward?.name ||
+        item?.bin?.ward?.name ||
+        (typeof item?.ward === 'string' ? item?.ward : '') ||
+        ''
+    ).trim();
 }
 
 
@@ -978,11 +1011,8 @@ function reportSearchText(
 
         recordArea(item),
 
-        item?.zoneName,
-        item?.wardName,
-
-        item?.bin?.zoneName,
-        item?.bin?.wardName,
+        getRecordZone(item),
+        getRecordWard(item),
 
         submittedByName(
             item
@@ -1374,6 +1404,18 @@ export default function UlbOperationsWorkspace({
 
 
     const [
+        selectedZone,
+        setSelectedZone,
+    ] = useState<string>('ALL');
+
+
+    const [
+        selectedWard,
+        setSelectedWard,
+    ] = useState<string>('ALL');
+
+
+    const [
         search,
         setSearch,
     ] = useState('');
@@ -1388,6 +1430,34 @@ export default function UlbOperationsWorkspace({
     const [
         toDate,
         setToDate,
+    ] = useState('');
+
+
+    /* ===========================
+       DASHBOARD DATE FILTER
+    =========================== */
+
+    const [
+        dashFromDate,
+        setDashFromDate,
+    ] = useState('');
+
+
+    const [
+        dashToDate,
+        setDashToDate,
+    ] = useState('');
+
+
+    const [
+        appliedDashFromDate,
+        setAppliedDashFromDate,
+    ] = useState('');
+
+
+    const [
+        appliedDashToDate,
+        setAppliedDashToDate,
     ] = useState('');
 
 
@@ -1617,6 +1687,8 @@ export default function UlbOperationsWorkspace({
     }, [
         view,
         moduleFilter,
+        selectedZone,
+        selectedWard,
         search,
         fromDate,
         toDate,
@@ -1624,7 +1696,7 @@ export default function UlbOperationsWorkspace({
 
 
     /* =========================================================
-       MODULE FILTER
+       MODULE & GEO FILTERS
     ========================================================= */
 
     const moduleRecords =
@@ -1649,6 +1721,96 @@ export default function UlbOperationsWorkspace({
         );
 
 
+    const availableZones =
+        useMemo(() => {
+            const set = new Set<string>();
+            records.forEach((record) => {
+                const z = getRecordZone(record);
+                if (z) set.add(z);
+            });
+            return Array.from(set).sort((a, b) =>
+                a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+            );
+        }, [records]);
+
+
+    const availableWards =
+        useMemo(() => {
+            const set = new Set<string>();
+            records.forEach((record) => {
+                const z = getRecordZone(record);
+                if (selectedZone !== 'ALL' && z !== selectedZone) {
+                    return;
+                }
+                const w = getRecordWard(record);
+                if (w) set.add(w);
+            });
+            return Array.from(set).sort((a, b) =>
+                a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+            );
+        }, [records, selectedZone]);
+
+
+    /* =========================================================
+       DASHBOARD FILTERED RECORDS (WITH DATE FILTER)
+    ========================================================= */
+
+    const dashboardRecords =
+        useMemo(() => {
+            if (
+                !appliedDashFromDate &&
+                !appliedDashToDate
+            ) {
+                return moduleRecords;
+            }
+
+
+            return moduleRecords.filter(
+                (item) =>
+                    isWithinRange(
+                        item,
+                        appliedDashFromDate,
+                        appliedDashToDate
+                    )
+            );
+        }, [
+            moduleRecords,
+            appliedDashFromDate,
+            appliedDashToDate,
+        ]);
+
+
+    /* =========================================================
+       LATEST REPORT (ALERT FOR ULB OFFICER)
+    ========================================================= */
+
+    const latestReport =
+        useMemo(() => {
+            if (
+                !records ||
+                records.length === 0
+            ) {
+                return null;
+            }
+
+
+            const sorted = [
+                ...records,
+            ].sort(
+                (a, b) =>
+                    new Date(
+                        recordDate(b) || 0
+                    ).getTime() -
+                    new Date(
+                        recordDate(a) || 0
+                    ).getTime()
+            );
+
+
+            return sorted[0] || null;
+        }, [records]);
+
+
     /* =========================================================
        GLOBAL STATS
     ========================================================= */
@@ -1657,7 +1819,7 @@ export default function UlbOperationsWorkspace({
         useMemo(() => {
 
             const approved =
-                moduleRecords.filter(
+                dashboardRecords.filter(
                     (
                         item
                     ) =>
@@ -1669,7 +1831,7 @@ export default function UlbOperationsWorkspace({
 
 
             const rejected =
-                moduleRecords.filter(
+                dashboardRecords.filter(
                     (
                         item
                     ) =>
@@ -1681,7 +1843,7 @@ export default function UlbOperationsWorkspace({
 
 
             const actionRequired =
-                moduleRecords.filter(
+                dashboardRecords.filter(
                     (
                         item
                     ) =>
@@ -1693,7 +1855,7 @@ export default function UlbOperationsWorkspace({
 
 
             const actionTaken =
-                moduleRecords.filter(
+                dashboardRecords.filter(
                     (
                         item
                     ) =>
@@ -1718,7 +1880,7 @@ export default function UlbOperationsWorkspace({
             };
 
         }, [
-            moduleRecords,
+            dashboardRecords,
         ]);
 
 
@@ -1760,6 +1922,24 @@ export default function UlbOperationsWorkspace({
                             ) ===
                             targetStatus
                             : true
+                )
+
+                .filter(
+                    (
+                        item
+                    ) =>
+                        selectedZone === 'ALL'
+                            ? true
+                            : getRecordZone(item) === selectedZone
+                )
+
+                .filter(
+                    (
+                        item
+                    ) =>
+                        selectedWard === 'ALL'
+                            ? true
+                            : getRecordWard(item) === selectedWard
                 )
 
                 .filter(
@@ -1809,6 +1989,8 @@ export default function UlbOperationsWorkspace({
         }, [
             moduleRecords,
             targetStatus,
+            selectedZone,
+            selectedWard,
             search,
             fromDate,
             toDate,
@@ -1863,7 +2045,7 @@ export default function UlbOperationsWorkspace({
                     ) => {
 
                         const rows =
-                            moduleRecords.filter(
+                            dashboardRecords.filter(
                                 (
                                     record
                                 ) =>
@@ -1930,7 +2112,7 @@ export default function UlbOperationsWorkspace({
                 ),
 
             [
-                moduleRecords,
+                dashboardRecords,
             ]
         );
 
@@ -2010,7 +2192,7 @@ export default function UlbOperationsWorkspace({
     const actionRequiredRecords =
         useMemo(
             () =>
-                moduleRecords
+                dashboardRecords
 
                     .filter(
                         (
@@ -2046,7 +2228,7 @@ export default function UlbOperationsWorkspace({
                     ),
 
             [
-                moduleRecords,
+                dashboardRecords,
             ]
         );
 
@@ -2059,7 +2241,7 @@ export default function UlbOperationsWorkspace({
         useMemo(
             () =>
                 [
-                    ...moduleRecords,
+                    ...dashboardRecords,
                 ]
 
                     .sort(
@@ -2086,7 +2268,7 @@ export default function UlbOperationsWorkspace({
                     ),
 
             [
-                moduleRecords,
+                dashboardRecords,
             ]
         );
 
@@ -2108,7 +2290,7 @@ export default function UlbOperationsWorkspace({
                                 .shortLabel,
 
                         count:
-                            moduleRecords.filter(
+                            dashboardRecords.filter(
                                 (
                                     record
                                 ) =>
@@ -2143,7 +2325,7 @@ export default function UlbOperationsWorkspace({
             );
 
         }, [
-            moduleRecords,
+            dashboardRecords,
         ]);
 
 
@@ -2533,7 +2715,7 @@ export default function UlbOperationsWorkspace({
 
                 <PortalHomeLayout>
 
-                    <div className="space-y-6 pb-8">
+                    <div className="space-y-4 pb-8">
 
 
                         {/* =================================================
@@ -2541,58 +2723,19 @@ export default function UlbOperationsWorkspace({
             ================================================= */}
 
                         {
-                            view ===
-                                'DASHBOARD'
-                                ? (
-
-                                    <DashboardHeader
-                                        moduleFilter={
-                                            moduleFilter
-                                        }
-
-                                        setModuleFilter={
-                                            setModuleFilter
-                                        }
-
-                                        loading={
-                                            loading
-                                        }
-
-                                        loadRecords={
-                                            loadRecords
-                                        }
-                                    />
-
-                                )
-                                : (
-
-                                    <StatusHeader
-                                        view={
-                                            view
-                                        }
-
-                                        moduleFilter={
-                                            moduleFilter
-                                        }
-
-                                        setModuleFilter={
-                                            setModuleFilter
-                                        }
-
-                                        loading={
-                                            loading
-                                        }
-
-                                        loadRecords={
-                                            loadRecords
-                                        }
-
-                                        router={
-                                            router
-                                        }
-                                    />
-
-                                )
+                            view === 'DASHBOARD' ? (
+                                <DashboardHeader
+                                    loading={loading}
+                                    loadRecords={loadRecords}
+                                />
+                            ) : (
+                                <StatusHeader
+                                    view={view}
+                                    loading={loading}
+                                    loadRecords={loadRecords}
+                                    router={router}
+                                />
+                            )
                         }
 
 
@@ -2633,13 +2776,136 @@ export default function UlbOperationsWorkspace({
 
 
                         {/* =================================================
+                LATEST REPORT ALERT FOR ULB OFFICER
+            ================================================= */}
+
+                        {
+                            latestReport && !loading ? (
+
+                                <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-slate-800 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+
+                                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold uppercase text-amber-900 border border-amber-500/30">
+                                            <span className="relative flex h-2 w-2 mr-0.5">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600" />
+                                            </span>
+                                            Latest Alert
+                                        </span>
+
+                                        <span className="font-black text-slate-900">
+                                            {recordTitle(latestReport, latestReport.dashboardModule)}
+                                        </span>
+
+                                        <span className="text-slate-400">•</span>
+
+                                        <span className="text-slate-600">
+                                            {moduleShortLabel(latestReport.dashboardModule)} ({recordArea(latestReport)})
+                                        </span>
+
+                                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase ${statusBadge(effectiveStatus(latestReport))}`}>
+                                            {effectiveStatus(latestReport).replace(/_/g, ' ')}
+                                        </span>
+
+                                    </div>
+
+
+                                    <div className="flex items-center gap-3 shrink-0">
+
+                                        <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">
+                                            Updated: {formatDate(recordDate(latestReport))}
+                                        </span>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => openDetail(latestReport)}
+                                            className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1 text-xs font-bold text-white shadow-xs transition hover:bg-slate-800 cursor-pointer active:scale-95"
+                                        >
+                                            <Eye size={13} />
+                                            View Details
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            ) : null
+                        }
+
+
+                        {/* =================================================
+                            UNIFIED FILTER BAR (OUTSIDE HEADER)
+                        ================================================= */}
+                        {
+                            !loading ? (
+                                <UnifiedFilterBar
+                                    moduleFilter={moduleFilter}
+                                    setModuleFilter={setModuleFilter}
+                                    selectedZone={selectedZone}
+                                    setSelectedZone={setSelectedZone}
+                                    availableZones={availableZones}
+                                    selectedWard={selectedWard}
+                                    setSelectedWard={setSelectedWard}
+                                    availableWards={availableWards}
+                                    search={search}
+                                    setSearch={setSearch}
+                                    fromDate={dashFromDate}
+                                    setFromDate={setDashFromDate}
+                                    toDate={dashToDate}
+                                    setToDate={setDashToDate}
+                                    appliedFromDate={appliedDashFromDate}
+                                    appliedToDate={appliedDashToDate}
+                                    onApplyDateFilter={(f?: string, t?: string) => {
+                                        const fromVal = f !== undefined ? f : dashFromDate;
+                                        const toVal = t !== undefined ? t : dashToDate;
+                                        setAppliedDashFromDate(fromVal);
+                                        setAppliedDashToDate(toVal);
+                                    }}
+                                    onClearFilters={() => {
+                                        setModuleFilter('ALL');
+                                        setSelectedZone('ALL');
+                                        setSelectedWard('ALL');
+                                        setSearch('');
+                                        setDashFromDate('');
+                                        setDashToDate('');
+                                        setAppliedDashFromDate('');
+                                        setAppliedDashToDate('');
+                                    }}
+                                />
+                            ) : null
+                        }
+
+
+                        {/* =================================================
+                FULL PAGE SPINNER LOADER
+            ================================================= */}
+
+                        {
+                            loading ? (
+
+                                <div className="flex items-center justify-center gap-3 py-20 text-sm font-bold text-slate-600">
+
+                                    <RefreshCw
+                                        size={20}
+                                        className="animate-spin text-blue-600"
+                                    />
+
+                                    <span>Loading...</span>
+
+                                </div>
+
+                            ) : null
+                        }
+
+
+                        {/* =================================================
                 DASHBOARD
             ================================================= */}
 
                         {
-                            view ===
-                                'DASHBOARD'
-                                ? (
+                            !loading ? (
+                                view === 'DASHBOARD' ? (
                                     <>
 
                                         {/* =========================================
@@ -3388,14 +3654,7 @@ export default function UlbOperationsWorkspace({
                                         </section>
 
                                     </>
-                                )
-
-                                : (
-
-                                    /* =================================================
-                                       STATUS PAGES
-                                    ================================================= */
-
+                                ) : (
                                     <>
 
                                         {/* =============================================
@@ -3451,142 +3710,7 @@ export default function UlbOperationsWorkspace({
                                         </section>
 
 
-                                        {/* =============================================
-                        SEARCH + DATE
-                    ============================================= */}
 
-                                        <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-
-                                            <div className="grid gap-3 xl:grid-cols-[1.3fr_0.8fr_0.8fr_auto]">
-
-
-                                                {/* SEARCH */}
-
-                                                <div className="relative">
-
-                                                    <Search
-                                                        size={17}
-
-                                                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                                                    />
-
-
-                                                    <input
-                                                        value={
-                                                            search
-                                                        }
-
-                                                        onChange={(
-                                                            event
-                                                        ) =>
-                                                            setSearch(
-                                                                event
-                                                                    .target
-                                                                    .value
-                                                            )
-                                                        }
-
-                                                        placeholder="Search report, location, ward, employee or remark..."
-
-                                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-400"
-                                                    />
-
-                                                </div>
-
-
-                                                {/* FROM */}
-
-                                                <label className="relative flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-
-                                                    <CalendarDays
-                                                        size={16}
-
-                                                        className="text-slate-400"
-                                                    />
-
-
-                                                    <input
-                                                        type="date"
-
-                                                        value={
-                                                            fromDate
-                                                        }
-
-                                                        onChange={(
-                                                            event
-                                                        ) =>
-                                                            setFromDate(
-                                                                event
-                                                                    .target
-                                                                    .value
-                                                            )
-                                                        }
-
-                                                        className="w-full bg-transparent text-xs font-bold text-slate-600 outline-none"
-                                                    />
-
-                                                </label>
-
-
-                                                {/* TO */}
-
-                                                <label className="relative flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-
-                                                    <CalendarDays
-                                                        size={16}
-
-                                                        className="text-slate-400"
-                                                    />
-
-
-                                                    <input
-                                                        type="date"
-
-                                                        value={
-                                                            toDate
-                                                        }
-
-                                                        onChange={(
-                                                            event
-                                                        ) =>
-                                                            setToDate(
-                                                                event
-                                                                    .target
-                                                                    .value
-                                                            )
-                                                        }
-
-                                                        className="w-full bg-transparent text-xs font-bold text-slate-600 outline-none"
-                                                    />
-
-                                                </label>
-
-
-                                                {/* CLEAR */}
-
-                                                <button
-                                                    type="button"
-
-                                                    onClick={() => {
-                                                        setSearch('');
-                                                        setFromDate('');
-                                                        setToDate('');
-                                                    }}
-
-                                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 text-xs font-black text-slate-600 transition hover:bg-slate-100"
-                                                >
-
-                                                    <Filter
-                                                        size={15}
-                                                    />
-
-                                                    Clear
-
-                                                </button>
-
-                                            </div>
-
-                                        </section>
 
 
                                         {/* =============================================
@@ -3813,6 +3937,7 @@ export default function UlbOperationsWorkspace({
 
                                     </>
                                 )
+                            ) : null
                         }
 
 
@@ -3919,131 +4044,21 @@ export default function UlbOperationsWorkspace({
    DASHBOARD HEADER
 ========================================================= */
 
-function DashboardHeader({
-    moduleFilter,
-    setModuleFilter,
-    loading,
-    loadRecords,
-}: any) {
-
+function DashboardHeader({ loading, loadRecords }: any) {
     return (
-        <section className="relative overflow-hidden rounded-[26px] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-6 text-white shadow-[0_18px_50px_rgba(15,23,42,0.15)]">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center justify-between">
+            <h1 className="text-xl font-black tracking-tight text-slate-900">
+                ULB Operations Dashboard
+            </h1>
 
-            <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
-
-            <div className="absolute bottom-[-90px] left-[28%] h-52 w-52 rounded-full bg-cyan-400/10 blur-3xl" />
-
-
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-
-                <div>
-
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">
-
-                        <Sparkles
-                            size={13}
-                        />
-
-                        Commissioner Operations View
-
-                    </div>
-
-
-                    <h1 className="max-w-3xl text-2xl font-black tracking-tight sm:text-3xl">
-                        Municipal Sanitation Command Center
-                    </h1>
-
-
-                    <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-300">
-                        Monitor QC decisions, assign corrective action, track Action Officer closure and inspect the complete submitted evidence across Toilets, Sweeping and Litter Bins.
-                    </p>
-
-                </div>
-
-
-                <div className="flex flex-wrap gap-2">
-
-                    <select
-                        value={
-                            moduleFilter
-                        }
-
-                        onChange={(
-                            event
-                        ) =>
-                            setModuleFilter(
-                                event
-                                    .target
-                                    .value
-                            )
-                        }
-
-                        className="h-11 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-bold text-white outline-none backdrop-blur-md"
-                    >
-
-                        <option
-                            value="ALL"
-                            className="text-slate-900"
-                        >
-                            All Modules
-                        </option>
-
-
-                        {
-                            MODULES.map(
-                                (
-                                    module
-                                ) => (
-
-                                    <option
-                                        key={
-                                            module.key
-                                        }
-
-                                        value={
-                                            module.key
-                                        }
-
-                                        className="text-slate-900"
-                                    >
-                                        {module.label}
-                                    </option>
-
-                                )
-                            )
-                        }
-
-                    </select>
-
-
-                    <button
-                        type="button"
-
-                        onClick={
-                            loadRecords
-                        }
-
-                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-black text-white transition hover:bg-white/15"
-                    >
-
-                        <RefreshCw
-                            size={16}
-
-                            className={
-                                loading
-                                    ? 'animate-spin'
-                                    : ''
-                            }
-                        />
-
-                        Refresh
-
-                    </button>
-
-                </div>
-
-            </div>
-
+            <button
+                type="button"
+                onClick={loadRecords}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 cursor-pointer shadow-2xs"
+            >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                Refresh
+            </button>
         </section>
     );
 }
@@ -4053,149 +4068,34 @@ function DashboardHeader({
    STATUS PAGE HEADER
 ========================================================= */
 
-function StatusHeader({
-    view,
-    moduleFilter,
-    setModuleFilter,
-    loading,
-    loadRecords,
-    router,
-}: any) {
-
-    const config =
-        VIEW_CONFIG[
-        view as Exclude<
-            UlbView,
-            'DASHBOARD'
-        >
-        ];
-
+function StatusHeader({ view, loading, loadRecords, router }: any) {
+    const config = VIEW_CONFIG[view as Exclude<UlbView, 'DASHBOARD'>];
 
     return (
-        <section className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <button
+                    type="button"
+                    onClick={() => router.push('/ulb/dashboard')}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100 cursor-pointer"
+                    title="Back to Dashboard"
+                >
+                    <ChevronLeft size={18} />
+                </button>
 
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-
-                <div className="flex items-start gap-4">
-
-                    <button
-                        type="button"
-
-                        onClick={() =>
-                            router.push(
-                                '/ulb/dashboard'
-                            )
-                        }
-
-                        className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-slate-100"
-                    >
-
-                        <ChevronLeft
-                            size={18}
-                        />
-
-                    </button>
-
-
-                    <div>
-
-                        <div className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-blue-700">
-                            Commissioner Operations View
-                        </div>
-
-
-                        <h1 className="text-2xl font-black tracking-tight text-slate-900">
-                            {config.title}
-                        </h1>
-
-
-                        <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-slate-500">
-                            {config.description}
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <div className="flex flex-wrap gap-2">
-
-                    <select
-                        value={
-                            moduleFilter
-                        }
-
-                        onChange={(
-                            event
-                        ) =>
-                            setModuleFilter(
-                                event
-                                    .target
-                                    .value
-                            )
-                        }
-
-                        className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-400"
-                    >
-
-                        <option value="ALL">
-                            All Modules
-                        </option>
-
-
-                        {
-                            MODULES.map(
-                                (
-                                    module
-                                ) => (
-
-                                    <option
-                                        key={
-                                            module.key
-                                        }
-
-                                        value={
-                                            module.key
-                                        }
-                                    >
-                                        {module.label}
-                                    </option>
-
-                                )
-                            )
-                        }
-
-                    </select>
-
-
-                    <button
-                        type="button"
-
-                        onClick={
-                            loadRecords
-                        }
-
-                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-700 transition hover:bg-blue-100"
-                    >
-
-                        <RefreshCw
-                            size={16}
-
-                            className={
-                                loading
-                                    ? 'animate-spin'
-                                    : ''
-                            }
-                        />
-
-                        Refresh
-
-                    </button>
-
-                </div>
-
+                <h1 className="text-xl font-black tracking-tight text-slate-900">
+                    {config.title}
+                </h1>
             </div>
 
+            <button
+                type="button"
+                onClick={loadRecords}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 cursor-pointer shadow-2xs"
+            >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                Refresh
+            </button>
         </section>
     );
 }
@@ -6449,5 +6349,353 @@ function ImagePreviewModal({
             />
 
         </div>
+    );
+}
+
+
+/* =========================================================
+   UNIFIED FILTER BAR (OUTSIDE HEADER)
+========================================================= */
+
+function UnifiedFilterBar({
+    moduleFilter,
+    setModuleFilter,
+    selectedZone,
+    setSelectedZone,
+    availableZones,
+    selectedWard,
+    setSelectedWard,
+    availableWards,
+    search,
+    setSearch,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+    appliedFromDate,
+    appliedToDate,
+    onApplyDateFilter,
+    onClearFilters,
+}: any) {
+    const [openDatePopover, setOpenDatePopover] = useState(false);
+    const [customMode, setCustomMode] = useState<'SINGLE' | 'RANGE'>('RANGE');
+    const [presetName, setPresetName] = useState<string>('All Time');
+
+    const formatDateYYYYMMDD = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const handleSelectPreset = (preset: 'TODAY' | 'YESTERDAY' | 'WEEKLY' | 'MONTHLY' | 'ALL') => {
+        const now = new Date();
+        if (preset === 'TODAY') {
+            const todayStr = formatDateYYYYMMDD(now);
+            setFromDate(todayStr);
+            setToDate(todayStr);
+            setPresetName('Today');
+            if (onApplyDateFilter) onApplyDateFilter(todayStr, todayStr);
+        } else if (preset === 'YESTERDAY') {
+            const y = new Date(now);
+            y.setDate(y.getDate() - 1);
+            const yStr = formatDateYYYYMMDD(y);
+            setFromDate(yStr);
+            setToDate(yStr);
+            setPresetName('Yesterday');
+            if (onApplyDateFilter) onApplyDateFilter(yStr, yStr);
+        } else if (preset === 'WEEKLY') {
+            const w = new Date(now);
+            w.setDate(w.getDate() - 7);
+            const wStr = formatDateYYYYMMDD(w);
+            const todayStr = formatDateYYYYMMDD(now);
+            setFromDate(wStr);
+            setToDate(todayStr);
+            setPresetName('This Week');
+            if (onApplyDateFilter) onApplyDateFilter(wStr, todayStr);
+        } else if (preset === 'MONTHLY') {
+            const m = new Date(now);
+            m.setDate(m.getDate() - 30);
+            const mStr = formatDateYYYYMMDD(m);
+            const todayStr = formatDateYYYYMMDD(now);
+            setFromDate(mStr);
+            setToDate(todayStr);
+            setPresetName('This Month');
+            if (onApplyDateFilter) onApplyDateFilter(mStr, todayStr);
+        } else if (preset === 'ALL') {
+            setFromDate('');
+            setToDate('');
+            setPresetName('All Time');
+            if (onApplyDateFilter) onApplyDateFilter('', '');
+        }
+        setOpenDatePopover(false);
+    };
+
+    const getDateLabel = () => {
+        if (!appliedFromDate && !appliedToDate) return 'Date Filter';
+        if (presetName && presetName !== 'All Time') return presetName;
+        if (appliedFromDate && appliedToDate && appliedFromDate === appliedToDate) return appliedFromDate;
+        if (appliedFromDate || appliedToDate) return `${appliedFromDate || 'Start'} → ${appliedToDate || 'Today'}`;
+        return 'Date Filter';
+    };
+
+    return (
+        <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="grid gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-[1.1fr_1.1fr_1.1fr_1.4fr_auto_auto] items-center">
+
+                {/* 1. MODULE FILTER */}
+                <select
+                    value={moduleFilter}
+                    onChange={(e) => setModuleFilter(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 cursor-pointer shadow-2xs"
+                >
+                    <option value="ALL">All Modules</option>
+                    {MODULES.map((m) => (
+                        <option key={m.key} value={m.key}>{m.label}</option>
+                    ))}
+                </select>
+
+                {/* 2. ZONE FILTER */}
+                <select
+                    value={selectedZone}
+                    onChange={(e) => {
+                        setSelectedZone(e.target.value);
+                        setSelectedWard('ALL');
+                    }}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 cursor-pointer shadow-2xs"
+                >
+                    <option value="ALL">All Zones ({availableZones.length})</option>
+                    {availableZones.map((z: string) => (
+                        <option key={z} value={z}>{z}</option>
+                    ))}
+                </select>
+
+                {/* 3. WARD FILTER */}
+                <select
+                    value={selectedWard}
+                    onChange={(e) => setSelectedWard(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 cursor-pointer shadow-2xs"
+                >
+                    <option value="ALL">All Wards ({availableWards.length})</option>
+                    {availableWards.map((w: string) => (
+                        <option key={w} value={w}>{w}</option>
+                    ))}
+                </select>
+
+                {/* 4. SEARCH INPUT */}
+                <div className="relative">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search location, ward, employee..."
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 shadow-2xs"
+                    />
+                </div>
+
+                {/* 5. SLEEK CALENDAR PRESET POPOVER */}
+                <div className="relative">
+                    <button
+                        type="button"
+                        onClick={() => setOpenDatePopover(!openDatePopover)}
+                        className={`flex h-10 items-center justify-between gap-2.5 rounded-xl border px-3 text-xs font-bold transition cursor-pointer shadow-2xs whitespace-nowrap ${
+                            appliedFromDate || appliedToDate
+                                ? 'border-blue-300 bg-blue-50/80 text-blue-700'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                    >
+                        <span className="flex items-center gap-1.5">
+                            <CalendarDays size={15} className={appliedFromDate || appliedToDate ? 'text-blue-600' : 'text-slate-500'} />
+                            <span>{getDateLabel()}</span>
+                        </span>
+                        <ChevronDown size={14} className="text-slate-400" />
+                    </button>
+
+                    {openDatePopover && (
+                        <div className="absolute right-0 sm:right-auto sm:left-0 top-12 z-50 w-72 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xl transition-all">
+                            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-2">
+                                Quick Date Presets
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-1.5 mb-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectPreset('TODAY')}
+                                    className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 cursor-pointer"
+                                >
+                                    Today
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectPreset('YESTERDAY')}
+                                    className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 cursor-pointer"
+                                >
+                                    Yesterday
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectPreset('WEEKLY')}
+                                    className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 cursor-pointer"
+                                >
+                                    This Week
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectPreset('MONTHLY')}
+                                    className="flex items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 cursor-pointer"
+                                >
+                                    This Month
+                                </button>
+                            </div>
+
+                            <div className="border-t border-slate-100 pt-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                                        Custom Date
+                                    </span>
+                                    <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px] font-bold">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomMode('SINGLE')}
+                                            className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                                                customMode === 'SINGLE' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            Single
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomMode('RANGE')}
+                                            className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                                                customMode === 'RANGE' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            Range
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {customMode === 'SINGLE' ? (
+                                    <div className="space-y-1">
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase">Select Date</label>
+                                        <input
+                                            type="date"
+                                            value={fromDate}
+                                            onChange={(e) => {
+                                                setFromDate(e.target.value);
+                                                setToDate(e.target.value);
+                                            }}
+                                            className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-400"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase">From</label>
+                                            <input
+                                                type="date"
+                                                value={fromDate}
+                                                onChange={(e) => setFromDate(e.target.value)}
+                                                className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-400"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase">To</label>
+                                            <input
+                                                type="date"
+                                                value={toDate}
+                                                onChange={(e) => setToDate(e.target.value)}
+                                                className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-400"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelectPreset('ALL')}
+                                        className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
+                                    >
+                                        Reset Date
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPresetName('Custom');
+                                            if (onApplyDateFilter) onApplyDateFilter(fromDate, toDate);
+                                            setOpenDatePopover(false);
+                                        }}
+                                        className="inline-flex h-8 items-center gap-1 rounded-xl bg-slate-900 px-3 text-xs font-bold text-white transition hover:bg-slate-800 cursor-pointer shadow-2xs active:scale-95"
+                                    >
+                                        <Filter size={12} />
+                                        Apply
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* 6. CLEAR ALL */}
+                <button
+                    type="button"
+                    onClick={() => {
+                        setPresetName('All Time');
+                        onClearFilters();
+                    }}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-600 transition hover:bg-slate-100 cursor-pointer whitespace-nowrap"
+                >
+                    <X size={14} />
+                    Clear
+                </button>
+
+            </div>
+
+            {/* ACTIVE FILTER BADGES */}
+            {(moduleFilter !== 'ALL' || selectedZone !== 'ALL' || selectedWard !== 'ALL' || search || appliedFromDate || appliedToDate) && (
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2.5 text-xs font-semibold text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-extrabold text-slate-700">Active Filters:</span>
+                        {moduleFilter !== 'ALL' && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200">
+                                Module: {moduleFilter}
+                            </span>
+                        )}
+                        {selectedZone !== 'ALL' && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-0.5 text-[11px] font-bold text-cyan-700 border border-cyan-200">
+                                Zone: {selectedZone}
+                            </span>
+                        )}
+                        {selectedWard !== 'ALL' && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                                Ward: {selectedWard}
+                            </span>
+                        )}
+                        {search && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 border border-purple-200">
+                                Search: "{search}"
+                            </span>
+                        )}
+                        {(appliedFromDate || appliedToDate) && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200">
+                                Date: {getDateLabel()} ({appliedFromDate || 'Start'} → {appliedToDate || 'Today'})
+                            </span>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setPresetName('All Time');
+                            onClearFilters();
+                        }}
+                        className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                    >
+                        Reset All
+                    </button>
+                </div>
+            )}
+        </section>
     );
 }

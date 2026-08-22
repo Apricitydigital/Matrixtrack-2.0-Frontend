@@ -176,8 +176,8 @@ export default function TwinbinStaffAssignmentsTab() {
                 rows.push({
                     id: `sup-unassigned-${sup.id}`,
                     binId: null,
-                    areaName: 'No Asset Assigned',
-                    binName: 'No Asset Assigned',
+                    areaName: 'No Litterbin Location Assigned',
+                    binName: 'No Litterbin Location Assigned',
                     binCode: '—',
                     lat: '22.7196',
                     lng: '75.8577',
@@ -451,12 +451,16 @@ export default function TwinbinStaffAssignmentsTab() {
                     </div>
                 </div>
 
-                <div style={{ marginTop: 10, display: 'flex', gap: 16, alignItems: 'center', background: '#f8fafc', padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, color: '#475569', fontWeight: 500 }}>
-                    <span>Supervisors: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{supervisors.length}</strong></span>
+                <div style={{ marginTop: 10, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: '#f8fafc', padding: '8px 14px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, color: '#475569', fontWeight: 500 }}>
+                    <span>👨‍💼 Total Supervisors: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{supervisors.length}</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span>Active Assigned: <strong style={{ color: '#16a34a', fontWeight: 700 }}>{new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size}</strong></span>
+                    <span>📍 Litterbin Points: <strong style={{ color: '#2563eb', fontWeight: 700 }}>{bins.length || filteredRows.length} Points</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span>Deployments: <strong style={{ color: '#2563eb', fontWeight: 700 }}>{filteredRows.length} Assets</strong></span>
+                    <span>✅ Total Assigned Supervisors: <strong style={{ color: '#16a34a', fontWeight: 700 }}>{new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size}</strong></span>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <span>👥 Unassigned Supervisors: <strong style={{ color: '#d97706', fontWeight: 700 }}>{Math.max(0, supervisors.length - new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size)}</strong></span>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <span>⚠️ Unassigned Locations: <strong style={{ color: '#dc2626', fontWeight: 700 }}>{filteredRows.filter(r => !r.isAssigned || !r.supervisorId || r.supervisorName === 'Unassigned').length}</strong></span>
                 </div>
             </div>
 

@@ -36,6 +36,7 @@ type GeoNode = {
 
 type EmployeeRow = {
     id: string;
+    employeeId?: string | null;
     name: string;
     email: string | null;
     phone: string | null;
@@ -64,6 +65,7 @@ type EmployeeImportStatus =
 
 type EmployeeImportRow = {
     rowNumber: number;
+    employeeId?: string;
     employeeName: string;
     mobileNumber: string;
     zoneName: string;
@@ -425,6 +427,7 @@ EMPLOYEE EXCEL IMPORT
 
             const searchableText = [
                 employee.name,
+                employee.employeeId || "",
                 employee.phone || "",
                 ...employeeZoneIds.map(
                     (id) =>
@@ -520,26 +523,24 @@ EMPLOYEE EXCEL IMPORT
                             .trim()
                 );
 
-            const expectedHeaders = [
-                "S.No",
-                "Employee Name",
-                "Mobile Number",
-                "Zone Name",
-                "Ward Name",
-            ];
+            const findColIdx = (queryKeywords: string[], defaultIdx: number) => {
+                const found = headers.findIndex((h) => {
+                    const norm = h.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    return queryKeywords.some((kw) => norm.includes(kw));
+                });
+                return found !== -1 ? found : defaultIdx;
+            };
 
-            const headerValid =
-                expectedHeaders.every(
-                    (header, index) =>
-                        headers[index] ===
-                        header
-                );
+            const hasEmpId = headers.some((h) => {
+                const norm = h.toLowerCase().replace(/[^a-z0-9]/g, "");
+                return norm.includes("empid") || norm.includes("employeeid");
+            });
 
-            if (!headerValid) {
-                throw new Error(
-                    'Invalid Excel format. Required columns are exactly: "S.No", "Employee Name", "Mobile Number", "Zone Name", "Ward Name". Please use the downloaded template.'
-                );
-            }
+            const empIdIdx = hasEmpId ? findColIdx(["empid", "employeeid"], 1) : -1;
+            const nameIdx = findColIdx(["empname", "employeename", "name"], hasEmpId ? 2 : 1);
+            const mobileIdx = findColIdx(["mobile", "phone", "contact"], hasEmpId ? 3 : 2);
+            const zoneIdx = findColIdx(["zone"], hasEmpId ? 4 : 3);
+            const wardIdx = findColIdx(["ward"], hasEmpId ? 5 : 4);
 
 
             /* =============================================
@@ -634,9 +635,14 @@ EMPLOYEE EXCEL IMPORT
                         const rowNumber =
                             index + 2;
 
+                        const employeeId =
+                            empIdIdx !== -1
+                                ? String(rawRow?.[empIdIdx] ?? "").trim()
+                                : undefined;
+
                         const employeeName =
                             String(
-                                rawRow?.[1] ?? ""
+                                rawRow?.[nameIdx] ?? ""
                             )
                                 .trim()
                                 .replace(
@@ -646,7 +652,7 @@ EMPLOYEE EXCEL IMPORT
 
                         const mobileNumber =
                             String(
-                                rawRow?.[2] ?? ""
+                                rawRow?.[mobileIdx] ?? ""
                             )
                                 .replace(
                                     /\D/g,
@@ -656,7 +662,7 @@ EMPLOYEE EXCEL IMPORT
 
                         const zoneName =
                             String(
-                                rawRow?.[3] ?? ""
+                                rawRow?.[zoneIdx] ?? ""
                             )
                                 .trim()
                                 .replace(
@@ -666,7 +672,7 @@ EMPLOYEE EXCEL IMPORT
 
                         const wardName =
                             String(
-                                rawRow?.[4] ?? ""
+                                rawRow?.[wardIdx] ?? ""
                             )
                                 .trim()
                                 .replace(
@@ -881,6 +887,7 @@ EMPLOYEE EXCEL IMPORT
 
                         parsedRows.push({
                             rowNumber,
+                            employeeId,
                             employeeName,
                             mobileNumber,
                             zoneName:
@@ -995,6 +1002,9 @@ EMPLOYEE EXCEL IMPORT
 
                                         wardId:
                                             row.wardId,
+
+                                        employeeId:
+                                            row.employeeId || undefined,
                                     }),
                             }
                         );
@@ -1187,6 +1197,7 @@ EMPLOYEE EXCEL IMPORT
         const templateRows = [
             [
                 "S.No",
+                "Employee ID",
                 "Employee Name",
                 "Mobile Number",
                 "Zone Name",
@@ -1194,6 +1205,7 @@ EMPLOYEE EXCEL IMPORT
             ],
             [
                 1,
+                "EMP001",
                 "Raisa Bai Aslam",
                 "9876543210",
                 "Zone 1",
@@ -1201,6 +1213,7 @@ EMPLOYEE EXCEL IMPORT
             ],
             [
                 2,
+                "EMP002",
                 "Sanjay",
                 "9876543211",
                 "Zone 1",
@@ -1214,7 +1227,8 @@ EMPLOYEE EXCEL IMPORT
             );
 
         worksheet["!cols"] = [
-            { wch: 10 },
+            { wch: 8 },
+            { wch: 16 },
             { wch: 28 },
             { wch: 18 },
             { wch: 20 },
@@ -1381,7 +1395,7 @@ EMPLOYEE EXCEL IMPORT
                                             e.target.value
                                         )
                                     }
-                                    placeholder="Search name, mobile, zone or ward..."
+                                    placeholder="Search name, employee ID, mobile, zone or ward..."
                                     className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                 />
 
@@ -1506,7 +1520,15 @@ EMPLOYEE EXCEL IMPORT
                                     <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
 
                                         <th className="px-5 py-3">
+                                            S.No
+                                        </th>
+
+                                        <th className="px-5 py-3">
                                             Employee Name
+                                        </th>
+
+                                        <th className="px-5 py-3">
+                                            Employee ID
                                         </th>
 
                                         <th className="px-5 py-3">
@@ -1519,6 +1541,10 @@ EMPLOYEE EXCEL IMPORT
 
                                         <th className="px-5 py-3">
                                             Ward
+                                        </th>
+
+                                        <th className="px-5 py-3">
+                                            Registered On
                                         </th>
 
                                         <th className="px-5 py-3">
@@ -1536,7 +1562,7 @@ EMPLOYEE EXCEL IMPORT
 
                                         <tr>
                                             <td
-                                                colSpan={5}
+                                                colSpan={8}
                                                 className="px-5 py-14 text-center text-sm text-slate-500"
                                             >
                                                 Loading employees...
@@ -1547,7 +1573,7 @@ EMPLOYEE EXCEL IMPORT
 
                                         <tr>
                                             <td
-                                                colSpan={5}
+                                                colSpan={8}
                                                 className="px-5 py-14 text-center"
                                             >
 
@@ -1573,7 +1599,7 @@ EMPLOYEE EXCEL IMPORT
                                     ) : (
 
                                         filteredEmployees.map(
-                                            (employee) => {
+                                            (employee, empIdx) => {
 
                                                 const employeeZones =
                                                     (employee.zoneIds || [])
@@ -1598,38 +1624,22 @@ EMPLOYEE EXCEL IMPORT
                                                         className="transition hover:bg-slate-50/70"
                                                     >
 
-                                                        <td className="px-5 py-4">
-
-                                                            <div className="flex items-center gap-3">
-
-                                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">
-                                                                    {employee.name
-                                                                        ?.trim()
-                                                                        ?.charAt(0)
-                                                                        ?.toUpperCase() ||
-                                                                        "E"}
-                                                                </div>
-
-                                                                <div>
-                                                                    <p className="font-semibold text-slate-900">
-                                                                        {employee.name}
-                                                                    </p>
-
-                                                                    <p className="mt-0.5 text-xs text-slate-400">
-                                                                        Beat assignment employee
-                                                                    </p>
-                                                                </div>
-
-                                                            </div>
-
+                                                        <td className="px-5 py-4 text-sm font-semibold text-slate-400">
+                                                            {empIdx + 1}
                                                         </td>
 
+                                                        <td className="px-5 py-4 font-semibold text-slate-900">
+                                                            {employee.name}
+                                                        </td>
+
+                                                        <td className="px-5 py-4 text-sm font-semibold text-blue-600">
+                                                            {employee.employeeId || "—"}
+                                                        </td>
 
                                                         <td className="px-5 py-4 text-sm font-medium text-slate-700">
                                                             {employee.phone ||
                                                                 "Not added"}
                                                         </td>
-
 
                                                         <td className="px-5 py-4">
 
@@ -1656,7 +1666,6 @@ EMPLOYEE EXCEL IMPORT
 
                                                         </td>
 
-
                                                         <td className="px-5 py-4">
 
                                                             <div className="flex max-w-xs flex-wrap gap-1.5">
@@ -1682,6 +1691,15 @@ EMPLOYEE EXCEL IMPORT
 
                                                         </td>
 
+                                                        <td className="px-5 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                                                            {employee.createdAt
+                                                                ? new Date(employee.createdAt).toLocaleDateString("en-IN", {
+                                                                    day: "2-digit",
+                                                                    month: "short",
+                                                                    year: "numeric"
+                                                                })
+                                                                : "—"}
+                                                        </td>
 
                                                         <td className="px-5 py-4">
 
@@ -1983,7 +2001,7 @@ EMPLOYEE EXCEL IMPORT
                                     </p>
 
                                     <p className="mt-1 text-xs text-blue-700">
-                                        S.No | Employee Name | Mobile Number | Zone Name | Ward Name
+                                        S.No | Employee ID | Employee Name | Mobile Number | Zone Name | Ward Name
                                     </p>
 
                                 </div>
@@ -2127,6 +2145,10 @@ EMPLOYEE EXCEL IMPORT
                                                     </th>
 
                                                     <th className="px-3 py-3">
+                                                        Employee ID
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
                                                         Employee
                                                     </th>
 
@@ -2163,6 +2185,10 @@ EMPLOYEE EXCEL IMPORT
 
                                                             <td className="px-3 py-3">
                                                                 {row.rowNumber}
+                                                            </td>
+
+                                                            <td className="px-3 py-3 font-semibold text-blue-600">
+                                                                {row.employeeId || "—"}
                                                             </td>
 
                                                             <td className="px-3 py-3 font-semibold">

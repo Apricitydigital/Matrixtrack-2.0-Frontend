@@ -96,7 +96,7 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
             setProcessingText(status === 'APPROVED' ? 'Approving request...' : 'Rejecting request...');
             if (!isInspection) {
                 if (status === 'APPROVED') {
-                    await ToiletApi.approveToilet(id);
+                    await ToiletApi.approveToilet(id, { comment: userComment });
                 } else {
                     await ToiletApi.rejectToilet(id, userComment || "Rejected by Reviewing Officer");
                 }
@@ -233,11 +233,7 @@ export default function ApprovalsTab({ cityId }: { cityId?: string }) {
                     record={{
                         ...fullReportModalItem,
                         wardName: fullReportModalItem.wardName || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.name) || fullReportModalItem.ward?.name,
-                        zoneName:
-                            fullReportModalItem.zoneName ||
-                            (fullReportModalItem.wardId &&
-                                wardMap[fullReportModalItem.wardId]?.zoneName) ||
-                            fullReportModalItem.ward?.parent?.name,
+                        zoneName: fullReportModalItem.zoneName || (fullReportModalItem.wardId && wardMap[fullReportModalItem.wardId]?.zoneName) || (fullReportModalItem.wardId && (wardMap[fullReportModalItem.wardId] as any)?.parent?.name) || fullReportModalItem.ward?.parent?.name,
                     }}
                     onClose={() => setFullReportModalItem(null)}
                     onApprove={async (rec, comment) => {
