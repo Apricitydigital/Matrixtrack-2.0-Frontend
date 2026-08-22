@@ -543,6 +543,10 @@ function PortalHomeLayoutContent({
       'User & Admin Management';
   }
 
+  if (pathname.startsWith('/ulb/inspection-performance')) {
+    pageTitle = 'Inspection and Performance';
+  }
+
 
   /* =========================================================
      TASKFORCE TITLES
@@ -2449,7 +2453,58 @@ function PortalHomeLayoutContent({
                 </Link>
 
 
-                {/* REPORTS */}
+                {/* ATTENDANCE ANALYTICS */}
+
+                <Link
+                  href="/city/attendance"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <ChartNoAxesCombined size={15} />
+
+                  <span>
+                    Attendance Analytics
+                  </span>
+                </Link>
+
+
+                {/* INSPECTION AND PERFORMANCE */}
+
+                <Link
+                  href="/ulb/inspection-performance"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/inspection-performance')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <ShieldCheck size={15} />
+
+                  <span>
+                    Inspection and Performance
+                  </span>
+                </Link>
+
+
+                {/* WARD RANKING */}
+
+                <Link
+                  href="/ulb/ward-ranking"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/ward-ranking')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <Award size={15} />
+
+                  <span>
+                    Ward Ranking
+                  </span>
+                </Link>
+
+
+                {/* REMAINING CURRENT ULB REPORT TABS */}
 
                 <div className="mt-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
                   Reports
@@ -2522,6 +2577,120 @@ function PortalHomeLayoutContent({
                     Action Taken
                   </span>
                 </Link>
+
+              </div>
+            )}
+
+            {/* =================================================
+    ULB OFFICER WORKSPACE
+================================================= */}
+
+            {isUlbUser && (
+              <div className="flex flex-col gap-1.5">
+
+                <Link
+                  href="/ulb/dashboard"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname === '/ulb/dashboard' &&
+                    !searchParams.get('status') &&
+                    !searchParams.get('module')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                >
+                  <LayoutDashboard size={15} />
+                  <span>Dashboard</span>
+                </Link>
+
+
+                {/* REPORTS */}
+
+                <div className="mt-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Reports
+                </div>
+
+                <Link
+                  href="/ulb/reports/approved"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${searchParams.get('status') === 'APPROVED'
+                    ? 'bg-emerald-50 text-emerald-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                >
+                  <CheckCircle2 size={15} />
+                  <span>Approved</span>
+                </Link>
+
+                <Link
+                  href="/ulb/reports/rejected"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${searchParams.get('status') === 'REJECTED'
+                    ? 'bg-rose-50 text-rose-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                >
+                  <XCircle size={15} />
+                  <span>Rejected</span>
+                </Link>
+
+                <Link
+                  href="/ulb/reports/rejected"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${searchParams.get('status') === 'ACTION_REQUIRED'
+                    ? 'bg-amber-50 text-amber-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                >
+                  <AlertTriangle size={15} />
+                  <span>Action Required</span>
+                </Link>
+
+                <Link
+                  href="/ulb/dashboard?status=ACTION_TAKEN"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${searchParams.get('status') === 'ACTION_TAKEN'
+                    ? 'bg-blue-50 text-blue-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                >
+                  <FileCheck2 size={15} />
+                  <span>Action Taken</span>
+                </Link>
+
+
+                {/* MODULES */}
+
+                {/* <div className="mt-3 px-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Modules
+                </div> */}
+
+                {/* <Link
+                  href="/ulb/dashboard?module=TOILET"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${searchParams.get('module') === 'TOILET'
+                    ? 'bg-blue-50 text-blue-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                >
+                  <Info size={15} />
+                  <span>Cleanliness of Toilets</span>
+                </Link>
+
+                <Link
+                  href="/ulb/dashboard?module=SWEEPING"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${searchParams.get('module') === 'SWEEPING'
+                    ? 'bg-blue-50 text-blue-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                >
+                  <Activity size={15} />
+                  <span>Sweeping</span>
+                </Link>
+
+                <Link
+                  href="/ulb/dashboard?module=LITTERBINS"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${searchParams.get('module') === 'LITTERBINS'
+                    ? 'bg-blue-50 text-blue-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                >
+                  <Trash2 size={15} />
+                  <span>Litter Bins</span>
+                </Link> */}
 
               </div>
             )}
@@ -3002,9 +3171,11 @@ function PortalHomeLayoutContent({
       ===================================================== */}
 
       <main
-        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser
-          ? 'ml-0 p-4 sm:p-5 lg:p-6'
-          : 'ml-72 p-5 sm:p-6'
+        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && pathname.startsWith('/city/attendance')
+          ? 'ml-72 p-4 sm:p-5 lg:p-6'
+          : isUlbUser
+            ? 'ml-0 p-4 sm:p-5 lg:p-6'
+            : 'ml-72 p-5 sm:p-6'
           }`}
       >
         {!isMainDashboard && (
