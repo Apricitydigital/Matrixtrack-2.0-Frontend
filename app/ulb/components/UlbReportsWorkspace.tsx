@@ -12,6 +12,8 @@ import {
     Activity,
     AlertTriangle,
     ArrowRight,
+    Award,
+    Building2,
     CalendarDays,
     CheckCircle2,
     ChevronLeft,
@@ -23,16 +25,25 @@ import {
     Filter,
     Image as ImageIcon,
     Layers3,
+    MapPin,
     RefreshCw,
     Search,
     ShieldCheck,
     Sparkles,
+    TimerReset,
     TrendingUp,
+    Trophy,
+    UserCheck,
+    UserRoundX,
+    UsersRound,
+    Wrench,
     X,
     XCircle,
 } from 'lucide-react';
 
 import {
+    Area,
+    AreaChart,
     Bar,
     BarChart,
     CartesianGrid,
@@ -58,6 +69,11 @@ import {
     ToiletApi,
     apiFetch,
 } from '@lib/apiClient';
+
+import {
+    AttendanceApi,
+    type AttendanceDashboardResponse,
+} from '@lib/attendanceApi';
 
 
 /* =========================================================
@@ -1066,6 +1082,248 @@ function isWithinRange(
 
 
 /* =========================================================
+   PERFORMANCE ANALYTICS HELPERS
+
+   These build ranked "leaderboard" rows (zone, ward, module,
+   employee, supervisor, QC reviewer, action officer) purely
+   from the fields the records API actually returns. Where an
+   identity isn't returned by the backend for a module (e.g.
+   Action Officer names on Sweeping/Litter Bin), the identity
+   function returns null and that record is simply excluded
+   from that specific leaderboard rather than being faked.
+========================================================= */
+
+type LeaderboardRow = {
+    key: string;
+    label: string;
+    total: number;
+    approved: number;
+    rejected: number;
+    actionRequired: number;
+    actionTaken: number;
+};
+
+function emptyLeaderboardRow(
+    key: string
+): LeaderboardRow {
+    return {
+        key,
+        label: key,
+        total: 0,
+        approved: 0,
+        rejected: 0,
+        actionRequired: 0,
+        actionTaken: 0,
+    };
+}
+
+function bumpLeaderboardRow(
+    row: LeaderboardRow,
+    item: any
+) {
+    row.total += 1;
+
+    const status = effectiveStatus(item);
+
+    if (status === 'APPROVED') row.approved += 1;
+    else if (status === 'REJECTED') row.rejected += 1;
+    else if (status === 'ACTION_REQUIRED') row.actionRequired += 1;
+    else if (status === 'ACTION_TAKEN') row.actionTaken += 1;
+}
+
+function approvalRateOf(
+    row: LeaderboardRow
+): number | null {
+    const decided = row.approved + row.rejected;
+    return decided > 0
+        ? Math.round((row.approved / decided) * 100)
+        : null;
+}
+
+function closureRateOf(
+    row: LeaderboardRow
+): number | null {
+    const corrective = row.actionRequired + row.actionTaken;
+    return corrective > 0
+        ? Math.round((row.actionTaken / corrective) * 100)
+        : null;
+}
+
+function buildLeaderboard(
+    records: any[],
+    identityFn: (item: any) => string | null,
+    limit = 8
+): LeaderboardRow[] {
+    const map = new Map<string, LeaderboardRow>();
+
+    records.forEach((item) => {
+        const identity = identityFn(item);
+        if (!identity) return;
+
+        const row = map.get(identity) || emptyLeaderboardRow(identity);
+        bumpLeaderboardRow(row, item);
+        map.set(identity, row);
+    });
+
+    return Array.from(map.values())
+        .sort((a, b) => b.total - a.total)
+        .slice(0, limit);
+}
+
+function zoneIdentity(item: any) {
+    return item?.zoneName || item?.bin?.zoneName || null;
+}
+
+function wardIdentity(item: any) {
+    return item?.wardName || item?.bin?.wardName || null;
+}
+
+function employeeIdentity(item: any) {
+    return item?.employee?.name || null;
+}
+
+function supervisorIdentity(item: any) {
+    return item?.supervisor?.name || null;
+}
+
+function qcReviewerIdentity(item: any) {
+    /*
+     * Currently only the Toilet inspection API joins the
+     * QC reviewer's name (reviewedBy). Sweeping and Litter
+     * Bin records do not expose a reviewer identity yet.
+     */
+    return item?.reviewedBy?.name || null;
+}
+
+function actionOfficerIdentity(
+    item: any,
+    moduleKey: ModuleKey
+) {
+    if (moduleKey === 'TOILET') {
+        return item?.actionTakenBy?.name || null;
+    }
+
+    if (moduleKey === 'LITTERBINS') {
+        /*
+         * Litter Bin records only carry actionOfficerId
+         * (no joined name from the API today), so the
+         * officer is identified by a short id badge
+         * rather than a fabricated name.
+         */
+        if (
+            item?.actionOfficerId &&
+            (
+                item?.actionOfficerRespondedAt ||
+                effectiveStatus(item) === 'ACTION_TAKEN'
+            )
+        ) {
+            return `Officer #${String(item.actionOfficerId).slice(-6).toUpperCase()}`;
+        }
+
+        return null;
+    }
+
+    /*
+     * Sweeping records carry no relational Action Officer
+     * identity at all (only a free-text remark).
+     */
+    return null;
+}
+
+function formatMinutes(
+    mins: number | null | undefined
+) {
+    if (
+        mins === null ||
+        mins === undefined ||
+        Number.isNaN(mins)
+    ) {
+        return '—';
+    }
+
+    const hours = Math.floor(mins / 60);
+    const minutes = Math.round(mins % 60);
+
+    return `${hours}h ${minutes}m`;
+}
+
+function formatDateOnly(
+    value: any
+) {
+    if (!value) return '—';
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return String(value).slice(0, 10);
+    }
+
+    return date.toLocaleDateString(undefined, {
+        day: '2-digit',
+        month: 'short',
+    });
+}
+
+function buildReportsTrend(
+    records: any[],
+    days = 14
+) {
+    const buckets = new Map<
+        string,
+        {
+            date: string;
+            total: number;
+            approved: number;
+            rejected: number;
+            actionRequired: number;
+            actionTaken: number;
+        }
+    >();
+
+    const now = new Date();
+
+    for (let i = days - 1; i >= 0; i--) {
+        const day = new Date(now);
+        day.setDate(day.getDate() - i);
+
+        const key = day.toISOString().slice(0, 10);
+
+        buckets.set(key, {
+            date: key,
+            total: 0,
+            approved: 0,
+            rejected: 0,
+            actionRequired: 0,
+            actionTaken: 0,
+        });
+    }
+
+    records.forEach((item) => {
+        const raw = recordDate(item);
+        if (!raw) return;
+
+        const key = new Date(raw).toISOString().slice(0, 10);
+        const bucket = buckets.get(key);
+        if (!bucket) return;
+
+        bucket.total += 1;
+
+        const status = effectiveStatus(item);
+
+        if (status === 'APPROVED') bucket.approved += 1;
+        else if (status === 'REJECTED') bucket.rejected += 1;
+        else if (status === 'ACTION_REQUIRED') bucket.actionRequired += 1;
+        else if (status === 'ACTION_TAKEN') bucket.actionTaken += 1;
+    });
+
+    return Array.from(buckets.values()).map((bucket) => ({
+        ...bucket,
+        label: formatDateOnly(bucket.date),
+    }));
+}
+
+
+/* =========================================================
    MAIN COMPONENT
 ========================================================= */
 
@@ -1193,6 +1451,30 @@ export default function UlbOperationsWorkspace({
     >(null);
 
 
+    /* ===========================
+       ATTENDANCE ANALYTICS
+    =========================== */
+
+    const [
+        attendance,
+        setAttendance,
+    ] = useState<
+        AttendanceDashboardResponse | null
+    >(null);
+
+
+    const [
+        attendanceLoading,
+        setAttendanceLoading,
+    ] = useState(true);
+
+
+    const [
+        attendanceError,
+        setAttendanceError,
+    ] = useState('');
+
+
     /* =========================================================
        LOAD ALL THREE MODULES
     ========================================================= */
@@ -1278,6 +1560,52 @@ export default function UlbOperationsWorkspace({
     useEffect(() => {
         loadRecords();
     }, []);
+
+
+    /* =========================================================
+       LOAD ATTENDANCE ANALYTICS
+
+       Only relevant on the dashboard overview, so it is not
+       fetched for the status list pages.
+    ========================================================= */
+
+    async function loadAttendance() {
+        setAttendanceLoading(true);
+        setAttendanceError('');
+
+        try {
+            const result =
+                await AttendanceApi.dashboard({
+                    pageSize: 1,
+                });
+
+            setAttendance(result);
+
+        } catch (
+        err: any
+        ) {
+
+            console.error(
+                'ULB attendance load failed',
+                err
+            );
+
+            setAttendanceError(
+                err?.message ||
+                'Unable to load attendance analytics.'
+            );
+
+        } finally {
+            setAttendanceLoading(false);
+        }
+    }
+
+
+    useEffect(() => {
+        if (view === 'DASHBOARD') {
+            loadAttendance();
+        }
+    }, [view]);
 
 
     /*
@@ -1817,6 +2145,77 @@ export default function UlbOperationsWorkspace({
         }, [
             moduleRecords,
         ]);
+
+
+    /* =========================================================
+       PERFORMANCE LEADERBOARDS
+       (zone, ward, module, employee, supervisor, QC, AO)
+    ========================================================= */
+
+    const zoneLeaderboard =
+        useMemo(
+            () => buildLeaderboard(moduleRecords, zoneIdentity, 8),
+            [moduleRecords]
+        );
+
+
+    const wardLeaderboard =
+        useMemo(
+            () => buildLeaderboard(moduleRecords, wardIdentity, 10),
+            [moduleRecords]
+        );
+
+
+    const modulePerformanceRows =
+        useMemo(
+            () =>
+                buildLeaderboard(
+                    moduleRecords,
+                    (item) => moduleShortLabel(item.dashboardModule),
+                    MODULES.length
+                ),
+            [moduleRecords]
+        );
+
+
+    const employeeLeaderboard =
+        useMemo(
+            () => buildLeaderboard(moduleRecords, employeeIdentity, 8),
+            [moduleRecords]
+        );
+
+
+    const supervisorLeaderboard =
+        useMemo(
+            () => buildLeaderboard(moduleRecords, supervisorIdentity, 8),
+            [moduleRecords]
+        );
+
+
+    const qcLeaderboard =
+        useMemo(
+            () => buildLeaderboard(moduleRecords, qcReviewerIdentity, 8),
+            [moduleRecords]
+        );
+
+
+    const actionOfficerLeaderboard =
+        useMemo(
+            () =>
+                buildLeaderboard(
+                    moduleRecords,
+                    (item) => actionOfficerIdentity(item, item.dashboardModule),
+                    8
+                ),
+            [moduleRecords]
+        );
+
+
+    const reportsTrend =
+        useMemo(
+            () => buildReportsTrend(moduleRecords, 14),
+            [moduleRecords]
+        );
 
 
     /* =========================================================
@@ -2454,6 +2853,17 @@ export default function UlbOperationsWorkspace({
 
 
                                         {/* =========================================
+                        ATTENDANCE
+                    ========================================= */}
+
+                                        <AttendanceOverview
+                                            data={attendance}
+                                            loading={attendanceLoading}
+                                            error={attendanceError}
+                                        />
+
+
+                                        {/* =========================================
                         CHARTS
                     ========================================= */}
 
@@ -2768,6 +3178,104 @@ export default function UlbOperationsWorkspace({
                                                 </div>
 
                                             </div>
+
+                                        </section>
+
+
+                                        {/* =========================================
+                        REPORTS VOLUME TREND
+                    ========================================= */}
+
+                                        <ReportsTrendChart
+                                            data={reportsTrend}
+                                        />
+
+
+                                        {/* =========================================
+                        ZONE / WARD PERFORMANCE
+                    ========================================= */}
+
+                                        <section className="grid gap-5 xl:grid-cols-2">
+
+                                            <GeoPerformanceTable
+                                                icon={Building2}
+                                                eyebrow="Zone-wise performance"
+                                                title="QC & Corrective Performance by Zone"
+                                                description="Approval and corrective-closure rates for every zone with submitted reports."
+                                                rows={zoneLeaderboard}
+                                                emptyMessage="No zone information is available on the current reports."
+                                            />
+
+                                            <GeoPerformanceTable
+                                                icon={MapPin}
+                                                eyebrow="Ward-wise performance"
+                                                title="QC & Corrective Performance by Ward"
+                                                description="Top wards ranked by submitted-report volume."
+                                                rows={wardLeaderboard}
+                                                emptyMessage="No ward information is available on the current reports."
+                                                scroll
+                                            />
+
+                                        </section>
+
+
+                                        {/* =========================================
+                        MODULE DEEP DIVE
+                    ========================================= */}
+
+                                        <GeoPerformanceTable
+                                            icon={Layers3}
+                                            eyebrow="Module-wise performance"
+                                            title="Sanitation Module Deep Dive"
+                                            description="Toilets, Sweeping and Litter Bins compared on approval rate and corrective-closure rate."
+                                            rows={modulePerformanceRows}
+                                            emptyMessage="No module data available."
+                                        />
+
+
+                                        {/* =========================================
+                        PEOPLE PERFORMANCE
+                    ========================================= */}
+
+                                        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+
+                                            <PeopleLeaderboardCard
+                                                icon={Wrench}
+                                                eyebrow="Field employees"
+                                                title="Employee Performance"
+                                                rows={employeeLeaderboard}
+                                                rateType="approval"
+                                                emptyMessage="No records are attributed to a named employee yet."
+                                            />
+
+                                            <PeopleLeaderboardCard
+                                                icon={UsersRound}
+                                                eyebrow="Field supervisors"
+                                                title="Supervisor Performance"
+                                                rows={supervisorLeaderboard}
+                                                rateType="approval"
+                                                emptyMessage="No records are attributed to a named supervisor yet."
+                                            />
+
+                                            <PeopleLeaderboardCard
+                                                icon={ShieldCheck}
+                                                eyebrow="Quality control"
+                                                title="QC Reviewer Performance"
+                                                rows={qcLeaderboard}
+                                                rateType="approval"
+                                                emptyMessage="No QC reviewer identity is available yet."
+                                                note="Currently available for Toilet inspections only — other modules don't expose reviewer identity via the API yet."
+                                            />
+
+                                            <PeopleLeaderboardCard
+                                                icon={Award}
+                                                eyebrow="Corrective closure"
+                                                title="Action Officer Performance"
+                                                rows={actionOfficerLeaderboard}
+                                                rateType="closure"
+                                                emptyMessage="No Action Officer identity is available yet."
+                                                note="Named officers are shown for Toilets; Litter Bin closures show an officer ID (name not returned by the API). Sweeping doesn't expose officer identity yet."
+                                            />
 
                                         </section>
 
@@ -4017,6 +4525,466 @@ function LegendDot({
             {label}
 
         </span>
+    );
+}
+
+
+/* =========================================================
+   RATE BAR
+========================================================= */
+
+function RateBar({
+    value,
+    tone = 'blue',
+}: {
+    value: number | null;
+    tone?: 'blue' | 'emerald' | 'amber' | 'rose';
+}) {
+
+    if (value === null) {
+        return (
+            <span className="text-[10px] font-semibold text-slate-400">
+                No decisions yet
+            </span>
+        );
+    }
+
+    const toneClass: Record<string, string> = {
+        blue: 'bg-blue-600',
+        emerald: 'bg-emerald-600',
+        amber: 'bg-amber-500',
+        rose: 'bg-rose-600',
+    };
+
+    return (
+        <div className="flex items-center gap-2">
+
+            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                <div
+                    className={`h-full rounded-full ${toneClass[tone]}`}
+                    style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+                />
+            </div>
+
+            <span className="text-xs font-black text-slate-700">
+                {value}%
+            </span>
+
+        </div>
+    );
+}
+
+
+/* =========================================================
+   ATTENDANCE OVERVIEW
+========================================================= */
+
+function AttendanceOverview({
+    data,
+    loading,
+    error,
+}: {
+    data: AttendanceDashboardResponse | null;
+    loading: boolean;
+    error: string;
+}) {
+
+    return (
+        <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+
+            <SectionHeading
+                icon={UsersRound}
+                eyebrow="Workforce attendance"
+                title="Attendance Performance"
+                description={
+                    data?.range
+                        ? `Reporting window ${formatDateOnly(data.range.from)} – ${formatDateOnly(data.range.to)}`
+                        : 'CSV-imported attendance across zones and wards.'
+                }
+            />
+
+            <div className="p-5">
+
+                {
+                    loading ? (
+
+                        <div className="flex items-center justify-center gap-3 py-14 text-sm font-bold text-slate-400">
+                            <RefreshCw size={18} className="animate-spin" />
+                            Loading attendance analytics...
+                        </div>
+
+                    ) : error ? (
+
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800">
+                            Attendance analytics unavailable: {error}
+                        </div>
+
+                    ) : !data?.hasData || !data?.summary ? (
+
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs font-semibold text-slate-400">
+                            No attendance data has been uploaded for this city yet.
+                        </div>
+
+                    ) : (
+
+                        <>
+
+                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+                                <CompactSummary
+                                    label="Attendance Rate"
+                                    value={`${data.summary.attendanceRate}%`}
+                                    note={`${data.summary.uniqueEmployees} employees tracked`}
+                                    icon={UserCheck}
+                                />
+
+                                <CompactSummary
+                                    label="Present"
+                                    value={data.summary.present}
+                                    note={`${data.summary.checkedOut} checked out`}
+                                    icon={CheckCircle2}
+                                />
+
+                                <CompactSummary
+                                    label="Absent"
+                                    value={data.summary.absent}
+                                    note={`${data.summary.openCheckIns} open check-ins`}
+                                    icon={UserRoundX}
+                                />
+
+                                <CompactSummary
+                                    label="Avg Work Duration"
+                                    value={formatMinutes(data.summary.avgWorkMinutes)}
+                                    note="Per completed shift"
+                                    icon={TimerReset}
+                                />
+
+                            </div>
+
+                            <div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4">
+
+                                    <div className="mb-3 text-xs font-black text-slate-700">
+                                        Daily Attendance Trend
+                                    </div>
+
+                                    <div className="h-[220px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={data.dailyTrend}>
+                                                <defs>
+                                                    <linearGradient id="ulbPresentGradient" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#0f766e" stopOpacity={0.35} />
+                                                        <stop offset="95%" stopColor="#0f766e" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid vertical={false} stroke="#eef2f7" strokeDasharray="3 3" />
+                                                <XAxis dataKey="date" tickFormatter={(v) => formatDateOnly(v)} axisLine={false} tickLine={false} fontSize={10} />
+                                                <YAxis axisLine={false} tickLine={false} fontSize={11} allowDecimals={false} />
+                                                <Tooltip labelFormatter={(v) => formatDateOnly(String(v))} />
+                                                <Area type="monotone" dataKey="present" name="Present" stroke="#0f766e" fill="url(#ulbPresentGradient)" strokeWidth={2} />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4">
+
+                                    <div className="mb-3 text-xs font-black text-slate-700">
+                                        Attendance by Designation
+                                    </div>
+
+                                    <div className="h-[220px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={data.designationBreakdown.slice(0, 6)}>
+                                                <CartesianGrid vertical={false} stroke="#eef2f7" strokeDasharray="3 3" />
+                                                <XAxis dataKey="designation" axisLine={false} tickLine={false} fontSize={9} interval={0} angle={-15} textAnchor="end" height={50} />
+                                                <YAxis axisLine={false} tickLine={false} fontSize={11} allowDecimals={false} />
+                                                <Tooltip />
+                                                <Bar dataKey="present" fill="#2563eb" radius={[5, 5, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                            {
+                                data.topEmployees.length ? (
+
+                                    <div className="mt-5 rounded-2xl border border-slate-100 p-4">
+
+                                        <div className="mb-3 flex items-center gap-2 text-xs font-black text-slate-700">
+                                            <Trophy size={14} className="text-amber-500" />
+                                            Top Attendance Performers
+                                        </div>
+
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[640px]">
+                                                <thead>
+                                                    <tr className="text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                        <th className="py-2 pr-3">Employee</th>
+                                                        <th className="py-2 pr-3">Designation</th>
+                                                        <th className="py-2 pr-3">Zone / Ward</th>
+                                                        <th className="py-2 pr-3">Attendance</th>
+                                                        <th className="py-2">Avg Work</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {
+                                                        data.topEmployees.slice(0, 8).map((emp) => (
+                                                            <tr key={emp.attendanceId} className="border-t border-slate-100">
+                                                                <td className="py-2.5 pr-3 text-xs font-black text-slate-800">{emp.employeeName}</td>
+                                                                <td className="py-2.5 pr-3 text-xs font-semibold text-slate-500">{emp.designation || '—'}</td>
+                                                                <td className="py-2.5 pr-3 text-xs font-semibold text-slate-500">
+                                                                    {[...(emp.zones || []), ...(emp.wards || [])].slice(0, 2).join(', ') || '—'}
+                                                                </td>
+                                                                <td className="py-2.5 pr-3"><RateBar value={emp.attendanceRate} tone="emerald" /></td>
+                                                                <td className="py-2.5 text-xs font-bold text-slate-600">{formatMinutes(emp.avgWorkMinutes)}</td>
+                                                            </tr>
+                                                        ))
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                    </div>
+
+                                ) : null
+                            }
+
+                        </>
+
+                    )
+                }
+
+            </div>
+
+        </section>
+    );
+}
+
+
+/* =========================================================
+   REPORTS TREND CHART
+========================================================= */
+
+function ReportsTrendChart({
+    data,
+}: {
+    data: ReturnType<typeof buildReportsTrend>;
+}) {
+
+    return (
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
+                <TrendingUp size={15} />
+                Inspection activity
+            </div>
+
+            <h3 className="mt-1 text-lg font-black text-slate-900">
+                Reports Submitted — Last 14 Days
+            </h3>
+
+            <p className="mt-1 text-xs font-medium text-slate-500">
+                Daily volume of QC-processed reports across all sanitation modules.
+            </p>
+
+            <div className="mt-4 h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data}>
+                        <defs>
+                            <linearGradient id="ulbTotalReportsGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.35} />
+                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid vertical={false} stroke="#eef2f7" strokeDasharray="3 3" />
+                        <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={11} />
+                        <YAxis axisLine={false} tickLine={false} fontSize={11} allowDecimals={false} />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="total" name="Reports" stroke="#2563eb" fill="url(#ulbTotalReportsGradient)" strokeWidth={2.5} />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+
+        </div>
+    );
+}
+
+
+/* =========================================================
+   GEO / MODULE PERFORMANCE TABLE
+   (reused for Zone, Ward and Module breakdowns)
+========================================================= */
+
+function GeoPerformanceTable({
+    icon: Icon,
+    eyebrow,
+    title,
+    description,
+    rows,
+    emptyMessage,
+    scroll,
+}: {
+    icon: any;
+    eyebrow: string;
+    title: string;
+    description: string;
+    rows: LeaderboardRow[];
+    emptyMessage: string;
+    scroll?: boolean;
+}) {
+
+    return (
+        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
+                <Icon size={15} />
+                {eyebrow}
+            </div>
+
+            <h3 className="mt-1 text-lg font-black text-slate-900">
+                {title}
+            </h3>
+
+            <p className="mt-1 text-xs font-medium text-slate-500">
+                {description}
+            </p>
+
+            {
+                rows.length === 0 ? (
+
+                    <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs font-semibold text-slate-400">
+                        {emptyMessage}
+                    </div>
+
+                ) : (
+
+                    <div className={`mt-4 overflow-x-auto ${scroll ? 'max-h-[360px] overflow-y-auto' : ''}`}>
+                        <table className="w-full min-w-[560px]">
+                            <thead>
+                                <tr className="text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                    <th className="py-2 pr-3">Name</th>
+                                    <th className="py-2 pr-3">Total</th>
+                                    <th className="py-2 pr-3">Approved</th>
+                                    <th className="py-2 pr-3">Rejected</th>
+                                    <th className="py-2 pr-3">Action Req.</th>
+                                    <th className="py-2 pr-3">Approval</th>
+                                    <th className="py-2">Closure</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {
+                                    rows.map((row) => (
+                                        <tr key={row.key} className="border-t border-slate-100">
+                                            <td className="py-2.5 pr-3 max-w-[180px] truncate text-xs font-black text-slate-800">{row.label}</td>
+                                            <td className="py-2.5 pr-3 text-xs font-bold text-slate-600">{row.total}</td>
+                                            <td className="py-2.5 pr-3 text-xs font-bold text-emerald-700">{row.approved}</td>
+                                            <td className="py-2.5 pr-3 text-xs font-bold text-rose-700">{row.rejected}</td>
+                                            <td className="py-2.5 pr-3 text-xs font-bold text-amber-700">{row.actionRequired}</td>
+                                            <td className="py-2.5 pr-3"><RateBar value={approvalRateOf(row)} tone="emerald" /></td>
+                                            <td className="py-2.5"><RateBar value={closureRateOf(row)} tone="blue" /></td>
+                                        </tr>
+                                    ))
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                )
+            }
+
+        </div>
+    );
+}
+
+
+/* =========================================================
+   PEOPLE PERFORMANCE LEADERBOARD
+   (employee, supervisor, QC, action officer)
+========================================================= */
+
+function PeopleLeaderboardCard({
+    icon: Icon,
+    eyebrow,
+    title,
+    rows,
+    rateType,
+    emptyMessage,
+    note,
+}: {
+    icon: any;
+    eyebrow: string;
+    title: string;
+    rows: LeaderboardRow[];
+    rateType: 'approval' | 'closure';
+    emptyMessage: string;
+    note?: string;
+}) {
+
+    return (
+        <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
+                <Icon size={15} />
+                {eyebrow}
+            </div>
+
+            <h3 className="mt-1 text-base font-black text-slate-900">
+                {title}
+            </h3>
+
+            {
+                note ? (
+                    <p className="mt-1 text-[10px] font-semibold leading-4 text-slate-400">
+                        {note}
+                    </p>
+                ) : null
+            }
+
+            {
+                rows.length === 0 ? (
+
+                    <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-xs font-semibold text-slate-400">
+                        {emptyMessage}
+                    </div>
+
+                ) : (
+
+                    <div className="mt-4 space-y-2">
+                        {
+                            rows.map((row, index) => (
+                                <div key={row.key} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+
+                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[10px] font-black text-slate-500">
+                                        {index + 1}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                        <div className="truncate text-xs font-black text-slate-800">{row.label}</div>
+                                        <div className="text-[10px] font-semibold text-slate-400">
+                                            {row.total} report{row.total === 1 ? '' : 's'}
+                                        </div>
+                                    </div>
+
+                                    <RateBar
+                                        value={rateType === 'approval' ? approvalRateOf(row) : closureRateOf(row)}
+                                        tone={rateType === 'approval' ? 'emerald' : 'blue'}
+                                    />
+
+                                </div>
+                            ))
+                        }
+                    </div>
+
+                )
+            }
+
+        </div>
     );
 }
 

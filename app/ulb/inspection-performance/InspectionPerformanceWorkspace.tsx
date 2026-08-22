@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 
 import {
+  GeoApi,
   ModuleRecordsApi,
   ToiletApi,
   apiFetch,
@@ -265,6 +266,14 @@ function reportTitle(item: any, moduleKey: ModuleKey) {
     item?.bin?.areaName ||
     'Litter Bin Report'
   );
+}
+
+function rawZoneName(item: any) {
+  return item?.zoneName || item?.zone?.name || item?.bin?.zoneName || item?.toilet?.zoneName || item?.beat?.zoneName || '';
+}
+
+function rawWardName(item: any) {
+  return item?.wardName || item?.ward?.name || item?.bin?.wardName || item?.toilet?.wardName || item?.beat?.wardName || '';
 }
 
 function reportArea(item: any) {
@@ -576,6 +585,10 @@ export default function InspectionPerformanceWorkspace() {
   const [datePreset, setDatePreset] = useState<DatePreset>('MONTH');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [zones, setZones] = useState<any[]>([]);
+  const [allWards, setAllWards] = useState<any[]>([]);
+  const [selectedZone, setSelectedZone] = useState('');
+  const [selectedWard, setSelectedWard] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -629,7 +642,49 @@ export default function InspectionPerformanceWorkspace() {
 
   useEffect(() => {
     loadRecords();
+    loadGeo();
   }, []);
+
+  async function loadGeo() {
+    try {
+      const [zRes, wRes] = await Promise.allSettled([GeoApi.list('ZONE'), GeoApi.list('WARD')]);
+      if (zRes.status === 'fulfilled') setZones(zRes.value?.nodes || []);
+      if (wRes.status === 'fulfilled') setAllWards(wRes.value?.nodes || []);
+    } catch (err) {
+      console.error('Unable to load zone/ward metadata', err);
+    }
+  }
+
+  const visibleWards = useMemo(
+    () =>
+      selectedZone
+        ? allWards.filter((ward) => ward.parentId === selectedZone || ward.parent?.id === selectedZone)
+        : allWards,
+    [allWards, selectedZone]
+  );
+
+  function handleZoneChange(zoneId: string) {
+    setSelectedZone(zoneId);
+    if (selectedWard) {
+      const wardObj = allWards.find((ward) => ward.id === selectedWard);
+      const parentZoneId = wardObj?.parentId || wardObj?.parent?.id;
+      if (zoneId && parentZoneId !== zoneId) setSelectedWard('');
+    }
+  }
+
+  function handleWardChange(wardId: string) {
+    setSelectedWard(wardId);
+    if (wardId) {
+      const wardObj = allWards.find((ward) => ward.id === wardId);
+      const parentZoneId = wardObj?.parentId || wardObj?.parent?.id;
+      if (parentZoneId) setSelectedZone(parentZoneId);
+    }
+  }
+
+  function clearLocationFilters() {
+    setSelectedZone('');
+    setSelectedWard('');
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
@@ -638,19 +693,43 @@ export default function InspectionPerformanceWorkspace() {
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [activeStatus, moduleFilter, datePreset, customStart, customEnd, debouncedSearch, sortField, sortDirection]);
+  }, [
+    activeStatus,
+    moduleFilter,
+    datePreset,
+    customStart,
+    customEnd,
+    selectedZone,
+    selectedWard,
+    debouncedSearch,
+    sortField,
+    sortDirection,
+  ]);
 
   const rangeRecords = useMemo(
     () => records.filter((item) => isWithinRange(item, dateRange.start, dateRange.end)),
     [records, dateRange]
   );
 
+  const locationRecords = useMemo(() => {
+    if (!selectedZone && !selectedWard) return rangeRecords;
+
+    const zoneName = (zones.find((zone) => zone.id === selectedZone)?.name || '').toLowerCase();
+    const wardName = (allWards.find((ward) => ward.id === selectedWard)?.name || '').toLowerCase();
+
+    return rangeRecords.filter((item) => {
+      if (zoneName && !rawZoneName(item).toLowerCase().includes(zoneName)) return false;
+      if (wardName && !rawWardName(item).toLowerCase().includes(wardName)) return false;
+      return true;
+    });
+  }, [rangeRecords, selectedZone, selectedWard, zones, allWards]);
+
   const moduleRecords = useMemo(
     () =>
       moduleFilter === 'ALL'
-        ? rangeRecords
-        : rangeRecords.filter((item) => item.dashboardModule === moduleFilter),
-    [rangeRecords, moduleFilter]
+        ? locationRecords
+        : locationRecords.filter((item) => item.dashboardModule === moduleFilter),
+    [locationRecords, moduleFilter]
   );
 
   const searchableRecords = useMemo(() => {
@@ -710,13 +789,13 @@ export default function InspectionPerformanceWorkspace() {
   );
 
   const moduleSplit = useMemo(() => {
-    const base = rangeRecords;
+    const base = locationRecords;
     return {
       TOILET: base.filter((item) => item.dashboardModule === 'TOILET').length,
       LITTERBINS: base.filter((item) => item.dashboardModule === 'LITTERBINS').length,
       SWEEPING: base.filter((item) => item.dashboardModule === 'SWEEPING').length,
     };
-  }, [rangeRecords]);
+  }, [locationRecords]);
 
   const suggestions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -839,9 +918,9 @@ export default function InspectionPerformanceWorkspace() {
 
   return (
     <div className="space-y-5 pb-8">
-      <section className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <section className="grid grid-cols-[1fr_auto] items-center gap-3">
         <p className="text-sm font-semibold text-slate-500">
-          {rangeRecords.length.toLocaleString()} reports in range ·{' '}
+          {locationRecords.length.toLocaleString()} reports in range ·{' '}
           {moduleSplit.TOILET.toLocaleString()} toilet ·{' '}
           {moduleSplit.LITTERBINS.toLocaleString()} litter bin ·{' '}
           {moduleSplit.SWEEPING.toLocaleString()} sweeping
@@ -851,10 +930,10 @@ export default function InspectionPerformanceWorkspace() {
           type="button"
           onClick={loadRecords}
           disabled={loading}
-          className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </button>
       </section>
 
@@ -869,63 +948,110 @@ export default function InspectionPerformanceWorkspace() {
       )}
 
       <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4">
-          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
-            <CalendarDays className="h-4 w-4" />
-            Period
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                <CalendarDays className="h-4 w-4" />
+                Period
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {DATE_PRESETS.map((preset) => {
+                  const active = datePreset === preset.key;
+                  return (
+                    <button
+                      type="button"
+                      key={preset.key}
+                      onClick={() => setDatePreset(preset.key)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                        active
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(['ALL', 'TOILET', 'LITTERBINS', 'SWEEPING'] as ModuleFilter[]).map((moduleKey) => {
+                const active = moduleFilter === moduleKey;
+                const label =
+                  moduleKey === 'ALL'
+                    ? 'All'
+                    : moduleKey === 'TOILET'
+                      ? 'Toilet'
+                      : moduleKey === 'LITTERBINS'
+                        ? 'Litter Bin'
+                        : 'Sweeping';
+
+                return (
+                  <button
+                    type="button"
+                    key={moduleKey}
+                    onClick={() => setModuleFilter(moduleKey)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                      active
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {DATE_PRESETS.map((preset) => {
-              const active = datePreset === preset.key;
-              return (
-                <button
-                  type="button"
-                  key={preset.key}
-                  onClick={() => setDatePreset(preset.key)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                    active
-                      ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              );
-            })}
-          </div>
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+              <MapPin className="h-4 w-4" />
+              Location
+            </div>
 
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            {(['ALL', 'TOILET', 'LITTERBINS', 'SWEEPING'] as ModuleFilter[]).map((moduleKey) => {
-              const active = moduleFilter === moduleKey;
-              const label =
-                moduleKey === 'ALL'
-                  ? 'All'
-                  : moduleKey === 'TOILET'
-                    ? 'Toilet'
-                    : moduleKey === 'LITTERBINS'
-                      ? 'Litter Bin'
-                      : 'Sweeping';
+            <select
+              value={selectedZone}
+              onChange={(event) => handleZoneChange(event.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 outline-none transition focus:border-blue-400"
+            >
+              <option value="">All Zones</option>
+              {zones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.name}
+                </option>
+              ))}
+            </select>
 
-              return (
-                <button
-                  type="button"
-                  key={moduleKey}
-                  onClick={() => setModuleFilter(moduleKey)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                    active
-                      ? 'border-blue-600 bg-blue-50 text-blue-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
+            <select
+              value={selectedWard}
+              onChange={(event) => handleWardChange(event.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 outline-none transition focus:border-blue-400"
+            >
+              <option value="">All Wards</option>
+              {visibleWards.map((ward) => (
+                <option key={ward.id} value={ward.id}>
+                  {ward.name}
+                </option>
+              ))}
+            </select>
+
+            {(selectedZone || selectedWard) && (
+              <button
+                type="button"
+                onClick={clearLocationFilters}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           {datePreset === 'CUSTOM' && (
-            <div className="flex w-full flex-wrap items-center gap-2 pt-1 lg:w-auto lg:pt-0">
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
               <input
                 type="date"
                 value={customStart}

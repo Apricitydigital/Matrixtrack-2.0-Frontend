@@ -3057,7 +3057,7 @@ function PortalHomeLayoutContent({
       ===================================================== */}
 
       <main
-        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && pathname.startsWith('/city/attendance')
+        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && (pathname.startsWith('/city/attendance') || pathname.startsWith('/ulb/inspection-performance'))
           ? 'ml-72 p-4 sm:p-5 lg:p-6'
           : isUlbUser
             ? 'ml-0 p-4 sm:p-5 lg:p-6'
