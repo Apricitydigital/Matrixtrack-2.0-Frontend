@@ -65,7 +65,9 @@ export default function CommonRegistrationModal({
       { key: "EMPLOYEE", label: "Field Employee" },
       { key: "QC", label: "Quality Controller" },
       { key: "ULB_OFFICER", label: "ULB Officer" },
-      { key: "ACTION_OFFICER", label: "Action Officer" }
+      { key: "ACTION_OFFICER", label: "Action Officer" },
+      { key: "COMMISSIONER", label: "Commissioner" },
+      { key: "CITY_ADMIN", label: "City Admin" }
     ],
     swachhRoles: [
       { key: "accessor", label: "Assessor / Evaluator" },
@@ -795,20 +797,47 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
           {statusMsg && (
             <div
               style={{
-                padding: "12px 16px",
-                borderRadius: "12px",
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                color: "#166534",
-                fontSize: "14px",
-                fontWeight: 500,
-                marginBottom: "20px",
+                padding: "16px 20px",
+                borderRadius: "16px",
+                background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                border: "1.5px solid #86efac",
+                color: "#14532d",
+                marginBottom: "24px",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px"
+                justifyContent: "space-between",
+                gap: "14px",
+                boxShadow: "0 4px 14px rgba(22, 101, 52, 0.08)"
               }}
             >
-              <CheckCircle2 size={18} /> {statusMsg}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#22c55e", display: "grid", placeItems: "center", color: "#ffffff", flexShrink: 0 }}>
+                  <CheckCircle2 size={22} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: "#14532d" }}>
+                    User Registered Successfully!
+                  </h4>
+                  <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#166534", fontWeight: 600 }}>
+                    {statusMsg}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStatusMsg("")}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#166534",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  padding: "4px 8px"
+                }}
+              >
+                Dismiss
+              </button>
             </div>
           )}
 
@@ -995,7 +1024,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                   <label className="form-label">Password</label>
                   <input
                     type="password"
-                    placeholder="Default: Matrix@2026"
+                    placeholder="Enter custom password (optional)"
                     className="form-input"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}

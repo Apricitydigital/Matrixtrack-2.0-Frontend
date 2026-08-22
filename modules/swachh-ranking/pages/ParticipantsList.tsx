@@ -347,6 +347,21 @@ if (typeof (window as any).font !== "undefined") {
         }));
 
         const ws = XLSX.utils.json_to_sheet(data);
+
+        // Format header row (Row 1) with 26pt height, bold font and subtle slate fill
+        ws["!rows"] = [{ hpt: 26 }];
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const address = XLSX.utils.encode_cell({ r: 0, c: C });
+            if (ws[address]) {
+                ws[address].s = {
+                    font: { bold: true, name: "Segoe UI", sz: 11, color: { rgb: "0F172A" } },
+                    fill: { fgColor: { rgb: "E2E8F0" } },
+                    alignment: { horizontal: "left", vertical: "center" }
+                };
+            }
+        }
+
         XLSX.utils.sheet_add_aoa(ws, [
             [],
             [`Total Records`, participants.length]
