@@ -19,7 +19,7 @@ export function Modal({
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -43,6 +43,8 @@ export function Modal({
     sm: "max-w-sm",
     md: "max-w-md",
     lg: "max-w-xl",
+    xl: "max-w-2xl",
+    "2xl": "max-w-4xl",
   };
 
   return createPortal(

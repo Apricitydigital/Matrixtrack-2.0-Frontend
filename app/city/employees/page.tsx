@@ -10,6 +10,7 @@ import React, {
 import {
     Download,
     FileSpreadsheet,
+    FileText,
     RefreshCw,
     Search,
     UserPlus,
@@ -25,6 +26,7 @@ import {
     apiFetch,
 } from "@lib/apiClient";
 
+import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import * as XLSX from "xlsx";
 
 
@@ -105,6 +107,9 @@ export default function EmployeesPage() {
        FILTERS
     ========================================================= */
 
+    const [showDownloadDropdown, setShowDownloadDropdown] =
+        useState(false);
+
     const [searchQuery, setSearchQuery] =
         useState("");
 
@@ -122,6 +127,9 @@ REGISTER EMPLOYEE
         useState(false);
 
     const [employeeName, setEmployeeName] =
+        useState("");
+
+    const [employeeCodeId, setEmployeeCodeId] =
         useState("");
 
     const [employeePhone, setEmployeePhone] =
@@ -455,6 +463,138 @@ EMPLOYEE EXCEL IMPORT
         zoneNameMap,
         wardNameMap,
     ]);
+
+    const exportEmployeesExcel = useCallback(() => {
+        if (!filteredEmployees.length) return;
+        const rows = filteredEmployees.map((emp, idx) => {
+            const zones = (emp.zoneIds || []).map((id) => zoneNameMap[id]).filter(Boolean).join(", ") || "—";
+            const wards = (emp.wardIds || []).map((id) => wardNameMap[id]).filter(Boolean).join(", ") || "—";
+            const createdDate = emp.createdAt
+                ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                : "—";
+
+            return {
+                "S.No": idx + 1,
+                "Employee Name": emp.name,
+                "Employee ID": emp.employeeId || "—",
+                "Mobile Number": emp.phone || "Not added",
+                "Zone": zones,
+                "Ward": wards,
+                "Registered On": createdDate,
+                "Status": "Registered"
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        worksheet["!cols"] = [
+            { wch: 8 },
+            { wch: 26 },
+            { wch: 16 },
+            { wch: 18 },
+            { wch: 22 },
+            { wch: 22 },
+            { wch: 18 },
+            { wch: 14 }
+        ];
+
+        // Format header row (Row 1) with 26pt height, bold font and subtle slate fill
+        worksheet["!rows"] = [{ hpt: 26 }];
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const address = XLSX.utils.encode_cell({ r: 0, c: C });
+            if (worksheet[address]) {
+                worksheet[address].s = {
+                    font: { bold: true, name: "Segoe UI", sz: 11, color: { rgb: "0F172A" } },
+                    fill: { fgColor: { rgb: "E2E8F0" } },
+                    alignment: { horizontal: "left", vertical: "center" }
+                };
+            }
+        }
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+        XLSX.writeFile(workbook, `Employee_Master_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }, [filteredEmployees, zoneNameMap, wardNameMap]);
+
+    const exportEmployeesPdf = useCallback(() => {
+        if (!filteredEmployees.length) return;
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) return;
+
+        const rowsHtml = filteredEmployees
+            .map((emp, idx) => {
+                const zones = (emp.zoneIds || []).map((id) => zoneNameMap[id]).filter(Boolean).join(", ") || "—";
+                const wards = (emp.wardIds || []).map((id) => wardNameMap[id]).filter(Boolean).join(", ") || "—";
+                const createdDate = emp.createdAt
+                    ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                    : "—";
+
+                return `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 10px 14px; font-weight: 600; text-align: center;">${idx + 1}</td>
+                        <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">${emp.name}</td>
+                        <td style="padding: 10px 14px; font-weight: 700; color: #2563eb;">${emp.employeeId || "—"}</td>
+                        <td style="padding: 10px 14px; color: #334155;">${emp.phone || "Not added"}</td>
+                        <td style="padding: 10px 14px; color: #1e40af;">${zones}</td>
+                        <td style="padding: 10px 14px; color: #475569;">${wards}</td>
+                        <td style="padding: 10px 14px; color: #64748b; font-size: 11px;">${createdDate}</td>
+                        <td style="padding: 10px 14px; text-align: center;"><span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">Registered</span></td>
+                    </tr>
+                `;
+            })
+            .join("");
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <title>Employee Master Directory Report</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 24px; color: #0f172a; }
+                        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 12px; }
+                        .title { font-size: 20px; font-weight: 800; color: #1e3a8a; margin: 0; }
+                        .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+                        th { background: #f1f5f9; color: #0f172a; font-weight: 800; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; padding: 12px 14px; text-align: left; border-bottom: 2px solid #cbd5e1; }
+                        @media print { body { margin: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div>
+                            <h1 class="title">MatrixTrack 2.0 - Employee Master Directory</h1>
+                            <p class="meta">Total Employee Records: ${filteredEmployees.length} | Date: ${new Date().toLocaleDateString('en-IN')}</p>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="text-align: center;">S.No</th>
+                                <th>Employee Name</th>
+                                <th>Employee ID</th>
+                                <th>Mobile Number</th>
+                                <th>Zone</th>
+                                <th>Ward</th>
+                                <th>Registered On</th>
+                                <th style="text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                        };
+                    </script>
+                </body>
+            </html>
+        `;
+
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    }, [filteredEmployees, zoneNameMap, wardNameMap]);
 
     const handleEmployeeExcelFile = async (
         e: React.ChangeEvent<HTMLInputElement>
@@ -1084,6 +1224,7 @@ EMPLOYEE EXCEL IMPORT
 
     const resetRegistrationForm = () => {
         setEmployeeName("");
+        setEmployeeCodeId("");
         setEmployeePhone("");
         setEmployeeZoneId("");
         setEmployeeWardId("");
@@ -1157,6 +1298,7 @@ EMPLOYEE EXCEL IMPORT
                     body: JSON.stringify({
                         name: cleanName,
                         phone: cleanPhone,
+                        employeeId: employeeCodeId.trim() || undefined,
                         zoneId: employeeZoneId,
                         wardId: employeeWardId,
                     }),
@@ -1288,7 +1430,45 @@ EMPLOYEE EXCEL IMPORT
 
 
                         {!isHmsAdmin && (
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
+                                        title="Download Employee Directory Options"
+                                    >
+                                        <Download size={17} className="text-blue-600" />
+                                        Download
+                                    </button>
+                                    {showDownloadDropdown && (
+                                        <div className="absolute right-0 top-full mt-2 z-[50] w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowDownloadDropdown(false);
+                                                    exportEmployeesExcel();
+                                                }}
+                                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition cursor-pointer"
+                                            >
+                                                <FileSpreadsheet size={16} className="text-emerald-600" />
+                                                Download Excel (.xlsx)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowDownloadDropdown(false);
+                                                    exportEmployeesPdf();
+                                                }}
+                                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-red-50 hover:text-red-800 transition cursor-pointer"
+                                            >
+                                                <FileText size={16} className="text-red-600" />
+                                                Download PDF
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
 
                                 <button
                                     type="button"
@@ -1299,7 +1479,7 @@ EMPLOYEE EXCEL IMPORT
                                         setEmployeeImportProgress("");
                                         setShowEmployeeImport(true);
                                     }}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 cursor-pointer"
                                 >
                                     <FileSpreadsheet size={17} />
                                     Import Excel
@@ -1312,7 +1492,7 @@ EMPLOYEE EXCEL IMPORT
                                         resetRegistrationForm();
                                         setShowRegisterEmployee(true);
                                     }}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 cursor-pointer"
                                 >
                                     <UserPlus size={17} />
                                     Register Employee
@@ -1454,14 +1634,31 @@ EMPLOYEE EXCEL IMPORT
                             </select>
 
 
-                            <button
-                                type="button"
-                                onClick={loadData}
-                                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                            >
-                                <RefreshCw size={16} />
-                                Refresh
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={loadData}
+                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+                                >
+                                    <RefreshCw size={16} />
+                                    Refresh
+                                </button>
+
+                                <TableExportDropdown
+                                    filename="Employee_Master_Directory"
+                                    title="Employee Master Directory Report"
+                                    data={filteredEmployees.map((emp, idx) => ({
+                                        "S.No": idx + 1,
+                                        "Employee Name": emp.name,
+                                        "Employee ID": emp.employeeId || "—",
+                                        "Mobile Number": emp.phone || "Not added",
+                                        "Zone": (emp.zoneIds || []).map((id) => zoneNameMap[id]).filter(Boolean).join(", ") || "—",
+                                        "Ward": (emp.wardIds || []).map((id) => wardNameMap[id]).filter(Boolean).join(", ") || "—",
+                                        "Registered On": emp.createdAt ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+                                        "Status": "Registered"
+                                    }))}
+                                />
+                            </div>
 
                         </div>
 
@@ -1499,14 +1696,31 @@ EMPLOYEE EXCEL IMPORT
                             </div>
 
 
-                            {!loading && (
-                                <span className="text-xs font-semibold text-slate-400">
-                                    {filteredEmployees.length} employee
-                                    {filteredEmployees.length === 1
-                                        ? ""
-                                        : "s"}
-                                </span>
-                            )}
+                            <div className="flex items-center gap-3">
+                                {!loading && (
+                                    <span className="text-xs font-semibold text-slate-400">
+                                        {filteredEmployees.length} employee
+                                        {filteredEmployees.length === 1
+                                            ? ""
+                                            : "s"}
+                                    </span>
+                                )}
+
+                                <TableExportDropdown
+                                    filename="Employee_Master_Directory"
+                                    title="Employee Master Directory Report"
+                                    data={filteredEmployees.map((emp, idx) => ({
+                                        "S.No": idx + 1,
+                                        "Employee Name": emp.name,
+                                        "Employee ID": emp.employeeId || "—",
+                                        "Mobile Number": emp.phone || "Not added",
+                                        "Zone": (emp.zoneIds || []).map((id) => zoneNameMap[id]).filter(Boolean).join(", ") || "—",
+                                        "Ward": (emp.wardIds || []).map((id) => wardNameMap[id]).filter(Boolean).join(", ") || "—",
+                                        "Registered On": emp.createdAt ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+                                        "Status": "Registered"
+                                    }))}
+                                />
+                            </div>
 
                         </div>
 
@@ -1782,6 +1996,21 @@ EMPLOYEE EXCEL IMPORT
                                         setEmployeeName(e.target.value)
                                     }
                                     placeholder="Enter employee name"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Employee ID <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                </label>
+
+                                <input
+                                    value={employeeCodeId}
+                                    onChange={(e) =>
+                                        setEmployeeCodeId(e.target.value)
+                                    }
+                                    placeholder="Enter Employee ID (e.g. EMP101)"
                                     className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                 />
                             </div>

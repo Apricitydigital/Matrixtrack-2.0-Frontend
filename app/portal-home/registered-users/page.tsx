@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
   CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, ChevronDown, X, Lock, Activity,
-  Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical
+  Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical, Download, Key, Copy, Check, Sparkles
 } from "lucide-react";
 import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@components/ui/ConfirmDialog";
 import { TableExportDropdown } from '@components/ui/TableExportDropdown';
 import { roleLabel } from '@lib/labels';
 import { Modal } from "@components/ui/Modal";
+import * as XLSX from "xlsx";
 
 type Role =
   | "HMS_SUPER_ADMIN"
@@ -34,6 +35,8 @@ type UserRecord = {
   name: string;
   email?: string | null;
   phone?: string;
+  password?: string | null;
+  plainPassword?: string | null;
   role: Role;
   cityId?: string;
   cityName?: string;
@@ -76,6 +79,10 @@ export default function RegisteredUsersPage() {
   const [filterDivision, setFilterDivision] = useState<string>("");
   const [filterDistrict, setFilterDistrict] = useState<string>("");
   const [filterCity, setFilterCity] = useState<string>("");
+  const [zones, setZones] = useState<{ id: string; name: string }[]>([]);
+  const [wards, setWards] = useState<{ id: string; name: string; parentId?: string | null }[]>([]);
+  const [filterZone, setFilterZone] = useState<string>("");
+  const [filterWard, setFilterWard] = useState<string>("");
   const [filterWorkspace, setFilterWorkspace] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [filterDate, setFilterDate] = useState<string>("");
@@ -88,6 +95,201 @@ export default function RegisteredUsersPage() {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
   const [selectedUserGeoModal, setSelectedUserGeoModal] = useState<{ user: UserRecord; zoneList: string[]; wardList: string[] } | null>(null);
+
+  // Reset Password State
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<UserRecord | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [showPasswordPlain, setShowPasswordPlain] = useState(true);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [copiedCreds, setCopiedCreds] = useState(false);
+
+  // Register Commissioner Modal State
+  const [showRegisterCommissionerModal, setShowRegisterCommissionerModal] = useState(false);
+  const [commissionerCityId, setCommissionerCityId] = useState("");
+  const [commissionerName, setCommissionerName] = useState("");
+  const [commissionerEmail, setCommissionerEmail] = useState("");
+  const [commissionerPassword, setCommissionerPassword] = useState("");
+  const [commissionerCreating, setCommissionerCreating] = useState(false);
+  const [commissionerStatus, setCommissionerStatus] = useState<string | null>(null);
+  const [citiesList, setCitiesList] = useState<any[]>([]);
+
+  // Custom Export Columns Modal State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [exportType, setExportType] = useState<"STANDARD" | "CREDENTIALS" | "CUSTOM">("STANDARD");
+  const [showAdvancedCols, setShowAdvancedCols] = useState(false);
+  const [exportModalSearch, setExportModalSearch] = useState("");
+  const [exportModalZoneIds, setExportModalZoneIds] = useState<string[]>([]);
+  const [exportModalWardIds, setExportModalWardIds] = useState<string[]>([]);
+  const [exportModalRole, setExportModalRole] = useState("ALL");
+  const [selectedExportCols, setSelectedExportCols] = useState<Record<string, boolean>>({
+    srNo: true,
+    name: true,
+    email: false,
+    password: false,
+    phone: true,
+    role: true,
+    state: true,
+    city: true,
+    zone: true,
+    ward: true,
+    modules: true,
+    status: true,
+    createdOn: true
+  });
+
+  const toggleExportCol = (key: string) => {
+    setSelectedExportCols((prev) => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const selectExportType = (type: "STANDARD" | "CREDENTIALS" | "CUSTOM") => {
+    setExportType(type);
+    if (type === "STANDARD") {
+      setSelectedExportCols({
+        srNo: true, name: true, email: false, password: false, phone: true,
+        role: true, state: true, city: true, zone: true, ward: true,
+        modules: true, status: true, createdOn: true
+      });
+    } else if (type === "CREDENTIALS") {
+      setSelectedExportCols({
+        srNo: true, name: true, email: true, password: true, phone: true,
+        role: true, state: true, city: true, zone: true, ward: true,
+        modules: true, status: true, createdOn: true
+      });
+    }
+  };
+
+  const applyExportPreset = (preset: "ALL" | "CREDS" | "SCOPE") => {
+    if (preset === "ALL") {
+      setSelectedExportCols({
+        srNo: true, name: true, email: true, password: true, phone: true,
+        role: true, state: true, city: true, zone: true, ward: true,
+        modules: true, status: true, createdOn: true
+      });
+    } else if (preset === "CREDS") {
+      setSelectedExportCols({
+        srNo: true, name: true, email: true, password: true, phone: true,
+        role: true, state: false, city: false, zone: false, ward: false,
+        modules: false, status: true, createdOn: false
+      });
+    } else if (preset === "SCOPE") {
+      setSelectedExportCols({
+        srNo: true, name: true, email: true, password: true, phone: true,
+        role: true, state: true, city: true, zone: true, ward: true,
+        modules: true, status: false, createdOn: false
+      });
+    }
+  };
+
+  const generateAutoPasswordForReset = (name: string, phone?: string | null) => {
+    const cleanName = (name || "").trim().replace(/[^a-zA-Z]/g, "");
+    const prefix = cleanName.length >= 4 
+      ? cleanName.slice(0, 4) 
+      : cleanName.length > 0 
+        ? cleanName 
+        : "User";
+    const capitalizedPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
+    const digits = (phone || "").replace(/\D/g, "");
+    const last4 = digits.length >= 4 ? digits.slice(-4) : "1234";
+    return `${capitalizedPrefix}@${last4}`;
+  };
+
+  const handleOpenResetModal = (u: UserRecord) => {
+    setResetPasswordTarget(u);
+    setNewPassword(generateAutoPasswordForReset(u.name, u.phone));
+    setShowPasswordPlain(true);
+    setCopiedCreds(false);
+    setActiveMenuUserId(null);
+  };
+
+  const handleConfirmPasswordReset = async () => {
+    if (!resetPasswordTarget) return;
+    if (!newPassword || newPassword.trim().length < 4) {
+      showToast({ title: "Validation Error", description: "Password must be at least 4 characters long.", tone: "error" });
+      return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      await apiFetch(`/city/users/${resetPasswordTarget.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: newPassword.trim() })
+      });
+      showToast({
+        title: "Password Updated",
+        description: `New password for ${resetPasswordTarget.name} has been set to: ${newPassword.trim()}`,
+        tone: "success"
+      });
+      setResetPasswordTarget(null);
+      setNewPassword("");
+    } catch (err: any) {
+      showToast({
+        title: "Password Reset Failed",
+        description: err?.message || "Failed to update user password.",
+        tone: "error"
+      });
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
+
+  const copyResetCredentials = () => {
+    if (!resetPasswordTarget) return;
+    const credText = `System User Credentials:\nName: ${resetPasswordTarget.name}\nContact: ${resetPasswordTarget.phone || resetPasswordTarget.email || "N/A"}\nNew Password: ${newPassword}`;
+    navigator.clipboard.writeText(credText);
+    setCopiedCreds(true);
+    setTimeout(() => setCopiedCreds(false), 3000);
+    showToast({ title: "Credentials Copied", description: "Copied user login details to clipboard.", tone: "success" });
+  };
+
+  const handleCreateCommissionerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCommissionerCreating(true);
+    setCommissionerStatus(null);
+
+    try {
+      const defaultCity = citiesList[0]?.id || "";
+      const targetCityId = commissionerCityId || defaultCity;
+
+      if (!targetCityId) {
+        setCommissionerStatus("Please select a city.");
+        setCommissionerCreating(false);
+        return;
+      }
+
+      await CityApi.createCommissioner(targetCityId, {
+        name: commissionerName.trim(),
+        email: commissionerEmail.trim().toLowerCase(),
+        password: commissionerPassword.trim()
+      });
+
+      showToast({
+        title: "Commissioner Created",
+        description: `Successfully registered Commissioner "${commissionerName}".`,
+        tone: "success"
+      });
+
+      setShowRegisterCommissionerModal(false);
+      setCommissionerName("");
+      setCommissionerEmail("");
+      setCommissionerPassword("");
+      await loadData();
+    } catch (err: any) {
+      console.error("Failed to create commissioner", err);
+      const msg = err?.message || "Failed to create commissioner.";
+      setCommissionerStatus(msg);
+      showToast({
+        title: "Registration Failed",
+        description: msg,
+        tone: "error"
+      });
+    } finally {
+      setCommissionerCreating(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -103,6 +305,12 @@ export default function RegisteredUsersPage() {
 
       const rawUsers = userRes.users || [];
       const fetchedCities = cityRes.cities || [];
+      setCitiesList(fetchedCities);
+      const zNodes = ((zoneRes as any)?.nodes || []).map((n: any) => ({ id: n.id, name: n.name }));
+      const wNodes = ((wardRes as any)?.nodes || []).map((n: any) => ({ id: n.id, name: n.name, parentId: n.parentId }));
+      setZones(zNodes);
+      setWards(wNodes);
+
       const allNodes = [
         ...((zoneRes as any)?.nodes || []),
         ...((wardRes as any)?.nodes || []),
@@ -163,13 +371,13 @@ export default function RegisteredUsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, filterRole, filterState, filterDivision, filterDistrict, filterCity, filterWorkspace, statusFilter, filterDate]);
+  }, [searchQuery, filterRole, filterZone, filterWard, filterWorkspace, statusFilter, filterDate]);
 
-  // Derived Filter Options
-  const uniqueStates = useMemo(() => Array.from(new Set(cities.map((c) => c.state?.name).filter(Boolean))), [cities]);
-  const uniqueDivisions = useMemo(() => Array.from(new Set(cities.map((c) => c.division?.name).filter(Boolean))), [cities]);
-  const uniqueDistricts = useMemo(() => Array.from(new Set(cities.map((c) => c.district?.name).filter(Boolean))), [cities]);
-  const uniqueCities = useMemo(() => Array.from(new Set(cities.map((c) => c.name).filter(Boolean))), [cities]);
+  // Derived Ward Options filtered by selected Zone
+  const availableWards = useMemo(() => {
+    if (!filterZone) return wards;
+    return wards.filter((w) => !w.parentId || w.parentId === filterZone);
+  }, [wards, filterZone]);
 
   // Filtered Users List
   const filteredUsers = useMemo(() => {
@@ -177,9 +385,6 @@ export default function RegisteredUsersPage() {
       .filter((u) => {
         const uCity = fullCityMap[u.cityId || ''] || {};
         const uCityName = u.cityName || u.city?.name || uCity.name || 'Indore';
-        const uStateName = u.stateName || uCity.state?.name || 'Madhya Pradesh';
-        const uDivName = u.divisionName || uCity.division?.name;
-        const uDistName = u.districtName || uCity.district?.name;
 
         const q = searchQuery.toLowerCase().trim();
         const matchesSearch =
@@ -191,10 +396,38 @@ export default function RegisteredUsersPage() {
           String(u.role || "").toLowerCase().includes(q);
 
         const matchesRole = filterRole === "ALL" || u.role === filterRole;
-        const matchesCity = !filterCity || uCityName === filterCity;
-        const matchesState = !filterState || uStateName === filterState;
-        const matchesDivision = !filterDivision || uDivName === filterDivision;
-        const matchesDistrict = !filterDistrict || uDistName === filterDistrict;
+
+        // Zone Filter Matching
+        let matchesZone = true;
+        if (filterZone) {
+          if (u.role !== 'CITY_ADMIN') {
+            const selectedZoneObj = zones.find((z) => z.id === filterZone);
+            const targetZoneName = (selectedZoneObj?.name || filterZone).toLowerCase();
+            const uZoneIds = u.zoneIds || [];
+            const uZoneNames = uZoneIds.map((zid: string) => (geoMap[zid] || zid).toLowerCase());
+
+            matchesZone =
+              uZoneIds.includes(filterZone) ||
+              uZoneNames.some((zn: string) => zn === targetZoneName || zn.includes(targetZoneName)) ||
+              Boolean(u.zoneName && u.zoneName.toLowerCase().includes(targetZoneName));
+          }
+        }
+
+        // Ward Filter Matching
+        let matchesWard = true;
+        if (filterWard) {
+          if (u.role !== 'CITY_ADMIN') {
+            const selectedWardObj = wards.find((w) => w.id === filterWard);
+            const targetWardName = (selectedWardObj?.name || filterWard).toLowerCase();
+            const uWardIds = u.wardIds || [];
+            const uWardNames = uWardIds.map((wid: string) => (geoMap[wid] || wid).toLowerCase());
+
+            matchesWard =
+              uWardIds.includes(filterWard) ||
+              uWardNames.some((wn: string) => wn === targetWardName || wn.includes(targetWardName)) ||
+              Boolean(u.wardName && u.wardName.toLowerCase().includes(targetWardName));
+          }
+        }
 
         const matchesDate =
           !filterDate ||
@@ -220,10 +453,311 @@ export default function RegisteredUsersPage() {
           (filterWorkspace === "SWACHH" && rolesAndPerms.some(r => r.includes("SWACHH") || r.includes("RANKING") || r.includes("WARD"))) ||
           (filterWorkspace === "WORKFORCE" && rolesAndPerms.some(r => r.includes("WORKFORCE") || r.includes("MATRIX")));
 
-        return matchesSearch && matchesRole && matchesCity && matchesState && matchesDivision && matchesDistrict && matchesStatus && matchesWorkspace && matchesDate;
+        return matchesSearch && matchesRole && matchesZone && matchesWard && matchesStatus && matchesWorkspace && matchesDate;
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [users, searchQuery, filterRole, filterState, filterDivision, filterDistrict, filterCity, filterWorkspace, statusFilter, filterDate]);
+  }, [users, searchQuery, filterRole, filterZone, filterWard, filterWorkspace, statusFilter, filterDate, fullCityMap, geoMap, zones, wards]);
+
+  // Unique Available Zones in Loaded Users
+  const availableZones = useMemo<string[]>(() => {
+    const list: string[] = [];
+    users.forEach((u) => {
+      if (u.zoneIds && Array.isArray(u.zoneIds)) {
+        u.zoneIds.forEach((zid: string, i: number) => {
+          const name = geoMap[zid] || (zid.length > 20 || zid.includes('-') || zid.startsWith('PT') ? `Zone ${i + 1}` : zid);
+          if (!list.includes(name)) list.push(name);
+        });
+      } else if (u.zoneName || u.zone?.name) {
+        const zName = u.zoneName || u.zone?.name;
+        if (zName && !list.includes(zName)) list.push(zName);
+      }
+    });
+    return list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [users, geoMap]);
+
+  // Unique Available Wards in Loaded Users
+  const allUserWardNames = useMemo<string[]>(() => {
+    const list: string[] = [];
+    users.forEach((u) => {
+      if (u.wardIds && Array.isArray(u.wardIds)) {
+        u.wardIds.forEach((wid: string, i: number) => {
+          const name = geoMap[wid] || (wid.length > 20 || wid.includes('-') || wid.startsWith('PT') ? `Ward ${i + 1}` : wid);
+          if (!list.includes(name)) list.push(name);
+        });
+      } else if (u.wardName || u.ward?.name) {
+        const wName = u.wardName || u.ward?.name;
+        if (wName && !list.includes(wName)) list.push(wName);
+      }
+    });
+    return list.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [users, geoMap]);
+
+  // Filtered Users scoped inside Export Modal
+  const finalExportUsers = useMemo(() => {
+    return filteredUsers.filter((u) => {
+      const q = exportModalSearch.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        String(u.name || "").toLowerCase().includes(q) ||
+        String(u.email || "").toLowerCase().includes(q) ||
+        String(u.phone || "").toLowerCase().includes(q);
+
+      const matchesRole = exportModalRole === "ALL" || u.role === exportModalRole;
+
+      const isCityAdminUser = u.role === 'CITY_ADMIN';
+
+      let matchesZone = true;
+      if (exportModalZoneIds.length > 0) {
+        if (!isCityAdminUser) {
+          const uZoneIds = u.zoneIds || [];
+          const uZoneNames = uZoneIds.map((zid: string) => (geoMap[zid] || zid).toLowerCase());
+          const selectedZoneNames = zones
+            .filter((z) => exportModalZoneIds.includes(z.id))
+            .map((z) => z.name.toLowerCase());
+
+          matchesZone =
+            uZoneIds.some((zid: string) => exportModalZoneIds.includes(zid)) ||
+            uZoneNames.some((zn: string) => selectedZoneNames.includes(zn)) ||
+            Boolean(u.zoneName && selectedZoneNames.some((zn) => (u.zoneName || "").toLowerCase().includes(zn)));
+        }
+      }
+
+      let matchesWard = true;
+      if (exportModalWardIds.length > 0) {
+        if (!isCityAdminUser) {
+          const uWardIds = u.wardIds || [];
+          const uWardNames = uWardIds.map((wid: string) => (geoMap[wid] || wid).toLowerCase());
+          const selectedWardNames = wards
+            .filter((w) => exportModalWardIds.includes(w.id))
+            .map((w) => w.name.toLowerCase());
+
+          matchesWard =
+            uWardIds.some((wid: string) => exportModalWardIds.includes(wid)) ||
+            uWardNames.some((wn: string) => selectedWardNames.includes(wn)) ||
+            Boolean(u.wardName && selectedWardNames.some((wn) => (u.wardName || "").toLowerCase().includes(wn)));
+        }
+      }
+
+      return matchesSearch && matchesRole && matchesZone && matchesWard;
+    });
+  }, [filteredUsers, exportModalSearch, exportModalRole, exportModalZoneIds, exportModalWardIds, zones, wards, geoMap]);
+
+  // All Export Columns Definitions
+  const ALL_EXPORT_COLUMNS: { key: string; header: string; label: string }[] = [
+    { key: "srNo", header: "SR. NO.", label: "Sr. No." },
+    { key: "name", header: "USER NAME", label: "User Name" },
+    { key: "email", header: "USER EMAIL", label: "User Email" },
+    { key: "password", header: "LOGIN PASSWORD", label: "Login Password" },
+    { key: "phone", header: "MOBILE NUMBER", label: "Mobile Number" },
+    { key: "role", header: "USER ROLE", label: "User Role" },
+    { key: "state", header: "STATE", label: "State Name" },
+    { key: "city", header: "CITY", label: "City Name" },
+    { key: "zone", header: "ZONE(S)", label: "Zone Scope" },
+    { key: "ward", header: "WARD(S)", label: "Ward Scope" },
+    { key: "modules", header: "ASSIGNED MODULES", label: "Assigned Modules" },
+    { key: "status", header: "ACCOUNT STATUS", label: "Account Status" },
+    { key: "createdOn", header: "CREATED ON", label: "Created Date & Time" }
+  ];
+
+  // Customizable XLSX/CSV Export Handler with Explicit Column Widths
+  const executeCustomExcelExport = (
+    fileFormat: "XLSX" | "CSV" = "XLSX",
+    overrideCols?: Record<string, boolean>,
+    customFilePrefix?: string
+  ) => {
+    const targetUsers = finalExportUsers;
+    if (!targetUsers.length) {
+      showToast({ title: "No data to export", description: "There are no users matching your export filters.", tone: "info" });
+      return;
+    }
+
+    const colsMap = overrideCols || selectedExportCols;
+    const activeCols = ALL_EXPORT_COLUMNS.filter((col) => colsMap[col.key]);
+    if (activeCols.length === 0) {
+      showToast({ title: "No columns selected", description: "Please select at least one column to export.", tone: "info" });
+      return;
+    }
+
+    const excelRows: Record<string, any>[] = [];
+
+    targetUsers.forEach((u, index) => {
+      const isCityAdmin = u.role === 'CITY_ADMIN';
+      const cleanGeoLabel = (val: any, prefix: string, idx: number) => {
+        if (!val) return `${prefix} ${idx + 1}`;
+        const str = String(val).trim();
+        if (geoMap[str]) return geoMap[str];
+        if (str.length > 20 || str.includes('-') || str.startsWith('PT')) {
+          return `${prefix} ${idx + 1}`;
+        }
+        return str;
+      };
+
+      const zoneList: string[] = isCityAdmin
+        ? ["All Zones (City Admin)"]
+        : u.zoneIds && u.zoneIds.length > 0
+          ? u.zoneIds.map((id: string, i: number) => cleanGeoLabel(id, 'Zone', i))
+          : u.zoneName || u.zone?.name
+            ? [u.zoneName || u.zone?.name]
+            : ['Zone 1'];
+
+      const wardList: string[] = isCityAdmin
+        ? ["All Wards (City Admin)"]
+        : u.wardIds && u.wardIds.length > 0
+          ? u.wardIds.map((id: string, i: number) => cleanGeoLabel(id, 'Ward', i))
+          : u.wardName || u.ward?.name
+            ? [u.wardName || u.ward?.name]
+            : ['Ward 1'];
+
+      // Collect Assigned Modules
+      const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN"];
+      const mods: string[] = [];
+      if (u.modules && u.modules.length > 0) {
+        u.modules.forEach((m: any) => {
+          const keyUpper = String(m.key || m.id || m.name || '').toUpperCase();
+          if (allowedTaskforceKeys.some(tk => keyUpper.includes(tk))) {
+            let displayLabel = m.name || m.key;
+            if (displayLabel.toUpperCase() === "SWEEPING") displayLabel = "Sweeping";
+            if (displayLabel.toUpperCase().includes("LITTER")) displayLabel = "Litter Bins";
+            if (displayLabel.toUpperCase().includes("TOILET")) displayLabel = "Cleanliness of Toilets";
+            if (displayLabel.toUpperCase() === "TASKFORCE" || displayLabel.toUpperCase().includes("CTU") || displayLabel.toUpperCase().includes("GVP")) displayLabel = "GVP";
+            mods.push(displayLabel);
+          }
+        });
+      } else if (u.assignedModules && u.assignedModules.length > 0) {
+        u.assignedModules.forEach((mKey: string) => {
+          let displayLabel = mKey;
+          if (mKey.toUpperCase() === "SWEEPING") displayLabel = "Sweeping";
+          if (mKey.toUpperCase().includes("LITTER")) displayLabel = "Litter Bins";
+          if (mKey.toUpperCase().includes("TOILET")) displayLabel = "Cleanliness of Toilets";
+          if (mKey.toUpperCase() === "TASKFORCE" || mKey.toUpperCase().includes("CTU") || mKey.toUpperCase().includes("GVP")) displayLabel = "GVP";
+          mods.push(displayLabel);
+        });
+      }
+
+      const modulesText = mods.length > 0 ? mods.join("; ") : "None";
+      const stateText = u.stateName || 'Madhya Pradesh';
+      const cityText = u.cityName || u.city?.name || cityMap[u.cityId || ''] || 'Indore';
+
+      // Real Password / Registration Pattern calculation
+      let passwordDisplay = "";
+      if (u.role === "EMPLOYEE") {
+        passwordDisplay = "—";
+      } else {
+        let rawPass = u.plainPassword || u.password || "";
+        if (rawPass && !rawPass.startsWith("$2b$") && !rawPass.startsWith("$2a$")) {
+          passwordDisplay = rawPass;
+        } else {
+          const namePrefix = (u.name || "").trim().replace(/[^a-zA-Z]/g, "").slice(0, 4) || "User";
+          const capPrefix = namePrefix.charAt(0).toUpperCase() + namePrefix.slice(1).toLowerCase();
+          const digits = (u.phone || "").replace(/\D/g, "");
+          const last4 = digits.length >= 4 ? digits.slice(-4) : "1234";
+          passwordDisplay = `${capPrefix}@${last4}`;
+        }
+      }
+
+      const createdDateStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-GB') : "";
+      const isLive = u.enabled !== false;
+
+      const rowFullData: Record<string, string> = {
+        srNo: String(index + 1),
+        name: u.name || "",
+        email: u.email || "N/A",
+        password: passwordDisplay,
+        phone: u.phone || "",
+        role: u.role || "",
+        state: stateText,
+        city: cityText,
+        zone: zoneList.join(", "),
+        ward: wardList.join(", "),
+        modules: modulesText,
+        status: isLive ? "Active" : "Inactive",
+        createdOn: createdDateStr
+      };
+
+      const rowObj: Record<string, string> = {};
+      activeCols.forEach((col) => {
+        rowObj[col.header] = rowFullData[col.key] || "";
+      });
+
+      excelRows.push(rowObj);
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+
+    const colWidthsMap: Record<string, number> = {
+      "SR. NO.": 10,
+      "USER NAME": 26,
+      "USER EMAIL": 32,
+      "PASSWORD": 22,
+      "MOBILE NUMBER": 18,
+      "USER ROLE": 20,
+      "STATE": 20,
+      "CITY": 18,
+      "ZONE(S)": 30,
+      "WARD(S)": 40,
+      "ASSIGNED MODULES": 35,
+      "ACCOUNT STATUS": 16,
+      "CREATED ON": 22
+    };
+
+    worksheet["!cols"] = activeCols.map((col) => ({
+      wch: colWidthsMap[col.header] || 25
+    }));
+
+    // Format header row (Row 1) with 26pt height, bold font and subtle slate background
+    worksheet["!rows"] = [{ hpt: 26 }];
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const address = XLSX.utils.encode_cell({ r: 0, c: C });
+      if (worksheet[address]) {
+        worksheet[address].s = {
+          font: { bold: true, name: "Segoe UI", sz: 11, color: { rgb: "0F172A" } },
+          fill: { fgColor: { rgb: "E2E8F0" } },
+          alignment: { horizontal: "left", vertical: "center" }
+        };
+      }
+    }
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Registered Users");
+
+    const extension = fileFormat === "CSV" ? "csv" : "xlsx";
+    const filePrefix = customFilePrefix || "Registered_Users_Export";
+    const fileName = `${filePrefix}_${new Date().toISOString().slice(0, 10)}.${extension}`;
+
+    if (fileFormat === "CSV") {
+      XLSX.writeFile(workbook, fileName, { bookType: "csv" });
+    } else {
+      XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
+    }
+
+    setShowExportModal(false);
+    showToast({
+      title: "Export Successful",
+      description: `Exported ${targetUsers.length} user records to ${fileName}.`,
+      tone: "success"
+    });
+  };
+
+  // Direct Credentials Export Handler (Name, Email, Mobile No, City, Zone, Ward, Password)
+  const executeCredentialsExport = (fileFormat: "XLSX" | "CSV" = "XLSX") => {
+    const credCols = {
+      srNo: true, name: true, email: true, password: true, phone: true,
+      role: true, state: true, city: true, zone: true, ward: true,
+      modules: false, status: true, createdOn: false
+    };
+    executeCustomExcelExport(fileFormat, credCols, "User_Credentials_Data");
+  };
+
+  // Direct Table Data Export Handler (Green Download Icon)
+  const executeTableDataExport = (fileFormat: "XLSX" | "CSV" = "XLSX") => {
+    const stdCols = {
+      srNo: true, name: true, email: true, password: false, phone: true,
+      role: true, state: true, city: true, zone: true, ward: true,
+      modules: true, status: true, createdOn: true
+    };
+    executeCustomExcelExport(fileFormat, stdCols, "Filtered_Users_Directory");
+  };
 
   // Pagination Calculations
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
@@ -272,13 +806,11 @@ export default function RegisteredUsersPage() {
               </span>
               Registered Users Directory
             </h1>
-            <p className="mt-1 text-xs font-semibold text-slate-500">
-              Overview and access configuration for all employees and officials registered via User Registration
-            </p>
+            
           </div>
 
-          <div className="flex items-center gap-3">
-            <TableExportDropdown tableId="registered-users-table" filename="Registered_Users_Directory" title="Registered Users Directory" />
+          <div className="flex flex-wrap items-center gap-3">
+           
             <button
               onClick={() => window.location.href = '/portal-home/common-registration'}
               className="
@@ -286,18 +818,51 @@ export default function RegisteredUsersPage() {
                 rounded-[11px] bg-blue-600 px-5
                 text-xs font-extrabold text-white
                 shadow-[0_10px_20px_-12px_rgba(37,99,235,0.75)]
-                hover:bg-blue-500 transition
+                hover:bg-blue-500 transition cursor-pointer
               "
             >
               <UserPlus size={16} />
               Register New User
             </button>
+
+            {/* 3-Dots Action Menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+                className="
+                  inline-flex h-11 w-11 shrink-0 items-center justify-center
+                  rounded-[11px] border border-slate-200 bg-white
+                  text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer
+                "
+                title="More Action Options"
+              >
+                <MoreVertical size={18} />
+              </button>
+
+              {showHeaderMenu && (
+                <div className="absolute right-0 top-full mt-2 z-[60] w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl animate-scale-in">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowHeaderMenu(false);
+                      selectExportType("CREDENTIALS");
+                      setShowExportModal(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-900 transition cursor-pointer"
+                  >
+                    <Key size={16} className="text-amber-600 shrink-0" />
+                    Download User Credentials
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* ── FILTER TOOLBAR ROW (SEARCH, ROLE DROPDOWN, WORKSPACE DROPDOWN, HIERARCHY) ── */}
-      <div className="mx-4 sm:mx-5 lg:mx-6 overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-xs">
+      <div className="mx-4 sm:mx-5 lg:mx-6 min-h-[440px] overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-xs flex flex-col justify-between">
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-3.5 lg:px-7">
           {/* Search Box */}
           <div className="relative min-w-0 flex-1 sm:min-w-[240px]">
@@ -345,30 +910,33 @@ export default function RegisteredUsersPage() {
             </select>
           </div>
 
-          {/* State Filter */}
-          <div className="relative min-w-[130px]">
+          {/* Zone Filter Dropdown */}
+          <div className="relative min-w-[140px]">
             <select
-              value={filterState}
-              onChange={(e) => setFilterState(e.target.value)}
+              value={filterZone}
+              onChange={(e) => {
+                setFilterZone(e.target.value);
+                setFilterWard("");
+              }}
               className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
             >
-              <option value="">All States</option>
-              {uniqueStates.map((st) => (
-                <option key={st} value={st}>{st}</option>
+              <option value="">All Zones</option>
+              {zones.map((z) => (
+                <option key={z.id} value={z.id}>{z.name}</option>
               ))}
             </select>
           </div>
 
-          {/* City Filter */}
-          <div className="relative min-w-[130px]">
+          {/* Ward Filter Dropdown */}
+          <div className="relative min-w-[140px]">
             <select
-              value={filterCity}
-              onChange={(e) => setFilterCity(e.target.value)}
+              value={filterWard}
+              onChange={(e) => setFilterWard(e.target.value)}
               className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
             >
-              <option value="">All Cities</option>
-              {uniqueCities.map((ct) => (
-                <option key={ct} value={ct}>{ct}</option>
+              <option value="">All Wards</option>
+              {availableWards.map((w) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
               ))}
             </select>
           </div>
@@ -395,10 +963,24 @@ export default function RegisteredUsersPage() {
               <option value="inactive">Inactive</option>
             </select>
           </div>
+
+          {/* Green Download Icon Button next to Status Filter */}
+          <button
+            type="button"
+            onClick={() => executeTableDataExport("XLSX")}
+            className="
+              inline-flex h-10 w-10 shrink-0 items-center justify-center
+              rounded-[10px] bg-emerald-600 text-white
+              shadow-xs hover:bg-emerald-500 transition cursor-pointer
+            "
+            title={`Download Filtered Table Data (${filteredUsers.length} Users)`}
+          >
+            <Download size={17} />
+          </button>
         </div>
 
         {/* Active Filter Pills Bar */}
-        {(searchQuery || filterRole !== "ALL" || filterWorkspace !== "ALL" || filterCity || filterState || statusFilter !== "ALL" || filterDate) && (
+        {(searchQuery || filterRole !== "ALL" || filterWorkspace !== "ALL" || filterZone || filterWard || statusFilter !== "ALL" || filterDate) && (
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-2 lg:px-7">
             <span className="text-xs font-bold text-slate-400">Active filters:</span>
             {searchQuery && (
@@ -419,10 +1001,16 @@ export default function RegisteredUsersPage() {
                 <button type="button" onClick={() => setFilterWorkspace("ALL")} className="text-slate-400 hover:text-slate-700">×</button>
               </span>
             )}
-            {filterCity && (
+            {filterZone && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
-                City: {filterCity}
-                <button type="button" onClick={() => setFilterCity("")} className="text-slate-400 hover:text-slate-700">×</button>
+                Zone: {zones.find(z => z.id === filterZone)?.name || filterZone}
+                <button type="button" onClick={() => { setFilterZone(""); setFilterWard(""); }} className="text-slate-400 hover:text-slate-700">×</button>
+              </span>
+            )}
+            {filterWard && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
+                Ward: {wards.find(w => w.id === filterWard)?.name || filterWard}
+                <button type="button" onClick={() => setFilterWard("")} className="text-slate-400 hover:text-slate-700">×</button>
               </span>
             )}
             {filterDate && (
@@ -435,7 +1023,7 @@ export default function RegisteredUsersPage() {
         )}
 
         {/* ── USERS TABLE ── */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[360px] flex-1">
           <table id="registered-users-table" className="w-full min-w-[1380px] table-fixed">
             <colgroup>
               <col className="w-[4%]" />
@@ -467,7 +1055,7 @@ export default function RegisteredUsersPage() {
                 ))
               ) : paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-xs font-semibold text-slate-400">
+                  <td colSpan={10} className="px-6 py-24 text-center text-xs font-semibold text-slate-400">
                     No registered users match your search and filter criteria.
                   </td>
                 </tr>
@@ -482,7 +1070,7 @@ export default function RegisteredUsersPage() {
                     : '12:45 PM';
 
                   const openActionMenuUpward =
-                    index >= paginatedUsers.length - 2;
+                    paginatedUsers.length > 3 && index >= paginatedUsers.length - 2;
 
                   const cleanGeoLabel = (val: any, prefix: string, idx: number) => {
                     if (!val) return `${prefix} ${idx + 1}`;
@@ -705,6 +1293,13 @@ export default function RegisteredUsersPage() {
                               </button>
                               <button
                                 type="button"
+                                onClick={() => handleOpenResetModal(u)}
+                                className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 transition w-full text-left cursor-pointer"
+                              >
+                                <Lock size={13} /> Reset Password
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => { setDeleteTarget(u); setActiveMenuUserId(null); }}
                                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition w-full text-left cursor-pointer"
                               >
@@ -867,6 +1462,383 @@ export default function RegisteredUsersPage() {
           </Modal>
         )
       }
+
+      {/* ── RESET PASSWORD MODAL ── */}
+      {resetPasswordTarget && (
+        <Modal
+          open={!!resetPasswordTarget}
+          onClose={() => setResetPasswordTarget(null)}
+          title={`Reset Password - ${resetPasswordTarget.name}`}
+          size="md"
+        >
+          <div className="flex flex-col gap-5 py-2">
+            {/* User Info Header Card */}
+            <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white shadow-md shadow-amber-500/20 font-black text-sm">
+                <Lock size={20} />
+              </div>
+              <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black text-slate-900 truncate">{resetPasswordTarget.name}</h4>
+                  <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[9.5px] font-black uppercase ${getRoleBadgeStyle(resetPasswordTarget.role)}`}>
+                    {resetPasswordTarget.role}
+                  </span>
+                </div>
+                <p className="text-[11px] font-semibold text-slate-500 truncate">
+                  Contact: <span className="text-slate-700 font-bold">{resetPasswordTarget.phone || resetPasswordTarget.email || "N/A"}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* New Password Field & Action Controls */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-extrabold text-slate-700">
+                  Set New Password *
+                </label>
+              </div>
+
+              <div className="relative">
+                <input
+                  type={showPasswordPlain ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 4 chars)"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-3.5 pr-10 text-xs font-bold text-slate-900 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordPlain(!showPasswordPlain)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  title={showPasswordPlain ? "Hide password" : "Show password"}
+                >
+                  <Eye size={16} />
+                </button>
+              </div>
+
+            </div>
+
+            {/* Quick Actions & Confirm Buttons */}
+            <div className="flex flex-col gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={copyResetCredentials}
+                className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center gap-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                {copiedCreds ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                {copiedCreds ? "Credentials Copied to Clipboard!" : "Copy User Login Credentials"}
+              </button>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setResetPasswordTarget(null)}
+                  disabled={updatingPassword}
+                  className="flex-1 h-11 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={updatingPassword || !newPassword}
+                  onClick={handleConfirmPasswordReset}
+                  className="flex-1 h-11 rounded-xl bg-amber-600 text-xs font-black text-white shadow-md shadow-amber-600/20 hover:bg-amber-500 transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {updatingPassword ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : (
+                    <Lock size={14} />
+                  )}
+                  {updatingPassword ? "Updating..." : "Update Password"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── REGISTER COMMISSIONER MODAL ── */}
+      {showRegisterCommissionerModal && (
+        <Modal
+          open={showRegisterCommissionerModal}
+          onClose={() => setShowRegisterCommissionerModal(false)}
+          title="Register Commissioner"
+          subtitle="CREATE A CITY-LEVEL READ-ONLY COMMISSIONER ACCOUNT"
+          size="sm"
+        >
+          <form onSubmit={handleCreateCommissionerSubmit} className="flex flex-col gap-4 py-1">
+            <div>
+              <label className="block text-[10px] font-black uppercase text-slate-500 mb-1 tracking-wider">
+                City <span className="text-red-500">*</span>
+              </label>
+              <select
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                value={commissionerCityId || citiesList[0]?.id || ""}
+                onChange={(e) => setCommissionerCityId(e.target.value)}
+                required
+              >
+                {citiesList.length === 0 ? (
+                  <option value="">Indore (indore)</option>
+                ) : (
+                  citiesList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.code || c.id})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase text-slate-500 mb-1 tracking-wider">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                value={commissionerName}
+                onChange={(e) => setCommissionerName(e.target.value)}
+                placeholder="Commissioner Name"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase text-slate-500 mb-1 tracking-wider">
+                Email Id <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                value={commissionerEmail}
+                onChange={(e) => setCommissionerEmail(e.target.value)}
+                placeholder="commissioner@city.local"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase text-slate-500 mb-1 tracking-wider">
+                Enter Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+                value={commissionerPassword}
+                onChange={(e) => setCommissionerPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {commissionerStatus && (
+              <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-700">
+                {commissionerStatus}
+              </div>
+            )}
+
+            <div className="mt-2 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowRegisterCommissionerModal(false)}
+                className="flex-1 h-10 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={commissionerCreating}
+                className="flex-1 h-10 rounded-xl bg-blue-900 text-xs font-extrabold text-white shadow-md hover:bg-blue-800 transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                {commissionerCreating ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield size={15} />
+                    <span>Create</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {showExportModal && (
+        <Modal
+          open={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          title={exportType === "CREDENTIALS" ? "Download User Credentials" : "Export User Directory"}
+          size="2xl"
+        >
+          <div className="flex flex-col gap-5 py-2">
+            {/* Export Scope Filters (Zone, Ward, Role) */}
+            <div className="flex flex-col gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/70">
+              <div className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Filter size={15} className="text-blue-600" />
+                  Select Filters for Export Scope:
+                </span>
+                <span className="text-xs font-black text-blue-700 bg-blue-100 px-3 py-1 rounded-full border border-blue-200">
+                  {finalExportUsers.length} records matching
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-1">
+                {/* Zone Scope MultiSelect */}
+                <MultiSelectDropdown
+                  label="Zone Scope"
+                  options={zones.map((z) => ({
+                    id: z.id,
+                    name: z.name
+                  }))}
+                  selectedIds={exportModalZoneIds}
+                  onChange={(newZoneIds) => {
+                    setExportModalZoneIds(newZoneIds);
+                    if (newZoneIds.length > 0) {
+                      setExportModalWardIds((currWards) =>
+                        currWards.filter((wid) => {
+                          const w = wards.find((item) => item.id === wid);
+                          return !w || !w.parentId || newZoneIds.includes(w.parentId);
+                        })
+                      );
+                    }
+                  }}
+                  placeholder="All Zones"
+                />
+
+                {/* Ward Scope MultiSelect */}
+                <MultiSelectDropdown
+                  label="Ward Scope"
+                  options={(exportModalZoneIds.length > 0
+                    ? wards.filter((w) => !w.parentId || exportModalZoneIds.includes(w.parentId))
+                    : wards
+                  ).map((w) => ({
+                    id: w.id,
+                    name: w.name
+                  }))}
+                  selectedIds={exportModalWardIds}
+                  onChange={setExportModalWardIds}
+                  placeholder="All Wards"
+                />
+
+                {/* Role Scope */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Role Scope</label>
+                  <select
+                    value={exportModalRole}
+                    onChange={(e) => setExportModalRole(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 shadow-xs cursor-pointer"
+                  >
+                    <option value="ALL">All Roles</option>
+                    <option value="HMS_SUPER_ADMIN">Super Admin</option>
+                    <option value="COMMISSIONER">Commissioner</option>
+                    <option value="CITY_ADMIN">City Admin</option>
+                    <option value="QC">Quality Controller (QC)</option>
+                    <option value="ACTION_OFFICER">Action Officer</option>
+                    <option value="SUPERVISOR">Supervisor</option>
+                    <option value="EMPLOYEE">Field Employee</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Field Selection Accordion Header */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wide">
+                Export Columns Selected:
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAdvancedCols(!showAdvancedCols)}
+                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition cursor-pointer"
+              >
+                {showAdvancedCols ? "Hide Column Customization" : "Customize Columns..."}
+              </button>
+            </div>
+
+            {/* Collapsible Custom Field Selection */}
+            {showAdvancedCols && (
+              <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-700">Select Specific Columns:</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => applyExportPreset("ALL")}
+                      className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200 hover:bg-blue-100"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyExportPreset("CREDS")}
+                      className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200 hover:bg-slate-200"
+                    >
+                      Creds
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                  {ALL_EXPORT_COLUMNS.map((col) => {
+                    const isSelected = !!selectedExportCols[col.key];
+                    return (
+                      <label
+                        key={col.key}
+                        onClick={() => toggleExportCol(col.key)}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-[11px] font-bold cursor-pointer transition select-none ${
+                          isSelected
+                            ? "bg-blue-50 border-blue-300 text-blue-900"
+                            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition ${
+                          isSelected ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white"
+                        }`}>
+                          {isSelected && <Check size={10} strokeWidth={3} />}
+                        </div>
+                        <span className="truncate">{col.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer with XLSX & CSV options */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="h-11 px-5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => executeCustomExcelExport("CSV")}
+                  className="h-11 px-5 rounded-xl border border-slate-300 bg-white text-xs font-black text-slate-800 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                >
+                  Download CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => executeCustomExcelExport("XLSX")}
+                  className="h-11 px-6 rounded-xl bg-blue-600 text-xs font-black text-white shadow-md shadow-blue-600/20 hover:bg-blue-500 transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Download size={16} />
+                  Download Excel (.xlsx)
+                </button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div >
   );
 }
@@ -899,6 +1871,16 @@ function MultiSelectDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const isAllSelected = options.length > 0 && selectedIds.length === options.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      onChange([]);
+    } else {
+      onChange(options.map((o) => o.id));
+    }
+  };
+
   const toggleOption = (id: string) => {
     if (selectedIds.includes(id)) {
       onChange(selectedIds.filter((item) => item !== id));
@@ -913,9 +1895,21 @@ function MultiSelectDropdown({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <label className="block text-xs font-bold text-slate-700 mb-1">
-        {label} <span className="text-slate-400 font-normal">({selectedIds.length} selected)</span>
-      </label>
+      <div className="flex items-center justify-between mb-1">
+        <label className="block text-xs font-bold text-slate-700">
+          {label} <span className="text-slate-400 font-normal">({selectedIds.length} selected)</span>
+        </label>
+        {options.length > 0 && (
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="text-[10px] font-black text-blue-600 hover:text-blue-800 transition cursor-pointer"
+          >
+            {isAllSelected ? "Clear All" : "Select All"}
+          </button>
+        )}
+      </div>
+
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
@@ -931,7 +1925,7 @@ function MultiSelectDropdown({
 
       {isOpen && (
         <div
-          className={`absolute left-0 right-0 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-[100] flex flex-col gap-1 ${openUpward
+          className={`absolute left-0 right-0 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-[100] flex flex-col gap-1 ${openUpward
             ? "bottom-full mb-1"
             : "top-full mt-1"
             }`}
@@ -939,26 +1933,41 @@ function MultiSelectDropdown({
           {options.length === 0 ? (
             <div className="px-3 py-2 text-xs text-slate-400 font-medium">No options available</div>
           ) : (
-            options.map((opt) => {
-              const isSelected = selectedIds.includes(opt.id);
-              return (
-                <button
-                  type="button"
-                  key={opt.id}
-                  onClick={() => toggleOption(opt.id)}
-                  className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between text-left transition-colors cursor-pointer ${isSelected ? "bg-blue-50 text-blue-700 font-bold" : "hover:bg-slate-50 text-slate-700"
-                    }`}
-                >
-                  <span className="truncate">{opt.name}</span>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => { }}
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
-                  />
-                </button>
-              );
-            })
+            <>
+              {/* Select All Option in Dropdown Menu Header */}
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="w-full px-3 py-1.5 rounded-lg text-xs font-black flex items-center justify-between text-left transition-colors cursor-pointer bg-blue-50/70 text-blue-800 hover:bg-blue-100 border border-blue-100"
+              >
+                <span>{isAllSelected ? "Deselect All" : "Select All Options"}</span>
+                <span className="text-[10px] font-bold text-blue-600">
+                  {selectedIds.length}/{options.length}
+                </span>
+              </button>
+              <div className="my-0.5 border-t border-slate-100" />
+
+              {options.map((opt) => {
+                const isSelected = selectedIds.includes(opt.id);
+                return (
+                  <button
+                    type="button"
+                    key={opt.id}
+                    onClick={() => toggleOption(opt.id)}
+                    className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between text-left transition-colors cursor-pointer ${isSelected ? "bg-blue-50/60 text-blue-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                      }`}
+                  >
+                    <span className="truncate">{opt.name}</span>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => { }}
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                    />
+                  </button>
+                );
+              })}
+            </>
           )}
         </div>
       )}
@@ -967,6 +1976,7 @@ function MultiSelectDropdown({
 }
 
 function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: () => void; onSave: () => Promise<void> }) {
+  const { showToast } = useToast();
   const [name, setName] = useState(user.name);
   const [email] = useState(user.email || "");
   const [role, setRole] = useState(user.role);
@@ -1151,9 +2161,11 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
     fetchData();
   }, []);
 
+  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const availableWards = useMemo(() => {
     if (!zoneIds.length) {
-      return [];
+      return wards;
     }
 
     return wards.filter((ward: any) => {
@@ -1162,7 +2174,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
         ward.parent?.id;
 
       return (
-        parentZoneId &&
+        !parentZoneId ||
         zoneIds.includes(parentZoneId)
       );
     });
@@ -1173,41 +2185,40 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   ) => {
     setZoneIds(newZoneIds);
 
-    setWardIds((currentWardIds) =>
-      currentWardIds.filter((wardId) => {
-        const ward = wards.find(
-          (item: any) =>
-            item.id === wardId
-        );
+    if (newZoneIds.length > 0) {
+      setWardIds((currentWardIds) =>
+        currentWardIds.filter((wardId) => {
+          const ward = wards.find(
+            (item: any) =>
+              item.id === wardId
+          );
 
-        if (!ward) return false;
+          if (!ward) return false;
 
-        const parentZoneId =
-          ward.parentId ||
-          ward.parent?.id;
+          const parentZoneId =
+            ward.parentId ||
+            ward.parent?.id;
 
-        return (
-          parentZoneId &&
-          newZoneIds.includes(
-            parentZoneId
-          )
-        );
-      })
-    );
+          return (
+            !parentZoneId ||
+            newZoneIds.includes(
+              parentZoneId
+            )
+          );
+        })
+      );
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      if (!modules.length) {
-        setLoading(false);
-        return;
-      }
+    setStatusMsg(null);
 
+    try {
       const enabledModuleKeys = new Set(
         modules
-          .filter((m: any) => m.enabled)
+          .filter((m: any) => m.enabled !== false)
           .map((m: any) =>
             String(m.key || "")
               .trim()
@@ -1220,7 +2231,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
           assignedModules
             .map(normalizeAssignedModuleKey)
             .filter((key) =>
-              enabledModuleKeys.has(key)
+              enabledModuleKeys.size === 0 || enabledModuleKeys.has(key)
             )
         )
       );
@@ -1235,7 +2246,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
       );
 
       await CityUserApi.update(user.id, {
-        name,
+        name: name.trim(),
         ...(password.trim()
           ? { password: password.trim() }
           : {}),
@@ -1244,8 +2255,33 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
         zoneIds,
         wardIds
       });
-      await onSave();
-    } catch {
+
+      setStatusMsg({
+        type: "success",
+        text: `User details and access permissions for "${name}" updated successfully!`
+      });
+
+      showToast({
+        title: "Access Saved",
+        description: `Updated access permissions for ${name}.`,
+        tone: "success"
+      });
+
+      setTimeout(async () => {
+        await onSave();
+      }, 1000);
+    } catch (err: any) {
+      console.error("Failed to update user access", err);
+      setStatusMsg({
+        type: "error",
+        text: err?.message || "Failed to update user access permissions. Please try again."
+      });
+      showToast({
+        title: "Update Failed",
+        description: err?.message || "Failed to save user access permissions.",
+        tone: "error"
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -1256,11 +2292,11 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
       onClose={onClose}
       title="Edit User & Access Permissions"
       subtitle={user.email || user.phone || "No login email"}
-      size="lg"
+      size="2xl"
     >
       <form
         onSubmit={handleSubmit}
-        className="flex max-h-[75vh] flex-col"
+        className="flex max-h-[80vh] flex-col"
       >
         <div className="min-h-0 flex-1 overflow-y-auto pr-1.5">
           <div className="space-y-4 pb-4">
@@ -1402,7 +2438,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                       name: "CTU / GVP Transformation"
                     }
                   ].filter((sub) =>
-                    enabledKeys.has(sub.id)
+                    enabledKeys.size === 0 || enabledKeys.has(sub.id)
                   );
 
                   const mainSystems: {
@@ -1418,7 +2454,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                   }
 
                   if (
-                    enabledKeys.has("SWACHH_RANKING")
+                    enabledKeys.size === 0 || enabledKeys.has("SWACHH_RANKING")
                   ) {
                     mainSystems.push({
                       id: "SWACHH_RANKING",
@@ -1427,9 +2463,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                   }
 
                   if (
-                    enabledKeys.has(
-                      "WORKFORCE_MONITORING"
-                    )
+                    enabledKeys.size === 0 || enabledKeys.has("WORKFORCE_MONITORING")
                   ) {
                     mainSystems.push({
                       id: "WORKFORCE_MONITORING",
@@ -1437,7 +2471,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                     });
                   }
 
-                  if (enabledKeys.has("MRF")) {
+                  if (enabledKeys.size === 0 || enabledKeys.has("MRF")) {
                     mainSystems.push({
                       id: "MRF",
                       name: "Processing Plant System"
@@ -1612,7 +2646,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                         return (
                           <div
                             key={sys.id}
-                            className="col-span-2 border border-slate-100 rounded-xl p-3 bg-slate-50/50 space-y-3"
+                            className="col-span-2 space-y-2"
                           >
                             <button
                               type="button"
@@ -1621,9 +2655,9 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                                   sys.id
                                 )
                               }
-                              className={`w-full px-3 py-2.5 rounded-xl border text-xs font-black flex items-center justify-between transition-all ${isSelected
-                                ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
-                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                              className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-black flex items-center justify-between transition-all cursor-pointer ${isSelected
+                                ? "border-blue-500 bg-blue-50/80 text-blue-800 shadow-2xs"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                                 }`}
                             >
                               <span>
@@ -1643,7 +2677,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                             {sys.id ===
                               "TASKFORCE_20" &&
                               isSelected && (
-                                <div className="pl-4 pt-1 border-l-2 border-blue-200 grid grid-cols-2 gap-2">
+                                <div className="pl-3 pt-1 border-l-2 border-blue-300 grid grid-cols-2 gap-2 mt-1">
                                   {taskforceSubModules.map(
                                     (sub) => {
                                       const isSubSelected =
@@ -1678,9 +2712,9 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                                           onClick={
                                             toggleSub
                                           }
-                                          className={`px-3 py-2 rounded-lg border text-[11px] font-bold flex items-center justify-between transition-all ${isSubSelected
-                                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                          className={`px-3 py-1.5 rounded-lg border text-[11px] font-extrabold flex items-center justify-between transition-all cursor-pointer ${isSubSelected
+                                            ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                             }`}
                                         >
                                           <span>
@@ -1711,7 +2745,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
             </div>
 
             {/* Geographic Access Control (Zones & Wards) */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <MultiSelectDropdown
                 label="Assigned Zones"
                 options={zones.map((z) => ({
@@ -1732,20 +2766,35 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                 }))}
                 selectedIds={wardIds}
                 onChange={setWardIds}
-                placeholder={
-                  zoneIds.length
-                    ? "Select wards..."
-                    : "Select zone first..."
-                }
+                placeholder="Select assigned wards..."
                 openUpward
               />
             </div>
+
+            {/* Status Message Alert Box */}
+            {statusMsg && (
+              <div
+                className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2.5 shadow-2xs transition-all ${
+                  statusMsg.type === "success"
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                    : "bg-red-50 border-red-300 text-red-800"
+                }`}
+              >
+                {statusMsg.type === "success" ? (
+                  <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertCircle size={17} className="text-red-600 shrink-0" />
+                )}
+                <span>{statusMsg.text}</span>
+              </div>
+            )}
 
             <div className="shrink-0 flex gap-3 border-t border-slate-200 bg-white pt-3 mt-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                disabled={loading}
+                className="flex-1 h-11 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1753,9 +2802,16 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors"
+                className="flex-1 h-11 rounded-xl bg-blue-600 text-xs font-bold text-white shadow-sm hover:bg-blue-500 transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
-                {loading ? "Saving access..." : "Save Access Permissions"}
+                {loading ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span>Saving Access Permissions...</span>
+                  </>
+                ) : (
+                  "Save Access Permissions"
+                )}
               </button>
             </div>
           </div>

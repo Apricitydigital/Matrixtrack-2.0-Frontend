@@ -471,13 +471,21 @@ export const CityApi = {
       name: string;
     }
   ) =>
-    apiFetch(`/hms/cities/${cityId}/commissioners`, {
+    apiFetch(`/city/commissioners`, {
       method: "POST",
       body: JSON.stringify({
         ...body,
         cityId,
       }),
-    }),
+    }).catch(() =>
+      apiFetch(`/hms/cities/${cityId}/commissioners`, {
+        method: "POST",
+        body: JSON.stringify({
+          ...body,
+          cityId,
+        }),
+      })
+    ),
   updateCityAdmin: (cityId: string, userId: string, body: { email?: string; password?: string; name?: string }) =>
     apiFetch(`/hms/cities/${cityId}/admins/${userId}`, {
       method: "PATCH",
