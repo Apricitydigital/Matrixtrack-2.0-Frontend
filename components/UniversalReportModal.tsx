@@ -175,6 +175,19 @@ export default function UniversalReportModal({
 
     const submitterPhone = record.phone || record.supervisor?.phone || record.employee?.phone || record.user?.phone || '';
 
+    const titleLower = (moduleTitle || '').toLowerCase();
+    const isSweepingModule = titleLower.includes('sweeping') || titleLower.includes('beat');
+    const isLitterbinModule = titleLower.includes('litter') || titleLower.includes('twinbin') || titleLower.includes('bin');
+    const isToiletModule = titleLower.includes('toilet');
+
+    const assetLabel = isSweepingModule
+        ? 'Beat Name'
+        : isLitterbinModule
+            ? 'Litter Bin Name'
+            : isToiletModule
+                ? 'Toilet Name'
+                : 'Asset Name';
+
     // Date/time
     const dateObj = new Date(record.createdAt || record.updatedAt || Date.now());
     const formattedDate = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -474,7 +487,7 @@ export default function UniversalReportModal({
                                             📋 Registered Asset Information
                                         </div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                            <MetaRow label="Asset / Toilet Name" value={assetName} />
+                                            <MetaRow label={assetLabel} value={assetName} />
                                             <MetaRow label="Asset ID" value={record.id || record.code || 'N/A'} />
                                             <MetaRow label="Area Name" value={record.areaName || record.area || record.toilet?.areaName || record.payload?.areaName || 'N/A'} />
                                             <MetaRow label="Address / Location" value={record.address || record.locationName || record.toilet?.address || record.payload?.address || 'N/A'} />
