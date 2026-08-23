@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   ArrowUpDown,
@@ -27,6 +27,7 @@ import {
   X,
   XCircle,
   ZoomIn,
+  Sparkles,
 } from 'lucide-react';
 
 import {
@@ -69,10 +70,10 @@ const MODULES: Array<{
   label: string;
   shortLabel: string;
 }> = [
-  { key: 'TOILET', label: 'Cleanliness of Toilets', shortLabel: 'Toilet' },
-  { key: 'LITTERBINS', label: 'Litter Bins', shortLabel: 'Litter Bin' },
-  { key: 'SWEEPING', label: 'Sweeping', shortLabel: 'Sweeping' },
-];
+    { key: 'TOILET', label: 'Cleanliness of Toilets', shortLabel: 'Toilet' },
+    { key: 'LITTERBINS', label: 'Litter Bins', shortLabel: 'Litter Bin' },
+    { key: 'SWEEPING', label: 'Sweeping', shortLabel: 'Sweeping' },
+  ];
 
 const DATE_PRESETS: Array<{ key: DatePreset; label: string }> = [
   { key: 'TODAY', label: 'Today' },
@@ -465,6 +466,67 @@ function extractAnswers(item: any): AnswerRow[] {
   return [{ question: 'Response', answer: displayAnswer(source), photos: [] }];
 }
 
+function getSweepingSubmittedPoints(
+  item: any
+) {
+  const points =
+    Array.isArray(
+      item?.payload?.points
+    )
+      ? item.payload.points
+      : [];
+
+  return [...points].sort(
+    (a: any, b: any) =>
+      Number(
+        a?.pointIndex ?? 999
+      ) -
+      Number(
+        b?.pointIndex ?? 999
+      )
+  );
+}
+
+function getSweepingSummary(
+  item: any
+) {
+  const points =
+    getSweepingSubmittedPoints(
+      item
+    );
+
+  const submitted =
+    Number(
+      item?.payload
+        ?.submittedPointCount
+    );
+
+  const total =
+    Number(
+      item?.payload
+        ?.totalPointCount
+    );
+
+  return {
+    points,
+
+    submitted:
+      Number.isFinite(submitted)
+        ? submitted
+        : points.length,
+
+    total:
+      Number.isFinite(total) &&
+        total > 0
+        ? total
+        : Array.isArray(
+          item?.beatPoints
+        )
+          ? item.beatPoints.length
+          : 5,
+  };
+}
+
 function collectTopLevelImages(item: any) {
   return normalizeImages([
     item?.photos,
@@ -483,13 +545,102 @@ function collectTopLevelImages(item: any) {
   ]);
 }
 
-function totalImageCount(item: any) {
-  const answerImages = extractAnswers(item).flatMap((answer) => answer.photos);
-  return new Set([...answerImages, ...collectTopLevelImages(item)]).size;
+function totalImageCount(
+  item: any
+) {
+  if (
+    item?.dashboardModule ===
+    'SWEEPING'
+  ) {
+    const pointImages =
+      getSweepingSubmittedPoints(
+        item
+      ).flatMap(
+        (point: any) =>
+          normalizeImages([
+            point?.photo,
+            point?.photoUrl,
+            point?.image,
+            point?.imageUrl,
+          ])
+      );
+
+    return new Set(
+      pointImages
+    ).size;
+  }
+
+  const answerImages =
+    extractAnswers(item).flatMap(
+      (answer) =>
+        answer.photos
+    );
+
+  return new Set([
+    ...answerImages,
+    ...collectTopLevelImages(
+      item
+    ),
+  ]).size;
 }
 
-function getQcRemark(item: any) {
-  return item?.qcComment || item?.payload?.qcRemarks || item?.qcRemarks || null;
+function getQcRemark(
+  item: any
+) {
+  return (
+    item?.qcRemark ||
+    item?.qcComment ||
+    item?.qcRemarks ||
+    item?.payload?.qcRemark ||
+    item?.payload?.qcRemarks ||
+    null
+  );
+}
+
+function parseAiObject(value: any) {
+  if (!value) return null;
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+
+      return parsed && typeof parsed === 'object'
+        ? parsed
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function getAutoQcResult(item: any) {
+  return parseAiObject(
+    item?.autoQcResult ??
+    item?.payload?.autoQcResult
+  );
+}
+
+function getActionAiResult(item: any) {
+  return parseAiObject(
+    item?.actionAiResult ??
+    item?.payload?.actionAiResult
+  );
+}
+
+function formatAiConfidence(value: any) {
+  const confidence = Number(value);
+
+  if (!Number.isFinite(confidence)) {
+    return '—';
+  }
+
+  return `${Math.round(confidence * 100)}%`;
 }
 
 function getActionRequiredRemark(item: any, moduleKey: ModuleKey) {
@@ -833,25 +984,333 @@ export default function InspectionPerformanceWorkspace() {
     setSortDirection('desc');
   }
 
-  async function openDetail(item: DashboardRecord) {
+  async function openDetail(
+    item: DashboardRecord
+  ) {
     setSelected(item);
-
-    if (item.dashboardModule !== 'TOILET') return;
+    setDetailLoading(true);
+    setError('');
 
     try {
-      setDetailLoading(true);
-      const response = await ToiletApi.getInspectionDetails(item.id);
+      /*
+       * =====================================================
+       * TOILET
+       * Keep existing Toilet detail hydration unchanged.
+       * =====================================================
+       */
+      if (
+        item.dashboardModule ===
+        'TOILET'
+      ) {
+        /*
+         * First hydrate the complete inspection.
+         */
+        const detailResponse =
+          await ToiletApi.getInspectionDetails(
+            item.id
+          );
 
-      if (response?.inspection) {
-        setSelected({
+        const detailedInspection =
+          detailResponse?.inspection || {};
+
+        /*
+         * Then generate / retrieve ULB Action AI.
+         *
+         * Existing results are returned without
+         * another OpenAI request.
+         */
+        const aiResponse =
+          await apiFetch<{
+            inspection?: any;
+            actionAiResult?: any;
+            generated?: boolean;
+          }>(
+            `/modules/toilet/inspections/${item.id}/action-ai`,
+            {
+              method: 'POST',
+            }
+          );
+
+        const hydratedReport: DashboardRecord = {
           ...item,
-          ...response.inspection,
-          dashboardModule: item.dashboardModule,
-          dashboardModuleLabel: item.dashboardModuleLabel,
-        });
+          ...detailedInspection,
+          ...(aiResponse?.inspection || {}),
+
+          actionAiResult:
+            aiResponse?.actionAiResult ??
+            aiResponse?.inspection
+              ?.actionAiResult ??
+            detailedInspection
+              ?.actionAiResult ??
+            item.actionAiResult,
+
+          actionAiAt:
+            aiResponse?.inspection
+              ?.actionAiAt ??
+            detailedInspection
+              ?.actionAiAt ??
+            item.actionAiAt,
+
+          actionAiModel:
+            aiResponse?.inspection
+              ?.actionAiModel ??
+            detailedInspection
+              ?.actionAiModel ??
+            item.actionAiModel,
+
+          autoQcResult:
+            aiResponse?.inspection
+              ?.autoQcResult ??
+            detailedInspection
+              ?.autoQcResult ??
+            item.autoQcResult,
+
+          qcComment:
+            aiResponse?.inspection
+              ?.qcComment ??
+            detailedInspection
+              ?.qcComment ??
+            item.qcComment,
+
+          dashboardModule:
+            item.dashboardModule,
+
+          dashboardModuleLabel:
+            item.dashboardModuleLabel,
+        };
+
+        /*
+         * Update View popup.
+         */
+        setSelected(
+          hydratedReport
+        );
+
+        /*
+         * Update outside Toilet card immediately.
+         */
+        setRecords((current) =>
+          current.map((record) =>
+            record.id === item.id &&
+              record.dashboardModule ===
+              'TOILET'
+              ? {
+                ...record,
+                ...hydratedReport,
+              }
+              : record
+          )
+        );
+
+        return;
       }
-    } catch (err) {
-      console.warn('Unable to hydrate toilet inspection detail', err);
+
+      /*
+ * =====================================================
+ * SWEEPING
+ *
+ * One report = one Beat/day.
+ *
+ * Retrieves existing ULB AI or generates it once.
+ * No questionnaire hydration is required.
+ * =====================================================
+ */
+      if (
+        item.dashboardModule ===
+        'SWEEPING'
+      ) {
+        const response =
+          await apiFetch<{
+            record?: any;
+            actionAiResult?: any;
+            generated?: boolean;
+          }>(
+            `/modules/SWEEPING/records/${item.id}/action-ai`,
+            {
+              method: 'POST',
+            }
+          );
+
+        const hydratedReport:
+          DashboardRecord = {
+          ...item,
+          ...(response?.record || {}),
+
+          actionAiResult:
+            response?.actionAiResult ??
+            response?.record
+              ?.actionAiResult ??
+            item.actionAiResult,
+
+          actionAiAt:
+            response?.record
+              ?.actionAiAt ??
+            item.actionAiAt,
+
+          actionAiModel:
+            response?.record
+              ?.actionAiModel ??
+            item.actionAiModel,
+
+          /*
+           * Preserve loaded Beat/P1-P5 data because
+           * update response contains only the DB record.
+           */
+          payload:
+            item.payload,
+
+          beatPoints:
+            item.beatPoints,
+
+          beatName:
+            item.beatName,
+
+          zoneName:
+            item.zoneName,
+
+          wardName:
+            item.wardName,
+
+          areaName:
+            item.areaName,
+
+          autoQcResult:
+            item.autoQcResult,
+
+          dashboardModule:
+            item.dashboardModule,
+
+          dashboardModuleLabel:
+            item.dashboardModuleLabel,
+        };
+
+        /*
+         * Full View popup.
+         */
+        setSelected(
+          hydratedReport
+        );
+
+        /*
+         * Outside Beat card.
+         */
+        setRecords((current) =>
+          current.map((record) =>
+            record.id === item.id &&
+              record.dashboardModule ===
+              'SWEEPING'
+              ? {
+                ...record,
+                ...hydratedReport,
+              }
+              : record
+          )
+        );
+
+        return;
+      }
+
+      /*
+       * =====================================================
+       * LITTER BIN
+       *
+       * Normal daily Litter Bin report.
+       *
+       * - Existing Action AI is returned directly.
+       * - Old QC-processed reports generate Action AI once.
+       * - Modal is updated.
+       * - Outside report card is also updated immediately.
+       * =====================================================
+       */
+      if (
+        item.dashboardModule ===
+        'LITTERBINS' &&
+        item.type !==
+        'VISIT_REPORT'
+      ) {
+        const response =
+          await apiFetch<{
+            report?: any;
+            actionAiResult?: any;
+            generated?: boolean;
+          }>(
+            `/modules/twinbin/reports/${item.id}/action-ai`,
+            {
+              method: 'POST',
+            }
+          );
+
+        const hydratedReport: DashboardRecord = {
+          ...item,
+          ...(response?.report || {}),
+
+          actionAiResult:
+            response?.actionAiResult ??
+            response?.report?.actionAiResult ??
+            item.actionAiResult,
+
+          actionAiAt:
+            response?.report?.actionAiAt ??
+            item.actionAiAt,
+
+          actionAiModel:
+            response?.report?.actionAiModel ??
+            item.actionAiModel,
+
+          dashboardModule:
+            item.dashboardModule,
+
+          dashboardModuleLabel:
+            item.dashboardModuleLabel,
+        };
+
+        /*
+         * Update open modal.
+         */
+        setSelected(
+          hydratedReport
+        );
+
+        /*
+         * Update outside card immediately.
+         *
+         * This means after closing View,
+         * AI Recommendation remains visible
+         * without refreshing the page.
+         */
+        setRecords((current) =>
+          current.map((record) =>
+            record.id === item.id &&
+              record.dashboardModule ===
+              item.dashboardModule
+              ? {
+                ...record,
+                ...hydratedReport,
+              }
+              : record
+          )
+        );
+
+        return;
+      }
+
+      /*
+       * Litter Bin visit reports and Sweeping
+       * currently use their loaded history data.
+       *
+       * Their ULB AI hydration will be added
+       * separately when we connect those flows.
+       */
+    } catch (err: any) {
+      console.warn(
+        'Unable to hydrate report detail',
+        err
+      );
+
+      setError(
+        err?.message ||
+        'Unable to generate ULB AI insight.'
+      );
     } finally {
       setDetailLoading(false);
     }
@@ -964,11 +1423,10 @@ export default function InspectionPerformanceWorkspace() {
                       type="button"
                       key={preset.key}
                       onClick={() => setDatePreset(preset.key)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                        active
-                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
-                      }`}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${active
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                        }`}
                     >
                       {preset.label}
                     </button>
@@ -994,11 +1452,10 @@ export default function InspectionPerformanceWorkspace() {
                     type="button"
                     key={moduleKey}
                     onClick={() => setModuleFilter(moduleKey)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                      active
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
-                    }`}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${active
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                      }`}
                   >
                     {label}
                   </button>
@@ -1140,11 +1597,10 @@ export default function InspectionPerformanceWorkspace() {
                     type="button"
                     key={field}
                     onClick={() => handleSort(field)}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2.5 text-xs font-bold transition ${
-                      active
-                        ? 'border-blue-200 bg-blue-50 text-blue-700'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
-                    }`}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2.5 text-xs font-bold transition ${active
+                      ? 'border-blue-200 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                      }`}
                   >
                     {label}
                     {active && <ArrowUpDown className="h-3.5 w-3.5" />}
@@ -1178,11 +1634,10 @@ export default function InspectionPerformanceWorkspace() {
                 type="button"
                 key={statusKey}
                 onClick={() => setActiveStatus(statusKey)}
-                className={`rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm ${
-                  active
-                    ? `${config.border} ${config.bg} shadow-sm`
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                }`}
+                className={`rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm ${active
+                  ? `${config.border} ${config.bg} shadow-sm`
+                  : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
               >
                 <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${config.bg}`}>
                   <Icon className={`h-5 w-5 ${config.text}`} />
@@ -1191,9 +1646,8 @@ export default function InspectionPerformanceWorkspace() {
                   {counts[statusKey].toLocaleString()}
                 </div>
                 <div
-                  className={`mt-2 text-[10px] font-black uppercase tracking-[0.12em] ${
-                    active ? config.text : 'text-slate-500'
-                  }`}
+                  className={`mt-2 text-[10px] font-black uppercase tracking-[0.12em] ${active ? config.text : 'text-slate-500'
+                    }`}
                 >
                   {config.shortLabel}
                 </div>
@@ -1332,6 +1786,26 @@ function ReportCard({
   const answers = extractAnswers(report);
   const imageCount = totalImageCount(report);
   const actionEnabled = ['APPROVED', 'REJECTED'].includes(status);
+  const actionAi =
+    getActionAiResult(report);
+
+  const aiRecommendation =
+    String(
+      actionAi?.recommendation || ''
+    ).toUpperCase();
+
+  const aiSuggestsAction =
+    aiRecommendation ===
+    'ACTION_REQUIRED';
+
+  const isSweeping =
+    report.dashboardModule ===
+    'SWEEPING';
+
+  const sweepingSummary =
+    isSweeping
+      ? getSweepingSummary(report)
+      : null;
 
   const moduleTone =
     report.dashboardModule === 'TOILET'
@@ -1395,13 +1869,86 @@ function ReportCard({
             )}
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5" />
-            {answers.length} answer{answers.length === 1 ? '' : 's'}
-          </div>
+          {isSweeping &&
+            sweepingSummary ? (
+            <div className="flex items-center gap-1.5">
+              <ImageIcon className="h-3.5 w-3.5" />
+
+              <span className="font-bold text-violet-600">
+                {sweepingSummary.submitted}
+                {' / '}
+                {sweepingSummary.total}
+                {' points submitted'}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+
+              {answers.length}{' '}
+              answer
+              {answers.length === 1
+                ? ''
+                : 's'}
+            </div>
+          )}
         </div>
       </div>
+      {actionAi && (
+        <div className="px-4 pb-3">
+          <div
+            className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 ${aiSuggestsAction
+              ? 'border-orange-200 bg-orange-50'
+              : 'border-emerald-200 bg-emerald-50'
+              }`}
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${aiSuggestsAction
+                  ? 'bg-orange-100 text-orange-600'
+                  : 'bg-emerald-100 text-emerald-600'
+                  }`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </div>
 
+              <div className="min-w-0">
+                <div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  AI Recommendation
+                </div>
+
+                <div
+                  className={`truncate text-[11px] font-black ${aiSuggestsAction
+                    ? 'text-orange-700'
+                    : 'text-emerald-700'
+                    }`}
+                >
+                  {aiSuggestsAction
+                    ? 'Action Required'
+                    : 'No Action Required'}
+                </div>
+              </div>
+            </div>
+
+            {Number.isFinite(
+              Number(actionAi?.confidence)
+            ) && (
+                <span
+                  className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-black ${aiSuggestsAction
+                    ? 'border-orange-200 bg-white text-orange-700'
+                    : 'border-emerald-200 bg-white text-emerald-700'
+                    }`}
+                >
+                  {Math.round(
+                    Number(actionAi.confidence) *
+                    100
+                  )}
+                  %
+                </span>
+              )}
+          </div>
+        </div>
+      )}
       <footer className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/80 px-4 py-3">
         <button
           type="button"
@@ -1421,11 +1968,10 @@ function ReportCard({
               ? 'Send this QC-processed report for corrective action'
               : 'Action Required can only be raised from Approved or Rejected reports'
           }
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-            actionEnabled
-              ? 'border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100'
-              : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-          }`}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${actionEnabled
+            ? 'border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100'
+            : 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+            }`}
         >
           <AlertTriangle className="h-3.5 w-3.5" />
           Action Required
@@ -1453,17 +1999,27 @@ function DetailModal({
   const qcRemark = getQcRemark(report);
   const actionRequiredRemark = getActionRequiredRemark(report, report.dashboardModule);
   const actionTakenRemark = getActionTakenRemark(report, report.dashboardModule);
+  const isSweeping =
+    report.dashboardModule ===
+    'SWEEPING';
 
-  return (
+  const sweepingSummary =
+    isSweeping
+      ? getSweepingSummary(report)
+      : null;
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-slate-950/65 p-3 backdrop-blur-sm sm:items-center sm:p-5"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="my-3 w-full max-w-4xl overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl sm:my-8"
-        onClick={(event) => event.stopPropagation()}
+        className="flex max-h-[calc(100vh-32px)] w-[min(1080px,calc(100vw-32px))] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}
       >
-        <div className="border-b border-slate-200 bg-gradient-to-r from-blue-50 via-white to-slate-50 px-5 py-4">
+        <div className="shrink-0 border-b border-slate-200 bg-gradient-to-r from-blue-50 via-white to-slate-50 px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1490,7 +2046,7 @@ function DetailModal({
           </div>
         </div>
 
-        <div className="max-h-[78vh] overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {loading && (
             <div className="mb-4 flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1502,7 +2058,20 @@ function DetailModal({
             {[
               { label: 'Module', value: moduleShortLabel(report.dashboardModule) },
               { label: 'Status', value: status.replace(/_/g, ' ') },
-              { label: 'Answers', value: String(answers.length) },
+              {
+                label:
+                  isSweeping
+                    ? 'Points'
+                    : 'Answers',
+
+                value:
+                  isSweeping &&
+                    sweepingSummary
+                    ? `${sweepingSummary.submitted}/${sweepingSummary.total}`
+                    : String(
+                      answers.length
+                    ),
+              },
               { label: 'Photos', value: String(totalImageCount(report)) },
             ].map((item) => (
               <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
@@ -1527,7 +2096,7 @@ function DetailModal({
               <DetailRow icon={MapPin} label="Ward" value={report?.wardName || report?.bin?.wardName || '—'} />
             </div>
           </section>
-
+          <AiInsightsSection report={report} />
           {(qcRemark || actionRequiredRemark || actionTakenRemark) && (
             <section className="mt-5">
               <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
@@ -1558,48 +2127,58 @@ function DetailModal({
             </section>
           )}
 
-          <section className="mt-5">
-            <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-              Questions &amp; Answers ({answers.length})
-            </h3>
+          {isSweeping ? (
+            <SweepingPointEvidenceSection
+              report={report}
+              onImagePreview={
+                onImagePreview
+              }
+            />
+          ) : (
+            <section className="mt-5">
+              <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Questions &amp; Answers ({answers.length})
+              </h3>
 
-            {answers.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-400">
-                No question/answer snapshot is available for this report.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {answers.map((answer, index) => (
-                  <div key={`${answer.question}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4">
-                    {answer.section && (
-                      <div className="mb-1 text-[9px] font-black uppercase tracking-[0.12em] text-blue-600">
-                        {answer.section}
+              {answers.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-400">
+                  No question/answer snapshot is available for this report.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {answers.map((answer, index) => (
+                    <div key={`${answer.question}-${index}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                      {answer.section && (
+                        <div className="mb-1 text-[9px] font-black uppercase tracking-[0.12em] text-blue-600">
+                          {answer.section}
+                        </div>
+                      )}
+                      <div className="text-sm font-black text-slate-800">
+                        <span className="text-slate-400">Q{index + 1}. </span>
+                        {answer.question}
                       </div>
-                    )}
-                    <div className="text-sm font-black text-slate-800">
-                      <span className="text-slate-400">Q{index + 1}. </span>
-                      {answer.question}
-                    </div>
-                    <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                      <span className="text-slate-400">Answer: </span>
-                      {answer.answer}
-                    </div>
+                      <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                        <span className="text-slate-400">Answer: </span>
+                        {answer.answer}
+                      </div>
 
-                    {answer.photos.length > 0 && (
-                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {answer.photos.map((url) => (
-                          <ImageTile key={url} url={url} onOpen={onImagePreview} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+                      {answer.photos.length > 0 && (
+                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          {answer.photos.map((url) => (
+                            <ImageTile key={url} url={url} onOpen={onImagePreview} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1644,6 +2223,534 @@ function RemarkBox({
       <div className="text-[9px] font-black uppercase tracking-[0.12em] opacity-70">{label}</div>
       <div className="mt-1 text-sm font-semibold">{displayAnswer(value)}</div>
     </div>
+  );
+}
+
+function AiInsightsSection({
+  report,
+}: {
+  report: DashboardRecord;
+}) {
+  const autoQc = getAutoQcResult(report);
+  const actionAi = getActionAiResult(report);
+
+  if (!autoQc && !actionAi) {
+    return (
+      <section className="mt-5">
+        <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+          AI Insights
+        </h3>
+
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+              <Sparkles className="h-4 w-4" />
+            </div>
+
+            <div>
+              <div className="text-sm font-black text-slate-700">
+                No AI insight available
+              </div>
+
+              <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+                No stored AI analysis is available for this report.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const actionRecommendation =
+    String(
+      actionAi?.recommendation || ''
+    ).toUpperCase();
+
+  const actionRequired =
+    actionRecommendation ===
+    'ACTION_REQUIRED';
+
+  const autoDecision =
+    String(
+      autoQc?.decision || ''
+    ).toUpperCase();
+
+  const autoRejected =
+    autoDecision === 'REJECTED';
+
+  return (
+    <section className="mt-5">
+      <div className="mb-2 flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-violet-600" />
+
+        <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+          AI Insights
+        </h3>
+      </div>
+
+      <div className="space-y-3">
+
+        {/* ============================= */}
+        {/* ULB ACTION AI */}
+        {/* ============================= */}
+
+        {actionAi && (
+          <div
+            className={`overflow-hidden rounded-2xl border ${actionRequired
+              ? 'border-orange-200 bg-orange-50/60'
+              : 'border-emerald-200 bg-emerald-50/60'
+              }`}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 px-4 py-3">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                  ULB AI Recommendation
+                </div>
+
+                <div className="mt-1 text-sm font-black text-slate-800">
+                  Corrective Action Assessment
+                </div>
+              </div>
+
+              <span
+                className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${actionRequired
+                  ? 'border-orange-200 bg-orange-100 text-orange-700'
+                  : 'border-emerald-200 bg-emerald-100 text-emerald-700'
+                  }`}
+              >
+                {actionRequired
+                  ? 'Action Required'
+                  : 'No Action Required'}
+              </span>
+            </div>
+
+            <div className="p-4">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/80 bg-white/80 px-3 py-2.5">
+                  <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    AI Confidence
+                  </div>
+
+                  <div className="mt-1 text-lg font-black text-slate-800">
+                    {formatAiConfidence(
+                      actionAi.confidence
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/80 bg-white/80 px-3 py-2.5">
+                  <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    Source QC Decision
+                  </div>
+
+                  <div className="mt-1 text-sm font-black text-slate-800">
+                    {String(
+                      actionAi.sourceQcDecision ||
+                      '—'
+                    ).replace(/_/g, ' ')}
+                  </div>
+                </div>
+              </div>
+
+              {actionAi.summary && (
+                <div className="mt-3">
+                  <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    AI Summary
+                  </div>
+
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-700">
+                    {actionAi.summary}
+                  </p>
+                </div>
+              )}
+
+              {Array.isArray(actionAi.reasons) &&
+                actionAi.reasons.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                      Key Findings
+                    </div>
+
+                    <div className="mt-2 space-y-1.5">
+                      {actionAi.reasons.map(
+                        (
+                          reason: any,
+                          index: number
+                        ) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-2 text-xs font-medium leading-5 text-slate-600"
+                          >
+                            <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                            <span>
+                              {String(reason)}
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              {actionAi.recommendedAction && (
+                <div className="mt-4 rounded-xl border border-orange-200 bg-white px-4 py-3">
+                  <div className="text-[9px] font-black uppercase tracking-wider text-orange-500">
+                    Recommended Corrective Action
+                  </div>
+
+                  <p className="mt-1 text-sm font-bold leading-6 text-slate-700">
+                    {actionAi.recommendedAction}
+                  </p>
+                </div>
+              )}
+
+              <p className="mt-3 text-[10px] font-semibold leading-4 text-slate-400">
+                AI provides operational guidance only.
+                The ULB Officer remains responsible for
+                the final Action Required decision.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ============================= */}
+        {/* ORIGINAL QC AUTO AI */}
+        {/* ============================= */}
+
+        {autoQc && (
+          <div className="overflow-hidden rounded-2xl border border-violet-200 bg-violet-50/50">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100 px-4 py-3">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-500">
+                  QC AI Verification
+                </div>
+
+                <div className="mt-1 text-sm font-black text-slate-800">
+                  Photo &amp; Response Analysis
+                </div>
+              </div>
+
+              {autoDecision && (
+                <span
+                  className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase ${autoRejected
+                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    }`}
+                >
+                  {autoDecision.replace(
+                    /_/g,
+                    ' '
+                  )}
+                </span>
+              )}
+            </div>
+
+            <div className="p-4">
+              <div className="mb-3 inline-flex rounded-lg border border-violet-100 bg-white px-3 py-2">
+                <div>
+                  <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    Confidence
+                  </div>
+
+                  <div className="mt-0.5 text-sm font-black text-violet-700">
+                    {formatAiConfidence(
+                      autoQc.confidence
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {autoQc.summary && (
+                <p className="text-sm font-semibold leading-6 text-slate-700">
+                  {autoQc.summary}
+                </p>
+              )}
+
+              {Array.isArray(autoQc.reasons) &&
+                autoQc.reasons.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {autoQc.reasons.map(
+                      (
+                        reason: any,
+                        index: number
+                      ) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-2 text-xs font-medium leading-5 text-slate-600"
+                        >
+                          <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+                          <span>
+                            {String(reason)}
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SweepingPointEvidenceSection({
+  report,
+  onImagePreview,
+}: {
+  report: DashboardRecord;
+  onImagePreview: (
+    url: string
+  ) => void;
+}) {
+  const {
+    points: submittedPoints,
+    submitted,
+    total,
+  } = getSweepingSummary(
+    report
+  );
+
+  const beatPoints =
+    Array.isArray(
+      report?.beatPoints
+    ) &&
+      report.beatPoints.length > 0
+      ? report.beatPoints
+      : Array.from(
+        {
+          length: total,
+        },
+        (_, index) => ({
+          code:
+            `P${index + 1}`,
+
+          name:
+            `Point ${index + 1}`,
+
+          type:
+            index === 0
+              ? 'START'
+              : index ===
+                total - 1
+                ? 'END'
+                : 'ROUTE',
+        })
+      );
+
+  const autoQc =
+    getAutoQcResult(
+      report
+    );
+
+  const pointFindings =
+    Array.isArray(
+      autoQc?.pointFindings
+    )
+      ? autoQc.pointFindings
+      : [];
+
+  return (
+    <section className="mt-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+          Beat Point Evidence
+        </h3>
+
+        <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">
+          {submitted}/{total} submitted
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {beatPoints.map(
+          (
+            beatPoint: any,
+            index: number
+          ) => {
+            const pointCode =
+              beatPoint?.code ||
+              `P${index + 1}`;
+
+            const pointIndex =
+              index;
+
+            const evidence =
+              submittedPoints.find(
+                (point: any) =>
+                  point?.pointCode ===
+                  pointCode ||
+                  Number(
+                    point?.pointIndex
+                  ) === pointIndex
+              );
+
+            const finding =
+              pointFindings.find(
+                (item: any) =>
+                  item?.pointCode ===
+                  pointCode ||
+                  Number(
+                    item?.pointIndex
+                  ) === pointIndex
+              );
+
+            const photos =
+              evidence
+                ? normalizeImages([
+                  evidence?.photo,
+                  evidence?.photoUrl,
+                  evidence?.image,
+                  evidence?.imageUrl,
+                ])
+                : [];
+
+            const submittedPoint =
+              Boolean(evidence);
+
+            return (
+              <div
+                key={pointCode}
+                className={`overflow-hidden rounded-2xl border ${submittedPoint
+                  ? 'border-slate-200 bg-white'
+                  : 'border-dashed border-amber-200 bg-amber-50/50'
+                  }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                  <div>
+                    <div className="text-sm font-black text-slate-800">
+                      {beatPoint?.name ||
+                        `Point ${index + 1}`}
+                    </div>
+
+                    <div className="mt-0.5 text-[10px] font-bold text-slate-400">
+                      {pointCode}
+
+                      {beatPoint?.type
+                        ? ` · ${beatPoint.type}`
+                        : ''}
+                    </div>
+                  </div>
+
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase ${submittedPoint
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-amber-200 bg-amber-50 text-amber-700'
+                      }`}
+                  >
+                    {submittedPoint
+                      ? 'Submitted'
+                      : 'Not Submitted'}
+                  </span>
+                </div>
+
+                <div className="p-4">
+                  {submittedPoint ? (
+                    <>
+                      {photos.length >
+                        0 && (
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {photos.map(
+                              (
+                                url
+                              ) => (
+                                <ImageTile
+                                  key={
+                                    url
+                                  }
+                                  url={
+                                    url
+                                  }
+                                  onOpen={
+                                    onImagePreview
+                                  }
+                                />
+                              )
+                            )}
+                          </div>
+                        )}
+
+                      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-[8px] font-black uppercase text-slate-400">
+                            Submitted At
+                          </div>
+
+                          <div className="mt-1 font-bold text-slate-700">
+                            {formatFullDate(
+                              evidence
+                                ?.submittedAt
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-[8px] font-black uppercase text-slate-400">
+                            Distance
+                          </div>
+
+                          <div className="mt-1 font-bold text-slate-700">
+                            {Number.isFinite(
+                              Number(
+                                evidence
+                                  ?.distanceMeters
+                              )
+                            )
+                              ? `${Number(
+                                evidence
+                                  .distanceMeters
+                              ).toFixed(
+                                1
+                              )} m`
+                              : '—'}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-[8px] font-black uppercase text-slate-400">
+                            QC AI
+                          </div>
+
+                          <div className="mt-1 font-bold text-slate-700">
+                            {String(
+                              finding
+                                ?.result ||
+                              '—'
+                            ).replace(
+                              /_/g,
+                              ' '
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {finding?.reason && (
+                        <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2.5">
+                          <div className="text-[8px] font-black uppercase tracking-wider text-violet-500">
+                            QC AI Finding
+                          </div>
+
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
+                            {finding.reason}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="py-5 text-center text-xs font-semibold text-amber-700">
+                      No photo was submitted
+                      for this Beat point.
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+        )}
+      </div>
+    </section>
   );
 }
 
