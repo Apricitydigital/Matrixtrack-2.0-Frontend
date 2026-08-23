@@ -461,6 +461,20 @@ export default function WardManagementPage() {
       { wch: 24 },
     ];
 
+    // Format header row (Row 1) with 26pt height, bold font and subtle slate fill
+    worksheet["!rows"] = [{ hpt: 26 }];
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const address = XLSX.utils.encode_cell({ r: 0, c: C });
+      if (worksheet[address]) {
+        worksheet[address].s = {
+          font: { bold: true, name: "Segoe UI", sz: 11, color: { rgb: "0F172A" } },
+          fill: { fgColor: { rgb: "E2E8F0" } },
+          alignment: { horizontal: "left", vertical: "center" }
+        };
+      }
+    }
+
     const workbook =
       XLSX.utils.book_new();
 
