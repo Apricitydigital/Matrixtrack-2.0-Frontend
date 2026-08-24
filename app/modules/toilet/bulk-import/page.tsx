@@ -103,130 +103,137 @@ export default function BulkImportPage() {
 
     const parseAndValidateCSV = async (csvFile: File, zoneList = zones, wardList = wards) => {
         try {
-            const text = await csvFile.text();
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-            if (lines.length < 2) {
+            const rawText = await csvFile.text();
+
+            // ── RFC-4180 full-document tokenizer ──────────────────────────────────
+            // MUST tokenize before splitting rows, because Address cells frequently
+            // contain embedded newlines (common Excel export behaviour).
+            const tokenizeCSV = (raw: string): string[][] => {
+                const rows: string[][] = [];
+                let row: string[] = [];
+                let cell = '';
+                let inQ = false;
+                for (let i = 0; i < raw.length; i++) {
+                    const ch   = raw[i];
+                    const next = raw[i + 1];
+                    if (inQ) {
+                        if (ch === '"' && next === '"') { cell += '"'; i++; }   // escaped "
+                        else if (ch === '"')             { inQ = false; }        // close quote
+                        else                             { cell += ch; }         // embedded \n ok
+                    } else {
+                        if      (ch === '"')  { inQ = true; }
+                        else if (ch === ',')  { row.push(cell.trim()); cell = ''; }
+                        else if (ch === '\r' && next === '\n') {
+                            row.push(cell.trim());
+                            if (row.some(c => c)) rows.push(row);
+                            row = []; cell = ''; i++;
+                        } else if (ch === '\n' || ch === '\r') {
+                            row.push(cell.trim());
+                            if (row.some(c => c)) rows.push(row);
+                            row = []; cell = '';
+                        } else { cell += ch; }
+                    }
+                }
+                if (cell || row.length) { row.push(cell.trim()); if (row.some(c => c)) rows.push(row); }
+                return rows;
+            };
+
+            const allRows = tokenizeCSV(rawText);
+            if (allRows.length < 2) {
                 setError('CSV file is empty or missing data rows');
                 setPreviewRows([]);
                 return;
             }
 
-            const parseCSVLine = (line: string): string[] => {
-                const result: string[] = [];
-                let current = '';
-                let inQuotes = false;
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') {
-                        inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) {
-                        result.push(current.trim().replace(/^"|"$/g, ''));
-                        current = '';
-                    } else {
-                        current += char;
-                    }
-                }
-                result.push(current.trim().replace(/^"|"$/g, ''));
-                return result;
-            };
-
-            const headerRow = parseCSVLine(lines[0]).map(h => h.toLowerCase());
-            const is9ColFormat = headerRow.includes('toilet type') || headerRow.includes('area type') || headerRow.includes('toilet name / id') || (headerRow[0] && headerRow[0].includes('zone'));
+            const headerRow = allRows[0].map(h => h.toLowerCase());
+            const is9ColFormat =
+                headerRow.includes('toilet type') ||
+                headerRow.includes('area type')   ||
+                headerRow.includes('toilet name / id') ||
+                (headerRow[0] && headerRow[0].includes('zone'));
 
             const parsed: PreviewRow[] = [];
+            // Carry-forward: Excel merged cells export as blank for child rows
+            let lastZone = '', lastWard = '', lastAreaType = 'RESIDENTIAL';
 
-            for (let i = 1; i < lines.length; i++) {
-                const values = parseCSVLine(lines[i]);
-                if (values.length < 3) continue;
+            for (let i = 1; i < allRows.length; i++) {
+                const v = allRows[i];
+                if (v.length < 3) continue;
 
-                let zoneName = '', wardName = '', areaType = 'RESIDENTIAL', areaName = '', name = '', address = '', typeStr = 'CT', latStr = '', lonStr = '';
+                let zoneName = '', wardName = '', areaType = '', areaName = '', name = '', address = '', typeStr = 'CT', latStr = '', lonStr = '';
 
                 if (is9ColFormat) {
-                    // Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude
-                    zoneName = values[0] || '';
-                    wardName = values[1] || '';
-                    areaType = values[2]?.trim() || 'RESIDENTIAL';
-                    areaName = values[3] || '';
-                    name = values[4] || '';
-                    address = values[5] || '';
-                    typeStr = values[6] || 'CT';
-                    latStr = values[7] || '';
-                    lonStr = values[8] || '';
+                    zoneName = v[0]?.trim() || ''; wardName = v[1]?.trim() || '';
+                    areaType = v[2]?.trim() || ''; areaName = v[3]?.trim() || '';
+                    name     = v[4]?.trim() || ''; address  = v[5]?.trim() || '';
+                    typeStr  = v[6]?.trim() || 'CT';
+                    latStr   = v[7]?.trim() || ''; lonStr   = v[8]?.trim() || '';
                 } else {
-                    // Name,Zone Name,Ward Name,Type,Gender,Code,Operator Name,Number of Seats,Latitude,Longitude,Address
-                    name = values[0] || '';
-                    zoneName = values[1] || '';
-                    wardName = values[2] || '';
-                    typeStr = values[3] || 'CT';
-                    latStr = values[8] || '';
-                    lonStr = values[9] || '';
-                    address = values.slice(10).join(',');
+                    name     = v[0]?.trim() || ''; zoneName = v[1]?.trim() || '';
+                    wardName = v[2]?.trim() || ''; typeStr  = v[3]?.trim() || 'CT';
+                    latStr   = v[8]?.trim() || ''; lonStr   = v[9]?.trim() || '';
+                    address  = v.slice(10).join(',').trim();
                 }
 
-                // Skip completely blank trailing rows exported by Excel
-                if (!zoneName.trim() && !wardName.trim() && !name.trim() && !address.trim() && (!latStr || latStr === '0')) {
-                    continue;
-                }
-                if (!zoneName.trim() && !wardName.trim()) {
-                    continue;
-                }
+                // Apply carry-forward for merged/blank cells
+                if (zoneName)  lastZone     = zoneName;     else zoneName  = lastZone;
+                if (wardName)  lastWard     = wardName;     else wardName  = lastWard;
+                if (areaType)  lastAreaType = areaType;     else areaType  = lastAreaType;
 
-                // Flexible Zone Matching against system registered Master Data
+                // Skip fully blank rows
+                if (!zoneName && !wardName && !name) continue;
+
+                // Zone match: exact → number → substring
                 let matchedZone = zoneList.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
                 if (!matchedZone) {
-                    const zoneNum = zoneName.replace(/\D/g, "");
-                    if (zoneNum) {
-                        matchedZone = zoneList.find(z => z.name.replace(/\D/g, "") === zoneNum);
-                    }
+                    const zNum = zoneName.replace(/\D/g, '');
+                    if (zNum) matchedZone = zoneList.find(z => z.name.replace(/\D/g, '') === zNum);
                 }
                 if (!matchedZone) {
-                    matchedZone = zoneList.find(z => z.name.toLowerCase().includes(zoneName.toLowerCase()) || zoneName.toLowerCase().includes(z.name.toLowerCase()));
-                }
-
-                // Flexible Ward Matching against system registered Master Data
-                const candidateWards = matchedZone ? wardList.filter(w => w.zoneId === matchedZone.id) : wardList;
-                let matchedWard = candidateWards.find(w => w.name.trim().toLowerCase() === wardName.toLowerCase());
-                if (!matchedWard) {
-                    const wardNum = wardName.replace(/\D/g, "");
-                    if (wardNum) {
-                        matchedWard = candidateWards.find(w => {
-                            const wNum = w.name.split('-')[0]?.trim().replace(/\D/g, "") || w.name.replace(/\D/g, "");
-                            return wNum === wardNum;
-                        });
-                    }
-                }
-                if (!matchedWard) {
-                    const cleanWard = wardName.replace(/ward/i, "").trim().toLowerCase();
-                    if (cleanWard) {
-                        matchedWard = candidateWards.find(w => w.name.toLowerCase().includes(cleanWard) || cleanWard.includes(w.name.toLowerCase()));
-                    }
-                }
-                if (!matchedWard && matchedZone) {
-                    const wardNum = wardName.replace(/\D/g, "");
-                    const cleanWard = wardName.replace(/ward/i, "").trim().toLowerCase();
-                    matchedWard = wardList.find(w => 
-                        (wardNum && (w.name.split('-')[0]?.trim().replace(/\D/g, "") === wardNum)) ||
-                        (cleanWard && w.name.toLowerCase().includes(cleanWard))
+                    matchedZone = zoneList.find(z =>
+                        z.name.toLowerCase().includes(zoneName.toLowerCase()) ||
+                        zoneName.toLowerCase().includes(z.name.toLowerCase())
                     );
                 }
 
-                let isValid = true;
-                let validationError = '';
+                // Ward match: exact → number → clean-name → global fallback
+                const pool        = matchedZone ? wardList.filter(w => w.zoneId === matchedZone!.id) : wardList;
+                const wNum        = wardName.replace(/\D/g, '');
+                const wClean      = wardName.replace(/ward/i, '').trim().toLowerCase();
 
-                if (!matchedZone) {
-                    isValid = false;
-                    validationError = `Zone '${zoneName}' not registered in system Master Data`;
-                } else if (!matchedWard) {
-                    isValid = false;
-                    validationError = `Ward '${wardName}' not registered under ${matchedZone?.name || 'Zone'}`;
+                let matchedWard = pool.find(w => w.name.trim().toLowerCase() === wardName.toLowerCase());
+                if (!matchedWard && wNum) {
+                    matchedWard = pool.find(w => {
+                        const n = w.name.split('-')[0]?.trim().replace(/\D/g, '') || w.name.replace(/\D/g, '');
+                        return n === wNum;
+                    });
                 }
+                if (!matchedWard && wClean) {
+                    matchedWard = pool.find(w =>
+                        w.name.toLowerCase().includes(wClean) || wClean.includes(w.name.toLowerCase())
+                    );
+                }
+                // Global fallback — drop zone constraint
+                if (!matchedWard) {
+                    matchedWard = wardList.find(w => {
+                        const n = w.name.split('-')[0]?.trim().replace(/\D/g, '') || w.name.replace(/\D/g, '');
+                        return (wNum && n === wNum) || (wClean && w.name.toLowerCase().includes(wClean));
+                    });
+                }
+
+                const isValid = !!(matchedZone && matchedWard);
+                const validationError = !matchedZone
+                    ? `Zone '${zoneName}' not found in Master Data`
+                    : !matchedWard
+                    ? `Ward '${wardName}' not found under ${matchedZone.name}`
+                    : '';
 
                 parsed.push({
                     index: parsed.length + 1,
                     zoneId: matchedZone?.id,
                     wardId: matchedWard?.id,
-                    zoneName: matchedZone ? matchedZone.name : zoneName,
-                    wardName: matchedWard ? matchedWard.name : wardName,
+                    zoneName: matchedZone?.name || zoneName,
+                    wardName: matchedWard?.name || wardName,
                     areaType,
                     areaName,
                     name: name || 'Toilet Asset',
@@ -254,7 +261,6 @@ export default function BulkImportPage() {
             setError('');
             setResult(null);
             if (!geoLoaded) {
-                // Geo data not ready yet — save the file and re-validate once it loads
                 pendingFileRef.current = selected;
                 setPreviewRows([]);
             } else {
