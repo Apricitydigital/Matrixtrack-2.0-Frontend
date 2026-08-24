@@ -257,7 +257,31 @@ export default function BulkImportPage() {
         setUploading(true);
         setError('');
         try {
-            const response = await ToiletApi.bulkImport({ rows: validRows });
+            const formatCSVValue = (val: any) => {
+                const str = String(val ?? '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            const csvLines = [
+                'Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude',
+                ...validRows.map(r => [
+                    formatCSVValue(r.zoneName),
+                    formatCSVValue(r.wardName),
+                    formatCSVValue(r.areaType),
+                    formatCSVValue(r.areaName),
+                    formatCSVValue(r.name),
+                    formatCSVValue(r.address),
+                    formatCSVValue(r.type),
+                    formatCSVValue(r.latitude),
+                    formatCSVValue(r.longitude)
+                ].join(','))
+            ];
+            const csvText = csvLines.join('\n');
+
+            const response = await ToiletApi.bulkImport({ rows: validRows, csvText });
             setResult(response);
             setTimeout(() => router.push('/modules/toilet'), 2500);
         } catch (err: any) {
@@ -280,9 +304,29 @@ export default function BulkImportPage() {
             const zoneName = selectedWard ? selectedWard.zoneName : 'Zone';
             const toiletName = formData.name.trim() || 'Toilet Asset';
 
-            const csvData = `Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude\n${zoneName},${wardName},${formData.areaType},${formData.areaName},${toiletName},${formData.address},${formData.type},${formData.latitude},${formData.longitude}`;
+            const formatCSVValue = (val: any) => {
+                const str = String(val ?? '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            const singleRow = {
+                zoneName,
+                wardName,
+                areaType: formData.areaType,
+                areaName: formData.areaName,
+                name: toiletName,
+                address: formData.address,
+                type: formData.type,
+                latitude: formData.latitude,
+                longitude: formData.longitude
+            };
+
+            const csvText = `Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude\n${formatCSVValue(zoneName)},${formatCSVValue(wardName)},${formatCSVValue(formData.areaType)},${formatCSVValue(formData.areaName)},${formatCSVValue(toiletName)},${formatCSVValue(formData.address)},${formatCSVValue(formData.type)},${formatCSVValue(formData.latitude)},${formatCSVValue(formData.longitude)}`;
             
-            const response = await ToiletApi.bulkImport(csvData);
+            const response = await ToiletApi.bulkImport({ rows: [singleRow], csvText });
             setResult(response);
             setTimeout(() => router.push('/modules/toilet'), 2500);
         } catch (err: any) {
