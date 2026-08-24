@@ -238,14 +238,7 @@ export default function BulkImportPage() {
         setUploading(true);
         setError('');
         try {
-            // Build validated CSV containing only valid rows
-            const csvLines = [
-                'Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude',
-                ...validRows.map(r => `${r.zoneName},${r.wardName},${r.areaType},${r.areaName},${r.name},${r.address},${r.type},${r.latitude},${r.longitude}`)
-            ];
-            const csvText = csvLines.join('\n');
-
-            const response = await ToiletApi.bulkImport(csvText);
+            const response = await ToiletApi.bulkImport({ rows: validRows });
             setResult(response);
             setTimeout(() => router.push('/modules/toilet'), 2500);
         } catch (err: any) {

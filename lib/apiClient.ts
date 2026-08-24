@@ -854,10 +854,10 @@ export const ToiletApi = {
   rejectToilet: (id: string, reason: string) =>
     apiFetch(`/modules/toilet/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
 
-  bulkImport: (csvText: string) =>
+  bulkImport: (payload: string | { rows?: any[]; csvText?: string }) =>
     apiFetch<{ count: number }>("/modules/toilet/bulk-import", {
       method: "POST",
-      body: JSON.stringify({ csvText })
+      body: JSON.stringify(typeof payload === 'string' ? { csvText: payload } : payload)
     }),
 
   // Operational
