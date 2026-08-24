@@ -1,5 +1,6 @@
 'use client';
 
+import * as XLSX from 'xlsx';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ToiletApi } from '@lib/apiClient';
 import { useRouter } from 'next/navigation';
@@ -103,7 +104,18 @@ export default function BulkImportPage() {
 
     const parseAndValidateCSV = async (csvFile: File, zoneList = zones, wardList = wards) => {
         try {
-            const rawText = await csvFile.text();
+            let rawText = '';
+            const isExcel = csvFile.name.endsWith('.xlsx') || csvFile.name.endsWith('.xls');
+
+            if (isExcel) {
+                const buffer = await csvFile.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                rawText = XLSX.utils.sheet_to_csv(worksheet);
+            } else {
+                rawText = await csvFile.text();
+            }
 
             // ── RFC-4180 full-document tokenizer ──────────────────────────────────
             // MUST tokenize before splitting rows, because Address cells frequently
@@ -605,8 +617,8 @@ export default function BulkImportPage() {
                                 <div>
                                     <div style={{ backgroundColor: '#f8fafc', borderRadius: 24, padding: 36, border: '2px dashed #cbd5e1', textAlign: 'center', transition: 'all 0.3s' }} onDragOver={e => e.preventDefault()} onMouseEnter={e => e.currentTarget.style.borderColor = '#1e293b'}>
                                         <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Upload CSV File for Validation</h3>
-                                        <p style={{ color: '#64748b', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Select a CSV dataset. The system will preview data & validate Zones/Wards before importing.</p>
+                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Upload CSV / Excel File for Validation</h3>
+                                        <p style={{ color: '#64748b', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Select a CSV or Excel dataset (.xlsx, .xls). The system will preview data & validate Zones/Wards before importing.</p>
 
                                         {!geoLoaded ? (
                                             <div style={{ marginTop: 24, display: 'inline-flex', alignItems: 'center', gap: 10, backgroundColor: '#f1f5f9', color: '#64748b', padding: '14px 28px', borderRadius: 14, fontSize: 14, fontWeight: 700 }}>
@@ -615,8 +627,8 @@ export default function BulkImportPage() {
                                             </div>
                                         ) : (
                                         <label style={{ display: 'inline-block', marginTop: 24, backgroundColor: '#1e293b', color: 'white', padding: '14px 28px', borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(30,41,59,0.2)' }}>
-                                            Select CSV File
-                                            <input type="file" accept=".csv" onChange={handleFileChange} style={{ display: 'none' }} />
+                                            Select CSV / Excel File
+                                            <input type="file" accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileChange} style={{ display: 'none' }} />
                                         </label>
                                         )}
                                     </div>

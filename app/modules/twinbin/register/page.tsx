@@ -1,5 +1,6 @@
 'use client';
 
+import * as XLSX from 'xlsx';
 import { useEffect, useState, useMemo } from 'react';
 import { ModuleGuard, Protected } from '@components/Guards';
 import { ApiError, AuthApi, PublicGeoApi, TwinbinApi, ToiletApi } from '@lib/apiClient';
@@ -157,10 +158,22 @@ export default function TwinbinRegisterPage() {
 
     const parseAndValidateCSV = async (csvFile: File) => {
         try {
-            const text = await csvFile.text();
+            let text = '';
+            const isExcel = csvFile.name.endsWith('.xlsx') || csvFile.name.endsWith('.xls');
+
+            if (isExcel) {
+                const buffer = await csvFile.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                text = XLSX.utils.sheet_to_csv(worksheet);
+            } else {
+                text = await csvFile.text();
+            }
+
             const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
             if (lines.length < 2) {
-                setError('CSV file is empty or missing data rows');
+                setError('File is empty or missing data rows');
                 setPreviewRows([]);
                 return;
             }
@@ -168,7 +181,7 @@ export default function TwinbinRegisterPage() {
             const parsed: PreviewRow[] = [];
 
             for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
+                const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
                 if (values.length < 4) continue;
 
                 // Zone Name, Ward Name, Area Type, Area Name, Latitude, Longitude
@@ -179,11 +192,42 @@ export default function TwinbinRegisterPage() {
                 const latStr = values[4] || '';
                 const lonStr = values[5] || '';
 
-                const matchedZone = zones.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
-                const matchedWard = allWardsWithZone.find(w =>
-                    w.name.trim().toLowerCase() === wardName.toLowerCase() &&
-                    (!matchedZone || w.zoneId === matchedZone.id)
-                );
+                // Smart Zone Match: Exact -> Number -> Substring / Hindi
+                let matchedZone = zones.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
+                if (!matchedZone) {
+                    const zNum = zoneName.replace(/\D/g, '');
+                    if (zNum) matchedZone = zones.find(z => z.name.replace(/\D/g, '') === zNum);
+                }
+                if (!matchedZone) {
+                    matchedZone = zones.find(z =>
+                        z.name.toLowerCase().includes(zoneName.toLowerCase()) ||
+                        zoneName.toLowerCase().includes(z.name.toLowerCase())
+                    );
+                }
+
+                // Smart Ward Match: Exact -> Number -> Clean Name -> Global Fallback
+                const pool = matchedZone ? allWardsWithZone.filter(w => w.zoneId === matchedZone!.id) : allWardsWithZone;
+                const wNum = wardName.replace(/\D/g, '');
+                const wClean = wardName.replace(/ward|वार्ड/gi, '').trim().toLowerCase();
+
+                let matchedWard = pool.find(w => w.name.trim().toLowerCase() === wardName.toLowerCase());
+                if (!matchedWard && wNum) {
+                    matchedWard = pool.find(w => {
+                        const n = w.name.split('-')[0]?.trim().replace(/\D/g, '') || w.name.replace(/\D/g, '');
+                        return n === wNum;
+                    });
+                }
+                if (!matchedWard && wClean) {
+                    matchedWard = pool.find(w =>
+                        w.name.toLowerCase().includes(wClean) || wClean.includes(w.name.toLowerCase())
+                    );
+                }
+                if (!matchedWard) {
+                    matchedWard = allWardsWithZone.find(w => {
+                        const n = w.name.split('-')[0]?.trim().replace(/\D/g, '') || w.name.replace(/\D/g, '');
+                        return (wNum && n === wNum) || (wClean && w.name.toLowerCase().includes(wClean));
+                    });
+                }
 
                 let isValid = true;
                 let validationError = '';
@@ -198,8 +242,8 @@ export default function TwinbinRegisterPage() {
 
                 parsed.push({
                     index: i,
-                    zoneName,
-                    wardName,
+                    zoneName: matchedZone?.name || zoneName,
+                    wardName: matchedWard?.name || wardName,
                     areaType,
                     areaName: areaName || 'Litterbin Location',
                     latitude: latStr,
@@ -212,7 +256,7 @@ export default function TwinbinRegisterPage() {
             setPreviewRows(parsed);
             setError('');
         } catch (err: any) {
-            setError('Failed to parse CSV file: ' + err.message);
+            setError('Failed to parse file: ' + err.message);
             setPreviewRows([]);
         }
     };
@@ -480,12 +524,12 @@ export default function TwinbinRegisterPage() {
                                         <div>
                                             <div style={{ backgroundColor: '#f8fafc', borderRadius: 24, padding: 36, border: '2px dashed #cbd5e1', textAlign: 'center', transition: 'all 0.3s' }}>
                                                 <div style={{ fontSize: 48, marginBottom: 16 }}>🗑️</div>
-                                                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Upload Litterbin CSV File for Validation</h3>
-                                                <p style={{ color: '#64748b', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Select a CSV dataset. The system will preview data & validate Zones/Wards before importing.</p>
+                                                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Upload Litterbin CSV / Excel File for Validation</h3>
+                                                <p style={{ color: '#64748b', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Select a CSV or Excel dataset (.xlsx, .xls). The system will preview data & validate Zones/Wards before importing.</p>
 
                                                 <label style={{ display: 'inline-block', marginTop: 24, backgroundColor: '#1e293b', color: 'white', padding: '14px 28px', borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(30,41,59,0.2)' }}>
-                                                    Select Litterbin CSV File
-                                                    <input type="file" accept=".csv" onChange={handleFileChange} style={{ display: 'none' }} />
+                                                    Select CSV / Excel File
+                                                    <input type="file" accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileChange} style={{ display: 'none' }} />
                                                 </label>
                                             </div>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import * as XLSX from "xlsx";
 import React, { useState, useEffect } from "react";
 import {
   CommonRegistrationApi,
@@ -590,12 +591,32 @@ export default function CommonRegistrationModal({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const content = evt.target?.result as string;
-      handleBulkTextChange(content);
-    };
-    reader.readAsText(file);
+
+    const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const csvText = XLSX.utils.sheet_to_csv(worksheet);
+          handleBulkTextChange(csvText);
+        } catch (err: any) {
+          setErrorMsg("Failed to read Excel file: " + (err?.message || "Invalid file format"));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const content = evt.target?.result as string;
+        handleBulkTextChange(content);
+      };
+      reader.readAsText(file, "UTF-8");
+    }
   };
 
   const handleBulkSubmit = async () => {
@@ -1353,11 +1374,11 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
               >
                 <UploadCloud size={36} style={{ color: "#3b82f6", marginBottom: "8px" }} />
                 <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: "14px", color: "#1e293b" }}>
-                  Upload CSV File or Paste Data Below
+                  Upload CSV or Excel (.xlsx) File
                 </p>
                 <input
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   onChange={handleFileUpload}
                   style={{ display: "none" }}
                   id="csv-file-input"
