@@ -397,6 +397,11 @@ export default function WardManagementPage() {
   }, [selectedCity, zoneOptions, filterZoneId]);
 
   const filteredWards = useMemo(() => {
+    const getWardSortValue = (value: string) => {
+      const match = String(value || "").match(/\d+/);
+      return match ? Number.parseInt(match[0], 10) : Number.MAX_SAFE_INTEGER;
+    };
+
     return wards.filter(w => {
       const parentZoneName = zoneMap[w.parentId || ''] || '';
 
@@ -412,6 +417,10 @@ export default function WardManagementPage() {
         wardCityName.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchesCity && matchesZone && matchesSearch;
+    }).sort((a, b) => {
+      const numberDiff = getWardSortValue(a.name) - getWardSortValue(b.name);
+      if (numberDiff !== 0) return numberDiff;
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
     });
   }, [wards, zoneMap, searchTerm, filterZoneId, selectedCity, zones, user?.city?.name]);
 
