@@ -9,6 +9,8 @@ type TableFilter = 'ALL' | 'VALID' | 'INVALID';
 
 type PreviewRow = {
     index: number;
+    zoneId?: string;
+    wardId?: string;
     zoneName: string;
     wardName: string;
     areaType: string;
@@ -207,6 +209,8 @@ export default function BulkImportPage() {
 
                 parsed.push({
                     index: parsed.length + 1,
+                    zoneId: matchedZone?.id,
+                    wardId: matchedWard?.id,
                     zoneName: matchedZone ? matchedZone.name : zoneName,
                     wardName: matchedWard ? matchedWard.name : wardName,
                     areaType,
