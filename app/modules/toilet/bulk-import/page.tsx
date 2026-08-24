@@ -95,13 +95,32 @@ export default function BulkImportPage() {
                 return;
             }
 
-            const headerRow = lines[0].toLowerCase().split(',').map(h => h.trim());
-            const is9ColFormat = headerRow.includes('toilet type') || headerRow.includes('area type') || headerRow.includes('toilet name / id') || headerRow[0].includes('zone');
+            const parseCSVLine = (line: string): string[] => {
+                const result: string[] = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current.trim().replace(/^"|"$/g, ''));
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                result.push(current.trim().replace(/^"|"$/g, ''));
+                return result;
+            };
+
+            const headerRow = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+            const is9ColFormat = headerRow.includes('toilet type') || headerRow.includes('area type') || headerRow.includes('toilet name / id') || (headerRow[0] && headerRow[0].includes('zone'));
 
             const parsed: PreviewRow[] = [];
 
             for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
+                const values = parseCSVLine(lines[i]);
                 if (values.length < 3) continue;
 
                 let zoneName = '', wardName = '', areaType = 'RESIDENTIAL', areaName = '', name = '', address = '', typeStr = 'CT', latStr = '', lonStr = '';
