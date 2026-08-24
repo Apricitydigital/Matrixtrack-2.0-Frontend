@@ -24,6 +24,7 @@ type WardImportRow = {
   rowNumber: number;
   zoneName: string;
   wardName: string;
+  displayName?: string;
   status: WardImportStatus;
   message: string;
   zoneId?: string;
@@ -42,7 +43,7 @@ export default function WardManagementPage() {
   const [modalTab, setModalTab] = useState<'SINGLE' | 'BULK'>('SINGLE');
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkZoneId, setBulkZoneId] = useState<string>("");
-  const [bulkParsedWards, setBulkParsedWards] = useState<{ name: string; zoneName?: string; status?: 'pending' | 'success' | 'error'; errorMsg?: string }[]>([]);
+  const [bulkParsedWards, setBulkParsedWards] = useState<{ name: string; displayName?: string; zoneName?: string; status?: 'pending' | 'success' | 'error'; errorMsg?: string }[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
@@ -204,7 +205,7 @@ export default function WardManagementPage() {
   };
 
   const downloadSampleTemplate = () => {
-    const csvContent = "Ward Number,Zone Name\nWard 101,Zone 1\nWard 102,Zone 1\nWard 103,Zone 2\nWard 104,Zone 2";
+    const csvContent = "Ward Number,Zone Name,Ward Name\nWard 101,Zone 1,Lal Ghati\nWard 102,Zone 1,Freeganj\nWard 103,Zone 2,Nanakheda\nWard 104,Zone 2,Dashahara Maidan";
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -223,14 +224,15 @@ export default function WardManagementPage() {
     const hasHeaders = firstLineLower.includes("ward") || firstLineLower.includes("zone") || firstLineLower.includes("number");
 
     const startIndex = hasHeaders ? 1 : 0;
-    const parsed: { name: string; zoneName?: string }[] = [];
+    const parsed: { name: string; displayName?: string; zoneName?: string }[] = [];
 
     for (let i = startIndex; i < lines.length; i++) {
       const parts = lines[i].split(/[,;\t]+/).map(p => p.trim().replace(/^["']|["']$/g, ''));
       if (parts.length >= 1 && parts[0]) {
-        const wardName = parts[0];
+        const wardNumber = parts[0];
         const zoneName = parts[1] || undefined;
-        parsed.push({ name: wardName, zoneName });
+        const displayName = parts[2] || undefined;
+        parsed.push({ name: wardNumber, zoneName, displayName });
       }
     }
     return parsed;
@@ -305,7 +307,12 @@ export default function WardManagementPage() {
       try {
         await apiFetch("/city/geo", {
           method: "POST",
-          body: JSON.stringify({ name: cleanWardName, level: "WARD", parentId: targetZoneId })
+          body: JSON.stringify({
+            name: cleanWardName,
+            displayName: item.displayName?.trim() || undefined,
+            level: "WARD",
+            parentId: targetZoneId
+          })
         });
         updatedList[i].status = 'success';
         successCount++;
@@ -462,21 +469,25 @@ export default function WardManagementPage() {
         "S.No",
         "Zone Name",
         "Ward Number",
+        "Ward Name",
       ],
       [
         1,
         "Zone 1",
         "Ward 1",
+        "Lal Ghati",
       ],
       [
         2,
         "Zone 1",
         "Ward 2",
+        "Freeganj",
       ],
       [
         3,
         "Zone 2",
         "Ward 3",
+        "Nanakheda",
       ],
     ];
 
@@ -487,6 +498,7 @@ export default function WardManagementPage() {
       { wch: 10 },
       { wch: 24 },
       { wch: 24 },
+      { wch: 28 },
     ];
 
     // Format header row (Row 1) with 26pt height, bold font and subtle slate fill
@@ -596,7 +608,8 @@ export default function WardManagementPage() {
         const expectedHeaders = [
           "S.No",
           "Zone Name",
-            "Ward Number",
+          "Ward Number",
+          "Ward Name",
         ];
 
 
@@ -610,7 +623,7 @@ export default function WardManagementPage() {
 
         if (!validHeader) {
           throw new Error(
-            'Invalid Excel format. Required columns are exactly: "S.No", "Zone Name", "Ward Number". Please use the downloaded template.'
+            'Invalid Excel format. Required columns are exactly: "S.No", "Zone Name", "Ward Number", "Ward Name". Please use the downloaded template.'
           );
         }
 
@@ -699,13 +712,24 @@ export default function WardManagementPage() {
                     " "
                   );
 
+              const displayName =
+                String(
+                  rawRow?.[3] ?? ""
+                )
+                  .trim()
+                  .replace(
+                    /\s+/g,
+                    " "
+                  );
+
 
               /*
                * Completely blank rows are ignored.
                */
               if (
                 !zoneName &&
-                !wardName
+                !wardName &&
+                !displayName
               ) {
                 return;
               }
@@ -713,16 +737,18 @@ export default function WardManagementPage() {
 
               if (
                 !zoneName ||
-                !wardName
+                !wardName ||
+                !displayName
               ) {
                 parsedRows.push({
                   rowNumber,
                   zoneName,
                   wardName,
+                  displayName,
                   status:
                     "INVALID_DATA",
                   message:
-                    "Zone Name and Ward Number are required.",
+                    "Zone Name, Ward Number and Ward Name are required.",
                 });
 
                 return;
@@ -745,6 +771,7 @@ export default function WardManagementPage() {
                   rowNumber,
                   zoneName,
                   wardName,
+                  displayName,
                   status:
                     "INVALID_ZONE",
                   message:
@@ -763,6 +790,7 @@ export default function WardManagementPage() {
                   rowNumber,
                   zoneName,
                   wardName,
+                  displayName,
                   status:
                     "AMBIGUOUS_ZONE",
                   message:
@@ -793,6 +821,7 @@ export default function WardManagementPage() {
                   zoneName:
                     zone.name,
                   wardName,
+                  displayName,
                   zoneId:
                     zone.id,
                   status:
@@ -815,6 +844,7 @@ export default function WardManagementPage() {
                   zoneName:
                     zone.name,
                   wardName,
+                  displayName,
                   zoneId:
                     zone.id,
                   status:
@@ -837,6 +867,7 @@ export default function WardManagementPage() {
                 zoneName:
                   zone.name,
                 wardName,
+                displayName,
                 zoneId:
                   zone.id,
                 status:
@@ -933,6 +964,8 @@ export default function WardManagementPage() {
 
                         wardName:
                           row.wardName,
+                        displayName:
+                          row.displayName,
                       })
                     ),
                 }),
@@ -993,7 +1026,7 @@ export default function WardManagementPage() {
                 data={filteredWards.map(w => ({
                   WardID: w.id,
                   WardNumber: w.name,
-                  DisplayName: w.displayName || "",
+                  WardName: w.displayName || "",
                   ParentZone: zones.find(z => z.id === w.parentId)?.name || 'Unassigned'
                 }))}
                 filename="Registered_Wards"
@@ -1331,7 +1364,7 @@ export default function WardManagementPage() {
                               "0.78rem",
                           }}
                         >
-                          S.No | Zone Name | Ward Number
+                          S.No | Zone Name | Ward Number | Ward Name
                         </div>
 
                       </div>
@@ -1988,7 +2021,7 @@ export default function WardManagementPage() {
                           Excel / CSV Template Format
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "#0284c7", fontWeight: 600, marginTop: "2px" }}>
-                          Headers: <code style={{ backgroundColor: "#e0f2fe", padding: "2px 6px", borderRadius: "4px" }}>Ward Number, Zone Name</code>
+                          Headers: <code style={{ backgroundColor: "#e0f2fe", padding: "2px 6px", borderRadius: "4px" }}>Ward Number, Zone Name, Ward Name</code>
                         </div>
                       </div>
                       <button
@@ -2041,7 +2074,7 @@ export default function WardManagementPage() {
                           {bulkFile ? bulkFile.name : "Click to choose CSV file"}
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, marginTop: "4px" }}>
-                          Supports .csv formats (e.g. Ward Number, Zone Name)
+                          Supports .csv formats (e.g. Ward Number, Zone Name, Ward Name)
                         </div>
                         <input
                           type="file"
@@ -2069,6 +2102,7 @@ export default function WardManagementPage() {
                               <tr>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>#</th>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Ward Number</th>
+                                <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Ward Name</th>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Target Zone</th>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800, textAlign: "right" }}>Status</th>
                               </tr>
@@ -2080,6 +2114,7 @@ export default function WardManagementPage() {
                                   <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
                                     <td style={{ padding: "6px 12px", color: "#64748b", fontWeight: 700 }}>{idx + 1}</td>
                                     <td style={{ padding: "6px 12px", fontWeight: 800, color: "#0f172a" }}>{item.name}</td>
+                                    <td style={{ padding: "6px 12px", fontWeight: 700, color: item.displayName ? "#334155" : "#94a3b8" }}>{item.displayName || "-"}</td>
                                     <td style={{ padding: "6px 12px", fontWeight: 700, color: "#2563eb" }}>{targetZoneName}</td>
                                     <td style={{ padding: "6px 12px", textAlign: "right" }}>
                                       {item.status === 'success' && <span style={{ color: "#16a34a", fontWeight: 800 }}>✓ Done</span>}
