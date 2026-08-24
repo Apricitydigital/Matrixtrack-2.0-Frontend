@@ -102,7 +102,7 @@ export default function BulkImportPage() {
 
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
-                if (values.length < 4) continue;
+                if (values.length < 3) continue;
 
                 let zoneName = '', wardName = '', areaType = 'RESIDENTIAL', areaName = '', name = '', address = '', typeStr = 'CT', latStr = '', lonStr = '';
 
@@ -128,12 +128,52 @@ export default function BulkImportPage() {
                     address = values.slice(10).join(',');
                 }
 
-                // Master Data Validation against system registered Zones and Wards
-                const matchedZone = zones.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
-                const matchedWard = wards.find(w => 
-                    w.name.trim().toLowerCase() === wardName.toLowerCase() && 
-                    (!matchedZone || w.zoneId === matchedZone.id)
-                );
+                // Skip completely blank trailing rows exported by Excel
+                if (!zoneName.trim() && !wardName.trim() && !name.trim() && !address.trim() && (!latStr || latStr === '0')) {
+                    continue;
+                }
+                if (!zoneName.trim() && !wardName.trim()) {
+                    continue;
+                }
+
+                // Flexible Zone Matching against system registered Master Data
+                let matchedZone = zones.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
+                if (!matchedZone) {
+                    const zoneNum = zoneName.replace(/\D/g, "");
+                    if (zoneNum) {
+                        matchedZone = zones.find(z => z.name.replace(/\D/g, "") === zoneNum);
+                    }
+                }
+                if (!matchedZone) {
+                    matchedZone = zones.find(z => z.name.toLowerCase().includes(zoneName.toLowerCase()) || zoneName.toLowerCase().includes(z.name.toLowerCase()));
+                }
+
+                // Flexible Ward Matching against system registered Master Data
+                const candidateWards = matchedZone ? wards.filter(w => w.zoneId === matchedZone.id) : wards;
+                let matchedWard = candidateWards.find(w => w.name.trim().toLowerCase() === wardName.toLowerCase());
+                if (!matchedWard) {
+                    const wardNum = wardName.replace(/\D/g, "");
+                    if (wardNum) {
+                        matchedWard = candidateWards.find(w => {
+                            const wNum = w.name.split('-')[0]?.trim().replace(/\D/g, "") || w.name.replace(/\D/g, "");
+                            return wNum === wardNum;
+                        });
+                    }
+                }
+                if (!matchedWard) {
+                    const cleanWard = wardName.replace(/ward/i, "").trim().toLowerCase();
+                    if (cleanWard) {
+                        matchedWard = candidateWards.find(w => w.name.toLowerCase().includes(cleanWard) || cleanWard.includes(w.name.toLowerCase()));
+                    }
+                }
+                if (!matchedWard && matchedZone) {
+                    const wardNum = wardName.replace(/\D/g, "");
+                    const cleanWard = wardName.replace(/ward/i, "").trim().toLowerCase();
+                    matchedWard = wards.find(w => 
+                        (wardNum && (w.name.split('-')[0]?.trim().replace(/\D/g, "") === wardNum)) ||
+                        (cleanWard && w.name.toLowerCase().includes(cleanWard))
+                    );
+                }
 
                 let isValid = true;
                 let validationError = '';
@@ -143,13 +183,13 @@ export default function BulkImportPage() {
                     validationError = `Zone '${zoneName}' not registered in system Master Data`;
                 } else if (!matchedWard) {
                     isValid = false;
-                    validationError = `Ward '${wardName}' not registered under ${matchedZone.name}`;
+                    validationError = `Ward '${wardName}' not registered under ${matchedZone?.name || 'Zone'}`;
                 }
 
                 parsed.push({
-                    index: i,
-                    zoneName,
-                    wardName,
+                    index: parsed.length + 1,
+                    zoneName: matchedZone ? matchedZone.name : zoneName,
+                    wardName: matchedWard ? matchedWard.name : wardName,
                     areaType,
                     areaName,
                     name: name || 'Toilet Asset',
