@@ -131,7 +131,7 @@ export default function BulkImportPage() {
                     // Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude
                     zoneName = values[0] || '';
                     wardName = values[1] || '';
-                    areaType = values[2] || 'RESIDENTIAL';
+                    areaType = values[2]?.trim() || 'RESIDENTIAL';
                     areaName = values[3] || '';
                     name = values[4] || '';
                     address = values[5] || '';
