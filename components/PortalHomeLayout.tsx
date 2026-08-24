@@ -547,6 +547,10 @@ function PortalHomeLayoutContent({
     pageTitle = 'Inspection and Performance';
   }
 
+  if (pathname.startsWith('/ulb/ward-ranking')) {
+    pageTitle = 'Ward Ranking';
+  }
+
 
   /* =========================================================
      TASKFORCE TITLES
@@ -2982,7 +2986,7 @@ function PortalHomeLayoutContent({
       ===================================================== */}
 
       <main
-        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && (pathname.startsWith('/city/attendance') || pathname.startsWith('/ulb/inspection-performance'))
+        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && (pathname.startsWith('/city/attendance') || pathname.startsWith('/ulb/inspection-performance') || pathname.startsWith('/ulb/ward-ranking'))
           ? 'ml-72 p-4 sm:p-5 lg:p-6'
           : isUlbUser
             ? 'ml-0 p-4 sm:p-5 lg:p-6'

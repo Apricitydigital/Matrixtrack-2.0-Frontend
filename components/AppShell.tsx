@@ -20,6 +20,7 @@ const STANDALONE_PATHS = [
   "/employees",
   "/modules",
   "/ulb/inspection-performance",
+  "/ulb/ward-ranking",
 ];
 
 export function AppShell({
