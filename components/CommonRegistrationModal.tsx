@@ -381,7 +381,6 @@ export default function CommonRegistrationModal({
     }
   };
 
-<<<<<<< HEAD
   // Smart Auto-Password Generator: [Name_Prefix]@[Last_4_Mobile]
   const generateAutoPassword = (name: string, phone: string) => {
     const cleanName = (name || "").trim().replace(/[^a-zA-Z]/g, "");
@@ -419,10 +418,6 @@ export default function CommonRegistrationModal({
 
   // CSV Parsing
   const parseCsvData = (text: string): { records: IntegratedRegistrationPayload[]; rows: ParsedBulkRow[] } => {
-=======
-  // CSV Parsing with Auto Email/Password generation from mobile number
-  const parseCsvData = (text: string) => {
->>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length <= 1) return { records: [], rows: [] };
 
@@ -449,7 +444,7 @@ export default function CommonRegistrationModal({
       };
 
       const name = getCol("full_name", "name", "fullname") || cols[0];
-      const phone = getCol("mobile_number", "phone", "mobilenumber", "mobile", "phone_number") || cols[2];
+      const phone = getCol("mobile_number", "phone", "mobilenumber", "mobile", "phone_number") || cols[2] || cols[1];
       const phoneDigits = (phone || "").replace(/\D/g, "");
 
       let email = getCol("email", "email_id", "emailaddress") || cols[1];
@@ -461,6 +456,7 @@ export default function CommonRegistrationModal({
       const isAutoPassword = !rawPassword || rawPassword.trim().length === 0;
       const password = isAutoPassword ? generateAutoPassword(name, phone) : rawPassword.trim();
 
+      const aadharNumber = getCol("aadhaar_number", "aadharnumber", "aadhaar", "aadhar") || undefined;
       const zoneName = getCol("zone_name", "zone") || "";
       const wardName = getCol("ward_name", "ward") || "";
       const roleRaw = getCol("role", "taskforcerole") || "SUPERVISOR";
@@ -468,7 +464,7 @@ export default function CommonRegistrationModal({
 
       const moduleKeys = modulesStr.toUpperCase() === "ALL" 
         ? ["SWEEPING", "LITTERBINS", "TOILET", "TASKFORCE"]
-        : modulesStr.split(";").map((m) => m.trim().toUpperCase()).filter(Boolean);
+        : modulesStr.split(/[;,]+/).map((m) => m.trim().toUpperCase()).filter(Boolean);
 
       const systemsStr = getCol("targetsystems", "systems") || "BOTH";
 
@@ -540,44 +536,21 @@ export default function CommonRegistrationModal({
       const payload: IntegratedRegistrationPayload = {
         name,
         email,
-        phone,
+        phone: phoneDigits || phone,
         password,
+        aadharNumber,
         targetSystems,
         cityId: form.cityId || undefined,
         zoneId: matchedZone?.id || form.zoneId || undefined,
         wardId: matchedWard?.id || form.wardId || undefined,
         taskforceConfig: {
           role: roleRaw,
-=======
-      const roleStr = getCol("role", "taskforcerole") || cols[7] || "SUPERVISOR";
-      const tfRole = roleStr.toUpperCase();
-
-      const modulesStr = getCol("modules", "module") || cols[8] || "SWEEPING,LITTERBINS,TOILET";
-      const moduleKeys = modulesStr.split(/[\s,;]+/).map((m) => m.trim().toUpperCase()).filter(Boolean);
-
-      const swachhRole = (getCol("swachhrole") || "accessor") as "accessor" | "qc" | "admin";
-      const swachhAccessorType = (getCol("accessortype") || "hms") as "hms" | "pmc" | "janwani";
-
-      records.push({
-        name,
-        email,
-        phone: phoneDigits,
-        password,
-        aadharNumber,
-        targetSystems,
-        cityId: form.cityId || undefined,
-        zoneId: form.zoneId || undefined,
-        wardId: form.wardId || undefined,
-        taskforceConfig: {
-          role: tfRole,
->>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
           moduleKeys
         },
         swachhConfig: {
           role: swachhRole,
           accessorType: swachhAccessorType
         }
-<<<<<<< HEAD
       };
 
       if (isValid) {
@@ -598,8 +571,6 @@ export default function CommonRegistrationModal({
         isValid,
         validationError,
         payload
-=======
->>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
       });
     }
 
