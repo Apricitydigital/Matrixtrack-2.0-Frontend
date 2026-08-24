@@ -88,6 +88,10 @@ const emptyFilters: FilterState = {
 
 type SearchableOption = { value: string; label: string };
 
+function formatScopeNames(values?: string[]) {
+  return Array.isArray(values) && values.length ? values.join(", ") : "—";
+}
+
 function SearchableSelect({
   value,
   options,
@@ -1007,8 +1011,8 @@ function KpiRecordsDrawer({
                             </td>
                             <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
-                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{(record.zones || []).length ? record.zones.join(", ") : "—"}</td>
-                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{(record.wards || []).length ? record.wards.join(", ") : "—"}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.zones)}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.wards)}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                             <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                             <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>
@@ -1167,8 +1171,8 @@ function WorkDurationEmployeesPopup({
                     <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400">
                       {record.designation || "Employee"} · {record.attendanceId}
                     </p>
-                    <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${(record.zones || []).join(", ") || "—"} · Ward: ${(record.wards || []).join(", ") || "—"}`}>
-                      Zone: {(record.zones || []).join(", ") || "—"} · Ward: {(record.wards || []).join(", ") || "—"}
+                    <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames(record.zones)} · Ward: ${formatScopeNames(record.wards)}`}>
+                      Zone: {formatScopeNames(record.zones)} · Ward: {formatScopeNames(record.wards)}
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-bold">
                       <span className="rounded-md bg-white px-1.5 py-1 text-slate-600 ring-1 ring-slate-200">
@@ -2469,8 +2473,13 @@ function AttendanceDashboard() {
                           <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
                             {employee.designation || "Employee"} · {employee.attendanceId}
                           </p>
+<<<<<<< HEAD
                           <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${(employee.zones || []).join(", ") || "—"} · Ward: ${(employee.wards || []).join(", ") || "—"}`}>
                             Zone: {(employee.zones || []).join(", ") || "—"} · Ward: {(employee.wards || []).join(", ") || "—"}
+=======
+                          <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames(employee.zones)} · Ward: ${formatScopeNames(employee.wards)}`}>
+                            Zone: {formatScopeNames(employee.zones)} · Ward: {formatScopeNames(employee.wards)}
+>>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
                           </p>
                         </div>
                       </div>
@@ -2612,8 +2621,13 @@ function AttendanceDashboard() {
                           </td>
                           <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
+<<<<<<< HEAD
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{(record.zones || []).length ? record.zones.join(", ") : "—"}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{(record.wards || []).length ? record.wards.join(", ") : "—"}</td>
+=======
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.zones)}</td>
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.wards)}</td>
+>>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                           <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                           <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>

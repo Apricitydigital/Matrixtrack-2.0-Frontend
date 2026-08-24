@@ -298,18 +298,23 @@ export default function CommonRegistrationModal({
     setErrorMsg("");
     setStatusMsg("");
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(form.email)) {
-      setErrorMsg("Please enter a valid email address (e.g. name@domain.com)");
-      return;
-    }
-
     // Validate mobile number (exactly 10 digits)
     const phoneDigits = form.phone.replace(/\D/g, "");
     if (phoneDigits.length !== 10) {
       setErrorMsg("Mobile number must be exactly 10 digits");
       return;
+    }
+
+    // Auto-generate email from mobile number if email is empty
+    let submitEmail = form.email.trim();
+    if (!submitEmail) {
+      submitEmail = `${phoneDigits}@matrixtrack20.in`;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(submitEmail)) {
+        setErrorMsg("Please enter a valid email address (e.g. name@domain.com)");
+        return;
+      }
     }
 
     // Validate Aadhaar number (exactly 12 digits if provided)
@@ -326,7 +331,7 @@ export default function CommonRegistrationModal({
     try {
       const payload: IntegratedRegistrationPayload = {
         name: form.name,
-        email: form.email,
+        email: submitEmail,
         phone: form.phone,
         password: form.password || undefined,
         aadharNumber: form.aadharNumber || undefined,
@@ -376,6 +381,7 @@ export default function CommonRegistrationModal({
     }
   };
 
+<<<<<<< HEAD
   // Smart Auto-Password Generator: [Name_Prefix]@[Last_4_Mobile]
   const generateAutoPassword = (name: string, phone: string) => {
     const cleanName = (name || "").trim().replace(/[^a-zA-Z]/g, "");
@@ -413,6 +419,10 @@ export default function CommonRegistrationModal({
 
   // CSV Parsing
   const parseCsvData = (text: string): { records: IntegratedRegistrationPayload[]; rows: ParsedBulkRow[] } => {
+=======
+  // CSV Parsing with Auto Email/Password generation from mobile number
+  const parseCsvData = (text: string) => {
+>>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length <= 1) return { records: [], rows: [] };
 
@@ -426,31 +436,41 @@ export default function CommonRegistrationModal({
 
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(",").map((c) => c.trim());
-      if (cols.length < 3) continue;
+      if (cols.length < 2) continue;
 
-      const getCol = (name: string) => {
-        const idx = headers.indexOf(name);
-        return idx !== -1 ? cols[idx] : "";
+      const getCol = (...possibleNames: string[]) => {
+        for (const name of possibleNames) {
+          const idx = headers.indexOf(name.toLowerCase());
+          if (idx !== -1 && cols[idx] !== undefined && cols[idx] !== "") {
+            return cols[idx];
+          }
+        }
+        return "";
       };
 
-      const name = getCol("full_name") || getCol("name") || cols[0];
-      const email = getCol("email") || cols[1];
-      const phone = getCol("mobile_number") || getCol("phone") || cols[2];
-      const rawPassword = getCol("password");
+      const name = getCol("full_name", "name", "fullname") || cols[0];
+      const phone = getCol("mobile_number", "phone", "mobilenumber", "mobile", "phone_number") || cols[2];
+      const phoneDigits = (phone || "").replace(/\D/g, "");
 
+      let email = getCol("email", "email_id", "emailaddress") || cols[1];
+      if ((!email || !email.includes("@")) && phoneDigits.length === 10) {
+        email = `${phoneDigits}@matrixtrack20.in`;
+      }
+
+      const rawPassword = getCol("password", "pass");
       const isAutoPassword = !rawPassword || rawPassword.trim().length === 0;
       const password = isAutoPassword ? generateAutoPassword(name, phone) : rawPassword.trim();
 
-      const zoneName = getCol("zone_name") || getCol("zone") || "";
-      const wardName = getCol("ward_name") || getCol("ward") || "";
-      const roleRaw = getCol("role") || getCol("taskforcerole") || "SUPERVISOR";
-      const modulesStr = getCol("modules") || "SWEEPING;LITTERBINS;TOILET;GVP";
+      const zoneName = getCol("zone_name", "zone") || "";
+      const wardName = getCol("ward_name", "ward") || "";
+      const roleRaw = getCol("role", "taskforcerole") || "SUPERVISOR";
+      const modulesStr = getCol("modules", "module") || "SWEEPING;LITTERBINS;TOILET;GVP";
 
       const moduleKeys = modulesStr.toUpperCase() === "ALL" 
         ? ["SWEEPING", "LITTERBINS", "TOILET", "TASKFORCE"]
         : modulesStr.split(";").map((m) => m.trim().toUpperCase()).filter(Boolean);
 
-      const systemsStr = getCol("targetsystems") || getCol("systems") || "BOTH";
+      const systemsStr = getCol("targetsystems", "systems") || "BOTH";
 
       let targetSystems: ("TASKFORCE_20" | "SWACHH_RANKING")[] = ["TASKFORCE_20", "SWACHH_RANKING"];
       if (systemsStr.toUpperCase() === "TASKFORCE" || systemsStr.toUpperCase() === "TASKFORCE_20") {
@@ -479,7 +499,6 @@ export default function CommonRegistrationModal({
 
       const matchedZone = matchGeoNode(zones, zoneName);
       const matchedWard = matchGeoNode(wards, wardName);
-      const phoneDigits = (phone || "").replace(/\D/g, "");
       const emailLower = (email || "").toLowerCase().trim();
 
       if (!name || name.length < 2) {
@@ -529,12 +548,36 @@ export default function CommonRegistrationModal({
         wardId: matchedWard?.id || form.wardId || undefined,
         taskforceConfig: {
           role: roleRaw,
+=======
+      const roleStr = getCol("role", "taskforcerole") || cols[7] || "SUPERVISOR";
+      const tfRole = roleStr.toUpperCase();
+
+      const modulesStr = getCol("modules", "module") || cols[8] || "SWEEPING,LITTERBINS,TOILET";
+      const moduleKeys = modulesStr.split(/[\s,;]+/).map((m) => m.trim().toUpperCase()).filter(Boolean);
+
+      const swachhRole = (getCol("swachhrole") || "accessor") as "accessor" | "qc" | "admin";
+      const swachhAccessorType = (getCol("accessortype") || "hms") as "hms" | "pmc" | "janwani";
+
+      records.push({
+        name,
+        email,
+        phone: phoneDigits,
+        password,
+        aadharNumber,
+        targetSystems,
+        cityId: form.cityId || undefined,
+        zoneId: form.zoneId || undefined,
+        wardId: form.wardId || undefined,
+        taskforceConfig: {
+          role: tfRole,
+>>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
           moduleKeys
         },
         swachhConfig: {
           role: swachhRole,
           accessorType: swachhAccessorType
         }
+<<<<<<< HEAD
       };
 
       if (isValid) {
@@ -555,6 +598,8 @@ export default function CommonRegistrationModal({
         isValid,
         validationError,
         payload
+=======
+>>>>>>> 39e9ee9 (Fix CSV bulk import email auto assignment and scope formatting)
       });
     }
 
