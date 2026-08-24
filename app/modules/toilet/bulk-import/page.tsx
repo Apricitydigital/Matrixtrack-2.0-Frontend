@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ToiletApi } from '@lib/apiClient';
 import { useRouter } from 'next/navigation';
 
@@ -27,12 +27,12 @@ type PreviewRow = {
 const AREA_TYPES = [
     { value: 'RESIDENTIAL', label: 'Residential' },
     { value: 'SLUM', label: 'Slum Area' },
-    { value: 'COMMERCIAL_AREA', label: 'Commercial Area' },
+    { value: 'COMMERCIAL', label: 'Commercial Area' },
     { value: 'RELIGIOUS_PLACE', label: 'Religious Place' },
-    { value: 'TOURIST_AREAS', label: 'Tourist Areas' },
+    { value: 'TOURIST_AREA', label: 'Tourist Areas' },
     { value: 'TRANSPORT_HUB', label: 'Transport Hub' },
     { value: 'PARKS_AND_GARDENS', label: 'Parks and Gardens' },
-    { value: 'MARKET', label: 'Market' },
+    { value: 'MARKET_AREA', label: 'Market' },
     { value: 'PARKING', label: 'Parking' },
 ];
 
@@ -47,6 +47,9 @@ export default function BulkImportPage() {
     const [error, setError] = useState('');
     const [zones, setZones] = useState<any[]>([]);
     const [wards, setWards] = useState<any[]>([]);
+    const [geoLoaded, setGeoLoaded] = useState(false);
+    // Keep a ref to the pending file so we can re-validate once geo data arrives
+    const pendingFileRef = useRef<File | null>(null);
 
     // Manual form state
     const [formData, setFormData] = useState({
@@ -76,18 +79,29 @@ export default function BulkImportPage() {
                     allWards.push(...(wardsRes.nodes || []).map((w: any) => ({ ...w, zoneId: zone.id, zoneName: zone.name })));
                 }
                 setWards(allWards);
+                setGeoLoaded(true);
             } catch (err) {
                 console.error("Failed to load geo nodes", err);
+                setGeoLoaded(true); // Allow usage even on partial failure
             }
         };
         loadGeo();
     }, []);
 
+    // Re-validate the pending CSV file once zone+ward master data is fully loaded
+    useEffect(() => {
+        if (geoLoaded && pendingFileRef.current) {
+            parseAndValidateCSV(pendingFileRef.current, zones, wards);
+            pendingFileRef.current = null;
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [geoLoaded]);
+
     const filteredWards = formData.zoneId
         ? wards.filter(w => w.zoneId === formData.zoneId)
         : wards;
 
-    const parseAndValidateCSV = async (csvFile: File) => {
+    const parseAndValidateCSV = async (csvFile: File, zoneList = zones, wardList = wards) => {
         try {
             const text = await csvFile.text();
             const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -158,19 +172,19 @@ export default function BulkImportPage() {
                 }
 
                 // Flexible Zone Matching against system registered Master Data
-                let matchedZone = zones.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
+                let matchedZone = zoneList.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
                 if (!matchedZone) {
                     const zoneNum = zoneName.replace(/\D/g, "");
                     if (zoneNum) {
-                        matchedZone = zones.find(z => z.name.replace(/\D/g, "") === zoneNum);
+                        matchedZone = zoneList.find(z => z.name.replace(/\D/g, "") === zoneNum);
                     }
                 }
                 if (!matchedZone) {
-                    matchedZone = zones.find(z => z.name.toLowerCase().includes(zoneName.toLowerCase()) || zoneName.toLowerCase().includes(z.name.toLowerCase()));
+                    matchedZone = zoneList.find(z => z.name.toLowerCase().includes(zoneName.toLowerCase()) || zoneName.toLowerCase().includes(z.name.toLowerCase()));
                 }
 
                 // Flexible Ward Matching against system registered Master Data
-                const candidateWards = matchedZone ? wards.filter(w => w.zoneId === matchedZone.id) : wards;
+                const candidateWards = matchedZone ? wardList.filter(w => w.zoneId === matchedZone.id) : wardList;
                 let matchedWard = candidateWards.find(w => w.name.trim().toLowerCase() === wardName.toLowerCase());
                 if (!matchedWard) {
                     const wardNum = wardName.replace(/\D/g, "");
@@ -190,7 +204,7 @@ export default function BulkImportPage() {
                 if (!matchedWard && matchedZone) {
                     const wardNum = wardName.replace(/\D/g, "");
                     const cleanWard = wardName.replace(/ward/i, "").trim().toLowerCase();
-                    matchedWard = wards.find(w => 
+                    matchedWard = wardList.find(w => 
                         (wardNum && (w.name.split('-')[0]?.trim().replace(/\D/g, "") === wardNum)) ||
                         (cleanWard && w.name.toLowerCase().includes(cleanWard))
                     );
@@ -239,7 +253,13 @@ export default function BulkImportPage() {
             setFile(selected);
             setError('');
             setResult(null);
-            parseAndValidateCSV(selected);
+            if (!geoLoaded) {
+                // Geo data not ready yet — save the file and re-validate once it loads
+                pendingFileRef.current = selected;
+                setPreviewRows([]);
+            } else {
+                parseAndValidateCSV(selected, zones, wards);
+            }
         }
     };
 
@@ -363,6 +383,7 @@ export default function BulkImportPage() {
         <div style={{ padding: '0 0 40px 0', animation: 'fadeIn 0.5s ease-out' }}>
             <style dangerouslySetInnerHTML={{ __html: `
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
                 .glass-card {
                     background: rgba(255, 255, 255, 0.95);
                     backdrop-filter: blur(10px);
@@ -581,10 +602,17 @@ export default function BulkImportPage() {
                                         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Upload CSV File for Validation</h3>
                                         <p style={{ color: '#64748b', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Select a CSV dataset. The system will preview data & validate Zones/Wards before importing.</p>
 
+                                        {!geoLoaded ? (
+                                            <div style={{ marginTop: 24, display: 'inline-flex', alignItems: 'center', gap: 10, backgroundColor: '#f1f5f9', color: '#64748b', padding: '14px 28px', borderRadius: 14, fontSize: 14, fontWeight: 700 }}>
+                                                <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid #94a3b8', borderTopColor: '#1e293b', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                                                Loading Zone & Ward Data...
+                                            </div>
+                                        ) : (
                                         <label style={{ display: 'inline-block', marginTop: 24, backgroundColor: '#1e293b', color: 'white', padding: '14px 28px', borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(30,41,59,0.2)' }}>
                                             Select CSV File
                                             <input type="file" accept=".csv" onChange={handleFileChange} style={{ display: 'none' }} />
                                         </label>
+                                        )}
                                     </div>
 
                                     <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
