@@ -510,7 +510,37 @@ export const CityApi = {
         cityAdmins: number;
       };
     }>(`/city/stats${query}`);
-  }
+  },
+  autoAssignSupervisors: () =>
+    apiFetch<{
+      success: boolean;
+      summary: {
+        cityId: string;
+        beats: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+        toilets: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+        litterbins: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+      };
+    }>("/city/auto-assign-supervisors", {
+      method: "POST",
+    })
 };
 
 export const HmsApi = {
@@ -1074,7 +1104,6 @@ export const TwinbinApi = {
       body: JSON.stringify(body || {})
     })
 };
-
 
 
 
