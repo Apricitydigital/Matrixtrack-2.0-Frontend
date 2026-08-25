@@ -26,6 +26,8 @@ import {
     UserX,
     RefreshCw,
     FileSearch,
+    Pencil,
+    Check,
 } from "lucide-react";
 
 interface BeatFormProps {
@@ -173,8 +175,50 @@ export default function BeatForm({
         setRegistrationError,
     ] = useState("");
 
+    const [editingBeatSourceIndex, setEditingBeatSourceIndex] =
+        useState<number | null>(null);
+
+    const [editingBeatName, setEditingBeatName] =
+        useState("");
+
     const lastPreviewLocationKey =
         useRef("");
+
+    const startPreviewBeatNameEdit = (beat: PreviewBeat) => {
+        setEditingBeatSourceIndex(beat.sourceIndex);
+        setEditingBeatName(beat.suggestedBeatName);
+        setStatus(null);
+    };
+
+    const savePreviewBeatName = (beat: PreviewBeat) => {
+        const nextName = editingBeatName.trim();
+        if (!nextName) {
+            setStatus({ type: "error", message: "Beat name cannot be empty" });
+            return;
+        }
+
+        const duplicate = preview?.beats.some((item) =>
+            item.sourceIndex !== beat.sourceIndex &&
+            item.suggestedBeatName.trim().toLowerCase() === nextName.toLowerCase()
+        );
+        if (duplicate) {
+            setStatus({ type: "error", message: `Beat name "${nextName}" is already used. Choose a unique name.` });
+            return;
+        }
+
+        setPreview((current) => current ? {
+            ...current,
+            beats: current.beats.map((item) => item.sourceIndex === beat.sourceIndex
+                ? { ...item, suggestedBeatName: nextName }
+                : item),
+        } : current);
+        setBeatDrafts((current) => current.map((draft) => draft.sourceIndex === beat.sourceIndex
+            ? { ...draft, beatName: nextName }
+            : draft));
+        setEditingBeatSourceIndex(null);
+        setEditingBeatName("");
+        setStatus({ type: "success", message: `Beat renamed to "${nextName}".` });
+    };
 
     /* =========================================================
        FILE
@@ -2234,20 +2278,60 @@ export default function BeatForm({
                                                         0,
                                                 }}
                                             >
-                                                <div
-                                                    style={{
-                                                        color:
-                                                            "#0f172a",
-                                                        fontSize:
-                                                            "0.78rem",
-                                                        fontWeight:
-                                                            800,
-                                                    }}
-                                                >
-                                                    {
-                                                        beat.suggestedBeatName
-                                                    }
-                                                </div>
+                                                {editingBeatSourceIndex === beat.sourceIndex ? (
+                                                    <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                                        <input
+                                                            autoFocus
+                                                            value={editingBeatName}
+                                                            onChange={(event) => setEditingBeatName(event.target.value)}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key === "Enter") savePreviewBeatName(beat);
+                                                                if (event.key === "Escape") setEditingBeatSourceIndex(null);
+                                                            }}
+                                                            style={{
+                                                                minWidth: 0,
+                                                                width: "100%",
+                                                                height: "32px",
+                                                                border: "1px solid #93c5fd",
+                                                                borderRadius: "8px",
+                                                                padding: "0 8px",
+                                                                color: "#0f172a",
+                                                                fontSize: "0.76rem",
+                                                                fontWeight: 800,
+                                                                outline: "none",
+                                                            }}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => savePreviewBeatName(beat)}
+                                                            title="Save beat name"
+                                                            style={{ width: "31px", height: "31px", border: "none", borderRadius: "8px", background: "#2563eb", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}
+                                                        >
+                                                            <Check size={15} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        style={{
+                                                            color: "#0f172a",
+                                                            fontSize: "0.78rem",
+                                                            fontWeight: 800,
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: "6px",
+                                                        }}
+                                                    >
+                                                        {beat.suggestedBeatName}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startPreviewBeatNameEdit(beat)}
+                                                            title="Edit beat name"
+                                                            style={{ border: "none", background: "#eff6ff", color: "#2563eb", width: "25px", height: "25px", borderRadius: "7px", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                                                        >
+                                                            <Pencil size={12} />
+                                                        </button>
+                                                    </div>
+                                                )}
 
                                                 <div
                                                     style={{
