@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ApiError, apiFetch, CityApi } from "@lib/apiClient";
 
-import { Edit2, Trash2, Check, X, Loader2, Map, Plus, Search, Download, FileText, FileSpreadsheet, RefreshCw, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { Edit2, Trash2, Check, X, Loader2, Map, Plus, Search, Download, FileText, FileSpreadsheet, RefreshCw, Upload, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 import { RoleGuard } from "@components/Guards";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
@@ -63,6 +63,16 @@ export default function WardManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  /* =========================================================
+     PAGINATION & BULK SELECTION
+  ========================================================= */
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [selectedWardIds, setSelectedWardIds] = useState<string[]>([]);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [editConfirmTarget, setEditConfirmTarget] = useState<string | null>(null);
 
   /* =========================================================
      WARD EXCEL IMPORT
@@ -431,6 +441,37 @@ export default function WardManagementPage() {
     });
   }, [wards, zoneMap, searchTerm, filterZoneId, selectedCity, zones, user?.city?.name]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCity, filterZoneId]);
+
+  const totalPages = Math.ceil(filteredWards.length / pageSize) || 1;
+  const paginatedWards = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredWards.slice(start, start + pageSize);
+  }, [filteredWards, currentPage, pageSize]);
+
+  const isAllCurrentPageSelected =
+    paginatedWards.length > 0 &&
+    paginatedWards.every((w) => selectedWardIds.includes(w.id));
+
+  const toggleSelectAllCurrentPage = (checked: boolean) => {
+    if (checked) {
+      const pageIds = paginatedWards.map((w) => w.id);
+      setSelectedWardIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    } else {
+      const pageIdSet = new Set(paginatedWards.map((w) => w.id));
+      setSelectedWardIds((prev) => prev.filter((id) => !pageIdSet.has(id)));
+    }
+  };
+
+  const toggleSelectWard = (id: string) => {
+    setSelectedWardIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
   const confirmDeleteWard = async () => {
     if (!deleteConfirmTarget || isReadOnly) return;
     const id = deleteConfirmTarget.id;
@@ -438,12 +479,36 @@ export default function WardManagementPage() {
     try {
       await apiFetch(`/city/geo/${id}`, { method: "DELETE" });
       setDeleteConfirmTarget(null);
+      setSelectedWardIds((prev) => prev.filter((item) => item !== id));
       await loadData();
     } catch (err) {
       alert(err instanceof ApiError ? err.message : "Failed to delete ward");
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const confirmBulkDeleteWards = async () => {
+    if (selectedWardIds.length === 0 || isReadOnly) return;
+    setBulkDeleting(true);
+    try {
+      for (const id of selectedWardIds) {
+        await apiFetch(`/city/geo/${id}`, { method: "DELETE" }).catch((err) => console.error(err));
+      }
+      setSelectedWardIds([]);
+      setShowBulkDeleteConfirm(false);
+      await loadData();
+    } catch (err) {
+      alert("Failed to delete some selected wards");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const resetAllFilters = () => {
+    setSearchTerm("");
+    if (isSuperAdmin) setSelectedCity("ALL");
+    setFilterZoneId("ALL");
   };
 
   /* =========================================================
@@ -1002,11 +1067,11 @@ export default function WardManagementPage() {
 
   return (
     <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "COMMISSIONER", "ULB_OFFICER"]}>
-      <div className="page" style={{ padding: "28px 36px", backgroundColor: "#f8fafc", minHeight: "100vh" }}>
+      <div className="page p-3 sm:p-6 lg:p-8" style={{ backgroundColor: "#f8fafc", minHeight: "100vh" }}>
         <div style={{ width: "100%" }}>
 
           {/* Header */}
-          <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+          <div className="mb-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div>
               <div className="breadcrumb" style={{ fontSize: "0.8125rem", color: "#64748b", display: "flex", gap: "8px", marginBottom: "6px", fontWeight: 600 }}>
                 <span>City Admin</span>
@@ -1021,7 +1086,32 @@ export default function WardManagementPage() {
               </p>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
+              {selectedWardIds.length > 0 && !isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    height: "44px",
+                    padding: "0 16px",
+                    borderRadius: "12px",
+                    backgroundColor: "#fee2e2",
+                    border: "1px solid #fecaca",
+                    color: "#dc2626",
+                    fontWeight: 800,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <Trash2 size={15} />
+                  <span>Delete Selected ({selectedWardIds.length})</span>
+                </button>
+              )}
+
               <TableExportDropdown
                 data={filteredWards.map(w => ({
                   WardID: w.id,
@@ -1525,7 +1615,7 @@ export default function WardManagementPage() {
                             display:
                               "grid",
                             gridTemplateColumns:
-                              "repeat(4,minmax(0,1fr))",
+                              "repeat(auto-fit, minmax(130px, 1fr))",
                             gap:
                               "10px",
                             marginTop:
@@ -2178,15 +2268,19 @@ export default function WardManagementPage() {
             }}>
               <div style={{
                 backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)"
+                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                textAlign: "center"
               }}>
+                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <Trash2 size={24} />
+                </div>
                 <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
                   Delete Ward ({deleteConfirmTarget.name})?
                 </div>
                 <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
-                  Are you sure you want to delete this ward? This action cannot be undone.
+                  Are you sure you want to delete this ward and its associated areas/beats? This action cannot be undone.
                 </p>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
                   <button
                     type="button"
                     onClick={() => setDeleteConfirmTarget(null)}
@@ -2200,7 +2294,94 @@ export default function WardManagementPage() {
                     disabled={deletingId === deleteConfirmTarget.id}
                     style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
                   >
-                    {deletingId === deleteConfirmTarget.id ? "Deleting..." : "Delete Ward"}
+                    {deletingId === deleteConfirmTarget.id ? "Deleting..." : "Yes, Delete Ward"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Delete Confirmation Modal */}
+          {showBulkDeleteConfirm && (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
+            }}>
+              <div style={{
+                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                textAlign: "center"
+              }}>
+                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <Trash2 size={24} />
+                </div>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                  Delete Multiple Wards?
+                </div>
+                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                  Are you sure you want to delete <strong>{selectedWardIds.length} selected wards</strong> and their children? This action cannot be undone.
+                </p>
+                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkDeleteConfirm(false)}
+                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmBulkDeleteWards}
+                    disabled={bulkDeleting}
+                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                  >
+                    {bulkDeleting ? "Deleting..." : `Yes, Delete ${selectedWardIds.length}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Confirmation Modal */}
+          {editConfirmTarget && (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
+            }}>
+              <div style={{
+                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                textAlign: "center"
+              }}>
+                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#dbeafe", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <AlertTriangle size={24} />
+                </div>
+                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                  Confirm Ward Changes
+                </div>
+                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                  Are you sure you want to save the modifications to this ward?
+                </p>
+                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditConfirmTarget(null)}
+                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const id = editConfirmTarget;
+                      setEditConfirmTarget(null);
+                      await updateWard(id);
+                    }}
+                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#2563eb", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                  >
+                    Yes, Save Changes
                   </button>
                 </div>
               </div>
@@ -2316,17 +2497,33 @@ export default function WardManagementPage() {
           </div>
 
           {/* Table Container */}
-          <div style={{ backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "20px", overflow: "hidden", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-            <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe" }}>
+          <div style={{ backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "20px", overflow: "hidden", boxShadow: "0 2px 4px rgba(0,0,0,0.02)", minHeight: "420px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
               <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 900, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 Registered Wards ({filteredWards.length})
               </h3>
+              {selectedWardIds.length > 0 && (
+                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#2563eb" }}>
+                  {selectedWardIds.length} ward{selectedWardIds.length > 1 ? "s" : ""} selected
+                </span>
+              )}
             </div>
 
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+            <div className="responsive-table-wrapper" style={{ overflowX: "auto", flex: 1 }}>
+              <table style={{ width: "100%", minWidth: "1050px", borderCollapse: "collapse", textAlign: "left" }}>
                 <thead style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                   <tr>
+                    {!isReadOnly && (
+                      <th style={{ padding: "12px 14px", width: "48px", textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={isAllCurrentPageSelected}
+                          onChange={(e) => toggleSelectAllCurrentPage(e.target.checked)}
+                          style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#2563eb" }}
+                          aria-label="Select all on current page"
+                        />
+                      </th>
+                    )}
                     <th style={{ padding: "12px 20px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", width: "70px" }}>Sr No</th>
                     <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ward Number</th>
                     <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ward Name</th>
@@ -2340,25 +2537,52 @@ export default function WardManagementPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>Loading wards...</td>
+                      <td colSpan={isReadOnly ? 8 : 9} style={{ padding: "64px 24px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>Loading wards...</td>
                     </tr>
                   ) : filteredWards.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}>No matching wards found.</td>
+                      <td colSpan={isReadOnly ? 8 : 9} style={{ padding: "64px 24px", textAlign: "center" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+                          <Map size={36} color="#94a3b8" />
+                          <p style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#334155" }}>
+                            No matching registered wards found
+                          </p>
+                          <p style={{ margin: 0, fontSize: "0.8125rem", color: "#64748b" }}>
+                            Try changing your search query or filter options above.
+                          </p>
+                          {(searchTerm || selectedCity !== "ALL" || filterZoneId !== "ALL") && (
+                            <button
+                              type="button"
+                              onClick={resetAllFilters}
+                              style={{
+                                marginTop: "8px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "6px 14px",
+                                borderRadius: "8px",
+                                border: "1px solid #cbd5e1",
+                                backgroundColor: "#f8fafc",
+                                color: "#2563eb",
+                                fontSize: "0.8125rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              <RotateCcw size={13} /> Reset Filters
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ) : (
-                    filteredWards.map((w, idx) => {
-                      const cleanLabel = (
-                        val: any,
-                        prefix: string
-                      ) => {
-                        const str =
-                          String(val ?? "").trim();
+                    paginatedWards.map((w, idx) => {
+                      const globalIdx = (currentPage - 1) * pageSize + idx + 1;
+                      const isSelected = selectedWardIds.includes(w.id);
 
-                        return (
-                          str ||
-                          `${prefix} ${idx + 1}`
-                        );
+                      const cleanLabel = (val: any, prefix: string) => {
+                        const str = String(val ?? "").trim();
+                        return str || `${prefix} ${globalIdx}`;
                       };
                       const rawZone = zoneMap[w.parentId || ''];
                       const zoneName = cleanLabel(rawZone || 'Zone 1', 'Zone');
@@ -2373,9 +2597,27 @@ export default function WardManagementPage() {
                         : '11:45 AM';
 
                       return (
-                        <tr key={w.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <tr
+                          key={w.id}
+                          style={{
+                            borderBottom: "1px solid #f1f5f9",
+                            backgroundColor: isSelected ? "#f0f7ff" : "transparent",
+                            transition: "background-color 0.15s",
+                          }}
+                        >
+                          {!isReadOnly && (
+                            <td style={{ padding: "14px 14px", textAlign: "center", width: "48px" }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectWard(w.id)}
+                                style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#2563eb" }}
+                                aria-label={`Select ${wardName}`}
+                              />
+                            </td>
+                          )}
                           <td style={{ padding: "14px 20px", fontSize: "0.8125rem", fontWeight: 800, color: "#64748b" }}>
-                            {idx + 1}
+                            {globalIdx}
                           </td>
                           <td style={{ padding: "14px 24px" }}>
                             {editingId === w.id ? (
@@ -2437,7 +2679,7 @@ export default function WardManagementPage() {
                               {editingId === w.id ? (
                                 <>
                                   <button
-                                    onClick={() => updateWard(w.id)}
+                                    onClick={() => setEditConfirmTarget(w.id)}
                                     disabled={updatingId === w.id}
                                     style={{ border: "none", background: "#dcfce7", color: "#16a34a", padding: "6px 12px", borderRadius: "8px", fontSize: "0.75rem", fontWeight: 800, cursor: "pointer" }}
                                   >
@@ -2475,6 +2717,148 @@ export default function WardManagementPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* PAGINATION FOOTER */}
+            {filteredWards.length > 0 && (
+              <div
+                style={{
+                  padding: "14px 24px",
+                  borderTop: "1px solid #f1f5f9",
+                  backgroundColor: "#fcfdfe",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600 }}>
+                    Showing{" "}
+                    <strong style={{ color: "#0f172a" }}>
+                      {(currentPage - 1) * pageSize + 1}
+                    </strong>{" "}
+                    to{" "}
+                    <strong style={{ color: "#0f172a" }}>
+                      {Math.min(currentPage * pageSize, filteredWards.length)}
+                    </strong>{" "}
+                    of{" "}
+                    <strong style={{ color: "#0f172a" }}>
+                      {filteredWards.length}
+                    </strong>{" "}
+                    wards
+                  </span>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>Per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        backgroundColor: "white",
+                        color: "#334155",
+                        outline: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "8px",
+                      border: "1px solid #cbd5e1",
+                      backgroundColor: currentPage === 1 ? "#f8fafc" : "white",
+                      color: currentPage === 1 ? "#cbd5e1" : "#334155",
+                      cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => {
+                      if (totalPages <= 5) return true;
+                      if (p === 1 || p === totalPages) return true;
+                      return Math.abs(p - currentPage) <= 1;
+                    })
+                    .map((p, idx, arr) => {
+                      const prev = arr[idx - 1];
+                      const showEllipsis = prev && p - prev > 1;
+
+                      return (
+                        <React.Fragment key={p}>
+                          {showEllipsis && (
+                            <span style={{ padding: "0 4px", color: "#94a3b8", fontSize: "0.75rem" }}>
+                              ...
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(p)}
+                            style={{
+                              minWidth: "32px",
+                              height: "32px",
+                              padding: "0 8px",
+                              borderRadius: "8px",
+                              border: p === currentPage ? "none" : "1px solid #cbd5e1",
+                              backgroundColor: p === currentPage ? "#2563eb" : "white",
+                              color: p === currentPage ? "white" : "#334155",
+                              fontSize: "0.8125rem",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "8px",
+                      border: "1px solid #cbd5e1",
+                      backgroundColor: currentPage >= totalPages ? "#f8fafc" : "white",
+                      color: currentPage >= totalPages ? "#cbd5e1" : "#334155",
+                      cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

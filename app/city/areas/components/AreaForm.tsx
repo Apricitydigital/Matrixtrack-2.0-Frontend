@@ -6,9 +6,11 @@ import { Plus, Loader2, CheckCircle2, AlertCircle, MapPin } from "lucide-react";
 
 interface AreaFormProps {
     onSuccess: () => void;
+    onCancel?: () => void;
+    wards?: any[];
 }
 
-export default function AreaForm({ onSuccess }: AreaFormProps) {
+export default function AreaForm({ onSuccess, onCancel }: AreaFormProps) {
     const [zones, setZones] = useState<any[]>([]);
     const [wards, setWards] = useState<any[]>([]);
 
@@ -87,8 +89,8 @@ export default function AreaForm({ onSuccess }: AreaFormProps) {
                 </h3>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ display: "grid", gap: "20px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                     <div className="form-group">
                         <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Select Zone *</label>
                         <select
@@ -123,8 +125,8 @@ export default function AreaForm({ onSuccess }: AreaFormProps) {
                     </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px" }}>
-                    <div className="form-group">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+                    <div className="form-group md:col-span-2">
                         <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Area Name *</label>
                         <input
                             type="text"

@@ -701,9 +701,12 @@ export const CityUserApi = {
     apiFetch<{
       users: {
         id: string;
+        employeeId?: string | null;
         name: string;
         email: string | null;
         phone: string | null;
+        aadhaar?: string | null;
+        employmentType?: string | null;
         role: string;
         cityId?: string;
         createdAt: string;
@@ -730,6 +733,10 @@ export const CityUserApi = {
     id: string,
     body: {
       name?: string;
+      employeeId?: string | null;
+      phone?: string | null;
+      aadhaar?: string | null;
+      employmentType?: string | null;
       role?: string;
       zoneIds?: string[];
       wardIds?: string[];

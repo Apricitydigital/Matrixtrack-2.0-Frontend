@@ -1419,3 +1419,50 @@ label {
 .portal-main-content select {
   font-size: 12px !important;
 }
+
+/* =========================================================================
+   Global Responsive Layout Utilities
+   ========================================================================= */
+
+.responsive-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.responsive-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.responsive-table-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 14px 16px !important;
+  }
+
+  .portal-main-content h1 {
+    font-size: 17px !important;
+  }
+
+  .portal-main-content h2 {
+    font-size: 15px !important;
+  }
+
+  .portal-main-content table th,
+  .portal-main-content table td {
+    padding: 8px 12px !important;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 10px 12px !important;
+  }
+}

@@ -8,11 +8,19 @@ import React, {
 } from "react";
 
 import {
+    AlertTriangle,
+    CheckSquare,
+    ChevronLeft,
+    ChevronRight,
     Download,
+    Edit2,
     FileSpreadsheet,
     FileText,
+    MoreVertical,
     RefreshCw,
     Search,
+    Square,
+    Trash2,
     UserPlus,
     Users,
     X,
@@ -42,6 +50,8 @@ type EmployeeRow = {
     name: string;
     email: string | null;
     phone: string | null;
+    aadhaar?: string | null;
+    employmentType?: string | null;
     role: string;
     createdAt: string;
     zoneIds?: string[];
@@ -62,6 +72,8 @@ type EmployeeImportStatus =
     | "INVALID_ZONE"
     | "INVALID_WARD"
     | "INVALID_MOBILE"
+    | "INVALID_AADHAAR"
+    | "INVALID_EMPLOYMENT_TYPE"
     | "INVALID_DATA"
     | "DUPLICATE_ROW";
 
@@ -69,7 +81,9 @@ type EmployeeImportRow = {
     rowNumber: number;
     employeeId?: string;
     employeeName: string;
-    mobileNumber: string;
+    mobileNumber?: string;
+    aadhaarNumber?: string;
+    employmentType?: string;
     zoneName: string;
     wardName: string;
     zoneId?: string;
@@ -77,6 +91,90 @@ type EmployeeImportRow = {
     status: EmployeeImportStatus;
     message: string;
 };
+
+function normalizeEmploymentType(input?: string | null): string {
+    if (!input) return "Permanent";
+    const str = String(input).trim();
+    const lower = str.toLowerCase();
+
+    // 1. Outsource: 'Outsource', 'Outsourced', 'आउटसोर्स', 'आउटसोर्सिंग', 'आउट सोर्स'
+    if (
+        lower.includes("outsource") ||
+        str.includes("आउटसोर्स") ||
+        str.includes("आउट सोर्स") ||
+        str.includes("आउटसोर्सिंग")
+    ) {
+        return "Outsource";
+    }
+
+    // 2. Temporary: 'Temporary', 'अस्थायी' (checked before Permanent)
+    if (
+        lower.includes("temp") ||
+        str.includes("अस्थायी") ||
+        str.includes("अस्थाई")
+    ) {
+        return "Temporary";
+    }
+
+    // 3. Regularized: 'Regularized', 'विनियमित', 'विनीयमित'
+    if (
+        lower.includes("regular") ||
+        str.includes("विनियमित") ||
+        str.includes("विनीयमित")
+    ) {
+        return "Regularized";
+    }
+
+    // 4. Permanent: 'Permanent', 'स्थायी'
+    if (
+        lower.includes("perman") ||
+        str.includes("स्थायी") ||
+        str.includes("स्थाई")
+    ) {
+        return "Permanent";
+    }
+
+    return "Permanent";
+}
+
+function getEmploymentTypeDisplay(type?: string | null): {
+    key: "Permanent" | "Regularized" | "Temporary" | "Outsource";
+    labelEn: string;
+    labelHi: string;
+    badgeLabel: string;
+} {
+    const normalized = normalizeEmploymentType(type);
+    if (normalized === "Outsource") {
+        return {
+            key: "Outsource",
+            labelEn: "Outsource",
+            labelHi: "आउटसोर्स",
+            badgeLabel: "Outsource / आउटसोर्स",
+        };
+    }
+    if (normalized === "Regularized") {
+        return {
+            key: "Regularized",
+            labelEn: "Regularized",
+            labelHi: "विनियमित",
+            badgeLabel: "Regularized / विनियमित",
+        };
+    }
+    if (normalized === "Temporary") {
+        return {
+            key: "Temporary",
+            labelEn: "Temporary",
+            labelHi: "अस्थायी",
+            badgeLabel: "Temporary / अस्थायी",
+        };
+    }
+    return {
+        key: "Permanent",
+        labelEn: "Permanent",
+        labelHi: "स्थायी",
+        badgeLabel: "Permanent / स्थायी",
+    };
+}
 
 
 export default function EmployeesPage() {
@@ -104,7 +202,7 @@ export default function EmployeesPage() {
 
 
     /* =========================================================
-       FILTERS
+       FILTERS & PAGINATION
     ========================================================= */
 
     const [showDownloadDropdown, setShowDownloadDropdown] =
@@ -119,9 +217,82 @@ export default function EmployeesPage() {
     const [selectedWardId, setSelectedWardId] =
         useState("");
 
+    const [currentPage, setCurrentPage] =
+        useState(1);
+
+    const [pageSize, setPageSize] =
+        useState(10);
+
+
     /* =========================================================
-REGISTER EMPLOYEE
-========================================================= */
+       SELECTION & BULK ACTIONS
+    ========================================================= */
+
+    const [selectedEmployeeIds, setSelectedEmployeeIds] =
+        useState<string[]>([]);
+
+    const [openActionMenuId, setOpenActionMenuId] =
+        useState<string | null>(null);
+
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] =
+        useState(false);
+
+    const [deletingBulk, setDeletingBulk] =
+        useState(false);
+
+
+    /* =========================================================
+       DELETE SINGLE EMPLOYEE
+    ========================================================= */
+
+    const [deleteTarget, setDeleteTarget] =
+        useState<{ id: string; name: string } | null>(null);
+
+    const [deletingSingle, setDeletingSingle] =
+        useState(false);
+
+
+    /* =========================================================
+       EDIT EMPLOYEE
+    ========================================================= */
+
+    const [editingEmployee, setEditingEmployee] =
+        useState<EmployeeRow | null>(null);
+
+    const [editName, setEditName] =
+        useState("");
+
+    const [editEmployeeCodeId, setEditEmployeeCodeId] =
+        useState("");
+
+    const [editPhone, setEditPhone] =
+        useState("");
+
+    const [editAadhaar, setEditAadhaar] =
+        useState("");
+
+    const [editEmploymentType, setEditEmploymentType] =
+        useState<string>("Permanent");
+
+    const [editZoneId, setEditZoneId] =
+        useState("");
+
+    const [editWardId, setEditWardId] =
+        useState("");
+
+    const [editError, setEditError] =
+        useState("");
+
+    const [showEditConfirm, setShowEditConfirm] =
+        useState(false);
+
+    const [savingEdit, setSavingEdit] =
+        useState(false);
+
+
+    /* =========================================================
+       REGISTER EMPLOYEE
+    ========================================================= */
 
     const [showRegisterEmployee, setShowRegisterEmployee] =
         useState(false);
@@ -134,6 +305,12 @@ REGISTER EMPLOYEE
 
     const [employeePhone, setEmployeePhone] =
         useState("");
+
+    const [employeeAadhaar, setEmployeeAadhaar] =
+        useState("");
+
+    const [employeeEmploymentType, setEmployeeEmploymentType] =
+        useState<string>("Permanent");
 
     const [employeeZoneId, setEmployeeZoneId] =
         useState("");
@@ -149,8 +326,8 @@ REGISTER EMPLOYEE
 
 
     /* =========================================================
-EMPLOYEE EXCEL IMPORT
-========================================================= */
+       EMPLOYEE EXCEL IMPORT
+    ========================================================= */
 
     const [showEmployeeImport, setShowEmployeeImport] =
         useState(false);
@@ -228,6 +405,16 @@ EMPLOYEE EXCEL IMPORT
         loadData();
     }, [loadData]);
 
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (!(e.target as HTMLElement).closest(".employee-action-menu-container")) {
+                setOpenActionMenuId(null);
+            }
+        };
+        document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
+    }, []);
+
 
     /* =========================================================
        GEO MAPS
@@ -265,116 +452,11 @@ EMPLOYEE EXCEL IMPORT
             return wards;
         }
 
-        const children = wards.filter(
+        return wards.filter(
             (ward) =>
                 !ward.parentId ||
                 ward.parentId === selectedZoneId
         );
-
-        const resetRegistrationForm = () => {
-            setEmployeeName("");
-            setEmployeePhone("");
-            setEmployeeZoneId("");
-            setEmployeeWardId("");
-            setRegistrationError("");
-        };
-
-
-        const closeRegistrationModal = () => {
-            if (registeringEmployee) return;
-
-            setShowRegisterEmployee(false);
-            resetRegistrationForm();
-        };
-
-
-        const handleRegisterEmployee = async (
-            e: React.FormEvent
-        ) => {
-            e.preventDefault();
-
-            const cleanName =
-                employeeName
-                    .trim()
-                    .replace(/\s+/g, " ");
-
-            const cleanPhone =
-                employeePhone.replace(/\D/g, "");
-
-
-            if (!cleanName) {
-                setRegistrationError(
-                    "Employee name is required."
-                );
-                return;
-            }
-
-
-            if (!/^\d{10}$/.test(cleanPhone)) {
-                setRegistrationError(
-                    "Mobile number must be exactly 10 digits."
-                );
-                return;
-            }
-
-
-            if (!employeeZoneId) {
-                setRegistrationError(
-                    "Please select a Zone."
-                );
-                return;
-            }
-
-
-            if (!employeeWardId) {
-                setRegistrationError(
-                    "Please select a Ward."
-                );
-                return;
-            }
-
-
-            try {
-                setRegisteringEmployee(true);
-                setRegistrationError("");
-
-
-                await apiFetch(
-                    "/city/areas/import-register-employee",
-                    {
-                        method: "POST",
-                        body: JSON.stringify({
-                            name: cleanName,
-                            phone: cleanPhone,
-                            zoneId: employeeZoneId,
-                            wardId: employeeWardId,
-                        }),
-                    }
-                );
-
-
-                await loadData();
-
-                setShowRegisterEmployee(false);
-                resetRegistrationForm();
-
-            } catch (err: any) {
-                console.error(
-                    "Employee registration failed",
-                    err
-                );
-
-                setRegistrationError(
-                    err?.message ||
-                    "Failed to register employee."
-                );
-
-            } finally {
-                setRegisteringEmployee(false);
-            }
-        };
-
-        return children;
     }, [
         wards,
         selectedZoneId,
@@ -388,6 +470,16 @@ EMPLOYEE EXCEL IMPORT
                 ward.parentId === employeeZoneId
         );
     }, [wards, employeeZoneId]);
+
+    const editRegistrationWards = useMemo(() => {
+        if (!editZoneId) return [];
+
+        return wards.filter(
+            (ward) =>
+                ward.parentId === editZoneId
+        );
+    }, [wards, editZoneId]);
+
 
     /* =========================================================
        FILTER EMPLOYEES
@@ -433,10 +525,17 @@ EMPLOYEE EXCEL IMPORT
             }
 
 
+            const empTypeInfo = getEmploymentTypeDisplay(employee.employmentType);
+
             const searchableText = [
                 employee.name,
                 employee.employeeId || "",
                 employee.phone || "",
+                employee.aadhaar || "",
+                employee.employmentType || "",
+                empTypeInfo.labelEn,
+                empTypeInfo.labelHi,
+                empTypeInfo.badgeLabel,
                 ...employeeZoneIds.map(
                     (id) =>
                         zoneNameMap[id] || ""
@@ -464,6 +563,203 @@ EMPLOYEE EXCEL IMPORT
         wardNameMap,
     ]);
 
+    /* =========================================================
+       PAGINATION
+    ========================================================= */
+
+    const totalPages = Math.max(
+        1,
+        Math.ceil(filteredEmployees.length / pageSize)
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, selectedZoneId, selectedWardId]);
+
+    const paginatedEmployees = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredEmployees.slice(start, start + pageSize);
+    }, [filteredEmployees, currentPage, pageSize]);
+
+
+    /* =========================================================
+       SELECTION LOGIC
+    ========================================================= */
+
+    const isAllPageSelected =
+        paginatedEmployees.length > 0 &&
+        paginatedEmployees.every((emp) =>
+            selectedEmployeeIds.includes(emp.id)
+        );
+
+    const toggleSelectAll = () => {
+        if (isAllPageSelected) {
+            const pageIds = new Set(paginatedEmployees.map((e) => e.id));
+            setSelectedEmployeeIds((prev) =>
+                prev.filter((id) => !pageIds.has(id))
+            );
+        } else {
+            const newIds = new Set([
+                ...selectedEmployeeIds,
+                ...paginatedEmployees.map((e) => e.id),
+            ]);
+            setSelectedEmployeeIds(Array.from(newIds));
+        }
+    };
+
+    const toggleSelectRow = (id: string) => {
+        setSelectedEmployeeIds((prev) =>
+            prev.includes(id)
+                ? prev.filter((item) => item !== id)
+                : [...prev, id]
+        );
+    };
+
+
+    /* =========================================================
+       DELETE ACTIONS
+    ========================================================= */
+
+    const handleConfirmDeleteSingle = async () => {
+        if (!deleteTarget) return;
+
+        try {
+            setDeletingSingle(true);
+            await CityUserApi.remove(deleteTarget.id);
+            await loadData();
+            setSelectedEmployeeIds((prev) =>
+                prev.filter((id) => id !== deleteTarget.id)
+            );
+            setDeleteTarget(null);
+        } catch (err: any) {
+            console.error("Failed to delete employee", err);
+            setError(err?.message || "Failed to delete employee.");
+        } finally {
+            setDeletingSingle(false);
+        }
+    };
+
+    const handleConfirmBulkDelete = async () => {
+        if (!selectedEmployeeIds.length) return;
+
+        try {
+            setDeletingBulk(true);
+            for (const id of selectedEmployeeIds) {
+                try {
+                    await CityUserApi.remove(id);
+                } catch (err) {
+                    console.error(`Failed to delete employee ${id}`, err);
+                }
+            }
+            await loadData();
+            setSelectedEmployeeIds([]);
+            setShowBulkDeleteConfirm(false);
+        } catch (err: any) {
+            console.error("Bulk delete failed", err);
+            setError(err?.message || "Failed to delete selected employees.");
+        } finally {
+            setDeletingBulk(false);
+        }
+    };
+
+
+    /* =========================================================
+       EDIT ACTIONS
+    ========================================================= */
+
+    const openEditModal = (emp: EmployeeRow) => {
+        setEditingEmployee(emp);
+        setEditName(emp.name);
+        setEditEmployeeCodeId(emp.employeeId || "");
+        setEditPhone(emp.phone || "");
+        setEditAadhaar(emp.aadhaar || "");
+        setEditEmploymentType(emp.employmentType || "Permanent");
+        setEditZoneId(emp.zoneIds?.[0] || "");
+        setEditWardId(emp.wardIds?.[0] || "");
+        setEditError("");
+        setShowEditConfirm(false);
+    };
+
+    const closeEditModal = () => {
+        if (savingEdit) return;
+        setEditingEmployee(null);
+        setShowEditConfirm(false);
+        setEditError("");
+    };
+
+    const handleEditSaveRequest = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const cleanName = editName.trim().replace(/\s+/g, " ");
+        const cleanPhone = editPhone.replace(/\D/g, "");
+        const cleanAadhaar = editAadhaar.replace(/\D/g, "");
+
+        if (!cleanName) {
+            setEditError("Employee name is required.");
+            return;
+        }
+
+        if (cleanPhone && !/^\d{10}$/.test(cleanPhone)) {
+            setEditError("Mobile number must be exactly 10 digits.");
+            return;
+        }
+
+        if (cleanAadhaar && !/^\d{12}$/.test(cleanAadhaar)) {
+            setEditError("Aadhaar number must be exactly 12 digits.");
+            return;
+        }
+
+        if (!editZoneId) {
+            setEditError("Please select a Zone.");
+            return;
+        }
+
+        if (!editWardId) {
+            setEditError("Please select a Ward.");
+            return;
+        }
+
+        setShowEditConfirm(true);
+    };
+
+    const handleConfirmEditSave = async () => {
+        if (!editingEmployee) return;
+
+        const cleanName = editName.trim().replace(/\s+/g, " ");
+        const cleanPhone = editPhone.replace(/\D/g, "");
+        const cleanAadhaar = editAadhaar.replace(/\D/g, "");
+
+        try {
+            setSavingEdit(true);
+            setEditError("");
+
+            await CityUserApi.update(editingEmployee.id, {
+                name: cleanName,
+                employeeId: editEmployeeCodeId.trim() || null,
+                phone: cleanPhone || null,
+                aadhaar: cleanAadhaar || null,
+                employmentType: editEmploymentType || "Permanent",
+                zoneIds: [editZoneId],
+                wardIds: [editWardId],
+                role: "EMPLOYEE",
+            });
+
+            await loadData();
+            closeEditModal();
+        } catch (err: any) {
+            console.error("Failed to update employee", err);
+            setEditError(err?.message || "Failed to update employee.");
+            setShowEditConfirm(false);
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+
+    /* =========================================================
+       EXPORT
+    ========================================================= */
+
     const exportEmployeesExcel = useCallback(() => {
         if (!filteredEmployees.length) return;
         const rows = filteredEmployees.map((emp, idx) => {
@@ -473,15 +769,18 @@ EMPLOYEE EXCEL IMPORT
                 ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
                 : "—";
 
+            const typeInfo = getEmploymentTypeDisplay(emp.employmentType);
+
             return {
                 "S.No": idx + 1,
                 "Employee Name": emp.name,
                 "Employee ID": emp.employeeId || "—",
                 "Mobile Number": emp.phone || "Not added",
+                "Aadhaar Number": emp.aadhaar || "—",
+                "Appointment Type": `${typeInfo.labelEn} / ${typeInfo.labelHi}`,
                 "Zone": zones,
                 "Ward": wards,
                 "Registered On": createdDate,
-                "Status": "Registered"
             };
         });
 
@@ -491,13 +790,13 @@ EMPLOYEE EXCEL IMPORT
             { wch: 26 },
             { wch: 16 },
             { wch: 18 },
+            { wch: 18 },
+            { wch: 26 },
             { wch: 22 },
             { wch: 22 },
             { wch: 18 },
-            { wch: 14 }
         ];
 
-        // Format header row (Row 1) with 26pt height, bold font and subtle slate fill
         worksheet["!rows"] = [{ hpt: 26 }];
         const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
         for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -528,6 +827,7 @@ EMPLOYEE EXCEL IMPORT
                 const createdDate = emp.createdAt
                     ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
                     : "—";
+                const typeInfo = getEmploymentTypeDisplay(emp.employmentType);
 
                 return `
                     <tr style="border-bottom: 1px solid #e2e8f0;">
@@ -535,6 +835,8 @@ EMPLOYEE EXCEL IMPORT
                         <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">${emp.name}</td>
                         <td style="padding: 10px 14px; font-weight: 700; color: #2563eb;">${emp.employeeId || "—"}</td>
                         <td style="padding: 10px 14px; color: #334155;">${emp.phone || "Not added"}</td>
+                        <td style="padding: 10px 14px; color: #334155; font-family: monospace;">${emp.aadhaar || "—"}</td>
+                        <td style="padding: 10px 14px; font-weight: 600; color: #1e40af;">${typeInfo.labelEn} / ${typeInfo.labelHi}</td>
                         <td style="padding: 10px 14px; color: #1e40af;">${zones}</td>
                         <td style="padding: 10px 14px; color: #475569;">${wards}</td>
                         <td style="padding: 10px 14px; color: #64748b; font-size: 11px;">${createdDate}</td>
@@ -573,6 +875,8 @@ EMPLOYEE EXCEL IMPORT
                                 <th>Employee Name</th>
                                 <th>Employee ID</th>
                                 <th>Mobile Number</th>
+                                <th>Aadhaar Number</th>
+                                <th>Employment Type</th>
                                 <th>Zone</th>
                                 <th>Ward</th>
                                 <th>Registered On</th>
@@ -595,6 +899,11 @@ EMPLOYEE EXCEL IMPORT
         printWindow.document.write(htmlContent);
         printWindow.document.close();
     }, [filteredEmployees, zoneNameMap, wardNameMap]);
+
+
+    /* =========================================================
+       EXCEL IMPORT LOGIC
+    ========================================================= */
 
     const handleEmployeeExcelFile = async (
         e: React.ChangeEvent<HTMLInputElement>
@@ -665,8 +974,12 @@ EMPLOYEE EXCEL IMPORT
 
             const findColIdx = (queryKeywords: string[], defaultIdx: number) => {
                 const found = headers.findIndex((h) => {
-                    const norm = h.toLowerCase().replace(/[^a-z0-9]/g, "");
-                    return queryKeywords.some((kw) => norm.includes(kw));
+                    const raw = h.toLowerCase().trim();
+                    const norm = raw.replace(/[^a-z0-9\u0900-\u097F]/g, "");
+                    return queryKeywords.some((kw) => {
+                        const cleanKw = kw.toLowerCase().replace(/[^a-z0-9\u0900-\u097F]/g, "");
+                        return norm.includes(cleanKw) || raw.includes(kw.toLowerCase());
+                    });
                 });
                 return found !== -1 ? found : defaultIdx;
             };
@@ -679,8 +992,20 @@ EMPLOYEE EXCEL IMPORT
             const empIdIdx = hasEmpId ? findColIdx(["empid", "employeeid"], 1) : -1;
             const nameIdx = findColIdx(["empname", "employeename", "name"], hasEmpId ? 2 : 1);
             const mobileIdx = findColIdx(["mobile", "phone", "contact"], hasEmpId ? 3 : 2);
-            const zoneIdx = findColIdx(["zone"], hasEmpId ? 4 : 3);
-            const wardIdx = findColIdx(["ward"], hasEmpId ? 5 : 4);
+            const aadhaarIdx = findColIdx(["aadhaar", "aadhar", "uid", "adharnumber", "aadharnumber"], hasEmpId ? 4 : 3);
+            const employmentTypeIdx = findColIdx([
+                "appointment",
+                "employment",
+                "employeement",
+                "नियुक्ति",
+                "नियुक्तिप्रकार",
+                "appointmenttype",
+                "employmenttype",
+                "type",
+                "category"
+            ], hasEmpId ? 5 : 4);
+            const zoneIdx = findColIdx(["zone"], hasEmpId ? 6 : 5);
+            const wardIdx = findColIdx(["ward"], hasEmpId ? 7 : 6);
 
 
             /* =============================================
@@ -790,35 +1115,35 @@ EMPLOYEE EXCEL IMPORT
                                     " "
                                 );
 
-                        const mobileNumber =
-                            String(
-                                rawRow?.[mobileIdx] ?? ""
-                            )
-                                .replace(
-                                    /\D/g,
-                                    ""
-                                )
-                                .trim();
+                        const rawMobile =
+                            mobileIdx !== -1
+                                ? String(rawRow?.[mobileIdx] ?? "").replace(/\D/g, "").trim()
+                                : "";
+                        // If 10 digits, keep it; otherwise blank/null without invalidating the row
+                        const mobileNumber = rawMobile.length === 10 ? rawMobile : "";
+
+                        const rawAadhaar =
+                            aadhaarIdx !== -1
+                                ? String(rawRow?.[aadhaarIdx] ?? "").replace(/\D/g, "").trim()
+                                : "";
+                        // If 12 digits, keep it; otherwise blank/null without invalidating the row
+                        const aadhaarNumber = rawAadhaar.length === 12 ? rawAadhaar : "";
+
+                        const rawEmploymentType =
+                            employmentTypeIdx !== -1
+                                ? String(rawRow?.[employmentTypeIdx] ?? "").trim()
+                                : "";
+                        const employmentType = normalizeEmploymentType(rawEmploymentType);
 
                         const zoneName =
-                            String(
-                                rawRow?.[zoneIdx] ?? ""
-                            )
-                                .trim()
-                                .replace(
-                                    /\s+/g,
-                                    " "
-                                );
+                            zoneIdx !== -1
+                                ? String(rawRow?.[zoneIdx] ?? "").trim().replace(/\s+/g, " ")
+                                : "";
 
                         const wardName =
-                            String(
-                                rawRow?.[wardIdx] ?? ""
-                            )
-                                .trim()
-                                .replace(
-                                    /\s+/g,
-                                    " "
-                                );
+                            wardIdx !== -1
+                                ? String(rawRow?.[wardIdx] ?? "").trim().replace(/\s+/g, " ")
+                                : "";
 
 
                         /* Completely blank rows */
@@ -826,6 +1151,7 @@ EMPLOYEE EXCEL IMPORT
                         if (
                             !employeeName &&
                             !mobileNumber &&
+                            !aadhaarNumber &&
                             !zoneName &&
                             !wardName
                         ) {
@@ -842,33 +1168,14 @@ EMPLOYEE EXCEL IMPORT
                                 rowNumber,
                                 employeeName,
                                 mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
                                 zoneName,
                                 wardName,
                                 status:
                                     "INVALID_DATA",
                                 message:
                                     "Employee Name, Zone Name and Ward Name are required.",
-                            });
-
-                            return;
-                        }
-
-
-                        if (
-                            !/^\d{10}$/.test(
-                                mobileNumber
-                            )
-                        ) {
-                            parsedRows.push({
-                                rowNumber,
-                                employeeName,
-                                mobileNumber,
-                                zoneName,
-                                wardName,
-                                status:
-                                    "INVALID_MOBILE",
-                                message:
-                                    "Mobile Number must contain exactly 10 digits.",
                             });
 
                             return;
@@ -893,6 +1200,8 @@ EMPLOYEE EXCEL IMPORT
                                 rowNumber,
                                 employeeName,
                                 mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
                                 zoneName,
                                 wardName,
                                 status:
@@ -930,6 +1239,8 @@ EMPLOYEE EXCEL IMPORT
                                 rowNumber,
                                 employeeName,
                                 mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
                                 zoneName:
                                     zone.name,
                                 wardName,
@@ -966,6 +1277,8 @@ EMPLOYEE EXCEL IMPORT
                                 rowNumber,
                                 employeeName,
                                 mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
                                 zoneName:
                                     zone.name,
                                 wardName:
@@ -1002,6 +1315,8 @@ EMPLOYEE EXCEL IMPORT
                                 rowNumber,
                                 employeeName,
                                 mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
                                 zoneName:
                                     zone.name,
                                 wardName:
@@ -1030,6 +1345,8 @@ EMPLOYEE EXCEL IMPORT
                             employeeId,
                             employeeName,
                             mobileNumber,
+                            aadhaarNumber,
+                            employmentType,
                             zoneName:
                                 zone.name,
                             wardName:
@@ -1097,69 +1414,41 @@ EMPLOYEE EXCEL IMPORT
 
 
                 let imported = 0;
+                const failed: string[] = [];
+                const BATCH_SIZE = 20;
 
-                const failed: string[] =
-                    [];
-
-
-                /*
-                 * Sequential import is intentional.
-                 * It avoids sending dozens of employee
-                 * creation requests to the backend at once.
-                 */
-
-                for (
-                    let index = 0;
-                    index < readyRows.length;
-                    index++
-                ) {
-                    const row =
-                        readyRows[index];
-
+                for (let i = 0; i < readyRows.length; i += BATCH_SIZE) {
+                    const chunk = readyRows.slice(i, i + BATCH_SIZE);
                     setEmployeeImportProgress(
-                        `Importing ${index + 1} of ${readyRows.length}...`
+                        `Importing ${Math.min(i + BATCH_SIZE, readyRows.length)} of ${readyRows.length} employees...`
                     );
 
-
-                    try {
-
-                        await apiFetch(
-                            "/city/areas/import-register-employee",
-                            {
-                                method:
-                                    "POST",
-
-                                body:
-                                    JSON.stringify({
-                                        name:
-                                            row.employeeName,
-
-                                        phone:
-                                            row.mobileNumber,
-
-                                        zoneId:
-                                            row.zoneId,
-
-                                        wardId:
-                                            row.wardId,
-
-                                        employeeId:
-                                            row.employeeId || undefined,
-                                    }),
+                    await Promise.all(
+                        chunk.map(async (row) => {
+                            try {
+                                await apiFetch(
+                                    "/city/areas/import-register-employee",
+                                    {
+                                        method: "POST",
+                                        body: JSON.stringify({
+                                            name: row.employeeName,
+                                            phone: row.mobileNumber || undefined,
+                                            aadhaar: row.aadhaarNumber || undefined,
+                                            employmentType: row.employmentType || "Permanent",
+                                            zoneId: row.zoneId,
+                                            wardId: row.wardId,
+                                            employeeId: row.employeeId || undefined,
+                                        }),
+                                    }
+                                );
+                                imported++;
+                            } catch (err: any) {
+                                failed.push(
+                                    `${row.employeeName}: ${err?.message || "Import failed"}`
+                                );
                             }
-                        );
-
-
-                        imported++;
-
-                    } catch (err: any) {
-
-                        failed.push(
-                            `${row.employeeName}: ${err?.message ||
-                            "Import failed"
-                            }`
-                        );
-                    }
+                        })
+                    );
                 }
 
 
@@ -1216,16 +1505,15 @@ EMPLOYEE EXCEL IMPORT
     };
 
     /* =========================================================
-   REGISTER EMPLOYEE HELPERS
-========================================================= */
-
-
-
+       REGISTER EMPLOYEE HELPERS
+    ========================================================= */
 
     const resetRegistrationForm = () => {
         setEmployeeName("");
         setEmployeeCodeId("");
         setEmployeePhone("");
+        setEmployeeAadhaar("");
+        setEmployeeEmploymentType("Permanent");
         setEmployeeZoneId("");
         setEmployeeWardId("");
         setRegistrationError("");
@@ -1253,6 +1541,9 @@ EMPLOYEE EXCEL IMPORT
         const cleanPhone =
             employeePhone.replace(/\D/g, "");
 
+        const cleanAadhaar =
+            employeeAadhaar.replace(/\D/g, "");
+
 
         if (!cleanName) {
             setRegistrationError(
@@ -1262,9 +1553,17 @@ EMPLOYEE EXCEL IMPORT
         }
 
 
-        if (!/^\d{10}$/.test(cleanPhone)) {
+        if (cleanPhone && !/^\d{10}$/.test(cleanPhone)) {
             setRegistrationError(
                 "Mobile number must be exactly 10 digits."
+            );
+            return;
+        }
+
+
+        if (cleanAadhaar && !/^\d{12}$/.test(cleanAadhaar)) {
+            setRegistrationError(
+                "Aadhaar number must be exactly 12 digits."
             );
             return;
         }
@@ -1297,7 +1596,9 @@ EMPLOYEE EXCEL IMPORT
                     method: "POST",
                     body: JSON.stringify({
                         name: cleanName,
-                        phone: cleanPhone,
+                        phone: cleanPhone || undefined,
+                        aadhaar: cleanAadhaar || undefined,
+                        employmentType: employeeEmploymentType || "Permanent",
                         employeeId: employeeCodeId.trim() || undefined,
                         zoneId: employeeZoneId,
                         wardId: employeeWardId,
@@ -1342,6 +1643,8 @@ EMPLOYEE EXCEL IMPORT
                 "Employee ID",
                 "Employee Name",
                 "Mobile Number",
+                "Aadhaar Number",
+                "Appointment Type",
                 "Zone Name",
                 "Ward Name",
             ],
@@ -1350,6 +1653,8 @@ EMPLOYEE EXCEL IMPORT
                 "EMP001",
                 "Raisa Bai Aslam",
                 "9876543210",
+                "123456789012",
+                "Permanent / स्थायी",
                 "Zone 1",
                 "1 - Bhairavgarh",
             ],
@@ -1358,8 +1663,30 @@ EMPLOYEE EXCEL IMPORT
                 "EMP002",
                 "Sanjay",
                 "9876543211",
+                "987654321098",
+                "Regularized / विनियमित",
                 "Zone 1",
                 "2 - Gadhkalika",
+            ],
+            [
+                3,
+                "EMP003",
+                "Amit Sharma",
+                "",
+                "456789012345",
+                "Temporary / अस्थायी",
+                "Zone 1",
+                "3 - Kotwali",
+            ],
+            [
+                4,
+                "EMP004",
+                "Vikram Singh",
+                "9876543212",
+                "789012345678",
+                "Outsource / आउटसोर्स",
+                "Zone 1",
+                "4 - Begambagh",
             ],
         ];
 
@@ -1372,6 +1699,8 @@ EMPLOYEE EXCEL IMPORT
             { wch: 8 },
             { wch: 16 },
             { wch: 28 },
+            { wch: 18 },
+            { wch: 20 },
             { wch: 18 },
             { wch: 20 },
             { wch: 30 },
@@ -1397,6 +1726,7 @@ EMPLOYEE EXCEL IMPORT
             roles={[
                 "CITY_ADMIN",
                 "HMS_SUPER_ADMIN",
+                "COMMISSIONER",
             ]}
         >
             <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -1405,8 +1735,8 @@ EMPLOYEE EXCEL IMPORT
 
 
                     {/* =================================================
-              HEADER
-          ================================================= */}
+                        HEADER
+                    ================================================= */}
 
                     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
@@ -1421,80 +1751,58 @@ EMPLOYEE EXCEL IMPORT
                                     Employee Master
                                 </h1>
 
-                                <p className="mt-0.5 text-sm text-slate-500">
-                                    Employees available for beat assignment.
+                                <p className="text-sm text-slate-500">
+                                    Register employees and configure beat assignments.
                                 </p>
                             </div>
 
                         </div>
 
 
+                        {/* ACTIONS */}
+
                         {!isHmsAdmin && (
                             <div className="flex flex-wrap items-center gap-2">
 
-                                <div className="relative">
+                                {selectedEmployeeIds.length > 0 && (
                                     <button
                                         type="button"
-                                        onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 cursor-pointer"
-                                        title="Download Employee Directory Options"
+                                        onClick={() => setShowBulkDeleteConfirm(true)}
+                                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-600 shadow-sm transition hover:bg-red-100 cursor-pointer"
                                     >
-                                        <Download size={17} className="text-blue-600" />
-                                        Download
+                                        <Trash2 size={17} />
+                                        Delete Selected ({selectedEmployeeIds.length})
                                     </button>
-                                    {showDownloadDropdown && (
-                                        <div className="absolute right-0 top-full mt-2 z-[50] w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setShowDownloadDropdown(false);
-                                                    exportEmployeesExcel();
-                                                }}
-                                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition cursor-pointer"
-                                            >
-                                                <FileSpreadsheet size={16} className="text-emerald-600" />
-                                                Download Excel (.xlsx)
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setShowDownloadDropdown(false);
-                                                    exportEmployeesPdf();
-                                                }}
-                                                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 hover:bg-red-50 hover:text-red-800 transition cursor-pointer"
-                                            >
-                                                <FileText size={16} className="text-red-600" />
-                                                Download PDF
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
+                                )}
 
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setEmployeeImportRows([]);
-                                        setEmployeeImportFileName("");
-                                        setEmployeeImportError("");
-                                        setEmployeeImportProgress("");
-                                        setShowEmployeeImport(true);
-                                    }}
-                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 cursor-pointer"
+                                    onClick={() =>
+                                        setShowEmployeeImport(
+                                            true
+                                        )
+                                    }
+                                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 cursor-pointer"
                                 >
-                                    <FileSpreadsheet size={17} />
+                                    <FileSpreadsheet
+                                        size={17}
+                                    />
                                     Import Excel
                                 </button>
 
 
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        resetRegistrationForm();
-                                        setShowRegisterEmployee(true);
-                                    }}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 cursor-pointer"
+                                    onClick={() =>
+                                        setShowRegisterEmployee(
+                                            true
+                                        )
+                                    }
+                                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 cursor-pointer"
                                 >
-                                    <UserPlus size={17} />
+                                    <UserPlus
+                                        size={17}
+                                    />
                                     Register Employee
                                 </button>
 
@@ -1505,8 +1813,8 @@ EMPLOYEE EXCEL IMPORT
 
 
                     {/* =================================================
-              SUMMARY
-          ================================================= */}
+                        SUMMARY
+                    ================================================= */}
 
                     <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
 
@@ -1553,8 +1861,8 @@ EMPLOYEE EXCEL IMPORT
 
 
                     {/* =================================================
-              FILTERS
-          ================================================= */}
+                        FILTERS
+                    ================================================= */}
 
                     <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 
@@ -1575,7 +1883,7 @@ EMPLOYEE EXCEL IMPORT
                                             e.target.value
                                         )
                                     }
-                                    placeholder="Search name, employee ID, mobile, zone or ward..."
+                                    placeholder="Search name, employee ID, mobile, aadhaar, employment type, zone or ward..."
                                     className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                 />
 
@@ -1652,10 +1960,11 @@ EMPLOYEE EXCEL IMPORT
                                         "Employee Name": emp.name,
                                         "Employee ID": emp.employeeId || "—",
                                         "Mobile Number": emp.phone || "Not added",
+                                        "Aadhaar Number": emp.aadhaar || "—",
+                                        "Appointment Type": `${getEmploymentTypeDisplay(emp.employmentType).labelEn} / ${getEmploymentTypeDisplay(emp.employmentType).labelHi}`,
                                         "Zone": (emp.zoneIds || []).map((id) => zoneNameMap[id]).filter(Boolean).join(", ") || "—",
                                         "Ward": (emp.wardIds || []).map((id) => wardNameMap[id]).filter(Boolean).join(", ") || "—",
                                         "Registered On": emp.createdAt ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
-                                        "Status": "Registered"
                                     }))}
                                 />
                             </div>
@@ -1666,8 +1975,8 @@ EMPLOYEE EXCEL IMPORT
 
 
                     {/* =================================================
-              ERROR
-          ================================================= */}
+                        ERROR
+                    ================================================= */}
 
                     {error && (
                         <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -1677,8 +1986,8 @@ EMPLOYEE EXCEL IMPORT
 
 
                     {/* =================================================
-              TABLE
-          ================================================= */}
+                        TABLE
+                    ================================================= */}
 
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
@@ -1714,10 +2023,11 @@ EMPLOYEE EXCEL IMPORT
                                         "Employee Name": emp.name,
                                         "Employee ID": emp.employeeId || "—",
                                         "Mobile Number": emp.phone || "Not added",
+                                        "Aadhaar Number": emp.aadhaar || "—",
+                                        "Appointment Type": `${getEmploymentTypeDisplay(emp.employmentType).labelEn} / ${getEmploymentTypeDisplay(emp.employmentType).labelHi}`,
                                         "Zone": (emp.zoneIds || []).map((id) => zoneNameMap[id]).filter(Boolean).join(", ") || "—",
                                         "Ward": (emp.wardIds || []).map((id) => wardNameMap[id]).filter(Boolean).join(", ") || "—",
                                         "Registered On": emp.createdAt ? new Date(emp.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
-                                        "Status": "Registered"
                                     }))}
                                 />
                             </div>
@@ -1733,37 +2043,64 @@ EMPLOYEE EXCEL IMPORT
 
                                     <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
 
-                                        <th className="px-5 py-3">
+                                        {!isHmsAdmin && (
+                                            <th className="w-10 px-4 py-3 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleSelectAll}
+                                                    className="inline-flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                                                    title={isAllPageSelected ? "Deselect page" : "Select all on page"}
+                                                >
+                                                    {isAllPageSelected ? (
+                                                        <CheckSquare size={16} className="text-blue-600" />
+                                                    ) : (
+                                                        <Square size={16} />
+                                                    )}
+                                                </button>
+                                            </th>
+                                        )}
+
+                                        <th className="px-4 py-3">
                                             S.No
                                         </th>
 
-                                        <th className="px-5 py-3">
+                                        <th className="px-4 py-3">
                                             Employee Name
                                         </th>
 
-                                        <th className="px-5 py-3">
+                                        <th className="px-4 py-3">
                                             Employee ID
                                         </th>
 
-                                        <th className="px-5 py-3">
+                                        <th className="px-4 py-3">
                                             Mobile Number
                                         </th>
 
-                                        <th className="px-5 py-3">
+                                        <th className="px-4 py-3">
+                                            Aadhaar Number
+                                        </th>
+
+                                        <th className="px-4 py-3">
+                                            Appointment Type
+                                        </th>
+
+                                        <th className="px-4 py-3">
                                             Zone
                                         </th>
 
-                                        <th className="px-5 py-3">
+                                        <th className="px-4 py-3">
                                             Ward
                                         </th>
 
-                                        <th className="px-5 py-3">
+                                        <th className="px-4 py-3">
                                             Registered On
                                         </th>
 
-                                        <th className="px-5 py-3">
-                                            Status
-                                        </th>
+                                        {!isHmsAdmin && (
+                                            <th className="px-4 py-3 text-right">
+                                                Actions
+                                            </th>
+                                        )}
 
                                     </tr>
 
@@ -1776,7 +2113,7 @@ EMPLOYEE EXCEL IMPORT
 
                                         <tr>
                                             <td
-                                                colSpan={8}
+                                                colSpan={isHmsAdmin ? 9 : 11}
                                                 className="px-5 py-14 text-center text-sm text-slate-500"
                                             >
                                                 Loading employees...
@@ -1787,7 +2124,7 @@ EMPLOYEE EXCEL IMPORT
 
                                         <tr>
                                             <td
-                                                colSpan={8}
+                                                colSpan={isHmsAdmin ? 9 : 11}
                                                 className="px-5 py-14 text-center"
                                             >
 
@@ -1805,6 +2142,20 @@ EMPLOYEE EXCEL IMPORT
                                                         Change the filters or register employees for beat assignment.
                                                     </p>
 
+                                                    {(searchQuery || selectedZoneId || selectedWardId) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSearchQuery("");
+                                                                setSelectedZoneId("");
+                                                                setSelectedWardId("");
+                                                            }}
+                                                            className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                                        >
+                                                            Reset Filters
+                                                        </button>
+                                                    )}
+
                                                 </div>
 
                                             </td>
@@ -1812,8 +2163,11 @@ EMPLOYEE EXCEL IMPORT
 
                                     ) : (
 
-                                        filteredEmployees.map(
+                                        paginatedEmployees.map(
                                             (employee, empIdx) => {
+
+                                                const globalIndex = (currentPage - 1) * pageSize + empIdx + 1;
+                                                const isSelected = selectedEmployeeIds.includes(employee.id);
 
                                                 const employeeZones =
                                                     (employee.zoneIds || [])
@@ -1831,31 +2185,81 @@ EMPLOYEE EXCEL IMPORT
                                                         )
                                                         .filter(Boolean);
 
+                                                const formattedAadhaar = employee.aadhaar
+                                                    ? employee.aadhaar.replace(/(\d{4})(\d{4})(\d{4})/, '$1 $2 $3')
+                                                    : "—";
+
+                                                const empType = employee.employmentType || "Permanent";
+                                                const empTypeLower = empType.toLowerCase();
 
                                                 return (
                                                     <tr
                                                         key={employee.id}
-                                                        className="transition hover:bg-slate-50/70"
+                                                        className={`transition hover:bg-slate-50/80 ${
+                                                            isSelected ? "bg-blue-50/40" : ""
+                                                        }`}
                                                     >
 
-                                                        <td className="px-5 py-4 text-sm font-semibold text-slate-400">
-                                                            {empIdx + 1}
+                                                        {!isHmsAdmin && (
+                                                            <td className="w-10 px-4 py-4 text-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => toggleSelectRow(employee.id)}
+                                                                    className="inline-flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                                                                >
+                                                                    {isSelected ? (
+                                                                        <CheckSquare size={16} className="text-blue-600" />
+                                                                    ) : (
+                                                                        <Square size={16} />
+                                                                    )}
+                                                                </button>
+                                                            </td>
+                                                        )}
+
+                                                        <td className="px-4 py-4 text-sm font-semibold text-slate-400">
+                                                            {globalIndex}
                                                         </td>
 
-                                                        <td className="px-5 py-4 font-semibold text-slate-900">
+                                                        <td className="px-4 py-4 font-semibold text-slate-900">
                                                             {employee.name}
                                                         </td>
 
-                                                        <td className="px-5 py-4 text-sm font-semibold text-blue-600">
+                                                        <td className="px-4 py-4 text-sm font-semibold text-blue-600">
                                                             {employee.employeeId || "—"}
                                                         </td>
 
-                                                        <td className="px-5 py-4 text-sm font-medium text-slate-700">
+                                                        <td className="px-4 py-4 text-sm font-medium text-slate-700">
                                                             {employee.phone ||
                                                                 "Not added"}
                                                         </td>
 
-                                                        <td className="px-5 py-4">
+                                                        <td className="px-4 py-4 text-sm font-mono text-slate-700">
+                                                            {formattedAadhaar}
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
+                                                            {(() => {
+                                                                const typeInfo = getEmploymentTypeDisplay(employee.employmentType);
+                                                                return (
+                                                                    <span
+                                                                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                                                            typeInfo.key === "Permanent"
+                                                                                ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                                                                : typeInfo.key === "Regularized"
+                                                                                ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                                                                : typeInfo.key === "Temporary"
+                                                                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                                                                : "bg-teal-50 text-teal-700 border border-teal-200"
+                                                                        }`}
+                                                                    >
+                                                                        <span>{typeInfo.labelEn}</span>
+                                                                        <span className="text-[11px] opacity-75 font-normal">/ {typeInfo.labelHi}</span>
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                        </td>
+
+                                                        <td className="px-4 py-4">
 
                                                             <div className="flex max-w-xs flex-wrap gap-1.5">
 
@@ -1880,7 +2284,7 @@ EMPLOYEE EXCEL IMPORT
 
                                                         </td>
 
-                                                        <td className="px-5 py-4">
+                                                        <td className="px-4 py-4">
 
                                                             <div className="flex max-w-xs flex-wrap gap-1.5">
 
@@ -1905,7 +2309,7 @@ EMPLOYEE EXCEL IMPORT
 
                                                         </td>
 
-                                                        <td className="px-5 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                                                        <td className="px-4 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">
                                                             {employee.createdAt
                                                                 ? new Date(employee.createdAt).toLocaleDateString("en-IN", {
                                                                     day: "2-digit",
@@ -1915,13 +2319,59 @@ EMPLOYEE EXCEL IMPORT
                                                                 : "—"}
                                                         </td>
 
-                                                        <td className="px-5 py-4">
+                                                        {!isHmsAdmin && (
+                                                            <td className="px-4 py-4 text-right">
+                                                                <div className="relative inline-block text-left employee-action-menu-container">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenActionMenuId(
+                                                                                openActionMenuId === employee.id ? null : employee.id
+                                                                            );
+                                                                        }}
+                                                                        className={`flex h-8 w-8 items-center justify-center rounded-lg border transition cursor-pointer ${
+                                                                            openActionMenuId === employee.id
+                                                                                ? "border-blue-300 bg-blue-50 text-blue-700 shadow-xs"
+                                                                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                                                                        }`}
+                                                                        title="Actions"
+                                                                    >
+                                                                        <MoreVertical size={16} />
+                                                                    </button>
 
-                                                            <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                                                Registered
-                                                            </span>
+                                                                    {openActionMenuId === employee.id && (
+                                                                        <div className="absolute right-0 top-full mt-1 z-[60] w-36 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setOpenActionMenuId(null);
+                                                                                    openEditModal(employee);
+                                                                                }}
+                                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                                                                            >
+                                                                                <Edit2 size={13} className="text-blue-600" />
+                                                                                <span>Edit</span>
+                                                                            </button>
 
-                                                        </td>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setOpenActionMenuId(null);
+                                                                                    setDeleteTarget({ id: employee.id, name: employee.name });
+                                                                                }}
+                                                                                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer"
+                                                                            >
+                                                                                <Trash2 size={13} className="text-red-600" />
+                                                                                <span>Delete</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        )}
 
                                                     </tr>
                                                 );
@@ -1936,11 +2386,439 @@ EMPLOYEE EXCEL IMPORT
 
                         </div>
 
+                        {/* PAGINATION FOOTER */}
+                        {filteredEmployees.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs font-medium text-slate-500">
+                                        Showing{" "}
+                                        <strong className="font-bold text-slate-800">
+                                            {(currentPage - 1) * pageSize + 1}
+                                        </strong>{" "}
+                                        to{" "}
+                                        <strong className="font-bold text-slate-800">
+                                            {Math.min(currentPage * pageSize, filteredEmployees.length)}
+                                        </strong>{" "}
+                                        of{" "}
+                                        <strong className="font-bold text-slate-800">
+                                            {filteredEmployees.length}
+                                        </strong>{" "}
+                                        employees
+                                    </span>
+
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs text-slate-400">Per page:</span>
+                                        <select
+                                            value={pageSize}
+                                            onChange={(e) => {
+                                                setPageSize(Number(e.target.value));
+                                                setCurrentPage(1);
+                                            }}
+                                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+                                        >
+                                            <option value={10}>10</option>
+                                            <option value={25}>25</option>
+                                            <option value={50}>50</option>
+                                            <option value={100}>100</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                                    >
+                                        <ChevronLeft size={16} />
+                                    </button>
+
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter((p) => {
+                                            if (totalPages <= 5) return true;
+                                            if (p === 1 || p === totalPages) return true;
+                                            return Math.abs(p - currentPage) <= 1;
+                                        })
+                                        .map((p, idx, arr) => {
+                                            const prev = arr[idx - 1];
+                                            const showEllipsis = prev && p - prev > 1;
+
+                                            return (
+                                                <React.Fragment key={p}>
+                                                    {showEllipsis && (
+                                                        <span className="px-1 text-xs text-slate-400">...</span>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setCurrentPage(p)}
+                                                        className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition cursor-pointer ${
+                                                            p === currentPage
+                                                                ? "bg-blue-600 text-white shadow-xs"
+                                                                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                                        }`}
+                                                    >
+                                                        {p}
+                                                    </button>
+                                                </React.Fragment>
+                                            );
+                                        })}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage >= totalPages}
+                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 cursor-pointer"
+                                    >
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                     </div>
 
                 </div>
 
             </div>
+
+            {/* =========================================================
+                EDIT EMPLOYEE MODAL
+            ========================================================= */}
+            {editingEmployee && (
+                <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                    onClick={closeEditModal}
+                >
+                    <form
+                        onSubmit={handleEditSaveRequest}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                    >
+                        {/* HEADER */}
+                        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
+                                    Employee Master
+                                </p>
+                                <h2 className="mt-1 text-xl font-bold text-slate-900">
+                                    Edit Employee
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Update employee details, type, zone, and ward assignment.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                disabled={savingEdit}
+                                onClick={closeEditModal}
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        {/* FORM */}
+                        <div className="space-y-4 px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Employee Name *
+                                </label>
+                                <input
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    placeholder="Enter employee name"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Employee ID <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                </label>
+                                <input
+                                    value={editEmployeeCodeId}
+                                    onChange={(e) => setEditEmployeeCodeId(e.target.value)}
+                                    placeholder="Enter Employee ID (e.g. EMP101)"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Mobile Number <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                </label>
+                                <input
+                                    type="tel"
+                                    inputMode="numeric"
+                                    value={editPhone}
+                                    maxLength={10}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                        setEditPhone(value);
+                                    }}
+                                    placeholder="Enter 10 digit mobile number"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Aadhaar Number <span className="text-xs font-normal text-slate-400">(12 Digits - Optional)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={editAadhaar}
+                                    maxLength={12}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, "").slice(0, 12);
+                                        setEditAadhaar(value);
+                                    }}
+                                    placeholder="Enter 12 digit Aadhaar number"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Appointment Type
+                                </label>
+                                <select
+                                    value={editEmploymentType}
+                                    onChange={(e) => setEditEmploymentType(e.target.value)}
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                >
+                                    <option value="Permanent">Permanent / स्थायी</option>
+                                    <option value="Regularized">Regularized / विनियमित</option>
+                                    <option value="Temporary">Temporary / अस्थायी</option>
+                                    <option value="Outsource">Outsource / आउटसोर्स</option>
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Zone *
+                                    </label>
+                                    <select
+                                        value={editZoneId}
+                                        onChange={(e) => {
+                                            setEditZoneId(e.target.value);
+                                            setEditWardId("");
+                                        }}
+                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
+                                        required
+                                    >
+                                        <option value="">Select Zone</option>
+                                        {zones.map((zone) => (
+                                            <option key={zone.id} value={zone.id}>
+                                                {zone.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Ward *
+                                    </label>
+                                    <select
+                                        value={editWardId}
+                                        disabled={!editZoneId}
+                                        onChange={(e) => setEditWardId(e.target.value)}
+                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100"
+                                        required
+                                    >
+                                        <option value="">
+                                            {editZoneId ? "Select Ward" : "Select Zone first"}
+                                        </option>
+                                        {editRegistrationWards.map((ward) => (
+                                            <option key={ward.id} value={ward.id}>
+                                                {ward.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {editError && (
+                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                    {editError}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* FOOTER */}
+                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                            <button
+                                type="button"
+                                disabled={savingEdit}
+                                onClick={closeEditModal}
+                                className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="submit"
+                                disabled={savingEdit}
+                                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:bg-blue-300"
+                            >
+                                <Edit2 size={16} />
+                                Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* =========================================================
+                EDIT CONFIRMATION MODAL
+            ========================================================= */}
+            {showEditConfirm && (
+                <div
+                    className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                    onClick={() => !savingEdit && setShowEditConfirm(false)}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                    >
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                            <Edit2 size={24} />
+                        </div>
+
+                        <h3 className="text-lg font-bold text-slate-900">
+                            Confirm Employee Update
+                        </h3>
+
+                        <p className="mt-2 text-sm text-slate-600">
+                            Are you sure you want to save changes for employee <strong className="text-slate-900">"{editName}"</strong>?
+                        </p>
+
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                disabled={savingEdit}
+                                onClick={() => setShowEditConfirm(false)}
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={savingEdit}
+                                onClick={handleConfirmEditSave}
+                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {savingEdit ? "Updating..." : "Yes, Save Changes"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* =========================================================
+                SINGLE DELETE CONFIRMATION MODAL
+            ========================================================= */}
+            {deleteTarget && (
+                <div
+                    className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                    onClick={() => !deletingSingle && setDeleteTarget(null)}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                    >
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                            <AlertTriangle size={24} />
+                        </div>
+
+                        <h3 className="text-lg font-bold text-slate-900">
+                            Delete Employee
+                        </h3>
+
+                        <p className="mt-2 text-sm text-slate-600">
+                            Are you sure you want to delete employee <strong className="text-slate-900">"{deleteTarget.name}"</strong>? This action cannot be undone.
+                        </p>
+
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                disabled={deletingSingle}
+                                onClick={() => setDeleteTarget(null)}
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={deletingSingle}
+                                onClick={handleConfirmDeleteSingle}
+                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {deletingSingle ? "Deleting..." : "Yes, Delete Employee"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* =========================================================
+                BULK DELETE CONFIRMATION MODAL
+            ========================================================= */}
+            {showBulkDeleteConfirm && (
+                <div
+                    className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                    onClick={() => !deletingBulk && setShowBulkDeleteConfirm(false)}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                    >
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                            <AlertTriangle size={24} />
+                        </div>
+
+                        <h3 className="text-lg font-bold text-slate-900">
+                            Delete Selected Employees
+                        </h3>
+
+                        <p className="mt-2 text-sm text-slate-600">
+                            Are you sure you want to delete <strong className="text-red-600">{selectedEmployeeIds.length}</strong> selected employee(s)? This action cannot be undone.
+                        </p>
+
+                        <div className="mt-6 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                disabled={deletingBulk}
+                                onClick={() => setShowBulkDeleteConfirm(false)}
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+
+                            <button
+                                type="button"
+                                disabled={deletingBulk}
+                                onClick={handleConfirmBulkDelete}
+                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                            >
+                                {deletingBulk ? "Deleting..." : `Yes, Delete (${selectedEmployeeIds.length})`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* =========================================================
+                REGISTER EMPLOYEE MODAL
+            ========================================================= */}
             {showRegisterEmployee && (
                 <div
                     className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
@@ -1983,7 +2861,7 @@ EMPLOYEE EXCEL IMPORT
 
 
                         {/* FORM */}
-                        <div className="space-y-5 px-6 py-5">
+                        <div className="space-y-4 px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
 
                             <div>
                                 <label className="mb-1.5 block text-sm font-semibold text-slate-700">
@@ -1997,6 +2875,7 @@ EMPLOYEE EXCEL IMPORT
                                     }
                                     placeholder="Enter employee name"
                                     className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    required
                                 />
                             </div>
 
@@ -2018,7 +2897,7 @@ EMPLOYEE EXCEL IMPORT
 
                             <div>
                                 <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Mobile Number *
+                                    Mobile Number <span className="text-xs font-normal text-slate-400">(Optional)</span>
                                 </label>
 
                                 <input
@@ -2039,6 +2918,48 @@ EMPLOYEE EXCEL IMPORT
                                 />
                             </div>
 
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Aadhaar Number <span className="text-xs font-normal text-slate-400">(12 Digits - Optional)</span>
+                                </label>
+
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={employeeAadhaar}
+                                    maxLength={12}
+                                    onChange={(e) => {
+                                        const value =
+                                            e.target.value
+                                                .replace(/\D/g, "")
+                                                .slice(0, 12);
+
+                                        setEmployeeAadhaar(value);
+                                    }}
+                                    placeholder="Enter 12 digit Aadhaar number"
+                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                    Appointment Type
+                                </label>
+
+                                <select
+                                    value={employeeEmploymentType}
+                                    onChange={(e) =>
+                                        setEmployeeEmploymentType(e.target.value)
+                                    }
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                >
+                                    <option value="Permanent">Permanent / स्थायी</option>
+                                    <option value="Regularized">Regularized / विनियमित</option>
+                                    <option value="Temporary">Temporary / अस्थायी</option>
+                                    <option value="Outsource">Outsource / आउटसोर्स</option>
+                                </select>
+                            </div>
+
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
@@ -2056,6 +2977,7 @@ EMPLOYEE EXCEL IMPORT
                                             setEmployeeWardId("");
                                         }}
                                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
+                                        required
                                     >
                                         <option value="">
                                             Select Zone
@@ -2087,6 +3009,7 @@ EMPLOYEE EXCEL IMPORT
                                             )
                                         }
                                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100"
+                                        required
                                     >
                                         <option value="">
                                             {employeeZoneId
@@ -2155,6 +3078,9 @@ EMPLOYEE EXCEL IMPORT
                 </div>
             )}
 
+            {/* =========================================================
+                IMPORT EMPLOYEES MODAL
+            ========================================================= */}
             {showEmployeeImport && (
 
                 <div
@@ -2174,7 +3100,7 @@ EMPLOYEE EXCEL IMPORT
                         onClick={(e) =>
                             e.stopPropagation()
                         }
-                        className="max-h-[calc(100vh-32px)] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                        className="max-h-[calc(100vh-32px)] w-full max-w-5xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
                     >
 
                         {/* HEADER */}
@@ -2230,7 +3156,7 @@ EMPLOYEE EXCEL IMPORT
                                     </p>
 
                                     <p className="mt-1 text-xs text-blue-700">
-                                        S.No | Employee ID | Employee Name | Mobile Number | Zone Name | Ward Name
+                                        S.No | Employee ID | Employee Name | Mobile Number | Aadhaar Number | Appointment Type | Zone Name | Ward Name
                                     </p>
 
                                 </div>
@@ -2241,7 +3167,7 @@ EMPLOYEE EXCEL IMPORT
                                     onClick={
                                         downloadEmployeeTemplate
                                     }
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700"
+                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-semibold text-blue-700 cursor-pointer"
                                 >
                                     <Download size={16} />
                                     Download Template
@@ -2256,7 +3182,7 @@ EMPLOYEE EXCEL IMPORT
 
                                 <input
                                     type="file"
-                                    accept=".xlsx,.xls"
+                                    accept=".xlsx,.xls,.csv"
                                     onChange={
                                         handleEmployeeExcelFile
                                     }
@@ -2270,11 +3196,11 @@ EMPLOYEE EXCEL IMPORT
 
                                 <p className="mt-2 font-semibold text-slate-800">
                                     {employeeImportFileName ||
-                                        "Select Employee Excel File"}
+                                        "Select Employee Excel / CSV File"}
                                 </p>
 
                                 <p className="mt-1 text-xs text-slate-400">
-                                    .xlsx or .xls
+                                    .xlsx, .xls, or .csv
                                 </p>
 
                             </label>
@@ -2386,6 +3312,14 @@ EMPLOYEE EXCEL IMPORT
                                                     </th>
 
                                                     <th className="px-3 py-3">
+                                                        Aadhaar
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
+                                                        Appointment Type
+                                                    </th>
+
+                                                    <th className="px-3 py-3">
                                                         Zone
                                                     </th>
 
@@ -2430,6 +3364,22 @@ EMPLOYEE EXCEL IMPORT
                                                                     "—"}
                                                             </td>
 
+                                                            <td className="px-3 py-3 font-mono">
+                                                                {row.aadhaarNumber ||
+                                                                    "—"}
+                                                            </td>
+
+                                                            <td className="px-3 py-3">
+                                                                {(() => {
+                                                                    const rowTypeInfo = getEmploymentTypeDisplay(row.employmentType);
+                                                                    return (
+                                                                        <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                                                                            {rowTypeInfo.labelEn} / {rowTypeInfo.labelHi}
+                                                                        </span>
+                                                                    );
+                                                                })()}
+                                                            </td>
+
                                                             <td className="px-3 py-3">
                                                                 {row.zoneName ||
                                                                     "—"}
@@ -2454,7 +3404,11 @@ EMPLOYEE EXCEL IMPORT
                                                                     }
                                                                 >
                                                                     {
-                                                                        row.status
+                                                                        row.status === "READY"
+                                                                            ? "Ready"
+                                                                            : row.status === "ALREADY_EXISTS"
+                                                                            ? "Already Exists"
+                                                                            : row.message
                                                                     }
                                                                 </span>
 

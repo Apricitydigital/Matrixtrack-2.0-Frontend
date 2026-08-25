@@ -899,7 +899,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                 >
                   Permitted Workspace Modules
                 </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   {/* Taskforce 2.0 Card */}
                   {isTaskforcePermitted ? (
                     <div
@@ -1021,7 +1021,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
               </div>
 
               {/* Personal Details Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4">
                 <div>
                   <label className="form-label">Full Name</label>
                   <input
@@ -1045,7 +1045,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
               </div>
 
               {/* Contact & Password Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
                 <div>
                   <label className="form-label">Mobile Number</label>
                   <input
@@ -1087,7 +1087,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
               </div>
 
               {/* City / Location Row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
                 <div>
                   <label className="form-label">City</label>
                   <select
@@ -1177,7 +1177,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                   </div>
                   <div>
                     <label className="form-label" style={{ marginBottom: "12px" }}>Select Module</label>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "10px" }}>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {config.modules
                         .filter((m) => {
                           const nameLower = (m.name || "").toLowerCase();
@@ -1249,7 +1249,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                   <h4 style={{ margin: "0 0 16px", fontSize: "14px", fontWeight: 800, color: "#166534", display: "flex", alignItems: "center", gap: "8px" }}>
                     <Building2 size={18} /> Swachh Ranking Assignment Details
                   </h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="form-label">Swachh Role</label>
                       <select
