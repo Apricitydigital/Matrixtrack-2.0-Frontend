@@ -1088,6 +1088,8 @@ export default function EmployeesPage() {
             const uploadedEmployeeKeys =
                 new Set<string>();
 
+            const uploadedAadhaars = new Set<string>();
+            const uploadedPhones = new Set<string>();
 
             const parsedRows: EmployeeImportRow[] =
                 [];
@@ -1312,17 +1314,14 @@ export default function EmployeesPage() {
 
                         /*
                          * Duplicate inside same uploaded file.
-                         * Use Name + Mobile + Aadhaar + Zone + Ward to be safe.
+                         * Use Name + Mobile + Aadhaar + Zone + Ward to be safe for exact duplicates.
                          */
 
                         const employeeKey =
                             `${normalizedName}::${mobileNumber || ""}::${aadhaarNumber || ""}::${zone.id}::${ward.id}`;
 
-
                         if (
-                            uploadedEmployeeKeys.has(
-                                employeeKey
-                            )
+                            uploadedEmployeeKeys.has(employeeKey)
                         ) {
                             parsedRows.push({
                                 rowNumber,
@@ -1330,26 +1329,53 @@ export default function EmployeesPage() {
                                 mobileNumber,
                                 aadhaarNumber,
                                 employmentType,
-                                zoneName:
-                                    zone.name,
-                                wardName:
-                                    ward.name,
-                                zoneId:
-                                    zone.id,
-                                wardId:
-                                    ward.id,
-                                status:
-                                    "DUPLICATE_ROW",
-                                message:
-                                    "Duplicate employee row in uploaded Excel.",
+                                zoneName: zone.name,
+                                wardName: ward.name,
+                                zoneId: zone.id,
+                                wardId: ward.id,
+                                status: "DUPLICATE_ROW",
+                                message: "Exact duplicate employee row in uploaded Excel.",
                             });
-
                             return;
                         }
 
-                        uploadedEmployeeKeys.add(
-                            employeeKey
-                        );
+                        if (aadhaarNumber && uploadedAadhaars.has(aadhaarNumber)) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
+                                zoneName: zone.name,
+                                wardName: ward.name,
+                                zoneId: zone.id,
+                                wardId: ward.id,
+                                status: "DUPLICATE_ROW",
+                                message: "This Aadhaar number is already used in another row in this Excel.",
+                            });
+                            return;
+                        }
+
+                        if (mobileNumber && uploadedPhones.has(mobileNumber)) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeName,
+                                mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
+                                zoneName: zone.name,
+                                wardName: ward.name,
+                                zoneId: zone.id,
+                                wardId: ward.id,
+                                status: "DUPLICATE_ROW",
+                                message: "This Mobile number is already used in another row in this Excel.",
+                            });
+                            return;
+                        }
+
+                        uploadedEmployeeKeys.add(employeeKey);
+                        if (aadhaarNumber) uploadedAadhaars.add(aadhaarNumber);
+                        if (mobileNumber) uploadedPhones.add(mobileNumber);
 
 
                         parsedRows.push({
