@@ -436,7 +436,7 @@ export default function SweepingModulePage() {
                                 };
 
                                 return (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 16 }}>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">
                                         <StatCard label="TOTAL REGISTERED BEATS" value={beats.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatus === ''} />
                                         <StatCard label="SUBMITTED REPORTS" value={stats.total || 0} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
                                         <StatCard label="PENDING REPORTS" value={stats.pending || 0} sub="Awaiting QC Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
@@ -656,25 +656,14 @@ function StatCard({ label, value, sub, color, onClick }: any) {
     return (
         <div
             onClick={onClick}
+            className="bg-white rounded-2xl p-4 sm:p-4.5 border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
             style={{
-                background: '#ffffff',
-                borderRadius: 16,
-                padding: '18px 22px',
-                border: '1px solid #e2e8f0',
-                borderLeft: `6px solid ${color}`,
-                cursor: onClick ? 'pointer' : 'default',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 4,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                transition: 'transform 0.2s, box-shadow 0.2s'
+                borderLeft: `5px solid ${color}`,
             }}
         >
-            <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
-            <div style={{ fontSize: 30, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
-            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>
+            <div className="text-[9.5px] font-black text-slate-400 tracking-wider uppercase truncate" title={label}>{label}</div>
+            <div className="my-1.5 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">{value}</div>
+            <div className="text-xs text-slate-500 font-semibold truncate">{sub}</div>
         </div>
     );
 }

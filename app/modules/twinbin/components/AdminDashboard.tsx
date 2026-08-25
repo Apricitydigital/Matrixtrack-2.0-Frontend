@@ -7,6 +7,7 @@ import LitterBinReviewModal from "./LitterBinReviewModal";
 import TwinbinStaffAssignmentsTab from "./TwinbinStaffAssignmentsTab";
 import SubmittedReportsTab from "../../qc-shared/SubmittedReportsTab";
 import { useAuth } from "@hooks/useAuth";
+import AutoAssignSupervisorsButton from "@components/ui/AutoAssignSupervisorsButton";
 
 export default function AdminDashboard() {
     const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function AdminDashboard() {
         (user?.roles || []).includes('super_admin');
 
     const isAdmin = user?.roles?.includes('CITY_ADMIN') || user?.roles?.includes('HMS_SUPER_ADMIN') || isSuperAdmin;
+    const isCityAdminOnly = user?.roles?.includes('CITY_ADMIN') && !isSuperAdmin;
 
     const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
     const [selectedCity, setSelectedCity] = useState<string>("ALL");
@@ -417,28 +419,39 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* TOP NAVIGATION 5 TABS */}
-                    <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 14, border: '1px solid #e2e8f0' }}>
-                        {[
-                            { id: 'DASHBOARD', label: 'Dashboard' },
-                            { id: 'SUBMITTED_REPORTS', label: 'Inspection Reports' },
-                            { id: 'REGISTERED', label: 'Registered Litterbins' },
-                            { id: 'APPROVALS', label: 'Approval & Verification' },
-                            { id: 'ASSIGNMENTS', label: 'Supervisor Assignments' },
-                        ].map(t => (
-                            <button
-                                key={t.id}
-                                onClick={() => setTopTab(t.id as any)}
-                                style={{
-                                    padding: '9px 18px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-                                    background: topTab === t.id ? '#2563eb' : 'transparent',
-                                    color: topTab === t.id ? '#ffffff' : '#64748b',
-                                    boxShadow: topTab === t.id ? '0 4px 12px rgba(37,99,235,0.25)' : 'none',
-                                    transition: 'all 0.15s'
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                            {[
+                                { id: 'DASHBOARD', label: 'Dashboard' },
+                                { id: 'SUBMITTED_REPORTS', label: 'Inspection Reports' },
+                                { id: 'REGISTERED', label: 'Registered Litterbins' },
+                                { id: 'APPROVALS', label: 'Approval & Verification' },
+                                { id: 'ASSIGNMENTS', label: 'Supervisor Assignments' },
+                            ].map(t => (
+                                <button
+                                    key={t.id}
+                                    onClick={() => setTopTab(t.id as any)}
+                                    style={{
+                                        padding: '9px 18px', borderRadius: 10, border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                                        background: topTab === t.id ? '#2563eb' : 'transparent',
+                                        color: topTab === t.id ? '#ffffff' : '#64748b',
+                                        boxShadow: topTab === t.id ? '0 4px 12px rgba(37,99,235,0.25)' : 'none',
+                                        transition: 'all 0.15s'
+                                    }}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                        {isCityAdminOnly ? (
+                            <AutoAssignSupervisorsButton
+                                onCompleted={() => {
+                                    if (typeof window !== "undefined") {
+                                        window.location.reload();
+                                    }
                                 }}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
+                            />
+                        ) : null}
                     </div>
                 </div>
             </div>
@@ -513,7 +526,7 @@ export default function AdminDashboard() {
                         const actionTakenCount = records.filter(r => r.status === 'ACTION_TAKEN').length || 0;
 
                         return (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">
                                 <StatCard label="TOTAL REGISTERED LITTERBINS" value={registeredBins.length || combinedBins.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={statusFilter === 'ALL'} />
                                 <StatCard label="SUBMITTED REPORTS" value={totalSubmitted} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
                                 <StatCard label="PENDING REVIEW REPORTS" value={pendingCount} sub="Awaiting QC Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
@@ -889,25 +902,14 @@ function StatCard({ label, value, sub, color, onClick }: any) {
     return (
         <div
             onClick={onClick}
+            className="bg-white rounded-2xl p-4 sm:p-4.5 border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
             style={{
-                background: '#ffffff',
-                borderRadius: 16,
-                padding: '16px 20px',
-                border: '1px solid #e2e8f0',
-                borderLeft: `6px solid ${color}`,
-                cursor: onClick ? 'pointer' : 'default',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 4,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                transition: 'transform 0.2s, box-shadow 0.2s'
+                borderLeft: `5px solid ${color}`,
             }}
         >
-            <div style={{ fontSize: 10, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: '#1e293b', letterSpacing: '-0.02em' }}>{value}</div>
-            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>{sub}</div>
+            <div className="text-[9.5px] font-black text-slate-400 tracking-wider uppercase truncate" title={label}>{label}</div>
+            <div className="my-1.5 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">{value}</div>
+            <div className="text-xs text-slate-500 font-semibold truncate">{sub}</div>
         </div>
     );
 }

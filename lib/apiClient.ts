@@ -510,7 +510,37 @@ export const CityApi = {
         cityAdmins: number;
       };
     }>(`/city/stats${query}`);
-  }
+  },
+  autoAssignSupervisors: () =>
+    apiFetch<{
+      success: boolean;
+      summary: {
+        cityId: string;
+        beats: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+        toilets: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+        litterbins: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+      };
+    }>("/city/auto-assign-supervisors", {
+      method: "POST",
+    })
 };
 
 export const HmsApi = {
@@ -701,9 +731,12 @@ export const CityUserApi = {
     apiFetch<{
       users: {
         id: string;
+        employeeId?: string | null;
         name: string;
         email: string | null;
         phone: string | null;
+        aadhaar?: string | null;
+        employmentType?: string | null;
         role: string;
         cityId?: string;
         createdAt: string;
@@ -730,6 +763,10 @@ export const CityUserApi = {
     id: string,
     body: {
       name?: string;
+      employeeId?: string | null;
+      phone?: string | null;
+      aadhaar?: string | null;
+      employmentType?: string | null;
       role?: string;
       zoneIds?: string[];
       wardIds?: string[];
@@ -1067,7 +1104,6 @@ export const TwinbinApi = {
       body: JSON.stringify(body || {})
     })
 };
-
 
 
 
