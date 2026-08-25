@@ -69,6 +69,13 @@
   border-color: var(--primary-soft);
 }
 
+.table-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .header-actions {
   display: flex;
   align-items: center;

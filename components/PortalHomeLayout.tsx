@@ -38,7 +38,13 @@ import {
   ChartNoAxesCombined,
   AlertTriangle,
   FileCheck2,
-  XCircle
+  XCircle,
+  Menu,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 
 import { moduleEntryPath } from '@utils/modules';
@@ -62,6 +68,26 @@ function PortalHomeLayoutContent({
 
   const currentView =
     searchParams.get('view') || 'dashboard';
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => !prev);
+  };
+
+  const handleMenuClick = (setter: React.Dispatch<React.SetStateAction<boolean>>) => {
+    if (sidebarCollapsed) {
+      setSidebarCollapsed(false);
+      setter(true);
+    } else {
+      setter((prev) => !prev);
+    }
+  };
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname, searchParams]);
 
 
   /* =========================================================
@@ -1725,7 +1751,7 @@ function PortalHomeLayoutContent({
   ========================================================= */
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex">
+    <div className="min-h-screen bg-slate-50/50 flex flex-col w-full overflow-x-hidden">
 
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {
@@ -1754,30 +1780,112 @@ function PortalHomeLayoutContent({
 
 
       {/* =====================================================
-          LEFT SIDEBAR
+          MOBILE TOPBAR (< lg)
       ===================================================== */}
-
-      <aside className="fixed left-0 top-0 bottom-0 w-72 bg-white border-r border-slate-200 flex flex-col justify-between p-5 h-screen overflow-y-auto scrollbar-hide z-30">
-
-        <div className="flex flex-col gap-6">
-
-          {/* LOGO */}
+      <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm w-full">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+            aria-label="Open navigation menu"
+          >
+            <Menu size={20} />
+          </button>
 
           <Link
             href={isUlbUser ? "/ulb/dashboard" : "/portal-home"}
-            className="flex items-center gap-3 px-1 py-1 cursor-pointer group transition-all"
-            title="Return to Main Portal Entrance"
+            className="flex items-center gap-2"
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-600/30 group-hover:scale-105 transition-transform">
-              <Shield size={22} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white shadow-sm font-black text-xs">
+              <Shield size={16} />
             </div>
+            <span className="text-sm font-black text-slate-900 tracking-tight">
+              MatrixTrack 2.0
+            </span>
+          </Link>
+        </div>
 
-            <div className="min-w-0">
-              <div className="truncate text-base font-black tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
-                MatrixTrack 2.0
-              </div>
+        {user && (
+          <Link
+            href="/portal-home/profile"
+            className="flex items-center gap-2"
+            title="Profile"
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-sm">
+              {userInitial}
             </div>
           </Link>
+        )}
+      </header>
+
+      {/* =====================================================
+          MOBILE DRAWER BACKDROP (< lg)
+      ===================================================== */}
+      {mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
+        />
+      )}
+
+      {/* =====================================================
+          LEFT SIDEBAR (DRAWER ON MOBILE, FIXED ON LG)
+      ===================================================== */}
+      <aside
+        className={`fixed left-0 top-0 bottom-0 bg-white border-r border-slate-200 flex flex-col justify-between h-screen overflow-y-auto scrollbar-hide z-50 transition-all duration-300 ease-out ${
+          sidebarCollapsed ? 'lg:w-[76px] lg:p-3 p-5 w-72' : 'w-72 p-5'
+        } ${
+          mobileMenuOpen
+            ? 'translate-x-0 shadow-2xl'
+            : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        <div className="flex flex-col gap-6">
+
+          {/* LOGO & CLOSE / TOGGLE BUTTON */}
+          <div className="flex items-center justify-between">
+            <Link
+              href={isUlbUser ? "/ulb/dashboard" : "/portal-home"}
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-3 px-1 py-1 cursor-pointer group transition-all ${
+                sidebarCollapsed ? 'lg:justify-center lg:w-full' : ''
+              }`}
+              title="Return to Main Portal Entrance"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-600/30 group-hover:scale-105 transition-transform">
+                <Shield size={20} />
+              </div>
+
+              <div className={`min-w-0 ${sidebarCollapsed ? 'lg:hidden' : 'block'}`}>
+                <div className="truncate text-base font-black tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
+                  MatrixTrack 2.0
+                </div>
+              </div>
+            </Link>
+
+            {/* Mobile Close Button */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              className="lg:hidden flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+              aria-label="Close menu"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Desktop Quick Collapse Button (shown ONLY when expanded) */}
+            {!sidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebarCollapsed}
+                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-xs cursor-pointer"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            )}
+          </div>
 
 
           <nav className="flex flex-col gap-2">
@@ -1797,7 +1905,9 @@ function PortalHomeLayoutContent({
                       (prev) => !prev
                     )
                   }
-                  className="flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  className={`flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors cursor-pointer ${
+                    sidebarCollapsed ? 'lg:hidden' : ''
+                  }`}
                 >
                   <span>
                     Navigation Menu
@@ -1812,7 +1922,9 @@ function PortalHomeLayoutContent({
                   />
                 </button>
               ) : (
-                <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <div className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 ${
+                  sidebarCollapsed ? 'lg:hidden' : ''
+                }`}>
                   Navigation Menu
                 </div>
               )}
@@ -1827,26 +1939,24 @@ function PortalHomeLayoutContent({
                     {!isUlbUser && (
                       <Link
                         href="/portal-home"
+                        title="Home"
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname === '/portal-home'
                           ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
                           : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                          }`}
+                          } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                       >
                         <LayoutDashboard
                           size={16}
-                          className={
+                          className={`shrink-0 ${
                             pathname === '/portal-home'
                               ? 'text-white'
                               : 'text-slate-400'
-                          }
+                          }`}
                         />
 
-                        <span>Home</span>
+                        <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Home</span>
                       </Link>
                     )}
-
-
-
 
 
                     {/* =================================================
@@ -1859,29 +1969,27 @@ function PortalHomeLayoutContent({
 
                         <button
                           type="button"
+                          title="User Management"
                           onClick={() =>
-                            setUserManagementOpen(
-                              (prev) =>
-                                !prev
-                            )
+                            handleMenuClick(setUserManagementOpen)
                           }
                           className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${userManagementOpen
                             ? 'text-blue-600 font-extrabold bg-blue-50'
                             : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
+                            } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                         >
                           <div className="flex items-center gap-3">
 
                             <UserCheck2
                               size={16}
-                              className={
+                              className={`shrink-0 ${
                                 userManagementOpen
                                   ? 'text-blue-600'
                                   : 'text-slate-500'
-                              }
+                              }`}
                             />
 
-                            <span>
+                            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                               User Management
                             </span>
 
@@ -1890,7 +1998,7 @@ function PortalHomeLayoutContent({
 
                           <ChevronDown
                             size={15}
-                            className={`transition-transform duration-200 ${userManagementOpen
+                            className={`transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${userManagementOpen
                               ? 'rotate-180 text-blue-600'
                               : 'text-slate-400'
                               }`}
@@ -1900,10 +2008,13 @@ function PortalHomeLayoutContent({
 
                         {userManagementOpen && (
 
-                          <div className="ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1">
+                          <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${
+                            sidebarCollapsed ? 'lg:hidden' : ''
+                          }`}>
 
                             <Link
                               href="/portal-home/common-registration"
+                              title="Create User"
                               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
                                 '/portal-home/common-registration'
                               )
@@ -1930,6 +2041,7 @@ function PortalHomeLayoutContent({
 
                             <Link
                               href="/portal-home/registered-users"
+                              title="Existing Users"
                               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
                                 '/portal-home/registered-users'
                               )
@@ -1956,6 +2068,7 @@ function PortalHomeLayoutContent({
 
                             <Link
                               href="/portal-home/registration-requests"
+                              title="User Registration Requests"
                               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
                                 '/portal-home/registration-requests'
                               )
@@ -1982,6 +2095,7 @@ function PortalHomeLayoutContent({
                             {/* Employees Tab */}
                             <Link
                               href="/city/employees"
+                              title="Employees"
                               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
                                 '/city/employees'
                               )
@@ -2020,25 +2134,26 @@ function PortalHomeLayoutContent({
 
                       <Link
                         href="/portal-home/city-directory"
+                        title="City Directory"
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.includes(
                           '/city-directory'
                         )
                           ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
                           : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                          }`}
+                          } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                       >
                         <Globe
                           size={16}
-                          className={
+                          className={`shrink-0 ${
                             pathname.includes(
                               '/city-directory'
                             )
                               ? 'text-white'
                               : 'text-slate-500'
-                          }
+                          }`}
                         />
 
-                        <span>
+                        <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                           City Directory
                         </span>
                       </Link>
@@ -2056,29 +2171,27 @@ function PortalHomeLayoutContent({
 
                         <button
                           type="button"
+                          title="Master Control"
                           onClick={() =>
-                            setMasterSubOpen(
-                              (prev) =>
-                                !prev
-                            )
+                            handleMenuClick(setMasterSubOpen)
                           }
                           className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${masterSubOpen
                             ? 'text-blue-600 font-extrabold bg-blue-50'
                             : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
+                            } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                         >
                           <div className="flex items-center gap-3">
 
                             <Map
                               size={16}
-                              className={
+                              className={`shrink-0 ${
                                 masterSubOpen
                                   ? 'text-blue-600'
                                   : 'text-slate-500'
-                              }
+                              }`}
                             />
 
-                            <span>
+                            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                               Master Control
                             </span>
 
@@ -2087,7 +2200,7 @@ function PortalHomeLayoutContent({
 
                           <ChevronDown
                             size={15}
-                            className={`transition-transform duration-200 ${masterSubOpen
+                            className={`transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${masterSubOpen
                               ? 'rotate-180 text-blue-600'
                               : 'text-slate-400'
                               }`}
@@ -2097,7 +2210,9 @@ function PortalHomeLayoutContent({
 
                         {masterSubOpen && (
 
-                          <div className="ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1">
+                          <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${
+                            sidebarCollapsed ? 'lg:hidden' : ''
+                          }`}>
 
 
                             {/* ZONES / WARDS / AREAS */}
@@ -2401,7 +2516,9 @@ function PortalHomeLayoutContent({
               hasWorkforceAccess ||
               isCityAdmin) && (
 
-                <div className="px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 mb-1">
+                <div className={`px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 mb-1 ${
+                  sidebarCollapsed ? 'lg:hidden' : ''
+                }`}>
                   Active Module
                 </div>
 
@@ -2413,10 +2530,11 @@ function PortalHomeLayoutContent({
             {isCityAdmin && (
               <Link
                 href="/city/attendance"
+                title="Attendance Analytics"
                 className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
                   ? 'bg-blue-600 text-white font-extrabold shadow-md shadow-blue-500/20'
                   : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                  }`}
+                  } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
               >
                 <ChartNoAxesCombined
                   size={18}
@@ -2426,7 +2544,7 @@ function PortalHomeLayoutContent({
                     }`}
                 />
 
-                <span className="text-left leading-snug">
+                <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                   Attendance Analytics
                 </span>
               </Link>
@@ -2444,14 +2562,15 @@ function PortalHomeLayoutContent({
 
                 <Link
                   href="/ulb/dashboard"
+                  title="Dashboard"
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname === '/ulb/dashboard'
                     ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
-                  <LayoutDashboard size={15} />
+                  <LayoutDashboard size={15} className="shrink-0" />
 
-                  <span>
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                     Dashboard
                   </span>
                 </Link>
@@ -2461,14 +2580,15 @@ function PortalHomeLayoutContent({
 
                 <Link
                   href="/city/attendance"
+                  title="Attendance Analytics"
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/city/attendance')
                     ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
-                  <ChartNoAxesCombined size={15} />
+                  <ChartNoAxesCombined size={15} className="shrink-0" />
 
-                  <span>
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                     Attendance Analytics
                   </span>
                 </Link>
@@ -2478,14 +2598,15 @@ function PortalHomeLayoutContent({
 
                 <Link
                   href="/ulb/inspection-performance"
+                  title="Inspection and Performance"
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/inspection-performance')
                     ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
-                  <ShieldCheck size={15} />
+                  <ShieldCheck size={15} className="shrink-0" />
 
-                  <span>
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                     Inspection and Performance
                   </span>
                 </Link>
@@ -2495,14 +2616,15 @@ function PortalHomeLayoutContent({
 
                 <Link
                   href="/ulb/ward-ranking"
+                  title="Ward Ranking"
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/ward-ranking')
                     ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
-                  <Award size={15} />
+                  <Award size={15} className="shrink-0" />
 
-                  <span>
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                     Ward Ranking
                   </span>
                 </Link>
@@ -2521,16 +2643,14 @@ function PortalHomeLayoutContent({
 
                 <button
                   type="button"
+                  title="Inspection & Performance System"
                   onClick={() =>
-                    setTaskforceOpen(
-                      (prev) =>
-                        !prev
-                    )
+                    handleMenuClick(setTaskforceOpen)
                   }
                   className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isTaskforceActive
                     ? 'bg-blue-50 text-blue-700 font-extrabold'
                     : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
                   <div className="flex items-center gap-3 text-left min-w-0">
 
@@ -2542,7 +2662,7 @@ function PortalHomeLayoutContent({
                         }`}
                     />
 
-                    <span className="text-left leading-snug">
+                    <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                       Inspection & Performance System
                     </span>
 
@@ -2551,7 +2671,7 @@ function PortalHomeLayoutContent({
 
                   <ChevronDown
                     size={16}
-                    className={`shrink-0 transition-transform duration-200 ${taskforceOpen
+                    className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${taskforceOpen
                       ? 'rotate-180 text-blue-600'
                       : 'text-slate-400'
                       }`}
@@ -2562,12 +2682,15 @@ function PortalHomeLayoutContent({
 
                 {taskforceOpen && (
 
-                  <div className="ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1.5">
+                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1.5 ${
+                    sidebarCollapsed ? 'lg:hidden' : ''
+                  }`}>
 
                     {/* DASHBOARD */}
 
                     <Link
                       href="/city"
+                      title="Dashboard"
                       className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname ===
                         '/city'
                         ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
@@ -2709,16 +2832,14 @@ function PortalHomeLayoutContent({
 
                 <button
                   type="button"
+                  title="Ward Ranking System"
                   onClick={() =>
-                    setSwachhOpen(
-                      (prev) =>
-                        !prev
-                    )
+                    handleMenuClick(setSwachhOpen)
                   }
                   className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isSwachhActive
                     ? 'bg-purple-50 text-purple-700 font-extrabold'
                     : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
                   <div className="flex items-center gap-3 text-left min-w-0">
 
@@ -2730,7 +2851,7 @@ function PortalHomeLayoutContent({
                         }`}
                     />
 
-                    <span className="text-left leading-snug">
+                    <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                       Ward Ranking System
                     </span>
 
@@ -2739,7 +2860,7 @@ function PortalHomeLayoutContent({
 
                   <ChevronDown
                     size={16}
-                    className={`shrink-0 transition-transform duration-200 ${swachhOpen
+                    className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${swachhOpen
                       ? 'rotate-180 text-purple-600'
                       : 'text-slate-400'
                       }`}
@@ -2750,7 +2871,9 @@ function PortalHomeLayoutContent({
 
                 {swachhOpen && (
 
-                  <div className="ml-4 mt-1 pl-3 border-l-2 border-purple-200 flex flex-col gap-2">
+                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-purple-200 flex flex-col gap-2 ${
+                    sidebarCollapsed ? 'lg:hidden' : ''
+                  }`}>
 
                     {swachhGroups.map(
                       (grp) => (
@@ -2830,16 +2953,14 @@ function PortalHomeLayoutContent({
 
                 <button
                   type="button"
+                  title="Workforce Attendance System"
                   onClick={() =>
-                    setWorkforceOpen(
-                      (prev) =>
-                        !prev
-                    )
+                    handleMenuClick(setWorkforceOpen)
                   }
                   className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isWorkforceActive
                     ? 'bg-cyan-50 text-cyan-700 font-extrabold'
                     : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                 >
                   <div className="flex items-center gap-3 text-left min-w-0">
 
@@ -2851,7 +2972,7 @@ function PortalHomeLayoutContent({
                         }`}
                     />
 
-                    <span className="text-left leading-snug">
+                    <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                       Workforce Attendance System
                     </span>
 
@@ -2860,7 +2981,7 @@ function PortalHomeLayoutContent({
 
                   <ChevronDown
                     size={16}
-                    className={`transition-transform duration-200 ${workforceOpen
+                    className={`transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${workforceOpen
                       ? 'rotate-180 text-cyan-600'
                       : 'text-slate-400'
                       }`}
@@ -2871,7 +2992,9 @@ function PortalHomeLayoutContent({
 
                 {workforceOpen && (
 
-                  <div className="ml-4 mt-1 pl-3 border-l-2 border-cyan-200 flex flex-col gap-2">
+                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-cyan-200 flex flex-col gap-2 ${
+                    sidebarCollapsed ? 'lg:hidden' : ''
+                  }`}>
 
                     {workforceGroups.map(
                       (grp) => (
@@ -2946,34 +3069,45 @@ function PortalHomeLayoutContent({
 
 
         {/* =====================================================
-            LOGOUT & PROFILE
+            LOGOUT & PROFILE & EXPAND TOGGLE
         ===================================================== */}
 
         <div className="flex flex-col gap-2.5 border-t border-slate-200 pt-4 mt-6">
 
+          {/* Expand Button: ONLY visible on desktop when sidebar is collapsed */}
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              className="hidden lg:flex h-9 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-xs cursor-pointer"
+              title="Expand sidebar"
+            >
+              <PanelLeftOpen size={18} className="text-blue-600" />
+            </button>
+          )}
+
           <Link
             href="/portal-home/profile"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${pathname === '/portal-home/profile' || pathname === '/profile'
-              ? 'bg-blue-600 text-white shadow-blue-500/20'
-              : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
-              }`}
+            title="My Profile"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
+              pathname === '/portal-home/profile' || pathname === '/profile'
+                ? 'bg-blue-600 text-white shadow-blue-500/20'
+                : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
+            } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
           >
-            <UserCheck size={16} />
-            My Profile
+            <UserCheck size={16} className="shrink-0" />
+            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>My Profile</span>
           </Link>
 
           <button
-            onClick={
-              handleLogout
-            }
-            className="flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-rose-50 border border-rose-200 text-rose-600 font-extrabold text-sm rounded-xl hover:bg-rose-100 transition-all shadow-sm"
+            onClick={handleLogout}
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-rose-50 border border-rose-200 text-rose-600 font-extrabold text-sm rounded-xl hover:bg-rose-100 transition-all shadow-sm cursor-pointer ${
+              sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''
+            }`}
             title="Sign out of portal"
           >
-            <LogOut
-              size={16}
-            />
-
-            Logout
+            <LogOut size={16} className="shrink-0" />
+            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Logout</span>
           </button>
 
         </div>
@@ -2986,12 +3120,13 @@ function PortalHomeLayoutContent({
       ===================================================== */}
 
       <main
-        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && (pathname.startsWith('/city/attendance') || pathname.startsWith('/ulb/inspection-performance') || pathname.startsWith('/ulb/ward-ranking'))
-          ? 'ml-72 p-4 sm:p-5 lg:p-6'
-          : isUlbUser
-            ? 'ml-0 p-4 sm:p-5 lg:p-6'
-            : 'ml-72 p-5 sm:p-6'
-          }`}
+        className={`portal-main-content min-h-screen text-slate-800 transition-all duration-300 w-full min-w-0 ${
+          isUlbUser && !pathname.startsWith('/city/attendance') && !pathname.startsWith('/ulb/inspection-performance') && !pathname.startsWith('/ulb/ward-ranking')
+            ? 'p-3 sm:p-5 lg:p-6'
+            : sidebarCollapsed
+              ? 'lg:pl-[76px] p-3 sm:p-5 lg:p-6'
+              : 'lg:pl-72 p-3 sm:p-5 lg:p-6'
+        }`}
       >
         {!isMainDashboard && (
 
