@@ -1495,55 +1495,61 @@ export default function EmployeesPage() {
                 setImportingEmployees(true);
                 setEmployeeImportError("");
 
+                setEmployeeImportProgress(
+                    `Importing ${readyRows.length} employees...`
+                );
 
-                let imported = 0;
-                const failed: string[] = [];
-                const BATCH_SIZE = 20;
-
-                for (let i = 0; i < readyRows.length; i += BATCH_SIZE) {
-                    const chunk = readyRows.slice(i, i + BATCH_SIZE);
-                    setEmployeeImportProgress(
-                        `Importing ${Math.min(i + BATCH_SIZE, readyRows.length)} of ${readyRows.length} employees...`
-                    );
-
-                    await Promise.all(
-                        chunk.map(async (row) => {
-                            try {
-                                await apiFetch(
-                                    "/city/areas/import-register-employee",
-                                    {
-                                        method: "POST",
-                                        body: JSON.stringify({
-                                            name: row.employeeName,
-                                            phone: row.mobileNumber || undefined,
-                                            aadhaar: row.aadhaarNumber || undefined,
-                                            employmentType: row.employmentType || "Permanent",
-                                            zoneId: row.zoneId,
-                                            wardId: row.wardId,
-                                            employeeId: row.employeeId || undefined,
-                                        }),
-                                    }
-                                );
-                                imported++;
-                            } catch (err: any) {
-                                failed.push(
-                                    `${row.employeeName}: ${err?.message || "Import failed"}`
-                                );
-                            }
-                        })
-                    );
-                }
+                const result = await apiFetch<{
+                    success: boolean;
+                    total: number;
+                    imported: number;
+                    failed: number;
+                    failures: Array<{
+                        rowNumber: number;
+                        employeeId: string | null;
+                        name: string;
+                        message: string;
+                    }>;
+                }>(
+                    "/city/areas/import-register-employees-bulk",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({
+                            employees: readyRows.map((row) => ({
+                                rowNumber: row.rowNumber,
+                                name: row.employeeName,
+                                phone: row.mobileNumber || undefined,
+                                aadhaar: row.aadhaarNumber || undefined,
+                                employmentType: row.employmentType || "Permanent",
+                                zoneId: row.zoneId,
+                                wardId: row.wardId,
+                                employeeId: row.employeeId,
+                            })),
+                        }),
+                    }
+                );
 
 
                 await loadData();
 
 
-                if (failed.length) {
+                if (result.failed) {
+                    const failureByRow = new Map(
+                        result.failures.map((failure) => [failure.rowNumber, failure.message])
+                    );
+
+                    setEmployeeImportRows((currentRows) =>
+                        currentRows.map((row) => {
+                            if (row.status !== "READY") return row;
+                            const failureMessage = failureByRow.get(row.rowNumber);
+                            return failureMessage
+                                ? { ...row, status: "INVALID_DATA", message: failureMessage }
+                                : { ...row, status: "ALREADY_EXISTS", message: "Imported successfully." };
+                        })
+                    );
 
                     setEmployeeImportError(
-                        `${imported} employee(s) imported. ${failed.length} row(s) failed: ${failed.join(
-                            " | "
-                        )}`
+                        `${result.imported} employee(s) imported. ${result.failed} row(s) failed. Review the highlighted rows for exact reasons.`
                     );
 
                     setEmployeeImportProgress("");
@@ -1568,7 +1574,11 @@ export default function EmployeesPage() {
                     ""
                 );
 
-
+            } catch (err: any) {
+                setEmployeeImportError(
+                    err?.message || "Employee import failed. No employees were saved."
+                );
+                setEmployeeImportProgress("");
             } finally {
                 setImportingEmployees(
                     false
