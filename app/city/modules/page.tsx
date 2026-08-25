@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { moduleLabel } from "@lib/labels";
 import { RoleGuard } from "@components/Guards";
+import AutoAssignSupervisorsButton from "@components/ui/AutoAssignSupervisorsButton";
 
 type CityModule = {
     id: string;
@@ -37,6 +38,15 @@ type CityModule = {
 export default function CityModulesPage() {
     const { user } = useAuth();
     const isReadOnly = user?.roles?.some(r => ["COMMISSIONER", "ULB_OFFICER"].includes(r));
+    const isSuperAdmin =
+        user?.role === 'super_admin' ||
+        user?.role === 'hms_super_admin' ||
+        user?.role === 'SUPER_ADMIN' ||
+        (user?.roles || []).includes('hms_super_admin') ||
+        (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
+        (user?.roles || []).includes('SUPER_ADMIN') ||
+        (user?.roles || []).includes('super_admin');
+    const isCityAdminOnly = user?.roles?.includes("CITY_ADMIN") && !isSuperAdmin;
     const [modules, setModules] = useState<CityModule[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -99,7 +109,7 @@ export default function CityModulesPage() {
                     )}
 
                     {/* Header */}
-                    <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
                         <div>
                             <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>
                                 System Modules
@@ -108,7 +118,7 @@ export default function CityModulesPage() {
                                 Active operational modules and platform extensions
                             </p>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap", justifyContent: "flex-end" }}>
                             <div style={{ display: "flex", gap: "8px" }}>
                                 <div style={{ backgroundColor: "#f0fdf4", padding: "6px 12px", borderRadius: "8px", border: "1px solid #bbf7d0", textAlign: "center" }}>
                                     <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#16a34a" }}>{loading ? "..." : activeCount} Active</div>
@@ -136,6 +146,15 @@ export default function CityModulesPage() {
                             >
                                 <Activity size={15} /> REFRESH
                             </button>
+                            {isCityAdminOnly ? (
+                                <AutoAssignSupervisorsButton
+                                    onCompleted={() => {
+                                        if (typeof window !== "undefined") {
+                                            window.location.reload();
+                                        }
+                                    }}
+                                />
+                            ) : null}
                         </div>
                     </div>
 

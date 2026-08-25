@@ -10,7 +10,6 @@ import ApprovalsTab from "./ApprovalsTab";
 import AssignmentsTab from "./AssignmentsTab";
 import SubmittedReportsTab from "../qc-shared/SubmittedReportsTab";
 import UniversalReportModal from "@components/UniversalReportModal";
-import AutoAssignSupervisorsButton from "@components/ui/AutoAssignSupervisorsButton";
 
 import type { Role } from "../../../types/auth";
 
@@ -30,10 +29,6 @@ export default function ToiletModulePage() {
     (user?.roles || []).includes('HMS_SUPER_ADMIN') ||
     (user?.roles || []).includes('SUPER_ADMIN') ||
     (user?.roles || []).includes('super_admin');
-
-  const isCityAdminOnly =
-    user?.roles?.includes("CITY_ADMIN") &&
-    !isSuperAdmin;
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -143,15 +138,6 @@ export default function ToiletModulePage() {
                 </button>
               );
             })}
-            {isCityAdminOnly ? (
-              <AutoAssignSupervisorsButton
-                onCompleted={() => {
-                  if (typeof window !== "undefined") {
-                    window.location.reload();
-                  }
-                }}
-              />
-            ) : null}
           </div>
         </div>
 
