@@ -9,7 +9,7 @@ import React, {
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
-import BeatTable from "./components/BeatTable";
+import GroupedBeatTable, { BeatGroup } from "./components/GroupedBeatTable";
 
 import type { BeatMapViewProps } from "./components/BeatMapView";
 
@@ -64,6 +64,16 @@ const BeatMapView = dynamic<BeatMapViewProps>(
   }
 );
 
+const GroupAssignModal = dynamic(
+  () => import("./components/GroupAssignModal"),
+  { ssr: false }
+);
+
+const BeatPointEditor = dynamic(
+  () => import("./components/BeatPointEditor"),
+  { ssr: false }
+);
+
 export default function BeatsPage() {
   const { user } = useAuth();
 
@@ -97,6 +107,12 @@ export default function BeatsPage() {
 
   const [deployingBeat, setDeployingBeat] =
     useState<any | null>(null);
+
+  const [pointEditingBeat, setPointEditingBeat] =
+    useState<any | null>(null);
+
+  const [groupAssignment, setGroupAssignment] =
+    useState<{ group: BeatGroup; mode: "SUPERVISOR" | "EMPLOYEE" } | null>(null);
 
   const [showCreateBeat, setShowCreateBeat] =
     useState(false);
@@ -1254,55 +1270,7 @@ export default function BeatsPage() {
                 </p>
               </div>
             ) : (
-              <div
-                style={{
-                  backgroundColor:
-                    "white",
-                  border:
-                    "1px solid #e2e8f0",
-                  borderRadius:
-                    "20px",
-                  overflow:
-                    "hidden",
-                  boxShadow:
-                    "0 2px 4px rgba(0,0,0,0.02)",
-                }}
-              >
-                <div
-                  style={{
-                    padding:
-                      "18px 24px",
-                    borderBottom:
-                      "1px solid #f1f5f9",
-                    backgroundColor:
-                      "#fcfdfe",
-                  }}
-                >
-                  <h3
-                    style={{
-                      margin:
-                        0,
-                      fontSize:
-                        "0.95rem",
-                      fontWeight:
-                        900,
-                      color:
-                        "#0f172a",
-                      textTransform:
-                        "uppercase",
-                      letterSpacing:
-                        "0.04em",
-                    }}
-                  >
-                    Registered Beats (
-                    {
-                      filteredBeats.length
-                    }
-                    )
-                  </h3>
-                </div>
-
-                <BeatTable
+              <GroupedBeatTable
                   beats={
                     filteredBeats
                   }
@@ -1315,28 +1283,22 @@ export default function BeatsPage() {
                   onEdit={
                     setEditingBeat
                   }
-                  onViewData={
-                    setInspectingBeat
-                  }
                   onAssign={
                     setAssigningBeat
                   }
                   onAssignEmployees={
                     setDeployingBeat
                   }
-                  onViewUser={(
-                    beat
-                  ) =>
-                    setDeployingBeat(
-                      beat
-                    )
+                  onEditPoints={
+                    setPointEditingBeat
                   }
-                  assignmentActionLabel="Assign Supervisor"
+                  onAssignGroup={(group, mode) =>
+                    setGroupAssignment({ group, mode })
+                  }
                   isReadOnly={
                     isReadOnly
                   }
                 />
-              </div>
             )}
           </section>
         </div>
@@ -1430,6 +1392,24 @@ export default function BeatsPage() {
             onSuccess={
               loadBeats
             }
+          />
+        )}
+
+        {groupAssignment && (
+          <GroupAssignModal
+            beats={groupAssignment.group.beats}
+            title={groupAssignment.group.title}
+            mode={groupAssignment.mode}
+            onClose={() => setGroupAssignment(null)}
+            onSuccess={loadBeats}
+          />
+        )}
+
+        {pointEditingBeat && (
+          <BeatPointEditor
+            beat={pointEditingBeat}
+            onClose={() => setPointEditingBeat(null)}
+            onSuccess={loadBeats}
           />
         )}
 
