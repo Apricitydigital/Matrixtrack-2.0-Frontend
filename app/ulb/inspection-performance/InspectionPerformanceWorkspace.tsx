@@ -1776,7 +1776,7 @@ export default function InspectionPerformanceWorkspace() {
         />
       )}
 
-      {imagePreview && (
+      {imagePreview && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setImagePreview(null)}
@@ -1794,7 +1794,8 @@ export default function InspectionPerformanceWorkspace() {
             className="max-h-full max-w-full rounded-xl object-contain"
             onClick={(event) => event.stopPropagation()}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -2347,11 +2348,7 @@ function AiInsightsSection({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 px-4 py-3">
               <div>
                 <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                  ULB AI Recommendation
-                </div>
-
-                <div className="mt-1 text-sm font-black text-slate-800">
-                  Corrective Action Assessment
+                  AI Recommendation
                 </div>
               </div>
 
@@ -2832,7 +2829,11 @@ function ActionRequiredModal({
   onClose: () => void;
   onSubmit: () => void;
 }) {
-  return (
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
       onClick={onClose}
@@ -2907,6 +2908,7 @@ function ActionRequiredModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
