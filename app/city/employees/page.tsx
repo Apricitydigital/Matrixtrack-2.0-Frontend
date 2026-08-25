@@ -1070,15 +1070,19 @@ export default function EmployeesPage() {
                EXISTING EMPLOYEE LOOKUP
             ============================================= */
 
-            const existingEmployeeNames =
-                new Set(
-                    employees.map(
-                        (employee) =>
-                            normalizeEmployeeImportValue(
-                                employee.name
-                            )
-                    )
-                );
+            const existingEmployeesByPhone = new Map<string, EmployeeRow>();
+            const existingEmployeesByAadhaar = new Map<string, EmployeeRow>();
+            const existingEmployeesByName = new Map<string, EmployeeRow[]>();
+
+            employees.forEach((emp) => {
+                if (emp.phone) existingEmployeesByPhone.set(emp.phone, emp);
+                if (emp.aadhaar) existingEmployeesByAadhaar.set(emp.aadhaar, emp);
+                
+                const normName = normalizeEmployeeImportValue(emp.name);
+                const arr = existingEmployeesByName.get(normName) || [];
+                arr.push(emp);
+                existingEmployeesByName.set(normName, arr);
+            });
 
 
             const uploadedEmployeeKeys =
@@ -1267,12 +1271,21 @@ export default function EmployeesPage() {
                                 employeeName
                             );
 
+                        let isAlreadyExists = false;
 
-                        if (
-                            existingEmployeeNames.has(
-                                normalizedName
-                            )
-                        ) {
+                        if (mobileNumber && existingEmployeesByPhone.has(mobileNumber)) {
+                            isAlreadyExists = true;
+                        } else if (aadhaarNumber && existingEmployeesByAadhaar.has(aadhaarNumber)) {
+                            isAlreadyExists = true;
+                        } else if (!mobileNumber && !aadhaarNumber) {
+                            // If they provide NO phone and NO aadhaar, and the name already exists, 
+                            // we flag it to prevent accidental identical named duplicates without identifiers.
+                            if (existingEmployeesByName.has(normalizedName)) {
+                                isAlreadyExists = true;
+                            }
+                        }
+
+                        if (isAlreadyExists) {
                             parsedRows.push({
                                 rowNumber,
                                 employeeName,
@@ -1299,11 +1312,11 @@ export default function EmployeesPage() {
 
                         /*
                          * Duplicate inside same uploaded file.
-                         * Name + Zone + Ward are used.
+                         * Use Name + Mobile + Aadhaar + Zone + Ward to be safe.
                          */
 
                         const employeeKey =
-                            `${normalizedName}::${zone.id}::${ward.id}`;
+                            `${normalizedName}::${mobileNumber || ""}::${aadhaarNumber || ""}::${zone.id}::${ward.id}`;
 
 
                         if (
@@ -1333,7 +1346,6 @@ export default function EmployeesPage() {
 
                             return;
                         }
-
 
                         uploadedEmployeeKeys.add(
                             employeeKey
