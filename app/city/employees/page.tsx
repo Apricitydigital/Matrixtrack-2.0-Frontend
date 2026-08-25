@@ -745,6 +745,7 @@ export default function EmployeesPage() {
         if (!editingEmployee) return;
 
         const cleanName = editName.trim().replace(/\s+/g, " ");
+        const cleanEmployeeId = normalizeEmployeeCodeId(editEmployeeCodeId);
         const cleanPhone = editPhone.replace(/\D/g, "");
         const cleanAadhaar = editAadhaar.replace(/\D/g, "");
 
