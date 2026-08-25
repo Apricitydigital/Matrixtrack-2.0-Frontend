@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ToiletApi } from '@lib/apiClient';
 import { useRouter } from 'next/navigation';
 
@@ -9,6 +10,8 @@ type TableFilter = 'ALL' | 'VALID' | 'INVALID';
 
 type PreviewRow = {
     index: number;
+    zoneId?: string;
+    wardId?: string;
     zoneName: string;
     wardName: string;
     areaType: string;
@@ -25,12 +28,12 @@ type PreviewRow = {
 const AREA_TYPES = [
     { value: 'RESIDENTIAL', label: 'Residential' },
     { value: 'SLUM', label: 'Slum Area' },
-    { value: 'COMMERCIAL_AREA', label: 'Commercial Area' },
+    { value: 'COMMERCIAL', label: 'Commercial Area' },
     { value: 'RELIGIOUS_PLACE', label: 'Religious Place' },
-    { value: 'TOURIST_AREAS', label: 'Tourist Areas' },
+    { value: 'TOURIST_AREA', label: 'Tourist Areas' },
     { value: 'TRANSPORT_HUB', label: 'Transport Hub' },
     { value: 'PARKS_AND_GARDENS', label: 'Parks and Gardens' },
-    { value: 'MARKET', label: 'Market' },
+    { value: 'MARKET_AREA', label: 'Market' },
     { value: 'PARKING', label: 'Parking' },
 ];
 
@@ -45,6 +48,9 @@ export default function BulkImportPage() {
     const [error, setError] = useState('');
     const [zones, setZones] = useState<any[]>([]);
     const [wards, setWards] = useState<any[]>([]);
+    const [geoLoaded, setGeoLoaded] = useState(false);
+    // Keep a ref to the pending file so we can re-validate once geo data arrives
+    const pendingFileRef = useRef<File | null>(null);
 
     // Manual form state
     const [formData, setFormData] = useState({
@@ -74,122 +80,172 @@ export default function BulkImportPage() {
                     allWards.push(...(wardsRes.nodes || []).map((w: any) => ({ ...w, zoneId: zone.id, zoneName: zone.name })));
                 }
                 setWards(allWards);
+                setGeoLoaded(true);
             } catch (err) {
                 console.error("Failed to load geo nodes", err);
+                setGeoLoaded(true); // Allow usage even on partial failure
             }
         };
         loadGeo();
     }, []);
 
+    // Re-validate the pending CSV file once zone+ward master data is fully loaded
+    useEffect(() => {
+        if (geoLoaded && pendingFileRef.current) {
+            parseAndValidateCSV(pendingFileRef.current, zones, wards);
+            pendingFileRef.current = null;
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [geoLoaded]);
+
     const filteredWards = formData.zoneId
         ? wards.filter(w => w.zoneId === formData.zoneId)
         : wards;
 
-    const parseAndValidateCSV = async (csvFile: File) => {
+    const parseAndValidateCSV = async (csvFile: File, zoneList = zones, wardList = wards) => {
         try {
-            const text = await csvFile.text();
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-            if (lines.length < 2) {
+            let rawText = '';
+            const isExcel = csvFile.name.endsWith('.xlsx') || csvFile.name.endsWith('.xls');
+
+            if (isExcel) {
+                const buffer = await csvFile.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                rawText = XLSX.utils.sheet_to_csv(worksheet);
+            } else {
+                rawText = await csvFile.text();
+            }
+
+            // ── RFC-4180 full-document tokenizer ──────────────────────────────────
+            // MUST tokenize before splitting rows, because Address cells frequently
+            // contain embedded newlines (common Excel export behaviour).
+            const tokenizeCSV = (raw: string): string[][] => {
+                const rows: string[][] = [];
+                let row: string[] = [];
+                let cell = '';
+                let inQ = false;
+                for (let i = 0; i < raw.length; i++) {
+                    const ch   = raw[i];
+                    const next = raw[i + 1];
+                    if (inQ) {
+                        if (ch === '"' && next === '"') { cell += '"'; i++; }   // escaped "
+                        else if (ch === '"')             { inQ = false; }        // close quote
+                        else                             { cell += ch; }         // embedded \n ok
+                    } else {
+                        if      (ch === '"')  { inQ = true; }
+                        else if (ch === ',')  { row.push(cell.trim()); cell = ''; }
+                        else if (ch === '\r' && next === '\n') {
+                            row.push(cell.trim());
+                            if (row.some(c => c)) rows.push(row);
+                            row = []; cell = ''; i++;
+                        } else if (ch === '\n' || ch === '\r') {
+                            row.push(cell.trim());
+                            if (row.some(c => c)) rows.push(row);
+                            row = []; cell = '';
+                        } else { cell += ch; }
+                    }
+                }
+                if (cell || row.length) { row.push(cell.trim()); if (row.some(c => c)) rows.push(row); }
+                return rows;
+            };
+
+            const allRows = tokenizeCSV(rawText);
+            if (allRows.length < 2) {
                 setError('CSV file is empty or missing data rows');
                 setPreviewRows([]);
                 return;
             }
 
-            const headerRow = lines[0].toLowerCase().split(',').map(h => h.trim());
-            const is9ColFormat = headerRow.includes('toilet type') || headerRow.includes('area type') || headerRow.includes('toilet name / id') || headerRow[0].includes('zone');
+            const headerRow = allRows[0].map(h => h.toLowerCase());
+            const is9ColFormat =
+                headerRow.includes('toilet type') ||
+                headerRow.includes('area type')   ||
+                headerRow.includes('toilet name / id') ||
+                (headerRow[0] && headerRow[0].includes('zone'));
 
             const parsed: PreviewRow[] = [];
+            // Carry-forward: Excel merged cells export as blank for child rows
+            let lastZone = '', lastWard = '', lastAreaType = 'RESIDENTIAL';
 
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
-                if (values.length < 3) continue;
+            for (let i = 1; i < allRows.length; i++) {
+                const v = allRows[i];
+                if (v.length < 3) continue;
 
-                let zoneName = '', wardName = '', areaType = 'RESIDENTIAL', areaName = '', name = '', address = '', typeStr = 'CT', latStr = '', lonStr = '';
+                let zoneName = '', wardName = '', areaType = '', areaName = '', name = '', address = '', typeStr = 'CT', latStr = '', lonStr = '';
 
                 if (is9ColFormat) {
-                    // Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude
-                    zoneName = values[0] || '';
-                    wardName = values[1] || '';
-                    areaType = values[2] || 'RESIDENTIAL';
-                    areaName = values[3] || '';
-                    name = values[4] || '';
-                    address = values[5] || '';
-                    typeStr = values[6] || 'CT';
-                    latStr = values[7] || '';
-                    lonStr = values[8] || '';
+                    zoneName = v[0]?.trim() || ''; wardName = v[1]?.trim() || '';
+                    areaType = v[2]?.trim() || ''; areaName = v[3]?.trim() || '';
+                    name     = v[4]?.trim() || ''; address  = v[5]?.trim() || '';
+                    typeStr  = v[6]?.trim() || 'CT';
+                    latStr   = v[7]?.trim() || ''; lonStr   = v[8]?.trim() || '';
                 } else {
-                    // Name,Zone Name,Ward Name,Type,Gender,Code,Operator Name,Number of Seats,Latitude,Longitude,Address
-                    name = values[0] || '';
-                    zoneName = values[1] || '';
-                    wardName = values[2] || '';
-                    typeStr = values[3] || 'CT';
-                    latStr = values[8] || '';
-                    lonStr = values[9] || '';
-                    address = values.slice(10).join(',');
+                    name     = v[0]?.trim() || ''; zoneName = v[1]?.trim() || '';
+                    wardName = v[2]?.trim() || ''; typeStr  = v[3]?.trim() || 'CT';
+                    latStr   = v[8]?.trim() || ''; lonStr   = v[9]?.trim() || '';
+                    address  = v.slice(10).join(',').trim();
                 }
 
-                // Skip completely blank trailing rows exported by Excel
-                if (!zoneName.trim() && !wardName.trim() && !name.trim() && !address.trim() && (!latStr || latStr === '0')) {
-                    continue;
-                }
-                if (!zoneName.trim() && !wardName.trim()) {
-                    continue;
-                }
+                // Apply carry-forward for merged/blank cells
+                if (zoneName)  lastZone     = zoneName;     else zoneName  = lastZone;
+                if (wardName)  lastWard     = wardName;     else wardName  = lastWard;
+                if (areaType)  lastAreaType = areaType;     else areaType  = lastAreaType;
 
-                // Flexible Zone Matching against system registered Master Data
-                let matchedZone = zones.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
+                // Skip fully blank rows
+                if (!zoneName && !wardName && !name) continue;
+
+                // Zone match: exact → number → substring
+                let matchedZone = zoneList.find(z => z.name.trim().toLowerCase() === zoneName.toLowerCase());
                 if (!matchedZone) {
-                    const zoneNum = zoneName.replace(/\D/g, "");
-                    if (zoneNum) {
-                        matchedZone = zones.find(z => z.name.replace(/\D/g, "") === zoneNum);
-                    }
+                    const zNum = zoneName.replace(/\D/g, '');
+                    if (zNum) matchedZone = zoneList.find(z => z.name.replace(/\D/g, '') === zNum);
                 }
                 if (!matchedZone) {
-                    matchedZone = zones.find(z => z.name.toLowerCase().includes(zoneName.toLowerCase()) || zoneName.toLowerCase().includes(z.name.toLowerCase()));
-                }
-
-                // Flexible Ward Matching against system registered Master Data
-                const candidateWards = matchedZone ? wards.filter(w => w.zoneId === matchedZone.id) : wards;
-                let matchedWard = candidateWards.find(w => w.name.trim().toLowerCase() === wardName.toLowerCase());
-                if (!matchedWard) {
-                    const wardNum = wardName.replace(/\D/g, "");
-                    if (wardNum) {
-                        matchedWard = candidateWards.find(w => {
-                            const wNum = w.name.split('-')[0]?.trim().replace(/\D/g, "") || w.name.replace(/\D/g, "");
-                            return wNum === wardNum;
-                        });
-                    }
-                }
-                if (!matchedWard) {
-                    const cleanWard = wardName.replace(/ward/i, "").trim().toLowerCase();
-                    if (cleanWard) {
-                        matchedWard = candidateWards.find(w => w.name.toLowerCase().includes(cleanWard) || cleanWard.includes(w.name.toLowerCase()));
-                    }
-                }
-                if (!matchedWard && matchedZone) {
-                    const wardNum = wardName.replace(/\D/g, "");
-                    const cleanWard = wardName.replace(/ward/i, "").trim().toLowerCase();
-                    matchedWard = wards.find(w => 
-                        (wardNum && (w.name.split('-')[0]?.trim().replace(/\D/g, "") === wardNum)) ||
-                        (cleanWard && w.name.toLowerCase().includes(cleanWard))
+                    matchedZone = zoneList.find(z =>
+                        z.name.toLowerCase().includes(zoneName.toLowerCase()) ||
+                        zoneName.toLowerCase().includes(z.name.toLowerCase())
                     );
                 }
 
-                let isValid = true;
-                let validationError = '';
+                // Ward match: exact → number → clean-name → global fallback
+                const pool        = matchedZone ? wardList.filter(w => w.zoneId === matchedZone!.id) : wardList;
+                const wNum        = wardName.replace(/\D/g, '');
+                const wClean      = wardName.replace(/ward/i, '').trim().toLowerCase();
 
-                if (!matchedZone) {
-                    isValid = false;
-                    validationError = `Zone '${zoneName}' not registered in system Master Data`;
-                } else if (!matchedWard) {
-                    isValid = false;
-                    validationError = `Ward '${wardName}' not registered under ${matchedZone?.name || 'Zone'}`;
+                let matchedWard = pool.find(w => w.name.trim().toLowerCase() === wardName.toLowerCase());
+                if (!matchedWard && wNum) {
+                    matchedWard = pool.find(w => {
+                        const n = w.name.split('-')[0]?.trim().replace(/\D/g, '') || w.name.replace(/\D/g, '');
+                        return n === wNum;
+                    });
                 }
+                if (!matchedWard && wClean) {
+                    matchedWard = pool.find(w =>
+                        w.name.toLowerCase().includes(wClean) || wClean.includes(w.name.toLowerCase())
+                    );
+                }
+                // Global fallback — drop zone constraint
+                if (!matchedWard) {
+                    matchedWard = wardList.find(w => {
+                        const n = w.name.split('-')[0]?.trim().replace(/\D/g, '') || w.name.replace(/\D/g, '');
+                        return (wNum && n === wNum) || (wClean && w.name.toLowerCase().includes(wClean));
+                    });
+                }
+
+                const isValid = !!(matchedZone && matchedWard);
+                const validationError = !matchedZone
+                    ? `Zone '${zoneName}' not found in Master Data`
+                    : !matchedWard
+                    ? `Ward '${wardName}' not found under ${matchedZone.name}`
+                    : '';
 
                 parsed.push({
                     index: parsed.length + 1,
-                    zoneName: matchedZone ? matchedZone.name : zoneName,
-                    wardName: matchedWard ? matchedWard.name : wardName,
+                    zoneId: matchedZone?.id,
+                    wardId: matchedWard?.id,
+                    zoneName: matchedZone?.name || zoneName,
+                    wardName: matchedWard?.name || wardName,
                     areaType,
                     areaName,
                     name: name || 'Toilet Asset',
@@ -216,7 +272,12 @@ export default function BulkImportPage() {
             setFile(selected);
             setError('');
             setResult(null);
-            parseAndValidateCSV(selected);
+            if (!geoLoaded) {
+                pendingFileRef.current = selected;
+                setPreviewRows([]);
+            } else {
+                parseAndValidateCSV(selected, zones, wards);
+            }
         }
     };
 
@@ -238,14 +299,31 @@ export default function BulkImportPage() {
         setUploading(true);
         setError('');
         try {
-            // Build validated CSV containing only valid rows
+            const formatCSVValue = (val: any) => {
+                const str = String(val ?? '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
             const csvLines = [
                 'Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude',
-                ...validRows.map(r => `${r.zoneName},${r.wardName},${r.areaType},${r.areaName},${r.name},${r.address},${r.type},${r.latitude},${r.longitude}`)
+                ...validRows.map(r => [
+                    formatCSVValue(r.zoneName),
+                    formatCSVValue(r.wardName),
+                    formatCSVValue(r.areaType),
+                    formatCSVValue(r.areaName),
+                    formatCSVValue(r.name),
+                    formatCSVValue(r.address),
+                    formatCSVValue(r.type),
+                    formatCSVValue(r.latitude),
+                    formatCSVValue(r.longitude)
+                ].join(','))
             ];
             const csvText = csvLines.join('\n');
 
-            const response = await ToiletApi.bulkImport(csvText);
+            const response = await ToiletApi.bulkImport({ rows: validRows, csvText });
             setResult(response);
             setTimeout(() => router.push('/modules/toilet'), 2500);
         } catch (err: any) {
@@ -268,9 +346,29 @@ export default function BulkImportPage() {
             const zoneName = selectedWard ? selectedWard.zoneName : 'Zone';
             const toiletName = formData.name.trim() || 'Toilet Asset';
 
-            const csvData = `Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude\n${zoneName},${wardName},${formData.areaType},${formData.areaName},${toiletName},${formData.address},${formData.type},${formData.latitude},${formData.longitude}`;
+            const formatCSVValue = (val: any) => {
+                const str = String(val ?? '');
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            };
+
+            const singleRow = {
+                zoneName,
+                wardName,
+                areaType: formData.areaType,
+                areaName: formData.areaName,
+                name: toiletName,
+                address: formData.address,
+                type: formData.type,
+                latitude: formData.latitude,
+                longitude: formData.longitude
+            };
+
+            const csvText = `Zone Name,Ward Name,Area Type,Area Name,Toilet Name / ID,Address,Toilet Type,Latitude,Longitude\n${formatCSVValue(zoneName)},${formatCSVValue(wardName)},${formatCSVValue(formData.areaType)},${formatCSVValue(formData.areaName)},${formatCSVValue(toiletName)},${formatCSVValue(formData.address)},${formatCSVValue(formData.type)},${formatCSVValue(formData.latitude)},${formatCSVValue(formData.longitude)}`;
             
-            const response = await ToiletApi.bulkImport(csvData);
+            const response = await ToiletApi.bulkImport({ rows: [singleRow], csvText });
             setResult(response);
             setTimeout(() => router.push('/modules/toilet'), 2500);
         } catch (err: any) {
@@ -303,6 +401,7 @@ export default function BulkImportPage() {
         <div style={{ padding: '0 0 40px 0', animation: 'fadeIn 0.5s ease-out' }}>
             <style dangerouslySetInnerHTML={{ __html: `
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
                 .glass-card {
                     background: rgba(255, 255, 255, 0.95);
                     backdrop-filter: blur(10px);
@@ -518,13 +617,20 @@ export default function BulkImportPage() {
                                 <div>
                                     <div style={{ backgroundColor: '#f8fafc', borderRadius: 24, padding: 36, border: '2px dashed #cbd5e1', textAlign: 'center', transition: 'all 0.3s' }} onDragOver={e => e.preventDefault()} onMouseEnter={e => e.currentTarget.style.borderColor = '#1e293b'}>
                                         <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Upload CSV File for Validation</h3>
-                                        <p style={{ color: '#64748b', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Select a CSV dataset. The system will preview data & validate Zones/Wards before importing.</p>
+                                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#1e293b' }}>Upload CSV / Excel File for Validation</h3>
+                                        <p style={{ color: '#64748b', fontSize: 13, marginTop: 8, fontWeight: 500 }}>Select a CSV or Excel dataset (.xlsx, .xls). The system will preview data & validate Zones/Wards before importing.</p>
 
+                                        {!geoLoaded ? (
+                                            <div style={{ marginTop: 24, display: 'inline-flex', alignItems: 'center', gap: 10, backgroundColor: '#f1f5f9', color: '#64748b', padding: '14px 28px', borderRadius: 14, fontSize: 14, fontWeight: 700 }}>
+                                                <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid #94a3b8', borderTopColor: '#1e293b', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                                                Loading Zone & Ward Data...
+                                            </div>
+                                        ) : (
                                         <label style={{ display: 'inline-block', marginTop: 24, backgroundColor: '#1e293b', color: 'white', padding: '14px 28px', borderRadius: 14, fontSize: 14, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(30,41,59,0.2)' }}>
-                                            Select CSV File
-                                            <input type="file" accept=".csv" onChange={handleFileChange} style={{ display: 'none' }} />
+                                            Select CSV / Excel File
+                                            <input type="file" accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileChange} style={{ display: 'none' }} />
                                         </label>
+                                        )}
                                     </div>
 
                                     <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>

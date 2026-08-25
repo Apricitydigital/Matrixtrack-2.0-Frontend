@@ -547,6 +547,14 @@ function PortalHomeLayoutContent({
     pageTitle = 'Inspection and Performance';
   }
 
+  if (pathname.startsWith('/ulb/attendance')) {
+    pageTitle = 'Attendance Analytics';
+  }
+
+  if (pathname.startsWith('/ulb/ward-ranking')) {
+    pageTitle = 'Ward Ranking';
+  }
+
 
   /* =========================================================
      TASKFORCE TITLES
@@ -2456,8 +2464,8 @@ function PortalHomeLayoutContent({
                 {/* ATTENDANCE ANALYTICS */}
 
                 <Link
-                  href="/city/attendance"
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                  href="/ulb/attendance"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/attendance')
                     ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
@@ -2982,7 +2990,7 @@ function PortalHomeLayoutContent({
       ===================================================== */}
 
       <main
-        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && (pathname.startsWith('/city/attendance') || pathname.startsWith('/ulb/inspection-performance'))
+        className={`portal-main-content flex-1 min-w-0 min-h-screen text-slate-800 ${isUlbUser && (pathname.startsWith('/ulb/attendance') || pathname.startsWith('/ulb/inspection-performance') || pathname.startsWith('/ulb/ward-ranking'))
           ? 'ml-72 p-4 sm:p-5 lg:p-6'
           : isUlbUser
             ? 'ml-0 p-4 sm:p-5 lg:p-6'

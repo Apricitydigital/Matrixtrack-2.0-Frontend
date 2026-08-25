@@ -1,5 +1,6 @@
 'use client';
 
+import * as XLSX from "xlsx";
 import React, { useState, useEffect } from "react";
 import {
   CommonRegistrationApi,
@@ -457,6 +458,7 @@ export default function CommonRegistrationModal({
       const password = isAutoPassword ? generateAutoPassword(name, phone) : rawPassword.trim();
 
       const aadharNumber = getCol("aadhaar_number", "aadharnumber", "aadhaar", "aadhar") || undefined;
+      const csvCity = getCol("city_name", "city", "city_id", "ulb") || "";
       const zoneName = getCol("zone_name", "zone") || "";
       const wardName = getCol("ward_name", "ward") || "";
       const roleRaw = getCol("role", "taskforcerole") || "SUPERVISOR";
@@ -495,8 +497,11 @@ export default function CommonRegistrationModal({
 
       const matchedZone = matchGeoNode(zones, zoneName);
       const matchedWard = matchGeoNode(wards, wardName);
+      const finalZoneId = matchedZone?.id || zoneName || form.zoneId || undefined;
+      const finalWardId = matchedWard?.id || wardName || form.wardId || undefined;
       const emailLower = (email || "").toLowerCase().trim();
 
+      let isExistingUser = false;
       if (!name || name.length < 2) {
         isValid = false;
         validationError = "Invalid Name";
@@ -506,23 +511,20 @@ export default function CommonRegistrationModal({
       } else if (phoneDigits.length !== 10) {
         isValid = false;
         validationError = "Invalid Mobile Number";
-      } else if (existingUserEmails.has(emailLower)) {
-        isValid = false;
-        validationError = "Email Already Registered";
-      } else if (phoneDigits && existingUserPhones.has(phoneDigits)) {
-        isValid = false;
-        validationError = "Mobile Already Registered";
       } else if (csvEmails.has(emailLower)) {
         isValid = false;
         validationError = "Duplicate Email in CSV";
       } else if (phoneDigits && csvPhones.has(phoneDigits)) {
         isValid = false;
         validationError = "Duplicate Mobile in CSV";
+      } else if (existingUserEmails.has(emailLower) || (phoneDigits && existingUserPhones.has(phoneDigits))) {
+        isExistingUser = true;
+        isValid = true;
       } else if (zoneName || wardName) {
-        if (zones.length > 0 && zoneName && !matchedZone) {
+        if (zones.length > 0 && zoneName && !matchedZone && !finalZoneId) {
           isValid = false;
           validationError = "Unregistered Zone";
-        } else if (wards.length > 0 && wardName && !matchedWard) {
+        } else if (wards.length > 0 && wardName && !matchedWard && !finalWardId) {
           isValid = false;
           validationError = "Unregistered Ward";
         }
@@ -533,6 +535,8 @@ export default function CommonRegistrationModal({
         if (phoneDigits) csvPhones.add(phoneDigits);
       }
 
+      const activeCityId = csvCity || form.cityId || (user as any)?.cityId || ((user as any)?.city && (user as any)?.city.id) || undefined;
+
       const payload: IntegratedRegistrationPayload = {
         name,
         email,
@@ -540,9 +544,9 @@ export default function CommonRegistrationModal({
         password,
         aadharNumber,
         targetSystems,
-        cityId: form.cityId || undefined,
-        zoneId: matchedZone?.id || form.zoneId || undefined,
-        wardId: matchedWard?.id || form.wardId || undefined,
+        cityId: activeCityId,
+        zoneId: finalZoneId,
+        wardId: finalWardId,
         taskforceConfig: {
           role: roleRaw,
           moduleKeys
@@ -587,12 +591,32 @@ export default function CommonRegistrationModal({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const content = evt.target?.result as string;
-      handleBulkTextChange(content);
-    };
-    reader.readAsText(file);
+
+    const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const csvText = XLSX.utils.sheet_to_csv(worksheet);
+          handleBulkTextChange(csvText);
+        } catch (err: any) {
+          setErrorMsg("Failed to read Excel file: " + (err?.message || "Invalid file format"));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const content = evt.target?.result as string;
+        handleBulkTextChange(content);
+      };
+      reader.readAsText(file, "UTF-8");
+    }
   };
 
   const handleBulkSubmit = async () => {
@@ -1350,11 +1374,11 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
               >
                 <UploadCloud size={36} style={{ color: "#3b82f6", marginBottom: "8px" }} />
                 <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: "14px", color: "#1e293b" }}>
-                  Upload CSV File or Paste Data Below
+                  Upload CSV or Excel (.xlsx) File
                 </p>
                 <input
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   onChange={handleFileUpload}
                   style={{ display: "none" }}
                   id="csv-file-input"

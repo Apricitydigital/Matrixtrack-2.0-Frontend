@@ -9,7 +9,7 @@ import { RoleGuard } from "@components/Guards";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import * as XLSX from "xlsx";
 
-type GeoNode = { id: string; name: string; parentId?: string };
+type GeoNode = { id: string; name: string; parentId?: string; displayName?: string };
 
 
 type WardImportStatus =
@@ -24,6 +24,7 @@ type WardImportRow = {
   rowNumber: number;
   zoneName: string;
   wardName: string;
+  displayName?: string;
   status: WardImportStatus;
   message: string;
   zoneId?: string;
@@ -33,6 +34,7 @@ export default function WardManagementPage() {
   const { user } = useAuth();
   const isReadOnly = user?.roles?.some(r => ["COMMISSIONER", "ULB_OFFICER"].includes(r));
   const [name, setName] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [zoneId, setZoneId] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,7 +43,7 @@ export default function WardManagementPage() {
   const [modalTab, setModalTab] = useState<'SINGLE' | 'BULK'>('SINGLE');
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkZoneId, setBulkZoneId] = useState<string>("");
-  const [bulkParsedWards, setBulkParsedWards] = useState<{ name: string; zoneName?: string; status?: 'pending' | 'success' | 'error'; errorMsg?: string }[]>([]);
+  const [bulkParsedWards, setBulkParsedWards] = useState<{ name: string; displayName?: string; zoneName?: string; status?: 'pending' | 'success' | 'error'; errorMsg?: string }[]>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
@@ -53,6 +55,7 @@ export default function WardManagementPage() {
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editDisplayName, setEditDisplayName] = useState("");
   const [editZoneId, setEditZoneId] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -163,6 +166,7 @@ export default function WardManagementPage() {
     setIsModalOpen(false);
     setModalTab('SINGLE');
     setName("");
+    setDisplayName("");
     setZoneId("");
     setStatus("");
     setBulkFile(null);
@@ -183,7 +187,15 @@ export default function WardManagementPage() {
     }
     setSaving(true); setStatus("Saving...");
     try {
-      await apiFetch("/city/geo", { method: "POST", body: JSON.stringify({ name, level: "WARD", parentId: zoneId }) });
+      await apiFetch("/city/geo", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          displayName: displayName.trim() || undefined,
+          level: "WARD",
+          parentId: zoneId
+        })
+      });
       setStatus("Ward created successfully");
       closeModal();
       await loadData();
@@ -193,7 +205,7 @@ export default function WardManagementPage() {
   };
 
   const downloadSampleTemplate = () => {
-    const csvContent = "Ward Name,Zone Name\nWard 101,Zone 1\nWard 102,Zone 1\nWard 103,Zone 2\nWard 104,Zone 2";
+    const csvContent = "Ward Number,Zone Name,Ward Name\nWard 101,Zone 1,Lal Ghati\nWard 102,Zone 1,Freeganj\nWard 103,Zone 2,Nanakheda\nWard 104,Zone 2,Dashahara Maidan";
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -209,17 +221,18 @@ export default function WardManagementPage() {
     if (lines.length === 0) return [];
 
     const firstLineLower = lines[0].toLowerCase();
-    const hasHeaders = firstLineLower.includes("ward") || firstLineLower.includes("zone") || firstLineLower.includes("name");
+    const hasHeaders = firstLineLower.includes("ward") || firstLineLower.includes("zone") || firstLineLower.includes("number");
 
     const startIndex = hasHeaders ? 1 : 0;
-    const parsed: { name: string; zoneName?: string }[] = [];
+    const parsed: { name: string; displayName?: string; zoneName?: string }[] = [];
 
     for (let i = startIndex; i < lines.length; i++) {
       const parts = lines[i].split(/[,;\t]+/).map(p => p.trim().replace(/^["']|["']$/g, ''));
       if (parts.length >= 1 && parts[0]) {
-        const wardName = parts[0];
+        const wardNumber = parts[0];
         const zoneName = parts[1] || undefined;
-        parsed.push({ name: wardName, zoneName });
+        const displayName = parts[2] || undefined;
+        parsed.push({ name: wardNumber, zoneName, displayName });
       }
     }
     return parsed;
@@ -294,7 +307,12 @@ export default function WardManagementPage() {
       try {
         await apiFetch("/city/geo", {
           method: "POST",
-          body: JSON.stringify({ name: cleanWardName, level: "WARD", parentId: targetZoneId })
+          body: JSON.stringify({
+            name: cleanWardName,
+            displayName: item.displayName?.trim() || undefined,
+            level: "WARD",
+            parentId: targetZoneId
+          })
         });
         updatedList[i].status = 'success';
         successCount++;
@@ -317,7 +335,14 @@ export default function WardManagementPage() {
     if (isReadOnly || !editName.trim() || !editZoneId) return;
     setUpdatingId(id);
     try {
-      await apiFetch(`/city/geo/${id}`, { method: "PATCH", body: JSON.stringify({ name: editName, parentId: editZoneId }) });
+      await apiFetch(`/city/geo/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editName,
+          displayName: editDisplayName.trim() || undefined,
+          parentId: editZoneId
+        })
+      });
       setEditingId(null);
       await loadData();
     } catch (err) { alert(err instanceof ApiError ? err.message : "Failed to update ward"); }
@@ -379,6 +404,11 @@ export default function WardManagementPage() {
   }, [selectedCity, zoneOptions, filterZoneId]);
 
   const filteredWards = useMemo(() => {
+    const getWardSortValue = (value: string) => {
+      const match = String(value || "").match(/\d+/);
+      return match ? Number.parseInt(match[0], 10) : Number.MAX_SAFE_INTEGER;
+    };
+
     return wards.filter(w => {
       const parentZoneName = zoneMap[w.parentId || ''] || '';
 
@@ -389,10 +419,15 @@ export default function WardManagementPage() {
       const matchesZone = filterZoneId === "ALL" || w.parentId === filterZoneId;
       const matchesSearch = !searchTerm ||
         w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (w.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         parentZoneName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         wardCityName.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchesCity && matchesZone && matchesSearch;
+    }).sort((a, b) => {
+      const numberDiff = getWardSortValue(a.name) - getWardSortValue(b.name);
+      if (numberDiff !== 0) return numberDiff;
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
     });
   }, [wards, zoneMap, searchTerm, filterZoneId, selectedCity, zones, user?.city?.name]);
 
@@ -433,22 +468,26 @@ export default function WardManagementPage() {
       [
         "S.No",
         "Zone Name",
+        "Ward Number",
         "Ward Name",
       ],
       [
         1,
         "Zone 1",
         "Ward 1",
+        "Lal Ghati",
       ],
       [
         2,
         "Zone 1",
         "Ward 2",
+        "Freeganj",
       ],
       [
         3,
         "Zone 2",
         "Ward 3",
+        "Nanakheda",
       ],
     ];
 
@@ -459,6 +498,7 @@ export default function WardManagementPage() {
       { wch: 10 },
       { wch: 24 },
       { wch: 24 },
+      { wch: 28 },
     ];
 
     // Format header row (Row 1) with 26pt height, bold font and subtle slate fill
@@ -568,6 +608,7 @@ export default function WardManagementPage() {
         const expectedHeaders = [
           "S.No",
           "Zone Name",
+          "Ward Number",
           "Ward Name",
         ];
 
@@ -582,7 +623,7 @@ export default function WardManagementPage() {
 
         if (!validHeader) {
           throw new Error(
-            'Invalid Excel format. Required columns are exactly: "S.No", "Zone Name", "Ward Name". Please use the downloaded template.'
+            'Invalid Excel format. Required columns are exactly: "S.No", "Zone Name", "Ward Number", "Ward Name". Please use the downloaded template.'
           );
         }
 
@@ -671,13 +712,24 @@ export default function WardManagementPage() {
                     " "
                   );
 
+              const displayName =
+                String(
+                  rawRow?.[3] ?? ""
+                )
+                  .trim()
+                  .replace(
+                    /\s+/g,
+                    " "
+                  );
+
 
               /*
                * Completely blank rows are ignored.
                */
               if (
                 !zoneName &&
-                !wardName
+                !wardName &&
+                !displayName
               ) {
                 return;
               }
@@ -685,16 +737,18 @@ export default function WardManagementPage() {
 
               if (
                 !zoneName ||
-                !wardName
+                !wardName ||
+                !displayName
               ) {
                 parsedRows.push({
                   rowNumber,
                   zoneName,
                   wardName,
+                  displayName,
                   status:
                     "INVALID_DATA",
                   message:
-                    "Zone Name and Ward Name are required.",
+                    "Zone Name, Ward Number and Ward Name are required.",
                 });
 
                 return;
@@ -717,6 +771,7 @@ export default function WardManagementPage() {
                   rowNumber,
                   zoneName,
                   wardName,
+                  displayName,
                   status:
                     "INVALID_ZONE",
                   message:
@@ -735,6 +790,7 @@ export default function WardManagementPage() {
                   rowNumber,
                   zoneName,
                   wardName,
+                  displayName,
                   status:
                     "AMBIGUOUS_ZONE",
                   message:
@@ -765,6 +821,7 @@ export default function WardManagementPage() {
                   zoneName:
                     zone.name,
                   wardName,
+                  displayName,
                   zoneId:
                     zone.id,
                   status:
@@ -787,6 +844,7 @@ export default function WardManagementPage() {
                   zoneName:
                     zone.name,
                   wardName,
+                  displayName,
                   zoneId:
                     zone.id,
                   status:
@@ -809,6 +867,7 @@ export default function WardManagementPage() {
                 zoneName:
                   zone.name,
                 wardName,
+                displayName,
                 zoneId:
                   zone.id,
                 status:
@@ -905,6 +964,8 @@ export default function WardManagementPage() {
 
                         wardName:
                           row.wardName,
+                        displayName:
+                          row.displayName,
                       })
                     ),
                 }),
@@ -964,7 +1025,8 @@ export default function WardManagementPage() {
               <TableExportDropdown
                 data={filteredWards.map(w => ({
                   WardID: w.id,
-                  WardName: w.name,
+                  WardNumber: w.name,
+                  WardName: w.displayName || "",
                   ParentZone: zones.find(z => z.id === w.parentId)?.name || 'Unassigned'
                 }))}
                 filename="Registered_Wards"
@@ -1302,7 +1364,7 @@ export default function WardManagementPage() {
                               "0.78rem",
                           }}
                         >
-                          S.No | Zone Name | Ward Name
+                          S.No | Zone Name | Ward Number | Ward Name
                         </div>
 
                       </div>
@@ -1894,13 +1956,28 @@ export default function WardManagementPage() {
 
                     <div style={{ marginBottom: "20px" }}>
                       <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
-                        Ward Name <span style={{ color: "#ef4444" }}>*</span>
+                        Ward Number <span style={{ color: "#ef4444" }}>*</span>
                       </label>
                       <input
                         placeholder="e.g. Ward 1 or Ward 22"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         required
+                        style={{
+                          width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
+                          border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
+                        Ward Name
+                      </label>
+                      <input
+                        placeholder="e.g. Lal Ghati"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
                         style={{
                           width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
                           border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
@@ -1944,7 +2021,7 @@ export default function WardManagementPage() {
                           Excel / CSV Template Format
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "#0284c7", fontWeight: 600, marginTop: "2px" }}>
-                          Headers: <code style={{ backgroundColor: "#e0f2fe", padding: "2px 6px", borderRadius: "4px" }}>Ward Name, Zone Name</code>
+                          Headers: <code style={{ backgroundColor: "#e0f2fe", padding: "2px 6px", borderRadius: "4px" }}>Ward Number, Zone Name, Ward Name</code>
                         </div>
                       </div>
                       <button
@@ -1997,7 +2074,7 @@ export default function WardManagementPage() {
                           {bulkFile ? bulkFile.name : "Click to choose CSV file"}
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, marginTop: "4px" }}>
-                          Supports .csv formats (e.g. Ward Name, Zone Name)
+                          Supports .csv formats (e.g. Ward Number, Zone Name, Ward Name)
                         </div>
                         <input
                           type="file"
@@ -2024,6 +2101,7 @@ export default function WardManagementPage() {
                             <thead style={{ backgroundColor: "#f1f5f9" }}>
                               <tr>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>#</th>
+                                <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Ward Number</th>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Ward Name</th>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800 }}>Target Zone</th>
                                 <th style={{ padding: "6px 12px", color: "#475569", fontWeight: 800, textAlign: "right" }}>Status</th>
@@ -2036,6 +2114,7 @@ export default function WardManagementPage() {
                                   <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
                                     <td style={{ padding: "6px 12px", color: "#64748b", fontWeight: 700 }}>{idx + 1}</td>
                                     <td style={{ padding: "6px 12px", fontWeight: 800, color: "#0f172a" }}>{item.name}</td>
+                                    <td style={{ padding: "6px 12px", fontWeight: 700, color: item.displayName ? "#334155" : "#94a3b8" }}>{item.displayName || "-"}</td>
                                     <td style={{ padding: "6px 12px", fontWeight: 700, color: "#2563eb" }}>{targetZoneName}</td>
                                     <td style={{ padding: "6px 12px", textAlign: "right" }}>
                                       {item.status === 'success' && <span style={{ color: "#16a34a", fontWeight: 800 }}>✓ Done</span>}
@@ -2249,7 +2328,8 @@ export default function WardManagementPage() {
                 <thead style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                   <tr>
                     <th style={{ padding: "12px 20px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", width: "70px" }}>Sr No</th>
-                    <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ward</th>
+                    <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ward Number</th>
+                    <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Ward Name</th>
                     <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Zone</th>
                     <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>City</th>
                     <th style={{ padding: "12px 24px", fontSize: "0.7rem", fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>Created On</th>
@@ -2260,11 +2340,11 @@ export default function WardManagementPage() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>Loading wards...</td>
+                      <td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>Loading wards...</td>
                     </tr>
                   ) : filteredWards.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}>No matching wards found.</td>
+                      <td colSpan={8} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}>No matching wards found.</td>
                     </tr>
                   ) : (
                     filteredWards.map((w, idx) => {
@@ -2283,6 +2363,7 @@ export default function WardManagementPage() {
                       const rawZone = zoneMap[w.parentId || ''];
                       const zoneName = cleanLabel(rawZone || 'Zone 1', 'Zone');
                       const wardName = cleanLabel(w.name, 'Ward');
+                      const wardDisplayName = String(w.displayName || '').trim();
 
                       const createdDate = (w as any).createdAt
                         ? new Date((w as any).createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -2306,6 +2387,20 @@ export default function WardManagementPage() {
                               />
                             ) : (
                               <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "#0f172a" }}>{wardName}</span>
+                            )}
+                          </td>
+                          <td style={{ padding: "14px 24px" }}>
+                            {editingId === w.id ? (
+                              <input
+                                value={editDisplayName}
+                                onChange={(e) => setEditDisplayName(e.target.value)}
+                                placeholder="e.g. Lal Ghati"
+                                style={{ padding: "6px 10px", borderRadius: "8px", border: "1px solid #2563eb", fontSize: "0.875rem", fontWeight: 700 }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: wardDisplayName ? "#334155" : "#94a3b8" }}>
+                                {wardDisplayName || "-"}
+                              </span>
                             )}
                           </td>
                           <td style={{ padding: "14px 24px" }}>
@@ -2358,7 +2453,7 @@ export default function WardManagementPage() {
                               ) : (
                                 <>
                                   <button
-                                    onClick={() => { setEditingId(w.id); setEditName(w.name); setEditZoneId(w.parentId || ""); }}
+                                    onClick={() => { setEditingId(w.id); setEditName(w.name); setEditDisplayName(w.displayName || ""); setEditZoneId(w.parentId || ""); }}
                                     style={{ background: "#f1f5f9", color: "#475569", padding: "6px 10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
                                   >
                                     <Edit2 size={13} /> Edit
