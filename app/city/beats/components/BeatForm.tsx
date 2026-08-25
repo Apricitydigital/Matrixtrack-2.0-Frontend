@@ -853,8 +853,6 @@ export default function BeatForm({
         beat: WardBeatDraft
     ) =>
         !!beat.beatName.trim() &&
-        !!beat.employeeId &&
-        !!beat.supervisorId &&
         !!beat.geometry &&
         beat.points.length === 5;
 
@@ -919,7 +917,7 @@ export default function BeatForm({
                 setStatus({
                     type: "error",
                     message:
-                        "No beats are ready to submit. Complete Beat Name, Employee, Supervisor and 5 Points first.",
+                        "No beats are ready to import. A beat needs a name, geometry and 5 inspection points.",
                 });
 
                 return;
@@ -1099,6 +1097,54 @@ export default function BeatForm({
                 );
             }
         };
+
+    const saveExistingAssignments = async (
+        drafts: WardBeatDraft[]
+    ) => {
+        for (const draft of drafts) {
+            if (!draft.submittedBeatId) continue;
+
+            await apiFetch(
+                `/city/areas/${draft.submittedBeatId}/points`,
+                {
+                    method: "PUT",
+                    body: JSON.stringify({ points: draft.points }),
+                }
+            );
+
+            if (draft.supervisorId) {
+                await apiFetch(
+                    `/city/areas/${draft.submittedBeatId}/assign`,
+                    {
+                        method: "POST",
+                        body: JSON.stringify({
+                            userId: draft.supervisorId,
+                            targetRole: "SUPERVISOR",
+                        }),
+                    }
+                );
+            }
+
+            if (draft.employeeId) {
+                await apiFetch(
+                    `/city/areas/${draft.submittedBeatId}/assign`,
+                    {
+                        method: "POST",
+                        body: JSON.stringify({
+                            userId: draft.employeeId,
+                            targetRole: "EMPLOYEE",
+                        }),
+                    }
+                );
+            }
+        }
+
+        setStatus({
+            type: "success",
+            message: `Assignments updated for ${drafts.length} existing beat${drafts.length === 1 ? "" : "s"}.`,
+        });
+        onSuccess();
+    };
 
     /* =========================================================
        UI
@@ -3166,6 +3212,10 @@ export default function BeatForm({
 
                         onChange={
                             setBeatDrafts
+                        }
+
+                        onSaveExistingAssignments={
+                            saveExistingAssignments
                         }
 
                         onClose={() =>
