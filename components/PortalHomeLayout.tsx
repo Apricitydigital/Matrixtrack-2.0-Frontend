@@ -573,6 +573,10 @@ function PortalHomeLayoutContent({
     pageTitle = 'Inspection and Performance';
   }
 
+  if (pathname.startsWith('/ulb/attendance')) {
+    pageTitle = 'Attendance Analytics';
+  }
+
   if (pathname.startsWith('/ulb/ward-ranking')) {
     pageTitle = 'Ward Ranking';
   }
@@ -2576,12 +2580,10 @@ function PortalHomeLayoutContent({
                 </Link>
 
 
-                {/* ATTENDANCE ANALYTICS */}
-
                 <Link
-                  href="/city/attendance"
+                  href="/ulb/attendance"
                   title="Attendance Analytics"
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/attendance') || pathname.startsWith('/city/attendance')
                     ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
@@ -3121,7 +3123,7 @@ function PortalHomeLayoutContent({
 
       <main
         className={`portal-main-content min-h-screen text-slate-800 transition-all duration-300 w-full min-w-0 ${
-          isUlbUser && !pathname.startsWith('/city/attendance') && !pathname.startsWith('/ulb/inspection-performance') && !pathname.startsWith('/ulb/ward-ranking')
+          isUlbUser && !pathname.startsWith('/ulb/attendance') && !pathname.startsWith('/city/attendance') && !pathname.startsWith('/ulb/inspection-performance') && !pathname.startsWith('/ulb/ward-ranking')
             ? 'p-3 sm:p-5 lg:p-6'
             : sidebarCollapsed
               ? 'lg:pl-[76px] p-3 sm:p-5 lg:p-6'

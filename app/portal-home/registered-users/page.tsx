@@ -888,6 +888,7 @@ export default function RegisteredUsersPage() {
               <option value="ALL">All Roles</option>
               <option value="HMS_SUPER_ADMIN">Super Admin</option>
               <option value="COMMISSIONER">Commissioner</option>
+              <option value="ULB_OFFICER">ULB Officer</option>
               <option value="CITY_ADMIN">City Admin</option>
               <option value="QC">Quality Controller (QC)</option>
               <option value="ACTION_OFFICER">Action Officer</option>
@@ -1735,6 +1736,7 @@ export default function RegisteredUsersPage() {
                     <option value="ALL">All Roles</option>
                     <option value="HMS_SUPER_ADMIN">Super Admin</option>
                     <option value="COMMISSIONER">Commissioner</option>
+                    <option value="ULB_OFFICER">ULB Officer</option>
                     <option value="CITY_ADMIN">City Admin</option>
                     <option value="QC">Quality Controller (QC)</option>
                     <option value="ACTION_OFFICER">Action Officer</option>
@@ -2362,6 +2364,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                   >
                     <option value="HMS_SUPER_ADMIN">Super Admin</option>
                     <option value="COMMISSIONER">Commissioner</option>
+                    <option value="ULB_OFFICER">ULB Officer</option>
                     <option value="CITY_ADMIN">City Admin</option>
                     <option value="QC">Quality Controller (QC)</option>
                     <option value="ACTION_OFFICER">Action Officer</option>
