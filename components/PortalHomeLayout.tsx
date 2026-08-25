@@ -44,7 +44,9 @@ import {
   ChevronLeft,
   ChevronRight,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 import { moduleEntryPath } from '@utils/modules';
@@ -59,6 +61,29 @@ function PortalHomeLayoutContent({
 }) {
   const { user } = useAuth();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark-theme');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const newDark = !prev;
+      if (newDark) {
+        document.documentElement.classList.add('dark-theme');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark-theme');
+        localStorage.setItem('theme', 'light');
+      }
+      return newDark;
+    });
+  };
 
   const router = useRouter();
 
@@ -1816,8 +1841,23 @@ function PortalHomeLayoutContent({
             className="flex items-center gap-2"
             title="Profile"
           >
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-sm">
-              {userInitial}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleDarkMode}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
+                title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              
+              <button
+                onClick={() => setIsProfileModalOpen(true)}
+                className="flex items-center gap-2 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[11px]">
+                  {userInitial}
+                </div>
+              </button>
             </div>
           </Link>
         )}
@@ -3087,6 +3127,15 @@ function PortalHomeLayoutContent({
               <PanelLeftOpen size={18} className="text-blue-600" />
             </button>
           )}
+
+          <button
+            onClick={toggleDarkMode}
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {isDarkMode ? <Sun size={16} className="shrink-0" /> : <Moon size={16} className="shrink-0" />}
+            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
 
           <Link
             href="/portal-home/profile"

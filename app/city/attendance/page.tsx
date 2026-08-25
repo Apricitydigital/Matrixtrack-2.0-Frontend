@@ -88,8 +88,10 @@ const emptyFilters: FilterState = {
 
 type SearchableOption = { value: string; label: string };
 
-function formatScopeNames(values?: string[]) {
-  return Array.isArray(values) && values.length ? values.join(", ") : "—";
+function formatScopeNames(values?: string[] | string) {
+  if (Array.isArray(values)) return values.length ? values.join(", ") : "—";
+  if (typeof values === "string" && values.trim()) return values.trim();
+  return "—";
 }
 
 function SearchableSelect({
@@ -1011,8 +1013,8 @@ function KpiRecordsDrawer({
                             </td>
                             <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
-                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.zones)}</td>
-                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.wards)}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames((record as any).zone || record.zones)}</td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames((record as any).ward || record.wards)}</td>
                             <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                             <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                             <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>
@@ -1171,8 +1173,8 @@ function WorkDurationEmployeesPopup({
                     <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400">
                       {record.designation || "Employee"} · {record.attendanceId}
                     </p>
-                    <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames(record.zones)} · Ward: ${formatScopeNames(record.wards)}`}>
-                      Zone: {formatScopeNames(record.zones)} · Ward: {formatScopeNames(record.wards)}
+                    <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames((record as any).zone || record.zones)} · Ward: ${formatScopeNames((record as any).ward || record.wards)}`}>
+                      Zone: {formatScopeNames((record as any).zone || record.zones)} · Ward: {formatScopeNames((record as any).ward || record.wards)}
                     </p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[9px] font-bold">
                       <span className="rounded-md bg-white px-1.5 py-1 text-slate-600 ring-1 ring-slate-200">
@@ -1242,6 +1244,7 @@ function AttendanceDashboard() {
   const [data, setData] = useState<AttendanceDashboardResponse | null>(null);
   const [draftFilters, setDraftFilters] = useState<FilterState>(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(emptyFilters);
+  const [employeeGroup, setEmployeeGroup] = useState<"ALL" | "HEALTH_WORKERS">("ALL");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1286,6 +1289,7 @@ function AttendanceDashboard() {
     designation: filters.designation || undefined,
     checkoutState: filters.checkoutState === "ALL" ? undefined : filters.checkoutState,
     search: filters.search.trim() || undefined,
+    employeeGroup: employeeGroup === "ALL" ? undefined : employeeGroup,
     page: requestedPage,
     pageSize: 25,
   });
@@ -1410,7 +1414,7 @@ function AttendanceDashboard() {
 
     void loadDashboard(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters, page, selectedCityId, hmsSuperAdmin]);
+  }, [appliedFilters, page, selectedCityId, hmsSuperAdmin, employeeGroup]);
 
   useEffect(() => {
     if (!kpiDrilldown) {
@@ -1744,10 +1748,30 @@ function AttendanceDashboard() {
 
       <section className="flex flex-col gap-2.5 rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-blue-700 ring-1 ring-blue-100">
-            <Sparkles size={12} />
-            {hmsSuperAdmin && selectedCity ? `${selectedCity.name} Attendance` : "City Attendance Intelligence"}
-          </span>
+          <div className="flex bg-slate-100/50 p-1 rounded-xl shadow-inner border border-slate-200/60 ring-1 ring-white/50">
+            <button
+              onClick={() => setEmployeeGroup("ALL")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                employeeGroup === "ALL" 
+                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80" 
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+              }`}
+            >
+              <Sparkles size={12} className={employeeGroup === "ALL" ? "text-blue-500" : "text-slate-400"} />
+              All Employees
+            </button>
+            <button
+              onClick={() => setEmployeeGroup("HEALTH_WORKERS")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                employeeGroup === "HEALTH_WORKERS" 
+                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80" 
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+              }`}
+            >
+              <Building2 size={12} className={employeeGroup === "HEALTH_WORKERS" ? "text-blue-500" : "text-slate-400"} />
+              Health Workers
+            </button>
+          </div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200">
             <CalendarDays size={12} />
             {visibleRangeLabel}
@@ -1922,7 +1946,6 @@ function AttendanceDashboard() {
             </div>
             <div>
               <p className="text-sm font-black text-slate-800">Smart filters</p>
-              <p className="text-[11px] font-medium text-slate-400">All KPIs, charts and records use the same filters</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1976,18 +1999,20 @@ function AttendanceDashboard() {
               ]}
             />
           </label>
-          <label className="space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Designation</span>
-            <SearchableSelect
-              value={draftFilters.designation}
-              onChange={(designation) => updateFilter({ designation })}
-              options={[
-                { value: "", label: "All designations" },
-                ...(data?.filters.designations || []).map((value) => ({ value, label: value })),
-              ]}
-            />
-          </label>
-          <label className="space-y-1.5">
+          {employeeGroup !== "HEALTH_WORKERS" && (
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Designation</span>
+              <SearchableSelect
+                value={draftFilters.designation}
+                onChange={(designation) => updateFilter({ designation })}
+                options={[
+                  { value: "", label: "All designations" },
+                  ...(data?.filters.designations || []).map((value) => ({ value, label: value })),
+                ]}
+              />
+            </label>
+          )}
+          <label className={`space-y-1.5 ${employeeGroup === "HEALTH_WORKERS" ? "md:col-span-2 xl:col-span-2 2xl:col-span-2" : ""}`}>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee search</span>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -2473,8 +2498,8 @@ function AttendanceDashboard() {
                           <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
                             {employee.designation || "Employee"} · {employee.attendanceId}
                           </p>
-                          <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames(employee.zones)} · Ward: ${formatScopeNames(employee.wards)}`}>
-                            Zone: {formatScopeNames(employee.zones)} · Ward: {formatScopeNames(employee.wards)}
+                          <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames((employee as any).zone || employee.zones)} · Ward: ${formatScopeNames((employee as any).ward || employee.wards)}`}>
+                            Zone: {formatScopeNames((employee as any).zone || employee.zones)} · Ward: {formatScopeNames((employee as any).ward || employee.wards)}
                           </p>
                         </div>
                       </div>
@@ -2616,8 +2641,8 @@ function AttendanceDashboard() {
                           </td>
                           <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.zones)}</td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(record.wards)}</td>
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames((record as any).zone || record.zones)}</td>
+                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames((record as any).ward || record.wards)}</td>
                           <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
                           <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
                           <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>

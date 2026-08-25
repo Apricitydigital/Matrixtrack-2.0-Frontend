@@ -1466,3 +1466,17 @@ label {
     padding: 10px 12px !important;
   }
 }
+/* Quick Global Dark Mode Toggle */
+html.dark-theme {
+  filter: invert(0.9) hue-rotate(180deg) brightness(1.1) contrast(0.85);
+  background-color: #121212;
+}
+html.dark-theme img,
+html.dark-theme video,
+html.dark-theme .leaflet-container,
+html.dark-theme .no-invert {
+  filter: invert(0.9) hue-rotate(180deg) brightness(1.1) contrast(0.85);
+}
+
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

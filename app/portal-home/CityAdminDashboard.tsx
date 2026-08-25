@@ -1729,7 +1729,7 @@ const beatRequests = (
       className="space-y-5 pb-12 max-w-[1500px] mx-auto"
     >
       {newNotificationNotice && (
-        <div className="fixed left-1/2 top-1/2 z-[100] w-[min(92vw,390px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.22)]">
+        <div className="fixed left-1/2 top-6 z-[100] w-[min(92vw,390px)] -translate-x-1/2 rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.22)]">
           <div className="flex items-start gap-3">
             <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
               <Bell size={17} />
@@ -1849,7 +1849,6 @@ const beatRequests = (
                   </div>
                   <div className="min-w-0">
                     <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">{item.label}</div>
-                    <div className="mt-1 text-[10px] font-semibold text-slate-400">View details</div>
                   </div>
                 </div>
 
@@ -2005,7 +2004,7 @@ const beatRequests = (
               </div>
 
               <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                Registration requests and report alerts that currently need attention. Auto-refreshes every 60 seconds.
+                Auto-refreshes every 60 seconds.
               </p>
             </div>
           </div>
@@ -2766,7 +2765,7 @@ const beatRequests = (
                 <Users size={16} className="text-blue-600" />
 
                 <h3 className="text-sm font-black text-slate-800">
-                  Platform User Directory
+                  Recent users / Registered employees
                 </h3>
 
                 <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
@@ -2775,7 +2774,7 @@ const beatRequests = (
               </div>
 
               <p className="text-[10px] uppercase text-slate-400 font-bold mt-1">
-                Cross-system access and role breakdown
+                List of recently added employees
               </p>
             </div>
 

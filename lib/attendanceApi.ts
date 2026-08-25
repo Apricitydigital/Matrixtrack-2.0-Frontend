@@ -113,6 +113,7 @@ export type AttendanceDashboardQuery = {
   checkoutState?: string;
   workDurationBucket?: string;
   search?: string;
+  employeeGroup?: string;
   page?: number;
   pageSize?: number;
 };
