@@ -2154,10 +2154,7 @@ const beatRequests = (
                   </div>
                 )}
 
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2 text-[9px] font-semibold text-emerald-700">
-                  <CheckCircle2 size={13} className="shrink-0" />
-                  Notification types not shown above are currently clear.
-                </div>
+                
               </>
             )}
           </div>

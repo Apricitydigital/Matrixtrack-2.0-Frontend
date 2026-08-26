@@ -19,6 +19,7 @@ const STANDALONE_PATHS = [
   "/admin-management",
   "/employees",
   "/modules",
+  "/ulb/dashboard",
   "/ulb/attendance",
   "/ulb/inspection-performance",
   "/ulb/ward-ranking",

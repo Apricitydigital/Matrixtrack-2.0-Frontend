@@ -1762,7 +1762,7 @@ function PortalHomeLayoutContent({
     isCityAdmin;
 
   const navItemsCount =
-    1 +
+    (isUlbUser ? 0 : 1) +
     (
       canAccessRegistration
         ? 1
@@ -1939,9 +1939,10 @@ function PortalHomeLayoutContent({
                 NAVIGATION MENU
             ================================================= */}
 
-            <div className="flex flex-col">
+            {navItemsCount > 0 && (
+              <div className="flex flex-col">
 
-              {navItemsCount > 1 ? (
+                {navItemsCount > 1 ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -2548,7 +2549,8 @@ function PortalHomeLayoutContent({
 
                 )}
 
-            </div>
+              </div>
+            )}
 
 
             {/* =================================================
@@ -3171,13 +3173,10 @@ function PortalHomeLayoutContent({
 
       <main
         className={`portal-main-content min-h-screen text-slate-800 transition-all duration-300 w-full min-w-0 ${
-          isUlbUser && !pathname.startsWith('/ulb/attendance') && !pathname.startsWith('/city/attendance') && !pathname.startsWith('/ulb/inspection-performance') && !pathname.startsWith('/ulb/ward-ranking')
-            ? 'p-3 sm:p-5 lg:p-6'
-            : sidebarCollapsed
-              ? 'lg:pl-[76px] p-3 sm:p-5 lg:p-6'
-              : 'lg:pl-72 p-3 sm:p-5 lg:p-6'
+          sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-72'
         }`}
       >
+        <div className="p-3 sm:p-5 lg:p-6 w-full min-h-full">
         {!isMainDashboard && (
 
           <div
@@ -3298,6 +3297,7 @@ function PortalHomeLayoutContent({
           {
             children
           }
+        </div>
         </div>
 
       </main>
