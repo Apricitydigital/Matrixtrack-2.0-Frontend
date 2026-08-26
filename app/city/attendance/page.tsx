@@ -17,6 +17,7 @@ import {
   Clock3,
   FileSpreadsheet,
   Filter,
+  Info,
   RefreshCw,
   Search,
   Sparkles,
@@ -57,6 +58,16 @@ import {
 } from "@lib/attendanceApi";
 
 const numberFormatter = new Intl.NumberFormat("en-IN");
+
+function formatAverageValue(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value >= 100 || Number.isInteger(value)) return numberFormatter.format(Math.round(value));
+  return value.toFixed(1);
+}
+
+function averageFormula(total: number, days: number) {
+  return `${numberFormatter.format(total)} ÷ ${days} ${days === 1 ? "day" : "days"}`;
+}
 
 const chartColors = {
   blue: "#2563eb",
@@ -1530,6 +1541,17 @@ function AttendanceDashboard() {
     ? summary.punchIn ?? summary.checkedOut + summary.openCheckIns
     : 0;
 
+  const rangeDayCount = data?.dailyTrend?.length || 0;
+  const isMultiDayRange = rangeDayCount > 1;
+  const avgDivisor = Math.max(rangeDayCount, 1);
+
+  const avgPresent = summary ? summary.present / avgDivisor : 0;
+  const avgAbsent = summary ? summary.absent / avgDivisor : 0;
+  const avgTotalRecords = summary ? summary.totalRecords / avgDivisor : 0;
+  const avgPunchIn = summary ? punchInCount / avgDivisor : 0;
+  const avgCheckedOut = summary ? summary.checkedOut / avgDivisor : 0;
+  const avgOpenCheckIns = summary ? summary.openCheckIns / avgDivisor : 0;
+
   const attendancePie = useMemo(
     () => [
       { name: "Present", value: summary?.present || 0, color: chartColors.emerald },
@@ -1540,15 +1562,31 @@ function AttendanceDashboard() {
 
   const checkInDistribution = useMemo(() => {
     const byHour = new Map((data?.checkInDistribution || []).map((item) => [item.hour, item.count]));
-    return Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      label: `${String(hour).padStart(2, "0")}:00`,
-      count: byHour.get(hour) || 0,
+    const days = Math.max(data?.dailyTrend?.length || 0, 1);
+    const multiDay = (data?.dailyTrend?.length || 0) > 1;
+    return Array.from({ length: 24 }, (_, hour) => {
+      const raw = byHour.get(hour) || 0;
+      return {
+        hour,
+        label: `${String(hour).padStart(2, "0")}:00`,
+        count: multiDay ? Number((raw / days).toFixed(1)) : raw,
+        rawCount: raw,
+      };
+    });
+  }, [data?.checkInDistribution, data?.dailyTrend]);
+
+  const workDurationChartData = useMemo(() => {
+    const days = Math.max(data?.dailyTrend?.length || 0, 1);
+    const multiDay = (data?.dailyTrend?.length || 0) > 1;
+    return (data?.workDurationBuckets || []).map((item) => ({
+      ...item,
+      rawCount: item.count,
+      count: multiDay ? Number((item.count / days).toFixed(1)) : item.count,
     }));
-  }, [data?.checkInDistribution]);
+  }, [data?.workDurationBuckets, data?.dailyTrend]);
 
   const peakCheckIn = useMemo(() => {
-    return checkInDistribution.reduce((best, item) => item.count > best.count ? item : best, checkInDistribution[0] || { hour: 0, label: "—", count: 0 });
+    return checkInDistribution.reduce((best, item) => item.count > best.count ? item : best, checkInDistribution[0] || { hour: 0, label: "—", count: 0, rawCount: 0 });
   }, [checkInDistribution]);
 
   const sortedDesignationBreakdown = useMemo(() => {
@@ -1973,6 +2011,12 @@ function AttendanceDashboard() {
               onChange={(e) => updateFilter({ to: e.target.value })}
               className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             />
+            {isMultiDayRange && (
+              <p className="flex items-start gap-1 text-[9.5px] font-semibold leading-[13px] text-blue-600">
+                <Info size={11} className="mt-0.5 shrink-0" />
+                {rangeDayCount}-day range: cards show avg/day (total ÷ {rangeDayCount} days)
+              </p>
+            )}
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance</span>
@@ -2073,7 +2117,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Total employees"
               value={numberFormatter.format(summary.uniqueEmployees)}
-              detail={`${numberFormatter.format(summary.totalRecords)} attendance records`}
+              detail={
+                isMultiDayRange
+                  ? `Avg ${formatAverageValue(avgTotalRecords)} records/day (${averageFormula(summary.totalRecords, rangeDayCount)})`
+                  : `${numberFormatter.format(summary.totalRecords)} attendance records`
+              }
               icon={<UsersRound size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "ALL"}
@@ -2087,8 +2135,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Present"
-              value={numberFormatter.format(summary.present)}
-              detail={`${summary.attendanceRate.toFixed(1)}% attendance`}
+              value={isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.present, rangeDayCount)})`
+                  : `${summary.attendanceRate.toFixed(1)}% attendance`
+              }
               icon={<UserCheck size={18} />}
               tone="emerald"
               active={kpiDrilldown?.key === "PRESENT"}
@@ -2103,8 +2155,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Absent"
-              value={numberFormatter.format(summary.absent)}
-              detail={`${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`}
+              value={isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.absent, rangeDayCount)})`
+                  : `${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`
+              }
               icon={<UserRoundX size={18} />}
               tone="rose"
               active={kpiDrilldown?.key === "ABSENT"}
@@ -2135,8 +2191,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Punch In"
-              value={numberFormatter.format(punchInCount)}
-              detail={`${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`}
+              value={isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(punchInCount, rangeDayCount)})`
+                  : `${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`
+              }
               icon={<Clock3 size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "PUNCH_IN"}
@@ -2151,8 +2211,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Punch Out"
-              value={numberFormatter.format(summary.checkedOut)}
-              detail="Completed Punch In / Punch Out cycle"
+              value={isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(summary.checkedOut)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.checkedOut, rangeDayCount)})`
+                  : "Completed Punch In / Punch Out cycle"
+              }
               icon={<CheckCircle2 size={18} />}
               tone="teal"
               active={kpiDrilldown?.key === "PUNCH_OUT"}
@@ -2167,8 +2231,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Open Punch In"
-              value={numberFormatter.format(summary.openCheckIns)}
-              detail="Punch In recorded · Punch Out pending"
+              value={isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.openCheckIns, rangeDayCount)})`
+                  : "Punch In recorded · Punch Out pending"
+              }
               icon={<TimerReset size={18} />}
               tone="amber"
               active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
@@ -2232,21 +2300,51 @@ function AttendanceDashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="group/mix rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 px-3.5 py-3 ring-1 ring-emerald-100 transition hover:-translate-y-0.5">
                   <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Present</p><UserCheck size={15} className="text-emerald-500" /></div>
-                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{numberFormatter.format(summary.present)}</p>
+                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
+                  </p>
+                  {isMultiDayRange && (
+                    <p className="mt-0.5 text-[9px] font-semibold text-emerald-700/70">
+                      Avg/day · {averageFormula(summary.present, rangeDayCount)}
+                    </p>
+                  )}
                 </div>
                 <div className="group/mix rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50/70 px-3.5 py-3 ring-1 ring-rose-100 transition hover:-translate-y-0.5">
                   <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-rose-700">Absent</p><UserRoundX size={15} className="text-rose-500" /></div>
-                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{numberFormatter.format(summary.absent)}</p>
+                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
+                  </p>
+                  {isMultiDayRange && (
+                    <p className="mt-0.5 text-[9px] font-semibold text-rose-700/70">
+                      Avg/day · {averageFormula(summary.absent, rangeDayCount)}
+                    </p>
+                  )}
                 </div>
               </div>
             </ChartCard>
           </section>
 
           <section className="grid gap-5 xl:grid-cols-2">
-            <ChartCard title="Punch In activity by hour" subtitle="Hourly Punch In pattern and peak reporting window" badge={`Peak ${peakCheckIn.label}`} icon={<Clock3 size={18} />} tone="violet">
+            <ChartCard
+              title="Punch In activity by hour"
+              subtitle={
+                isMultiDayRange
+                  ? `Average hourly Punch In pattern across ${rangeDayCount} days`
+                  : "Hourly Punch In pattern and peak reporting window"
+              }
+              badge={`Peak ${peakCheckIn.label}`}
+              icon={<Clock3 size={18} />}
+              tone="violet"
+            >
               <div className="mb-3 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-violet-50/70 px-3 py-2.5 ring-1 ring-violet-100"><p className="text-[9px] font-black uppercase tracking-wider text-violet-500">Peak hour</p><p className="mt-0.5 text-sm font-black text-violet-900">{peakCheckIn.label}</p></div>
-                <div className="rounded-2xl bg-blue-50/70 px-3 py-2.5 ring-1 ring-blue-100"><p className="text-[9px] font-black uppercase tracking-wider text-blue-500">Peak punches</p><p className="mt-0.5 text-sm font-black text-blue-900">{numberFormatter.format(peakCheckIn.count)}</p></div>
+                <div className="rounded-2xl bg-blue-50/70 px-3 py-2.5 ring-1 ring-blue-100">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-blue-500">{isMultiDayRange ? "Peak punches (avg/day)" : "Peak punches"}</p>
+                  <p className="mt-0.5 text-sm font-black text-blue-900">{numberFormatter.format(peakCheckIn.count)}</p>
+                  {isMultiDayRange && (
+                    <p className="mt-0.5 text-[9px] font-semibold text-blue-700/70">{averageFormula(peakCheckIn.rawCount, rangeDayCount)}</p>
+                  )}
+                </div>
               </div>
               <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-violet-50/35 to-white px-1 pt-2 ring-1 ring-violet-100/70">
                 <ResponsiveContainer width="100%" height="100%">
@@ -2255,11 +2353,23 @@ function AttendanceDashboard() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                     <XAxis dataKey="label" interval={2} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
+                      formatter={(value: number, _name, item: any) => {
+                        if (!isMultiDayRange) return [numberFormatter.format(value as number), "Punch Ins"];
+                        const raw = item?.payload?.rawCount ?? 0;
+                        return [`${numberFormatter.format(value as number)}/day (${averageFormula(raw, rangeDayCount)})`, "Punch Ins avg"];
+                      }}
+                    />
                     <Bar dataKey="count" name="Punch Ins" fill="url(#checkInBars)" radius={[7, 7, 2, 2]} maxBarSize={26} animationDuration={900} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              {isMultiDayRange && (
+                <p className="mt-2 text-[9.5px] font-semibold text-violet-700/70">
+                  Bars show the daily average Punch In count per hour across {rangeDayCount} days.
+                </p>
+              )}
             </ChartCard>
 
             <ChartCard title="Designation performance" subtitle="Attendance rate across all workforce groups" badge={`${numberFormatter.format(designationTotal)} designations`} icon={<UsersRound size={18} />} tone="violet">
@@ -2275,7 +2385,7 @@ function AttendanceDashboard() {
                         const item = payload?.[0]?.payload as { designation: string; total: number; present: number; absent: number; rate: number } | undefined;
                         if (!active || !item) return null;
                         return (
-                          <div className="min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs shadow-lg">
+                          <div className="min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs shadow-lg">
                             <p className="font-black text-slate-900">{item.designation}</p>
                             <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
                               <div className="flex items-center justify-between gap-4"><span>Attendance rate</span><strong className="text-violet-700">{item.rate.toFixed(1)}%</strong></div>
@@ -2283,6 +2393,13 @@ function AttendanceDashboard() {
                               <div className="flex items-center justify-between gap-4"><span>Present</span><strong className="text-emerald-700">{numberFormatter.format(item.present)}</strong></div>
                               <div className="flex items-center justify-between gap-4"><span>Absent</span><strong className="text-rose-700">{numberFormatter.format(item.absent)}</strong></div>
                             </div>
+                            {isMultiDayRange && (
+                              <div className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-500">
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Daily average</p>
+                                <div className="flex items-center justify-between gap-4"><span>Present/day</span><strong className="text-emerald-700">{formatAverageValue(item.present / rangeDayCount)} ({averageFormula(item.present, rangeDayCount)})</strong></div>
+                                <div className="flex items-center justify-between gap-4"><span>Absent/day</span><strong className="text-rose-700">{formatAverageValue(item.absent / rangeDayCount)} ({averageFormula(item.absent, rangeDayCount)})</strong></div>
+                              </div>
+                            )}
                           </div>
                         );
                       }}
@@ -2368,15 +2485,32 @@ function AttendanceDashboard() {
           </section>
 
           <section className="grid items-stretch gap-5 lg:grid-cols-3">
-            <ChartCard title="Work duration" subtitle="Click a bar to view employees in that working-hour range" badge={`${numberFormatter.format(summary.checkedOut)} completed`} icon={<BarChart3 size={18} />} tone="blue">
+            <ChartCard
+              title="Work duration"
+              subtitle="Click a bar to view employees in that working-hour range"
+              badge={
+                isMultiDayRange
+                  ? `${formatAverageValue(avgCheckedOut)} avg/day`
+                  : `${numberFormatter.format(summary.checkedOut)} completed`
+              }
+              icon={<BarChart3 size={18} />}
+              tone="blue"
+            >
               <div className="flex h-full flex-col">
                 <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-blue-50/35 to-white px-1 pt-2 ring-1 ring-blue-100/70">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.workDurationBuckets} margin={{ left: -15, right: 5, top: 8, bottom: 0 }}>
+                    <BarChart data={workDurationChartData} margin={{ left: -15, right: 5, top: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="bucket" tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
                       <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
+                        formatter={(value: number, _name, item: any) => {
+                          if (!isMultiDayRange) return [numberFormatter.format(value as number), "Employees"];
+                          const raw = item?.payload?.rawCount ?? 0;
+                          return [`${numberFormatter.format(value as number)}/day (${averageFormula(raw, rangeDayCount)})`, "Employees avg"];
+                        }}
+                      />
                       <Bar
                         dataKey="count"
                         name="Employees"
@@ -2389,7 +2523,7 @@ function AttendanceDashboard() {
                           if (bucket) openWorkDurationBucket(bucket);
                         }}
                       >
-                        {data.workDurationBuckets.map((item, index) => (
+                        {workDurationChartData.map((item, index) => (
                           <Cell
                             key={`${item.bucket}-${index}`}
                             fill={[chartColors.rose, chartColors.amber, chartColors.blue, chartColors.emerald, chartColors.violet][index % 5]}
@@ -2402,6 +2536,11 @@ function AttendanceDashboard() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                {isMultiDayRange && (
+                  <p className="mt-2 text-[9.5px] font-semibold text-blue-700/70">
+                    Bars show the daily average employee count per duration bucket across {rangeDayCount} days.
+                  </p>
+                )}
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-blue-50/75 px-3 py-2.5 ring-1 ring-blue-100">
@@ -2418,20 +2557,27 @@ function AttendanceDashboard() {
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">Duration mix</p>
-                      <p className="mt-0.5 text-[9.5px] font-semibold text-slate-400">Completed employees by working-hour bucket</p>
+                      <p className="mt-0.5 text-[9.5px] font-semibold text-slate-400">
+                        {isMultiDayRange ? `Avg completed employees/day by working-hour bucket` : "Completed employees by working-hour bucket"}
+                      </p>
                     </div>
                     <TimerReset size={17} className="text-blue-500" />
                   </div>
                   <div className="space-y-2.5">
-                    {(data.workDurationBuckets || []).map((item, index) => {
-                      const maxCount = Math.max(...(data.workDurationBuckets || []).map((bucket) => bucket.count), 1);
+                    {(workDurationChartData || []).map((item, index) => {
+                      const maxCount = Math.max(...(workDurationChartData || []).map((bucket) => bucket.count), 1);
                       const width = (item.count / maxCount) * 100;
                       const barColors = ["bg-rose-500", "bg-amber-500", "bg-blue-500", "bg-emerald-500", "bg-violet-500"];
                       return (
                         <div key={`duration-insight-${item.bucket}`}>
                           <div className="mb-1 flex items-center justify-between gap-2">
                             <span className="text-[10px] font-bold text-slate-600">{item.bucket}</span>
-                            <span className="text-[10px] font-black tabular-nums text-slate-800">{numberFormatter.format(item.count)}</span>
+                            <span className="text-[10px] font-black tabular-nums text-slate-800">
+                              {numberFormatter.format(item.count)}
+                              {isMultiDayRange && (
+                                <span className="ml-1 font-semibold text-slate-400">({averageFormula(item.rawCount, rangeDayCount)})</span>
+                              )}
+                            </span>
                           </div>
                           <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                             <div className={`h-full rounded-full ${barColors[index % barColors.length]} transition-[width] duration-1000`} style={{ width: `${width}%` }} />
@@ -2541,8 +2687,15 @@ function AttendanceDashboard() {
                         <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/60">
                           <div className={`h-full rounded-full transition-[width] duration-1000 ease-out ${office.rate >= 85 ? "bg-emerald-500" : office.rate >= 70 ? "bg-blue-500" : office.rate >= 50 ? "bg-amber-500" : "bg-rose-500"}`} style={{ width: `${Math.min(office.rate, 100)}%` }} />
                         </div>
-                        <span className="w-16 text-right text-[10px] font-semibold text-slate-400">{numberFormatter.format(office.present)}/{numberFormatter.format(office.total)}</span>
+                        <span className="w-16 text-right text-[10px] font-semibold text-slate-400">
+                          {numberFormatter.format(office.present)}/{numberFormatter.format(office.total)}
+                        </span>
                       </div>
+                      {isMultiDayRange && (
+                        <p className="mt-1 text-right text-[9px] font-semibold text-slate-400">
+                          Avg {formatAverageValue(office.present / rangeDayCount)}/{formatAverageValue(office.total / rangeDayCount)} per day
+                        </p>
+                      )}
                     </div>
                   )) : (
                     <div className="flex h-[150px] items-center justify-center text-center text-xs font-medium text-slate-400">No office/location values for this range</div>
@@ -2555,16 +2708,24 @@ function AttendanceDashboard() {
                       <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Present</p>
                       <UserCheck size={14} className="text-emerald-500" />
                     </div>
-                    <p className="mt-1 text-lg font-black tabular-nums text-emerald-950">{numberFormatter.format(summary.present)}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold text-emerald-700/60">Across selected offices</p>
+                    <p className="mt-1 text-lg font-black tabular-nums text-emerald-950">
+                      {isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
+                    </p>
+                    <p className="mt-0.5 text-[9px] font-semibold text-emerald-700/60">
+                      {isMultiDayRange ? `Avg/day · ${averageFormula(summary.present, rangeDayCount)}` : "Across selected offices"}
+                    </p>
                   </div>
                   <div className="rounded-2xl bg-rose-50/75 px-3 py-3 ring-1 ring-rose-100">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">Absent</p>
                       <UserRoundX size={14} className="text-rose-500" />
                     </div>
-                    <p className="mt-1 text-lg font-black tabular-nums text-rose-950">{numberFormatter.format(summary.absent)}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold text-rose-700/60">Across selected offices</p>
+                    <p className="mt-1 text-lg font-black tabular-nums text-rose-950">
+                      {isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
+                    </p>
+                    <p className="mt-0.5 text-[9px] font-semibold text-rose-700/60">
+                      {isMultiDayRange ? `Avg/day · ${averageFormula(summary.absent, rangeDayCount)}` : "Across selected offices"}
+                    </p>
                   </div>
                 </div>
 
@@ -2580,8 +2741,12 @@ function AttendanceDashboard() {
                     <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-[width] duration-1000" style={{ width: `${Math.min(summary.attendanceRate, 100)}%` }} />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-3 text-[9.5px] font-bold">
-                    <span className="text-emerald-700">{numberFormatter.format(summary.present)} present</span>
-                    <span className="text-rose-600">{numberFormatter.format(summary.absent)} absent</span>
+                    <span className="text-emerald-700">
+                      {isMultiDayRange ? `${formatAverageValue(avgPresent)}/day present` : `${numberFormatter.format(summary.present)} present`}
+                    </span>
+                    <span className="text-rose-600">
+                      {isMultiDayRange ? `${formatAverageValue(avgAbsent)}/day absent` : `${numberFormatter.format(summary.absent)} absent`}
+                    </span>
                   </div>
                 </div>
 
@@ -2591,8 +2756,15 @@ function AttendanceDashboard() {
                     <p className="mt-1 text-sm font-black text-slate-900">{numberFormatter.format(data.officeBreakdown.length)}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2.5 shadow-sm">
-                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Attendance records</p>
-                    <p className="mt-1 text-sm font-black text-slate-900">{numberFormatter.format(summary.totalRecords)}</p>
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                      {isMultiDayRange ? "Attendance records (avg/day)" : "Attendance records"}
+                    </p>
+                    <p className="mt-1 text-sm font-black text-slate-900">
+                      {isMultiDayRange ? formatAverageValue(avgTotalRecords) : numberFormatter.format(summary.totalRecords)}
+                    </p>
+                    {isMultiDayRange && (
+                      <p className="mt-0.5 text-[9px] font-semibold text-slate-400">{averageFormula(summary.totalRecords, rangeDayCount)}</p>
+                    )}
                   </div>
                 </div>
               </div>
