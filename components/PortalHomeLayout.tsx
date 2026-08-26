@@ -396,12 +396,6 @@ function PortalHomeLayoutContent({
         ].includes(r)
     );
 
-  const isCityAdminRole =
-    normalizedAllRoles.includes(
-      'CITY_ADMIN'
-    );
-
-
   const isSwachhAdmin =
     isSuperAdmin ||
     normalizedAllRoles.some(
@@ -2840,9 +2834,9 @@ function PortalHomeLayoutContent({
 
                 <button
                   type="button"
-                  title="Ward Ranking System"
+                  title={isCityAdmin ? 'Ward Ranking' : 'Ward Ranking System'}
                   onClick={() => {
-                    if (isCityAdminRole) {
+                    if (isCityAdmin) {
                       router.push('/ulb/ward-ranking');
                       return;
                     }
@@ -2865,13 +2859,13 @@ function PortalHomeLayoutContent({
                     />
 
                     <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-                      Ward Ranking System
+                      {isCityAdmin ? 'Ward Ranking' : 'Ward Ranking System'}
                     </span>
 
                   </div>
 
 
-                  {isCityAdminRole ? (
+                  {isCityAdmin ? (
                     <ChevronRight
                       size={16}
                       className={`shrink-0 text-slate-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}
@@ -2889,7 +2883,7 @@ function PortalHomeLayoutContent({
                 </button>
 
 
-                {swachhOpen && !isCityAdminRole && (
+                {swachhOpen && !isCityAdmin && (
 
                   <div className={`ml-4 mt-1 pl-3 border-l-2 border-purple-200 flex flex-col gap-2 ${
                     sidebarCollapsed ? 'lg:hidden' : ''
