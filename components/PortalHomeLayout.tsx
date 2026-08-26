@@ -65,7 +65,7 @@ function PortalHomeLayoutContent({
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (savedTheme === 'dark') {
       setIsDarkMode(true);
       document.documentElement.classList.add('dark-theme');
     }
@@ -3130,11 +3130,10 @@ function PortalHomeLayoutContent({
 
           <button
             onClick={toggleDarkMode}
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
+            className={`flex items-center justify-center w-full py-2.5 px-4 rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200`}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {isDarkMode ? <Sun size={16} className="shrink-0" /> : <Moon size={16} className="shrink-0" />}
-            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+            {isDarkMode ? <Sun size={20} className="shrink-0" /> : <Moon size={20} className="shrink-0" />}
           </button>
 
           <Link
