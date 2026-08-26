@@ -647,11 +647,37 @@ export const AreaBeatApi = {
       method: "POST",
       body: JSON.stringify({ userId, segmentId, segmentIds, targetRole })
     }),
-  bulkAssign: (beatIds: string[], userId: string | null, targetRole: "SUPERVISOR" | "EMPLOYEE") =>
-    apiFetch<{ success: boolean; updatedBeatCount: number }>("/city/areas/bulk-assign", {
-      method: "POST",
-      body: JSON.stringify({ beatIds, userId, targetRole })
-    }),
+  bulkAssign: async (beatIds: string[], userId: string | null, targetRole: "SUPERVISOR" | "EMPLOYEE") => {
+    try {
+      return await apiFetch<{ success: boolean; updatedBeatCount: number }>("/city/areas/bulk-assign", {
+        method: "POST",
+        body: JSON.stringify({ beatIds, userId, targetRole })
+      });
+    } catch (error) {
+      const isMissingBulkRoute =
+        error instanceof ApiError &&
+        (error.status === 404 || error.message.includes("Cannot POST /city/areas/bulk-assign"));
+
+      if (!isMissingBulkRoute) {
+        throw error;
+      }
+
+      // Compatibility for deployments that have not picked up the bulk route yet.
+      // The existing assignment endpoint applies the user to the entire beat when
+      // no segment selection is supplied.
+      for (const beatId of Array.from(new Set(beatIds))) {
+        await apiFetch(`/city/areas/${beatId}/assign`, {
+          method: "POST",
+          body: JSON.stringify({ userId, targetRole })
+        });
+      }
+
+      return {
+        success: true,
+        updatedBeatCount: new Set(beatIds).size
+      };
+    }
+  },
   updatePoints: (id: string, points: Array<{ lat: number; lng: number; label: string }>) =>
     apiFetch<{ success: boolean; points: any[] }>(`/city/areas/${id}/points`, {
       method: "PUT",
@@ -1114,7 +1140,6 @@ export const TwinbinApi = {
       body: JSON.stringify(body || {})
     })
 };
-
 
 
 

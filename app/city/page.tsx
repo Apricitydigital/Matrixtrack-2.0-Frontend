@@ -3295,7 +3295,7 @@ export default function CityDashboardPage() {
                   </div>
 
                   <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.02em' }}>
-                    {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'Indore Admin'} <span style={{ fontSize: '22px' }}>👋</span>
+                    {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || user?.email?.split('@')[0] || 'Indore Admin'} <span style={{ fontSize: '22px' }}></span>
                   </h1>
 
                   
@@ -3539,12 +3539,14 @@ export default function CityDashboardPage() {
                         '--kpi-border': card.border,
                       } as React.CSSProperties}
                     >
-                      <div className="mx-kpi-top">
+                      <div className="mx-kpi-top" style={{ marginBottom: '12px' }}>
                         <div className="mx-kpi-icon"><card.icon size={18} strokeWidth={1.9} /></div>
                         <ChevronRight className="mx-kpi-arrow" size={16} />
                       </div>
-                      <div className="mx-kpi-label">{card.label}</div>
-                      <div className="mx-kpi-value">{statsLoading ? '—' : card.value}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="mx-kpi-label" style={{ margin: 0 }}>{card.label}</div>
+                        <div className="mx-kpi-value" style={{ margin: 0 }}>{statsLoading ? '—' : card.value}</div>
+                      </div>
                       <span className="mx-kpi-accent" />
                     </div>
                   ))}
@@ -3589,9 +3591,9 @@ export default function CityDashboardPage() {
                       } as React.CSSProperties}
                     >
                       <div className="mx-user-icon"><card.icon size={21} strokeWidth={1.9} /></div>
-                      <div>
-                        <div className="mx-user-label">{card.title}</div>
-                        <div className="mx-user-value">{statsLoading ? '—' : card.count}</div>
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div className="mx-user-label" style={{ margin: 0 }}>{card.title}</div>
+                        <div className="mx-user-value" style={{ margin: 0 }}>{statsLoading ? '—' : card.count}</div>
                       </div>
                     </div>
                   ))}
@@ -3637,11 +3639,11 @@ export default function CityDashboardPage() {
                         } as React.CSSProperties}
                       >
                         <div className="mx-module-icon"><item.icon size={20} strokeWidth={1.9} /></div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div className="mx-module-name">{item.title}</div>
-                          <div className="mx-module-records">{info.registered || 0} Registered</div>
+                        <div style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div className="mx-module-name" style={{ margin: 0 }}>{item.title}</div>
+                          <div className="mx-module-records" style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--text)' }}>{info.registered || 0}</div>
                         </div>
-                        <ChevronRight size={15} style={{ color: item.color, flexShrink: 0 }} />
+                        <ChevronRight size={15} style={{ color: item.color, flexShrink: 0, marginLeft: '8px' }} />
                       </div>
                     );
                   })}
@@ -3704,75 +3706,6 @@ export default function CityDashboardPage() {
                 })()}
               </section>
 
-              {/* Supervisor Performance (Missed Work) */}
-              <section className="mx-section">
-                <div className="mx-section-head">
-                  <div className="mx-section-title-wrap">
-                    <div className="mx-section-icon" style={{ color: '#eab308', background: '#fefce8', borderColor: '#fef08a' }}>
-                      <AlertTriangle size={18} />
-                    </div>
-                    <div>
-                      <h2 className="mx-section-title">SUPERVISOR ACTION REQUIRED</h2>
-                      <div className="mx-section-subtitle">Supervisors with sweeping work that still needs attention</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <select
-                      value={perfZoneFilter}
-                      onChange={(e) => setPerfZoneFilter(e.target.value)}
-                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none' }}
-                    >
-                      <option value="ALL">All Zones</option>
-                      {/* Unique zones from missed work */}
-                      {Array.from(new Set(supervisorMissedWork.map(w => w.zone))).map((z, i) => (
-                        <option key={i} value={z}>{z}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={perfWardFilter}
-                      onChange={(e) => setPerfWardFilter(e.target.value)}
-                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none' }}
-                    >
-                      <option value="ALL">All Wards</option>
-                      {/* Unique wards from missed work (filtered by zone) */}
-                      {Array.from(new Set(supervisorMissedWork.filter(w => perfZoneFilter === 'ALL' || w.zone === perfZoneFilter).map(w => w.ward))).map((w, i) => (
-                        <option key={i} value={w}>{w}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(() => {
-                    const filteredWork = supervisorMissedWork.filter(w =>
-                      (perfZoneFilter === 'ALL' || w.zone === perfZoneFilter) &&
-                      (perfWardFilter === 'ALL' || w.ward === perfWardFilter)
-                    );
-
-                    if (filteredWork.length === 0) {
-                      return <div style={{ padding: '4px 0 12px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 500 }}>No supervisor tasks need attention for the selected filters.</div>;
-                    }
-
-                    return filteredWork.map((worker, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '10px', background: '#fff' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontWeight: 700, fontSize: '14px' }}>
-                            {worker.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{worker.name}</div>
-                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>{worker.zone} • {worker.ward}</div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', color: '#ef4444', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>
-                          <AlertCircle size={14} />
-                          {worker.missedCount} Task{worker.missedCount !== 1 ? 's' : ''} Need{worker.missedCount === 1 ? 's' : ''} Attention
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </section>
 
               {/* Live Asset Registration Tracker */}
               <section className="mx-section">
@@ -3788,38 +3721,74 @@ export default function CityDashboardPage() {
                   </div>
                 </div>
 
-                <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   {(() => {
-                    const visibleRequests = assetRequests;
+                    const toiletReqs = assetRequests.filter(req => req.module === 'Toilet');
+                    const binReqs = assetRequests.filter(req => req.module !== 'Toilet');
 
-                    if (visibleRequests.length === 0) {
-                      return <div style={{ padding: '4px 0 12px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 500 }}>No new toilet or litter bin requests are waiting for review.</div>;
-                    }
-
-                    return visibleRequests.map((req, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '10px', background: '#fff' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ background: req.module === 'Toilet' ? '#eff6ff' : '#fffbeb', color: req.module === 'Toilet' ? '#3b82f6' : '#f59e0b', padding: '10px', borderRadius: '10px' }}>
-                            {req.module === 'Toilet' ? <Toilet size={18} /> : <Trash2 size={18} />}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{req.module} Request</div>
-                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
-                              Requested by: <span style={{ color: '#0f172a', fontWeight: 600 }}>{req.requestedBy}</span> • {req.zone} • {req.ward}
-                            </div>
-                          </div>
+                    const renderSlider = (reqs: typeof assetRequests, emptyText: string) => (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', overflowX: 'auto', gap: '12px', scrollSnapType: 'x mandatory', paddingBottom: '4px' }} className="hide-scrollbar">
+                          {reqs.length === 0 ? (
+                            <div style={{ padding: '24px 0', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 500, width: '100%' }}>{emptyText}</div>
+                          ) : (
+                            reqs.map((req, i) => (
+                              <div key={i} style={{ flex: '0 0 100%', scrollSnapAlign: 'start', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '10px', background: '#fff' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{ background: req.module === 'Toilet' ? '#eff6ff' : '#fffbeb', color: req.module === 'Toilet' ? '#3b82f6' : '#f59e0b', padding: '10px', borderRadius: '10px' }}>
+                                    {req.module === 'Toilet' ? <Toilet size={18} /> : <Trash2 size={18} />}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{req.module} Request</div>
+                                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+                                      By: <span style={{ color: '#0f172a', fontWeight: 600 }}>{req.requestedBy}</span> • {req.zone} • {req.ward}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: req.status === 'PENDING' ? '#fefce8' : '#ecfdf5', color: req.status === 'PENDING' ? '#eab308' : '#10b981', padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, marginBottom: '4px' }}>
+                                    {req.status === 'PENDING' ? <Clock size={12} /> : <CheckCircle2 size={12} />}
+                                    {req.status}
+                                  </div>
+                                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>
+                                    {new Date(req.date).toLocaleString('en-US', { month: 'short', day: 'numeric' })}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: req.status === 'PENDING' ? '#fefce8' : '#ecfdf5', color: req.status === 'PENDING' ? '#eab308' : '#10b981', padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, marginBottom: '4px' }}>
-                            {req.status === 'PENDING' ? <Clock size={12} /> : <CheckCircle2 size={12} />}
-                            {req.status}
+                        {reqs.length > 1 && (
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                            {reqs.map((_, i) => (
+                              <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i === 0 ? '#3b82f6' : '#cbd5e1' }} />
+                            ))}
                           </div>
-                          <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>
-                            {new Date(req.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                        </div>
+                        )}
                       </div>
-                    ));
+                    );
+
+                    return (
+                      <>
+                        {/* Toilet Requests Box */}
+                        <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                            <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '6px', borderRadius: '8px' }}><Toilet size={16} /></div>
+                            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Toilet Requests</h3>
+                          </div>
+                          {renderSlider(toiletReqs, 'No pending toilet requests.')}
+                        </div>
+
+                        {/* Litter Bin Requests Box */}
+                        <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                            <div style={{ background: '#fffbeb', color: '#f59e0b', padding: '6px', borderRadius: '8px' }}><Trash2 size={16} /></div>
+                            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Litter Bin Requests</h3>
+                          </div>
+                          {renderSlider(binReqs, 'No pending litter bin requests.')}
+                        </div>
+                      </>
+                    );
                   })()}
                 </div>
               </section>
@@ -4466,16 +4435,76 @@ export default function CityDashboardPage() {
       </section>
       {/* ====== END OF NEW SECTION ====== */}
 
-      {/* Daily Target Status - city-wide supervisor report targets */}
-      <div style={{ marginTop: '20px' }}>
-        <TargetStatus
-          date={filterDate}
-          cityId={isSuperAdmin && filterCity !== 'ALL' ? filterCity : undefined}
-          refreshKey={lastRefreshed.getTime()}
-          refreshing={refreshing}
-          onRefresh={loadAll}
-        />
-      </div>
+      {/* Supervisor Performance (Missed Work) */}
+      <section className="mx-section" style={{ marginTop: '20px' }}>
+        <div className="mx-section-head">
+          <div className="mx-section-title-wrap">
+            <div className="mx-section-icon" style={{ color: '#eab308', background: '#fefce8', borderColor: '#fef08a' }}>
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <h2 className="mx-section-title">SUPERVISOR ACTION REQUIRED</h2>
+              <div className="mx-section-subtitle">Supervisors with sweeping work that still needs attention</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <select
+              value={perfZoneFilter}
+              onChange={(e) => setPerfZoneFilter(e.target.value)}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none' }}
+            >
+              <option value="ALL">All Zones</option>
+              {/* Unique zones from missed work */}
+              {Array.from(new Set(supervisorMissedWork.map(w => w.zone))).map((z, i) => (
+                <option key={i} value={z}>{z}</option>
+              ))}
+            </select>
+            <select
+              value={perfWardFilter}
+              onChange={(e) => setPerfWardFilter(e.target.value)}
+              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', outline: 'none' }}
+            >
+              <option value="ALL">All Wards</option>
+              {/* Unique wards from missed work (filtered by zone) */}
+              {Array.from(new Set(supervisorMissedWork.filter(w => perfZoneFilter === 'ALL' || w.zone === perfZoneFilter).map(w => w.ward))).map((w, i) => (
+                <option key={i} value={w}>{w}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {(() => {
+            const filteredWork = supervisorMissedWork.filter(w =>
+              (perfZoneFilter === 'ALL' || w.zone === perfZoneFilter) &&
+              (perfWardFilter === 'ALL' || w.ward === perfWardFilter)
+            );
+
+            if (filteredWork.length === 0) {
+              return <div style={{ padding: '4px 0 12px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', fontWeight: 500 }}>No supervisor tasks need attention for the selected filters.</div>;
+            }
+
+            return filteredWork.map((worker, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid #f1f5f9', borderRadius: '10px', background: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontWeight: 700, fontSize: '14px' }}>
+                    {worker.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{worker.name}</div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>{worker.zone} • {worker.ward}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef2f2', color: '#ef4444', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>
+                  <AlertCircle size={14} />
+                  {worker.missedCount} Task{worker.missedCount !== 1 ? 's' : ''} Need{worker.missedCount === 1 ? 's' : ''} Attention
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      </section>
+
 
       {/* Attention & Performance Alerts Modal */}
       {showAlertModal && typeof document !== 'undefined' && createPortal(

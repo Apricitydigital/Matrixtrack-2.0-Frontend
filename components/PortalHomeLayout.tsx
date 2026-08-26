@@ -44,7 +44,9 @@ import {
   ChevronLeft,
   ChevronRight,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Moon,
+  Sun
 } from 'lucide-react';
 
 import { moduleEntryPath } from '@utils/modules';
@@ -59,6 +61,29 @@ function PortalHomeLayoutContent({
 }) {
   const { user } = useAuth();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark-theme');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const newDark = !prev;
+      if (newDark) {
+        document.documentElement.classList.add('dark-theme');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark-theme');
+        localStorage.setItem('theme', 'light');
+      }
+      return newDark;
+    });
+  };
 
   const router = useRouter();
 
@@ -107,7 +132,8 @@ function PortalHomeLayoutContent({
     pathname.startsWith('/modules');
 
   const isSwachhActive =
-    pathname.startsWith('/ward-ranking');
+    pathname.startsWith('/ward-ranking') ||
+    pathname.startsWith('/ulb/ward-ranking');
 
   const isWorkforceActive =
     pathname.startsWith('/workforce-monitoring');
@@ -394,7 +420,6 @@ function PortalHomeLayoutContent({
           'HMS_ADMIN',
         ].includes(r)
     );
-
 
   const isSwachhAdmin =
     isSuperAdmin ||
@@ -1816,8 +1841,23 @@ function PortalHomeLayoutContent({
             className="flex items-center gap-2"
             title="Profile"
           >
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-sm">
-              {userInitial}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleDarkMode}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
+                title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              
+              <button
+                onClick={() => setIsProfileModalOpen(true)}
+                className="flex items-center gap-2 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[11px]">
+                  {userInitial}
+                </div>
+              </button>
             </div>
           </Link>
         )}
@@ -2834,10 +2874,15 @@ function PortalHomeLayoutContent({
 
                 <button
                   type="button"
-                  title="Ward Ranking System"
-                  onClick={() =>
-                    handleMenuClick(setSwachhOpen)
-                  }
+                  title={isCityAdmin ? 'Ward Ranking' : 'Ward Ranking System'}
+                  onClick={() => {
+                    if (isCityAdmin) {
+                      router.push('/ulb/ward-ranking');
+                      return;
+                    }
+
+                    handleMenuClick(setSwachhOpen);
+                  }}
                   className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isSwachhActive
                     ? 'bg-purple-50 text-purple-700 font-extrabold'
                     : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
@@ -2854,24 +2899,31 @@ function PortalHomeLayoutContent({
                     />
 
                     <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-                      Ward Ranking System
+                      {isCityAdmin ? 'Ward Ranking' : 'Ward Ranking System'}
                     </span>
 
                   </div>
 
 
-                  <ChevronDown
-                    size={16}
-                    className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${swachhOpen
-                      ? 'rotate-180 text-purple-600'
-                      : 'text-slate-400'
-                      }`}
-                  />
+                  {isCityAdmin ? (
+                    <ChevronRight
+                      size={16}
+                      className={`shrink-0 text-slate-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}
+                    />
+                  ) : (
+                    <ChevronDown
+                      size={16}
+                      className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${swachhOpen
+                        ? 'rotate-180 text-purple-600'
+                        : 'text-slate-400'
+                        }`}
+                    />
+                  )}
 
                 </button>
 
 
-                {swachhOpen && (
+                {swachhOpen && !isCityAdmin && (
 
                   <div className={`ml-4 mt-1 pl-3 border-l-2 border-purple-200 flex flex-col gap-2 ${
                     sidebarCollapsed ? 'lg:hidden' : ''
@@ -3087,6 +3139,14 @@ function PortalHomeLayoutContent({
               <PanelLeftOpen size={18} className="text-blue-600" />
             </button>
           )}
+
+          <button
+            onClick={toggleDarkMode}
+            className={`flex items-center justify-center w-full py-2.5 px-4 rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200`}
+            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {isDarkMode ? <Sun size={20} className="shrink-0" /> : <Moon size={20} className="shrink-0" />}
+          </button>
 
           <Link
             href="/portal-home/profile"
