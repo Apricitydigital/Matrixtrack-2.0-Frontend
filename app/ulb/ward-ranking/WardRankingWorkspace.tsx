@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-
+import WardExecutiveOverview
+  from './WardExecutiveOverview';
 import {
   AlertTriangle,
   Award,
@@ -102,27 +103,27 @@ const COMPONENT_FIELD_BY_KEY:
     WardRankingComponent,
     keyof WardRankingRow['components']
   > = {
-    WORKFORCE:
-      'workforce',
+  WORKFORCE:
+    'workforce',
 
-    BEAT:
-      'beat',
+  BEAT:
+    'beat',
 
-    TOILET:
-      'toilet',
+  TOILET:
+    'toilet',
 
-    LITTERBIN:
-      'litterBin',
+  LITTERBIN:
+    'litterBin',
 
-    SUPERVISOR:
-      'supervisor',
+  SUPERVISOR:
+    'supervisor',
 
-    QC:
-      'qc',
+  QC:
+    'qc',
 
-    ACTION_OFFICER:
-      'actionOfficer',
-  };
+  ACTION_OFFICER:
+    'actionOfficer',
+};
 
 
 
@@ -130,69 +131,69 @@ const PERIOD_OPTIONS: Array<{
   key: WardRankingPeriodType;
   label: string;
 }> = [
-  {
-    key: 'DAY',
-    label: 'Day',
-  },
-  {
-    key: 'WEEK',
-    label: 'Week',
-  },
-  {
-    key: 'MONTH',
-    label: 'Month',
-  },
-  {
-    key: 'CUSTOM',
-    label: 'Custom',
-  },
-];
+    {
+      key: 'DAY',
+      label: 'Day',
+    },
+    {
+      key: 'WEEK',
+      label: 'Week',
+    },
+    {
+      key: 'MONTH',
+      label: 'Month',
+    },
+    {
+      key: 'CUSTOM',
+      label: 'Custom',
+    },
+  ];
 
 
 const MODULE_OPTIONS: Array<{
   key: ModuleFilter;
   label: string;
 }> = [
-  {
-    key: 'ALL',
-    label: 'All Modules',
-  },
-  {
-    key: 'TOILET',
-    label: 'Toilet',
-  },
-  {
-    key: 'LITTERBINS',
-    label: 'Litter Bin',
-  },
-  {
-    key: 'SWEEPING',
-    label: 'Sweeping',
-  },
-];
+    {
+      key: 'ALL',
+      label: 'All Modules',
+    },
+    {
+      key: 'TOILET',
+      label: 'Toilet',
+    },
+    {
+      key: 'LITTERBINS',
+      label: 'Litter Bin',
+    },
+    {
+      key: 'SWEEPING',
+      label: 'Sweeping',
+    },
+  ];
 
 
 const STATUS_OPTIONS: Array<{
   key: StatusFilter;
   label: string;
 }> = [
-  {
-    key: 'ALL',
-    label: 'All Status',
-  },
-  {
-    key: 'GREEN',
-    label: 'Green',
-  },
-  {
-    key: 'AMBER',
-    label: 'Amber',
-  },
-  {
-    key: 'RED',
-    label: 'Red',
-  },
-];
+    {
+      key: 'ALL',
+      label: 'All Status',
+    },
+    {
+      key: 'GREEN',
+      label: 'Green',
+    },
+    {
+      key: 'AMBER',
+      label: 'Amber',
+    },
+    {
+      key: 'RED',
+      label: 'Red',
+    },
+  ];
 
 
 function toLocalISO(
@@ -536,9 +537,9 @@ function BandBadge({
   rankable,
 }: {
   band:
-    | WardPerformanceBand
-    | null
-    | undefined;
+  | WardPerformanceBand
+  | null
+  | undefined;
 
   rankable: boolean;
 }) {
@@ -657,10 +658,10 @@ function KpiCard({
   icon: any;
 
   tone:
-    | 'blue'
-    | 'green'
-    | 'amber'
-    | 'red';
+  | 'blue'
+  | 'green'
+  | 'amber'
+  | 'red';
 
   active: boolean;
 
@@ -708,11 +709,10 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-        active
-          ? `ring-2 ${toneClasses.active}`
-          : ''
-      }`}
+      className={`w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active
+        ? `ring-2 ${toneClasses.active}`
+        : ''
+        }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -971,19 +971,19 @@ export default function WardRankingWorkspace() {
         const filtered =
           selectedZoneId
             ? wards.filter(
-                (ward) => {
-                  const parentId =
-                    ward.parentId ||
-                    ward.zoneId ||
-                    ward.parent?.id ||
-                    null;
+              (ward) => {
+                const parentId =
+                  ward.parentId ||
+                  ward.zoneId ||
+                  ward.parent?.id ||
+                  null;
 
-                  return (
-                    parentId ===
-                    selectedZoneId
-                  );
-                }
-              )
+                return (
+                  parentId ===
+                  selectedZoneId
+                );
+              }
+            )
             : wards;
 
         return filtered
@@ -1030,7 +1030,7 @@ export default function WardRankingWorkspace() {
 
         module:
           moduleFilter ===
-          'ALL'
+            'ALL'
             ? undefined
             : moduleFilter,
       }),
@@ -1100,7 +1100,7 @@ export default function WardRankingWorkspace() {
             wardRows
           );
         } catch (
-          geoError
+        geoError
         ) {
           console.warn(
             '[WardRanking] Unable to load geo filters',
@@ -1156,11 +1156,11 @@ export default function WardRankingWorkspace() {
             summaryResponse
           );
         } catch (
-          err: any
+        err: any
         ) {
           setError(
             err?.message ||
-              'Unable to load Ward Ranking.'
+            'Unable to load Ward Ranking.'
           );
         } finally {
           setLoading(
@@ -1281,7 +1281,7 @@ export default function WardRankingWorkspace() {
             (item) =>
               item.rankable &&
               item.performanceBand ===
-                'GREEN'
+              'GREEN'
           ).length,
 
         amber:
@@ -1289,7 +1289,7 @@ export default function WardRankingWorkspace() {
             (item) =>
               item.rankable &&
               item.performanceBand ===
-                'AMBER'
+              'AMBER'
           ).length,
 
         red:
@@ -1297,52 +1297,12 @@ export default function WardRankingWorkspace() {
             (item) =>
               item.rankable &&
               item.performanceBand ===
-                'RED'
+              'RED'
           ).length,
       }),
 
       [
         rows,
-        rankableRows,
-      ]
-    );
-
-
-  const averageScore =
-    useMemo(
-      () => {
-        if (
-          typeof summary?.averageScore ===
-          'number'
-        ) {
-          return summary.averageScore;
-        }
-
-        if (
-          !rankableRows.length
-        ) {
-          return 0;
-        }
-
-        return (
-          rankableRows.reduce(
-            (
-              total,
-              item
-            ) =>
-              total +
-              Number(
-                item.finalScore ||
-                0
-              ),
-            0
-          ) /
-          rankableRows.length
-        );
-      },
-
-      [
-        summary,
         rankableRows,
       ]
     );
@@ -1361,9 +1321,9 @@ export default function WardRankingWorkspace() {
             (item) => {
               if (
                 statusFilter !==
-                  'ALL' &&
+                'ALL' &&
                 item.performanceBand !==
-                  statusFilter
+                statusFilter
               ) {
                 return false;
               }
@@ -1387,9 +1347,9 @@ export default function WardRankingWorkspace() {
                       value
                     ) =>
                       value !==
-                        null &&
+                      null &&
                       value !==
-                        undefined
+                      undefined
                   )
                   .join(' ')
                   .toLowerCase();
@@ -1443,9 +1403,9 @@ export default function WardRankingWorkspace() {
 
               return naturalCompare(
                 first.wardName ||
-                  '',
+                '',
                 second.wardName ||
-                  ''
+                ''
               );
             }
           );
@@ -1464,7 +1424,7 @@ export default function WardRankingWorkspace() {
       1,
       Math.ceil(
         filteredRows.length /
-          PAGE_SIZE
+        PAGE_SIZE
       )
     );
 
@@ -1489,7 +1449,7 @@ export default function WardRankingWorkspace() {
         return filteredRows.slice(
           start,
           start +
-            PAGE_SIZE
+          PAGE_SIZE
         );
       },
 
@@ -1653,9 +1613,9 @@ export default function WardRankingWorkspace() {
             item
           ) =>
             item.sevenDay !==
-              null ||
+            null ||
             item.thirtyDay !==
-              null
+            null
         ),
       [
         trendComparisonData,
@@ -1668,38 +1628,38 @@ export default function WardRankingWorkspace() {
       () => {
         const definitions: Array<{
           key:
-            keyof WardRankingRow['components'];
+          keyof WardRankingRow['components'];
           label: string;
         }> = [
-          {
-            key: 'workforce',
-            label: 'Workforce',
-          },
-          {
-            key: 'beat',
-            label: 'Beat',
-          },
-          {
-            key: 'toilet',
-            label: 'Toilet',
-          },
-          {
-            key: 'litterBin',
-            label: 'Litter Bin',
-          },
-          {
-            key: 'supervisor',
-            label: 'Supervisor',
-          },
-          {
-            key: 'qc',
-            label: 'QC',
-          },
-          {
-            key: 'actionOfficer',
-            label: 'AO',
-          },
-        ];
+            {
+              key: 'workforce',
+              label: 'Workforce',
+            },
+            {
+              key: 'beat',
+              label: 'Beat',
+            },
+            {
+              key: 'toilet',
+              label: 'Toilet',
+            },
+            {
+              key: 'litterBin',
+              label: 'Litter Bin',
+            },
+            {
+              key: 'supervisor',
+              label: 'Supervisor',
+            },
+            {
+              key: 'qc',
+              label: 'QC',
+            },
+            {
+              key: 'actionOfficer',
+              label: 'AO',
+            },
+          ];
 
         return definitions.map(
           (
@@ -1712,7 +1672,7 @@ export default function WardRankingWorkspace() {
                     item
                   ) =>
                     item.components?.[
-                      definition.key
+                    definition.key
                     ]
                 )
                 .filter(
@@ -1721,25 +1681,25 @@ export default function WardRankingWorkspace() {
                   ): component is WardComponentScore =>
                     Boolean(
                       component &&
-                        component.applicable
+                      component.applicable
                     )
                 );
 
             const average =
               applicable.length
                 ? applicable.reduce(
-                    (
-                      total,
-                      component
-                    ) =>
-                      total +
-                      Number(
-                        component.percentage ||
-                          0
-                      ),
-                    0
-                  ) /
-                  applicable.length
+                  (
+                    total,
+                    component
+                  ) =>
+                    total +
+                    Number(
+                      component.percentage ||
+                      0
+                    ),
+                  0
+                ) /
+                applicable.length
                 : null;
 
             return {
@@ -1748,13 +1708,13 @@ export default function WardRankingWorkspace() {
 
               average:
                 average ===
-                null
+                  null
                   ? null
                   : Number(
-                      average.toFixed(
-                        2
-                      )
-                    ),
+                    average.toFixed(
+                      2
+                    )
+                  ),
 
               applicable:
                 applicable.length,
@@ -1770,18 +1730,18 @@ export default function WardRankingWorkspace() {
   const displayedFrom =
     filteredRows.length
       ? (
-          safePage -
-          1
-        ) *
-          PAGE_SIZE +
+        safePage -
         1
+      ) *
+      PAGE_SIZE +
+      1
       : 0;
 
 
   const displayedTo =
     Math.min(
       safePage *
-        PAGE_SIZE,
+      PAGE_SIZE,
       filteredRows.length
     );
 
@@ -1803,7 +1763,7 @@ export default function WardRankingWorkspace() {
           ) => {
             const field =
               COMPONENT_FIELD_BY_KEY[
-                key
+              key
               ];
 
             return Boolean(
@@ -1941,113 +1901,7 @@ export default function WardRankingWorkspace() {
   return (
     <div className="space-y-4 pb-8">
 
-      {/* =====================================================
-          DASHBOARD HEADER
-      ===================================================== */}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <Award
-                  size={20}
-                />
-              </div>
-
-              <div>
-                <h2 className="text-base font-black text-slate-900 sm:text-lg">
-                  Ward Performance Ranking
-                </h2>
-
-                <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                  Automatically derived from Workforce, Beat, Toilet, Litter Bin, Supervisor, QC and Action Officer performance.
-                </p>
-              </div>
-            </div>
-          </div>
-
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                Average Score
-              </div>
-
-              <div className="text-lg font-black text-slate-900">
-                {formatScore(
-                  averageScore,
-                  2
-                )}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                void loadRanking(
-                  true
-                );
-              }}
-              disabled={
-                refreshing
-              }
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCw
-                size={14}
-                className={
-                  refreshing
-                    ? 'animate-spin'
-                    : ''
-                }
-              />
-
-              Refresh
-            </button>
-          </div>
-        </div>
-
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-3 text-[11px] font-semibold text-slate-500">
-          <span className="inline-flex items-center gap-1.5">
-            <CalendarDays
-              size={13}
-              className="text-blue-500"
-            />
-
-            {formatDateLabel(
-              summary?.period?.from ||
-                dateRange.from
-            )}
-
-            {' — '}
-
-            {formatDateLabel(
-              summary?.period?.to ||
-                dateRange.to
-            )}
-          </span>
-
-          {formatGeneratedAt(
-            summary?.generatedAt
-          ) && (
-            <span>
-              Updated{' '}
-              {formatGeneratedAt(
-                summary?.generatedAt
-              )}
-            </span>
-          )}
-
-          <span>
-            {counts.rankable} ranked
-            {' · '}
-            {counts.noData} no data
-          </span>
-        </div>
-      </section>
 
 
       {/* =====================================================
@@ -2071,12 +1925,11 @@ export default function WardRankingWorkspace() {
                         option.key
                       );
                     }}
-                    className={`flex-1 rounded-lg px-4 py-2 text-xs font-black transition sm:flex-none ${
-                      periodType ===
+                    className={`flex-1 rounded-lg px-4 py-2 text-xs font-black transition sm:flex-none ${periodType ===
                       option.key
-                        ? 'bg-white text-blue-700 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                      }`}
                   >
                     {option.label}
                   </button>
@@ -2103,7 +1956,7 @@ export default function WardRankingWorkspace() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
 
             {periodType !==
-            'CUSTOM' ? (
+              'CUSTOM' ? (
               <label className="space-y-1.5">
                 <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
                   Date
@@ -2377,295 +2230,34 @@ export default function WardRankingWorkspace() {
 
 
       {/* =====================================================
-          KPI CARDS
+          WARD PERFORMANCE INTELLIGENCE
       ===================================================== */}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          label="Total Wards"
-          value={
-            counts.total
-          }
-          helper={`${counts.rankable} ranked · ${counts.noData} no data`}
-          icon={
-            Trophy
-          }
-          tone="blue"
-          active={
-            statusFilter ===
-            'ALL'
-          }
-          onClick={() => {
-            setStatusFilter(
-              'ALL'
-            );
-          }}
-        />
-
-        <KpiCard
-          label="Green"
-          value={
-            counts.green
-          }
-          helper="Score 85 and above"
-          icon={
-            CheckCircle2
-          }
-          tone="green"
-          active={
-            statusFilter ===
-            'GREEN'
-          }
-          onClick={() => {
-            setStatusFilter(
-              'GREEN'
-            );
-          }}
-        />
-
-        <KpiCard
-          label="Amber"
-          value={
-            counts.amber
-          }
-          helper="Score 70 to 84.99"
-          icon={
-            AlertTriangle
-          }
-          tone="amber"
-          active={
-            statusFilter ===
-            'AMBER'
-          }
-          onClick={() => {
-            setStatusFilter(
-              'AMBER'
-            );
-          }}
-        />
-
-        <KpiCard
-          label="Red"
-          value={
-            counts.red
-          }
-          helper="Score below 70"
-          icon={
-            XCircle
-          }
-          tone="red"
-          active={
-            statusFilter ===
-            'RED'
-          }
-          onClick={() => {
-            setStatusFilter(
-              'RED'
-            );
-          }}
-        />
-      </section>
+      <WardExecutiveOverview
+        rows={rows}
+        from={
+          dateRange.from
+        }
+        to={
+          dateRange.to
+        }
+        onOpenWard={
+          openWardDrilldown
+        }
+      />
 
 
       {/* =====================================================
           PERFORMANCE ANALYTICS
       ===================================================== */}
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <section>
 
-        <ChartCard
-          title="Performance Distribution"
-          subtitle="Ward distribution across Green, Amber, Red and No Data performance bands."
-          badge={`${counts.total} wards`}
-        >
-          {counts.total ? (
-            <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
-              <div className="h-[280px] min-w-0">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-                  <PieChart>
-                    <Pie
-                      data={
-                        performanceDistributionData
-                      }
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={66}
-                      outerRadius={98}
-                      paddingAngle={3}
-                    >
-                      {performanceDistributionData.map(
-                        (
-                          item
-                        ) => (
-                          <Cell
-                            key={
-                              item.name
-                            }
-                            fill={
-                              item.color
-                            }
-                          />
-                        )
-                      )}
-                    </Pie>
-
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 14,
-                        border:
-                          '1px solid #e2e8f0',
-                        boxShadow:
-                          '0 12px 34px rgba(15,23,42,.10)',
-                        fontSize: 12,
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-2">
-                {performanceDistributionData.map(
-                  (
-                    item
-                  ) => (
-                    <div
-                      key={
-                        item.name
-                      }
-                      className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{
-                            backgroundColor:
-                              item.color,
-                          }}
-                        />
-
-                        <span className="text-[11px] font-bold text-slate-600">
-                          {item.name}
-                        </span>
-                      </div>
-
-                      <span className="text-sm font-black text-slate-900">
-                        {item.value}
-                      </span>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          ) : (
-            <ChartEmptyState
-              message="No ward performance data is available for this selection."
-            />
-          )}
-        </ChartCard>
 
 
         <ChartCard
-          title="Top Ward Scores"
-          subtitle="Highest ranked wards by current final Ward Performance Score."
-          badge="Top 10"
-        >
-          {topWardChartData.some((item) => Number(item.score) > 0) ? (
-            <div className="h-[320px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <BarChart
-                  data={
-                    topWardChartData
-                  }
-                  layout="vertical"
-                  margin={{
-                    top: 4,
-                    right: 18,
-                    bottom: 4,
-                    left: 22,
-                  }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    horizontal={false}
-                    stroke="#e2e8f0"
-                  />
-
-                  <XAxis
-                    type="number"
-                    domain={[
-                      0,
-                      100,
-                    ]}
-                    tick={{
-                      fill:
-                        '#94a3b8',
-                      fontSize: 10,
-                      fontWeight: 600,
-                    }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-
-                  <YAxis
-                    type="category"
-                    dataKey="ward"
-                    width={88}
-                    tick={{
-                      fill:
-                        '#64748b',
-                      fontSize: 10,
-                      fontWeight: 700,
-                    }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 14,
-                      border:
-                        '1px solid #e2e8f0',
-                      boxShadow:
-                        '0 12px 34px rgba(15,23,42,.10)',
-                      fontSize: 12,
-                    }}
-                  />
-
-                  <Bar
-                    dataKey="score"
-                    name="Final Score"
-                    fill={
-                      CHART_COLORS.blue
-                    }
-                    radius={[
-                      0,
-                      7,
-                      7,
-                      0,
-                    ]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <ChartEmptyState
-              message="All ranked wards currently have a 0 score for this selection."
-            />
-          )}
-        </ChartCard>
-
-
-        <ChartCard
-          title="Daily vs 7-Day vs 30-Day"
-          subtitle="Current Ward Score compared with immutable 7-day rolling and 30-day historical averages."
+          title="Historical Performance Trend"
+          subtitle="Current Ward Score compared with 7-day and 30-day historical averages."
           badge="Trend"
         >
           {trendComparisonData.length ? (
@@ -2809,106 +2401,6 @@ export default function WardRankingWorkspace() {
           )}
         </ChartCard>
 
-
-        <ChartCard
-          title="Component Performance"
-          subtitle="Average applicable performance percentage across the seven Ward Ranking components."
-          badge="7 Components"
-        >
-          {componentAverageData.some(
-            (
-              item
-            ) =>
-              item.average !== null &&
-              Number(item.average) > 0
-          ) ? (
-            <div className="h-[320px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <BarChart
-                  data={
-                    componentAverageData
-                  }
-                  margin={{
-                    top: 8,
-                    right: 8,
-                    left: -12,
-                    bottom: 28,
-                  }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="#e2e8f0"
-                  />
-
-                  <XAxis
-                    dataKey="component"
-                    angle={-25}
-                    textAnchor="end"
-                    interval={0}
-                    height={58}
-                    tick={{
-                      fill:
-                        '#64748b',
-                      fontSize: 9,
-                      fontWeight: 700,
-                    }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-
-                  <YAxis
-                    domain={[
-                      0,
-                      100,
-                    ]}
-                    tick={{
-                      fill:
-                        '#94a3b8',
-                      fontSize: 10,
-                      fontWeight: 600,
-                    }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 14,
-                      border:
-                        '1px solid #e2e8f0',
-                      boxShadow:
-                        '0 12px 34px rgba(15,23,42,.10)',
-                      fontSize: 12,
-                    }}
-                  />
-
-                  <Bar
-                    dataKey="average"
-                    name="Average %"
-                    fill={
-                      CHART_COLORS.indigo
-                    }
-                    radius={[
-                      6,
-                      6,
-                      0,
-                      0,
-                    ]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <ChartEmptyState
-              message="Applicable Ward Ranking components are currently scoring 0% for this selection."
-            />
-          )}
-        </ChartCard>
-
       </section>
 
       {/* =====================================================
@@ -2987,7 +2479,7 @@ export default function WardRankingWorkspace() {
                       <div className="inline-flex min-w-9 items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-black text-slate-700">
                         {item.rankable
                           ? item.cityRank ??
-                            '—'
+                          '—'
                           : '—'}
                       </div>
                     </td>
@@ -3010,7 +2502,7 @@ export default function WardRankingWorkspace() {
                         {item.zoneRank !==
                           null &&
                           item.zoneRank !==
-                            undefined && (
+                          undefined && (
                             <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
                               Zone Rank #{item.zoneRank}
                             </div>
@@ -3100,16 +2592,15 @@ export default function WardRankingWorkspace() {
                                 openWardDrilldown(
                                   item,
                                   COMPONENT_DRILLDOWN_KEYS[
-                                    index
+                                  index
                                   ]
                                 );
                               }
                             }}
-                            className={`whitespace-nowrap rounded-lg px-2 py-1 text-[11px] font-black transition ${
-                              component?.applicable
-                                ? 'cursor-pointer text-slate-700 hover:bg-blue-50 hover:text-blue-700'
-                                : 'cursor-not-allowed text-slate-400'
-                            }`}
+                            className={`whitespace-nowrap rounded-lg px-2 py-1 text-[11px] font-black transition ${component?.applicable
+                              ? 'cursor-pointer text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                              : 'cursor-not-allowed text-slate-400'
+                              }`}
                           >
                             {componentScoreLabel(
                               component
@@ -3151,7 +2642,7 @@ export default function WardRankingWorkspace() {
                       <div className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black text-slate-700">
                         {item.rankable
                           ? item.cityRank ??
-                            '—'
+                          '—'
                           : '—'}
                       </div>
 
@@ -3201,9 +2692,9 @@ export default function WardRankingWorkspace() {
                     <div className="mt-1 text-sm font-black text-slate-900">
                       {item.rankable
                         ? formatScore(
-                            item.finalScore,
-                            2
-                          )
+                          item.finalScore,
+                          2
+                        )
                         : 'N/A'}
                     </div>
                   </div>
@@ -3215,14 +2706,14 @@ export default function WardRankingWorkspace() {
 
                     <div className="mt-1 text-sm font-black text-slate-900">
                       {item.rankable &&
-                      item.trend
-                        ?.sevenDayAverage !==
+                        item.trend
+                          ?.sevenDayAverage !==
                         undefined
                         ? formatScore(
-                            item.trend
-                              .sevenDayAverage,
-                            1
-                          )
+                          item.trend
+                            .sevenDayAverage,
+                          1
+                        )
                         : '—'}
                     </div>
                   </div>
@@ -3304,7 +2795,7 @@ export default function WardRankingWorkspace() {
                             openWardDrilldown(
                               item,
                               COMPONENT_DRILLDOWN_KEYS[
-                                index
+                              index
                               ]
                             );
                           }
@@ -3317,13 +2808,12 @@ export default function WardRankingWorkspace() {
                           )}
                         </span>
 
-                        <span className={`text-[10px] font-black ${
-                          (
-                            component as WardComponentScore
-                          )?.applicable
-                            ? 'text-slate-700'
-                            : 'text-slate-400'
-                        }`}>
+                        <span className={`text-[10px] font-black ${(
+                          component as WardComponentScore
+                        )?.applicable
+                          ? 'text-slate-700'
+                          : 'text-slate-400'
+                          }`}>
                           {componentScoreLabel(
                             component as WardComponentScore
                           )}
@@ -3358,67 +2848,67 @@ export default function WardRankingWorkspace() {
 
         {filteredRows.length >
           PAGE_SIZE && (
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
-            <div className="text-[11px] font-bold text-slate-400">
-              Page{' '}
-              {safePage}
-              {' of '}
-              {totalPages}
-            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+              <div className="text-[11px] font-bold text-slate-400">
+                Page{' '}
+                {safePage}
+                {' of '}
+                {totalPages}
+              </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={
-                  safePage <=
-                  1
-                }
-                onClick={() => {
-                  setPage(
-                    (
-                      current
-                    ) =>
-                      Math.max(
-                        1,
-                        current -
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    safePage <=
+                    1
+                  }
+                  onClick={() => {
+                    setPage(
+                      (
+                        current
+                      ) =>
+                        Math.max(
+                          1,
+                          current -
                           1
-                      )
-                  );
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ChevronLeft
-                  size={15}
-                />
-              </button>
+                        )
+                    );
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft
+                    size={15}
+                  />
+                </button>
 
-              <button
-                type="button"
-                disabled={
-                  safePage >=
-                  totalPages
-                }
-                onClick={() => {
-                  setPage(
-                    (
-                      current
-                    ) =>
-                      Math.min(
-                        totalPages,
-                        current +
+                <button
+                  type="button"
+                  disabled={
+                    safePage >=
+                    totalPages
+                  }
+                  onClick={() => {
+                    setPage(
+                      (
+                        current
+                      ) =>
+                        Math.min(
+                          totalPages,
+                          current +
                           1
-                      )
-                  );
-                }}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ChevronRight
-                  size={15}
-                />
-              </button>
+                        )
+                    );
+                  }}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight
+                    size={15}
+                  />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </section>
 
       <WardDrilldownDrawer
@@ -3443,6 +2933,6 @@ export default function WardRankingWorkspace() {
           closeWardDrilldown
         }
       />
-    </div>
+    </div >
   );
 }

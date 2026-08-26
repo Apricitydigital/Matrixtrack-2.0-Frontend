@@ -509,22 +509,121 @@ function extractAnswers(item: any): AnswerRow[] {
 function getSweepingSubmittedPoints(
   item: any
 ) {
-  const points =
+  /*
+   * =====================================================
+   * AGGREGATED BEAT FORMAT
+   * =====================================================
+   *
+   * Supports records where P1-P5 are already
+   * grouped inside payload.points.
+   */
+  const aggregatePoints =
     Array.isArray(
       item?.payload?.points
     )
       ? item.payload.points
       : [];
 
-  return [...points].sort(
-    (a: any, b: any) =>
-      Number(
-        a?.pointIndex ?? 999
-      ) -
-      Number(
-        b?.pointIndex ?? 999
-      )
-  );
+  if (
+    aggregatePoints.length > 0
+  ) {
+    return [...aggregatePoints].sort(
+      (a: any, b: any) =>
+        Number(
+          a?.pointIndex ?? 999
+        ) -
+        Number(
+          b?.pointIndex ?? 999
+        )
+    );
+  }
+
+
+  /*
+   * =====================================================
+   * CURRENT POINT-LEVEL FORMAT
+   * =====================================================
+   *
+   * Current Sweeping submission stores one
+   * SweepingRecord for each Beat point:
+   *
+   * payload.pointIndex
+   * payload.pointCode
+   * payload.pointName
+   * payload.pointType
+   * payload.photos
+   */
+  const payload =
+    item?.payload;
+
+  if (
+    !payload ||
+    typeof payload !== 'object'
+  ) {
+    return [];
+  }
+
+
+  const pointIndex =
+    Number(
+      payload?.pointIndex
+    );
+
+
+  if (
+    !Number.isInteger(
+      pointIndex
+    ) ||
+    pointIndex < 0
+  ) {
+    return [];
+  }
+
+
+  const photos =
+    normalizeImages([
+      payload?.photos,
+      payload?.photoUrls,
+      payload?.images,
+      payload?.imageUrls,
+      payload?.photo,
+      payload?.photoUrl,
+      payload?.image,
+      payload?.imageUrl,
+    ]);
+
+
+  /*
+   * A point-level record itself represents
+   * one submitted Beat point.
+   */
+  return [
+    {
+      pointIndex,
+
+      pointCode:
+        payload?.pointCode ||
+        `P${pointIndex + 1}`,
+
+      pointName:
+        payload?.pointName ||
+        `Point ${pointIndex + 1}`,
+
+      pointType:
+        payload?.pointType,
+
+      photos,
+
+      /*
+       * Keep first-image aliases for existing UI.
+       */
+      photo:
+        photos[0] || null,
+
+      photoUrl:
+        photos[0] || null,
+    },
+  ];
 }
 
 function getSweepingSummary(
@@ -615,6 +714,10 @@ function totalImageCount(
       ).flatMap(
         (point: any) =>
           normalizeImages([
+            point?.photos,
+            point?.photoUrls,
+            point?.images,
+            point?.imageUrls,
             point?.photo,
             point?.photoUrl,
             point?.image,
@@ -2011,22 +2114,42 @@ function ReportCard({
   );
 }
 
-function DetailModal({
+export function DetailModal({
   report,
   loading,
   onClose,
   onImagePreview,
+  stacked = false,
+  qcReviewHistory = [],
 }: {
   report: DashboardRecord;
-  loading: boolean;
-  onClose: () => void;
-  onImagePreview: (url: string) => void;
+
+  loading:
+  boolean;
+
+  onClose:
+  () => void;
+
+  onImagePreview:
+  (
+    url: string
+  ) => void;
+
+  stacked?:
+  boolean;
+
+  qcReviewHistory?:
+  any[];
 }) {
   const status = normalizedStatus(report);
   const classes = statusClasses(status);
   const answers = extractAnswers(report);
   const topLevelImages = collectTopLevelImages(report);
   const qcRemark = getQcRemark(report);
+  const qcReviewer =
+    report?.reviewedByQc ||
+    report?.reviewedBy ||
+    null;
   const actionRequiredRemark = getActionRequiredRemark(report, report.dashboardModule);
   const actionTakenRemark = getActionTakenRemark(report, report.dashboardModule);
   const actionTakenPhotos = getActionTakenPhotos(report, report.dashboardModule);
@@ -2042,9 +2165,13 @@ function DetailModal({
     return null;
   }
 
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/70 p-4 backdrop-blur-sm"
+      className={`fixed inset-0 flex items-center justify-center overflow-hidden bg-slate-950/70 p-4 backdrop-blur-sm ${stacked
+        ? 'z-[10020]'
+        : 'z-[100]'
+        }`}
       onClick={onClose}
     >
       <div
@@ -2157,6 +2284,116 @@ function DetailModal({
             </section>
           )}
 
+          {report.dashboardModule === 'TOILET' &&
+            (
+              String(
+                report?.qcDecision ||
+                status ||
+                ''
+              ).toUpperCase() === 'APPROVED' ||
+              String(
+                report?.qcDecision ||
+                status ||
+                ''
+              ).toUpperCase() === 'REJECTED'
+            ) && (
+              <section className="mt-5">
+
+                <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                  QC Review
+                </h3>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+
+                    {/* DECISION */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        Decision
+                      </div>
+
+                      <div className="mt-1">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${String(
+                            report?.qcDecision ||
+                            status
+                          ).toUpperCase() ===
+                            'APPROVED'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-rose-200 bg-rose-50 text-rose-700'
+                            }`}
+                        >
+                          {String(
+                            report?.qcDecision ||
+                            status
+                          )
+                            .replace(
+                              /_/g,
+                              ' '
+                            )}
+                        </span>
+                      </div>
+                    </div>
+                    {/* REVIEWED BY */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        Reviewed By
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                          <User className="h-4 w-4" />
+                        </div>
+
+                        <div>
+                          <div className="text-sm font-black text-slate-700">
+                            {qcReviewer?.name || '—'}
+                          </div>
+
+                          <div className="text-[9px] font-bold text-slate-400">
+                            QC Officer
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* REVIEWED AT */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        Reviewed At
+                      </div>
+
+                      <div className="mt-1 text-sm font-bold text-slate-700">
+                        {formatFullDate(
+                          report?.qcReviewedAt ||
+                          report?.reviewedAt
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+
+                  {/* QC REMARK */}
+                  {qcRemark && (
+                    <div className="mt-4 border-t border-slate-200 pt-3">
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        QC Remark
+                      </div>
+
+                      <div className="mt-1 text-sm font-semibold leading-6 text-slate-700">
+                        {displayAnswer(
+                          qcRemark
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+              </section>
+            )}
           {topLevelImages.length > 0 && (
             <section className="mt-5">
               <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
@@ -2639,6 +2876,10 @@ function SweepingPointEvidenceSection({
             const photos =
               evidence
                 ? normalizeImages([
+                  evidence?.photos,
+                  evidence?.photoUrls,
+                  evidence?.images,
+                  evidence?.imageUrls,
                   evidence?.photo,
                   evidence?.photoUrl,
                   evidence?.image,
