@@ -10,21 +10,20 @@ import {
 import WardExecutiveOverview
   from './WardExecutiveOverview';
 import {
-  AlertTriangle,
   Award,
   CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Loader2,
   MapPin,
   Minus,
   RefreshCw,
-  RotateCcw,
   Search,
+  ShieldCheck,
   TrendingDown,
   TrendingUp,
   Trophy,
+  X,
   XCircle,
 } from 'lucide-react';
 
@@ -66,6 +65,8 @@ type ModuleFilter =
 
 type StatusFilter =
   | 'ALL'
+  | 'RANKED'
+  | 'NODATA'
   | WardPerformanceBand;
 
 type GeoNode = {
@@ -855,6 +856,12 @@ export default function WardRankingWorkspace() {
     useState('');
 
   const [
+    trendZoneId,
+    setTrendZoneId,
+  ] =
+    useState('');
+
+  const [
     moduleFilter,
     setModuleFilter,
   ] =
@@ -1320,8 +1327,28 @@ export default function WardRankingWorkspace() {
           .filter(
             (item) => {
               if (
+                statusFilter ===
+                'RANKED' &&
+                !item.rankable
+              ) {
+                return false;
+              }
+
+              if (
+                statusFilter ===
+                'NODATA' &&
+                item.rankable
+              ) {
+                return false;
+              }
+
+              if (
                 statusFilter !==
                 'ALL' &&
+                statusFilter !==
+                'RANKED' &&
+                statusFilter !==
+                'NODATA' &&
                 item.performanceBand !==
                 statusFilter
               ) {
@@ -1550,6 +1577,12 @@ export default function WardRankingWorkspace() {
     useMemo(
       () =>
         rankableRows
+          .filter(
+            (item) =>
+              !trendZoneId ||
+              item.zoneId ===
+              trendZoneId
+          )
           .slice()
           .sort(
             (
@@ -1601,6 +1634,7 @@ export default function WardRankingWorkspace() {
           ),
       [
         rankableRows,
+        trendZoneId,
       ]
     );
 
@@ -1899,333 +1933,200 @@ export default function WardRankingWorkspace() {
 
 
   return (
-    <div className="space-y-4 pb-8">
-
-
-
+    <div className="space-y-5 pb-8">
 
       {/* =====================================================
           FILTERS
       ===================================================== */}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4">
-
+      <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="inline-flex w-full rounded-xl bg-slate-100 p-1 sm:w-auto">
-              {PERIOD_OPTIONS.map(
-                (option) => (
-                  <button
-                    key={
-                      option.key
-                    }
-                    type="button"
-                    onClick={() => {
-                      setPeriodType(
-                        option.key
-                      );
-                    }}
-                    className={`flex-1 rounded-lg px-4 py-2 text-xs font-black transition sm:flex-none ${periodType ===
-                      option.key
-                      ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                  >
-                    {option.label}
-                  </button>
-                )
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                <CalendarDays className="h-4 w-4" />
+                Date
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {PERIOD_OPTIONS.map((option) => {
+                  const active = periodType === option.key;
+                  return (
+                    <button
+                      type="button"
+                      key={option.key}
+                      onClick={() => setPeriodType(option.key)}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${active
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                        }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {periodType !== 'CUSTOM' && (
+                <input
+                  type="date"
+                  value={anchorDate}
+                  max={todayString()}
+                  onChange={(event) => setAnchorDate(event.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 outline-none transition focus:border-blue-400"
+                />
               )}
             </div>
 
+            <div className="flex flex-wrap items-center gap-1.5">
+              {MODULE_OPTIONS.map((option) => {
+                const active = moduleFilter === option.key;
+                return (
+                  <button
+                    type="button"
+                    key={option.key}
+                    onClick={() => setModuleFilter(option.key)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${active
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                      }`}
+                  >
+                    {option.key === 'ALL' ? 'All' : option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+              <ShieldCheck className="h-4 w-4" />
+              Status
+            </div>
+
+            {STATUS_OPTIONS.map((option) => {
+              const active = statusFilter === option.key;
+              const value =
+                option.key === 'ALL'
+                  ? counts.total
+                  : option.key === 'GREEN'
+                    ? counts.green
+                    : option.key === 'AMBER'
+                      ? counts.amber
+                      : counts.red;
+
+              return (
+                <button
+                  type="button"
+                  key={option.key}
+                  onClick={() => setStatusFilter(option.key)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${active
+                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+                    }`}
+                >
+                  {option.label} ({value.toLocaleString()})
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+              <MapPin className="h-4 w-4" />
+              Location
+            </div>
+
+            <select
+              value={selectedZoneId}
+              onChange={(event) => setSelectedZoneId(event.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 outline-none transition focus:border-blue-400"
+            >
+              <option value="">All Zones</option>
+              {zones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {displayGeoName(zone)}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedWardId}
+              onChange={(event) => setSelectedWardId(event.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 outline-none transition focus:border-blue-400"
+            >
+              <option value="">All Wards</option>
+              {visibleWards.map((ward) => (
+                <option key={ward.id} value={ward.id}>
+                  {displayGeoName(ward)}
+                </option>
+              ))}
+            </select>
+
             <button
               type="button"
-              onClick={
-                resetFilters
-              }
-              className="inline-flex items-center justify-center gap-2 self-start rounded-lg px-3 py-2 text-xs font-black text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 lg:self-auto"
+              onClick={resetFilters}
+              className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
             >
-              <RotateCcw
-                size={13}
-              />
-
-              Reset Filters
+              Reset
             </button>
           </div>
 
+          {periodType === 'CUSTOM' && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+              <input
+                type="date"
+                value={customFrom}
+                max={customTo || todayString()}
+                onChange={(event) => setCustomFrom(event.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 outline-none focus:border-blue-400"
+              />
+              <span className="text-xs font-semibold text-slate-400">to</span>
+              <input
+                type="date"
+                value={customTo}
+                min={customFrom || undefined}
+                max={todayString()}
+                onChange={(event) => setCustomTo(event.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 outline-none focus:border-blue-400"
+              />
+            </div>
+          )}
+        </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-
-            {periodType !==
-              'CUSTOM' ? (
-              <label className="space-y-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                  Date
-                </span>
-
-                <input
-                  type="date"
-                  value={
-                    anchorDate
-                  }
-                  max={
-                    todayString()
-                  }
-                  onChange={(
-                    event
-                  ) => {
-                    setAnchorDate(
-                      event.target
-                        .value
-                    );
-                  }}
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                />
-              </label>
-            ) : (
-              <>
-                <label className="space-y-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                    From
-                  </span>
-
-                  <input
-                    type="date"
-                    value={
-                      customFrom
-                    }
-                    max={
-                      todayString()
-                    }
-                    onChange={(
-                      event
-                    ) => {
-                      setCustomFrom(
-                        event.target
-                          .value
-                      );
-                    }}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-
-                <label className="space-y-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                    To
-                  </span>
-
-                  <input
-                    type="date"
-                    value={
-                      customTo
-                    }
-                    max={
-                      todayString()
-                    }
-                    onChange={(
-                      event
-                    ) => {
-                      setCustomTo(
-                        event.target
-                          .value
-                      );
-                    }}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  />
-                </label>
-              </>
+        <div className="border-b border-slate-200 bg-white px-4 py-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search ward or zone..."
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
+          </div>
 
-
-            <label className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                Zone
-              </span>
-
-              <select
-                value={
-                  selectedZoneId
-                }
-                onChange={(
-                  event
-                ) => {
-                  setSelectedZoneId(
-                    event.target
-                      .value
-                  );
-                }}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">
-                  All Zones
-                </option>
-
-                {zones.map(
-                  (zone) => (
-                    <option
-                      key={
-                        zone.id
-                      }
-                      value={
-                        zone.id
-                      }
-                    >
-                      {displayGeoName(
-                        zone
-                      )}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-
-
-            <label className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                Ward
-              </span>
-
-              <select
-                value={
-                  selectedWardId
-                }
-                onChange={(
-                  event
-                ) => {
-                  setSelectedWardId(
-                    event.target
-                      .value
-                  );
-                }}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              >
-                <option value="">
-                  All Wards
-                </option>
-
-                {visibleWards.map(
-                  (ward) => (
-                    <option
-                      key={
-                        ward.id
-                      }
-                      value={
-                        ward.id
-                      }
-                    >
-                      {displayGeoName(
-                        ward
-                      )}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-
-
-            <label className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                Module
-              </span>
-
-              <select
-                value={
-                  moduleFilter
-                }
-                onChange={(
-                  event
-                ) => {
-                  setModuleFilter(
-                    event.target
-                      .value as ModuleFilter
-                  );
-                }}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              >
-                {MODULE_OPTIONS.map(
-                  (option) => (
-                    <option
-                      key={
-                        option.key
-                      }
-                      value={
-                        option.key
-                      }
-                    >
-                      {option.label}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-
-
-            <label className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                Status
-              </span>
-
-              <select
-                value={
-                  statusFilter
-                }
-                onChange={(
-                  event
-                ) => {
-                  setStatusFilter(
-                    event.target
-                      .value as StatusFilter
-                  );
-                }}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              >
-                {STATUS_OPTIONS.map(
-                  (option) => (
-                    <option
-                      key={
-                        option.key
-                      }
-                      value={
-                        option.key
-                      }
-                    >
-                      {option.label}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-
-
-            <label className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">
-                Search
-              </span>
-
-              <div className="relative">
-                <Search
-                  size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-
-                <input
-                  value={
-                    search
-                  }
-                  onChange={(
-                    event
-                  ) => {
-                    setSearch(
-                      event.target
-                        .value
-                    );
-                  }}
-                  placeholder="Ward or zone..."
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition placeholder:font-medium placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-            </label>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium text-slate-400">
+            <span>
+              Showing {displayedFrom}–{displayedTo} of {filteredRows.length.toLocaleString()} wards
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-emerald-600">Green: {counts.green}</span>
+              <span className="text-amber-600">Amber: {counts.amber}</span>
+              <span className="text-rose-600">Red: {counts.red}</span>
+            </div>
           </div>
         </div>
+
       </section>
 
 
@@ -2244,41 +2145,57 @@ export default function WardRankingWorkspace() {
         onOpenWard={
           openWardDrilldown
         }
-      />
-
-
-      {/* =====================================================
-          PERFORMANCE ANALYTICS
-      ===================================================== */}
-
-      <section>
-
-
+        statusFilter={
+          statusFilter
+        }
+        onFilterStatus={
+          setStatusFilter
+        }
+      >
 
         <ChartCard
-          title="Historical Performance Trend"
-          subtitle="Current Ward Score compared with 7-day and 30-day historical averages."
-          badge="Trend"
+          title="Ward Performance Trend"
+          subtitle="Current score vs 7-day and 30-day averages."
+          // badge="Trend"
         >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black text-blue-700">
+                <span className="h-2 w-2 rounded-full bg-blue-600" />
+                Current
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[9px] font-black text-violet-700">
+                <span className="h-2 w-2 rounded-full bg-violet-600" />
+                7-Day Avg
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-2.5 py-1 text-[9px] font-black text-cyan-700">
+                <span className="h-2 w-2 rounded-full bg-cyan-600" />
+                30-Day Avg
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-slate-400" />
+
+              <select
+                value={trendZoneId}
+                onChange={(event) => setTrendZoneId(event.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600 outline-none transition focus:border-blue-400"
+              >
+                <option value="">All Zones</option>
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {displayGeoName(zone)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {trendComparisonData.length ? (
             <div>
-              <div className="mb-3 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-black text-blue-700">
-                  <span className="h-2 w-2 rounded-full bg-blue-600" />
-                  Current
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[9px] font-black text-violet-700">
-                  <span className="h-2 w-2 rounded-full bg-violet-600" />
-                  7-Day Avg
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-2.5 py-1 text-[9px] font-black text-cyan-700">
-                  <span className="h-2 w-2 rounded-full bg-cyan-600" />
-                  30-Day Avg
-                </span>
-              </div>
-
               <div className="h-[310px]">
                 <ResponsiveContainer
                   width="100%"
@@ -2390,18 +2307,19 @@ export default function WardRankingWorkspace() {
 
               {!hasHistoricalTrend && (
                 <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[10px] font-bold text-amber-700">
-                  Historical averages will appear as immutable daily Ward Ranking snapshots accumulate.
+                  Historical averages will appear as data accumulates.
                 </div>
               )}
             </div>
           ) : (
             <ChartEmptyState
-              message="No rankable ward trend data is available."
+              message="No ward trend data available."
             />
           )}
         </ChartCard>
 
-      </section>
+      </WardExecutiveOverview>
+
 
       {/* =====================================================
           RANKING LIST
@@ -2414,10 +2332,6 @@ export default function WardRankingWorkspace() {
             <h3 className="text-sm font-black text-slate-900">
               Ward Ranking
             </h3>
-
-            <p className="mt-0.5 text-[11px] font-semibold text-slate-400">
-              Scores are calculated only from applicable operational components.
-            </p>
           </div>
 
           <div className="text-[11px] font-bold text-slate-500">
@@ -2438,7 +2352,7 @@ export default function WardRankingWorkspace() {
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80 text-left">
                 {[
-                  'City Rank',
+                  'Rank',
                   'Ward',
                   'Zone',
                   'Final Score',
@@ -2836,11 +2750,7 @@ export default function WardRankingWorkspace() {
             />
 
             <div className="mt-3 text-sm font-black text-slate-600">
-              No wards match the selected filters.
-            </div>
-
-            <div className="mt-1 text-xs font-semibold text-slate-400">
-              Change the date, location, module or performance status.
+              No wards match your filters.
             </div>
           </div>
         )}
