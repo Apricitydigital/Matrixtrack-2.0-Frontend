@@ -9,10 +9,14 @@ import {
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 
-const COLORS = [
-    "#FF3D00", "#FFD600", "#00E676", "#00B0FF", "#651FFF", "#D500F9",
-    "#F50057", "#1DE9B6", "#C6FF00", "#FF9100", "#FF1744", "#3D5AFE"
-];
+function getBeatColor(beatId: string, index: number) {
+    const hash = Array.from(beatId || String(index)).reduce(
+        (value, character) => ((value << 5) - value + character.charCodeAt(0)) | 0,
+        0
+    );
+    const hue = Math.abs(hash * 137.508) % 360;
+    return `hsl(${hue} 82% 45%)`;
+}
 
 function FitAllBounds({ beats, selectedBeatId }: { beats: any[], selectedBeatId?: string | null }) {
     const map = useMap();
@@ -193,21 +197,17 @@ function BeatGeoJSONLayer({
                 const segHasReport = props?.hasReport;
                 const isUnassigned = props?.isUnassigned;
 
-                let strokeColor = COLORS[bIdx % COLORS.length];
-                if (segHasReport) {
-                    strokeColor = "#10b981";
-                } else if (isUnassigned) {
-                    strokeColor = "#94a3b8";
-                }
-
-                if (isSelected) strokeColor = "#2563eb";
+                const strokeColor = isSelected
+                    ? "#1d4ed8"
+                    : getBeatColor(beat.id, bIdx);
 
                 return {
                     color: strokeColor,
-                    weight: isSelected ? 7 : (segHasReport ? 5 : (isUnassigned ? 2 : 4)),
-                    opacity: isSelected ? 1 : (segHasReport ? 1 : 0.85),
-                    fillOpacity: isSelected ? 0.35 : (segHasReport ? 0.25 : 0.1),
-                    dashArray: isUnassigned && !segHasReport ? "5, 8" : "none"
+                    weight: isSelected ? 8 : 5,
+                    opacity: isSelected ? 1 : 0.95,
+                    fillColor: strokeColor,
+                    fillOpacity: isSelected ? 0.42 : 0.25,
+                    dashArray: isUnassigned && !segHasReport ? "7, 5" : "none"
                 };
             }}
             onEachFeature={(feature, layer) => {
