@@ -13,7 +13,12 @@ export default function Page() {
   return (
     <Protected>
       <RoleGuard
-        roles={['ULB_OFFICER']}
+        roles={[
+          'ULB_OFFICER',
+          'CITY_ADMIN',
+          'COMMISSIONER',
+          'HMS_SUPER_ADMIN',
+        ]}
       >
         <PortalHomeLayout>
           <WardRankingWorkspace />

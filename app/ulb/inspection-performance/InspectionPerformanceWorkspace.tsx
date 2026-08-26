@@ -9,7 +9,6 @@ import {
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
-  ArrowUpDown,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -45,10 +44,9 @@ type StatusKey =
   | 'APPROVED'
   | 'REJECTED'
   | 'ACTION_REQUIRED'
+  | 'PENDING_ACTION'
   | 'ACTION_TAKEN';
 type DatePreset = 'TODAY' | 'YESTERDAY' | 'WEEK' | 'MONTH' | 'ALL' | 'CUSTOM';
-type SortField = 'DATE' | 'POINT' | 'USER';
-type SortDirection = 'asc' | 'desc';
 
 type DashboardRecord = any & {
   dashboardModule: ModuleKey;
@@ -90,6 +88,7 @@ const STATUS_ORDER: StatusKey[] = [
   'APPROVED',
   'REJECTED',
   'ACTION_REQUIRED',
+  'PENDING_ACTION',
   'ACTION_TAKEN',
 ];
 
@@ -105,32 +104,32 @@ const STATUS_CONFIG: Record<
   }
 > = {
   TOTAL: {
-    label: 'Total Reports',
-    shortLabel: 'Total',
+    label: 'Total Inspection',
+    shortLabel: 'Total Inspection',
     text: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-500',
     icon: FileText,
   },
   PENDING: {
-    label: 'Pending Reports',
-    shortLabel: 'Pending',
+    label: 'QC Pending Reports',
+    shortLabel: 'QC Pending',
     text: 'text-amber-600',
     bg: 'bg-amber-50',
     border: 'border-amber-500',
     icon: Clock3,
   },
   APPROVED: {
-    label: 'Approved Reports',
-    shortLabel: 'Approved',
+    label: 'QC Approved Reports',
+    shortLabel: 'QC Approved',
     text: 'text-emerald-600',
     bg: 'bg-emerald-50',
     border: 'border-emerald-500',
     icon: CheckCircle2,
   },
   REJECTED: {
-    label: 'Rejected Reports',
-    shortLabel: 'Rejected',
+    label: 'QC Rejected Reports',
+    shortLabel: 'QC Rejected',
     text: 'text-rose-600',
     bg: 'bg-rose-50',
     border: 'border-rose-500',
@@ -143,6 +142,14 @@ const STATUS_CONFIG: Record<
     bg: 'bg-orange-50',
     border: 'border-orange-500',
     icon: AlertTriangle,
+  },
+  PENDING_ACTION: {
+    label: 'Pending Action Reports',
+    shortLabel: 'Pending Action',
+    text: 'text-cyan-600',
+    bg: 'bg-cyan-50',
+    border: 'border-cyan-500',
+    icon: Clock3,
   },
   ACTION_TAKEN: {
     label: 'Action Taken Reports',
@@ -236,6 +243,28 @@ function normalizedStatus(item: any): Exclude<StatusKey, 'TOTAL'> | string {
   return rawStatus || 'PENDING';
 }
 
+/**
+ * The permanent QC verdict for a report. Unlike `normalizedStatus`,
+ * this stays APPROVED/REJECTED even after the report has moved on to
+ * ACTION_REQUIRED / ACTION_TAKEN, so the QC Approved / QC Rejected
+ * tabs can show every report that ever received that verdict.
+ */
+function getQcDecision(item: any): 'APPROVED' | 'REJECTED' | null {
+  const decision = String(item?.qcDecision || '').toUpperCase();
+  if (decision === 'APPROVED' || decision === 'REJECTED') return decision;
+
+  const status = normalizedStatus(item);
+  if (status === 'APPROVED' || status === 'REJECTED') return status;
+
+  // Legacy reports escalated to Action Required / Action Taken before the
+  // permanent qcDecision field existed have no recoverable original verdict.
+  // Default them to Approved (the far more common precursor to escalation)
+  // so QC Pending + QC Approved + QC Rejected still reconciles with Total.
+  if (status === 'ACTION_REQUIRED' || status === 'ACTION_TAKEN') return 'APPROVED';
+
+  return null;
+}
+
 function moduleLabel(moduleKey: ModuleKey) {
   return MODULES.find((module) => module.key === moduleKey)?.label || moduleKey;
 }
@@ -302,12 +331,23 @@ function submittedByName(item: any) {
 }
 
 function reportTimestamp(item: any) {
+  /*
+   * createdAt is the original submission date and never moves, so
+   * checking it first made this function (used for both date-range
+   * filtering and sorting) always report the submission date - even
+   * for a report that was marked Action Required or resolved Action
+   * Taken much later. The most recent action-specific timestamp (or
+   * updatedAt, which every module bumps on that write) must win first
+   * so those reports filter/sort under the date the action happened.
+   */
   const raw =
+    item?.actionTakenAt ||
+    item?.actionOfficerRespondedAt ||
+    item?.updatedAt ||
+    item?.reviewedAt ||
     item?.createdAt ||
     item?.submittedAt ||
     item?.visitedAt ||
-    item?.reviewedAt ||
-    item?.updatedAt ||
     null;
 
   if (!raw) return 0;
@@ -469,22 +509,121 @@ function extractAnswers(item: any): AnswerRow[] {
 function getSweepingSubmittedPoints(
   item: any
 ) {
-  const points =
+  /*
+   * =====================================================
+   * AGGREGATED BEAT FORMAT
+   * =====================================================
+   *
+   * Supports records where P1-P5 are already
+   * grouped inside payload.points.
+   */
+  const aggregatePoints =
     Array.isArray(
       item?.payload?.points
     )
       ? item.payload.points
       : [];
 
-  return [...points].sort(
-    (a: any, b: any) =>
-      Number(
-        a?.pointIndex ?? 999
-      ) -
-      Number(
-        b?.pointIndex ?? 999
-      )
-  );
+  if (
+    aggregatePoints.length > 0
+  ) {
+    return [...aggregatePoints].sort(
+      (a: any, b: any) =>
+        Number(
+          a?.pointIndex ?? 999
+        ) -
+        Number(
+          b?.pointIndex ?? 999
+        )
+    );
+  }
+
+
+  /*
+   * =====================================================
+   * CURRENT POINT-LEVEL FORMAT
+   * =====================================================
+   *
+   * Current Sweeping submission stores one
+   * SweepingRecord for each Beat point:
+   *
+   * payload.pointIndex
+   * payload.pointCode
+   * payload.pointName
+   * payload.pointType
+   * payload.photos
+   */
+  const payload =
+    item?.payload;
+
+  if (
+    !payload ||
+    typeof payload !== 'object'
+  ) {
+    return [];
+  }
+
+
+  const pointIndex =
+    Number(
+      payload?.pointIndex
+    );
+
+
+  if (
+    !Number.isInteger(
+      pointIndex
+    ) ||
+    pointIndex < 0
+  ) {
+    return [];
+  }
+
+
+  const photos =
+    normalizeImages([
+      payload?.photos,
+      payload?.photoUrls,
+      payload?.images,
+      payload?.imageUrls,
+      payload?.photo,
+      payload?.photoUrl,
+      payload?.image,
+      payload?.imageUrl,
+    ]);
+
+
+  /*
+   * A point-level record itself represents
+   * one submitted Beat point.
+   */
+  return [
+    {
+      pointIndex,
+
+      pointCode:
+        payload?.pointCode ||
+        `P${pointIndex + 1}`,
+
+      pointName:
+        payload?.pointName ||
+        `Point ${pointIndex + 1}`,
+
+      pointType:
+        payload?.pointType,
+
+      photos,
+
+      /*
+       * Keep first-image aliases for existing UI.
+       */
+      photo:
+        photos[0] || null,
+
+      photoUrl:
+        photos[0] || null,
+    },
+  ];
 }
 
 function getSweepingSummary(
@@ -537,11 +676,28 @@ function collectTopLevelImages(item: any) {
     item?.photoUrl,
     item?.image,
     item?.imageUrl,
-    item?.actionPhoto,
-    item?.actionPhotoUrl,
     item?.payload?.photos,
     item?.payload?.photoUrls,
-    item?.payload?.aoPhoto,
+  ]);
+}
+
+function getActionTakenPhotos(item: any, moduleKey: ModuleKey) {
+  if (moduleKey === 'SWEEPING') {
+    return normalizeImages([
+      item?.payload?.aoPhotos,
+      item?.payload?.aoPhoto,
+      item?.payload?.actionPhoto,
+      item?.payload?.actionPhotoUrl,
+    ]);
+  }
+
+  return normalizeImages([
+    item?.actionPhotos,
+    item?.actionPhotoUrls,
+    item?.actionPhoto,
+    item?.actionPhotoUrl,
+    item?.actionOfficerPhoto,
+    item?.actionOfficerPhotoUrl,
   ]);
 }
 
@@ -558,6 +714,10 @@ function totalImageCount(
       ).flatMap(
         (point: any) =>
           normalizeImages([
+            point?.photos,
+            point?.photoUrls,
+            point?.images,
+            point?.imageUrls,
             point?.photo,
             point?.photoUrl,
             point?.image,
@@ -565,9 +725,10 @@ function totalImageCount(
           ])
       );
 
-    return new Set(
-      pointImages
-    ).size;
+    return new Set([
+      ...pointImages,
+      ...getActionTakenPhotos(item, 'SWEEPING'),
+    ]).size;
   }
 
   const answerImages =
@@ -581,6 +742,7 @@ function totalImageCount(
     ...collectTopLevelImages(
       item
     ),
+    ...getActionTakenPhotos(item, item.dashboardModule),
   ]).size;
 }
 
@@ -743,8 +905,6 @@ export default function InspectionPerformanceWorkspace() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('DATE');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [selected, setSelected] = useState<DashboardRecord | null>(null);
@@ -853,8 +1013,6 @@ export default function InspectionPerformanceWorkspace() {
     selectedZone,
     selectedWard,
     debouncedSearch,
-    sortField,
-    sortDirection,
   ]);
 
   const rangeRecords = useMemo(
@@ -896,13 +1054,29 @@ export default function InspectionPerformanceWorkspace() {
       APPROVED: 0,
       REJECTED: 0,
       ACTION_REQUIRED: 0,
+      PENDING_ACTION: 0,
       ACTION_TAKEN: 0,
     };
 
     searchableRecords.forEach((item) => {
       const status = normalizedStatus(item);
-      if (status in next && status !== 'TOTAL') {
-        next[status as Exclude<StatusKey, 'TOTAL'>] += 1;
+      const decision = getQcDecision(item);
+
+      // QC Approved / QC Rejected are supersets: a report keeps its
+      // original QC verdict even after it moves on to Action Required
+      // or Action Taken, so it still counts here.
+      if (decision === 'APPROVED') next.APPROVED += 1;
+      else if (decision === 'REJECTED') next.REJECTED += 1;
+
+      if (status === 'PENDING') next.PENDING += 1;
+      else if (status === 'ACTION_REQUIRED') {
+        // Action Required is a superset that also includes reports
+        // whose action has already been taken.
+        next.ACTION_REQUIRED += 1;
+        next.PENDING_ACTION += 1;
+      } else if (status === 'ACTION_TAKEN') {
+        next.ACTION_REQUIRED += 1;
+        next.ACTION_TAKEN += 1;
       }
     });
 
@@ -912,27 +1086,24 @@ export default function InspectionPerformanceWorkspace() {
   const filteredRecords = useMemo(() => {
     const list = searchableRecords.filter((item) => {
       if (activeStatus === 'TOTAL') return true;
-      return normalizedStatus(item) === activeStatus;
-    });
 
-    list.sort((a, b) => {
-      let compare = 0;
+      const status = normalizedStatus(item);
 
-      if (sortField === 'DATE') {
-        compare = reportTimestamp(a) - reportTimestamp(b);
-      } else if (sortField === 'POINT') {
-        compare = reportTitle(a, a.dashboardModule).localeCompare(
-          reportTitle(b, b.dashboardModule)
-        );
-      } else {
-        compare = submittedByName(a).localeCompare(submittedByName(b));
+      if (activeStatus === 'ACTION_REQUIRED') {
+        return status === 'ACTION_REQUIRED' || status === 'ACTION_TAKEN';
+      }
+      if (activeStatus === 'PENDING_ACTION') return status === 'ACTION_REQUIRED';
+      if (activeStatus === 'APPROVED' || activeStatus === 'REJECTED') {
+        return getQcDecision(item) === activeStatus;
       }
 
-      return sortDirection === 'desc' ? -compare : compare;
+      return status === activeStatus;
     });
 
+    list.sort((a, b) => reportTimestamp(b) - reportTimestamp(a));
+
     return list;
-  }, [searchableRecords, activeStatus, sortField, sortDirection]);
+  }, [searchableRecords, activeStatus]);
 
   const displayedRecords = useMemo(
     () => filteredRecords.slice(0, visibleCount),
@@ -973,16 +1144,6 @@ export default function InspectionPerformanceWorkspace() {
 
     return Array.from(values.values()).slice(0, 8);
   }, [search, records]);
-
-  function handleSort(field: SortField) {
-    if (sortField === field) {
-      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-
-    setSortField(field);
-    setSortDirection('desc');
-  }
 
   async function openDetail(
     item: DashboardRecord
@@ -1379,10 +1540,7 @@ export default function InspectionPerformanceWorkspace() {
     <div className="space-y-5 pb-8">
       <section className="grid grid-cols-[1fr_auto] items-center gap-3">
         <p className="text-sm font-semibold text-slate-500">
-          {locationRecords.length.toLocaleString()} reports in range ·{' '}
-          {moduleSplit.TOILET.toLocaleString()} toilet ·{' '}
-          {moduleSplit.LITTERBINS.toLocaleString()} litter bin ·{' '}
-          {moduleSplit.SWEEPING.toLocaleString()} sweeping
+          
         </p>
 
         <button
@@ -1530,84 +1688,58 @@ export default function InspectionPerformanceWorkspace() {
         </div>
 
         <div className="border-b border-slate-200 bg-white px-4 py-3">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setShowSuggestions(true);
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => search && setShowSuggestions(true)}
+              onBlur={() => {
+                suggestionBlurTimer.current = setTimeout(() => setShowSuggestions(false), 120);
+              }}
+              placeholder="Search report, location, user, zone, ward..."
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
+
+            {search && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setShowSuggestions(false);
                 }}
-                onFocus={() => search && setShowSuggestions(true)}
-                onBlur={() => {
-                  suggestionBlurTimer.current = setTimeout(() => setShowSuggestions(false), 120);
-                }}
-                placeholder="Search report, location, user, zone, ward..."
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              />
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
 
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearch('');
-                    setShowSuggestions(false);
-                  }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                  {suggestions.map((suggestion, index) => (
-                    <button
-                      type="button"
-                      key={`${suggestion.type}-${suggestion.label}-${index}`}
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        if (suggestionBlurTimer.current) clearTimeout(suggestionBlurTimer.current);
-                        setSearch(suggestion.label);
-                        setShowSuggestions(false);
-                      }}
-                      className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50"
-                    >
-                      <span className="truncate">{suggestion.label}</span>
-                      <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                        {suggestion.type}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              {([
-                ['DATE', 'Date'],
-                ['POINT', 'Point'],
-                ['USER', 'User'],
-              ] as Array<[SortField, string]>).map(([field, label]) => {
-                const active = sortField === field;
-                return (
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                {suggestions.map((suggestion, index) => (
                   <button
                     type="button"
-                    key={field}
-                    onClick={() => handleSort(field)}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2.5 text-xs font-bold transition ${active
-                      ? 'border-blue-200 bg-blue-50 text-blue-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
-                      }`}
+                    key={`${suggestion.type}-${suggestion.label}-${index}`}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      if (suggestionBlurTimer.current) clearTimeout(suggestionBlurTimer.current);
+                      setSearch(suggestion.label);
+                      setShowSuggestions(false);
+                    }}
+                    className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left text-xs font-semibold text-slate-700 last:border-b-0 hover:bg-slate-50"
                   >
-                    {label}
-                    {active && <ArrowUpDown className="h-3.5 w-3.5" />}
+                    <span className="truncate">{suggestion.label}</span>
+                    <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                      {suggestion.type}
+                    </span>
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium text-slate-400">
@@ -1623,7 +1755,7 @@ export default function InspectionPerformanceWorkspace() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-3 xl:grid-cols-7">
           {STATUS_ORDER.map((statusKey) => {
             const config = STATUS_CONFIG[statusKey];
             const Icon = config.icon;
@@ -1747,7 +1879,7 @@ export default function InspectionPerformanceWorkspace() {
         />
       )}
 
-      {imagePreview && (
+      {imagePreview && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setImagePreview(null)}
@@ -1765,7 +1897,8 @@ export default function InspectionPerformanceWorkspace() {
             className="max-h-full max-w-full rounded-xl object-contain"
             onClick={(event) => event.stopPropagation()}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1981,24 +2114,45 @@ function ReportCard({
   );
 }
 
-function DetailModal({
+export function DetailModal({
   report,
   loading,
   onClose,
   onImagePreview,
+  stacked = false,
+  qcReviewHistory = [],
 }: {
   report: DashboardRecord;
-  loading: boolean;
-  onClose: () => void;
-  onImagePreview: (url: string) => void;
+
+  loading:
+  boolean;
+
+  onClose:
+  () => void;
+
+  onImagePreview:
+  (
+    url: string
+  ) => void;
+
+  stacked?:
+  boolean;
+
+  qcReviewHistory?:
+  any[];
 }) {
   const status = normalizedStatus(report);
   const classes = statusClasses(status);
   const answers = extractAnswers(report);
   const topLevelImages = collectTopLevelImages(report);
   const qcRemark = getQcRemark(report);
+  const qcReviewer =
+    report?.reviewedByQc ||
+    report?.reviewedBy ||
+    null;
   const actionRequiredRemark = getActionRequiredRemark(report, report.dashboardModule);
   const actionTakenRemark = getActionTakenRemark(report, report.dashboardModule);
+  const actionTakenPhotos = getActionTakenPhotos(report, report.dashboardModule);
   const isSweeping =
     report.dashboardModule ===
     'SWEEPING';
@@ -2011,9 +2165,13 @@ function DetailModal({
     return null;
   }
 
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/70 p-4 backdrop-blur-sm"
+      className={`fixed inset-0 flex items-center justify-center overflow-hidden bg-slate-950/70 p-4 backdrop-blur-sm ${stacked
+        ? 'z-[10020]'
+        : 'z-[100]'
+        }`}
       onClick={onClose}
     >
       <div
@@ -2097,7 +2255,7 @@ function DetailModal({
             </div>
           </section>
           <AiInsightsSection report={report} />
-          {(qcRemark || actionRequiredRemark || actionTakenRemark) && (
+          {(qcRemark || actionRequiredRemark || actionTakenRemark || actionTakenPhotos.length > 0) && (
             <section className="mt-5">
               <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
                 Workflow Remarks
@@ -2110,10 +2268,132 @@ function DetailModal({
                 {actionTakenRemark && (
                   <RemarkBox label="Action Officer Response" value={actionTakenRemark} tone="indigo" />
                 )}
+                {actionTakenPhotos.length > 0 && (
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+                    <div className="text-[9px] font-black uppercase tracking-[0.12em] text-indigo-500">
+                      Action Officer Uploaded Photos
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {actionTakenPhotos.map((url) => (
+                        <ImageTile key={url} url={url} onOpen={onImagePreview} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           )}
 
+          {report.dashboardModule === 'TOILET' &&
+            (
+              String(
+                report?.qcDecision ||
+                status ||
+                ''
+              ).toUpperCase() === 'APPROVED' ||
+              String(
+                report?.qcDecision ||
+                status ||
+                ''
+              ).toUpperCase() === 'REJECTED'
+            ) && (
+              <section className="mt-5">
+
+                <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                  QC Review
+                </h3>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+
+                    {/* DECISION */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        Decision
+                      </div>
+
+                      <div className="mt-1">
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${String(
+                            report?.qcDecision ||
+                            status
+                          ).toUpperCase() ===
+                            'APPROVED'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-rose-200 bg-rose-50 text-rose-700'
+                            }`}
+                        >
+                          {String(
+                            report?.qcDecision ||
+                            status
+                          )
+                            .replace(
+                              /_/g,
+                              ' '
+                            )}
+                        </span>
+                      </div>
+                    </div>
+                    {/* REVIEWED BY */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        Reviewed By
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                          <User className="h-4 w-4" />
+                        </div>
+
+                        <div>
+                          <div className="text-sm font-black text-slate-700">
+                            {qcReviewer?.name || '—'}
+                          </div>
+
+                          <div className="text-[9px] font-bold text-slate-400">
+                            QC Officer
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* REVIEWED AT */}
+                    <div>
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        Reviewed At
+                      </div>
+
+                      <div className="mt-1 text-sm font-bold text-slate-700">
+                        {formatFullDate(
+                          report?.qcReviewedAt ||
+                          report?.reviewedAt
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+
+
+                  {/* QC REMARK */}
+                  {qcRemark && (
+                    <div className="mt-4 border-t border-slate-200 pt-3">
+                      <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                        QC Remark
+                      </div>
+
+                      <div className="mt-1 text-sm font-semibold leading-6 text-slate-700">
+                        {displayAnswer(
+                          qcRemark
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+              </section>
+            )}
           {topLevelImages.length > 0 && (
             <section className="mt-5">
               <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
@@ -2305,11 +2585,7 @@ function AiInsightsSection({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 px-4 py-3">
               <div>
                 <div className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
-                  ULB AI Recommendation
-                </div>
-
-                <div className="mt-1 text-sm font-black text-slate-800">
-                  Corrective Action Assessment
+                  AI Recommendation
                 </div>
               </div>
 
@@ -2600,6 +2876,10 @@ function SweepingPointEvidenceSection({
             const photos =
               evidence
                 ? normalizeImages([
+                  evidence?.photos,
+                  evidence?.photoUrls,
+                  evidence?.images,
+                  evidence?.imageUrls,
                   evidence?.photo,
                   evidence?.photoUrl,
                   evidence?.image,
@@ -2790,7 +3070,11 @@ function ActionRequiredModal({
   onClose: () => void;
   onSubmit: () => void;
 }) {
-  return (
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm"
       onClick={onClose}
@@ -2865,6 +3149,7 @@ function ActionRequiredModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -132,7 +132,8 @@ function PortalHomeLayoutContent({
     pathname.startsWith('/modules');
 
   const isSwachhActive =
-    pathname.startsWith('/ward-ranking');
+    pathname.startsWith('/ward-ranking') ||
+    pathname.startsWith('/ulb/ward-ranking');
 
   const isWorkforceActive =
     pathname.startsWith('/workforce-monitoring');
@@ -419,7 +420,6 @@ function PortalHomeLayoutContent({
           'HMS_ADMIN',
         ].includes(r)
     );
-
 
   const isSwachhAdmin =
     isSuperAdmin ||
@@ -2876,10 +2876,15 @@ function PortalHomeLayoutContent({
 
                 <button
                   type="button"
-                  title="Ward Ranking System"
-                  onClick={() =>
-                    handleMenuClick(setSwachhOpen)
-                  }
+                  title={isCityAdmin ? 'Ward Ranking' : 'Ward Ranking System'}
+                  onClick={() => {
+                    if (isCityAdmin) {
+                      router.push('/ulb/ward-ranking');
+                      return;
+                    }
+
+                    handleMenuClick(setSwachhOpen);
+                  }}
                   className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${isSwachhActive
                     ? 'bg-purple-50 text-purple-700 font-extrabold'
                     : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
@@ -2896,24 +2901,31 @@ function PortalHomeLayoutContent({
                     />
 
                     <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-                      Ward Ranking System
+                      {isCityAdmin ? 'Ward Ranking' : 'Ward Ranking System'}
                     </span>
 
                   </div>
 
 
-                  <ChevronDown
-                    size={16}
-                    className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${swachhOpen
-                      ? 'rotate-180 text-purple-600'
-                      : 'text-slate-400'
-                      }`}
-                  />
+                  {isCityAdmin ? (
+                    <ChevronRight
+                      size={16}
+                      className={`shrink-0 text-slate-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}
+                    />
+                  ) : (
+                    <ChevronDown
+                      size={16}
+                      className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${swachhOpen
+                        ? 'rotate-180 text-purple-600'
+                        : 'text-slate-400'
+                        }`}
+                    />
+                  )}
 
                 </button>
 
 
-                {swachhOpen && (
+                {swachhOpen && !isCityAdmin && (
 
                   <div className={`ml-4 mt-1 pl-3 border-l-2 border-purple-200 flex flex-col gap-2 ${
                     sidebarCollapsed ? 'lg:hidden' : ''

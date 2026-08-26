@@ -268,12 +268,20 @@ function effectiveStatus(
 function recordDate(
     item: any
 ) {
+    /*
+     * qcReviewedAt/reviewedAt are fixed milestone dates from the QC
+     * decision - they never move even after ULB/AO act later. updatedAt
+     * (or a dedicated action timestamp, where the model has one) reflects
+     * the most recent write, so it must be checked first or an
+     * Action Required/Action Taken record keeps sorting/filtering under
+     * its old QC review date instead of when that action actually happened.
+     */
     return (
         item?.actionTakenAt ||
         item?.actionOfficerRespondedAt ||
+        item?.updatedAt ||
         item?.reviewedAt ||
         item?.qcReviewedAt ||
-        item?.updatedAt ||
         item?.createdAt ||
         item?.visitedAt ||
         null
@@ -987,10 +995,13 @@ function collectTopLevelImages(
 
         item?.actionPhoto,
         item?.actionPhotoUrl,
+        item?.actionPhotos,
+        item?.actionPhotoUrls,
 
         item?.payload?.photos,
         item?.payload?.photoUrls,
         item?.payload?.aoPhoto,
+        item?.payload?.aoPhotos,
     ]);
 }
 
