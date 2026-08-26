@@ -12,7 +12,7 @@ import {
     MapContainer,
     TileLayer,
     GeoJSON,
-    CircleMarker,
+    Marker,
     Tooltip,
     useMap,
     useMapEvents,
@@ -144,6 +144,10 @@ interface Props {
         drafts: WardBeatDraft[]
     ) => void;
 
+    onSaveExistingAssignments?: (
+        drafts: WardBeatDraft[]
+    ) => Promise<void>;
+
     onClose: () => void;
 }
 
@@ -164,6 +168,68 @@ const BEAT_COLORS = [
     "#0f766e",
     "#c2410c",
 ];
+
+function generateFiveBeatPoints(geometry: any) {
+    const paths: number[][][] = [];
+    const collect = (value: any) => {
+        if (!Array.isArray(value) || value.length === 0) return;
+        if (
+            Array.isArray(value[0]) &&
+            value[0].length >= 2 &&
+            Number.isFinite(Number(value[0][0])) &&
+            Number.isFinite(Number(value[0][1]))
+        ) {
+            paths.push(value as number[][]);
+            return;
+        }
+        value.forEach(collect);
+    };
+
+    collect(geometry?.coordinates);
+    const path = paths.sort((a, b) => b.length - a.length)[0] || [];
+    const clean = path
+        .map((coordinate) => [Number(coordinate[0]), Number(coordinate[1])])
+        .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
+    if (!clean.length) return [];
+    if (clean.length === 1) {
+        return Array.from({ length: 5 }, (_, index) => ({
+            lat: clean[0][1], lng: clean[0][0], label: `P${index + 1}`,
+        }));
+    }
+
+    const lengths = [0];
+    for (let index = 1; index < clean.length; index += 1) {
+        lengths.push(lengths[index - 1] + Math.hypot(
+            clean[index][0] - clean[index - 1][0],
+            clean[index][1] - clean[index - 1][1]
+        ));
+    }
+    const total = lengths[lengths.length - 1];
+    return Array.from({ length: 5 }, (_, pointIndex) => {
+        const target = total > 0 ? (total * (pointIndex + 0.5)) / 5 : 0;
+        let segmentIndex = lengths.findIndex((length) => length >= target);
+        if (segmentIndex <= 0) segmentIndex = 1;
+        const startLength = lengths[segmentIndex - 1];
+        const endLength = lengths[segmentIndex] || startLength;
+        const ratio = endLength > startLength
+            ? (target - startLength) / (endLength - startLength)
+            : 0;
+        const start = clean[segmentIndex - 1];
+        const end = clean[segmentIndex] || start;
+        return {
+            lat: start[1] + (end[1] - start[1]) * ratio,
+            lng: start[0] + (end[0] - start[0]) * ratio,
+            label: `P${pointIndex + 1}`,
+        };
+    });
+}
+
+const pointIcon = (label: string) => L.divIcon({
+    className: "ward-point-marker",
+    html: `<span>${String(label).replace(/[^a-zA-Z0-9_-]/g, "")}</span>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+});
 
 
 /* =========================================================
@@ -319,6 +385,7 @@ export default function WardBeatConfigurator({
     existingDrafts = [],
 
     onChange,
+    onSaveExistingAssignments,
     onClose,
 }: Props) {
     const [mounted, setMounted] =
@@ -342,6 +409,12 @@ export default function WardBeatConfigurator({
         useState<WardBeatDraft[]>(
             []
         );
+
+    const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+    const [bulkSupervisorId, setBulkSupervisorId] = useState("");
+    const [bulkEmployeeId, setBulkEmployeeId] = useState("");
+    const [dirtyExistingKeys, setDirtyExistingKeys] = useState<string[]>([]);
+    const [savingAssignments, setSavingAssignments] = useState(false);
 
     const [
         pointSelectionMode,
@@ -527,7 +600,7 @@ export default function WardBeatConfigurator({
                         null,
 
                     points:
-                        [],
+                        generateFiveBeatPoints(beat.geometry),
 
                     submittedBeatId:
                         null,
@@ -539,6 +612,7 @@ export default function WardBeatConfigurator({
 
 
         setDrafts(initial);
+        setSelectedKeys(initial.map((beat) => beat.key));
 
 
         /*
@@ -750,6 +824,41 @@ export default function WardBeatConfigurator({
         );
     };
 
+    const updateSelectedPoint = (index: number, lat: number, lng: number) => {
+        if (!selectedBeat) return;
+        updateSelectedBeat({
+            points: selectedBeat.points.map((point, pointIndex) =>
+                pointIndex === index ? { ...point, lat, lng } : point
+            ),
+        });
+        if (selectedBeat.submittedBeatId) {
+            setDirtyExistingKeys((current) => Array.from(new Set([...current, selectedBeat.key])));
+        }
+    };
+
+    const applyBulkAssignment = (role: "SUPERVISOR" | "EMPLOYEE") => {
+        const userId = role === "SUPERVISOR" ? bulkSupervisorId : bulkEmployeeId;
+        const candidates = role === "SUPERVISOR" ? supervisors : employees;
+        if (!userId || selectedKeys.length === 0) return;
+        const person = candidates.find((item) => item.id === userId);
+        setDrafts((current) => current.map((beat) => {
+            if (!selectedKeys.includes(beat.key)) return beat;
+            return role === "SUPERVISOR"
+                ? { ...beat, supervisorId: userId, supervisorName: person?.name || null }
+                : { ...beat, employeeId: userId, employeeName: person?.name || null };
+        }));
+        setDirtyExistingKeys((current) => Array.from(new Set([
+            ...current,
+            ...drafts.filter((beat) => selectedKeys.includes(beat.key) && beat.submittedBeatId).map((beat) => beat.key),
+        ])));
+    };
+
+    const toggleBeatSelection = (key: string) => {
+        setSelectedKeys((current) => current.includes(key)
+            ? current.filter((item) => item !== key)
+            : [...current, key]);
+    };
+
     const addPointToSelectedBeat = (
         lat: number,
         lng: number
@@ -869,8 +978,6 @@ export default function WardBeatConfigurator({
         beat: WardBeatDraft
     ) =>
         !!beat.beatName.trim() &&
-        !!beat.employeeId &&
-        !!beat.supervisorId &&
         !!beat.geometry &&
         beat.points.length === 5;
 
@@ -905,9 +1012,19 @@ export default function WardBeatConfigurator({
        DONE
     ===================================================== */
 
-    const handleDone = () => {
-        onChange(drafts);
-        onClose();
+    const handleDone = async () => {
+        try {
+            setSavingAssignments(true);
+            if (onSaveExistingAssignments && dirtyExistingKeys.length) {
+                await onSaveExistingAssignments(
+                    drafts.filter((beat) => dirtyExistingKeys.includes(beat.key))
+                );
+            }
+            onChange(drafts);
+            onClose();
+        } finally {
+            setSavingAssignments(false);
+        }
     };
 
 
@@ -998,6 +1115,41 @@ export default function WardBeatConfigurator({
                 </div>
 
 
+                <div className="ward-config-bulkbar">
+                    <div className="ward-config-selection-actions">
+                        <strong>{selectedKeys.length} selected</strong>
+                        <button type="button" onClick={() => setSelectedKeys(
+                            drafts.map((beat) => beat.key)
+                        )}>Select all</button>
+                        <button type="button" onClick={() => setSelectedKeys([])}>Clear</button>
+                    </div>
+                    <div className="ward-config-bulk-control">
+                        <select value={bulkSupervisorId} onChange={(event) => setBulkSupervisorId(event.target.value)}>
+                            <option value="">Choose supervisor</option>
+                            {supervisors.map((supervisor) => (
+                                <option key={supervisor.id} value={supervisor.id}>{supervisor.name}</option>
+                            ))}
+                        </select>
+                        <button type="button" disabled={!bulkSupervisorId || !selectedKeys.length}
+                            onClick={() => applyBulkAssignment("SUPERVISOR")}>
+                            Assign supervisor
+                        </button>
+                    </div>
+                    <div className="ward-config-bulk-control">
+                        <select value={bulkEmployeeId} onChange={(event) => setBulkEmployeeId(event.target.value)}>
+                            <option value="">Choose employee</option>
+                            {employees.map((employee) => (
+                                <option key={employee.id} value={employee.id}>{employee.name}</option>
+                            ))}
+                        </select>
+                        <button type="button" disabled={!bulkEmployeeId || !selectedKeys.length}
+                            onClick={() => applyBulkAssignment("EMPLOYEE")}>
+                            Assign employee
+                        </button>
+                    </div>
+                </div>
+
+
                 {/* ======================================
                     CONTENT
                 ======================================= */}
@@ -1072,6 +1224,16 @@ export default function WardBeatConfigurator({
                                             }
                                         >
                                             <span
+                                                className={`ward-beat-checkbox ${selectedKeys.includes(beat.key) ? "checked" : ""}`}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    toggleBeatSelection(beat.key);
+                                                }}
+                                                aria-label={`Select ${beat.beatName}`}
+                                            >
+                                                {selectedKeys.includes(beat.key) ? "✓" : ""}
+                                            </span>
+                                            <span
                                                 className="ward-beat-number"
                                                 style={{
                                                     borderColor:
@@ -1097,7 +1259,9 @@ export default function WardBeatConfigurator({
                                                     {submitted
                                                         ? "Submitted"
                                                         : ready
-                                                            ? "Ready to submit"
+                                                            ? beat.employeeName || beat.supervisorName
+                                                                ? "Ready to import • assigned"
+                                                                : "Ready to import • unassigned"
                                                             : beat.employeeName
                                                                 ? `Employee: ${beat.employeeName}`
                                                                 : "Employee not selected"}
@@ -1238,28 +1402,22 @@ export default function WardBeatConfigurator({
 
                             {selectedBeat?.points.map(
                                 (point, index) => (
-                                    <CircleMarker
-                                        key={`${selectedBeat.key}-point-${index}`}
-                                        center={[
-                                            point.lat,
-                                            point.lng,
-                                        ]}
-                                        radius={9}
-                                        pathOptions={{
-                                            color: "#ffffff",
-                                            weight: 3,
-                                            fillColor: "#2563eb",
-                                            fillOpacity: 1,
+                                    <Marker
+                                        key={`${selectedBeat.key}-editable-point-${index}`}
+                                        position={[point.lat, point.lng]}
+                                        icon={pointIcon(point.label)}
+                                        draggable
+                                        eventHandlers={{
+                                            dragend: (event: any) => {
+                                                const position = event.target.getLatLng();
+                                                updateSelectedPoint(index, position.lat, position.lng);
+                                            },
                                         }}
                                     >
-                                        <Tooltip
-                                            permanent
-                                            direction="top"
-                                            offset={[0, -8]}
-                                        >
-                                            {point.label}
+                                        <Tooltip direction="top" offset={[0, -16]}>
+                                            Drag to edit {point.label}
                                         </Tooltip>
-                                    </CircleMarker>
+                                    </Marker>
                                 )
                             )}
                         </MapContainer>
@@ -1269,7 +1427,7 @@ export default function WardBeatConfigurator({
                                 ? `Click on the map to add point ${(selectedBeat?.points.length ||
                                     0) + 1
                                 } of 5`
-                                : "Click any beat on the map to configure it."}
+                                : "Click a beat to configure it. Drag its point markers to fine-tune them."}
                         </div>
                     </section>
 
@@ -1765,8 +1923,9 @@ export default function WardBeatConfigurator({
                             onClick={
                                 handleDone
                             }
+                            disabled={savingAssignments}
                         >
-                            Save Configuration
+                            {savingAssignments ? "Saving..." : "Save Configuration"}
                         </button>
                     </div>
                 </div>
@@ -1913,6 +2072,57 @@ export default function WardBeatConfigurator({
                     overflow: hidden;
                 }
 
+                .ward-config-bulkbar {
+                    min-height: 58px;
+                    padding: 9px 18px;
+                    border-bottom: 1px solid #e2e8f0;
+                    background: #f8fafc;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    flex-wrap: wrap;
+                }
+
+                .ward-config-selection-actions,
+                .ward-config-bulk-control {
+                    display: flex;
+                    align-items: center;
+                    gap: 7px;
+                }
+
+                .ward-config-selection-actions strong {
+                    color: #0f172a;
+                    font-size: 12px;
+                }
+
+                .ward-config-bulkbar select {
+                    height: 36px;
+                    min-width: 170px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 9px;
+                    background: #fff;
+                    padding: 0 9px;
+                    color: #334155;
+                    font-size: 12px;
+                }
+
+                .ward-config-bulkbar button {
+                    height: 34px;
+                    border: 1px solid #bfdbfe;
+                    border-radius: 8px;
+                    background: #eff6ff;
+                    color: #1d4ed8;
+                    padding: 0 10px;
+                    font-size: 11px;
+                    font-weight: 800;
+                    cursor: pointer;
+                }
+
+                .ward-config-bulkbar button:disabled {
+                    opacity: 0.45;
+                    cursor: not-allowed;
+                }
+
           .ward-config-list {
     min-width: 0;
     min-height: 0;
@@ -1990,7 +2200,7 @@ export default function WardBeatConfigurator({
                     margin-bottom: 5px;
                     display: grid;
                     grid-template-columns:
-                        38px minmax(
+                        22px 38px minmax(
                             0,
                             1fr
                         )
@@ -1999,6 +2209,43 @@ export default function WardBeatConfigurator({
                     align-items: center;
                     cursor: pointer;
                     text-align: left;
+                }
+
+                .ward-beat-checkbox {
+                    width: 18px;
+                    height: 18px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 5px;
+                    background: #fff;
+                    color: #fff;
+                    display: grid;
+                    place-items: center;
+                    font-size: 12px;
+                    font-weight: 900;
+                }
+
+                .ward-beat-checkbox.checked {
+                    background: #2563eb;
+                    border-color: #2563eb;
+                }
+
+                .ward-point-marker {
+                    border: 0;
+                    background: transparent;
+                }
+
+                .ward-point-marker span {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    background: #2563eb;
+                    border: 3px solid #fff;
+                    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+                    color: #fff;
+                    display: grid;
+                    place-items: center;
+                    font-size: 10px;
+                    font-weight: 900;
                 }
 
                 .ward-beat-list-item:hover {

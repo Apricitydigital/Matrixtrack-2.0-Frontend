@@ -646,6 +646,16 @@ export const AreaBeatApi = {
     apiFetch(`/city/areas/${id}/assign`, {
       method: "POST",
       body: JSON.stringify({ userId, segmentId, segmentIds, targetRole })
+    }),
+  bulkAssign: (beatIds: string[], userId: string | null, targetRole: "SUPERVISOR" | "EMPLOYEE") =>
+    apiFetch<{ success: boolean; updatedBeatCount: number }>("/city/areas/bulk-assign", {
+      method: "POST",
+      body: JSON.stringify({ beatIds, userId, targetRole })
+    }),
+  updatePoints: (id: string, points: Array<{ lat: number; lng: number; label: string }>) =>
+    apiFetch<{ success: boolean; points: any[] }>(`/city/areas/${id}/points`, {
+      method: "PUT",
+      body: JSON.stringify({ points })
     })
 };
 
@@ -1104,7 +1114,6 @@ export const TwinbinApi = {
       body: JSON.stringify(body || {})
     })
 };
-
 
 
 

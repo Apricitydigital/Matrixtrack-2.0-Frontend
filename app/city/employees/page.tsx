@@ -137,6 +137,14 @@ function normalizeEmploymentType(input?: string | null): string {
     return "Permanent";
 }
 
+function normalizeEmployeeCodeId(value: unknown): string {
+    return String(value ?? "").trim();
+}
+
+function isValidEmployeeCodeId(value: string): boolean {
+    return /^[A-Za-z0-9_-]{3,50}$/.test(value);
+}
+
 function getEmploymentTypeDisplay(type?: string | null): {
     key: "Permanent" | "Regularized" | "Temporary" | "Outsource";
     labelEn: string;
@@ -691,11 +699,22 @@ export default function EmployeesPage() {
         e.preventDefault();
 
         const cleanName = editName.trim().replace(/\s+/g, " ");
+        const cleanEmployeeId = normalizeEmployeeCodeId(editEmployeeCodeId);
         const cleanPhone = editPhone.replace(/\D/g, "");
         const cleanAadhaar = editAadhaar.replace(/\D/g, "");
 
         if (!cleanName) {
             setEditError("Employee name is required.");
+            return;
+        }
+
+        if (!cleanEmployeeId) {
+            setEditError("Employee ID is required.");
+            return;
+        }
+
+        if (!isValidEmployeeCodeId(cleanEmployeeId)) {
+            setEditError("Employee ID must be 3 to 50 characters and can contain only letters, numbers, hyphen or underscore.");
             return;
         }
 
@@ -726,6 +745,7 @@ export default function EmployeesPage() {
         if (!editingEmployee) return;
 
         const cleanName = editName.trim().replace(/\s+/g, " ");
+        const cleanEmployeeId = normalizeEmployeeCodeId(editEmployeeCodeId);
         const cleanPhone = editPhone.replace(/\D/g, "");
         const cleanAadhaar = editAadhaar.replace(/\D/g, "");
 
@@ -735,7 +755,7 @@ export default function EmployeesPage() {
 
             await CityUserApi.update(editingEmployee.id, {
                 name: cleanName,
-                employeeId: editEmployeeCodeId.trim() || null,
+                employeeId: cleanEmployeeId,
                 phone: cleanPhone || null,
                 aadhaar: cleanAadhaar || null,
                 employmentType: editEmploymentType || "Permanent",
@@ -1070,13 +1090,18 @@ export default function EmployeesPage() {
                EXISTING EMPLOYEE LOOKUP
             ============================================= */
 
-            const existingEmployeesByPhone = new Map<string, EmployeeRow>();
             const existingEmployeesByAadhaar = new Map<string, EmployeeRow>();
+            const existingEmployeesByEmployeeId = new Map<string, EmployeeRow>();
             const existingEmployeesByName = new Map<string, EmployeeRow[]>();
 
             employees.forEach((emp) => {
-                if (emp.phone) existingEmployeesByPhone.set(emp.phone, emp);
                 if (emp.aadhaar) existingEmployeesByAadhaar.set(emp.aadhaar, emp);
+                if (emp.employeeId) {
+                    existingEmployeesByEmployeeId.set(
+                        normalizeEmployeeCodeId(emp.employeeId),
+                        emp
+                    );
+                }
                 
                 const normName = normalizeEmployeeImportValue(emp.name);
                 const arr = existingEmployeesByName.get(normName) || [];
@@ -1088,9 +1113,8 @@ export default function EmployeesPage() {
             const uploadedEmployeeKeys =
                 new Set<string>();
 
+            const uploadedEmployeeIds = new Set<string>();
             const uploadedAadhaars = new Set<string>();
-            const uploadedPhones = new Set<string>();
-
             const parsedRows: EmployeeImportRow[] =
                 [];
 
@@ -1108,7 +1132,7 @@ export default function EmployeesPage() {
 
                         const employeeId =
                             empIdIdx !== -1
-                                ? String(rawRow?.[empIdIdx] ?? "").trim()
+                                ? normalizeEmployeeCodeId(rawRow?.[empIdIdx])
                                 : undefined;
 
                         const employeeName =
@@ -1167,6 +1191,7 @@ export default function EmployeesPage() {
 
                         if (
                             !employeeName ||
+                            !employeeId ||
                             !zoneName ||
                             !wardName
                         ) {
@@ -1181,7 +1206,25 @@ export default function EmployeesPage() {
                                 status:
                                     "INVALID_DATA",
                                 message:
-                                    "Employee Name, Zone Name and Ward Name are required.",
+                                    "Employee ID, Employee Name, Zone Name and Ward Name are required.",
+                            });
+
+                            return;
+                        }
+
+                        if (!isValidEmployeeCodeId(employeeId)) {
+                            parsedRows.push({
+                                rowNumber,
+                                employeeId,
+                                employeeName,
+                                mobileNumber,
+                                aadhaarNumber,
+                                employmentType,
+                                zoneName,
+                                wardName,
+                                status: "INVALID_DATA",
+                                message:
+                                    "Employee ID must be 3 to 50 characters and can contain only letters, numbers, hyphen or underscore.",
                             });
 
                             return;
@@ -1275,7 +1318,7 @@ export default function EmployeesPage() {
 
                         let isAlreadyExists = false;
 
-                        if (mobileNumber && existingEmployeesByPhone.has(mobileNumber)) {
+                        if (existingEmployeesByEmployeeId.has(employeeId)) {
                             isAlreadyExists = true;
                         } else if (aadhaarNumber && existingEmployeesByAadhaar.has(aadhaarNumber)) {
                             isAlreadyExists = true;
@@ -1342,6 +1385,7 @@ export default function EmployeesPage() {
                         if (aadhaarNumber && uploadedAadhaars.has(aadhaarNumber)) {
                             parsedRows.push({
                                 rowNumber,
+                                employeeId,
                                 employeeName,
                                 mobileNumber,
                                 aadhaarNumber,
@@ -1356,9 +1400,10 @@ export default function EmployeesPage() {
                             return;
                         }
 
-                        if (mobileNumber && uploadedPhones.has(mobileNumber)) {
+                        if (uploadedEmployeeIds.has(employeeId)) {
                             parsedRows.push({
                                 rowNumber,
+                                employeeId,
                                 employeeName,
                                 mobileNumber,
                                 aadhaarNumber,
@@ -1368,14 +1413,14 @@ export default function EmployeesPage() {
                                 zoneId: zone.id,
                                 wardId: ward.id,
                                 status: "DUPLICATE_ROW",
-                                message: "This Mobile number is already used in another row in this Excel.",
+                                message: "This Employee ID is already used in another row in this Excel.",
                             });
                             return;
                         }
 
                         uploadedEmployeeKeys.add(employeeKey);
+                        uploadedEmployeeIds.add(employeeId);
                         if (aadhaarNumber) uploadedAadhaars.add(aadhaarNumber);
-                        if (mobileNumber) uploadedPhones.add(mobileNumber);
 
 
                         parsedRows.push({
@@ -1450,55 +1495,61 @@ export default function EmployeesPage() {
                 setImportingEmployees(true);
                 setEmployeeImportError("");
 
+                setEmployeeImportProgress(
+                    `Importing ${readyRows.length} employees...`
+                );
 
-                let imported = 0;
-                const failed: string[] = [];
-                const BATCH_SIZE = 20;
-
-                for (let i = 0; i < readyRows.length; i += BATCH_SIZE) {
-                    const chunk = readyRows.slice(i, i + BATCH_SIZE);
-                    setEmployeeImportProgress(
-                        `Importing ${Math.min(i + BATCH_SIZE, readyRows.length)} of ${readyRows.length} employees...`
-                    );
-
-                    await Promise.all(
-                        chunk.map(async (row) => {
-                            try {
-                                await apiFetch(
-                                    "/city/areas/import-register-employee",
-                                    {
-                                        method: "POST",
-                                        body: JSON.stringify({
-                                            name: row.employeeName,
-                                            phone: row.mobileNumber || undefined,
-                                            aadhaar: row.aadhaarNumber || undefined,
-                                            employmentType: row.employmentType || "Permanent",
-                                            zoneId: row.zoneId,
-                                            wardId: row.wardId,
-                                            employeeId: row.employeeId || undefined,
-                                        }),
-                                    }
-                                );
-                                imported++;
-                            } catch (err: any) {
-                                failed.push(
-                                    `${row.employeeName}: ${err?.message || "Import failed"}`
-                                );
-                            }
-                        })
-                    );
-                }
+                const result = await apiFetch<{
+                    success: boolean;
+                    total: number;
+                    imported: number;
+                    failed: number;
+                    failures: Array<{
+                        rowNumber: number;
+                        employeeId: string | null;
+                        name: string;
+                        message: string;
+                    }>;
+                }>(
+                    "/city/areas/import-register-employees-bulk",
+                    {
+                        method: "POST",
+                        body: JSON.stringify({
+                            employees: readyRows.map((row) => ({
+                                rowNumber: row.rowNumber,
+                                name: row.employeeName,
+                                phone: row.mobileNumber || undefined,
+                                aadhaar: row.aadhaarNumber || undefined,
+                                employmentType: row.employmentType || "Permanent",
+                                zoneId: row.zoneId,
+                                wardId: row.wardId,
+                                employeeId: row.employeeId,
+                            })),
+                        }),
+                    }
+                );
 
 
                 await loadData();
 
 
-                if (failed.length) {
+                if (result.failed) {
+                    const failureByRow = new Map(
+                        result.failures.map((failure) => [failure.rowNumber, failure.message])
+                    );
+
+                    setEmployeeImportRows((currentRows) =>
+                        currentRows.map((row) => {
+                            if (row.status !== "READY") return row;
+                            const failureMessage = failureByRow.get(row.rowNumber);
+                            return failureMessage
+                                ? { ...row, status: "INVALID_DATA", message: failureMessage }
+                                : { ...row, status: "ALREADY_EXISTS", message: "Imported successfully." };
+                        })
+                    );
 
                     setEmployeeImportError(
-                        `${imported} employee(s) imported. ${failed.length} row(s) failed: ${failed.join(
-                            " | "
-                        )}`
+                        `${result.imported} employee(s) imported. ${result.failed} row(s) failed. Review the highlighted rows for exact reasons.`
                     );
 
                     setEmployeeImportProgress("");
@@ -1523,7 +1574,11 @@ export default function EmployeesPage() {
                     ""
                 );
 
-
+            } catch (err: any) {
+                setEmployeeImportError(
+                    err?.message || "Employee import failed. No employees were saved."
+                );
+                setEmployeeImportProgress("");
             } finally {
                 setImportingEmployees(
                     false
@@ -1575,6 +1630,8 @@ export default function EmployeesPage() {
             employeeName
                 .trim()
                 .replace(/\s+/g, " ");
+        const cleanEmployeeId =
+            normalizeEmployeeCodeId(employeeCodeId);
 
         const cleanPhone =
             employeePhone.replace(/\D/g, "");
@@ -1590,6 +1647,20 @@ export default function EmployeesPage() {
             return;
         }
 
+
+        if (!cleanEmployeeId) {
+            setRegistrationError(
+                "Employee ID is required."
+            );
+            return;
+        }
+
+        if (!isValidEmployeeCodeId(cleanEmployeeId)) {
+            setRegistrationError(
+                "Employee ID must be 3 to 50 characters and can contain only letters, numbers, hyphen or underscore."
+            );
+            return;
+        }
 
         if (cleanPhone && !/^\d{10}$/.test(cleanPhone)) {
             setRegistrationError(
@@ -1637,7 +1708,7 @@ export default function EmployeesPage() {
                         phone: cleanPhone || undefined,
                         aadhaar: cleanAadhaar || undefined,
                         employmentType: employeeEmploymentType || "Permanent",
-                        employeeId: employeeCodeId.trim() || undefined,
+                        employeeId: cleanEmployeeId,
                         zoneId: employeeZoneId,
                         wardId: employeeWardId,
                     }),
