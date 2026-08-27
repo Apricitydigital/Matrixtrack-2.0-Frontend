@@ -46,6 +46,23 @@ export type AttendanceUpload = {
   createdAt: string;
 };
 
+export type AttendanceEmployeeSummary = {
+  attendanceId: string;
+  employeeName: string;
+  designation: string | null;
+  officeLocation: string | null;
+  matrixTrackUserId: string | null;
+  zones: string[];
+  wards: string[];
+  totalDays: number;
+  presentDays: number;
+  absentDays: number;
+  attendanceRate: number;
+  completedPunches: number;
+  avgWorkMinutes: number | null;
+  lastAttendanceDate: string;
+};
+
 export type AttendanceDashboardResponse = {
   hasData: boolean;
   range: { from: string; to: string } | null;
@@ -87,8 +104,21 @@ export type AttendanceDashboardResponse = {
     completedPunches: number;
     avgWorkMinutes: number | null;
   }>;
+  employeePerformance: {
+    totalEmployees: number;
+    fullyPresent: number;
+    fullyPresentWithCompletedCycle: number;
+    fullyAbsent: number;
+  } | null;
   records: AttendanceRecord[];
+  employees: AttendanceEmployeeSummary[];
   pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  employeePagination: {
     page: number;
     pageSize: number;
     total: number;
@@ -114,6 +144,7 @@ export type AttendanceDashboardQuery = {
   workDurationBucket?: string;
   search?: string;
   employeeGroup?: string;
+  employeeId?: string;
   page?: number;
   pageSize?: number;
 };
