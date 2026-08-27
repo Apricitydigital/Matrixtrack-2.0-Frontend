@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -15,9 +15,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Copy,
   FileSpreadsheet,
   Filter,
+  Info,
   RefreshCw,
+  Share2,
   Search,
   Sparkles,
   TimerReset,
@@ -51,12 +54,23 @@ import {
   type AttendanceCity,
   type AttendanceDashboardQuery,
   type AttendanceDashboardResponse,
+  type AttendanceEmployeeSummary,
   type AttendanceRecord,
   type AttendanceUploadCalendarResponse,
   type AttendanceUploadResponse,
 } from "@lib/attendanceApi";
 
 const numberFormatter = new Intl.NumberFormat("en-IN");
+
+function formatAverageValue(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value >= 100 || Number.isInteger(value)) return numberFormatter.format(Math.round(value));
+  return value.toFixed(1);
+}
+
+function averageFormula(total: number, days: number) {
+  return `${numberFormatter.format(total)} ÷ ${days} ${days === 1 ? "day" : "days"}`;
+}
 
 const chartColors = {
   blue: "#2563eb",
@@ -432,6 +446,7 @@ function ChartCard({
   title,
   subtitle,
   badge,
+  headerRight,
   icon,
   tone = "blue",
   children,
@@ -439,6 +454,7 @@ function ChartCard({
   title: string;
   subtitle: string;
   badge?: string;
+  headerRight?: React.ReactNode;
   icon?: React.ReactNode;
   tone?: "blue" | "emerald" | "rose" | "violet" | "amber" | "slate";
   children: React.ReactNode;
@@ -453,10 +469,10 @@ function ChartCard({
   };
 
   return (
-    <section className="group relative h-full overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/45 p-5 shadow-[0_12px_38px_rgba(15,23,42,0.055)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_20px_48px_rgba(15,23,42,0.09)]">
+    <section className="group relative flex h-full flex-col overflow-hidden rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-white via-white to-slate-50/45 p-5 shadow-[0_12px_38px_rgba(15,23,42,0.055)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_20px_48px_rgba(15,23,42,0.09)]">
       <div className={`absolute left-0 top-0 h-1 w-40 bg-gradient-to-r ${tones[tone].bar}`} />
       <div className={`pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full blur-3xl transition-transform duration-700 group-hover:scale-125 ${tones[tone].glow}`} />
-      <div className="relative mb-5 flex items-start justify-between gap-4">
+      <div className="relative mb-5 flex shrink-0 items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           {icon && <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 shadow-sm ${tones[tone].icon}`}>{icon}</div>}
           <div className="min-w-0">
@@ -464,14 +480,57 @@ function ChartCard({
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{subtitle}</p>
           </div>
         </div>
-        {badge && (
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ${tones[tone].badge}`}>
-            {badge}
+        {headerRight ? (
+          <div className="shrink-0">{headerRight}</div>
+        ) : (
+          badge && (
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ${tones[tone].badge}`}>
+              {badge}
+            </span>
+          )
+        )}
+      </div>
+      <div className="relative min-h-0 flex-1">{children}</div>
+    </section>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  detail,
+  icon,
+  tone = "blue",
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  icon?: React.ReactNode;
+  tone?: "blue" | "emerald" | "rose" | "violet" | "teal" | "amber" | "slate";
+}) {
+  const tones = {
+    blue: "bg-blue-50 text-blue-600 ring-blue-100",
+    emerald: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+    rose: "bg-rose-50 text-rose-600 ring-rose-100",
+    violet: "bg-violet-50 text-violet-600 ring-violet-100",
+    teal: "bg-teal-50 text-teal-600 ring-teal-100",
+    amber: "bg-amber-50 text-amber-600 ring-amber-100",
+    slate: "bg-slate-100 text-slate-600 ring-slate-200",
+  } as const;
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-3.5 py-3 transition hover:border-slate-200 hover:bg-white hover:shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">{label}</p>
+        {icon && (
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ring-1 ${tones[tone]}`}>
+            {icon}
           </span>
         )}
       </div>
-      <div className="relative">{children}</div>
-    </section>
+      <p className="mt-1.5 whitespace-nowrap text-lg font-black tabular-nums text-slate-950">{value}</p>
+      {detail && <p className="mt-1 text-[9.5px] font-semibold leading-[13px] text-slate-500">{detail}</p>}
+    </div>
   );
 }
 
@@ -1093,6 +1152,153 @@ function KpiRecordsDrawer({
   );
 }
 
+function EmployeeRecordsDrawer({
+  open,
+  employee,
+  data,
+  loading,
+  page,
+  onPageChange,
+  onClose,
+}: {
+  open: boolean;
+  employee: AttendanceEmployeeSummary | null;
+  data: AttendanceDashboardResponse | null;
+  loading: boolean;
+  page: number;
+  onPageChange: (page: number) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  if (!open || !employee) return null;
+
+  const records = data?.records || [];
+  const totalPages = Math.max(data?.pagination.totalPages || 0, 1);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[35] bg-slate-950/35 backdrop-blur-[2px]"
+      onMouseDown={onClose}
+    >
+      <aside
+        className="fixed bottom-5 left-4 right-4 top-[124px] flex flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)] animate-[attendanceDrawer_.3s_cubic-bezier(.2,.8,.2,1)] sm:left-5 sm:right-5 lg:left-[calc(18rem+1.25rem)] lg:top-[136px]"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 px-5 py-5 text-white sm:px-7">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">
+                  Employee drill-down
+                </span>
+                <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-blue-100">
+                  {employee.attendanceId}
+                </span>
+              </div>
+              <h2 className="text-xl font-black tracking-[-0.03em] sm:text-2xl">{employee.employeeName}</h2>
+              <p className="mt-1.5 max-w-3xl text-xs font-semibold leading-5 text-blue-100/75">
+                {employee.designation || "Employee"} · {employee.officeLocation || "—"} · Zone: {formatScopeNames(employee.zones)} · Ward: {formatScopeNames(employee.wards)}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-lg bg-emerald-400/15 px-2.5 py-1 text-[10.5px] font-black text-emerald-200 ring-1 ring-emerald-300/20">
+                  {employee.presentDays}/{employee.totalDays} present ({employee.attendanceRate.toFixed(1)}%)
+                </span>
+                <span className="rounded-lg bg-rose-400/15 px-2.5 py-1 text-[10.5px] font-black text-rose-200 ring-1 ring-rose-300/20">
+                  {employee.absentDays} absent
+                </span>
+                <span className="rounded-lg bg-blue-400/15 px-2.5 py-1 text-[10.5px] font-black text-blue-200 ring-1 ring-blue-300/20">
+                  {employee.completedPunches} completed punch cycles
+                </span>
+                <span className="rounded-lg bg-white/10 px-2.5 py-1 text-[10.5px] font-black text-white/90 ring-1 ring-white/15">
+                  Avg work time {minutesToDuration(employee.avgWorkMinutes)}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+              aria-label="Close employee records"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-50/55">
+          {loading && !data ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 text-slate-500">
+              <RefreshCw size={22} className="animate-spin text-blue-600" />
+              <p className="text-sm font-bold">Loading this employee's attendance...</p>
+            </div>
+          ) : (
+            <div className="p-4 sm:p-6">
+              <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-left">
+                        {['Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
+                          <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {records.map((record: AttendanceRecord) => {
+                        const punch = record.outTime ? "Punch Out" : record.inTime ? "Punch In" : "No punch";
+                        return (
+                          <tr key={record.id} className="border-b border-slate-100 transition-colors odd:bg-white even:bg-slate-50/35 hover:bg-blue-50/60 last:border-b-0">
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
+                            <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
+                            <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>
+                            <td className="px-4 py-3.5 text-xs font-semibold text-slate-500">{durationLabel(record.inTime, record.outTime)}</td>
+                            <td className="px-4 py-3.5"><StatusPill status={record.status} /></td>
+                            <td className="px-4 py-3.5">
+                              <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : record.inTime ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-slate-100 text-slate-500 ring-slate-200"}`}>
+                                {record.outTime ? <CheckCircle2 size={11} /> : record.inTime ? <Clock3 size={11} /> : <AlertCircle size={11} />}{punch}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {!loading && !records.length && (
+                  <div className="flex min-h-[260px] flex-col items-center justify-center px-6 text-center">
+                    <Search size={25} className="mb-3 text-slate-300" />
+                    <p className="text-sm font-black text-slate-700">No records found</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400">This employee has no attendance rows in the selected date range.</p>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[11px] font-semibold text-slate-500">Page {data?.pagination.page || page} of {totalPages}</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page <= 1 || loading} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={14} /> Previous</button>
+                    <button type="button" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page >= totalPages || loading} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Next <ChevronRight size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+    </div>,
+    document.body
+  );
+}
+
 
 function WorkDurationEmployeesPopup({
   open,
@@ -1282,6 +1488,7 @@ function AttendanceDashboard() {
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(emptyFilters);
   const [employeeGroup, setEmployeeGroup] = useState<"ALL" | "HEALTH_WORKERS">("ALL");
   const [page, setPage] = useState(1);
+  const [employeePageSize, setEmployeePageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -1308,6 +1515,13 @@ function AttendanceDashboard() {
   const [workDurationPage, setWorkDurationPage] = useState(1);
   const [workDurationLoading, setWorkDurationLoading] = useState(false);
   const [designationPage, setDesignationPage] = useState(1);
+  const [designationNameFilter, setDesignationNameFilter] = useState("");
+  const [designationRateFilter, setDesignationRateFilter] = useState<"ALL" | "HIGH" | "MID_HIGH" | "MID_LOW" | "LOW">("ALL");
+  const [topEmployeesPage, setTopEmployeesPage] = useState(1);
+  const [employeeDrilldown, setEmployeeDrilldown] = useState<AttendanceEmployeeSummary | null>(null);
+  const [employeeDrilldownData, setEmployeeDrilldownData] = useState<AttendanceDashboardResponse | null>(null);
+  const [employeeDrilldownPage, setEmployeeDrilldownPage] = useState(1);
+  const [employeeDrilldownLoading, setEmployeeDrilldownLoading] = useState(false);
 
   const today = new Date();
   const todayKey = toLocalDateKey(today);
@@ -1327,7 +1541,7 @@ function AttendanceDashboard() {
     search: filters.search.trim() || undefined,
     employeeGroup: employeeGroup === "ALL" ? undefined : employeeGroup,
     page: requestedPage,
-    pageSize: 25,
+    pageSize: employeePageSize,
   });
 
   useEffect(() => {
@@ -1450,7 +1664,7 @@ function AttendanceDashboard() {
 
     void loadDashboard(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters, page, selectedCityId, hmsSuperAdmin, employeeGroup]);
+  }, [appliedFilters, page, employeePageSize, selectedCityId, hmsSuperAdmin, employeeGroup]);
 
   useEffect(() => {
     if (!kpiDrilldown) {
@@ -1529,6 +1743,43 @@ function AttendanceDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workDurationBucket, workDurationPage, appliedFilters, selectedCityId, hmsSuperAdmin]);
 
+  useEffect(() => {
+    if (!employeeDrilldown) {
+      setEmployeeDrilldownData(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadEmployeeRecords = async () => {
+      setEmployeeDrilldownLoading(true);
+      try {
+        const result = await AttendanceApi.dashboard({
+          cityId: attendanceCityId,
+          from: appliedFilters.from || undefined,
+          to: appliedFilters.to || undefined,
+          employeeGroup: employeeGroup === "ALL" ? undefined : employeeGroup,
+          employeeId: employeeDrilldown.attendanceId,
+          page: employeeDrilldownPage,
+          pageSize: 25,
+        });
+        if (!cancelled) setEmployeeDrilldownData(result);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : "Unable to load this employee's attendance");
+        }
+      } finally {
+        if (!cancelled) setEmployeeDrilldownLoading(false);
+      }
+    };
+
+    void loadEmployeeRecords();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeDrilldown, employeeDrilldownPage, appliedFilters, selectedCityId, hmsSuperAdmin, employeeGroup]);
+
   const handleCityChange = (cityId: string) => {
     setSelectedCityId(cityId);
     setData(null);
@@ -1544,7 +1795,10 @@ function AttendanceDashboard() {
     setKpiDrilldownData(null);
     setWorkDurationBucket(null);
     setWorkDurationData(null);
+    setEmployeeDrilldown(null);
+    setEmployeeDrilldownData(null);
     setDesignationPage(1);
+    setTopEmployeesPage(1);
     setNotice("");
     setError("");
   };
@@ -1553,6 +1807,12 @@ function AttendanceDashboard() {
     setWorkDurationBucket(bucket);
     setWorkDurationPage(1);
     setWorkDurationData(null);
+  };
+
+  const openEmployeeDrilldown = (employee: AttendanceEmployeeSummary) => {
+    setEmployeeDrilldownPage(1);
+    setEmployeeDrilldownData(null);
+    setEmployeeDrilldown(employee);
   };
 
   const openKpiDrilldown = (config: KpiDrilldown) => {
@@ -1566,25 +1826,57 @@ function AttendanceDashboard() {
     ? summary.punchIn ?? summary.checkedOut + summary.openCheckIns
     : 0;
 
-  const attendancePie = useMemo(
-    () => [
-      { name: "Present", value: summary?.present || 0, color: chartColors.emerald },
-      { name: "Absent", value: summary?.absent || 0, color: chartColors.rose },
-    ],
-    [summary?.present, summary?.absent]
-  );
+  const rangeDayCount = data?.dailyTrend?.length || 0;
+  const isMultiDayRange = rangeDayCount > 1;
+  const avgDivisor = Math.max(rangeDayCount, 1);
+
+  const avgPresent = summary ? summary.present / avgDivisor : 0;
+  const avgAbsent = summary ? summary.absent / avgDivisor : 0;
+  const avgTotalRecords = summary ? summary.totalRecords / avgDivisor : 0;
+  const avgPunchIn = summary ? punchInCount / avgDivisor : 0;
+  const avgCheckedOut = summary ? summary.checkedOut / avgDivisor : 0;
+  const avgOpenCheckIns = summary ? summary.openCheckIns / avgDivisor : 0;
+  const avgNoPunch = summary ? summary.noPunch / avgDivisor : 0;
+
+  const punchCompletionPie = useMemo(() => {
+    if (!summary) return [];
+    return [
+      { name: "Punch Out", value: summary.checkedOut, color: chartColors.emerald },
+      { name: "Not punched out", value: summary.openCheckIns, color: chartColors.amber },
+      { name: "No punch", value: summary.noPunch, color: chartColors.slate },
+    ].filter((item) => item.value > 0);
+  }, [summary?.checkedOut, summary?.openCheckIns, summary?.noPunch]);
+
+  const punchCompletionRate =
+    summary && summary.totalRecords ? (summary.checkedOut / summary.totalRecords) * 100 : 0;
 
   const checkInDistribution = useMemo(() => {
     const byHour = new Map((data?.checkInDistribution || []).map((item) => [item.hour, item.count]));
-    return Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      label: `${String(hour).padStart(2, "0")}:00`,
-      count: byHour.get(hour) || 0,
+    const days = Math.max(data?.dailyTrend?.length || 0, 1);
+    const multiDay = (data?.dailyTrend?.length || 0) > 1;
+    return Array.from({ length: 24 }, (_, hour) => {
+      const raw = byHour.get(hour) || 0;
+      return {
+        hour,
+        label: `${String(hour).padStart(2, "0")}:00`,
+        count: multiDay ? Number((raw / days).toFixed(1)) : raw,
+        rawCount: raw,
+      };
+    });
+  }, [data?.checkInDistribution, data?.dailyTrend]);
+
+  const workDurationChartData = useMemo(() => {
+    const days = Math.max(data?.dailyTrend?.length || 0, 1);
+    const multiDay = (data?.dailyTrend?.length || 0) > 1;
+    return (data?.workDurationBuckets || []).map((item) => ({
+      ...item,
+      rawCount: item.count,
+      count: multiDay ? Number((item.count / days).toFixed(1)) : item.count,
     }));
-  }, [data?.checkInDistribution]);
+  }, [data?.workDurationBuckets, data?.dailyTrend]);
 
   const peakCheckIn = useMemo(() => {
-    return checkInDistribution.reduce((best, item) => item.count > best.count ? item : best, checkInDistribution[0] || { hour: 0, label: "—", count: 0 });
+    return checkInDistribution.reduce((best, item) => item.count > best.count ? item : best, checkInDistribution[0] || { hour: 0, label: "—", count: 0, rawCount: 0 });
   }, [checkInDistribution]);
 
   const sortedDesignationBreakdown = useMemo(() => {
@@ -1594,20 +1886,84 @@ function AttendanceDashboard() {
   }, [data?.designationBreakdown]);
 
   const bestDesignation = sortedDesignationBreakdown[0] || null;
+  const worstDesignation =
+    sortedDesignationBreakdown.length > 1
+      ? sortedDesignationBreakdown[sortedDesignationBreakdown.length - 1]
+      : null;
+
+  const designationsFullyPresentCount = sortedDesignationBreakdown.filter(
+    (item) => item.total > 0 && item.present === item.total
+  ).length;
+  const designationsFullyAbsentCount = sortedDesignationBreakdown.filter(
+    (item) => item.total > 0 && item.present === 0
+  ).length;
+
+  const sortedDurationBuckets = useMemo(
+    () => [...workDurationChartData].sort((a, b) => b.count - a.count),
+    [workDurationChartData]
+  );
+  const peakDurationBucket = sortedDurationBuckets[0] || null;
+  const leastDurationBucket =
+    sortedDurationBuckets.length > 1
+      ? sortedDurationBuckets[sortedDurationBuckets.length - 1]
+      : null;
+
+  const employeePerformance = data?.employeePerformance || null;
+
+  const designationRateMatchers: Record<typeof designationRateFilter, (rate: number) => boolean> = {
+    ALL: () => true,
+    HIGH: (rate) => rate >= 85,
+    MID_HIGH: (rate) => rate >= 70 && rate < 85,
+    MID_LOW: (rate) => rate >= 50 && rate < 70,
+    LOW: (rate) => rate < 50,
+  };
+
+  const filteredDesignationBreakdown = useMemo(() => {
+    const rateMatch = designationRateMatchers[designationRateFilter];
+    return sortedDesignationBreakdown.filter(
+      (item) => (!designationNameFilter || item.designation === designationNameFilter) && rateMatch(item.rate)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedDesignationBreakdown, designationNameFilter, designationRateFilter]);
 
   const designationPageSize = 8;
-  const designationTotal = sortedDesignationBreakdown.length;
+  const designationTotal = filteredDesignationBreakdown.length;
   const designationTotalPages = Math.max(1, Math.ceil(designationTotal / designationPageSize));
   const designationPageItems = useMemo(() => {
     const start = (designationPage - 1) * designationPageSize;
-    return sortedDesignationBreakdown.slice(start, start + designationPageSize);
-  }, [sortedDesignationBreakdown, designationPage]);
+    return filteredDesignationBreakdown.slice(start, start + designationPageSize);
+  }, [filteredDesignationBreakdown, designationPage]);
   const designationStart = designationTotal ? (designationPage - 1) * designationPageSize + 1 : 0;
   const designationEnd = Math.min(designationPage * designationPageSize, designationTotal);
 
   useEffect(() => {
     setDesignationPage((current) => Math.min(current, designationTotalPages));
   }, [designationTotalPages]);
+
+  useEffect(() => {
+    setDesignationPage(1);
+  }, [designationNameFilter, designationRateFilter]);
+
+  useEffect(() => {
+    if (designationNameFilter && !sortedDesignationBreakdown.some((item) => item.designation === designationNameFilter)) {
+      setDesignationNameFilter("");
+    }
+  }, [sortedDesignationBreakdown, designationNameFilter]);
+
+  const topEmployeesPageSize = 3;
+  const topEmployeesTotal = data?.topEmployees.length || 0;
+  const topEmployeesTotalPages = Math.max(1, Math.ceil(topEmployeesTotal / topEmployeesPageSize));
+  const topEmployeesPageItems = useMemo(() => {
+    const start = (topEmployeesPage - 1) * topEmployeesPageSize;
+    return (data?.topEmployees || []).slice(start, start + topEmployeesPageSize);
+  }, [data?.topEmployees, topEmployeesPage]);
+
+  useEffect(() => {
+    setTopEmployeesPage((current) => Math.min(current, topEmployeesTotalPages));
+  }, [topEmployeesTotalPages]);
+
+  const topEmployeesStart = topEmployeesTotal ? (topEmployeesPage - 1) * topEmployeesPageSize + 1 : 0;
+  const topEmployeesEnd = Math.min(topEmployeesPage * topEmployeesPageSize, topEmployeesTotal);
 
   const updateFilter = (patch: Partial<FilterState>) => {
     const next = { ...draftFilters, ...patch };
@@ -1620,6 +1976,7 @@ function AttendanceDashboard() {
     setDraftFilters(next);
     setPage(1);
     setDesignationPage(1);
+    setTopEmployeesPage(1);
     setAppliedFilters(next);
   };
 
@@ -1631,6 +1988,7 @@ function AttendanceDashboard() {
     setError("");
     setPage(1);
     setDesignationPage(1);
+    setTopEmployeesPage(1);
     setAppliedFilters({ ...draftFilters });
   };
 
@@ -1638,6 +1996,7 @@ function AttendanceDashboard() {
     setDraftFilters({ ...emptyFilters });
     setPage(1);
     setDesignationPage(1);
+    setTopEmployeesPage(1);
     setAppliedFilters({ ...emptyFilters });
   };
 
@@ -1653,6 +2012,7 @@ function AttendanceDashboard() {
     setDraftFilters(next);
     setPage(1);
     setDesignationPage(1);
+    setTopEmployeesPage(1);
     setAppliedFilters(next);
   };
 
@@ -1712,6 +2072,88 @@ function AttendanceDashboard() {
     ? cities.find((city) => city.id === selectedCityId) || null
     : null;
 
+  const buildSummaryText = () => {
+    if (!summary) return "";
+    const lines: string[] = [];
+
+    lines.push(`Attendance Summary${selectedCity ? ` — ${selectedCity.name}` : ""}`);
+    lines.push(`Period: ${visibleRangeLabel} (${rangeDayCount} ${rangeDayCount === 1 ? "day" : "days"})`);
+    lines.push(isMultiDayRange ? "Figures below are daily averages (total ÷ days)." : "Figures below are exact for the selected date.");
+    lines.push("");
+    lines.push(`Total employees: ${numberFormatter.format(summary.uniqueEmployees)}`);
+    lines.push(`Present (avg/day): ${formatAverageValue(avgPresent)}`);
+    lines.push(`Absent (avg/day): ${formatAverageValue(avgAbsent)}`);
+    lines.push(`Attendance rate: ${summary.attendanceRate.toFixed(1)}%`);
+    lines.push("");
+    lines.push(`Punch In (avg/day): ${formatAverageValue(avgPunchIn)}`);
+    lines.push(`Completed punch cycle (avg/day): ${formatAverageValue(avgCheckedOut)}`);
+    lines.push(`Not punched out (avg/day): ${formatAverageValue(avgOpenCheckIns)}`);
+    lines.push(`Punch completion: ${summary.punchIn ? ((summary.checkedOut / summary.punchIn) * 100).toFixed(1) : "0.0"}%`);
+    lines.push("");
+    if (bestDesignation) lines.push(`Highest punch-in rate designation: ${bestDesignation.designation} (${bestDesignation.rate.toFixed(1)}%)`);
+    if (worstDesignation) lines.push(`Lowest punch-in rate designation: ${worstDesignation.designation} (${worstDesignation.rate.toFixed(1)}%)`);
+    lines.push("");
+    lines.push(`Average working hours: ${minutesToDuration(summary.avgWorkMinutes)}`);
+    if (peakDurationBucket) lines.push(`Peak duration bucket: ${peakDurationBucket.bucket} (${numberFormatter.format(peakDurationBucket.count)}${isMultiDayRange ? "/day" : ""})`);
+    if (leastDurationBucket) lines.push(`Least duration bucket: ${leastDurationBucket.bucket} (${numberFormatter.format(leastDurationBucket.count)}${isMultiDayRange ? "/day" : ""})`);
+
+    if (employeePerformance) {
+      lines.push("");
+      lines.push(`100% present employees: ${numberFormatter.format(employeePerformance.fullyPresent)} of ${numberFormatter.format(employeePerformance.totalEmployees)}`);
+      lines.push(`— of which full punch cycle (Punch In + Punch Out every day): ${numberFormatter.format(employeePerformance.fullyPresentWithCompletedCycle)}`);
+      lines.push(`Fully absent employees (0% present): ${numberFormatter.format(employeePerformance.fullyAbsent)} of ${numberFormatter.format(employeePerformance.totalEmployees)}`);
+    }
+    lines.push(`Designations at 100% present: ${numberFormatter.format(designationsFullyPresentCount)} of ${numberFormatter.format(designationTotal)}`);
+    lines.push(`Designations fully absent (0% present): ${numberFormatter.format(designationsFullyAbsentCount)} of ${numberFormatter.format(designationTotal)}`);
+
+    lines.push("");
+    lines.push(`Generated ${new Date().toLocaleString()} · MatrixTrack Attendance Dashboard`);
+
+    return lines.join("\n");
+  };
+
+  const copySummaryToClipboard = async (text: string) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  };
+
+  const handleCopySummary = async () => {
+    const text = buildSummaryText();
+    if (!text) return;
+    try {
+      await copySummaryToClipboard(text);
+      setError("");
+      setNotice("Summary copied to clipboard — paste it to share with the commissioner or higher authority");
+    } catch {
+      setError("Unable to copy summary. Please try again.");
+    }
+  };
+
+  const handleShareSummary = async () => {
+    const text = buildSummaryText();
+    if (!text) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Attendance Summary", text });
+      } catch {
+        // user cancelled the native share sheet — no error needed
+      }
+      return;
+    }
+    void handleCopySummary();
+  };
+
   if (loading && !data) {
     return (
       <div className="flex min-h-[68vh] items-center justify-center">
@@ -1765,6 +2207,15 @@ function AttendanceDashboard() {
         page={workDurationPage}
         onPageChange={setWorkDurationPage}
         onClose={() => setWorkDurationBucket(null)}
+      />
+      <EmployeeRecordsDrawer
+        open={Boolean(employeeDrilldown)}
+        employee={employeeDrilldown}
+        data={employeeDrilldownData}
+        loading={employeeDrilldownLoading}
+        page={employeeDrilldownPage}
+        onPageChange={setEmployeeDrilldownPage}
+        onClose={() => setEmployeeDrilldown(null)}
       />
 
       <style jsx global>{`
@@ -2009,6 +2460,12 @@ function AttendanceDashboard() {
               onChange={(e) => updateFilter({ to: e.target.value })}
               className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
             />
+            {isMultiDayRange && (
+              <p className="flex items-start gap-1 text-[9.5px] font-semibold leading-[13px] text-blue-600">
+                <Info size={11} className="mt-0.5 shrink-0" />
+                {rangeDayCount}-day range: cards show avg/day (total ÷ {rangeDayCount} days)
+              </p>
+            )}
           </label>
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance</span>
@@ -2109,7 +2566,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Total employees"
               value={numberFormatter.format(summary.uniqueEmployees)}
-              detail={`${numberFormatter.format(summary.totalRecords)} attendance records`}
+              detail={
+                isMultiDayRange
+                  ? `Avg ${formatAverageValue(avgTotalRecords)} records/day (${averageFormula(summary.totalRecords, rangeDayCount)})`
+                  : `${numberFormatter.format(summary.totalRecords)} attendance records`
+              }
               icon={<UsersRound size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "ALL"}
@@ -2123,8 +2584,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Present"
-              value={numberFormatter.format(summary.present)}
-              detail={`${summary.attendanceRate.toFixed(1)}% attendance`}
+              value={isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.present, rangeDayCount)})`
+                  : `${summary.attendanceRate.toFixed(1)}% attendance`
+              }
               icon={<UserCheck size={18} />}
               tone="emerald"
               active={kpiDrilldown?.key === "PRESENT"}
@@ -2139,8 +2604,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Absent"
-              value={numberFormatter.format(summary.absent)}
-              detail={`${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`}
+              value={isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.absent, rangeDayCount)})`
+                  : `${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`
+              }
               icon={<UserRoundX size={18} />}
               tone="rose"
               active={kpiDrilldown?.key === "ABSENT"}
@@ -2171,8 +2640,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Punch In"
-              value={numberFormatter.format(punchInCount)}
-              detail={`${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`}
+              value={isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(punchInCount, rangeDayCount)})`
+                  : `${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`
+              }
               icon={<Clock3 size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "PUNCH_IN"}
@@ -2187,8 +2660,12 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Punch Out"
-              value={numberFormatter.format(summary.checkedOut)}
-              detail="Completed Punch In / Punch Out cycle"
+              value={isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(summary.checkedOut)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.checkedOut, rangeDayCount)})`
+                  : "Completed Punch In / Punch Out cycle"
+              }
               icon={<CheckCircle2 size={18} />}
               tone="teal"
               active={kpiDrilldown?.key === "PUNCH_OUT"}
@@ -2202,15 +2679,19 @@ function AttendanceDashboard() {
               })}
             />
             <KpiCard
-              label="Open Punch In"
-              value={numberFormatter.format(summary.openCheckIns)}
-              detail="Punch In recorded · Punch Out pending"
+              label="Not punched out"
+              value={isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
+              detail={
+                isMultiDayRange
+                  ? `Avg/day (${averageFormula(summary.openCheckIns, rangeDayCount)})`
+                  : "Punch In recorded · Punch Out pending"
+              }
               icon={<TimerReset size={18} />}
               tone="amber"
               active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
               onClick={() => openKpiDrilldown({
                 key: "OPEN_PUNCH_IN",
-                title: "Open Punch In records",
+                title: "Not punched out records",
                 subtitle: "Employees with Punch In recorded but no Punch Out yet.",
                 value: numberFormatter.format(summary.openCheckIns),
                 tone: "amber",
@@ -2250,169 +2731,89 @@ function AttendanceDashboard() {
               </div>
             </ChartCard>
 
-            <ChartCard title="Attendance mix" subtitle="A quick view of present vs absent workforce" badge={`${summary.attendanceRate.toFixed(1)}% present`} icon={<UserCheck size={18} />} tone="emerald">
+            <ChartCard
+              title="Punch completion"
+              subtitle="Punch In → Punch Out completion across all attendance records"
+              badge={`${punchCompletionRate.toFixed(1)}% completed`}
+              icon={<CheckCircle2 size={18} />}
+              tone="emerald"
+            >
               <div className="relative h-[230px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={attendancePie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={70} outerRadius={96} paddingAngle={3} strokeWidth={0}>
-                      {attendancePie.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                    <Pie data={punchCompletionPie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={70} outerRadius={96} paddingAngle={3} strokeWidth={0}>
+                      {punchCompletionPie.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
+                      formatter={(value: number, name: string) => [numberFormatter.format(value as number), name]}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-black tracking-tight text-slate-900">{summary.attendanceRate.toFixed(1)}%</span>
-                  <span className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Attendance</span>
+                  <span className="text-3xl font-black tracking-tight text-slate-900">{punchCompletionRate.toFixed(1)}%</span>
+                  <span className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Completed</span>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="group/mix rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 px-3.5 py-3 ring-1 ring-emerald-100 transition hover:-translate-y-0.5">
-                  <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Present</p><UserCheck size={15} className="text-emerald-500" /></div>
-                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{numberFormatter.format(summary.present)}</p>
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="group/mix rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 px-2.5 py-3 ring-1 ring-emerald-100 transition hover:-translate-y-0.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">Punch Out</p>
+                  <p className="mt-1 text-base font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(summary.checkedOut)}
+                  </p>
+                  <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-emerald-700/70">
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.checkedOut, rangeDayCount)}` : "Completed Punch In / Punch Out cycle"}
+                  </p>
                 </div>
-                <div className="group/mix rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50/70 px-3.5 py-3 ring-1 ring-rose-100 transition hover:-translate-y-0.5">
-                  <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-rose-700">Absent</p><UserRoundX size={15} className="text-rose-500" /></div>
-                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{numberFormatter.format(summary.absent)}</p>
+                <div className="group/mix rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/70 px-2.5 py-3 ring-1 ring-amber-100 transition hover:-translate-y-0.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-amber-700">Not punched out</p>
+                  <p className="mt-1 text-base font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
+                  </p>
+                  <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-amber-700/70">
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.openCheckIns, rangeDayCount)}` : "Punch In recorded · Punch Out pending"}
+                  </p>
                 </div>
-              </div>
-            </ChartCard>
-          </section>
-
-          <section className="grid gap-5 xl:grid-cols-2">
-            <ChartCard title="Punch In activity by hour" subtitle="Hourly Punch In pattern and peak reporting window" badge={`Peak ${peakCheckIn.label}`} icon={<Clock3 size={18} />} tone="violet">
-              <div className="mb-3 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-violet-50/70 px-3 py-2.5 ring-1 ring-violet-100"><p className="text-[9px] font-black uppercase tracking-wider text-violet-500">Peak hour</p><p className="mt-0.5 text-sm font-black text-violet-900">{peakCheckIn.label}</p></div>
-                <div className="rounded-2xl bg-blue-50/70 px-3 py-2.5 ring-1 ring-blue-100"><p className="text-[9px] font-black uppercase tracking-wider text-blue-500">Peak punches</p><p className="mt-0.5 text-sm font-black text-blue-900">{numberFormatter.format(peakCheckIn.count)}</p></div>
-              </div>
-              <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-violet-50/35 to-white px-1 pt-2 ring-1 ring-violet-100/70">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={checkInDistribution} margin={{ left: -15, right: 6, top: 8, bottom: 0 }}>
-                    <defs><linearGradient id="checkInBars" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7c3aed" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="label" interval={2} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
-                    <Bar dataKey="count" name="Punch Ins" fill="url(#checkInBars)" radius={[7, 7, 2, 2]} maxBarSize={26} animationDuration={900} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </ChartCard>
-
-            <ChartCard title="Designation performance" subtitle="Attendance rate across all workforce groups" badge={`${numberFormatter.format(designationTotal)} designations`} icon={<UsersRound size={18} />} tone="violet">
-              <div className="h-[300px] w-full rounded-2xl bg-gradient-to-r from-violet-50/30 to-white px-2 py-2 ring-1 ring-violet-100/70">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={designationPageItems} layout="vertical" margin={{ left: 18, right: 18, top: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                    <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
-                    <YAxis type="category" dataKey="designation" width={142} tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
-                    <Tooltip
-                      cursor={{ fill: "rgba(124,58,237,0.05)" }}
-                      content={({ active, payload }) => {
-                        const item = payload?.[0]?.payload as { designation: string; total: number; present: number; absent: number; rate: number } | undefined;
-                        if (!active || !item) return null;
-                        return (
-                          <div className="min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs shadow-lg">
-                            <p className="font-black text-slate-900">{item.designation}</p>
-                            <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
-                              <div className="flex items-center justify-between gap-4"><span>Attendance rate</span><strong className="text-violet-700">{item.rate.toFixed(1)}%</strong></div>
-                              <div className="flex items-center justify-between gap-4"><span>Total count</span><strong className="text-slate-900">{numberFormatter.format(item.total)}</strong></div>
-                              <div className="flex items-center justify-between gap-4"><span>Present</span><strong className="text-emerald-700">{numberFormatter.format(item.present)}</strong></div>
-                              <div className="flex items-center justify-between gap-4"><span>Absent</span><strong className="text-rose-700">{numberFormatter.format(item.absent)}</strong></div>
-                            </div>
-                          </div>
-                        );
-                      }}
-                    />
-                    <Bar dataKey="rate" radius={[0, 7, 7, 0]} maxBarSize={16} animationDuration={950}>
-                      {designationPageItems.map((item, index) => <Cell key={`${item.designation}-${index}`} fill={item.rate >= 85 ? chartColors.emerald : item.rate >= 70 ? chartColors.violet : item.rate >= 50 ? chartColors.amber : chartColors.rose} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Designation performance color meaning */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
-                <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">
-                  Performance:
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: chartColors.emerald }}
-                  />
-                  85%
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: chartColors.violet }}
-                  />
-                  70%–84.9% 
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: chartColors.amber }}
-                  />
-                  50%–69.9% 
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-600">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: chartColors.rose }}
-                  />
-                  Below 50% 
-                </span>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2 text-[10.5px] font-semibold text-slate-500">
-                  <span>{designationStart}-{designationEnd} of {numberFormatter.format(designationTotal)} designations</span>
-                  {bestDesignation && (
-                    <span className="hidden rounded-full bg-violet-50 px-2 py-1 font-bold text-violet-700 ring-1 ring-violet-100 sm:inline">
-                      Best: {bestDesignation.designation} · {bestDesignation.rate.toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setDesignationPage((current) => Math.max(1, current - 1))}
-                    disabled={designationPage <= 1}
-                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronLeft size={13} /> Previous
-                  </button>
-                  <span className="min-w-[58px] text-center text-[10.5px] font-black text-slate-600">
-                    {designationPage} / {designationTotalPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setDesignationPage((current) => Math.min(designationTotalPages, current + 1))}
-                    disabled={designationPage >= designationTotalPages}
-                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next <ChevronRight size={13} />
-                  </button>
+                <div className="group/mix rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50/70 px-2.5 py-3 ring-1 ring-slate-200 transition hover:-translate-y-0.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-600">No punch</p>
+                  <p className="mt-1 text-base font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgNoPunch) : numberFormatter.format(summary.noPunch)}
+                  </p>
+                  <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-slate-500">
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.noPunch, rangeDayCount)}` : "No Punch In or Punch Out recorded"}
+                  </p>
                 </div>
               </div>
             </ChartCard>
           </section>
 
-          <section className="grid items-stretch gap-5 lg:grid-cols-3">
-            <ChartCard title="Work duration" subtitle="Click a bar to view employees in that working-hour range" badge={`${numberFormatter.format(summary.checkedOut)} completed`} icon={<BarChart3 size={18} />} tone="blue">
+          <section className="grid items-stretch gap-5 lg:grid-cols-2">
+            <ChartCard
+              title="Work duration"
+              subtitle="Click a bar to view employees in that working-hour range"
+              badge={
+                isMultiDayRange
+                  ? `${formatAverageValue(avgCheckedOut)} avg/day`
+                  : `${numberFormatter.format(summary.checkedOut)} completed`
+              }
+              icon={<BarChart3 size={18} />}
+              tone="blue"
+            >
               <div className="flex h-full flex-col">
                 <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-blue-50/35 to-white px-1 pt-2 ring-1 ring-blue-100/70">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data.workDurationBuckets} margin={{ left: -15, right: 5, top: 8, bottom: 0 }}>
+                    <BarChart data={workDurationChartData} margin={{ left: -15, right: 5, top: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="bucket" tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
                       <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
+                        formatter={(value: number, _name, item: any) => {
+                          if (!isMultiDayRange) return [numberFormatter.format(value as number), "Employees"];
+                          const raw = item?.payload?.rawCount ?? 0;
+                          return [`${numberFormatter.format(value as number)}/day (${averageFormula(raw, rangeDayCount)})`, "Employees avg"];
+                        }}
+                      />
                       <Bar
                         dataKey="count"
                         name="Employees"
@@ -2425,7 +2826,7 @@ function AttendanceDashboard() {
                           if (bucket) openWorkDurationBucket(bucket);
                         }}
                       >
-                        {data.workDurationBuckets.map((item, index) => (
+                        {workDurationChartData.map((item, index) => (
                           <Cell
                             key={`${item.bucket}-${index}`}
                             fill={[chartColors.rose, chartColors.amber, chartColors.blue, chartColors.emerald, chartColors.violet][index % 5]}
@@ -2438,6 +2839,11 @@ function AttendanceDashboard() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                {isMultiDayRange && (
+                  <p className="mt-2 text-[9.5px] font-semibold text-blue-700/70">
+                    Bars show the daily average employee count per duration bucket across {rangeDayCount} days.
+                  </p>
+                )}
 
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-blue-50/75 px-3 py-2.5 ring-1 ring-blue-100">
@@ -2454,20 +2860,27 @@ function AttendanceDashboard() {
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">Duration mix</p>
-                      <p className="mt-0.5 text-[9.5px] font-semibold text-slate-400">Completed employees by working-hour bucket</p>
+                      <p className="mt-0.5 text-[9.5px] font-semibold text-slate-400">
+                        {isMultiDayRange ? `Avg completed employees/day by working-hour bucket` : "Completed employees by working-hour bucket"}
+                      </p>
                     </div>
                     <TimerReset size={17} className="text-blue-500" />
                   </div>
                   <div className="space-y-2.5">
-                    {(data.workDurationBuckets || []).map((item, index) => {
-                      const maxCount = Math.max(...(data.workDurationBuckets || []).map((bucket) => bucket.count), 1);
+                    {(workDurationChartData || []).map((item, index) => {
+                      const maxCount = Math.max(...(workDurationChartData || []).map((bucket) => bucket.count), 1);
                       const width = (item.count / maxCount) * 100;
                       const barColors = ["bg-rose-500", "bg-amber-500", "bg-blue-500", "bg-emerald-500", "bg-violet-500"];
                       return (
                         <div key={`duration-insight-${item.bucket}`}>
                           <div className="mb-1 flex items-center justify-between gap-2">
                             <span className="text-[10px] font-bold text-slate-600">{item.bucket}</span>
-                            <span className="text-[10px] font-black tabular-nums text-slate-800">{numberFormatter.format(item.count)}</span>
+                            <span className="text-[10px] font-black tabular-nums text-slate-800">
+                              {numberFormatter.format(item.count)}
+                              {isMultiDayRange && (
+                                <span className="ml-1 font-semibold text-slate-400">({averageFormula(item.rawCount, rangeDayCount)})</span>
+                              )}
+                            </span>
                           </div>
                           <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                             <div className={`h-full rounded-full ${barColors[index % barColors.length]} transition-[width] duration-1000`} style={{ width: `${width}%` }} />
@@ -2483,155 +2896,311 @@ function AttendanceDashboard() {
             <ChartCard
               title="Top attendance employees"
               subtitle="Best employee attendance across the selected date range"
-              badge={`${Math.min(data.topEmployees?.length || 0, 3)} ranked`}
+              badge={`${numberFormatter.format(topEmployeesTotal)} ranked`}
               icon={<Trophy size={18} />}
               tone="amber"
             >
-              <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50/65 px-3 py-2.5">
-                <p className="text-[9.5px] font-bold leading-4 text-amber-800">
-                  Ranking is based on most present days, then attendance rate, then completed Punch In / Punch Out cycles.
-                </p>
-              </div>
+              <div className="flex h-full flex-col">
+                <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50/65 px-3 py-2.5">
+                  <p className="text-[9.5px] font-bold leading-4 text-amber-800">
+                    Ranking is based on most present days, then attendance rate, then completed Punch In / Punch Out cycles.
+                  </p>
+                </div>
 
-              <div className="space-y-2.5">
-                {(data.topEmployees || []).slice(0, 3).map((employee, index) => {
-                  const rankStyles = [
-                    "from-amber-400 to-orange-500 text-white shadow-amber-500/20",
-                    "from-slate-300 to-slate-500 text-white shadow-slate-400/20",
-                    "from-orange-300 to-amber-700 text-white shadow-orange-500/20",
-                  ];
-                  const attendanceTone =
-                    employee.attendanceRate >= 90
-                      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-                      : employee.attendanceRate >= 75
-                        ? "bg-blue-50 text-blue-700 ring-blue-100"
-                        : "bg-amber-50 text-amber-700 ring-amber-100";
-                  const dayWord = employee.presentDays === 1 ? "day" : "days";
-                  const punchWord = employee.completedPunches === 1 ? "cycle" : "cycles";
-                  const whyTop = `${employee.presentDays} present ${dayWord} · ${employee.attendanceRate.toFixed(1)}% attendance · ${employee.completedPunches} completed punch ${punchWord}`;
+                <div className="flex-1 space-y-2.5">
+                  {topEmployeesPageItems.map((employee, index) => {
+                    const rank = (topEmployeesPage - 1) * topEmployeesPageSize + index;
+                    const rankStyles = [
+                      "from-amber-400 to-orange-500 text-white shadow-amber-500/20",
+                      "from-slate-300 to-slate-500 text-white shadow-slate-400/20",
+                      "from-orange-300 to-amber-700 text-white shadow-orange-500/20",
+                      "from-blue-400 to-indigo-600 text-white shadow-blue-500/20",
+                      "from-violet-400 to-fuchsia-600 text-white shadow-violet-500/20",
+                    ];
+                    const attendanceTone =
+                      employee.attendanceRate >= 90
+                        ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                        : employee.attendanceRate >= 75
+                          ? "bg-blue-50 text-blue-700 ring-blue-100"
+                          : "bg-amber-50 text-amber-700 ring-amber-100";
+                    const dayWord = employee.presentDays === 1 ? "day" : "days";
+                    const punchWord = employee.completedPunches === 1 ? "cycle" : "cycles";
+                    const whyTop = `${employee.presentDays} present ${dayWord} · ${employee.attendanceRate.toFixed(1)}% attendance · ${employee.completedPunches} completed punch ${punchWord}`;
 
-                  return (
-                    <div
-                      key={employee.attendanceId}
-                      className="group/top rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-amber-50/25 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-100 hover:shadow-md"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xs font-black shadow-md ${rankStyles[index]}`}>
-                          #{index + 1}
-                        </div>
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-xs font-black text-blue-700 ring-1 ring-blue-100">
-                          {employee.employeeName.slice(0, 1).toUpperCase()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="truncate text-xs font-black text-slate-800" title={employee.employeeName}>
-                              {employee.employeeName}
-                            </p>
-                            <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ring-1 ${attendanceTone}`}>
-                              {employee.attendanceRate.toFixed(1)}%
-                            </span>
+                    return (
+                      <div
+                        key={employee.attendanceId}
+                        className="group/top rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-amber-50/25 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-100 hover:shadow-md"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xs font-black shadow-md ${rankStyles[rank % rankStyles.length]}`}>
+                            #{rank + 1}
                           </div>
-                          <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
-                            {employee.designation || "Employee"} · {employee.attendanceId}
-                          </p>
-                          <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames((employee as any).zone || employee.zones)} · Ward: ${formatScopeNames((employee as any).ward || employee.wards)}`}>
-                            Zone: {formatScopeNames((employee as any).zone || employee.zones)} · Ward: {formatScopeNames((employee as any).ward || employee.wards)}
-                          </p>
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                            {employee.employeeName.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-xs font-black text-slate-800" title={employee.employeeName}>
+                                {employee.employeeName}
+                              </p>
+                              <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black ring-1 ${attendanceTone}`}>
+                                {employee.attendanceRate.toFixed(1)}%
+                              </span>
+                            </div>
+                            <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
+                              {employee.designation || "Employee"} · {employee.attendanceId}
+                            </p>
+                            <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames((employee as any).zone || employee.zones)} · Ward: ${formatScopeNames((employee as any).ward || employee.wards)}`}>
+                              Zone: {formatScopeNames((employee as any).zone || employee.zones)} · Ward: {formatScopeNames((employee as any).ward || employee.wards)}
+                            </p>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="mt-2.5 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-amber-100/80">
-                        <div className="flex items-start gap-2">
-                          <Trophy size={12} className="mt-0.5 shrink-0 text-amber-500" />
-                          <p className="text-[9.5px] font-semibold leading-4 text-slate-600">
-                            <span className="font-black text-amber-700">Why #{index + 1}:</span> {whyTop}
-                          </p>
+                        <div className="mt-2.5 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-amber-100/80">
+                          <div className="flex items-start gap-2">
+                            <Trophy size={12} className="mt-0.5 shrink-0 text-amber-500" />
+                            <p className="text-[9.5px] font-semibold leading-4 text-slate-600">
+                              <span className="font-black text-amber-700">Why #{rank + 1}:</span> {whyTop}
+                            </p>
+                          </div>
                         </div>
                       </div>
+                    );
+                  })}
+
+                  {!topEmployeesTotal && (
+                    <div className="flex h-[238px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-5 text-center">
+                      <Trophy size={24} className="mb-2 text-slate-300" />
+                      <p className="text-xs font-black text-slate-600">No ranking data available</p>
+                      <p className="mt-1 text-[10px] font-medium leading-4 text-slate-400">
+                        Top employees will appear for the selected attendance date range.
+                      </p>
                     </div>
-                  );
-                })}
+                  )}
+                </div>
 
-                {!data.topEmployees?.length && (
-                  <div className="flex h-[238px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-5 text-center">
-                    <Trophy size={24} className="mb-2 text-slate-300" />
-                    <p className="text-xs font-black text-slate-600">No ranking data available</p>
-                    <p className="mt-1 text-[10px] font-medium leading-4 text-slate-400">
-                      Top employees will appear for the selected attendance date range.
-                    </p>
+                {topEmployeesTotal > topEmployeesPageSize && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                    <span className="text-[10.5px] font-semibold text-slate-500">
+                      {topEmployeesStart}-{topEmployeesEnd} of {numberFormatter.format(topEmployeesTotal)}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setTopEmployeesPage((current) => Math.max(1, current - 1))}
+                        disabled={topEmployeesPage <= 1}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ChevronLeft size={13} /> Previous
+                      </button>
+                      <span className="min-w-[58px] text-center text-[10.5px] font-black text-slate-600">
+                        {topEmployeesPage} / {topEmployeesTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setTopEmployeesPage((current) => Math.min(topEmployeesTotalPages, current + 1))}
+                        disabled={topEmployeesPage >= topEmployeesTotalPages}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Next <ChevronRight size={13} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             </ChartCard>
 
-            <ChartCard title="Office attendance" subtitle="Location-wise attendance strength and workforce participation" badge={`${data.officeBreakdown.length} shown`} icon={<Activity size={18} />} tone="emerald">
-              <div className="flex h-full flex-col">
-                <div className="space-y-3">
-                  {data.officeBreakdown.length ? data.officeBreakdown.slice(0, 3).map((office) => (
-                    <div key={office.officeLocation} className="group/office rounded-2xl border border-slate-100 bg-gradient-to-r from-slate-50/80 to-white px-3.5 py-3 transition-all hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-2"><div className={`h-7 w-1 rounded-full ${office.rate >= 85 ? "bg-emerald-500" : office.rate >= 70 ? "bg-blue-500" : office.rate >= 50 ? "bg-amber-500" : "bg-rose-500"}`} /><p className="min-w-0 truncate text-xs font-black text-slate-700" title={office.officeLocation}>{office.officeLocation}</p></div>
-                        <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-black ${office.rate >= 85 ? "bg-emerald-50 text-emerald-700" : office.rate >= 70 ? "bg-blue-50 text-blue-700" : office.rate >= 50 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700"}`}>{office.rate.toFixed(1)}%</span>
-                      </div>
-                      <div className="mt-2.5 flex items-center gap-2">
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/60">
-                          <div className={`h-full rounded-full transition-[width] duration-1000 ease-out ${office.rate >= 85 ? "bg-emerald-500" : office.rate >= 70 ? "bg-blue-500" : office.rate >= 50 ? "bg-amber-500" : "bg-rose-500"}`} style={{ width: `${Math.min(office.rate, 100)}%` }} />
-                        </div>
-                        <span className="w-16 text-right text-[10px] font-semibold text-slate-400">{numberFormatter.format(office.present)}/{numberFormatter.format(office.total)}</span>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="flex h-[150px] items-center justify-center text-center text-xs font-medium text-slate-400">No office/location values for this range</div>
+          </section>
+
+          <section className="grid gap-5 xl:grid-cols-2">
+            <ChartCard
+              title="Punch In activity by hour"
+              subtitle={
+                isMultiDayRange
+                  ? `Average hourly Punch In pattern across ${rangeDayCount} days`
+                  : "Hourly Punch In pattern and peak reporting window"
+              }
+              badge={`Peak ${peakCheckIn.label}`}
+              icon={<Clock3 size={18} />}
+              tone="violet"
+            >
+              <div className="mb-3 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-violet-50/70 px-3 py-2.5 ring-1 ring-violet-100"><p className="text-[9px] font-black uppercase tracking-wider text-violet-500">Peak hour</p><p className="mt-0.5 text-sm font-black text-violet-900">{peakCheckIn.label}</p></div>
+                <div className="rounded-2xl bg-blue-50/70 px-3 py-2.5 ring-1 ring-blue-100">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-blue-500">{isMultiDayRange ? "Peak punches (avg/day)" : "Peak punches"}</p>
+                  <p className="mt-0.5 text-sm font-black text-blue-900">{numberFormatter.format(peakCheckIn.count)}</p>
+                  {isMultiDayRange && (
+                    <p className="mt-0.5 text-[9px] font-semibold text-blue-700/70">{averageFormula(peakCheckIn.rawCount, rangeDayCount)}</p>
                   )}
                 </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl bg-emerald-50/75 px-3 py-3 ring-1 ring-emerald-100">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">Present</p>
-                      <UserCheck size={14} className="text-emerald-500" />
-                    </div>
-                    <p className="mt-1 text-lg font-black tabular-nums text-emerald-950">{numberFormatter.format(summary.present)}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold text-emerald-700/60">Across selected offices</p>
-                  </div>
-                  <div className="rounded-2xl bg-rose-50/75 px-3 py-3 ring-1 ring-rose-100">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">Absent</p>
-                      <UserRoundX size={14} className="text-rose-500" />
-                    </div>
-                    <p className="mt-1 text-lg font-black tabular-nums text-rose-950">{numberFormatter.format(summary.absent)}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold text-rose-700/60">Across selected offices</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-blue-50/60 p-3.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">Participation snapshot</p>
-                      <p className="mt-0.5 text-[9.5px] font-semibold text-slate-500">Present workforce against all attendance records</p>
-                    </div>
-                    <span className="rounded-xl bg-white px-2.5 py-1.5 text-sm font-black tabular-nums text-emerald-700 shadow-sm ring-1 ring-emerald-100">{summary.attendanceRate.toFixed(1)}%</span>
-                  </div>
-                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-rose-100">
-                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-[width] duration-1000" style={{ width: `${Math.min(summary.attendanceRate, 100)}%` }} />
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-[9.5px] font-bold">
-                    <span className="text-emerald-700">{numberFormatter.format(summary.present)} present</span>
-                    <span className="text-rose-600">{numberFormatter.format(summary.absent)} absent</span>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2.5 shadow-sm">
-                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Office groups</p>
-                    <p className="mt-1 text-sm font-black text-slate-900">{numberFormatter.format(data.officeBreakdown.length)}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-100 bg-white px-3 py-2.5 shadow-sm">
-                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Attendance records</p>
-                    <p className="mt-1 text-sm font-black text-slate-900">{numberFormatter.format(summary.totalRecords)}</p>
-                  </div>
-                </div>
               </div>
+              <div className="h-[245px] w-full rounded-2xl bg-gradient-to-b from-violet-50/35 to-white px-1 pt-2 ring-1 ring-violet-100/70">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={checkInDistribution} margin={{ left: -15, right: 6, top: 8, bottom: 0 }}>
+                    <defs><linearGradient id="checkInBars" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7c3aed" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient></defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="label" interval={2} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
+                      formatter={(value: number, _name, item: any) => {
+                        if (!isMultiDayRange) return [numberFormatter.format(value as number), "Punch Ins"];
+                        const raw = item?.payload?.rawCount ?? 0;
+                        return [`${numberFormatter.format(value as number)}/day (${averageFormula(raw, rangeDayCount)})`, "Punch Ins avg"];
+                      }}
+                    />
+                    <Bar dataKey="count" name="Punch Ins" fill="url(#checkInBars)" radius={[7, 7, 2, 2]} maxBarSize={26} animationDuration={900} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {isMultiDayRange && (
+                <p className="mt-2 text-[9.5px] font-semibold text-violet-700/70">
+                  Bars show the daily average Punch In count per hour across {rangeDayCount} days.
+                </p>
+              )}
+            </ChartCard>
+
+            <ChartCard
+              title="Designation performance"
+              subtitle="Attendance rate across all workforce groups"
+              headerRight={
+                <div className="w-44">
+                  <SearchableSelect
+                    value={designationNameFilter}
+                    onChange={setDesignationNameFilter}
+                    options={[
+                      { value: "", label: `All (${sortedDesignationBreakdown.length})` },
+                      ...sortedDesignationBreakdown.map((item) => ({ value: item.designation, label: item.designation })),
+                    ]}
+                  />
+                </div>
+              }
+              icon={<UsersRound size={18} />}
+              tone="violet"
+            >
+              {/* Designation performance color meaning — click a bucket to filter the chart */}
+              <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400">
+                  Performance:
+                </span>
+
+                {(
+                  [
+                    { key: "HIGH", color: chartColors.emerald, label: "85%" },
+                    { key: "MID_HIGH", color: chartColors.violet, label: "70%–84.9%" },
+                    { key: "MID_LOW", color: chartColors.amber, label: "50%–69.9%" },
+                    { key: "LOW", color: chartColors.rose, label: "Below 50%" },
+                  ] as const
+                ).map((bucket) => {
+                  const active = designationRateFilter === bucket.key;
+                  return (
+                    <button
+                      key={bucket.key}
+                      type="button"
+                      onClick={() => setDesignationRateFilter((current) => (current === bucket.key ? "ALL" : bucket.key))}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold transition ${
+                        active ? "bg-white text-slate-900 ring-1 ring-slate-300 shadow-sm" : "text-slate-600 hover:bg-white/70"
+                      }`}
+                    >
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: bucket.color }} />
+                      {bucket.label}
+                    </button>
+                  );
+                })}
+
+                {designationRateFilter !== "ALL" && (
+                  <button
+                    type="button"
+                    onClick={() => setDesignationRateFilter("ALL")}
+                    className="ml-auto text-[10px] font-bold text-violet-600 hover:text-violet-700"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {designationTotal ? (
+                <>
+                  <div className="h-[300px] w-full rounded-2xl bg-gradient-to-r from-violet-50/30 to-white px-2 py-2 ring-1 ring-violet-100/70">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={designationPageItems} layout="vertical" margin={{ left: 18, right: 18, top: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                        <XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
+                        <YAxis type="category" dataKey="designation" width={142} tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickLine={false} axisLine={false} />
+                        <Tooltip
+                          cursor={{ fill: "rgba(124,58,237,0.05)" }}
+                          content={({ active, payload }) => {
+                            const item = payload?.[0]?.payload as { designation: string; total: number; present: number; absent: number; rate: number } | undefined;
+                            if (!active || !item) return null;
+                            return (
+                              <div className="min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs shadow-lg">
+                                <p className="font-black text-slate-900">{item.designation}</p>
+                                <div className="mt-2 space-y-1 text-[11px] font-semibold text-slate-600">
+                                  <div className="flex items-center justify-between gap-4"><span>Attendance rate</span><strong className="text-violet-700">{item.rate.toFixed(1)}%</strong></div>
+                                  <div className="flex items-center justify-between gap-4"><span>Total count</span><strong className="text-slate-900">{numberFormatter.format(item.total)}</strong></div>
+                                  <div className="flex items-center justify-between gap-4"><span>Present</span><strong className="text-emerald-700">{numberFormatter.format(item.present)}</strong></div>
+                                  <div className="flex items-center justify-between gap-4"><span>Absent</span><strong className="text-rose-700">{numberFormatter.format(item.absent)}</strong></div>
+                                </div>
+                                {isMultiDayRange && (
+                                  <div className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-500">
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Daily average</p>
+                                    <div className="flex items-center justify-between gap-4"><span>Present/day</span><strong className="text-emerald-700">{formatAverageValue(item.present / rangeDayCount)} ({averageFormula(item.present, rangeDayCount)})</strong></div>
+                                    <div className="flex items-center justify-between gap-4"><span>Absent/day</span><strong className="text-rose-700">{formatAverageValue(item.absent / rangeDayCount)} ({averageFormula(item.absent, rangeDayCount)})</strong></div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Bar dataKey="rate" radius={[0, 7, 7, 0]} maxBarSize={16} animationDuration={950}>
+                          {designationPageItems.map((item, index) => <Cell key={`${item.designation}-${index}`} fill={item.rate >= 85 ? chartColors.emerald : item.rate >= 70 ? chartColors.violet : item.rate >= 50 ? chartColors.amber : chartColors.rose} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2 text-[10.5px] font-semibold text-slate-500">
+                      <span>{designationStart}-{designationEnd} of {numberFormatter.format(designationTotal)} designations</span>
+                      {bestDesignation && (
+                        <span className="hidden rounded-full bg-violet-50 px-2 py-1 font-bold text-violet-700 ring-1 ring-violet-100 sm:inline">
+                          Best: {bestDesignation.designation} · {bestDesignation.rate.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setDesignationPage((current) => Math.max(1, current - 1))}
+                        disabled={designationPage <= 1}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <ChevronLeft size={13} /> Previous
+                      </button>
+                      <span className="min-w-[58px] text-center text-[10.5px] font-black text-slate-600">
+                        {designationPage} / {designationTotalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDesignationPage((current) => Math.min(designationTotalPages, current + 1))}
+                        disabled={designationPage >= designationTotalPages}
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-600 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Next <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-5 text-center">
+                  <UsersRound size={24} className="mb-2 text-slate-300" />
+                  <p className="text-xs font-black text-slate-600">No designations match this filter</p>
+                  <p className="mt-1 text-[10px] font-medium leading-4 text-slate-400">
+                    Try a different designation or clear the performance bucket filter.
+                  </p>
+                </div>
+              )}
             </ChartCard>
           </section>
 
@@ -2642,7 +3211,9 @@ function AttendanceDashboard() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100"><UsersRound size={18} /></div>
                   <div>
                     <h2 className="text-base font-black tracking-tight text-slate-950">Employee attendance records</h2>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">{numberFormatter.format(data.pagination.total)} records match the current filters</p>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      {numberFormatter.format(data.employeePagination.total)} unique employees match the current filters · tap a name for their full history
+                    </p>
                   </div>
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[11px] font-black text-blue-700 shadow-sm ring-1 ring-blue-100">
@@ -2650,52 +3221,94 @@ function AttendanceDashboard() {
                 </div>
               </div>
 
+              <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative max-w-sm sm:flex-1">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={draftFilters.search}
+                    onChange={(e) => setDraftFilters((current) => ({ ...current, search: e.target.value }))}
+                    onKeyDown={(e) => e.key === "Enter" && applyFilters()}
+                    placeholder="Search employee by name or attendance ID"
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-[4.5rem] text-xs font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyFilters}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-blue-700"
+                  >
+                    Search
+                  </button>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Show</span>
+                  <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                    {[10, 20, 50, 100].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => {
+                          setEmployeePageSize(size);
+                          setPage(1);
+                        }}
+                        className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${
+                          employeePageSize === size
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1270px] border-collapse">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-50/95 text-left backdrop-blur">
-                      {['Employee', 'Attendance ID', 'Designation', 'Zone', 'Ward', 'Date', 'Punch In', 'Punch Out', 'Duration', 'Status', 'Punch status'].map((heading) => (
+                      {['Employee', 'Attendance ID', 'Designation', 'Zone', 'Ward', 'Present', 'Absent', 'Attendance rate', 'Completed punches', 'Avg work time'].map((heading) => (
                         <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {data.records.map((record: AttendanceRecord) => {
-                      const punch = record.outTime ? "Punch Out" : record.inTime ? "Punch In" : "No punch";
-                      return (
-                        <tr key={record.id} className="group border-b border-slate-100 transition-all duration-200 odd:bg-white even:bg-slate-50/25 hover:bg-blue-50/55 last:border-b-0">
-                          <td className="px-4 py-3.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">
-                                {record.employeeName.slice(0, 1).toUpperCase()}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="max-w-[190px] truncate text-xs font-bold text-slate-800" title={record.employeeName}>{record.employeeName}</p>
-                                <p className="mt-0.5 max-w-[190px] truncate text-[10px] font-medium text-slate-400" title={record.officeLocation || ""}>{record.officeLocation || "—"}</p>
-                              </div>
+                    {data.employees.map((employee: AttendanceEmployeeSummary) => (
+                      <tr key={employee.attendanceId} className="group border-b border-slate-100 transition-all duration-200 odd:bg-white even:bg-slate-50/25 hover:bg-blue-50/55 last:border-b-0">
+                        <td className="px-4 py-3.5">
+                          <button
+                            type="button"
+                            onClick={() => openEmployeeDrilldown(employee)}
+                            className="flex items-center gap-2.5 text-left"
+                            title={`View ${employee.employeeName}'s attendance for ${visibleRangeLabel}`}
+                          >
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">
+                              {employee.employeeName.slice(0, 1).toUpperCase()}
                             </div>
-                          </td>
-                          <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{record.attendanceId}</td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{record.designation || "—"}</td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames((record as any).zone || record.zones)}</td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames((record as any).ward || record.wards)}</td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatShortDate(record.attendanceDate)}</td>
-                          <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700 ring-1 ring-blue-100"><Clock3 size={11} />{formatTime(record.inTime)}</span></td>
-                          <td className="px-4 py-3.5"><span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-slate-50 text-slate-400 ring-slate-100"}`}><CheckCircle2 size={11} />{formatTime(record.outTime)}</span></td>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-500">{durationLabel(record.inTime, record.outTime)}</td>
-                          <td className="px-4 py-3.5"><StatusPill status={record.status} /></td>
-                          <td className="px-4 py-3.5">
-                            <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[10px] font-black ring-1 ${record.outTime ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : record.inTime ? "bg-amber-50 text-amber-700 ring-amber-100" : "bg-slate-100 text-slate-500 ring-slate-200"}`}>{record.outTime ? <CheckCircle2 size={11} /> : record.inTime ? <Clock3 size={11} /> : <AlertCircle size={11} />}{punch}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            <div className="min-w-0">
+                              <p className="max-w-[190px] truncate text-xs font-bold text-blue-700 underline-offset-2 group-hover:underline" title={employee.employeeName}>{employee.employeeName}</p>
+                              <p className="mt-0.5 max-w-[190px] truncate text-[10px] font-medium text-slate-400" title={employee.officeLocation || ""}>{employee.officeLocation || "—"}</p>
+                            </div>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{employee.attendanceId}</td>
+                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{employee.designation || "—"}</td>
+                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(employee.zones)}</td>
+                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(employee.wards)}</td>
+                        <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">{employee.presentDays}/{employee.totalDays}</span></td>
+                        <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">{employee.absentDays}</span></td>
+                        <td className="px-4 py-3.5 text-xs font-bold text-slate-700">{employee.attendanceRate.toFixed(1)}%</td>
+                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{employee.completedPunches}</td>
+                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-500">{minutesToDuration(employee.avgWorkMinutes)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
-                {!data.records.length && (
+                {!data.employees.length && (
                   <div className="flex min-h-[220px] flex-col items-center justify-center px-6 text-center">
                     <Search size={24} className="mb-3 text-slate-300" />
-                    <p className="text-sm font-bold text-slate-600">No records match these filters</p>
+                    <p className="text-sm font-bold text-slate-600">No employees match these filters</p>
                     <button onClick={resetFilters} className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-700">Clear filters</button>
                   </div>
                 )}
@@ -2703,7 +3316,7 @@ function AttendanceDashboard() {
 
               <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[11px] font-semibold text-slate-500">
-                  Page {data.pagination.page} of {Math.max(data.pagination.totalPages, 1)}
+                  Page {data.employeePagination.page} of {Math.max(data.employeePagination.totalPages, 1)}
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -2716,8 +3329,8 @@ function AttendanceDashboard() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPage((current) => Math.min(data.pagination.totalPages, current + 1))}
-                    disabled={page >= data.pagination.totalPages}
+                    onClick={() => setPage((current) => Math.min(data.employeePagination.totalPages, current + 1))}
+                    disabled={page >= data.employeePagination.totalPages}
                     className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Next <ChevronRight size={14} />
@@ -2727,6 +3340,216 @@ function AttendanceDashboard() {
             </div>
 
           </section>
+
+          {/* <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_38px_rgba(15,23,42,0.06)] sm:p-6">
+            <div className="absolute left-0 top-0 h-1 w-40 bg-gradient-to-r from-blue-500 via-violet-400 to-transparent" />
+
+            <div className="relative mb-5 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700 ring-1 ring-blue-100">
+                    Exclusive summary
+                  </span>
+                  <h2 className="mt-1.5 text-base font-black tracking-[-0.02em] text-slate-950">{visibleRangeLabel}</h2>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                    {isMultiDayRange
+                      ? `Daily average across ${rangeDayCount} days with data — total ÷ days`
+                      : "Exact figures for the selected date"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleCopySummary()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                  title="Copy a shareable text summary for the commissioner or higher authority"
+                >
+                  <Copy size={13} /> Copy summary
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleShareSummary()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-2 text-[11px] font-bold text-white shadow-md shadow-blue-600/20 transition hover:-translate-y-0.5"
+                  title="Share this summary"
+                >
+                  <Share2 size={13} /> Share
+                </button>
+              </div>
+            </div>
+
+            <div className="relative grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <SummaryTile
+                label="Avg total records"
+                value={formatAverageValue(avgTotalRecords)}
+                detail={isMultiDayRange ? `/day · ${averageFormula(summary.totalRecords, rangeDayCount)}` : "Exact — single day"}
+                icon={<UsersRound size={13} />}
+                tone="blue"
+              />
+              <SummaryTile
+                label="Avg present"
+                value={formatAverageValue(avgPresent)}
+                detail={isMultiDayRange ? `/day · ${averageFormula(summary.present, rangeDayCount)}` : `${summary.attendanceRate.toFixed(1)}% attendance`}
+                icon={<UserCheck size={13} />}
+                tone="emerald"
+              />
+              <SummaryTile
+                label="Avg absent"
+                value={formatAverageValue(avgAbsent)}
+                detail={isMultiDayRange ? `/day · ${averageFormula(summary.absent, rangeDayCount)}` : "Of total records"}
+                icon={<UserRoundX size={13} />}
+                tone="rose"
+              />
+              <SummaryTile
+                label="Attendance rate"
+                value={`${summary.attendanceRate.toFixed(1)}%`}
+                detail="Present ÷ total records"
+                icon={<Activity size={13} />}
+                tone="violet"
+              />
+            </div>
+
+            <div className="relative mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <SummaryTile
+                label="Avg Punch In"
+                value={formatAverageValue(avgPunchIn)}
+                detail={isMultiDayRange ? `/day · ${averageFormula(punchInCount, rangeDayCount)}` : "Recorded Punch Ins"}
+                icon={<Clock3 size={13} />}
+                tone="blue"
+              />
+              <SummaryTile
+                label="Avg punch cycle"
+                value={formatAverageValue(avgCheckedOut)}
+                detail={isMultiDayRange ? `/day completed · ${averageFormula(summary.checkedOut, rangeDayCount)}` : "Completed Punch In → Punch Out"}
+                icon={<CheckCircle2 size={13} />}
+                tone="teal"
+              />
+              <SummaryTile
+                label="Avg not punched out"
+                value={formatAverageValue(avgOpenCheckIns)}
+                detail={isMultiDayRange ? `/day · ${averageFormula(summary.openCheckIns, rangeDayCount)}` : "Punch Out pending"}
+                icon={<TimerReset size={13} />}
+                tone="amber"
+              />
+              <SummaryTile
+                label="Punch completion"
+                value={`${summary.punchIn ? ((summary.checkedOut / summary.punchIn) * 100).toFixed(1) : "0.0"}%`}
+                detail="Punch Out ÷ Punch In"
+                icon={<BarChart3 size={13} />}
+                tone="slate"
+              />
+            </div>
+
+            <div className="relative mt-4 grid gap-3 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3.5">
+                <p className="mb-2 text-[9.5px] font-black uppercase tracking-wider text-slate-400">Designation punch-in rate</p>
+                {bestDesignation ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-bold text-emerald-700" title={bestDesignation.designation}>
+                        ▲ {bestDesignation.designation}
+                      </span>
+                      <span className="shrink-0 rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">
+                        {bestDesignation.rate.toFixed(1)}%
+                      </span>
+                    </div>
+                    {worstDesignation ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-bold text-rose-700" title={worstDesignation.designation}>
+                          ▼ {worstDesignation.designation}
+                        </span>
+                        <span className="shrink-0 rounded-lg bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">
+                          {worstDesignation.rate.toFixed(1)}%
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] font-semibold text-slate-400">Only one designation in this range</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[10px] font-semibold text-slate-400">No designation data</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3.5">
+                <p className="mb-2 text-[9.5px] font-black uppercase tracking-wider text-slate-400">Working hours</p>
+                <p className="text-lg font-black tabular-nums text-slate-950">
+                  {minutesToDuration(summary.avgWorkMinutes)}
+                  <span className="ml-1.5 text-[10px] font-semibold text-slate-400">avg</span>
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 text-[10.5px] font-bold">
+                    <span className="text-emerald-700">Peak bucket</span>
+                    <span className="text-slate-700">
+                      {peakDurationBucket ? `${peakDurationBucket.bucket} · ${numberFormatter.format(peakDurationBucket.count)}${isMultiDayRange ? "/day" : ""}` : "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-[10.5px] font-bold">
+                    <span className="text-rose-700">Least bucket</span>
+                    <span className="text-slate-700">
+                      {leastDurationBucket ? `${leastDurationBucket.bucket} · ${numberFormatter.format(leastDurationBucket.count)}${isMultiDayRange ? "/day" : ""}` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative mt-3 grid gap-3 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3.5">
+                <p className="mb-2.5 text-[9.5px] font-black uppercase tracking-wider text-slate-400">Employee performance</p>
+                {employeePerformance ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-emerald-700">100% present</span>
+                      <span className="shrink-0 rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">
+                        {numberFormatter.format(employeePerformance.fullyPresent)} / {numberFormatter.format(employeePerformance.totalEmployees)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pl-3">
+                      <span className="truncate text-[10.5px] font-semibold text-slate-500">↳ also full punch cycle</span>
+                      <span className="shrink-0 rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">
+                        {numberFormatter.format(employeePerformance.fullyPresentWithCompletedCycle)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-rose-700">Fully absent</span>
+                      <span className="shrink-0 rounded-lg bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">
+                        {numberFormatter.format(employeePerformance.fullyAbsent)} / {numberFormatter.format(employeePerformance.totalEmployees)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] font-semibold text-slate-400">No employee data</p>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3.5">
+                <p className="mb-2.5 text-[9.5px] font-black uppercase tracking-wider text-slate-400">Designation performance</p>
+                {designationTotal ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-emerald-700">100% present</span>
+                      <span className="shrink-0 rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">
+                        {numberFormatter.format(designationsFullyPresentCount)} / {numberFormatter.format(designationTotal)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-rose-700">Fully absent</span>
+                      <span className="shrink-0 rounded-lg bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">
+                        {numberFormatter.format(designationsFullyAbsentCount)} / {numberFormatter.format(designationTotal)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] font-semibold text-slate-400">No designation data</p>
+                )}
+              </div>
+            </div>
+          </section> */}
         </>
       )}
     </div>
