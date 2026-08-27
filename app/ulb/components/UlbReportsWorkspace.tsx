@@ -4544,7 +4544,7 @@ function AttendanceOverview({
 
                                 <CompactSummary
                                     label="Attendance Rate"
-                                    value={`${data.summary.attendanceRate}%`}
+                                    value={`${Number(data.summary.attendanceRate).toFixed(2)}%`}
                                     note={`${data.summary.uniqueEmployees} employees tracked`}
                                     icon={UserCheck}
                                 />

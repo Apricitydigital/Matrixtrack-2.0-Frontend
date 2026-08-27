@@ -62,7 +62,7 @@ export default function PortalHomePage() {
     (user?.roles || []).includes('COMMISSIONER') ||
     (user?.roles || []).includes('commissioner');
 
-  const userCityName = user?.city ? user.city.name : 'Indore';
+  const userCityName = user?.city?.name || user?.cityName || 'Not Assigned';
   const userRoles = user?.roles || [];
 
   const isUlbOfficer =
@@ -166,7 +166,7 @@ export default function PortalHomePage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <MapPin size={12} color="#38bdf8" /> {userCityName || 'Indore Municipal Corporation'}
+              <MapPin size={12} color="#38bdf8" /> {userCityName === 'Not Assigned' && isSuperAdmin ? 'Global Command Center' : userCityName}
             </span>
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#818cf8', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.25)', padding: '3px 10px', borderRadius: '12px' }}>
               {isSuperAdmin ? 'Super Admin' : 'City Admin'}
