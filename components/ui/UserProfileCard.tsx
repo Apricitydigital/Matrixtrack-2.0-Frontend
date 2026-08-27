@@ -241,7 +241,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>Assigned System Hierarchy ({assignedModules.length})</span>
+                <span>Assigned Modules ({assignedModules.length})</span>
               </button>
 
               <button
@@ -253,7 +253,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5" />
-                <span>Jurisdiction Scope</span>
+                <span>Assigned Location</span>
               </button>
             </div>
 
@@ -280,8 +280,8 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
               <User className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-slate-800">Personal Identity</h3>
-              <p className="text-xs text-slate-400">Account holder credentials</p>
+              <h3 className="text-base font-extrabold text-slate-800">User Detail</h3>
+              
             </div>
           </div>
 
@@ -354,8 +354,7 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
                     <Layers className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-800">Assigned System Hierarchy</h3>
-                    <p className="text-xs text-slate-400">Parent systems with assigned sub-modules nested underneath</p>
+                    <h3 className="text-base font-extrabold text-slate-800">Assigned Modules</h3>
                   </div>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-extrabold text-xs">
@@ -546,8 +545,8 @@ export const UserProfileCard: React.FC<UserProfileCardProps> = () => {
                     <Building2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-800">Jurisdiction & Scope</h3>
-                    <p className="text-xs text-slate-400">Administrative boundary coverage</p>
+                    <h3 className="text-base font-extrabold text-slate-800">Assigned Location</h3>
+                   
                   </div>
                 </div>
               </div>

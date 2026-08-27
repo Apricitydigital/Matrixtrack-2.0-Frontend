@@ -893,7 +893,7 @@ export default function RegisteredUsersPage() {
               <option value="QC">Quality Controller (QC)</option>
               <option value="ACTION_OFFICER">Action Officer</option>
               <option value="SUPERVISOR">Supervisor</option>
-              <option value="EMPLOYEE">Field Employee</option>
+              <option value="EMPLOYEE">Employee</option>
             </select>
           </div>
 
@@ -1408,7 +1408,7 @@ export default function RegisteredUsersPage() {
                   </div>
                   <p className="text-[11px] font-semibold text-slate-500 truncate">
                     {selectedUserGeoModal.user.email?.includes('@internal.')
-                      ? (selectedUserGeoModal.user.phone ? `Mobile: ${selectedUserGeoModal.user.phone}` : 'Registered Field Staff')
+                      ? (selectedUserGeoModal.user.phone ? `Mobile: ${selectedUserGeoModal.user.phone}` : 'Registere Users')
                       : selectedUserGeoModal.user.email}
                   </p>
                 </div>
@@ -1741,7 +1741,7 @@ export default function RegisteredUsersPage() {
                     <option value="QC">Quality Controller (QC)</option>
                     <option value="ACTION_OFFICER">Action Officer</option>
                     <option value="SUPERVISOR">Supervisor</option>
-                    <option value="EMPLOYEE">Field Employee</option>
+                    <option value="EMPLOYEE">Employee</option>
                   </select>
                 </div>
               </div>
@@ -2369,7 +2369,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                     <option value="QC">Quality Controller (QC)</option>
                     <option value="ACTION_OFFICER">Action Officer</option>
                     <option value="SUPERVISOR">Supervisor</option>
-                    <option value="EMPLOYEE">Field Employee</option>
+                    <option value="EMPLOYEE">Employee</option>
                   </select>
                 </div>
 

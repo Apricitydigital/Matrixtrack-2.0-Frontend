@@ -112,12 +112,22 @@ function SearchableSelect({
   value,
   options,
   onChange,
+  isMultiSelect,
 }: {
   value: string;
   options: SearchableOption[];
   onChange: (value: string) => void;
+  isMultiSelect?: boolean;
 }) {
-  const selectedLabel = options.find((option) => option.value === value)?.label || "";
+  const selectedLabel = useMemo(() => {
+    if (isMultiSelect) {
+      if (!value) return options.find(o => o.value === "")?.label || "Select all";
+      const selected = value.split(',').filter(Boolean);
+      return selected.map(s => options.find(o => o.value === s)?.label).filter(Boolean).join(', ');
+    }
+    return options.find((option) => option.value === value)?.label || "";
+  }, [value, options, isMultiSelect]);
+
   const [query, setQuery] = useState(selectedLabel);
   const [open, setOpen] = useState(false);
 
@@ -132,9 +142,30 @@ function SearchableSelect({
   }, [options, query, selectedLabel]);
 
   const choose = (option: SearchableOption) => {
-    setQuery(option.label);
-    setOpen(false);
-    onChange(option.value);
+    if (isMultiSelect) {
+      if (option.value === "") {
+        onChange("");
+      } else {
+        const selected = value.split(',').filter(Boolean);
+        if (selected.includes(option.value)) {
+          onChange(selected.filter((v) => v !== option.value).join(','));
+        } else {
+          onChange([...selected, option.value].join(','));
+        }
+      }
+    } else {
+      setQuery(option.label);
+      setOpen(false);
+      onChange(option.value);
+    }
+  };
+
+  const isSelected = (optionValue: string) => {
+    if (isMultiSelect) {
+      if (!value) return optionValue === "";
+      return value.split(',').includes(optionValue);
+    }
+    return optionValue === value;
   };
 
   return (
@@ -178,13 +209,18 @@ function SearchableSelect({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(option)}
-                className={`block w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${
-                  option.value === value
+                className={`flex items-center w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${
+                  isSelected(option.value)
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
               >
-                {option.label}
+                {isMultiSelect && (
+                  <div className={`w-3 h-3 mr-2 rounded-[3px] border flex items-center justify-center shrink-0 ${isSelected(option.value) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                    {isSelected(option.value) && <CheckCircle2 size={9} className="text-white" />}
+                  </div>
+                )}
+                <span className="truncate">{option.label}</span>
               </button>
             ))
           ) : (
@@ -2463,7 +2499,7 @@ function AttendanceDashboard() {
                 value={draftFilters.designation}
                 onChange={(designation) => updateFilter({ designation })}
                 options={[
-                  { value: "", label: "All designations" },
+                  { value: "", label: "Select all" },
                   ...(data?.filters.designations || []).map((value) => ({ value, label: value })),
                 ]}
               />
