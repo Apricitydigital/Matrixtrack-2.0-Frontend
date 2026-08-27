@@ -1800,14 +1800,19 @@ function AttendanceDashboard() {
   const avgPunchIn = summary ? punchInCount / avgDivisor : 0;
   const avgCheckedOut = summary ? summary.checkedOut / avgDivisor : 0;
   const avgOpenCheckIns = summary ? summary.openCheckIns / avgDivisor : 0;
+  const avgNoPunch = summary ? summary.noPunch / avgDivisor : 0;
 
-  const attendancePie = useMemo(
-    () => [
-      { name: "Present", value: summary?.present || 0, color: chartColors.emerald },
-      { name: "Absent", value: summary?.absent || 0, color: chartColors.rose },
-    ],
-    [summary?.present, summary?.absent]
-  );
+  const punchCompletionPie = useMemo(() => {
+    if (!summary) return [];
+    return [
+      { name: "Punch Out", value: summary.checkedOut, color: chartColors.emerald },
+      { name: "Not punched out", value: summary.openCheckIns, color: chartColors.amber },
+      { name: "No punch", value: summary.noPunch, color: chartColors.slate },
+    ].filter((item) => item.value > 0);
+  }, [summary?.checkedOut, summary?.openCheckIns, summary?.noPunch]);
+
+  const punchCompletionRate =
+    summary && summary.totalRecords ? (summary.checkedOut / summary.totalRecords) * 100 : 0;
 
   const checkInDistribution = useMemo(() => {
     const byHour = new Map((data?.checkInDistribution || []).map((item) => [item.hour, item.count]));
@@ -2046,7 +2051,7 @@ function AttendanceDashboard() {
     lines.push("");
     lines.push(`Punch In (avg/day): ${formatAverageValue(avgPunchIn)}`);
     lines.push(`Completed punch cycle (avg/day): ${formatAverageValue(avgCheckedOut)}`);
-    lines.push(`Open Punch In (avg/day): ${formatAverageValue(avgOpenCheckIns)}`);
+    lines.push(`Not punched out (avg/day): ${formatAverageValue(avgOpenCheckIns)}`);
     lines.push(`Punch completion: ${summary.punchIn ? ((summary.checkedOut / summary.punchIn) * 100).toFixed(1) : "0.0"}%`);
     lines.push("");
     if (bestDesignation) lines.push(`Highest punch-in rate designation: ${bestDesignation.designation} (${bestDesignation.rate.toFixed(1)}%)`);
@@ -2638,7 +2643,7 @@ function AttendanceDashboard() {
               })}
             />
             <KpiCard
-              label="Open Punch In"
+              label="Not punched out"
               value={isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
               detail={
                 isMultiDayRange
@@ -2650,7 +2655,7 @@ function AttendanceDashboard() {
               active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
               onClick={() => openKpiDrilldown({
                 key: "OPEN_PUNCH_IN",
-                title: "Open Punch In records",
+                title: "Not punched out records",
                 subtitle: "Employees with Punch In recorded but no Punch Out yet.",
                 value: numberFormatter.format(summary.openCheckIns),
                 tone: "amber",
@@ -2690,43 +2695,57 @@ function AttendanceDashboard() {
               </div>
             </ChartCard>
 
-            <ChartCard title="Attendance mix" subtitle="A quick view of present vs absent workforce" badge={`${summary.attendanceRate.toFixed(1)}% present`} icon={<UserCheck size={18} />} tone="emerald">
+            <ChartCard
+              title="Punch completion"
+              subtitle="Punch In → Punch Out completion across all attendance records"
+              badge={`${punchCompletionRate.toFixed(1)}% completed`}
+              icon={<CheckCircle2 size={18} />}
+              tone="emerald"
+            >
               <div className="relative h-[230px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={attendancePie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={70} outerRadius={96} paddingAngle={3} strokeWidth={0}>
-                      {attendancePie.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                    <Pie data={punchCompletionPie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={70} outerRadius={96} paddingAngle={3} strokeWidth={0}>
+                      {punchCompletionPie.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
+                      formatter={(value: number, name: string) => [numberFormatter.format(value as number), name]}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-black tracking-tight text-slate-900">{summary.attendanceRate.toFixed(1)}%</span>
-                  <span className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Attendance</span>
+                  <span className="text-3xl font-black tracking-tight text-slate-900">{punchCompletionRate.toFixed(1)}%</span>
+                  <span className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">Completed</span>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="group/mix rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 px-3.5 py-3 ring-1 ring-emerald-100 transition hover:-translate-y-0.5">
-                  <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Present</p><UserCheck size={15} className="text-emerald-500" /></div>
-                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">
-                    {isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="group/mix rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 px-2.5 py-3 ring-1 ring-emerald-100 transition hover:-translate-y-0.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">Punch Out</p>
+                  <p className="mt-1 text-base font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(summary.checkedOut)}
                   </p>
-                  {isMultiDayRange && (
-                    <p className="mt-0.5 text-[9px] font-semibold text-emerald-700/70">
-                      Avg/day · {averageFormula(summary.present, rangeDayCount)}
-                    </p>
-                  )}
+                  <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-emerald-700/70">
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.checkedOut, rangeDayCount)}` : "Completed Punch In / Punch Out cycle"}
+                  </p>
                 </div>
-                <div className="group/mix rounded-2xl bg-gradient-to-br from-rose-50 to-pink-50/70 px-3.5 py-3 ring-1 ring-rose-100 transition hover:-translate-y-0.5">
-                  <div className="flex items-center justify-between gap-2"><p className="text-[10px] font-black uppercase tracking-wider text-rose-700">Absent</p><UserRoundX size={15} className="text-rose-500" /></div>
-                  <p className="mt-1 text-lg font-black tabular-nums text-slate-950">
-                    {isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
+                <div className="group/mix rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/70 px-2.5 py-3 ring-1 ring-amber-100 transition hover:-translate-y-0.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-amber-700">Not punched out</p>
+                  <p className="mt-1 text-base font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
                   </p>
-                  {isMultiDayRange && (
-                    <p className="mt-0.5 text-[9px] font-semibold text-rose-700/70">
-                      Avg/day · {averageFormula(summary.absent, rangeDayCount)}
-                    </p>
-                  )}
+                  <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-amber-700/70">
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.openCheckIns, rangeDayCount)}` : "Punch In recorded · Punch Out pending"}
+                  </p>
+                </div>
+                <div className="group/mix rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50/70 px-2.5 py-3 ring-1 ring-slate-200 transition hover:-translate-y-0.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-600">No punch</p>
+                  <p className="mt-1 text-base font-black tabular-nums text-slate-950">
+                    {isMultiDayRange ? formatAverageValue(avgNoPunch) : numberFormatter.format(summary.noPunch)}
+                  </p>
+                  <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-slate-500">
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.noPunch, rangeDayCount)}` : "No Punch In or Punch Out recorded"}
+                  </p>
                 </div>
               </div>
             </ChartCard>
@@ -3286,7 +3305,7 @@ function AttendanceDashboard() {
 
           </section>
 
-          <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_38px_rgba(15,23,42,0.06)] sm:p-6">
+          {/* <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_38px_rgba(15,23,42,0.06)] sm:p-6">
             <div className="absolute left-0 top-0 h-1 w-40 bg-gradient-to-r from-blue-500 via-violet-400 to-transparent" />
 
             <div className="relative mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -3374,7 +3393,7 @@ function AttendanceDashboard() {
                 tone="teal"
               />
               <SummaryTile
-                label="Avg open Punch In"
+                label="Avg not punched out"
                 value={formatAverageValue(avgOpenCheckIns)}
                 detail={isMultiDayRange ? `/day · ${averageFormula(summary.openCheckIns, rangeDayCount)}` : "Punch Out pending"}
                 icon={<TimerReset size={13} />}
@@ -3494,7 +3513,7 @@ function AttendanceDashboard() {
                 )}
               </div>
             </div>
-          </section>
+          </section> */}
         </>
       )}
     </div>
