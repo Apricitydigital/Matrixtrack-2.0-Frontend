@@ -3341,7 +3341,7 @@ function AttendanceDashboard() {
 
           </section>
 
-          {/* <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_38px_rgba(15,23,42,0.06)] sm:p-6">
+          <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_38px_rgba(15,23,42,0.06)] sm:p-6">
             <div className="absolute left-0 top-0 h-1 w-40 bg-gradient-to-r from-blue-500 via-violet-400 to-transparent" />
 
             <div className="relative mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -3549,7 +3549,7 @@ function AttendanceDashboard() {
                 )}
               </div>
             </div>
-          </section> */}
+          </section>
         </>
       )}
     </div>
