@@ -21,16 +21,24 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Eye,
   Filter,
   Flame,
   Layers3,
+  LayoutDashboard,
+  LucideIcon,
+  Map as MapIcon,
   MapPin,
+  RefreshCcw,
   RefreshCw,
   Search,
+  Settings,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Toilet,
   Trash2,
+  TrendingUp,
   Trophy,
   Truck,
   UserPlus,
@@ -54,6 +62,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import UserPerformanceModal from "../../components/ui/UserPerformanceModal";
 
 type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "TASKFORCE";
 type GeoLevel = "zone" | "ward" | "area";
@@ -439,11 +448,30 @@ export default function CityAdminDashboard({
     count: number;
     labels: string[];
   } | null>(null);
-  const [snapshotDetail, setSnapshotDetail] =
-    useState<SnapshotDetailKey | null>(null);
+  const [snapshotDetail, setSnapshotDetail] = useState<SnapshotDetailKey | null>(null);
+  const [selectedPerformanceUser, setSelectedPerformanceUser] = useState<any>(null);
+  
+  const [overall30DayRecords, setOverall30DayRecords] = useState<any[]>([]);
+  const [overall30DayLoading, setOverall30DayLoading] = useState(false);
+  const [overallTimeframe, setOverallTimeframe] = useState<15 | 30 | "CUSTOM">(30);
+  const [customDateStart, setCustomDateStart] = useState<string>("");
+  const [customDateEnd, setCustomDateEnd] = useState<string>("");
+  const [personnelTab, setPersonnelTab] = useState<"EMPLOYEE" | "SUPERVISOR" | "ALL">("EMPLOYEE");
+  const [operationalReviewTab, setOperationalReviewTab] = useState<"ACTION_REQUIRED" | "REJECTED" | "NEEDS_ATTENTION">("ACTION_REQUIRED");
+  const [operationalReviewPage, setOperationalReviewPage] = useState(1);
+  const [directoryPage, setDirectoryPage] = useState(1);
+  const DIRECTORY_PAGE_SIZE = 10;
 
+  const [leaderboardEmployeeTop, setLeaderboardEmployeeTop] = useState(true);
+  const [leaderboardSupervisorTop, setLeaderboardSupervisorTop] = useState(true);
+  const [leaderboardWardTop, setLeaderboardWardTop] = useState(true);
+  const [leaderboardZoneTop, setLeaderboardZoneTop] = useState(true);
+  const [leaderboardTimeframe, setLeaderboardTimeframe] = useState<"TODAY" | "WEEK" | "MONTH">("TODAY");
+  const [leaderboardZone, setLeaderboardZone] = useState("ALL");
+  const [leaderboardWard, setLeaderboardWard] = useState("ALL");
+  const [leaderboardMonthOffset, setLeaderboardMonthOffset] = useState(0);
   useEffect(() => {
-    if (!snapshotDetail) return;
+    if (!snapshotDetail && !selectedPerformanceUser) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -451,7 +479,7 @@ export default function CityAdminDashboard({
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [snapshotDetail]);
+  }, [snapshotDetail, selectedPerformanceUser]);
 
   // City Admin operational analytics are always based on today.
   // Inspection Trend is intentionally the only chart that uses a rolling 7-day window.
@@ -703,6 +731,32 @@ const beatRequests = (
     }
   }
 
+  async function loadOverall30DayPerformanceData(silent = false) {
+    if (!silent) setOverall30DayLoading(true);
+
+    const endDate = new Date(`${today}T00:00:00`);
+    endDate.setDate(endDate.getDate() + 1);
+    
+    const startDate = new Date(`${today}T00:00:00`);
+    startDate.setDate(startDate.getDate() - 30);
+    
+    const params = new URLSearchParams({ 
+      startDate: startDate.toISOString(), 
+      endDate: endDate.toISOString() 
+    });
+
+    try {
+      const response = await apiFetch<{ data: any[] }>(
+        `/city/dashboard/inspection-records?${params.toString()}`
+      );
+      setOverall30DayRecords(response?.data || []);
+    } catch (error) {
+      console.error("Overall 30-day performance refresh failed:", error);
+    } finally {
+      if (!silent) setOverall30DayLoading(false);
+    }
+  }
+
   async function loadAll(initial = false, silent = false) {
     if (liveRefreshInFlightRef.current) return;
 
@@ -712,7 +766,13 @@ const beatRequests = (
     else if (!silent) setRefreshing(true);
 
     try {
-      await Promise.all([loadBase(), loadRecords(), loadNotificationData(), loadModulePerformanceData(true)]);
+      await Promise.all([
+        loadBase(), 
+        loadRecords(), 
+        loadNotificationData(), 
+        loadModulePerformanceData(true),
+        loadOverall30DayPerformanceData(true)
+      ]);
     } finally {
       liveRefreshInFlightRef.current = false;
       setLoading(false);
@@ -731,6 +791,7 @@ const beatRequests = (
         void loadAll(false, true);
         void loadSupervisorPerformanceData(true);
         void loadModulePerformanceData(true);
+        void loadOverall30DayPerformanceData(true);
       }
     };
 
@@ -1121,10 +1182,30 @@ const beatRequests = (
       heatLevel === "zone" ? zones : heatLevel === "ward" ? visibleWards : visibleAreas;
 
     baseNodes.forEach((node) => {
+      // Calculate assigned expected target (beats/assets registered in this zone/ward)
+      const assignedBeatsCount = (beats || []).filter((b: any) => {
+        if (heatLevel === "zone") return norm(b.zoneId) === norm(node.id) || b.zone?.name === node.name;
+        if (heatLevel === "ward") return norm(b.wardId) === norm(node.id) || b.ward?.name === node.name;
+        return norm(b.areaId) === norm(node.id) || b.area?.name === node.name;
+      }).length;
+
+      // Also count assigned users in this jurisdiction
+      const assignedUsersCount = (users || []).filter((u: any) => {
+        if (heatLevel === "zone") return norm(u.assignedZoneId || u.zoneId) === norm(node.id) || u.assignedZone?.name === node.name;
+        if (heatLevel === "ward") return norm(u.assignedWardId || u.wardId) === norm(node.id) || u.assignedWard?.name === node.name;
+        return norm(u.assignedAreaId || u.areaId) === norm(node.id) || u.assignedArea?.name === node.name;
+      }).length;
+
+      const expectedTarget = Math.max(1, assignedBeatsCount || assignedUsersCount || 5);
+
       map[node.id] = {
         id: node.id,
         name: node.name,
         total: 0,
+        expected: expectedTarget,
+        approved: 0,
+        rejected: 0,
+        actionRequired: 0,
         exceptions: 0,
         modules: { SWEEPING: 0, TOILET: 0, TWINBIN: 0, TASKFORCE: 0 },
       };
@@ -1140,6 +1221,10 @@ const beatRequests = (
             geoName(record, heatLevel, geoMap) ||
             `Unmapped ${heatLevelLabel}`,
           total: 0,
+          expected: 5,
+          approved: 0,
+          rejected: 0,
+          actionRequired: 0,
           exceptions: 0,
           modules: {
             SWEEPING: 0,
@@ -1153,28 +1238,25 @@ const beatRequests = (
       map[id].total += 1;
       map[id].modules[record.__module] += 1;
 
-      if (rejected(record.status) || actionRequired(record.status)) {
+      const st = up(record.status);
+      if (["APPROVED", "RESOLVED", "ACTION_TAKEN"].includes(st)) {
+        map[id].approved += 1;
+      } else if (st === "REJECTED") {
+        map[id].rejected += 1;
+        map[id].exceptions += 1;
+      } else if (actionRequired(record.status)) {
+        map[id].actionRequired += 1;
         map[id].exceptions += 1;
       }
     });
 
-    return Object.values(map).sort((a: any, b: any) => b.total - a.total);
-  }, [selected, geoMap, heatLevel, heatLevelLabel, zones, visibleWards, visibleAreas]);
+    const result = Object.values(map);
+    return result.length > 0 ? result.sort((a: any, b: any) => b.total - a.total || (a.name || "").localeCompare(b.name || "")) : [];
+  }, [selected, geoMap, heatLevel, heatLevelLabel, zones, visibleWards, visibleAreas, beats, users]);
 
   const heatRows = useMemo(
-    () =>
-      heat.length
-        ? heat
-        : [
-            {
-              id: "NO_REGISTERED_SCOPE",
-              name: `No registered ${heatLevelLabel.toLowerCase()}s`,
-              total: 0,
-              exceptions: 0,
-              modules: { SWEEPING: 0, TOILET: 0, TWINBIN: 0, TASKFORCE: 0 },
-            },
-          ],
-    [heat, heatLevelLabel]
+    () => heat,
+    [heat]
   );
 
   const maxHeat = useMemo(
@@ -1590,6 +1672,14 @@ const beatRequests = (
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
+    
+    // Compute activity score for ranking
+    const userActivityScore: Record<string, number> = {};
+    overall30DayRecords.forEach(record => {
+      if (record.employeeId) userActivityScore[record.employeeId] = (userActivityScore[record.employeeId] || 0) + 1;
+      if (record.supervisorId) userActivityScore[record.supervisorId] = (userActivityScore[record.supervisorId] || 0) + 1;
+      if (record.createdById) userActivityScore[record.createdById] = (userActivityScore[record.createdById] || 0) + 1;
+    });
 
     return users.filter((user) => {
       const roles = getUserRoleLabels(user);
@@ -1613,12 +1703,22 @@ const beatRequests = (
       const matchesStatus =
         directoryStatus === "ALL" || statusLabel === directoryStatus;
 
+      const matchesTab = 
+        personnelTab === "ALL" || 
+        (personnelTab === "SUPERVISOR" && roles.includes("SUPERVISOR")) ||
+        (personnelTab === "EMPLOYEE" && roles.includes("EMPLOYEE"));
+
       return (
         matchesSearch &&
         matchesRole &&
         matchesModule &&
-        matchesStatus
+        matchesStatus &&
+        matchesTab
       );
+    }).sort((a, b) => {
+      const scoreA = userActivityScore[a.id] || 0;
+      const scoreB = userActivityScore[b.id] || 0;
+      return scoreB - scoreA;
     });
   }, [
     users,
@@ -1626,9 +1726,12 @@ const beatRequests = (
     directoryRole,
     directoryModule,
     directoryStatus,
+    personnelTab,
+    overall30DayRecords
   ]);
 
-  const visibleDirectoryUsers = filteredUsers.slice(0, 10);
+  const directoryTotalPages = Math.max(1, Math.ceil(filteredUsers.length / DIRECTORY_PAGE_SIZE));
+  const visibleDirectoryUsers = filteredUsers.slice((directoryPage - 1) * DIRECTORY_PAGE_SIZE, directoryPage * DIRECTORY_PAGE_SIZE);
 
 
   const insightTopGeo: any = heat[0];
@@ -1664,7 +1767,290 @@ const beatRequests = (
       value: status.actionRequired,
       color: "#f97316",
     },
-  ];
+  ]
+
+  const overallChartData = useMemo(() => {
+    const dailyData: Record<string, { date: string; employeeInspections: number; supervisorInspections: number }> = {};
+    
+    if (overallTimeframe === "CUSTOM") {
+      if (customDateStart && customDateEnd) {
+        const start = new Date(`${customDateStart}T00:00:00`);
+        const end = new Date(`${customDateEnd}T00:00:00`);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          dailyData[dateStr] = {
+            date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            employeeInspections: 0,
+            supervisorInspections: 0
+          };
+        }
+      }
+    } else {
+      for (let i = overallTimeframe - 1; i >= 0; i--) {
+        const d = new Date(`${today}T00:00:00`);
+        d.setDate(d.getDate() - i);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        dailyData[dateStr] = {
+          date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          employeeInspections: 0,
+          supervisorInspections: 0
+        };
+      }
+    }
+
+    overall30DayRecords.forEach((record) => {
+      const rDate = new Date(record.createdAt);
+      if (!Number.isNaN(rDate.getTime())) {
+        const dateStr = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, "0")}-${String(rDate.getDate()).padStart(2, "0")}`;
+        if (dailyData[dateStr]) {
+          if (record.employeeId || record.submittedById) {
+             dailyData[dateStr].employeeInspections++;
+          }
+          if (record.supervisorId || (record.createdById && !record.employeeId)) {
+             dailyData[dateStr].supervisorInspections++;
+          }
+        }
+      }
+    });
+
+    return Object.values(dailyData);
+  }, [overall30DayRecords, today, overallTimeframe, customDateStart, customDateEnd]);
+
+  interface LeaderboardScoreItem {
+    name: string;
+    inspections: number;
+    approved: number;
+    rejected: number;
+    rate: number;
+    score: number;
+  }
+
+  const dailyLeaderboards = useMemo(() => {
+    const employeeScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    const supervisorScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    const wardScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    const zoneScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    
+    const tDateObj = new Date(`${today}T00:00:00`);
+    const tStr = `${tDateObj.getFullYear()}-${String(tDateObj.getMonth() + 1).padStart(2, "0")}-${String(tDateObj.getDate()).padStart(2, "0")}`;
+    
+    const filteredRecords = overall30DayRecords.filter(r => {
+      const rDate = new Date(r.createdAt);
+      if (Number.isNaN(rDate.getTime())) return false;
+      
+      // Zone / Ward filtering
+      if (leaderboardZone !== "ALL") {
+        const rZoneId = norm(r?.zoneId ?? r?.zone_id ?? r?.zone?.id ?? r?.location?.zoneId);
+        const rZoneName = geoName(r, "zone", geoMap);
+        const matchedZone = zones.find(z => z.id === leaderboardZone);
+        if (rZoneId !== leaderboardZone && (!matchedZone || rZoneName !== matchedZone.name)) {
+          return false;
+        }
+      }
+      if (leaderboardWard !== "ALL") {
+        const rWardId = norm(r?.wardId ?? r?.ward_id ?? r?.ward?.id ?? r?.location?.wardId);
+        const rWardName = geoName(r, "ward", geoMap);
+        const matchedWard = wards.find(w => w.id === leaderboardWard);
+        if (rWardId !== leaderboardWard && (!matchedWard || rWardName !== matchedWard.name)) {
+          return false;
+        }
+      }
+
+      if (leaderboardTimeframe === "TODAY") {
+        const dateStr = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, "0")}-${String(rDate.getDate()).padStart(2, "0")}`;
+        return dateStr === tStr;
+      } else if (leaderboardTimeframe === "WEEK") {
+        const diffTime = tDateObj.getTime() - rDate.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 7;
+      } else if (leaderboardTimeframe === "MONTH") {
+        const preset = monthPreset(today, leaderboardMonthOffset);
+        const rDateIso = rDate.toISOString().split("T")[0];
+        return rDateIso >= preset.from && rDateIso <= preset.to;
+      }
+      return false;
+    });
+
+    const findUser = (id?: string) => {
+      if (!id) return null;
+      const target = norm(id);
+      return users.find(u => 
+        norm(u.id) === target || 
+        norm(u._id) === target || 
+        norm(u.userId) === target || 
+        norm(u.employeeId) === target ||
+        norm(u.mobile) === target
+      );
+    };
+
+    const addScore = (
+      bucket: Record<string, { total: number; approved: number; rejected: number }>,
+      name: string,
+      statusVal: string
+    ) => {
+      if (!name) return;
+      if (!bucket[name]) {
+        bucket[name] = { total: 0, approved: 0, rejected: 0 };
+      }
+      bucket[name].total += 1;
+      if (approved(statusVal)) bucket[name].approved += 1;
+      if (rejected(statusVal)) bucket[name].rejected += 1;
+    };
+
+    filteredRecords.forEach((record) => {
+      const empId = record.employeeId || record.submittedById;
+      const supId = record.supervisorId || record.createdById;
+      const recStatus = record.status || "";
+
+      if (empId) {
+        const empUser = findUser(empId);
+        const roles = empUser ? getUserRoleLabels(empUser) : [];
+        if (!roles.includes("SUPERVISOR")) {
+          const name = empUser?.name || record?.employee?.name || record?.submittedBy?.name || "Field Employee";
+          addScore(employeeScores, name, recStatus);
+        }
+      }
+
+      if (supId) {
+        const supUser = findUser(supId);
+        const roles = supUser ? getUserRoleLabels(supUser) : [];
+        if (roles.includes("SUPERVISOR") || !empId) {
+          const name = supUser?.name || record?.supervisor?.name || record?.createdBy?.name || "Field Supervisor";
+          addScore(supervisorScores, name, recStatus);
+        }
+      }
+      
+      const wardName = geoName(record, "ward", geoMap);
+      if (wardName) addScore(wardScores, wardName, recStatus);
+      
+      const zoneName = geoName(record, "zone", geoMap);
+      if (zoneName) addScore(zoneScores, zoneName, recStatus);
+    });
+
+    const getTopBottom = (scores: Record<string, { total: number; approved: number; rejected: number }>) => {
+      const items: LeaderboardScoreItem[] = Object.entries(scores).map(([name, data]) => {
+        const rate = data.total > 0 ? Math.round((data.approved * 100) / data.total) : 0;
+        // Balanced Performance Score: Total volume + Approved weight - Rejected penalty
+        const score = (data.approved * 2) + data.total - (data.rejected * 2);
+        return {
+          name,
+          inspections: data.total,
+          approved: data.approved,
+          rejected: data.rejected,
+          rate,
+          score,
+        };
+      });
+
+      // Sort by volume + approval rate
+      const sortedByPerformance = [...items].sort((a, b) => b.inspections - a.inspections || b.rate - a.rate);
+
+      if (sortedByPerformance.length === 0) {
+        return { top: [], bottom: [] };
+      }
+
+      const top5 = sortedByPerformance.slice(0, Math.min(5, sortedByPerformance.length));
+
+      // Bottom list: only include entries that are NOT in top5 if more than 5 exist;
+      // or if total entries are few (e.g. 4), bottom shows entries with lowest volume/rate but excluding the #1 top performer
+      let bottomPool = sortedByPerformance.slice(top5.length);
+      if (bottomPool.length === 0 && sortedByPerformance.length > 1) {
+        // If 2-5 users total, lowest performers are the ones below #1
+        bottomPool = sortedByPerformance.slice(1);
+      }
+
+      const bottom5 = [...bottomPool].sort((a, b) => a.inspections - b.inspections || a.rate - b.rate).slice(0, 5);
+
+      return {
+        top: top5,
+        bottom: bottom5,
+      };
+    };
+
+    return {
+      employees: getTopBottom(employeeScores),
+      supervisors: getTopBottom(supervisorScores),
+      wards: getTopBottom(wardScores),
+      zones: getTopBottom(zoneScores),
+    };
+  }, [overall30DayRecords, today, users, leaderboardTimeframe, leaderboardZone, leaderboardWard, leaderboardMonthOffset, wards]);
+
+  const renderLeaderboardList = (data: LeaderboardScoreItem[], isTop: boolean, category: string) => {
+    if (data.length === 0) {
+      return (
+        <div className="h-64 flex flex-col items-center justify-center text-center p-6">
+          <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 mb-2">
+            <Trophy size={18} />
+          </div>
+          <p className="text-xs font-bold text-slate-400">No records to display</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Performance requires multiple recorded activities</p>
+        </div>
+      );
+    }
+
+    const maxInspections = Math.max(...data.map(d => d.inspections), 1);
+
+    return (
+      <div className="space-y-2.5 p-2">
+        {data.map((item, idx) => {
+          const rank = idx + 1;
+          const percentage = Math.round((item.inspections / maxInspections) * 100);
+          
+          let rankBadgeBg = "bg-slate-100 text-slate-600 border-slate-200";
+          if (isTop) {
+            if (rank === 1) rankBadgeBg = "bg-amber-100 text-amber-700 border-amber-300 font-black shadow-xs";
+            else if (rank === 2) rankBadgeBg = "bg-slate-200 text-slate-700 border-slate-300 font-bold";
+            else if (rank === 3) rankBadgeBg = "bg-orange-100 text-orange-700 border-orange-200 font-bold";
+          } else {
+            rankBadgeBg = "bg-rose-50 text-rose-600 border-rose-200 font-bold";
+          }
+
+          return (
+            <div 
+              key={`${item.name}-${idx}`} 
+              className="group flex flex-col p-3 rounded-xl bg-slate-50/70 hover:bg-white border border-slate-100 hover:border-slate-200 hover:shadow-xs transition duration-150"
+            >
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={`w-5 h-5 rounded-lg border flex items-center justify-center text-[10px] shrink-0 ${rankBadgeBg}`}>
+                    {rank}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-xs font-black text-slate-800 truncate block" title={item.name}>
+                      {item.name}
+                    </span>
+                    <span className="text-[8px] font-semibold text-slate-400 block">
+                      {item.approved} approved • {item.rejected} rejected ({item.rate}%)
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs font-black text-slate-900">
+                    {item.inspections}
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase">
+                    {item.inspections === 1 ? 'insp' : 'insps'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full h-1.5 rounded-full bg-slate-200/60 overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isTop 
+                      ? rank === 1 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-emerald-500' 
+                      : 'bg-gradient-to-r from-rose-500 to-rose-400'
+                  }`}
+                  style={{ width: `${Math.max(percentage, 6)}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   async function downloadPdf() {
     if (!reportRef.current) return;
@@ -2161,6 +2547,304 @@ const beatRequests = (
         )}
       </section>
 
+      {/* 3 DEDICATED OPERATIONAL REVIEW SECTIONS: ACTION REQUIRED, REJECTED, NEEDS ATTENTION */}
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-100 shadow-xs">
+              <ShieldAlert size={17} />
+            </span>
+            <div>
+              <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                Operational Action & Quality Hub
+              </h2>
+              <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                Dedicated review and resolution streams for Action Required, Rejected Reports, and Inactive Areas
+              </p>
+            </div>
+          </div>
+
+          {/* 3 Distinct Segmented Tabs */}
+          <div className="flex flex-wrap items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-inner">
+            <button
+              onClick={() => { setOperationalReviewTab("ACTION_REQUIRED"); setOperationalReviewPage(1); }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                operationalReviewTab === "ACTION_REQUIRED"
+                  ? "bg-amber-500 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <AlertTriangle size={13} />
+              Action Required
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "ACTION_REQUIRED" ? "bg-amber-600 text-white" : "bg-slate-200 text-slate-700"}`}>
+                {records.filter(r => actionRequired(r.status)).length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => { setOperationalReviewTab("REJECTED"); setOperationalReviewPage(1); }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                operationalReviewTab === "REJECTED"
+                  ? "bg-rose-500 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <XCircle size={13} />
+              Rejected Reports
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "REJECTED" ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-700"}`}>
+                {records.filter(r => rejected(r.status)).length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => { setOperationalReviewTab("NEEDS_ATTENTION"); setOperationalReviewPage(1); }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                operationalReviewTab === "NEEDS_ATTENTION"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Eye size={13} />
+              Needs Attention / Inactivity
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "NEEDS_ATTENTION" ? "bg-blue-700 text-white" : "bg-slate-200 text-slate-700"}`}>
+                {noActivityAlerts.length}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tab 1: ACTION REQUIRED TABLE */}
+        {operationalReviewTab === "ACTION_REQUIRED" && (
+          <div className="p-5">
+            {records.filter(r => actionRequired(r.status)).length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-100">
+                <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
+                <div className="text-xs font-black text-slate-700">No Action Required Issues</div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-1">All inspection points are operating without immediate field flags.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {records.filter(r => actionRequired(r.status)).slice((operationalReviewPage - 1) * 6, operationalReviewPage * 6).map((item: any) => (
+                    <div key={item.id} className="p-4 rounded-xl border border-amber-200 bg-amber-50/30 flex flex-col justify-between hover:bg-amber-50/60 transition shadow-2xs">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                            {item.__module || "INSPECTION"}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">
+                            {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-800">
+                          {item.locationName || item.beatName || item.areaName || "Operational Point"}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-500 mt-1">
+                          {[geoName(item, "zone", geoMap), geoName(item, "ward", geoMap), geoName(item, "area", geoMap)].filter(Boolean).join(" • ") || "City Jurisdiction"}
+                        </div>
+                        <div className="text-[10px] text-amber-700 font-bold mt-2 bg-amber-100/60 p-2 rounded-lg border border-amber-200/50">
+                          ⚠️ {item.remarks || item.issueDescription || "Immediate field cleanup or repair required."}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-amber-100">
+                        <span className="text-[9px] font-bold text-slate-500">
+                          Inspector: <strong className="text-slate-700">{item.supervisorName || item.supervisor?.name || item.employee?.name || "Assigned Officer"}</strong>
+                        </span>
+                        <button
+                          onClick={() => router.push("/city")}
+                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-black transition flex items-center gap-1 shadow-xs"
+                        >
+                          Resolve <ArrowRight size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {Math.ceil(records.filter(r => actionRequired(r.status)).length / 6) > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Showing {(operationalReviewPage - 1) * 6 + 1} to {Math.min(operationalReviewPage * 6, records.filter(r => actionRequired(r.status)).length)} of {records.filter(r => actionRequired(r.status)).length} issues
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setOperationalReviewPage(p => Math.max(1, p - 1))}
+                        disabled={operationalReviewPage === 1}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setOperationalReviewPage(p => p + 1)}
+                        disabled={operationalReviewPage * 6 >= records.filter(r => actionRequired(r.status)).length}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: REJECTED REPORTS TABLE */}
+        {operationalReviewTab === "REJECTED" && (
+          <div className="p-5">
+            {records.filter(r => rejected(r.status)).length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-100">
+                <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
+                <div className="text-xs font-black text-slate-700">No Rejected Reports</div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-1">All submitted inspections satisfy QC specifications.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {records.filter(r => rejected(r.status)).slice((operationalReviewPage - 1) * 6, operationalReviewPage * 6).map((item: any) => (
+                    <div key={item.id} className="p-4 rounded-xl border border-rose-200 bg-rose-50/30 flex flex-col justify-between hover:bg-rose-50/60 transition shadow-2xs">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-200">
+                            {item.__module || "INSPECTION"}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">
+                            {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-800">
+                          {item.locationName || item.beatName || item.areaName || "Inspection Submission"}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-500 mt-1">
+                          {[geoName(item, "zone", geoMap), geoName(item, "ward", geoMap), geoName(item, "area", geoMap)].filter(Boolean).join(" • ") || "City Jurisdiction"}
+                        </div>
+                        <div className="text-[10px] text-rose-700 font-bold mt-2 bg-rose-100/60 p-2 rounded-lg border border-rose-200/50">
+                          ❌ {item.rejectionReason || item.remarks || "Rejected due to invalid photo evidence or incomplete coverage."}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-rose-100">
+                        <span className="text-[9px] font-bold text-slate-500">
+                          Submitted by: <strong className="text-slate-700">{item.supervisorName || item.supervisor?.name || item.employee?.name || "Field Personnel"}</strong>
+                        </span>
+                        <button
+                          onClick={() => router.push("/city")}
+                          className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black transition flex items-center gap-1 shadow-xs"
+                        >
+                          View Report <ArrowRight size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {Math.ceil(records.filter(r => rejected(r.status)).length / 6) > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Showing {(operationalReviewPage - 1) * 6 + 1} to {Math.min(operationalReviewPage * 6, records.filter(r => rejected(r.status)).length)} of {records.filter(r => rejected(r.status)).length} rejected reports
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setOperationalReviewPage(p => Math.max(1, p - 1))}
+                        disabled={operationalReviewPage === 1}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setOperationalReviewPage(p => p + 1)}
+                        disabled={operationalReviewPage * 6 >= records.filter(r => rejected(r.status)).length}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: NEEDS ATTENTION / INACTIVITY TABLE */}
+        {operationalReviewTab === "NEEDS_ATTENTION" && (
+          <div className="p-5">
+            {noActivityAlerts.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-100">
+                <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
+                <div className="text-xs font-black text-slate-700">Full Operational Coverage</div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-1">All registered zones and wards have recent report activity.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {noActivityAlerts.slice((operationalReviewPage - 1) * 6, operationalReviewPage * 6).map((alert: any) => (
+                    <div key={alert.id} className="p-4 rounded-xl border border-blue-200 bg-blue-50/30 flex flex-col justify-between hover:bg-blue-50/60 transition shadow-2xs">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200">
+                            {alert.level} INACTIVE
+                          </span>
+                          <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                            {inactivityLabel(alert.daysInactive)}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-800">
+                          {alert.name}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-500 mt-1">
+                          {[alert.zone, alert.ward, alert.area].filter(Boolean).filter((val, i, arr) => arr.indexOf(val) === i).join(" • ")}
+                        </div>
+                        <div className="text-[10px] text-blue-700 font-semibold mt-2 bg-blue-100/60 p-2 rounded-lg border border-blue-200/50">
+                          {alert.lastActivityDate ? `Last reported: ${new Date(`${alert.lastActivityDate}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}` : "No report logged in the last 7 days."}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-100">
+                        <span className="text-[9px] font-bold text-slate-500">
+                          Action: <strong className="text-slate-700">Assign Field Inspection</strong>
+                        </span>
+                        <button
+                          onClick={() => router.push("/portal-home/registered-users")}
+                          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black transition flex items-center gap-1 shadow-xs"
+                        >
+                          Check Workforce <ArrowRight size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {Math.ceil(noActivityAlerts.length / 6) > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Showing {(operationalReviewPage - 1) * 6 + 1} to {Math.min(operationalReviewPage * 6, noActivityAlerts.length)} of {noActivityAlerts.length} inactive locations
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setOperationalReviewPage(p => Math.max(1, p - 1))}
+                        disabled={operationalReviewPage === 1}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setOperationalReviewPage(p => p + 1)}
+                        disabled={operationalReviewPage * 6 >= noActivityAlerts.length}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
       {/* WORKFORCE ALLOCATION - SEPARATE SECTION */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-4">
@@ -2519,31 +3203,46 @@ const beatRequests = (
                   <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-blue-500" />Toilets</span>
                   <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-amber-500" />Litter Bins</span>
                   <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-violet-500" />GVP</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-rose-500" />Needs Attention</span>
+                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-amber-500" />Action Required</span>
                 </div>
 
                 <div className="space-y-2">
-                <div className="grid grid-cols-[118px_repeat(4,minmax(64px,1fr))_96px] gap-1.5 text-[8px] font-black uppercase text-slate-400 mb-2">
-                  <div>{heatLevelLabel}</div>
+                <div className="grid grid-cols-[140px_repeat(4,minmax(54px,1fr))_160px] gap-1.5 text-[8px] font-black uppercase text-slate-400 mb-2 px-1">
+                  <div>{heatLevelLabel} (Actual / Target)</div>
                   <div className="text-center">Sweeping</div>
                   <div className="text-center">Toilets</div>
                   <div className="text-center">Litter Bins</div>
                   <div className="text-center">GVP</div>
-                  <div className="text-center">Needs Attention</div>
+                  <div className="text-center">Quality & Issues</div>
                 </div>
 
-                {visibleHeatRows.map((row: any) => (
+                {visibleHeatRows.map((row: any) => {
+                  const pct = Math.min(100, Math.round((row.total / (row.expected || 1)) * 100));
+                  return (
                   <div
                     key={row.id}
-                    className="grid grid-cols-[118px_repeat(4,minmax(64px,1fr))_96px] gap-1.5"
+                    className="grid grid-cols-[140px_repeat(4,minmax(54px,1fr))_160px] gap-1.5"
                   >
-                    <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
-                      <div className="font-black text-[11px] text-slate-800">
-                        {row.name}
+                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-2.5 flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-black text-[11px] text-slate-800 truncate" title={row.name}>
+                          {row.name}
+                        </span>
+                        <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                          {pct}%
+                        </span>
                       </div>
 
-                      <div className="text-[9px] text-slate-400">
-                        {row.total} total
+                      <div className="text-[9px] text-slate-500 font-bold mt-1">
+                        <span className="text-slate-900 font-black">{row.total}</span> <span className="text-slate-400 font-normal">/ {row.expected} target</span>
+                      </div>
+
+                      {/* Mini progress bar */}
+                      <div className="h-1 rounded-full bg-slate-200 mt-1.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-blue-500' : 'bg-amber-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                     </div>
 
@@ -2555,7 +3254,7 @@ const beatRequests = (
                         <div
                           key={key}
                           title={`${row.name}: ${value} ${MODULES[key].short} report${value === 1 ? "" : "s"}`}
-                          className="rounded-xl border border-slate-100 flex items-center justify-center font-black text-sm transition"
+                          className="rounded-xl border border-slate-100 flex items-center justify-center font-black text-xs transition shadow-2xs"
                           style={{
                             background: value
                               ? ratio > 0.7
@@ -2575,24 +3274,32 @@ const beatRequests = (
                       );
                     })}
 
-                    <div
-                      title={`${row.name}: ${row.exceptions} report${row.exceptions === 1 ? "" : "s"} need attention`}
-                      className={`rounded-xl flex items-center justify-center font-black text-xs border ${
-                        row.exceptions
-                          ? "bg-rose-50 text-rose-600 border-rose-200"
-                          : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                      }`}
-                    >
-                      {row.exceptions}
+                    {/* QUALITY & ISSUES BREAKDOWN: Approved, Rejected, Action Required */}
+                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-2 flex items-center justify-between gap-1 text-[8px] font-black">
+                      <div className="flex flex-col items-center flex-1 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100" title={`${row.approved || 0} Approved Reports`}>
+                        <span className="text-[10px] font-black">{row.approved || 0}</span>
+                        <span className="text-[7px] font-bold uppercase text-emerald-600/80">Apprv</span>
+                      </div>
+
+                      <div className="flex flex-col items-center flex-1 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-100" title={`${row.rejected || 0} Rejected Reports`}>
+                        <span className="text-[10px] font-black">{row.rejected || 0}</span>
+                        <span className="text-[7px] font-bold uppercase text-rose-600/80">Rej</span>
+                      </div>
+
+                      <div className="flex flex-col items-center flex-1 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100" title={`${row.actionRequired || 0} Action Required`}>
+                        <span className="text-[10px] font-black">{row.actionRequired || 0}</span>
+                        <span className="text-[7px] font-bold uppercase text-amber-600/80">Action</span>
+                      </div>
                     </div>
                   </div>
-                ))}
+                );
+                })}
                 </div>
               </div>
 
               <div className="mt-auto pt-3">
                 <div className="min-w-[560px] border-t border-slate-100 pt-2 text-[8px] font-semibold text-slate-400">
-                  Showing {visibleHeatRows.length} of {heatRows.length} registered {heatLevelLabel.toLowerCase()}{heatRows.length === 1 ? "" : "s"}. Each number is the report count; red shows rejected or action-required reports.
+                  Showing {visibleHeatRows.length} of {heatRows.length} registered {heatLevelLabel.toLowerCase()}{heatRows.length === 1 ? "" : "s"} with Expected targets vs Actual inspections, module counts, and live Approved/Rejected/Action Required breakdown.
                 </div>
               </div>
 
@@ -2684,7 +3391,7 @@ const beatRequests = (
                 <span>Supervisor</span>
                 <span>Approval</span>
               </div>
-              <div className="space-y-1.5 flex-1 min-h-0 overflow-hidden">
+              <div className="space-y-1.5 flex-1 min-h-0 max-h-[360px] overflow-y-auto pr-1">
               {supervisorPerformance.length === 0 ? (
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-center">
                   <div className="text-[11px] font-black text-slate-600">No supervisors found</div>
@@ -2708,7 +3415,7 @@ const beatRequests = (
                       </div>
 
                       <div className="text-[9px] text-slate-400 mt-1">
-                        Reports {item.total} • Approved {item.approved} • Rejected {item.rejected} • Needs attention {item.action}
+                        Reports {item.total} • Approved {item.approved} • Rejected {item.rejected} • Action required {item.action}
                       </div>
                     </div>
 
@@ -2750,87 +3457,452 @@ const beatRequests = (
         </div>
       </section>
 
-      {/* EXTRA CITY INSIGHTS */}
-      
+      {/* OPERATIONAL LEADERBOARDS & PERFORMANCE (2x2 Grid with Common Filters) */}
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-slate-800 tracking-tight">Leaderboards & Operational Insights</h2>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Clean Direct Filters without text labels */}
+            <select
+              value={leaderboardMonthOffset}
+              onChange={(e) => {
+                setLeaderboardMonthOffset(Number(e.target.value));
+                setLeaderboardTimeframe("MONTH");
+              }}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              {monthPresets.map((preset) => (
+                <option key={preset.offset} value={preset.offset}>{preset.label}</option>
+              ))}
+            </select>
 
-      {/* PLATFORM USER DIRECTORY - 10 ROW PREVIEW */}
+            <select
+              value={leaderboardZone}
+              onChange={(e) => {
+                setLeaderboardZone(e.target.value);
+                setLeaderboardWard("ALL");
+              }}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">All Zones</option>
+              {zones.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={leaderboardWard}
+              onChange={(e) => setLeaderboardWard(e.target.value)}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">All Wards</option>
+              {(leaderboardZone === "ALL" ? wards : wards.filter(w => parentId(w) === leaderboardZone)).map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+
+            {/* Quick Timeframe pills */}
+            <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200 ml-1">
+              <button
+                onClick={() => setLeaderboardTimeframe("TODAY")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "TODAY" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setLeaderboardTimeframe("WEEK")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "WEEK" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                7 Days
+              </button>
+              <button
+                onClick={() => setLeaderboardTimeframe("MONTH")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "MONTH" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                30 Days
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* 2 x 2 Division Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           {/* Employee Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <Users size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Employees</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Activity & task rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardEmployeeTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardEmployeeTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardEmployeeTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardEmployeeTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardEmployeeTop ? dailyLeaderboards.employees.top : dailyLeaderboards.employees.bottom, leaderboardEmployeeTop, 'Employees')}
+             </div>
+           </div>
+           
+           {/* Supervisor Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <Users size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Supervisors</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Inspection submission rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardSupervisorTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardSupervisorTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardSupervisorTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardSupervisorTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardSupervisorTop ? dailyLeaderboards.supervisors.top : dailyLeaderboards.supervisors.bottom, leaderboardSupervisorTop, 'Supervisors')}
+             </div>
+           </div>
+
+           {/* Ward Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-orange-100/80 text-orange-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <MapPin size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Wards</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Jurisdiction activity rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardWardTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardWardTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardWardTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardWardTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardWardTop ? dailyLeaderboards.wards.top : dailyLeaderboards.wards.bottom, leaderboardWardTop, 'Wards')}
+             </div>
+           </div>
+
+           {/* Zone Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <MapIcon size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Zones</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Zone-wide operational rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardZoneTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardZoneTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardZoneTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardZoneTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardZoneTop ? dailyLeaderboards.zones.top : dailyLeaderboards.zones.bottom, leaderboardZoneTop, 'Zones')}
+             </div>
+           </div>
+        </div>
+      </section>
+
+      {/* OVERALL CITY PERFORMANCE: SPLIT CONTAINERS (SUPERVISOR VS EMPLOYEE) */}
+      <section className="mb-6 space-y-4">
+        {/* Universal Timeframe Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-sm">
+              <Activity size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-slate-800 tracking-tight">Overall City Operational Performance</h2>
+              <p className="text-[11px] font-semibold text-slate-400">Independent analytics & trends for Field Supervisors and Field Workforce</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200/60">
+              <button
+                onClick={() => setOverallTimeframe(15)}
+                className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition ${
+                  overallTimeframe === 15 
+                    ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                15 Days
+              </button>
+              <button
+                onClick={() => setOverallTimeframe(30)}
+                className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition ${
+                  overallTimeframe === 30 
+                    ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                30 Days
+              </button>
+              <button
+                onClick={() => setOverallTimeframe("CUSTOM")}
+                className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition ${
+                  overallTimeframe === "CUSTOM" 
+                    ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Custom
+              </button>
+            </div>
+
+            {overallTimeframe === "CUSTOM" && (
+              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                <input
+                  type="date"
+                  value={customDateStart}
+                  onChange={(e) => setCustomDateStart(e.target.value)}
+                  className="h-7 px-2 text-[10px] font-bold rounded-lg border-none outline-none text-slate-700 bg-white"
+                />
+                <span className="text-[10px] font-black text-slate-400">to</span>
+                <input
+                  type="date"
+                  value={customDateEnd}
+                  onChange={(e) => setCustomDateEnd(e.target.value)}
+                  className="h-7 px-2 text-[10px] font-bold rounded-lg border-none outline-none text-slate-700 bg-white"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 2 Distinct Independent Containers */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Container 1: SUPERVISOR INSPECTIONS & QUALITY ANALYTICS */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col hover:border-slate-300 transition">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-xs">
+                  <Users size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">Supervisor Inspection Trends</h3>
+                  <p className="text-[10px] font-bold text-slate-400">Inspections submitted by supervisors across Sweeping, Toilets, Bins & Taskforce</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 text-[10px] font-black border border-purple-200">
+                {overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0)} Total Submitted
+              </span>
+            </div>
+
+            {/* Quick KPI stats */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[8px] font-black uppercase text-slate-400">Daily Avg</span>
+                <div className="text-base font-black text-slate-800 mt-0.5">
+                  {overallChartData.length ? Math.round(overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0) / overallChartData.length) : 0} /day
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                <span className="text-[8px] font-black uppercase text-emerald-600">Peak Inspection Day</span>
+                <div className="text-base font-black text-emerald-950 mt-0.5">
+                  {Math.max(...overallChartData.map(d => d.supervisorInspections), 0)} insps
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-purple-50 border border-purple-100">
+                <span className="text-[8px] font-black uppercase text-purple-600">Active Supervisors</span>
+                <div className="text-base font-black text-purple-950 mt-0.5">
+                  {users.filter(u => getUserRoleLabels(u).includes("SUPERVISOR")).length} Registered
+                </div>
+              </div>
+            </div>
+
+            {/* Area / Bar Chart */}
+            <div className="h-[240px] w-full mt-auto">
+              {overall30DayLoading && overall30DayRecords.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400 animate-pulse">
+                  Loading supervisor inspection trends...
+                </div>
+              ) : overallChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={overallChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorSupervisor" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dy={8} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dx={-8} allowDecimals={false} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 700 }}
+                      cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    />
+                    <Area type="monotone" dataKey="supervisorInspections" name="Supervisor Inspections" stroke="#8b5cf6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSupervisor)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400">
+                  No supervisor activity found for this timeframe.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Container 2: EMPLOYEE FIELD WORK & BEAT ACTIVITY ANALYTICS */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col hover:border-slate-300 transition">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+                  <Users size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800">Employee Field Activity Trends</h3>
+                  <p className="text-[10px] font-bold text-slate-400">Daily completed field work records and assigned beat coverage</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black border border-blue-200">
+                {overallChartData.reduce((sum, d) => sum + d.employeeInspections, 0)} Field Tasks Logged
+              </span>
+            </div>
+
+            {/* Quick KPI stats */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[8px] font-black uppercase text-slate-400">Daily Avg Tasks</span>
+                <div className="text-base font-black text-slate-800 mt-0.5">
+                  {overallChartData.length ? Math.round(overallChartData.reduce((sum, d) => sum + d.employeeInspections, 0) / overallChartData.length) : 0} /day
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
+                <span className="text-[8px] font-black uppercase text-blue-600">Peak Activity Day</span>
+                <div className="text-base font-black text-blue-950 mt-0.5">
+                  {Math.max(...overallChartData.map(d => d.employeeInspections), 0)} tasks
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-teal-50 border border-teal-100">
+                <span className="text-[8px] font-black uppercase text-teal-600">Total Workforce</span>
+                <div className="text-base font-black text-teal-950 mt-0.5">
+                  {users.filter(u => !getUserRoleLabels(u).includes("SUPERVISOR")).length} Employees
+                </div>
+              </div>
+            </div>
+
+            {/* Area / Bar Chart */}
+            <div className="h-[240px] w-full mt-auto">
+              {overall30DayLoading && overall30DayRecords.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400 animate-pulse">
+                  Loading employee field activity trends...
+                </div>
+              ) : overallChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={overallChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorEmployee" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dy={8} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dx={-8} allowDecimals={false} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 700 }}
+                      cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    />
+                    <Area type="monotone" dataKey="employeeInspections" name="Employee Tasks" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorEmployee)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400">
+                  No employee activity found for this timeframe.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {selectedPerformanceUser && typeof document !== 'undefined' && createPortal(
+        <UserPerformanceModal 
+          isOpen={Boolean(selectedPerformanceUser)}
+          user={selectedPerformanceUser} 
+          onClose={() => setSelectedPerformanceUser(null)} 
+        />,
+        document.body
+      )}
+      {/* PERSONNEL PERFORMANCE DIRECTORY */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/80 p-5">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <Users size={16} className="text-blue-600" />
-
                 <h3 className="text-sm font-black text-slate-800">
-                  Recent users / Registered employees
+                  Personnel Performance Directory
                 </h3>
-
                 <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
                   {filteredUsers.length}
                 </span>
               </div>
-
               <p className="text-[10px] uppercase text-slate-400 font-bold mt-1">
-                List of recently added employees
+                View analytics for individual personnel
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[210px] flex-1 xl:flex-none">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search personnel..."
-                  className="h-9 w-full xl:w-60 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[10px] font-bold outline-none focus:border-blue-400"
-                />
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Role Type Filter Dropdown & Tabs */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={personnelTab}
+                  onChange={(e) => {
+                    setPersonnelTab(e.target.value as any);
+                    setDirectoryPage(1);
+                  }}
+                  className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-[11px] font-black text-slate-700 outline-none focus:border-blue-400 shadow-sm"
+                >
+                  <option value="EMPLOYEE">👥 Employees ({users.filter(u => getUserRoleLabels(u).includes("EMPLOYEE")).length})</option>
+                  <option value="SUPERVISOR">👔 Supervisors ({users.filter(u => getUserRoleLabels(u).includes("SUPERVISOR")).length})</option>
+                  <option value="ALL">🌐 All Personnel ({users.length})</option>
+                </select>
               </div>
 
-              <select
-                value={directoryRole}
-                onChange={(event) => setDirectoryRole(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Roles</option>
-
-                {directoryRoleOptions.map((role) => (
-                  <option key={role} value={role}>
-                    {role.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={directoryModule}
-                onChange={(event) => setDirectoryModule(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Modules</option>
-
-                {directoryModuleOptions.map((module) => (
-                  <option key={module} value={module}>
-                    {prettyModuleName(module)}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={directoryStatus}
-                onChange={(event) => setDirectoryStatus(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Status</option>
-
-                {directoryStatusOptions.map((statusValue) => (
-                  <option key={statusValue} value={statusValue}>
-                    {statusValue}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setDirectoryPage(1);
+                  }}
+                  placeholder="Direct search by name..."
+                  className="h-9 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[10px] font-bold outline-none focus:border-blue-400 shadow-sm"
+                />
+              </div>
 
               <button
                 type="button"
@@ -2842,11 +3914,46 @@ const beatRequests = (
               </button>
             </div>
           </div>
+          
+          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200/50">
+            <Filter size={12} className="text-slate-400" />
+            <select
+              value={directoryRole}
+              onChange={(event) => setDirectoryRole(event.target.value)}
+              className="h-7 rounded-lg border-none bg-slate-200/50 px-2 text-[9px] font-bold text-slate-600 outline-none"
+            >
+              <option value="ALL">All Roles</option>
+              {directoryRoleOptions.map((role) => (
+                <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+
+            <select
+              value={directoryModule}
+              onChange={(event) => setDirectoryModule(event.target.value)}
+              className="h-7 rounded-lg border-none bg-slate-200/50 px-2 text-[9px] font-bold text-slate-600 outline-none"
+            >
+              <option value="ALL">All Modules</option>
+              {directoryModuleOptions.map((module) => (
+                <option key={module} value={module}>{prettyModuleName(module)}</option>
+              ))}
+            </select>
+
+            <select
+              value={directoryStatus}
+              onChange={(event) => setDirectoryStatus(event.target.value)}
+              className="h-7 rounded-lg border-none bg-slate-200/50 px-2 text-[9px] font-bold text-slate-600 outline-none"
+            >
+              <option value="ALL">All Status</option>
+              {directoryStatusOptions.map((statusValue) => (
+                <option key={statusValue} value={statusValue}>{statusValue}</option>
+              ))}
+            </select>
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
             <span>
-              Showing {Math.min(10, filteredUsers.length)} of {filteredUsers.length} matching user
-              {filteredUsers.length === 1 ? "" : "s"}
+              Showing {filteredUsers.length > 0 ? (directoryPage - 1) * DIRECTORY_PAGE_SIZE + 1 : 0} - {Math.min(directoryPage * DIRECTORY_PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length} matching {personnelTab === 'SUPERVISOR' ? 'supervisors' : personnelTab === 'EMPLOYEE' ? 'employees' : 'users'}
             </span>
 
             {(search ||
@@ -2873,10 +3980,12 @@ const beatRequests = (
           <table className="w-full min-w-[900px] text-left text-xs">
             <thead className="bg-white">
               <tr className="border-b border-slate-200 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                <th className="p-4">Personnel</th>
+                <th className="p-4 w-12 text-center">Rank</th>
+                <th className="p-4">Name</th>
                 <th className="p-4">System Roles</th>
                 <th className="p-4">Active Modules</th>
-                <th className="p-4 text-right">Status</th>
+                <th className="p-4">Status</th>
+                <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
 
@@ -2886,19 +3995,38 @@ const beatRequests = (
                 const modules = getUserModuleLabels(user);
                 const statusValue = getUserStatus(user);
 
+                const userId = user.id || user.email || index.toString();
+                const isExpanded = selectedPerformanceUser?.id === user.id;
+
                 return (
+                  <React.Fragment key={userId}>
                   <tr
-                    key={user.id || user.email || index}
-                    className="hover:bg-slate-50 transition"
+                    className={`transition ${isExpanded ? 'bg-blue-50/30' : 'hover:bg-slate-50'}`}
                   >
+                    <td className="p-4 text-center font-black text-slate-400">
+                      #{index + 1}
+                    </td>
                     <td className="p-4">
-                      <div className="font-black text-[11px] text-slate-900">
+                      <button 
+                        onClick={() => setSelectedPerformanceUser(user)}
+                        className="font-black text-[11px] text-blue-600 hover:text-blue-700 hover:underline text-left"
+                      >
                         {user.name || "Unnamed Personnel"}
-                      </div>
+                      </button>
 
                       <div className="mt-1 text-[9px] font-semibold text-slate-400">
                         {user.email || user.phone || "-"}
                       </div>
+                      
+                      {/* Assigned Location */}
+                      {(user.assignedZone || user.assignedWard || user.assignedArea) && (
+                        <div className="mt-1 text-[8px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <MapPin size={9} />
+                          {[user.assignedZone?.name, user.assignedWard?.name, user.assignedArea?.name]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-4">
@@ -2945,7 +4073,7 @@ const beatRequests = (
                       </div>
                     </td>
 
-                    <td className="p-4 text-right">
+                    <td className="p-4">
                       <span
                         className={`rounded-md border px-2 py-1 text-[8px] font-black ${
                           statusValue === "ACTIVE"
@@ -2956,14 +4084,28 @@ const beatRequests = (
                         {statusValue}
                       </span>
                     </td>
+                    
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => setSelectedPerformanceUser(isExpanded ? null : user)}
+                        className={`inline-flex px-2.5 py-1.5 rounded-lg border text-[10px] font-black transition items-center gap-1.5 shadow-sm ${
+                          isExpanded 
+                            ? "bg-slate-800 text-white border-slate-900 hover:bg-slate-700" 
+                            : "bg-blue-50/50 text-blue-600 border-blue-100 hover:bg-blue-100 hover:border-blue-200"
+                        }`}
+                      >
+                        <Activity size={12} /> {isExpanded ? 'Close' : 'Performance'}
+                      </button>
+                    </td>
                   </tr>
+                  </React.Fragment>
                 );
               })}
 
               {visibleDirectoryUsers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={6}
                     className="py-14 text-center text-[10px] font-bold text-slate-400"
                   >
                     No personnel records match the selected filters.
@@ -2974,20 +4116,31 @@ const beatRequests = (
           </table>
         </div>
 
-        {filteredUsers.length > 10 && (
+        {/* Pagination Footer */}
+        {filteredUsers.length > 0 && (
           <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center justify-between gap-3">
-            <span className="text-[9px] font-bold text-slate-400">
-              Preview is limited to 10 users for a cleaner dashboard.
+            <span className="text-[10px] font-bold text-slate-500">
+              Page {directoryPage} of {directoryTotalPages} ({filteredUsers.length} total records)
             </span>
 
-            <button
-              type="button"
-              onClick={() => router.push("/portal-home/registered-users")}
-              className="text-[9px] font-black text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              Open full directory
-              <ArrowRight size={11} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDirectoryPage(p => Math.max(1, p - 1))}
+                disabled={directoryPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[10px] font-black text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition shadow-sm"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryPage(p => Math.min(directoryTotalPages, p + 1))}
+                disabled={directoryPage >= directoryTotalPages}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[10px] font-black text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition shadow-sm"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </section>
