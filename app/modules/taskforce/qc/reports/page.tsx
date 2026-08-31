@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Protected, ModuleGuard } from "@components/Guards";
 import { ApiError, TaskforceApi } from "@lib/apiClient";
+import { resolveMediaUrl } from "@lib/mediaUrl";
 
 type Report = {
   id: string;
@@ -158,7 +159,7 @@ export default function TaskforceQcReportsPage() {
                             {photoUrl ? (
                               <details className="photo-block">
                                 <summary>View photo</summary>
-                                <img src={photoUrl} alt="answer proof" className="thumb" />
+                                <img src={resolveMediaUrl(photoUrl) || undefined} alt="answer proof" className="thumb" />
                               </details>
                             ) : (
                               <div className="muted small">No photo provided</div>

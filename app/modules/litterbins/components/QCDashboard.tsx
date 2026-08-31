@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ModuleRecordsApi, TwinbinApi, ApiError, apiFetch } from "@lib/apiClient";
 import { StatsCard, RecordsTable, StatusBadge, ActionButtons, TableColumn, FilterTabs } from "../../qc-shared";
+import { resolveMediaUrl } from "@lib/mediaUrl";
 
 type RecordItem = {
     id: string;
@@ -462,7 +463,7 @@ function BinRequestView({ item, onClose, onAssign }: { item: any; onClose: () =>
                     <div className="flex flex-wrap gap-2">
                         {item.photos.map((p: string, idx: number) => (
                             <a key={idx} href={p} target="_blank" rel="noreferrer">
-                                <img src={p} alt={`Photo ${idx + 1}`} className="h-16 w-16 object-cover rounded border" />
+                                <img src={resolveMediaUrl(p) || undefined} alt={`Photo ${idx + 1}`} className="h-16 w-16 object-cover rounded border" />
                             </a>
                         ))}
                     </div>
@@ -512,7 +513,7 @@ function DailyReportView({ item, loading, onClose }: { item: any; loading: boole
                                         <div className="flex flex-wrap gap-2 mt-2">
                                             {photos.map((p: string, idx: number) => (
                                                 <a key={idx} href={p} target="_blank" rel="noreferrer" className="block">
-                                                    <img src={p} alt={`Photo ${idx + 1}`} className="h-16 w-16 object-cover rounded border" />
+                                                    <img src={resolveMediaUrl(p) || undefined} alt={`Photo ${idx + 1}`} className="h-16 w-16 object-cover rounded border" />
                                                 </a>
                                             ))}
                                         </div>

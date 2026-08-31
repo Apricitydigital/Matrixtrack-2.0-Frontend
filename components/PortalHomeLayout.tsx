@@ -606,6 +606,10 @@ function PortalHomeLayoutContent({
     pageTitle = 'Ward Ranking';
   }
 
+  if (pathname.startsWith('/ulb/map-view-dashboard')) {
+    pageTitle = 'Map View Dashboard';
+  }
+
 
   /* =========================================================
      TASKFORCE TITLES
@@ -2621,6 +2625,21 @@ function PortalHomeLayoutContent({
                   </span>
                 </Link>
 
+                <Link
+                  href="/ulb/map-view-dashboard"
+                  title="Map View Dashboard"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/map-view-dashboard')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                >
+                  <Map size={15} className="shrink-0" />
+
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                    Map View Dashboard
+                  </span>
+                </Link>
+
 
                 <Link
                   href="/ulb/attendance"
@@ -2870,7 +2889,7 @@ function PortalHomeLayoutContent({
                 WARD RANKING SYSTEM
             ================================================= */}
 
-            {hasSwachhAccess && (
+            {(hasSwachhAccess || isCityAdmin) && (
 
               <div className="flex flex-col">
 

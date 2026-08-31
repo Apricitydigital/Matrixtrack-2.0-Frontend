@@ -70,6 +70,7 @@ import {
     ToiletApi,
     apiFetch,
 } from '@lib/apiClient';
+import { resolveMediaUrl, resolveMediaUrls } from '@lib/mediaUrl';
 
 import {
     AttendanceApi,
@@ -648,56 +649,14 @@ function getActionTakenRemark(
 function isRenderableImage(
     value: any
 ) {
-    const uri =
-        String(
-            value || ''
-        );
-
-
-    return (
-        uri.startsWith(
-            'http://'
-        ) ||
-        uri.startsWith(
-            'https://'
-        ) ||
-        uri.startsWith(
-            'data:image/'
-        ) ||
-        uri.startsWith(
-            'file://'
-        ) ||
-        uri.startsWith(
-            '/uploads/'
-        ) ||
-        uri.startsWith(
-            '/media/'
-        )
-    );
+    return Boolean(resolveMediaUrl(value));
 }
 
 
 function normalizeImages(
     values: any[]
 ) {
-    return Array.from(
-        new Set(
-            values
-                .flatMap(
-                    (value) =>
-                        Array.isArray(
-                            value
-                        )
-                            ? value
-                            : [value]
-                )
-                .filter(Boolean)
-                .map(String)
-                .filter(
-                    isRenderableImage
-                )
-        )
-    );
+    return resolveMediaUrls(values);
 }
 
 
