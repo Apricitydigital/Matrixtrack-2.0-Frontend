@@ -1087,6 +1087,10 @@ export const EmployeesApi = {
 };
 
 export const TwinbinApi = {
+  all: (cityId?: string) => {
+    const query = cityId ? `?cityId=${encodeURIComponent(cityId)}` : "";
+    return apiFetch<{ bins: any[] }>(`/modules/twinbin/bins/all${query}`);
+  },
   deleteBin: (id: string) => apiFetch<{ success: boolean }>(`/modules/twinbin/bins/${id}`, { method: "DELETE" }),
   bulkImport: (csvText: string) =>
     apiFetch<{ count: number }>("/modules/twinbin/bulk-import", { method: "POST", body: JSON.stringify({ csvText }) }),

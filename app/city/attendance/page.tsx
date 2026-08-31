@@ -1478,8 +1478,16 @@ function WorkDurationEmployeesPopup({
 function AttendanceDashboard() {
   const { user } = useAuth();
   const hmsSuperAdmin = isHmsSuperAdmin(user);
-  const isUlbOfficer =
-    user?.roles?.some((role) => String(role).toUpperCase() === "ULB_OFFICER") ?? false;
+  const attendanceRoles = new Set(
+    [user?.role, ...(user?.roles || [])]
+      .filter(Boolean)
+      .map((role) => String(role).toUpperCase())
+  );
+  const isUlbOfficer = attendanceRoles.has("ULB_OFFICER");
+  const canUploadAttendance =
+    hmsSuperAdmin ||
+    attendanceRoles.has("CITY_ADMIN") ||
+    attendanceRoles.has("COMMISSIONER");
   const [cities, setCities] = useState<AttendanceCity[]>([]);
   const [selectedCityId, setSelectedCityId] = useState("");
   const [citiesLoading, setCitiesLoading] = useState(false);
@@ -2017,6 +2025,11 @@ function AttendanceDashboard() {
   };
 
   const handleUpload = async (files: File[]) => {
+    if (!canUploadAttendance) {
+      setError("Only City Admin, Commissioner, or HMS Super Admin can upload attendance files.");
+      return;
+    }
+
     const attendanceFiles = files.filter((file) => /\.(csv|xlsx)$/i.test(file.name));
     if (!attendanceFiles.length) {
       setError("Please choose at least one CSV or XLSX file");
@@ -2169,7 +2182,7 @@ function AttendanceDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-[1780px] space-y-4 pb-8">
-      {!isUlbOfficer && (
+      {canUploadAttendance && (
         <UploadModal
           open={uploadOpen}
           uploading={uploading}
@@ -2320,7 +2333,7 @@ function AttendanceDashboard() {
             Upload calendar
           </button>
 
-          {!isUlbOfficer && (
+          {canUploadAttendance && (
             <button
               type="button"
               onClick={() => setUploadOpen(true)}

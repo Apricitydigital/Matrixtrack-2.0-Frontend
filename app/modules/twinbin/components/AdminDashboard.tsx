@@ -34,6 +34,7 @@ export default function AdminDashboard() {
     const [records, setRecords] = useState<any[]>([]);
     const [allBins, setAllBins] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState("");
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
     // 5 Top Level Tabs
@@ -128,6 +129,7 @@ export default function AdminDashboard() {
 
     const loadData = useCallback(async (dFilter = dateFilter, cDate = customDate) => {
         setLoading(true);
+        setLoadError("");
         try {
             let fromDate: string | undefined;
             let toDate: string | undefined;
@@ -150,23 +152,36 @@ export default function AdminDashboard() {
                 }
             }
 
-            const [recRes, binRes, myBinsRes] = await Promise.allSettled([
+            const [recRes, binRes] = await Promise.allSettled([
                 ModuleRecordsApi.getRecords("LITTERBINS", { tab: 'ALL', limit: 500, fromDate, toDate, cityId: selectedCity !== 'ALL' ? selectedCity : undefined }),
-                TwinbinApi.assigned(),
-                TwinbinApi.myBins()
+                TwinbinApi.all(isSuperAdmin ? selectedCity : undefined)
             ]);
 
-            if (recRes.status === 'fulfilled') setRecords(recRes.value.data || []);
-            const fetchedBins: any[] = [];
-            if (binRes.status === 'fulfilled' && binRes.value.bins) fetchedBins.push(...binRes.value.bins);
-            if (myBinsRes.status === 'fulfilled' && myBinsRes.value.bins) fetchedBins.push(...myBinsRes.value.bins);
-            setAllBins(fetchedBins);
+            if (recRes.status === 'fulfilled') {
+                setRecords(recRes.value.data || []);
+            } else {
+                setRecords([]);
+            }
+
+            if (binRes.status === 'fulfilled') {
+                setAllBins(binRes.value.bins || []);
+            } else {
+                setAllBins([]);
+            }
+
+            const failures = [recRes, binRes]
+                .filter((result) => result.status === 'rejected')
+                .map((result: any) => result.reason?.message || 'Request failed');
+            if (failures.length) {
+                setLoadError(`Some litter-bin data could not be loaded: ${failures.join(' | ')}`);
+            }
         } catch (err) {
             console.error("Failed to load records", err);
+            setLoadError(err instanceof Error ? err.message : "Failed to load litter-bin data");
         } finally {
             setLoading(false);
         }
-    }, [dateFilter, customDate, selectedCity]);
+    }, [dateFilter, customDate, selectedCity, isSuperAdmin]);
 
     async function loadSupervisors() {
         try {
@@ -184,6 +199,9 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         loadData(dateFilter, customDate);
+    }, [selectedCity]);
+
+    useEffect(() => {
         loadSupervisors();
     }, []);
 
@@ -369,6 +387,16 @@ export default function AdminDashboard() {
                 }
             `}</style>
 
+            {loadError && (
+                <div style={{
+                    marginBottom: 16, padding: '12px 16px', borderRadius: 12,
+                    border: '1px solid #fecaca', background: '#fef2f2',
+                    color: '#991b1b', fontSize: 12, fontWeight: 700
+                }}>
+                    {loadError}
+                </div>
+            )}
+
             {/* TOP LEVEL MODULE HEADER */}
             <div style={{
                 background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -505,7 +533,7 @@ export default function AdminDashboard() {
                             }, 80);
                         };
 
-                        const totalSubmitted = records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT').length || records.length || 0;
+                        const totalSubmitted = records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT').length;
                         const pendingCount = records.filter(r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED').length || 0;
                         const approvedCount = records.filter(r => r.status === 'APPROVED').length || 0;
                         const rejectedCount = records.filter(r => r.status === 'REJECTED').length || 0;

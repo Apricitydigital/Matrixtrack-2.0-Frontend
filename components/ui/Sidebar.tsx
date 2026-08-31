@@ -278,7 +278,7 @@ export default function Sidebar() {
           icon: <LayoutDashboard size={18} />,
         },
         {
-          label: "Home 2 · Operations Map",
+          label: "Operations Map",
           href: "/municipal/commissioner/home-2",
           icon: <Map size={18} />,
         },
