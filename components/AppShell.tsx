@@ -23,6 +23,7 @@ const STANDALONE_PATHS = [
   "/ulb/attendance",
   "/ulb/inspection-performance",
   "/ulb/ward-ranking",
+  "/ulb/map-view-dashboard",
 ];
 
 export function AppShell({

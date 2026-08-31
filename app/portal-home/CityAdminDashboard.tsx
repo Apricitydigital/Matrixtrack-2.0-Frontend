@@ -9,6 +9,8 @@ import {
   AreaBeatApi,
   CityUserApi,
   RegistrationApi,
+  SupervisorAssignmentApi,
+  type SupervisorAssignmentStatus,
 } from "@lib/apiClient";
 import swachhApi from "../../modules/swachh-ranking/api/axios";
 
@@ -405,6 +407,9 @@ export default function CityAdminDashboard({
   const [beats, setBeats] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [records, setRecords] = useState<any[]>([]);
+  const [assignmentStatus, setAssignmentStatus] =
+    useState<SupervisorAssignmentStatus | null>(null);
+  const [assignmentDetailsOpen, setAssignmentDetailsOpen] = useState(false);
   const [swachh, setSwachh] = useState<any>({});
 
   const [search, setSearch] = useState("");
@@ -630,7 +635,7 @@ const beatRequests = (
   }
 
   async function loadBase() {
-    const [userResponse, beatResponse, zoneResponse, wardResponse, areaResponse, swachhResponse] =
+    const [userResponse, beatResponse, zoneResponse, wardResponse, areaResponse, swachhResponse, assignmentResponse] =
       await Promise.all([
         CityUserApi.list().catch(() => ({ users: [] })),
         AreaBeatApi.list().catch(() => ({ beats: [] })),
@@ -644,6 +649,7 @@ const beatRequests = (
           nodes: [],
         })),
         swachhApi.get("/admin/stats").catch(() => ({ data: {} })),
+        SupervisorAssignmentApi.status().catch(() => null),
       ]);
 
     setUsers(userResponse?.users || []);
@@ -652,6 +658,7 @@ const beatRequests = (
     setWards(wardResponse?.nodes || []);
     setAreas(areaResponse?.nodes || []);
     setSwachh(swachhResponse?.data || {});
+    setAssignmentStatus(assignmentResponse);
   }
 
   async function loadRecords() {
@@ -1482,6 +1489,10 @@ const beatRequests = (
       (record?.assignedEmployees || []).forEach((person: any) => addId(person?.id));
     });
 
+    // Include persistent assignments from all three auto-assignment modules.
+    // Inspection records alone do not contain every Toilet/Litter Bin assignment.
+    (assignmentStatus?.supervisors.assignedIds || []).forEach(addId);
+
     // Module access is permission, not a work assignment.
     // Assigned/unassigned is therefore calculated only from actual live work links.
     const hasAssignment = (user: any) => assignedIds.has(norm(user?.id));
@@ -1508,7 +1519,7 @@ const beatRequests = (
       supervisors: buildRole("SUPERVISOR"),
       employees: buildRole("EMPLOYEE"),
     };
-  }, [users, beats, records]);
+  }, [users, beats, records, assignmentStatus]);
 
   const noActivityAlerts = useMemo(
     () => buildNoActivityAlerts(records, zones, wards, areas, today),
@@ -3099,18 +3110,125 @@ const beatRequests = (
           {(workforce.supervisors.available > 0 || workforce.employees.available > 0) && (
             <button
               type="button"
-              onClick={() => router.push("/portal-home/registered-users")}
+              onClick={() => setAssignmentDetailsOpen((current) => !current)}
               className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left hover:bg-amber-100/70 transition"
             >
-              <div className="flex items-center gap-2 text-[10px] font-black text-amber-800">
-                <AlertTriangle size={13} />
-                Unassigned workforce
-              </div>
-              <div className="text-[9px] font-semibold text-amber-600 mt-1 pl-5">
-                {workforce.supervisors.available} supervisor(s) and{" "}
-                {workforce.employees.available} employee(s) are currently unassigned from active work.
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-[10px] font-black text-amber-800">
+                    <AlertTriangle size={13} />
+                    Unassigned workforce
+                  </div>
+                  <div className="text-[9px] font-semibold text-amber-600 mt-1 pl-5">
+                    {workforce.supervisors.available} supervisor(s) and{" "}
+                    {workforce.employees.available} employee(s) are currently unassigned from active work.
+                  </div>
+                </div>
+                {assignmentDetailsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
             </button>
+          )}
+
+          {assignmentDetailsOpen && assignmentStatus && (
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-[11px] font-black text-slate-800">Supervisor Assignment Audit</h4>
+                  <p className="mt-0.5 text-[9px] font-semibold text-slate-500">
+                    Live assignment status across Sweeping, Toilet, and Litter Bin
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push("/portal-home/registered-users")}
+                  className="text-[9px] font-black text-blue-600 hover:text-blue-700"
+                >
+                  Open user management →
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {([
+                  ["SWEEPING", "Sweeping"],
+                  ["TOILET", "Toilet"],
+                  ["LITTERBINS", "Litter Bin"],
+                ] as const).map(([key, label]) => {
+                  const module = assignmentStatus.modules[key];
+                  return (
+                    <div key={key} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="text-[9px] font-black uppercase text-slate-500">{label}</div>
+                      <div className="mt-1 text-sm font-black text-slate-900">
+                        {module.assignedAssets}/{module.totalAssets} assigned
+                      </div>
+                      <div className={`mt-1 text-[9px] font-bold ${module.unassignedAssets ? "text-amber-600" : "text-emerald-600"}`}>
+                        {module.unassignedAssets} unassigned asset(s)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-[10px] font-black text-slate-800">
+                    Unassigned Supervisors ({assignmentStatus.supervisors.unassigned})
+                  </div>
+                  <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {assignmentStatus.supervisors.unassignedItems.length ? (
+                      assignmentStatus.supervisors.unassignedItems.map((supervisor) => (
+                        <div key={supervisor.id} className="rounded-lg border border-amber-100 bg-amber-50/60 p-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-[10px] font-black text-slate-800">{supervisor.name}</div>
+                            <div className="text-[8px] font-bold text-slate-400">{supervisor.phone || "No phone"}</div>
+                          </div>
+                          <div className="mt-1 text-[8px] font-semibold text-amber-700">{supervisor.reason}</div>
+                          <div className="mt-1 text-[8px] font-semibold text-slate-500">
+                            Modules: {supervisor.moduleKeys.length ? supervisor.moduleKeys.map((key) => key === "LITTERBINS" ? "Litter Bin" : key === "TOILET" ? "Toilet" : "Sweeping").join(", ") : "None"}
+                            {` • ${supervisor.zoneIds.length} zone(s) • ${supervisor.wardIds.length} ward(s)`}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
+                        All supervisors have at least one active asset assignment.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-[10px] font-black text-slate-800">Unassigned Assets</div>
+                  <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {([
+                      ["SWEEPING", "Sweeping"],
+                      ["TOILET", "Toilet"],
+                      ["LITTERBINS", "Litter Bin"],
+                    ] as const).flatMap(([key, label]) =>
+                      assignmentStatus.modules[key].unassignedItems.map((asset) => ({
+                        ...asset,
+                        moduleLabel: label,
+                      }))
+                    ).map((asset) => (
+                      <div key={`${asset.moduleLabel}:${asset.id}`} className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-[10px] font-black text-slate-800">{asset.name}</div>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[8px] font-black text-slate-500">{asset.moduleLabel}</span>
+                        </div>
+                        <div className="mt-1 text-[8px] font-semibold text-slate-500">
+                          Zone: {asset.zoneId ? geoMap[asset.zoneId] || asset.zoneId : "Not set"}
+                          {` • Ward: ${asset.wardId ? geoMap[asset.wardId] || asset.wardId : "Not set"}`}
+                        </div>
+                      </div>
+                    ))}
+                    {Object.values(assignmentStatus.modules).every((module) => module.unassignedAssets === 0) && (
+                      <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
+                        Every approved Sweeping, Toilet, and Litter Bin asset has a supervisor.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </section>

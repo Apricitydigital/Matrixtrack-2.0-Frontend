@@ -1,13 +1,13 @@
 import { Protected, RoleGuard } from '@components/Guards';
 import PortalHomeLayout from '@components/PortalHomeLayout';
-import AttendanceAnalyticsPage from '../../city/attendance/page';
+import OperationsMapDashboard from '../../municipal/commissioner/home-2/page';
 
 export default function Page() {
   return (
     <Protected>
-      <RoleGuard roles={['ULB_OFFICER', 'COMMISSIONER']}>
+      <RoleGuard roles={['ULB_OFFICER']}>
         <PortalHomeLayout>
-          <AttendanceAnalyticsPage />
+          <OperationsMapDashboard />
         </PortalHomeLayout>
       </RoleGuard>
     </Protected>

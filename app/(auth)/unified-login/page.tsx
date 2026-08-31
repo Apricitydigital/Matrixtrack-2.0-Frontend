@@ -467,7 +467,7 @@ export default function LoginPage() {
     }
 
     if (roles.includes("COMMISSIONER")) {
-      return "/municipal/commissioner";
+      return "/municipal/commissioner/home-2";
     }
 
     return response.redirectTo || "/portal-home";

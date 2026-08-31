@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Protected, ModuleGuard } from "@components/Guards";
 import { ApiError, EmployeesApi, TaskforceApi } from "@lib/apiClient";
+import { resolveMediaUrl } from "@lib/mediaUrl";
 
 type Request = {
   id: string;
@@ -175,7 +176,7 @@ export default function TaskforceQcRequestsPage() {
                   {active.photoUrl && (
                     <div style={{ marginTop: 12 }}>
                       <label>Photo</label>
-                      <img src={active.photoUrl} alt="Location" style={{ maxWidth: "100%", borderRadius: 8 }} />
+                      <img src={resolveMediaUrl(active.photoUrl) || undefined} alt="Location" style={{ maxWidth: "100%", borderRadius: 8 }} />
                     </div>
                   )}
 

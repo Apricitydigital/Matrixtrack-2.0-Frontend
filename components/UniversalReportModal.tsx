@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { normalizeInspectionAnswers, NormalizedAnswer } from '@lib/reportAnswers';
+import { resolveMediaUrl } from '@lib/mediaUrl';
 import { useAuth } from '@hooks/useAuth';
 
 export type UniversalReportModalProps = {
@@ -18,14 +19,8 @@ export type UniversalReportModalProps = {
     userRoles?: string[];
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
 function resolveUrl(url: string | null | undefined): string | null {
-    if (!url || typeof url !== 'string' || url.trim().length < 5 || url === 'null' || url === 'undefined') return null;
-    const u = url.trim();
-    if (u.startsWith('http://') || u.startsWith('https://')) return u;
-    if (u.startsWith('/')) return `${API_BASE}${u}`;
-    return u;
+    return resolveMediaUrl(url);
 }
 
 function StatusBadgeInline({ status }: { status: string }) {

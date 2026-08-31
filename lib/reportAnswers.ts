@@ -1,3 +1,5 @@
+import { resolveMediaUrls } from './mediaUrl';
+
 export type NormalizedAnswer = {
     questionCode?: string;
     questionText: string;
@@ -90,7 +92,7 @@ export function parseReportAnswer(val: any): { answerText: string; photos: strin
         answerText = JSON.stringify(answerVal);
     }
 
-    return { answerText: answerText || "N/A", photos };
+    return { answerText: answerText || "N/A", photos: resolveMediaUrls(photos) };
 }
 
 // Fields that should never appear as Q&A items (they are record metadata)

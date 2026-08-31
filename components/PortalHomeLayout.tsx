@@ -606,12 +606,22 @@ function PortalHomeLayoutContent({
     pageTitle = 'Ward Ranking';
   }
 
+  if (pathname.startsWith('/ulb/map-view-dashboard')) {
+    pageTitle = 'Map View Dashboard';
+  }
+
+
+
 
   /* =========================================================
-     TASKFORCE TITLES
+     TARGET / TASKFORCE TITLES
   ========================================================= */
 
-  if (isTaskforceActive) {
+  if (pathname.startsWith('/city/targets')) {
+    pageTitle = 'Target Assignment';
+  }
+
+  else if (isTaskforceActive) {
     if (
       pathname.startsWith('/city/attendance')
     ) {
@@ -1849,7 +1859,7 @@ function PortalHomeLayoutContent({
               >
                 {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
               </button>
-              
+
               <button
                 onClick={() => setIsProfileModalOpen(true)}
                 className="flex items-center gap-2 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
@@ -1877,13 +1887,11 @@ function PortalHomeLayoutContent({
           LEFT SIDEBAR (DRAWER ON MOBILE, FIXED ON LG)
       ===================================================== */}
       <aside
-        className={`fixed left-0 top-0 bottom-0 bg-white border-r border-slate-200 flex flex-col justify-between h-screen overflow-y-auto scrollbar-hide z-50 transition-all duration-300 ease-out ${
-          sidebarCollapsed ? 'lg:w-[76px] lg:p-3 p-5 w-72' : 'w-72 p-5'
-        } ${
-          mobileMenuOpen
+        className={`fixed left-0 top-0 bottom-0 bg-white border-r border-slate-200 flex flex-col justify-between h-screen overflow-y-auto scrollbar-hide z-50 transition-all duration-300 ease-out ${sidebarCollapsed ? 'lg:w-[76px] lg:p-3 p-5 w-72' : 'w-72 p-5'
+          } ${mobileMenuOpen
             ? 'translate-x-0 shadow-2xl'
             : '-translate-x-full lg:translate-x-0'
-        }`}
+          }`}
       >
         <div className="flex flex-col gap-6">
 
@@ -1892,9 +1900,8 @@ function PortalHomeLayoutContent({
             <Link
               href={isUlbUser ? "/ulb/dashboard" : "/portal-home"}
               onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-1 py-1 cursor-pointer group transition-all ${
-                sidebarCollapsed ? 'lg:justify-center lg:w-full' : ''
-              }`}
+              className={`flex items-center gap-3 px-1 py-1 cursor-pointer group transition-all ${sidebarCollapsed ? 'lg:justify-center lg:w-full' : ''
+                }`}
               title="Return to Main Portal Entrance"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-600/30 group-hover:scale-105 transition-transform">
@@ -1943,611 +1950,632 @@ function PortalHomeLayoutContent({
               <div className="flex flex-col">
 
                 {navItemsCount > 1 ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPortalToolsOpen(
-                      (prev) => !prev
-                    )
-                  }
-                  className={`flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors cursor-pointer ${
-                    sidebarCollapsed ? 'lg:hidden' : ''
-                  }`}
-                >
-                  <span>
-                    Navigation Menu
-                  </span>
-
-                  <ChevronDown
-                    size={14}
-                    className={`transition-transform duration-200 ${portalToolsOpen
-                      ? 'rotate-180 text-blue-600'
-                      : 'text-slate-400'
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPortalToolsOpen(
+                        (prev) => !prev
+                      )
+                    }
+                    className={`flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors cursor-pointer ${sidebarCollapsed ? 'lg:hidden' : ''
                       }`}
-                  />
-                </button>
-              ) : (
-                <div className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 ${
-                  sidebarCollapsed ? 'lg:hidden' : ''
-                }`}>
-                  Navigation Menu
-                </div>
-              )}
+                  >
+                    <span>
+                      Navigation Menu
+                    </span>
+
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform duration-200 ${portalToolsOpen
+                        ? 'rotate-180 text-blue-600'
+                        : 'text-slate-400'
+                        }`}
+                    />
+                  </button>
+                ) : (
+                  <div className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 ${sidebarCollapsed ? 'lg:hidden' : ''
+                    }`}>
+                    Navigation Menu
+                  </div>
+                )}
 
 
-              {(portalToolsOpen ||
-                navItemsCount <= 1) && (
+                {(portalToolsOpen ||
+                  navItemsCount <= 1) && (
 
-                  <div className="flex flex-col gap-1 mt-1">
+                    <div className="flex flex-col gap-1 mt-1">
 
-                    {/* HOME */}
-                    {!isUlbUser && (
-                      <Link
-                        href="/portal-home"
-                        title="Home"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname === '/portal-home'
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                          } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
-                      >
-                        <LayoutDashboard
-                          size={16}
-                          className={`shrink-0 ${
-                            pathname === '/portal-home'
-                              ? 'text-white'
-                              : 'text-slate-400'
-                          }`}
-                        />
-
-                        <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Home</span>
-                      </Link>
-                    )}
-
-
-                    {/* =================================================
-                      USER MANAGEMENT
-                  ================================================= */}
-
-                    {canAccessRegistration && (
-
-                      <div className="flex flex-col">
-
-                        <button
-                          type="button"
-                          title="User Management"
-                          onClick={() =>
-                            handleMenuClick(setUserManagementOpen)
-                          }
-                          className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${userManagementOpen
-                            ? 'text-blue-600 font-extrabold bg-blue-50'
+                      {/* HOME */}
+                      {!isUlbUser && (
+                        <Link
+                          href="/portal-home"
+                          title="Home"
+                          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname === '/portal-home'
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
                             : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                             } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                         >
-                          <div className="flex items-center gap-3">
-
-                            <UserCheck2
-                              size={16}
-                              className={`shrink-0 ${
-                                userManagementOpen
-                                  ? 'text-blue-600'
-                                  : 'text-slate-500'
-                              }`}
-                            />
-
-                            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
-                              User Management
-                            </span>
-
-                          </div>
-
-
-                          <ChevronDown
-                            size={15}
-                            className={`transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${userManagementOpen
-                              ? 'rotate-180 text-blue-600'
+                          <LayoutDashboard
+                            size={16}
+                            className={`shrink-0 ${pathname === '/portal-home'
+                              ? 'text-white'
                               : 'text-slate-400'
                               }`}
                           />
-                        </button>
+
+                          <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Home</span>
+                        </Link>
+                      )}
 
 
-                        {userManagementOpen && (
+                      {/* =================================================
+                      USER MANAGEMENT
+                  ================================================= */}
 
-                          <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${
-                            sidebarCollapsed ? 'lg:hidden' : ''
-                          }`}>
+                      {canAccessRegistration && (
 
-                            <Link
-                              href="/portal-home/common-registration"
-                              title="Create User"
-                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
-                                '/portal-home/common-registration'
-                              )
-                                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                }`}
-                            >
-                              <UserPlus
-                                size={15}
-                                className={
-                                  pathname.startsWith(
-                                    '/portal-home/common-registration'
-                                  )
-                                    ? 'text-white'
-                                    : 'text-slate-400'
-                                }
+                        <div className="flex flex-col">
+
+                          <button
+                            type="button"
+                            title="User Management"
+                            onClick={() =>
+                              handleMenuClick(setUserManagementOpen)
+                            }
+                            className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${userManagementOpen
+                              ? 'text-blue-600 font-extrabold bg-blue-50'
+                              : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                              } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                          >
+                            <div className="flex items-center gap-3">
+
+                              <UserCheck2
+                                size={16}
+                                className={`shrink-0 ${userManagementOpen
+                                  ? 'text-blue-600'
+                                  : 'text-slate-500'
+                                  }`}
                               />
 
-                              <span>
-                                Create User
+                              <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                                User Management
                               </span>
-                            </Link>
+
+                            </div>
 
 
-                            <Link
-                              href="/portal-home/registered-users"
-                              title="Existing Users"
-                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
-                                '/portal-home/registered-users'
-                              )
-                                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                            <ChevronDown
+                              size={15}
+                              className={`transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${userManagementOpen
+                                ? 'rotate-180 text-blue-600'
+                                : 'text-slate-400'
                                 }`}
-                            >
-                              <Users
-                                size={15}
-                                className={
-                                  pathname.startsWith(
-                                    '/portal-home/registered-users'
-                                  )
-                                    ? 'text-white'
-                                    : 'text-slate-400'
-                                }
-                              />
-
-                              <span>
-                                Existing Users
-                              </span>
-                            </Link>
+                            />
+                          </button>
 
 
-                            <Link
-                              href="/portal-home/registration-requests"
-                              title="User Registration Requests"
-                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
-                                '/portal-home/registration-requests'
-                              )
-                                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                }`}
-                            >
-                              <UserCheck
-                                size={15}
-                                className={
-                                  pathname.startsWith(
-                                    '/portal-home/registration-requests'
-                                  )
-                                    ? 'text-white'
-                                    : 'text-slate-400'
-                                }
-                              />
+                          {userManagementOpen && (
 
-                              <span>
-                                User Registration Requests
-                              </span>
-                            </Link>
+                            <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${sidebarCollapsed ? 'lg:hidden' : ''
+                              }`}>
 
-                            {/* Employees Tab */}
-                            <Link
-                              href="/city/employees"
-                              title="Employees"
-                              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
-                                '/city/employees'
-                              )
-                                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                }`}
-                            >
-                              <Users
-                                size={15}
-                                className={
-                                  pathname.startsWith(
-                                    '/city/employees'
-                                  )
-                                    ? 'text-white'
-                                    : 'text-slate-400'
-                                }
-                              />
+                              <Link
+                                href="/portal-home/common-registration"
+                                title="Create User"
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
+                                  '/portal-home/common-registration'
+                                )
+                                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                  }`}
+                              >
+                                <UserPlus
+                                  size={15}
+                                  className={
+                                    pathname.startsWith(
+                                      '/portal-home/common-registration'
+                                    )
+                                      ? 'text-white'
+                                      : 'text-slate-400'
+                                  }
+                                />
 
-                              <span>
-                                Employees
-                              </span>
-                            </Link>
-
-                          </div>
-
-                        )}
-
-                      </div>
-
-                    )}
+                                <span>
+                                  Create User
+                                </span>
+                              </Link>
 
 
-                    {/* CITY DIRECTORY */}
+                              <Link
+                                href="/portal-home/registered-users"
+                                title="Existing Users"
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
+                                  '/portal-home/registered-users'
+                                )
+                                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                  }`}
+                              >
+                                <Users
+                                  size={15}
+                                  className={
+                                    pathname.startsWith(
+                                      '/portal-home/registered-users'
+                                    )
+                                      ? 'text-white'
+                                      : 'text-slate-400'
+                                  }
+                                />
 
-                    {isSuperAdmin && (
+                                <span>
+                                  Existing Users
+                                </span>
+                              </Link>
 
-                      <Link
-                        href="/portal-home/city-directory"
-                        title="City Directory"
-                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.includes(
-                          '/city-directory'
-                        )
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                          } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
-                      >
-                        <Globe
-                          size={16}
-                          className={`shrink-0 ${
-                            pathname.includes(
+
+                              <Link
+                                href="/portal-home/registration-requests"
+                                title="User Registration Requests"
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
+                                  '/portal-home/registration-requests'
+                                )
+                                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                  }`}
+                              >
+                                <UserCheck
+                                  size={15}
+                                  className={
+                                    pathname.startsWith(
+                                      '/portal-home/registration-requests'
+                                    )
+                                      ? 'text-white'
+                                      : 'text-slate-400'
+                                  }
+                                />
+
+                                <span>
+                                  User Registration Requests
+                                </span>
+                              </Link>
+
+                              {/* Employees Tab */}
+                              <Link
+                                href="/city/employees"
+                                title="Employees"
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith(
+                                  '/city/employees'
+                                )
+                                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                  }`}
+                              >
+                                <Users
+                                  size={15}
+                                  className={
+                                    pathname.startsWith(
+                                      '/city/employees'
+                                    )
+                                      ? 'text-white'
+                                      : 'text-slate-400'
+                                  }
+                                />
+
+                                <span>
+                                  Employees
+                                </span>
+                              </Link>
+
+                            </div>
+
+                          )}
+
+                        </div>
+
+                      )}
+
+
+                      {/* CITY DIRECTORY */}
+
+                      {isSuperAdmin && (
+
+                        <Link
+                          href="/portal-home/city-directory"
+                          title="City Directory"
+                          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.includes(
+                            '/city-directory'
+                          )
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md shadow-blue-600/30'
+                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                            } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                        >
+                          <Globe
+                            size={16}
+                            className={`shrink-0 ${pathname.includes(
                               '/city-directory'
                             )
                               ? 'text-white'
                               : 'text-slate-500'
-                          }`}
-                        />
+                              }`}
+                          />
 
-                        <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
-                          City Directory
-                        </span>
-                      </Link>
+                          <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                            City Directory
+                          </span>
+                        </Link>
 
-                    )}
+                      )}
 
 
-                    {/* =================================================
+                      {/* =================================================
                       MASTER CONTROL
                   ================================================= */}
 
-                    {isCityAdmin && (
+                      {isCityAdmin && (
 
-                      <div className="flex flex-col">
+                        <div className="flex flex-col">
 
-                        <button
-                          type="button"
-                          title="Master Control"
-                          onClick={() =>
-                            handleMenuClick(setMasterSubOpen)
-                          }
-                          className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${masterSubOpen
-                            ? 'text-blue-600 font-extrabold bg-blue-50'
-                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                            } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
-                        >
-                          <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            title="Master Control"
+                            onClick={() =>
+                              handleMenuClick(setMasterSubOpen)
+                            }
+                            className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${masterSubOpen
+                              ? 'text-blue-600 font-extrabold bg-blue-50'
+                              : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                              } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                          >
+                            <div className="flex items-center gap-3">
 
-                            <Map
-                              size={16}
-                              className={`shrink-0 ${
-                                masterSubOpen
+                              <Map
+                                size={16}
+                                className={`shrink-0 ${masterSubOpen
                                   ? 'text-blue-600'
                                   : 'text-slate-500'
-                              }`}
-                            />
-
-                            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
-                              Master Control
-                            </span>
-
-                          </div>
-
-
-                          <ChevronDown
-                            size={15}
-                            className={`transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${masterSubOpen
-                              ? 'rotate-180 text-blue-600'
-                              : 'text-slate-400'
-                              }`}
-                          />
-                        </button>
-
-
-                        {masterSubOpen && (
-
-                          <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${
-                            sidebarCollapsed ? 'lg:hidden' : ''
-                          }`}>
-
-
-                            {/* ZONES / WARDS / AREAS */}
-
-                            {masterSubTabs.map(
-                              (sub) => (
-
-                                <Link
-                                  key={
-                                    sub.name
-                                  }
-                                  href={
-                                    sub.href
-                                  }
-                                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${sub.isActive
-                                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                    }`}
-                                >
-                                  <span
-                                    className={
-                                      sub.isActive
-                                        ? 'text-white'
-                                        : 'text-slate-400'
-                                    }
-                                  >
-                                    {
-                                      sub.icon
-                                    }
-                                  </span>
-
-                                  <span>
-                                    {
-                                      sub.name
-                                    }
-                                  </span>
-                                </Link>
-
-                              )
-                            )}
-
-
-                            {/* =================================================
-                              BEATS
-                          ================================================= */}
-
-                            <div className="flex flex-col">
-
-                              <div
-                                className={`flex items-center justify-between rounded-lg transition-all duration-200 ${isBeatSectionActive
-                                  ? 'bg-blue-50 text-blue-700 font-bold'
-                                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                                   }`}
-                              >
+                              />
 
-                                {/* BEATS MAIN PAGE */}
-
-                                <Link
-                                  href="/city/beats"
-                                  className="flex flex-1 items-center gap-2 px-3 py-1.5 text-xs font-semibold min-w-0"
-                                >
-                                  <Activity
-                                    size={15}
-                                    className={
-                                      isBeatSectionActive
-                                        ? 'text-blue-600'
-                                        : 'text-slate-400'
-                                    }
-                                  />
-
-                                  <span>
-                                    Beats
-                                  </span>
-                                </Link>
-
-
-                                {/* BEATS ARROW */}
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setBeatsSubOpen(
-                                      (prev) =>
-                                        !prev
-                                    )
-                                  }
-                                  className="flex items-center justify-center px-2.5 py-1.5 cursor-pointer"
-                                >
-                                  <ChevronDown
-                                    size={14}
-                                    className={`transition-transform duration-200 ${beatsSubOpen
-                                      ? 'rotate-180 text-blue-600'
-                                      : 'text-slate-400'
-                                      }`}
-                                  />
-                                </button>
-
-                              </div>
-
-
-                              {/* BEATS SUB MENU */}
-
-                              {beatsSubOpen && (
-
-                                <div className="ml-3 mt-1 pl-2.5 border-l border-blue-200 flex flex-col gap-1">
-
-
-                                  {/* BEAT REQUESTS */}
-
-                                  <Link
-                                    href="/city/beat-requests"
-                                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${pathname.startsWith(
-                                      '/city/beat-requests'
-                                    )
-                                      ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                      }`}
-                                  >
-                                    <FileText
-                                      size={14}
-                                      className={
-                                        pathname.startsWith(
-                                          '/city/beat-requests'
-                                        )
-                                          ? 'text-white'
-                                          : 'text-slate-400'
-                                      }
-                                    />
-
-                                    <span>
-                                      Beat Requests
-                                    </span>
-                                  </Link>
-
-
-                                  {/* BEAT STATUS */}
-
-                                  <Link
-                                    href="/city/beat-status"
-                                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${pathname.startsWith(
-                                      '/city/beat-status'
-                                    )
-                                      ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                      }`}
-                                  >
-                                    <CheckCircle2
-                                      size={14}
-                                      className={
-                                        pathname.startsWith(
-                                          '/city/beat-status'
-                                        )
-                                          ? 'text-white'
-                                          : 'text-slate-400'
-                                      }
-                                    />
-
-                                    <span>
-                                      Beat Status
-                                    </span>
-                                  </Link>
-
-
-                                  {/* =================================================
-                                    BEAT STAFF ASSIGNMENT
-                                ================================================= */}
-
-                                  <div className="flex flex-col">
-
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setBeatStaffSubOpen(
-                                          (prev) =>
-                                            !prev
-                                        )
-                                      }
-                                      className={`flex items-center justify-between w-full px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 cursor-pointer ${isBeatStaffActive
-                                        ? 'bg-blue-50 text-blue-700 font-bold'
-                                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                        }`}
-                                    >
-                                      <div className="flex items-center gap-2">
-
-                                        <Users
-                                          size={14}
-                                          className={
-                                            isBeatStaffActive
-                                              ? 'text-blue-600'
-                                              : 'text-slate-400'
-                                          }
-                                        />
-
-                                        <span>
-                                          Beat Staff Assignment
-                                        </span>
-
-                                      </div>
-
-
-                                      <ChevronDown
-                                        size={13}
-                                        className={`transition-transform duration-200 ${beatStaffSubOpen
-                                          ? 'rotate-180 text-blue-600'
-                                          : 'text-slate-400'
-                                          }`}
-                                      />
-
-                                    </button>
-
-
-                                    {/* STAFF CHILDREN */}
-
-                                    {beatStaffSubOpen && (
-
-                                      <div className="ml-3 mt-1 pl-2.5 border-l border-blue-100 flex flex-col gap-1">
-
-
-                                        {/* SUPERVISOR ASSIGNMENT */}
-
-                                        <Link
-                                          href="/city/beats/assignments?view=supervisor"
-                                          className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[10.5px] font-semibold transition-all ${pathname.startsWith(
-                                            '/city/beats/assignments'
-                                          ) &&
-                                            searchParams.get(
-                                              'view'
-                                            ) !==
-                                            'employee'
-                                            ? 'bg-blue-600 text-white font-bold'
-                                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-                                            }`}
-                                        >
-                                          <UserCheck2
-                                            size={13}
-                                          />
-
-                                          <span>
-                                            Supervisor Assignment
-                                          </span>
-                                        </Link>
-
-
-                                        {/* EMPLOYEE ASSIGNMENT */}
-
-                                        <Link
-                                          href="/city/beats/assignments?view=employee"
-                                          className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[10.5px] font-semibold transition-all ${pathname.startsWith(
-                                            '/city/beats/assignments'
-                                          ) &&
-                                            searchParams.get(
-                                              'view'
-                                            ) ===
-                                            'employee'
-                                            ? 'bg-blue-600 text-white font-bold'
-                                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-                                            }`}
-                                        >
-                                          <Users
-                                            size={13}
-                                          />
-
-                                          <span>
-                                            Employee Assignment
-                                          </span>
-                                        </Link>
-
-                                      </div>
-
-                                    )}
-
-                                  </div>
-
-                                </div>
-
-                              )}
+                              <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                                Master Control
+                              </span>
 
                             </div>
 
-                          </div>
 
-                        )}
+                            <ChevronDown
+                              size={15}
+                              className={`transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${masterSubOpen
+                                ? 'rotate-180 text-blue-600'
+                                : 'text-slate-400'
+                                }`}
+                            />
+                          </button>
 
-                      </div>
 
-                    )}
+                          {masterSubOpen && (
 
-                  </div>
+                            <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${sidebarCollapsed ? 'lg:hidden' : ''
+                              }`}>
 
-                )}
+
+                              {/* ZONES / WARDS / AREAS */}
+
+                              {masterSubTabs.map(
+                                (sub) => (
+
+                                  <Link
+                                    key={
+                                      sub.name
+                                    }
+                                    href={
+                                      sub.href
+                                    }
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${sub.isActive
+                                      ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                      }`}
+                                  >
+                                    <span
+                                      className={
+                                        sub.isActive
+                                          ? 'text-white'
+                                          : 'text-slate-400'
+                                      }
+                                    >
+                                      {
+                                        sub.icon
+                                      }
+                                    </span>
+
+                                    <span>
+                                      {
+                                        sub.name
+                                      }
+                                    </span>
+                                  </Link>
+
+                                )
+                              )}
+
+
+                              {/* =================================================
+                              BEATS
+                          ================================================= */}
+
+                              <div className="flex flex-col">
+
+                                <div
+                                  className={`flex items-center justify-between rounded-lg transition-all duration-200 ${isBeatSectionActive
+                                    ? 'bg-blue-50 text-blue-700 font-bold'
+                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                    }`}
+                                >
+
+                                  {/* BEATS MAIN PAGE */}
+
+                                  <Link
+                                    href="/city/beats"
+                                    className="flex flex-1 items-center gap-2 px-3 py-1.5 text-xs font-semibold min-w-0"
+                                  >
+                                    <Activity
+                                      size={15}
+                                      className={
+                                        isBeatSectionActive
+                                          ? 'text-blue-600'
+                                          : 'text-slate-400'
+                                      }
+                                    />
+
+                                    <span>
+                                      Beats
+                                    </span>
+                                  </Link>
+
+
+                                  {/* BEATS ARROW */}
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setBeatsSubOpen(
+                                        (prev) =>
+                                          !prev
+                                      )
+                                    }
+                                    className="flex items-center justify-center px-2.5 py-1.5 cursor-pointer"
+                                  >
+                                    <ChevronDown
+                                      size={14}
+                                      className={`transition-transform duration-200 ${beatsSubOpen
+                                        ? 'rotate-180 text-blue-600'
+                                        : 'text-slate-400'
+                                        }`}
+                                    />
+                                  </button>
+
+                                </div>
+
+
+                                {/* BEATS SUB MENU */}
+
+                                {beatsSubOpen && (
+
+                                  <div className="ml-3 mt-1 pl-2.5 border-l border-blue-200 flex flex-col gap-1">
+
+
+                                    {/* BEAT REQUESTS */}
+
+                                    <Link
+                                      href="/city/beat-requests"
+                                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${pathname.startsWith(
+                                        '/city/beat-requests'
+                                      )
+                                        ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                        }`}
+                                    >
+                                      <FileText
+                                        size={14}
+                                        className={
+                                          pathname.startsWith(
+                                            '/city/beat-requests'
+                                          )
+                                            ? 'text-white'
+                                            : 'text-slate-400'
+                                        }
+                                      />
+
+                                      <span>
+                                        Beat Requests
+                                      </span>
+                                    </Link>
+
+
+                                    {/* BEAT STATUS */}
+
+                                    <Link
+                                      href="/city/beat-status"
+                                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${pathname.startsWith(
+                                        '/city/beat-status'
+                                      )
+                                        ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                        }`}
+                                    >
+                                      <CheckCircle2
+                                        size={14}
+                                        className={
+                                          pathname.startsWith(
+                                            '/city/beat-status'
+                                          )
+                                            ? 'text-white'
+                                            : 'text-slate-400'
+                                        }
+                                      />
+
+                                      <span>
+                                        Beat Status
+                                      </span>
+                                    </Link>
+
+
+                                    {/* =================================================
+                                    BEAT STAFF ASSIGNMENT
+                                ================================================= */}
+
+                                    <div className="flex flex-col">
+
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setBeatStaffSubOpen(
+                                            (prev) =>
+                                              !prev
+                                          )
+                                        }
+                                        className={`flex items-center justify-between w-full px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-all duration-200 cursor-pointer ${isBeatStaffActive
+                                          ? 'bg-blue-50 text-blue-700 font-bold'
+                                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                          }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+
+                                          <Users
+                                            size={14}
+                                            className={
+                                              isBeatStaffActive
+                                                ? 'text-blue-600'
+                                                : 'text-slate-400'
+                                            }
+                                          />
+
+                                          <span>
+                                            Beat Staff Assignment
+                                          </span>
+
+                                        </div>
+
+
+                                        <ChevronDown
+                                          size={13}
+                                          className={`transition-transform duration-200 ${beatStaffSubOpen
+                                            ? 'rotate-180 text-blue-600'
+                                            : 'text-slate-400'
+                                            }`}
+                                        />
+
+                                      </button>
+
+
+                                      {/* STAFF CHILDREN */}
+
+                                      {beatStaffSubOpen && (
+
+                                        <div className="ml-3 mt-1 pl-2.5 border-l border-blue-100 flex flex-col gap-1">
+
+
+                                          {/* SUPERVISOR ASSIGNMENT */}
+
+                                          <Link
+                                            href="/city/beats/assignments?view=supervisor"
+                                            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[10.5px] font-semibold transition-all ${pathname.startsWith(
+                                              '/city/beats/assignments'
+                                            ) &&
+                                              searchParams.get(
+                                                'view'
+                                              ) !==
+                                              'employee'
+                                              ? 'bg-blue-600 text-white font-bold'
+                                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                                              }`}
+                                          >
+                                            <UserCheck2
+                                              size={13}
+                                            />
+
+                                            <span>
+                                              Supervisor Assignment
+                                            </span>
+                                          </Link>
+
+
+                                          {/* EMPLOYEE ASSIGNMENT */}
+
+                                          <Link
+                                            href="/city/beats/assignments?view=employee"
+                                            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-[10.5px] font-semibold transition-all ${pathname.startsWith(
+                                              '/city/beats/assignments'
+                                            ) &&
+                                              searchParams.get(
+                                                'view'
+                                              ) ===
+                                              'employee'
+                                              ? 'bg-blue-600 text-white font-bold'
+                                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                                              }`}
+                                          >
+                                            <Users
+                                              size={13}
+                                            />
+
+                                            <span>
+                                              Employee Assignment
+                                            </span>
+                                          </Link>
+
+                                        </div>
+
+                                      )}
+
+                                    </div>
+
+                                  </div>
+
+                                )}
+
+                              </div>
+
+                            </div>
+
+                          )}
+
+                        </div>
+
+                      )}
+                      {/* =================================================
+    TARGET ASSIGNMENT - CITY ADMIN
+================================================= */}
+
+                      {isCityAdmin && (
+                        <Link
+                          href="/city/targets"
+                          title="Target Assignment"
+                          className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/city/targets')
+                            ? 'bg-blue-600 text-white font-extrabold shadow-md shadow-blue-500/20'
+                            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                            } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                        >
+                          <Target
+                            size={18}
+                            className={`shrink-0 ${pathname.startsWith('/city/targets')
+                              ? 'text-white'
+                              : 'text-slate-500'
+                              }`}
+                          />
+
+                          <span
+                            className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''
+                              }`}
+                          >
+                            Target Assignment
+                          </span>
+                        </Link>
+                      )}
+
+                    </div>
+
+                  )}
 
               </div>
             )}
@@ -2562,9 +2590,8 @@ function PortalHomeLayoutContent({
               hasWorkforceAccess ||
               isCityAdmin) && (
 
-                <div className={`px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 mb-1 ${
-                  sidebarCollapsed ? 'lg:hidden' : ''
-                }`}>
+                <div className={`px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-4 mb-1 ${sidebarCollapsed ? 'lg:hidden' : ''
+                  }`}>
                   Active Module
                 </div>
 
@@ -2618,6 +2645,21 @@ function PortalHomeLayoutContent({
 
                   <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                     Dashboard
+                  </span>
+                </Link>
+
+                <Link
+                  href="/ulb/map-view-dashboard"
+                  title="Map View Dashboard"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/map-view-dashboard')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                >
+                  <Map size={15} className="shrink-0" />
+
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                    Map View Dashboard
                   </span>
                 </Link>
 
@@ -2726,9 +2768,8 @@ function PortalHomeLayoutContent({
 
                 {taskforceOpen && (
 
-                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1.5 ${
-                    sidebarCollapsed ? 'lg:hidden' : ''
-                  }`}>
+                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1.5 ${sidebarCollapsed ? 'lg:hidden' : ''
+                    }`}>
 
                     {/* DASHBOARD */}
 
@@ -2870,7 +2911,7 @@ function PortalHomeLayoutContent({
                 WARD RANKING SYSTEM
             ================================================= */}
 
-            {hasSwachhAccess && (
+            {(hasSwachhAccess || isCityAdmin) && (
 
               <div className="flex flex-col">
 
@@ -2927,9 +2968,8 @@ function PortalHomeLayoutContent({
 
                 {swachhOpen && !isCityAdmin && (
 
-                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-purple-200 flex flex-col gap-2 ${
-                    sidebarCollapsed ? 'lg:hidden' : ''
-                  }`}>
+                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-purple-200 flex flex-col gap-2 ${sidebarCollapsed ? 'lg:hidden' : ''
+                    }`}>
 
                     {swachhGroups.map(
                       (grp) => (
@@ -3048,9 +3088,8 @@ function PortalHomeLayoutContent({
 
                 {workforceOpen && (
 
-                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-cyan-200 flex flex-col gap-2 ${
-                    sidebarCollapsed ? 'lg:hidden' : ''
-                  }`}>
+                  <div className={`ml-4 mt-1 pl-3 border-l-2 border-cyan-200 flex flex-col gap-2 ${sidebarCollapsed ? 'lg:hidden' : ''
+                    }`}>
 
                     {workforceGroups.map(
                       (grp) => (
@@ -3153,11 +3192,10 @@ function PortalHomeLayoutContent({
           <Link
             href="/portal-home/profile"
             title="My Profile"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
-              pathname === '/portal-home/profile' || pathname === '/profile'
-                ? 'bg-blue-600 text-white shadow-blue-500/20'
-                : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
-            } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${pathname === '/portal-home/profile' || pathname === '/profile'
+              ? 'bg-blue-600 text-white shadow-blue-500/20'
+              : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
+              } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
           >
             <UserCheck size={16} className="shrink-0" />
             <span className={sidebarCollapsed ? 'lg:hidden' : ''}>My Profile</span>
@@ -3165,9 +3203,8 @@ function PortalHomeLayoutContent({
 
           <button
             onClick={handleLogout}
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-rose-50 border border-rose-200 text-rose-600 font-extrabold text-sm rounded-xl hover:bg-rose-100 transition-all shadow-sm cursor-pointer ${
-              sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''
-            }`}
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-rose-50 border border-rose-200 text-rose-600 font-extrabold text-sm rounded-xl hover:bg-rose-100 transition-all shadow-sm cursor-pointer ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''
+              }`}
             title="Sign out of portal"
           >
             <LogOut size={16} className="shrink-0" />
@@ -3184,132 +3221,131 @@ function PortalHomeLayoutContent({
       ===================================================== */}
 
       <main
-        className={`portal-main-content min-h-screen text-slate-800 transition-all duration-300 w-full min-w-0 ${
-          sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-72'
-        }`}
+        className={`portal-main-content min-h-screen text-slate-800 transition-all duration-300 w-full min-w-0 ${sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-72'
+          }`}
       >
         <div className="p-3 sm:p-5 lg:p-6 w-full min-h-full">
-        {!isMainDashboard && (
+          {!isMainDashboard && (
 
-          <div
-            className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-white px-6 py-3.5 rounded-2xl border border-slate-800/80 shadow-lg sticky top-3 z-30 transition-all overflow-hidden relative"
-            style={{
-              background:
-                'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
-            }}
-          >
+            <div
+              className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-white px-6 py-3.5 rounded-2xl border border-slate-800/80 shadow-lg sticky top-3 z-30 transition-all overflow-hidden relative"
+              style={{
+                background:
+                  'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+              }}
+            >
 
-            {/* SUBTLE GLOW */}
+              {/* SUBTLE GLOW */}
 
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent pointer-events-none" />
-
-
-            <div className="z-10">
-
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-400 flex items-center gap-1.5 mb-0.5">
-
-                <ShieldCheck
-                  size={13}
-                  className="text-blue-400"
-                />
-
-                MATRIXTRACK 2.0
-
-              </div>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent pointer-events-none" />
 
 
-              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-tight">
-                {pageTitle}
-              </h1>
+              <div className="z-10">
 
-            </div>
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-400 flex items-center gap-1.5 mb-0.5">
 
+                  <ShieldCheck
+                    size={13}
+                    className="text-blue-400"
+                  />
 
-            {user && (
-
-              <div className="flex items-center gap-5 z-10">
-
-
-                {/* LIVE CLOCK */}
-
-                <div className="hidden sm:flex flex-col items-end gap-1 px-1">
-
-                  <span className="inline-flex items-center gap-2 text-emerald-400 font-extrabold text-[11px] bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/30 w-fit shadow-sm">
-
-                    <span className="relative flex h-2 w-2">
-
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-
-                    </span>
-
-                    <span className="relative">
-                      LIVE
-                    </span>
-
-                  </span>
-
-
-                  <span className="text-[10px] font-bold text-slate-400 tracking-wider">
-                    {clockStr}
-                  </span>
+                  MATRIXTRACK 2.0
 
                 </div>
 
 
-                {/* USER */}
-
-                <Link
-                  href="/portal-home/profile"
-                  className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/10 shadow-sm px-3.5 py-1.5 rounded-[16px] shrink-0 hover:bg-white/15 transition-all cursor-pointer text-left no-underline"
-                  title="Click to view user profile"
-                >
-
-                  <div className="w-8 h-8 rounded-[10px] bg-blue-600 text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
-                    {
-                      userInitial
-                    }
-                  </div>
-
-
-                  <div className="flex flex-col min-w-0">
-
-                    <span className="text-[12px] font-bold text-white truncate leading-tight">
-                      {
-                        displayName
-                      }
-                    </span>
-
-                    <span className="text-[10px] font-medium text-slate-300 truncate leading-tight mt-0.5">
-                      {
-                        roleLabelText
-                      }
-                    </span>
-
-                  </div>
-
-                </Link>
+                <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-tight">
+                  {pageTitle}
+                </h1>
 
               </div>
 
-            )}
 
+              {user && (
+
+                <div className="flex items-center gap-5 z-10">
+
+
+                  {/* LIVE CLOCK */}
+
+                  <div className="hidden sm:flex flex-col items-end gap-1 px-1">
+
+                    <span className="inline-flex items-center gap-2 text-emerald-400 font-extrabold text-[11px] bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/30 w-fit shadow-sm">
+
+                      <span className="relative flex h-2 w-2">
+
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+
+                      </span>
+
+                      <span className="relative">
+                        LIVE
+                      </span>
+
+                    </span>
+
+
+                    <span className="text-[10px] font-bold text-slate-400 tracking-wider">
+                      {clockStr}
+                    </span>
+
+                  </div>
+
+
+                  {/* USER */}
+
+                  <Link
+                    href="/portal-home/profile"
+                    className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/10 shadow-sm px-3.5 py-1.5 rounded-[16px] shrink-0 hover:bg-white/15 transition-all cursor-pointer text-left no-underline"
+                    title="Click to view user profile"
+                  >
+
+                    <div className="w-8 h-8 rounded-[10px] bg-blue-600 text-white font-black text-sm flex items-center justify-center shadow-md shrink-0">
+                      {
+                        userInitial
+                      }
+                    </div>
+
+
+                    <div className="flex flex-col min-w-0">
+
+                      <span className="text-[12px] font-bold text-white truncate leading-tight">
+                        {
+                          displayName
+                        }
+                      </span>
+
+                      <span className="text-[10px] font-medium text-slate-300 truncate leading-tight mt-0.5">
+                        {
+                          roleLabelText
+                        }
+                      </span>
+
+                    </div>
+
+                  </Link>
+
+                </div>
+
+              )}
+
+            </div>
+
+          )}
+
+
+          <div
+            key={
+              pathname
+            }
+            className="relative z-10 animate-page-entrance"
+          >
+            {
+              children
+            }
           </div>
-
-        )}
-
-
-        <div
-          key={
-            pathname
-          }
-          className="relative z-10 animate-page-entrance"
-        >
-          {
-            children
-          }
-        </div>
         </div>
 
       </main>

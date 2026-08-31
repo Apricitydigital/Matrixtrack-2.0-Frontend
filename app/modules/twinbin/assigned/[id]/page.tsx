@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Protected, ModuleGuard } from "@components/Guards";
 import { ApiError, TwinbinApi } from "@lib/apiClient";
+import { resolveMediaUrl } from "@lib/mediaUrl";
 
 type Bin = {
   id: string;
@@ -270,7 +271,7 @@ export default function AssignedBinDetailPage() {
                             {value.photoUrl && <span className="text-xs text-green-700 font-medium">Photo added</span>}
                           </div>
                           {value.photoUrl && (
-                            <img src={value.photoUrl} alt="Evidence" className="mt-3 rounded-lg h-32 object-cover border" />
+                            <img src={resolveMediaUrl(value.photoUrl) || undefined} alt="Evidence" className="mt-3 rounded-lg h-32 object-cover border" />
                           )}
                         </div>
                       );
