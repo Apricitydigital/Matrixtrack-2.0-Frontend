@@ -408,7 +408,7 @@ export default function PortalHomePage() {
 
 
       {/* 4. EXECUTIVE ANALYTICS DASHBOARD (CHARTS & WORKSPACE PERFORMANCE) */}
-      <div className="px-4 sm:px-5 lg:px-6">
+      <div>
         {isCityAdmin && !isSuperAdmin ? (
           <CityAdminDashboard userCityName={userCityName} />
         ) : (

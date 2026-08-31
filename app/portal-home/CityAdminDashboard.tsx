@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Bell,
+  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -456,8 +457,9 @@ export default function CityAdminDashboard({
   const [overallTimeframe, setOverallTimeframe] = useState<15 | 30 | "CUSTOM">(30);
   const [customDateStart, setCustomDateStart] = useState<string>("");
   const [customDateEnd, setCustomDateEnd] = useState<string>("");
-  const [personnelTab, setPersonnelTab] = useState<"EMPLOYEE" | "SUPERVISOR" | "ALL">("EMPLOYEE");
+  const [personnelTab, setPersonnelTab] = useState<"SUPERVISOR">("SUPERVISOR");
   const [operationalReviewTab, setOperationalReviewTab] = useState<"ACTION_REQUIRED" | "REJECTED" | "NEEDS_ATTENTION">("ACTION_REQUIRED");
+  const [operationalReviewOpen, setOperationalReviewOpen] = useState(true);
   const [operationalReviewPage, setOperationalReviewPage] = useState(1);
   const [directoryPage, setDirectoryPage] = useState(1);
   const DIRECTORY_PAGE_SIZE = 10;
@@ -470,6 +472,7 @@ export default function CityAdminDashboard({
   const [leaderboardZone, setLeaderboardZone] = useState("ALL");
   const [leaderboardWard, setLeaderboardWard] = useState("ALL");
   const [leaderboardMonthOffset, setLeaderboardMonthOffset] = useState(0);
+  const [attendanceEmployees, setAttendanceEmployees] = useState<any[]>([]);
   useEffect(() => {
     if (!snapshotDetail && !selectedPerformanceUser) return;
 
@@ -481,19 +484,21 @@ export default function CityAdminDashboard({
     };
   }, [snapshotDetail, selectedPerformanceUser]);
 
-  // City Admin operational analytics are always based on today.
-  // Inspection Trend is intentionally the only chart that uses a rolling 7-day window.
-  const activeFromDate = today;
-  const activeToDate = today;
-  const trendFromDate = addDays(today, -6);
+  const [reportDate, setReportDate] = useState<string>(today);
+
+  // City Admin operational analytics are based on selected reportDate (defaults to today).
+  // Inspection Trend is a rolling 7-day window ending on reportDate.
+  const activeFromDate = reportDate;
+  const activeToDate = reportDate;
+  const trendFromDate = addDays(reportDate, -6);
   const reportScopeLabel = useMemo(
     () =>
-      new Date(`${today}T00:00:00`).toLocaleDateString("en-GB", {
+      new Date(`${reportDate}T00:00:00`).toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       }),
-    [today]
+    [reportDate]
   );
 
   const monthPresets = useMemo(
@@ -652,11 +657,10 @@ const beatRequests = (
   async function loadRecords() {
     const requestId = ++recordsRequestIdRef.current;
 
-    // Fetch exactly the rolling 7-day window needed by Inspection Trend.
-    // Today's cards use only today's rows from this same live snapshot.
-    const startDate = new Date(`${trendFromDate}T00:00:00`).toISOString();
-    const endDate = new Date(`${addDays(today, 1)}T00:00:00`).toISOString();
-    const params = new URLSearchParams({ startDate, endDate });
+    // Fetch rolling 7-day window relative to reportDate.
+    const queryStart = `${trendFromDate}T00:00:00.000Z`;
+    const queryEnd = `${addDays(reportDate, 1)}T23:59:59.999Z`;
+    const params = new URLSearchParams({ startDate: queryStart, endDate: queryEnd });
 
     try {
       const response = await apiFetch<{ data: any[] }>(
@@ -731,18 +735,28 @@ const beatRequests = (
     }
   }
 
-  async function loadOverall30DayPerformanceData(silent = false) {
+  async function loadOverallPerformanceData(silent = false) {
     if (!silent) setOverall30DayLoading(true);
 
-    const endDate = new Date(`${today}T00:00:00`);
-    endDate.setDate(endDate.getDate() + 1);
-    
-    const startDate = new Date(`${today}T00:00:00`);
-    startDate.setDate(startDate.getDate() - 30);
-    
+    let start = new Date(`${today}T00:00:00`);
+    let end = new Date(`${today}T00:00:00`);
+    end.setDate(end.getDate() + 1);
+
+    if (overallTimeframe === "CUSTOM") {
+      if (customDateStart && customDateEnd) {
+        start = new Date(`${customDateStart}T00:00:00`);
+        end = new Date(`${customDateEnd}T00:00:00`);
+        end.setDate(end.getDate() + 1);
+      } else {
+        start.setDate(start.getDate() - 30);
+      }
+    } else {
+      start.setDate(start.getDate() - Number(overallTimeframe));
+    }
+
     const params = new URLSearchParams({ 
-      startDate: startDate.toISOString(), 
-      endDate: endDate.toISOString() 
+      startDate: start.toISOString(), 
+      endDate: end.toISOString() 
     });
 
     try {
@@ -751,9 +765,40 @@ const beatRequests = (
       );
       setOverall30DayRecords(response?.data || []);
     } catch (error) {
-      console.error("Overall 30-day performance refresh failed:", error);
+      console.error("Overall performance refresh failed:", error);
     } finally {
       if (!silent) setOverall30DayLoading(false);
+    }
+  }
+
+  async function loadLeaderboardAttendance() {
+    try {
+      let fromDate = today;
+      let toDate = addDays(today, 1);
+      if (leaderboardTimeframe === "WEEK") {
+        fromDate = addDays(today, -7);
+      } else if (leaderboardTimeframe === "MONTH") {
+        const preset = monthPreset(today, leaderboardMonthOffset);
+        fromDate = preset.from;
+        toDate = preset.to;
+      }
+
+      const params = new URLSearchParams({
+        from: fromDate,
+        to: toDate,
+        pageSize: "100",
+      });
+
+      const response = await apiFetch<any>(`/city/attendance/dashboard?${params.toString()}`);
+      if (response?.topEmployees && Array.isArray(response.topEmployees)) {
+        setAttendanceEmployees(response.topEmployees);
+      } else if (response?.records && Array.isArray(response.records)) {
+        setAttendanceEmployees(response.records);
+      } else {
+        setAttendanceEmployees([]);
+      }
+    } catch (error) {
+      console.error("Leaderboard attendance fetch failed:", error);
     }
   }
 
@@ -771,7 +816,8 @@ const beatRequests = (
         loadRecords(), 
         loadNotificationData(), 
         loadModulePerformanceData(true),
-        loadOverall30DayPerformanceData(true)
+        loadOverallPerformanceData(true),
+        loadLeaderboardAttendance(),
       ]);
     } finally {
       liveRefreshInFlightRef.current = false;
@@ -791,7 +837,7 @@ const beatRequests = (
         void loadAll(false, true);
         void loadSupervisorPerformanceData(true);
         void loadModulePerformanceData(true);
-        void loadOverall30DayPerformanceData(true);
+        void loadOverallPerformanceData(true);
       }
     };
 
@@ -821,6 +867,21 @@ const beatRequests = (
 
 
   useEffect(() => {
+    void loadRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportDate]);
+
+  useEffect(() => {
+    void loadOverallPerformanceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overallTimeframe, customDateStart, customDateEnd]);
+
+  useEffect(() => {
+    void loadLeaderboardAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaderboardTimeframe, leaderboardMonthOffset, leaderboardZone, leaderboardWard]);
+
+  useEffect(() => {
     void loadSupervisorPerformanceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supervisorFromDate, supervisorToDate]);
@@ -841,8 +902,8 @@ const beatRequests = (
   }, [records, area, geoMap]);
 
   const selected = useMemo(
-    () => scoped.filter((record) => recordDate(record) === today),
-    [scoped, today]
+    () => scoped.filter((record) => recordDate(record) === reportDate),
+    [scoped, reportDate]
   );
 
   const status = useMemo(() => {
@@ -1129,7 +1190,7 @@ const beatRequests = (
 
   const trend = useMemo(
     () =>
-      Array.from({ length: 7 }, (_, index) => addDays(today, index - 6)).map(
+      Array.from({ length: 7 }, (_, index) => addDays(reportDate, index - 6)).map(
         (dateValue) => {
           const row: any = {
             date: new Date(`${dateValue}T00:00:00`).toLocaleDateString("en-GB", {
@@ -1147,7 +1208,7 @@ const beatRequests = (
           return row;
         }
       ),
-    [records, today]
+    [records, reportDate]
   );
 
   const modulePerformance = useMemo(
@@ -1642,32 +1703,37 @@ const beatRequests = (
     );
   }, [headerNotificationCount]);
 
+  const supervisorsList = useMemo(
+    () => users.filter((u) => getUserRoleLabels(u).includes("SUPERVISOR")),
+    [users]
+  );
+
   const directoryRoleOptions = useMemo(
     () =>
       Array.from(
-        new Set(users.flatMap((user) => getUserRoleLabels(user)))
+        new Set(supervisorsList.flatMap((user) => getUserRoleLabels(user)))
       ).sort(),
-    [users]
+    [supervisorsList]
   );
 
   const directoryModuleOptions = useMemo(
     () =>
       Array.from(
-        new Set(users.flatMap((user) => getUserModuleLabels(user)))
+        new Set(supervisorsList.flatMap((user) => getUserModuleLabels(user)))
       ).sort(),
-    [users]
+    [supervisorsList]
   );
 
   const directoryStatusOptions = useMemo(
     () =>
       Array.from(
         new Set(
-          users
+          supervisorsList
             .map((user) => getUserStatus(user))
             .filter(Boolean)
         )
       ).sort(),
-    [users]
+    [supervisorsList]
   );
 
   const filteredUsers = useMemo(() => {
@@ -1703,10 +1769,7 @@ const beatRequests = (
       const matchesStatus =
         directoryStatus === "ALL" || statusLabel === directoryStatus;
 
-      const matchesTab = 
-        personnelTab === "ALL" || 
-        (personnelTab === "SUPERVISOR" && roles.includes("SUPERVISOR")) ||
-        (personnelTab === "EMPLOYEE" && roles.includes("EMPLOYEE"));
+      const matchesTab = roles.includes("SUPERVISOR");
 
       return (
         matchesSearch &&
@@ -1816,6 +1879,74 @@ const beatRequests = (
     return Object.values(dailyData);
   }, [overall30DayRecords, today, overallTimeframe, customDateStart, customDateEnd]);
 
+  const overallTrendMetrics = useMemo(() => {
+    let totalSupervisorInspections = 0;
+    let approved = 0;
+    let rejected = 0;
+    let pending = 0;
+    const activeSupervisorIds = new Set<string>();
+    const moduleCounts: Record<string, number> = {
+      SWEEPING: 0,
+      TOILET: 0,
+      TWINBIN: 0,
+      TASKFORCE: 0,
+    };
+
+    overall30DayRecords.forEach((record) => {
+      const isSupervisor = record.supervisorId || (record.createdById && !record.employeeId) || record.supervisor;
+      if (isSupervisor) {
+        totalSupervisorInspections++;
+        const sId = record.supervisorId || record.createdById || record.supervisor?.id;
+        if (sId) activeSupervisorIds.add(norm(sId));
+
+        const st = up(record.status);
+        if (["APPROVED", "RESOLVED", "ACTION_TAKEN"].includes(st)) {
+          approved++;
+        } else if (st === "REJECTED") {
+          rejected++;
+        } else {
+          pending++;
+        }
+
+        if (record.__module && moduleCounts[record.__module] !== undefined) {
+          moduleCounts[record.__module]++;
+        }
+      }
+    });
+
+    const approvalRate = totalSupervisorInspections > 0 ? Math.round((approved * 100) / totalSupervisorInspections) : 0;
+    const rejectionRate = totalSupervisorInspections > 0 ? Math.round((rejected * 100) / totalSupervisorInspections) : 0;
+
+    // Top module
+    let topModuleName = "None";
+    let topModuleCount = 0;
+    Object.entries(moduleCounts).forEach(([mod, count]) => {
+      if (count > topModuleCount) {
+        topModuleCount = count;
+        topModuleName = MODULES[mod as ModuleKey]?.short || mod;
+      }
+    });
+
+    const registeredSupervisorsCount = users.filter((u) => getUserRoleLabels(u).includes("SUPERVISOR")).length;
+    const activeCoveragePercent = registeredSupervisorsCount > 0 
+      ? Math.round((activeSupervisorIds.size * 100) / registeredSupervisorsCount) 
+      : 0;
+
+    return {
+      total: totalSupervisorInspections,
+      approved,
+      rejected,
+      pending,
+      approvalRate,
+      rejectionRate,
+      topModuleName,
+      topModuleCount,
+      activeSupervisorsOnGround: activeSupervisorIds.size,
+      registeredSupervisorsCount,
+      activeCoveragePercent,
+    };
+  }, [overall30DayRecords, users]);
+
   interface LeaderboardScoreItem {
     name: string;
     inspections: number;
@@ -1823,6 +1954,7 @@ const beatRequests = (
     rejected: number;
     rate: number;
     score: number;
+    isAttendance?: boolean;
   }
 
   const dailyLeaderboards = useMemo(() => {
@@ -1856,19 +1988,21 @@ const beatRequests = (
         }
       }
 
+      const rDateStr = recordDate(r);
+      if (!rDateStr) return false;
+
       if (leaderboardTimeframe === "TODAY") {
-        const dateStr = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, "0")}-${String(rDate.getDate()).padStart(2, "0")}`;
-        return dateStr === tStr;
+        return rDateStr === today;
       } else if (leaderboardTimeframe === "WEEK") {
-        const diffTime = tDateObj.getTime() - rDate.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const rTime = new Date(`${rDateStr}T00:00:00`).getTime();
+        const tTime = tDateObj.getTime();
+        const diffDays = Math.round((tTime - rTime) / (1000 * 60 * 60 * 24));
         return diffDays >= 0 && diffDays <= 7;
       } else if (leaderboardTimeframe === "MONTH") {
         const preset = monthPreset(today, leaderboardMonthOffset);
-        const rDateIso = rDate.toISOString().split("T")[0];
-        return rDateIso >= preset.from && rDateIso <= preset.to;
+        return rDateStr >= preset.from && rDateStr <= preset.to;
       }
-      return false;
+      return true;
     });
 
     const findUser = (id?: string) => {
@@ -1902,6 +2036,20 @@ const beatRequests = (
       const supId = record.supervisorId || record.createdById;
       const recStatus = record.status || "";
 
+      // 1. Supervisor attribution
+      const supervisorName = 
+        record.supervisorName || 
+        record.supervisor?.name || 
+        (supId ? findUser(supId)?.name : null) || 
+        record.createdByUser?.name || 
+        ownerName(record) ||
+        submitterNameForRecord(record);
+
+      if (supervisorName && supervisorName !== "Unknown submitter" && supervisorName !== "Field Personnel") {
+        addScore(supervisorScores, supervisorName, recStatus);
+      }
+
+      // 2. Employee attribution
       if (empId) {
         const empUser = findUser(empId);
         const roles = empUser ? getUserRoleLabels(empUser) : [];
@@ -1910,28 +2058,54 @@ const beatRequests = (
           addScore(employeeScores, name, recStatus);
         }
       }
-
-      if (supId) {
-        const supUser = findUser(supId);
-        const roles = supUser ? getUserRoleLabels(supUser) : [];
-        if (roles.includes("SUPERVISOR") || !empId) {
-          const name = supUser?.name || record?.supervisor?.name || record?.createdBy?.name || "Field Supervisor";
-          addScore(supervisorScores, name, recStatus);
-        }
-      }
       
-      const wardName = geoName(record, "ward", geoMap);
+      const wardName = geoName(record, "ward", geoMap) || record.wardName || record.ward?.name;
       if (wardName) addScore(wardScores, wardName, recStatus);
       
-      const zoneName = geoName(record, "zone", geoMap);
+      const zoneName = geoName(record, "zone", geoMap) || record.zoneName || record.zone?.name;
       if (zoneName) addScore(zoneScores, zoneName, recStatus);
     });
 
-    const getTopBottom = (scores: Record<string, { total: number; approved: number; rejected: number }>) => {
+    // Employee ranking STRICTLY based on Attendance Analytics (attendanceId matched with employeeId)
+    const employeeAttendanceScores: Record<string, { total: number; approved: number; rejected: number; rate: number; isAttendance?: boolean }> = {};
+    
+    // Map of users for quick ID matching
+    const empMapById = new Map<string, any>();
+    users.forEach(u => {
+      if (u.employeeId) empMapById.set(norm(u.employeeId), u);
+      if (u.attendanceId) empMapById.set(norm(u.attendanceId), u);
+      if (u.id) empMapById.set(norm(u.id), u);
+    });
+
+    attendanceEmployees.forEach((emp: any) => {
+      const attId = norm(emp.attendanceId || emp.employeeId || emp.empId || "");
+      const matchedUser = attId ? empMapById.get(attId) : null;
+      
+      // Use matched employee's official name, or attendance recorded name
+      const name = matchedUser?.name || emp.employeeName || emp.name;
+      if (!name) return;
+      
+      const present = Number(emp.presentDays ?? (emp.status === "PRESENT" || emp.status === "P" ? 1 : 0));
+      const absent = Number(emp.absentDays ?? (emp.status === "ABSENT" || emp.status === "A" ? 1 : 0));
+      const total = Number(emp.totalDays ?? (present + absent || 1));
+      const rate = Number(emp.attendanceRate ?? (total > 0 ? Math.round((present * 100) / total) : 0));
+
+      employeeAttendanceScores[name] = {
+        total: present, // Primary display = total present days
+        approved: present,
+        rejected: absent,
+        rate,
+        isAttendance: true,
+      };
+    });
+
+    const getTopBottom = (scores: Record<string, { total: number; approved: number; rejected: number; rate?: number; isAttendance?: boolean }>, isAttendanceMode = false) => {
       const items: LeaderboardScoreItem[] = Object.entries(scores).map(([name, data]) => {
-        const rate = data.total > 0 ? Math.round((data.approved * 100) / data.total) : 0;
-        // Balanced Performance Score: Total volume + Approved weight - Rejected penalty
-        const score = (data.approved * 2) + data.total - (data.rejected * 2);
+        const rate = data.rate !== undefined ? data.rate : (data.total > 0 ? Math.round((data.approved * 100) / data.total) : 0);
+        const score = isAttendanceMode 
+          ? (data.approved * 10) + rate 
+          : (data.approved * 2) + data.total - (data.rejected * 2);
+
         return {
           name,
           inspections: data.total,
@@ -1939,10 +2113,11 @@ const beatRequests = (
           rejected: data.rejected,
           rate,
           score,
+          isAttendance: Boolean(data.isAttendance || isAttendanceMode),
         };
       });
 
-      // Sort by volume + approval rate
+      // Sort by volume + approval / attendance rate
       const sortedByPerformance = [...items].sort((a, b) => b.inspections - a.inspections || b.rate - a.rate);
 
       if (sortedByPerformance.length === 0) {
@@ -1951,11 +2126,8 @@ const beatRequests = (
 
       const top5 = sortedByPerformance.slice(0, Math.min(5, sortedByPerformance.length));
 
-      // Bottom list: only include entries that are NOT in top5 if more than 5 exist;
-      // or if total entries are few (e.g. 4), bottom shows entries with lowest volume/rate but excluding the #1 top performer
       let bottomPool = sortedByPerformance.slice(top5.length);
       if (bottomPool.length === 0 && sortedByPerformance.length > 1) {
-        // If 2-5 users total, lowest performers are the ones below #1
         bottomPool = sortedByPerformance.slice(1);
       }
 
@@ -1968,12 +2140,12 @@ const beatRequests = (
     };
 
     return {
-      employees: getTopBottom(employeeScores),
-      supervisors: getTopBottom(supervisorScores),
-      wards: getTopBottom(wardScores),
-      zones: getTopBottom(zoneScores),
+      employees: getTopBottom(employeeAttendanceScores, true),
+      supervisors: getTopBottom(supervisorScores, false),
+      wards: getTopBottom(wardScores, false),
+      zones: getTopBottom(zoneScores, false),
     };
-  }, [overall30DayRecords, today, users, leaderboardTimeframe, leaderboardZone, leaderboardWard, leaderboardMonthOffset, wards]);
+  }, [overall30DayRecords, today, users, leaderboardTimeframe, leaderboardZone, leaderboardWard, leaderboardMonthOffset, wards, attendanceEmployees]);
 
   const renderLeaderboardList = (data: LeaderboardScoreItem[], isTop: boolean, category: string) => {
     if (data.length === 0) {
@@ -2020,7 +2192,9 @@ const beatRequests = (
                       {item.name}
                     </span>
                     <span className="text-[8px] font-semibold text-slate-400 block">
-                      {item.approved} approved • {item.rejected} rejected ({item.rate}%)
+                      {item.isAttendance
+                        ? `${item.approved} Present • ${item.rejected} Absent (${item.rate}% rate)`
+                        : `${item.approved} approved • ${item.rejected} rejected (${item.rate}%)`}
                     </span>
                   </div>
                 </div>
@@ -2029,7 +2203,7 @@ const beatRequests = (
                     {item.inspections}
                   </span>
                   <span className="text-[9px] font-bold text-slate-400 uppercase">
-                    {item.inspections === 1 ? 'insp' : 'insps'}
+                    {item.isAttendance ? (item.inspections === 1 ? 'day' : 'days') : (item.inspections === 1 ? 'insp' : 'insps')}
                   </span>
                 </div>
               </div>
@@ -2112,7 +2286,7 @@ const beatRequests = (
   return (
     <div
       ref={reportRef}
-      className="space-y-5 pb-12 max-w-[1500px] mx-auto"
+      className="space-y-5 pb-12 w-full"
     >
       {newNotificationNotice && (
         <div className="fixed left-1/2 top-6 z-[100] w-[min(92vw,390px)] -translate-x-1/2 rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.22)]">
@@ -2177,11 +2351,33 @@ const beatRequests = (
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3">
-              <Filter size={12} className="text-blue-600" />
-              <div className="leading-none">
-                <div className="text-[7px] font-black uppercase tracking-wide text-blue-500">Report Scope</div>
-                <div className="mt-1 text-[10px] font-black text-slate-700">Today • {reportScopeLabel}</div>
+            <div className="flex h-9 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-2.5 shadow-xs transition hover:border-blue-300">
+              <Calendar size={13} className="text-blue-600 shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <div className="leading-none">
+                  <div className="text-[7px] font-black uppercase tracking-wide text-blue-600">Report Scope Date</div>
+                  <input
+                    type="date"
+                    value={reportDate}
+                    max={today}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setReportDate(e.target.value);
+                      }
+                    }}
+                    className="mt-0.5 bg-transparent text-[11px] font-black text-slate-800 outline-none cursor-pointer p-0 border-none h-4"
+                  />
+                </div>
+                {reportDate !== today && (
+                  <button
+                    type="button"
+                    onClick={() => setReportDate(today)}
+                    className="ml-1 rounded-lg bg-blue-600 px-1.5 py-0.5 text-[8px] font-black text-white hover:bg-blue-700 transition"
+                    title="Reset to today"
+                  >
+                    Today
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2547,73 +2743,82 @@ const beatRequests = (
         )}
       </section>
 
-      {/* 3 DEDICATED OPERATIONAL REVIEW SECTIONS: ACTION REQUIRED, REJECTED, NEEDS ATTENTION */}
+      {/* 3 DEDICATED OPERATIONAL REVIEW SECTIONS: ACTION REQUIRED, REJECTED, INACTIVE LOCATIONS */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-100 shadow-xs">
-              <ShieldAlert size={17} />
+        <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-100 shadow-xs shrink-0">
+              <ShieldAlert size={16} />
             </span>
-            <div>
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-                Operational Action & Quality Hub
-              </h2>
-              <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                Dedicated review and resolution streams for Action Required, Rejected Reports, and Inactive Areas
-              </p>
-            </div>
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800 truncate">
+              Operational Action & Quality Hub
+            </h2>
           </div>
 
-          {/* 3 Distinct Segmented Tabs */}
-          <div className="flex flex-wrap items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-inner">
-            <button
-              onClick={() => { setOperationalReviewTab("ACTION_REQUIRED"); setOperationalReviewPage(1); }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
-                operationalReviewTab === "ACTION_REQUIRED"
-                  ? "bg-amber-500 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <AlertTriangle size={13} />
-              Action Required
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "ACTION_REQUIRED" ? "bg-amber-600 text-white" : "bg-slate-200 text-slate-700"}`}>
-                {records.filter(r => actionRequired(r.status)).length}
-              </span>
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* 3 Distinct Segmented Tabs in a single line */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-inner gap-1">
+              <button
+                onClick={() => { setOperationalReviewTab("ACTION_REQUIRED"); setOperationalReviewPage(1); if (!operationalReviewOpen) setOperationalReviewOpen(true); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                  operationalReviewTab === "ACTION_REQUIRED"
+                    ? "bg-amber-500 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <AlertTriangle size={13} />
+                Action Required
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "ACTION_REQUIRED" ? "bg-amber-600 text-white" : "bg-slate-200 text-slate-700"}`}>
+                  {records.filter(r => actionRequired(r.status)).length}
+                </span>
+              </button>
 
-            <button
-              onClick={() => { setOperationalReviewTab("REJECTED"); setOperationalReviewPage(1); }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
-                operationalReviewTab === "REJECTED"
-                  ? "bg-rose-500 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <XCircle size={13} />
-              Rejected Reports
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "REJECTED" ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-700"}`}>
-                {records.filter(r => rejected(r.status)).length}
-              </span>
-            </button>
+              <button
+                onClick={() => { setOperationalReviewTab("REJECTED"); setOperationalReviewPage(1); if (!operationalReviewOpen) setOperationalReviewOpen(true); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                  operationalReviewTab === "REJECTED"
+                    ? "bg-rose-500 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <XCircle size={13} />
+                Rejected Reports
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "REJECTED" ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-700"}`}>
+                  {records.filter(r => rejected(r.status)).length}
+                </span>
+              </button>
 
+              <button
+                onClick={() => { setOperationalReviewTab("NEEDS_ATTENTION"); setOperationalReviewPage(1); if (!operationalReviewOpen) setOperationalReviewOpen(true); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                  operationalReviewTab === "NEEDS_ATTENTION"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Eye size={13} />
+                Inactive Locations
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "NEEDS_ATTENTION" ? "bg-blue-700 text-white" : "bg-slate-200 text-slate-700"}`}>
+                  {noActivityAlerts.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Expand / Shrink Toggle Button */}
             <button
-              onClick={() => { setOperationalReviewTab("NEEDS_ATTENTION"); setOperationalReviewPage(1); }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
-                operationalReviewTab === "NEEDS_ATTENTION"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+              type="button"
+              onClick={() => setOperationalReviewOpen(prev => !prev)}
+              title={operationalReviewOpen ? "Collapse section" : "Expand section"}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition shrink-0"
             >
-              <Eye size={13} />
-              Needs Attention / Inactivity
-              <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "NEEDS_ATTENTION" ? "bg-blue-700 text-white" : "bg-slate-200 text-slate-700"}`}>
-                {noActivityAlerts.length}
-              </span>
+              {operationalReviewOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
             </button>
           </div>
         </div>
 
-        {/* Tab 1: ACTION REQUIRED TABLE */}
+        {operationalReviewOpen && (
+          <>
+            {/* Tab 1: ACTION REQUIRED TABLE */}
         {operationalReviewTab === "ACTION_REQUIRED" && (
           <div className="p-5">
             {records.filter(r => actionRequired(r.status)).length === 0 ? (
@@ -2802,14 +3007,8 @@ const beatRequests = (
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-100">
                         <span className="text-[9px] font-bold text-slate-500">
-                          Action: <strong className="text-slate-700">Assign Field Inspection</strong>
+                          Recommended Action: <strong className="text-slate-700">Assign Field Inspection</strong>
                         </span>
-                        <button
-                          onClick={() => router.push("/portal-home/registered-users")}
-                          className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black transition flex items-center gap-1 shadow-xs"
-                        >
-                          Check Workforce <ArrowRight size={10} />
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -2842,6 +3041,8 @@ const beatRequests = (
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </section>
 
@@ -3187,135 +3388,183 @@ const beatRequests = (
 
       
 
-      {/* ADAPTIVE HEAT MAP + SUPERVISOR RANKING */}
-      <section className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] items-stretch gap-5">
-        <div className="h-[530px] rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
-          <Head
-            title={`${heatLevelLabel} Activity Heat Map`}
-            sub={`Today's report count by ${heatLevelLabel.toLowerCase()} and module • ${reportScopeLabel}`}
-            icon={<Layers3 size={17} />}
-          />
+      {/* OPERATIONAL LEADERBOARDS & PERFORMANCE (2x2 Grid with Common Filters) */}
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-slate-800 tracking-tight">Leaderboards & Operational Insights</h2>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Clean Direct Filters without text labels */}
+            <select
+              value={leaderboardMonthOffset}
+              onChange={(e) => {
+                setLeaderboardMonthOffset(Number(e.target.value));
+                setLeaderboardTimeframe("MONTH");
+              }}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              {monthPresets.map((preset) => (
+                <option key={preset.offset} value={preset.offset}>{preset.label}</option>
+              ))}
+            </select>
 
-          <div className="overflow-x-auto p-4 flex-1 flex flex-col">
-              <div className="min-w-[560px] w-full">
-                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[8px] font-bold text-slate-500">
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-emerald-500" />Sweeping</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-blue-500" />Toilets</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-amber-500" />Litter Bins</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-violet-500" />GVP</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-amber-500" />Action Required</span>
-                </div>
+            <select
+              value={leaderboardZone}
+              onChange={(e) => {
+                setLeaderboardZone(e.target.value);
+                setLeaderboardWard("ALL");
+              }}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">All Zones</option>
+              {zones.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
 
-                <div className="space-y-2">
-                <div className="grid grid-cols-[140px_repeat(4,minmax(54px,1fr))_160px] gap-1.5 text-[8px] font-black uppercase text-slate-400 mb-2 px-1">
-                  <div>{heatLevelLabel} (Actual / Target)</div>
-                  <div className="text-center">Sweeping</div>
-                  <div className="text-center">Toilets</div>
-                  <div className="text-center">Litter Bins</div>
-                  <div className="text-center">GVP</div>
-                  <div className="text-center">Quality & Issues</div>
-                </div>
+            <select
+              value={leaderboardWard}
+              onChange={(e) => setLeaderboardWard(e.target.value)}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">All Wards</option>
+              {(leaderboardZone === "ALL" ? wards : wards.filter(w => parentId(w) === leaderboardZone)).map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
 
-                {visibleHeatRows.map((row: any) => {
-                  const pct = Math.min(100, Math.round((row.total / (row.expected || 1)) * 100));
-                  return (
-                  <div
-                    key={row.id}
-                    className="grid grid-cols-[140px_repeat(4,minmax(54px,1fr))_160px] gap-1.5"
-                  >
-                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-2.5 flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-black text-[11px] text-slate-800 truncate" title={row.name}>
-                          {row.name}
-                        </span>
-                        <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                          {pct}%
-                        </span>
-                      </div>
-
-                      <div className="text-[9px] text-slate-500 font-bold mt-1">
-                        <span className="text-slate-900 font-black">{row.total}</span> <span className="text-slate-400 font-normal">/ {row.expected} target</span>
-                      </div>
-
-                      {/* Mini progress bar */}
-                      <div className="h-1 rounded-full bg-slate-200 mt-1.5 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-blue-500' : 'bg-amber-500'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {KEYS.map((key) => {
-                      const value = row.modules[key];
-                      const ratio = value / maxHeat;
-
-                      return (
-                        <div
-                          key={key}
-                          title={`${row.name}: ${value} ${MODULES[key].short} report${value === 1 ? "" : "s"}`}
-                          className="rounded-xl border border-slate-100 flex items-center justify-center font-black text-xs transition shadow-2xs"
-                          style={{
-                            background: value
-                              ? ratio > 0.7
-                                ? MODULES[key].color
-                                : MODULES[key].soft
-                              : "#f8fafc",
-                            color:
-                              value && ratio > 0.7
-                                ? "#fff"
-                                : value
-                                  ? MODULES[key].color
-                                  : "#94a3b8",
-                          }}
-                        >
-                          {value}
-                        </div>
-                      );
-                    })}
-
-                    {/* QUALITY & ISSUES BREAKDOWN: Approved, Rejected, Action Required */}
-                    <div className="rounded-xl bg-slate-50 border border-slate-100 p-2 flex items-center justify-between gap-1 text-[8px] font-black">
-                      <div className="flex flex-col items-center flex-1 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100" title={`${row.approved || 0} Approved Reports`}>
-                        <span className="text-[10px] font-black">{row.approved || 0}</span>
-                        <span className="text-[7px] font-bold uppercase text-emerald-600/80">Apprv</span>
-                      </div>
-
-                      <div className="flex flex-col items-center flex-1 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-100" title={`${row.rejected || 0} Rejected Reports`}>
-                        <span className="text-[10px] font-black">{row.rejected || 0}</span>
-                        <span className="text-[7px] font-bold uppercase text-rose-600/80">Rej</span>
-                      </div>
-
-                      <div className="flex flex-col items-center flex-1 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100" title={`${row.actionRequired || 0} Action Required`}>
-                        <span className="text-[10px] font-black">{row.actionRequired || 0}</span>
-                        <span className="text-[7px] font-bold uppercase text-amber-600/80">Action</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-                })}
-                </div>
-              </div>
-
-              <div className="mt-auto pt-3">
-                <div className="min-w-[560px] border-t border-slate-100 pt-2 text-[8px] font-semibold text-slate-400">
-                  Showing {visibleHeatRows.length} of {heatRows.length} registered {heatLevelLabel.toLowerCase()}{heatRows.length === 1 ? "" : "s"} with Expected targets vs Actual inspections, module counts, and live Approved/Rejected/Action Required breakdown.
-                </div>
-              </div>
-
-              {heatPageCount > 1 && (
-                <Pager
-                  page={heatPage}
-                  pages={heatPageCount}
-                  onPrev={() => setHeatPage((page) => Math.max(1, page - 1))}
-                  onNext={() => setHeatPage((page) => Math.min(heatPageCount, page + 1))}
-                  label={`${heatLevelLabel}s`}
-                />
-              )}
+            {/* Quick Timeframe pills */}
+            <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200 ml-1">
+              <button
+                onClick={() => setLeaderboardTimeframe("TODAY")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "TODAY" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setLeaderboardTimeframe("WEEK")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "WEEK" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                7 Days
+              </button>
+              <button
+                onClick={() => setLeaderboardTimeframe("MONTH")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "MONTH" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                30 Days
+              </button>
+            </div>
           </div>
         </div>
+        
+        {/* 2 x 2 Division Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           {/* Employee Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <Users size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Employees</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Attendance & presence rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardEmployeeTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardEmployeeTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardEmployeeTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardEmployeeTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardEmployeeTop ? dailyLeaderboards.employees.top : dailyLeaderboards.employees.bottom, leaderboardEmployeeTop, 'Employees')}
+             </div>
+           </div>
+           
+           {/* Supervisor Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <Users size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Supervisors</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Inspection submission rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardSupervisorTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardSupervisorTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardSupervisorTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardSupervisorTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardSupervisorTop ? dailyLeaderboards.supervisors.top : dailyLeaderboards.supervisors.bottom, leaderboardSupervisorTop, 'Supervisors')}
+             </div>
+           </div>
 
-        <div className="h-[530px] rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
+           {/* Ward Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-orange-100/80 text-orange-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <MapPin size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Wards</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Jurisdiction activity rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardWardTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardWardTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardWardTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardWardTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardWardTop ? dailyLeaderboards.wards.top : dailyLeaderboards.wards.bottom, leaderboardWardTop, 'Wards')}
+             </div>
+           </div>
+
+           {/* Zone Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <MapIcon size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Zones</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Zone-wide operational rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardZoneTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardZoneTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardZoneTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardZoneTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardZoneTop ? dailyLeaderboards.zones.top : dailyLeaderboards.zones.bottom, leaderboardZoneTop, 'Zones')}
+             </div>
+           </div>
+        </div>
+      </section>
+
+      {/* SUPERVISOR PERFORMANCE (FULL WIDTH BELOW LEADERBOARDS) */}
+      <section className="w-full mb-6">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
           <Head
             title="Supervisor Performance"
             sub="Supervisor report results for the selected month, zone and ward"
@@ -3457,180 +3706,6 @@ const beatRequests = (
         </div>
       </section>
 
-      {/* OPERATIONAL LEADERBOARDS & PERFORMANCE (2x2 Grid with Common Filters) */}
-      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
-              <TrendingUp size={20} />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-slate-800 tracking-tight">Leaderboards & Operational Insights</h2>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Clean Direct Filters without text labels */}
-            <select
-              value={leaderboardMonthOffset}
-              onChange={(e) => {
-                setLeaderboardMonthOffset(Number(e.target.value));
-                setLeaderboardTimeframe("MONTH");
-              }}
-              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
-            >
-              {monthPresets.map((preset) => (
-                <option key={preset.offset} value={preset.offset}>{preset.label}</option>
-              ))}
-            </select>
-
-            <select
-              value={leaderboardZone}
-              onChange={(e) => {
-                setLeaderboardZone(e.target.value);
-                setLeaderboardWard("ALL");
-              }}
-              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
-            >
-              <option value="ALL">All Zones</option>
-              {zones.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-
-            <select
-              value={leaderboardWard}
-              onChange={(e) => setLeaderboardWard(e.target.value)}
-              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
-            >
-              <option value="ALL">All Wards</option>
-              {(leaderboardZone === "ALL" ? wards : wards.filter(w => parentId(w) === leaderboardZone)).map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-
-            {/* Quick Timeframe pills */}
-            <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200 ml-1">
-              <button
-                onClick={() => setLeaderboardTimeframe("TODAY")}
-                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
-                  leaderboardTimeframe === "TODAY" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Today
-              </button>
-              <button
-                onClick={() => setLeaderboardTimeframe("WEEK")}
-                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
-                  leaderboardTimeframe === "WEEK" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                7 Days
-              </button>
-              <button
-                onClick={() => setLeaderboardTimeframe("MONTH")}
-                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
-                  leaderboardTimeframe === "MONTH" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                30 Days
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        {/* 2 x 2 Division Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-           {/* Employee Ranking Card */}
-           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
-             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
-               <div className="flex items-center gap-2.5 min-w-0">
-                 <div className="w-8 h-8 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
-                   <Users size={16} />
-                 </div>
-                 <div>
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Employees</h3>
-                   <span className="text-[9px] text-slate-400 font-semibold">Activity & task rank</span>
-                 </div>
-               </div>
-               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
-                 <button onClick={() => setLeaderboardEmployeeTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardEmployeeTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
-                 <button onClick={() => setLeaderboardEmployeeTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardEmployeeTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
-               </div>
-             </div>
-             <div className="flex-1">
-                {renderLeaderboardList(leaderboardEmployeeTop ? dailyLeaderboards.employees.top : dailyLeaderboards.employees.bottom, leaderboardEmployeeTop, 'Employees')}
-             </div>
-           </div>
-           
-           {/* Supervisor Ranking Card */}
-           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
-             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
-               <div className="flex items-center gap-2.5 min-w-0">
-                 <div className="w-8 h-8 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0 shadow-xs">
-                   <Users size={16} />
-                 </div>
-                 <div>
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Supervisors</h3>
-                   <span className="text-[9px] text-slate-400 font-semibold">Inspection submission rank</span>
-                 </div>
-               </div>
-               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
-                 <button onClick={() => setLeaderboardSupervisorTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardSupervisorTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
-                 <button onClick={() => setLeaderboardSupervisorTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardSupervisorTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
-               </div>
-             </div>
-             <div className="flex-1">
-                {renderLeaderboardList(leaderboardSupervisorTop ? dailyLeaderboards.supervisors.top : dailyLeaderboards.supervisors.bottom, leaderboardSupervisorTop, 'Supervisors')}
-             </div>
-           </div>
-
-           {/* Ward Ranking Card */}
-           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
-             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
-               <div className="flex items-center gap-2.5 min-w-0">
-                 <div className="w-8 h-8 rounded-xl bg-orange-100/80 text-orange-600 flex items-center justify-center shrink-0 shadow-xs">
-                   <MapPin size={16} />
-                 </div>
-                 <div>
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Wards</h3>
-                   <span className="text-[9px] text-slate-400 font-semibold">Jurisdiction activity rank</span>
-                 </div>
-               </div>
-               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
-                 <button onClick={() => setLeaderboardWardTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardWardTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
-                 <button onClick={() => setLeaderboardWardTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardWardTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
-               </div>
-             </div>
-             <div className="flex-1">
-                {renderLeaderboardList(leaderboardWardTop ? dailyLeaderboards.wards.top : dailyLeaderboards.wards.bottom, leaderboardWardTop, 'Wards')}
-             </div>
-           </div>
-
-           {/* Zone Ranking Card */}
-           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
-             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
-               <div className="flex items-center gap-2.5 min-w-0">
-                 <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
-                   <MapIcon size={16} />
-                 </div>
-                 <div>
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Zones</h3>
-                   <span className="text-[9px] text-slate-400 font-semibold">Zone-wide operational rank</span>
-                 </div>
-               </div>
-               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
-                 <button onClick={() => setLeaderboardZoneTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardZoneTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
-                 <button onClick={() => setLeaderboardZoneTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardZoneTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
-               </div>
-             </div>
-             <div className="flex-1">
-                {renderLeaderboardList(leaderboardZoneTop ? dailyLeaderboards.zones.top : dailyLeaderboards.zones.bottom, leaderboardZoneTop, 'Zones')}
-             </div>
-           </div>
-        </div>
-      </section>
-
       {/* OVERALL CITY PERFORMANCE: SPLIT CONTAINERS (SUPERVISOR VS EMPLOYEE) */}
       <section className="mb-6 space-y-4">
         {/* Universal Timeframe Header */}
@@ -3641,7 +3716,7 @@ const beatRequests = (
             </div>
             <div>
               <h2 className="text-base font-black text-slate-800 tracking-tight">Overall City Operational Performance</h2>
-              <p className="text-[11px] font-semibold text-slate-400">Independent analytics & trends for Field Supervisors and Field Workforce</p>
+              <p className="text-[11px] font-semibold text-slate-400">Independent inspection analytics & trends for Field Supervisors</p>
             </div>
           </div>
 
@@ -3699,150 +3774,138 @@ const beatRequests = (
           </div>
         </div>
 
-        {/* 2 Distinct Independent Containers */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Container 1: SUPERVISOR INSPECTIONS & QUALITY ANALYTICS */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col hover:border-slate-300 transition">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-xs">
-                  <Users size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800">Supervisor Inspection Trends</h3>
-                  <p className="text-[10px] font-bold text-slate-400">Inspections submitted by supervisors across Sweeping, Toilets, Bins & Taskforce</p>
-                </div>
+        {/* Supervisor Inspection Trends Container (Full Width) */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col hover:border-slate-300 transition">
+          <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-xs">
+                <Users size={18} />
               </div>
-              <span className="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 text-[10px] font-black border border-purple-200">
-                {overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0)} Total Submitted
-              </span>
-            </div>
-
-            {/* Quick KPI stats */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="text-[8px] font-black uppercase text-slate-400">Daily Avg</span>
-                <div className="text-base font-black text-slate-800 mt-0.5">
-                  {overallChartData.length ? Math.round(overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0) / overallChartData.length) : 0} /day
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                <span className="text-[8px] font-black uppercase text-emerald-600">Peak Inspection Day</span>
-                <div className="text-base font-black text-emerald-950 mt-0.5">
-                  {Math.max(...overallChartData.map(d => d.supervisorInspections), 0)} insps
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-purple-50 border border-purple-100">
-                <span className="text-[8px] font-black uppercase text-purple-600">Active Supervisors</span>
-                <div className="text-base font-black text-purple-950 mt-0.5">
-                  {users.filter(u => getUserRoleLabels(u).includes("SUPERVISOR")).length} Registered
-                </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">Supervisor Inspection Trends</h3>
+                <p className="text-[10px] font-bold text-slate-400">Inspections submitted by supervisors across Beats, Toilets, Litter Bins</p>
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-1.5 shadow-xs">
+                <Users size={14} className="text-purple-600" />
+                <div className="leading-tight">
+                  <div className="text-[8px] font-black uppercase text-purple-600">Supervisors on Ground</div>
+                  <div className="text-[11px] font-black text-slate-800">
+                    {overallTrendMetrics.activeSupervisorsOnGround} Active <span className="text-slate-400 font-bold">/ {overallTrendMetrics.registeredSupervisorsCount} Registered ({overallTrendMetrics.activeCoveragePercent}%)</span>
+                  </div>
+                </div>
+              </div>
 
-            {/* Area / Bar Chart */}
-            <div className="h-[240px] w-full mt-auto">
-              {overall30DayLoading && overall30DayRecords.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400 animate-pulse">
-                  Loading supervisor inspection trends...
+              <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 shadow-xs">
+                <Activity size={14} className="text-indigo-600" />
+                <div className="leading-tight">
+                  <div className="text-[8px] font-black uppercase text-indigo-600">Total Inspections</div>
+                  <div className="text-[11px] font-black text-indigo-950">
+                    {overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0)} Submitted
+                  </div>
                 </div>
-              ) : overallChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={overallChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorSupervisor" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dy={8} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dx={-8} allowDecimals={false} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 700 }}
-                      cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    />
-                    <Area type="monotone" dataKey="supervisorInspections" name="Supervisor Inspections" stroke="#8b5cf6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSupervisor)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400">
-                  No supervisor activity found for this timeframe.
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Container 2: EMPLOYEE FIELD WORK & BEAT ACTIVITY ANALYTICS */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col hover:border-slate-300 transition">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
-                  <Users size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800">Employee Field Activity Trends</h3>
-                  <p className="text-[10px] font-bold text-slate-400">Daily completed field work records and assigned beat coverage</p>
-                </div>
+          {/* Quick High-Value KPI Stats (5 Cards) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+            {/* 1. Daily Average */}
+            <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">Daily Average</span>
+                <TrendingUp size={13} className="text-slate-400" />
               </div>
-              <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black border border-blue-200">
-                {overallChartData.reduce((sum, d) => sum + d.employeeInspections, 0)} Field Tasks Logged
-              </span>
+              <div className="text-lg font-black text-slate-800 mt-1">
+                {overallChartData.length ? Math.round(overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0) / overallChartData.length) : 0} <span className="text-[10px] font-bold text-slate-400">/day</span>
+              </div>
+              <div className="text-[8px] font-semibold text-slate-400 mt-0.5">Average inspections daily</div>
             </div>
 
-            {/* Quick KPI stats */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="text-[8px] font-black uppercase text-slate-400">Daily Avg Tasks</span>
-                <div className="text-base font-black text-slate-800 mt-0.5">
-                  {overallChartData.length ? Math.round(overallChartData.reduce((sum, d) => sum + d.employeeInspections, 0) / overallChartData.length) : 0} /day
-                </div>
+            {/* 2. Peak Day */}
+            <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-sky-600">Peak Inspection Day</span>
+                <Sparkles size={13} className="text-sky-500" />
               </div>
-              <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
-                <span className="text-[8px] font-black uppercase text-blue-600">Peak Activity Day</span>
-                <div className="text-base font-black text-blue-950 mt-0.5">
-                  {Math.max(...overallChartData.map(d => d.employeeInspections), 0)} tasks
-                </div>
+              <div className="text-lg font-black text-sky-950 mt-1">
+                {Math.max(...overallChartData.map(d => d.supervisorInspections), 0)} <span className="text-[10px] font-bold text-sky-600">insps</span>
               </div>
-              <div className="p-3 rounded-xl bg-teal-50 border border-teal-100">
-                <span className="text-[8px] font-black uppercase text-teal-600">Total Workforce</span>
-                <div className="text-base font-black text-teal-950 mt-0.5">
-                  {users.filter(u => !getUserRoleLabels(u).includes("SUPERVISOR")).length} Employees
-                </div>
+              <div className="text-[8px] font-semibold text-sky-700/80 mt-0.5">Highest volume day</div>
+            </div>
+
+            {/* 3. Approval Rate */}
+            <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-emerald-600">Approval Quality</span>
+                <CheckCircle2 size={13} className="text-emerald-500" />
+              </div>
+              <div className="text-lg font-black text-emerald-950 mt-1">
+                {overallTrendMetrics.approvalRate}%
+              </div>
+              <div className="text-[8px] font-semibold text-emerald-700/80 mt-0.5">
+                {overallTrendMetrics.approved} approved inspections
               </div>
             </div>
 
-            {/* Area / Bar Chart */}
-            <div className="h-[240px] w-full mt-auto">
-              {overall30DayLoading && overall30DayRecords.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400 animate-pulse">
-                  Loading employee field activity trends...
-                </div>
-              ) : overallChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={overallChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorEmployee" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dy={8} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dx={-8} allowDecimals={false} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 700 }}
-                      cursor={{ stroke: '#3b82f6', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    />
-                    <Area type="monotone" dataKey="employeeInspections" name="Employee Tasks" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorEmployee)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400">
-                  No employee activity found for this timeframe.
-                </div>
-              )}
+            {/* 4. Rejected / Issues */}
+            <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-rose-600">Rejections</span>
+                <XCircle size={13} className="text-rose-500" />
+              </div>
+              <div className="text-lg font-black text-rose-950 mt-1">
+                {overallTrendMetrics.rejected} <span className="text-[10px] font-bold text-rose-600">({overallTrendMetrics.rejectionRate}%)</span>
+              </div>
+              <div className="text-[8px] font-semibold text-rose-700/80 mt-0.5">Field corrections needed</div>
             </div>
+
+            {/* 5. Top Module */}
+            <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-purple-600">Top Active Module</span>
+                <Filter size={13} className="text-purple-500" />
+              </div>
+              <div className="text-lg font-black text-purple-950 mt-1 truncate" title={overallTrendMetrics.topModuleName}>
+                {overallTrendMetrics.topModuleName}
+              </div>
+              <div className="text-[8px] font-semibold text-purple-700/80 mt-0.5">
+                {overallTrendMetrics.topModuleCount} inspections logged
+              </div>
+            </div>
+          </div>
+
+          {/* Area / Bar Chart */}
+          <div className="h-[280px] w-full mt-auto">
+            {overall30DayLoading && overall30DayRecords.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400 animate-pulse">
+                Loading supervisor inspection trends...
+              </div>
+            ) : overallChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={overallChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorSupervisor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dx={-8} allowDecimals={false} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 700 }}
+                    cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  />
+                  <Area type="monotone" dataKey="supervisorInspections" name="Supervisor Inspections" stroke="#8b5cf6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSupervisor)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400">
+                No supervisor activity found for this timeframe.
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -3863,34 +3926,18 @@ const beatRequests = (
               <div className="flex items-center gap-2">
                 <Users size={16} className="text-blue-600" />
                 <h3 className="text-sm font-black text-slate-800">
-                  Personnel Performance Directory
+                  Supervisor Performance Directory
                 </h3>
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
-                  {filteredUsers.length}
+                <span className="rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[9px] font-black text-purple-700">
+                  {filteredUsers.length} Supervisors
                 </span>
               </div>
               <p className="text-[10px] uppercase text-slate-400 font-bold mt-1">
-                View analytics for individual personnel
+                View analytics for individual supervisors
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {/* Role Type Filter Dropdown & Tabs */}
-              <div className="flex items-center gap-2">
-                <select
-                  value={personnelTab}
-                  onChange={(e) => {
-                    setPersonnelTab(e.target.value as any);
-                    setDirectoryPage(1);
-                  }}
-                  className="h-9 px-3 rounded-xl border border-slate-200 bg-white text-[11px] font-black text-slate-700 outline-none focus:border-blue-400 shadow-sm"
-                >
-                  <option value="EMPLOYEE">👥 Employees ({users.filter(u => getUserRoleLabels(u).includes("EMPLOYEE")).length})</option>
-                  <option value="SUPERVISOR">👔 Supervisors ({users.filter(u => getUserRoleLabels(u).includes("SUPERVISOR")).length})</option>
-                  <option value="ALL">🌐 All Personnel ({users.length})</option>
-                </select>
-              </div>
-
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -3899,8 +3946,8 @@ const beatRequests = (
                     setSearch(event.target.value);
                     setDirectoryPage(1);
                   }}
-                  placeholder="Direct search by name..."
-                  className="h-9 w-56 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[10px] font-bold outline-none focus:border-blue-400 shadow-sm"
+                  placeholder="Search supervisor by name..."
+                  className="h-9 w-64 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[10px] font-bold outline-none focus:border-blue-400 shadow-sm"
                 />
               </div>
 
@@ -3953,7 +4000,7 @@ const beatRequests = (
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
             <span>
-              Showing {filteredUsers.length > 0 ? (directoryPage - 1) * DIRECTORY_PAGE_SIZE + 1 : 0} - {Math.min(directoryPage * DIRECTORY_PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length} matching {personnelTab === 'SUPERVISOR' ? 'supervisors' : personnelTab === 'EMPLOYEE' ? 'employees' : 'users'}
+              Showing {filteredUsers.length > 0 ? (directoryPage - 1) * DIRECTORY_PAGE_SIZE + 1 : 0} - {Math.min(directoryPage * DIRECTORY_PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length} matching supervisors
             </span>
 
             {(search ||

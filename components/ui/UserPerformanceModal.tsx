@@ -40,23 +40,24 @@ export default function UserPerformanceModal({
       
       setLoading(true);
       try {
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(endDate.getDate() - timeframe);
-        
-        const queryEnd = new Date();
-        queryEnd.setDate(endDate.getDate() + 1);
+        const now = new Date();
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - timeframe);
+
+        const startDateIso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}T00:00:00.000Z`;
+        const endDateIso = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}T23:59:59.999Z`;
 
         const params = new URLSearchParams({
-          startDate: startDate.toISOString().split("T")[0] + "T00:00:00.000Z",
-          endDate: queryEnd.toISOString().split("T")[0] + "T00:00:00.000Z",
+          startDate: startDateIso,
+          endDate: endDateIso,
           userId: targetUserId,
+          userName: (user.name || "").trim(),
         });
 
         const searchKey = user.name || user.employeeId || "";
         const attParams = new URLSearchParams({
-          from: startDate.toISOString().split("T")[0],
-          to: queryEnd.toISOString().split("T")[0],
+          from: startDateIso.split("T")[0],
+          to: endDateIso.split("T")[0],
           search: searchKey,
           pageSize: "100",
         });
@@ -88,9 +89,10 @@ export default function UserPerformanceModal({
               setAttendance({ present, absent, total: present + absent });
             } else if (Array.isArray(attData?.topEmployees) && attData.topEmployees.length > 0) {
               const matchedEmp = attData.topEmployees.find((e: any) => 
-                (user.name && e.employeeName?.toLowerCase().includes(user.name.toLowerCase())) ||
-                (user.employeeId && e.attendanceId === user.employeeId)
-              ) || attData.topEmployees[0];
+                (user.name && e.employeeName?.toLowerCase().trim() === user.name.toLowerCase().trim()) ||
+                (user.employeeId && e.attendanceId === user.employeeId) ||
+                (user.id && e.matrixTrackUserId === user.id)
+              );
 
               if (matchedEmp) {
                 setAttendance({
