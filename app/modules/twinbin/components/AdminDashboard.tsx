@@ -533,12 +533,34 @@ export default function AdminDashboard() {
                             }, 80);
                         };
 
-                        const totalSubmitted = records.filter(r => r.type === 'DAILY_REPORT' || r.type === 'VISIT_REPORT' || r.type === 'CITIZEN_REPORT').length;
-                        const pendingCount = records.filter(r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED').length || 0;
-                        const approvedCount = records.filter(r => r.status === 'APPROVED').length || 0;
-                        const rejectedCount = records.filter(r => r.status === 'REJECTED').length || 0;
-                        const actionReqCount = records.filter(r => r.status === 'ACTION_REQUIRED').length || 0;
-                        const actionTakenCount = records.filter(r => r.status === 'ACTION_TAKEN').length || 0;
+                        const inspectionReports = records.filter(
+                            r =>
+                                r.type === 'DAILY_REPORT' ||
+                                r.type === 'VISIT_REPORT' ||
+                                r.type === 'CITIZEN_REPORT'
+                        );
+
+                        const totalSubmitted = inspectionReports.length;
+
+                        const pendingCount = inspectionReports.filter(
+                            r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED'
+                        ).length;
+
+                        const approvedCount = inspectionReports.filter(
+                            r => r.status === 'APPROVED'
+                        ).length;
+
+                        const rejectedCount = inspectionReports.filter(
+                            r => r.status === 'REJECTED'
+                        ).length;
+
+                        const actionReqCount = inspectionReports.filter(
+                            r => r.status === 'ACTION_REQUIRED'
+                        ).length;
+
+                        const actionTakenCount = inspectionReports.filter(
+                            r => r.status === 'ACTION_TAKEN'
+                        ).length;
 
                         return (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">

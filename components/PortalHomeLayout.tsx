@@ -2551,13 +2551,13 @@ function PortalHomeLayoutContent({
                         <Link
                           href="/city/targets"
                           title="Target Assignment"
-                          className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/city/targets')
+                          className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${pathname.startsWith('/city/targets')
                             ? 'bg-blue-600 text-white font-extrabold shadow-md shadow-blue-500/20'
                             : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                             } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
                         >
                           <Target
-                            size={18}
+                            size={16}
                             className={`shrink-0 ${pathname.startsWith('/city/targets')
                               ? 'text-white'
                               : 'text-slate-500'
