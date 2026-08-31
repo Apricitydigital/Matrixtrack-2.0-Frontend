@@ -37,44 +37,50 @@ function markerIcon(
 
   const statusColor = STATE_COLORS[state];
 
+  /*
+   * Match the Map Layers icons:
+   * Toilet     -> Building icon
+   * Litter Bin -> Trash icon
+   */
   const glyph =
     kind === 'toilet'
       ? `
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="7" cy="5" r="2"/>
-          <path d="M4 21v-5H2.5L5 9h4l2.5 7H10v5"/>
-          <circle cx="17" cy="5" r="2"/>
-          <path d="M15 9v12"/>
-          <path d="M19 9v12"/>
-          <path d="M14 14h6"/>
-        </svg>
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="8" cy="7" r="2.5"/>
+      <circle cx="16" cy="7" r="2.5"/>
+      <path d="M4.5 20v-3.5c0-2.3 1.5-4 3.5-4h0"/>
+      <path d="M19.5 20v-3.5c0-2.3-1.5-4-3.5-4h0"/>
+      <path d="M8 12.5V20"/>
+      <path d="M16 12.5V20"/>
+    </svg>
       `
       : `
         <svg
-          width="19"
-          height="19"
+          width="15"
+          height="15"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="2.3"
+          stroke-width="2.2"
           stroke-linecap="round"
           stroke-linejoin="round"
           aria-hidden="true"
         >
-          <path d="M3 6h18" />
-          <path d="M8 6V4h8v2" />
-          <path d="M19 6l-1 14H6L5 6" />
-          <path d="M10 10v6M14 10v6" />
+          <path d="M3 6h18"/>
+          <path d="M8 6V4h8v2"/>
+          <path d="M19 6l-1 14H6L5 6"/>
+          <path d="M10 10v6"/>
+          <path d="M14 10v6"/>
         </svg>
       `;
 
@@ -84,14 +90,12 @@ function markerIcon(
       <div
         style="
           position:relative;
-          width:38px;
-          height:38px;
-          border-radius:${kind === 'toilet' ? '11px' : '50%'};
+          width:30px;
+          height:30px;
+          border-radius:9px;
           background:${moduleColor};
-          border:3px solid ${statusColor};
-          box-shadow:
-            0 6px 18px rgba(15,23,42,.28),
-            0 0 0 2px rgba(255,255,255,.95);
+          border:2px solid white;
+          box-shadow:0 3px 9px rgba(15,23,42,.25);
           display:flex;
           align-items:center;
           justify-content:center;
@@ -105,19 +109,19 @@ function markerIcon(
             position:absolute;
             right:-3px;
             bottom:-3px;
-            width:10px;
-            height:10px;
+            width:8px;
+            height:8px;
             border-radius:50%;
             background:${statusColor};
-            border:2px solid white;
-            box-shadow:0 2px 6px rgba(15,23,42,.22);
+            border:1.5px solid white;
+            box-shadow:0 1px 4px rgba(15,23,42,.22);
           "
         ></span>
       </div>
     `,
-    iconSize: [38, 38],
-    iconAnchor: [19, 19],
-    popupAnchor: [0, -20],
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -17],
   });
 }
 

@@ -10,7 +10,7 @@ import {
 } from 'react';
 import {
   AlertTriangle,
-  Building2,
+  UsersRound,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
@@ -634,7 +634,7 @@ export default function CommissionerHome2Page() {
               {
                 key: 'toilets' as const,
                 label: 'Toilets',
-                icon: Building2,
+                icon: UsersRound,
                 count: data?.toilets.length || 0,
 
                 activeClass:
@@ -672,8 +672,8 @@ export default function CommissionerHome2Page() {
 
                   <span
                     className={`rounded-lg px-2 py-0.5 text-[10px] font-black ${visible[layer.key]
-                        ? layer.countClass
-                        : 'bg-slate-100 text-slate-400'
+                      ? layer.countClass
+                      : 'bg-slate-100 text-slate-400'
                       }`}
                   >
                     {layer.count}
