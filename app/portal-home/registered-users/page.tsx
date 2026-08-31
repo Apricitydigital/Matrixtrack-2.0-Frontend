@@ -17,6 +17,7 @@ import * as XLSX from "xlsx";
 type Role =
   | "HMS_SUPER_ADMIN"
   | "COMMISSIONER"
+  | "ULB_OFFICER"
   | "CITY_ADMIN"
   | "QC"
   | "ACTION_OFFICER"
@@ -186,10 +187,10 @@ export default function RegisteredUsersPage() {
 
   const generateAutoPasswordForReset = (name: string, phone?: string | null) => {
     const cleanName = (name || "").trim().replace(/[^a-zA-Z]/g, "");
-    const prefix = cleanName.length >= 4 
-      ? cleanName.slice(0, 4) 
-      : cleanName.length > 0 
-        ? cleanName 
+    const prefix = cleanName.length >= 4
+      ? cleanName.slice(0, 4)
+      : cleanName.length > 0
+        ? cleanName
         : "User";
     const capitalizedPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
     const digits = (phone || "").replace(/\D/g, "");
@@ -806,11 +807,11 @@ export default function RegisteredUsersPage() {
               </span>
               Registered Users Directory
             </h1>
-            
+
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-           
+
             <button
               onClick={() => window.location.href = '/portal-home/common-registration'}
               className="
@@ -1791,15 +1792,13 @@ export default function RegisteredUsersPage() {
                       <label
                         key={col.key}
                         onClick={() => toggleExportCol(col.key)}
-                        className={`flex items-center gap-2 p-2 rounded-lg border text-[11px] font-bold cursor-pointer transition select-none ${
-                          isSelected
-                            ? "bg-blue-50 border-blue-300 text-blue-900"
-                            : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
-                        }`}
+                        className={`flex items-center gap-2 p-2 rounded-lg border text-[11px] font-bold cursor-pointer transition select-none ${isSelected
+                          ? "bg-blue-50 border-blue-300 text-blue-900"
+                          : "bg-white border-slate-200 text-slate-400 hover:bg-slate-50"
+                          }`}
                       >
-                        <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition ${
-                          isSelected ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white"
-                        }`}>
+                        <div className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition ${isSelected ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white"
+                          }`}>
                           {isSelected && <Check size={10} strokeWidth={3} />}
                         </div>
                         <span className="truncate">{col.label}</span>
@@ -1851,14 +1850,21 @@ function MultiSelectDropdown({
   selectedIds,
   onChange,
   placeholder = "Select...",
-  openUpward = false
+  openUpward = false,
+  singleSelect = false
 }: {
   label: string;
-  options: { id: string; name: string }[];
+  options: {
+    id: string;
+    name: string;
+  }[];
   selectedIds: string[];
-  onChange: (newIds: string[]) => void;
+  onChange: (
+    newIds: string[]
+  ) => void;
   placeholder?: string;
   openUpward?: boolean;
+  singleSelect?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -1884,10 +1890,27 @@ function MultiSelectDropdown({
   };
 
   const toggleOption = (id: string) => {
+    if (singleSelect) {
+      onChange(
+        selectedIds.includes(id)
+          ? []
+          : [id]
+      );
+      setIsOpen(false);
+      return;
+    }
+
     if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter((item) => item !== id));
+      onChange(
+        selectedIds.filter(
+          (item) => item !== id
+        )
+      );
     } else {
-      onChange([...selectedIds, id]);
+      onChange([
+        ...selectedIds,
+        id
+      ]);
     }
   };
 
@@ -1899,17 +1922,24 @@ function MultiSelectDropdown({
     <div className="relative" ref={dropdownRef}>
       <div className="flex items-center justify-between mb-1">
         <label className="block text-xs font-bold text-slate-700">
-          {label} <span className="text-slate-400 font-normal">({selectedIds.length} selected)</span>
+          {label}
+
+          {!singleSelect && (
+            <span className="text-slate-400 font-normal">
+              ({selectedIds.length} selected)
+            </span>
+          )}
         </label>
-        {options.length > 0 && (
-          <button
-            type="button"
-            onClick={toggleSelectAll}
-            className="text-[10px] font-black text-blue-600 hover:text-blue-800 transition cursor-pointer"
-          >
-            {isAllSelected ? "Clear All" : "Select All"}
-          </button>
-        )}
+        {options.length > 0 &&
+          !singleSelect && (
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="text-[10px] font-black text-blue-600 hover:text-blue-800 transition cursor-pointer"
+            >
+              {isAllSelected ? "Clear All" : "Select All"}
+            </button>
+          )}
       </div>
 
       <button
@@ -1937,17 +1967,28 @@ function MultiSelectDropdown({
           ) : (
             <>
               {/* Select All Option in Dropdown Menu Header */}
-              <button
-                type="button"
-                onClick={toggleSelectAll}
-                className="w-full px-3 py-1.5 rounded-lg text-xs font-black flex items-center justify-between text-left transition-colors cursor-pointer bg-blue-50/70 text-blue-800 hover:bg-blue-100 border border-blue-100"
-              >
-                <span>{isAllSelected ? "Deselect All" : "Select All Options"}</span>
-                <span className="text-[10px] font-bold text-blue-600">
-                  {selectedIds.length}/{options.length}
-                </span>
-              </button>
-              <div className="my-0.5 border-t border-slate-100" />
+              {!singleSelect && (
+                <>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="w-full px-3 py-1.5 rounded-lg text-xs font-black flex items-center justify-between text-left transition-colors cursor-pointer bg-blue-50/70 text-blue-800 hover:bg-blue-100 border border-blue-100"
+                  >
+                    <span>
+                      {isAllSelected
+                        ? "Deselect All"
+                        : "Select All Options"}
+                    </span>
+
+                    <span className="text-[10px] font-bold text-blue-600">
+                      {selectedIds.length}/
+                      {options.length}
+                    </span>
+                  </button>
+
+                  <div className="my-0.5 border-t border-slate-100" />
+                </>
+              )}
 
               {options.map((opt) => {
                 const isSelected = selectedIds.includes(opt.id);
@@ -1982,6 +2023,9 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [name, setName] = useState(user.name);
   const [email] = useState(user.email || "");
   const [role, setRole] = useState(user.role);
+  const isSingleZoneRole =
+    role === "SUPERVISOR" ||
+    role === "QC";
   const [password, setPassword] = useState("");
 
   const [assignedModules, setAssignedModules] =
@@ -2166,6 +2210,13 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const availableWards = useMemo(() => {
+    if (
+      isSingleZoneRole &&
+      zoneIds.length === 0
+    ) {
+      return [];
+    }
+
     if (!zoneIds.length) {
       return wards;
     }
@@ -2180,14 +2231,23 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
         zoneIds.includes(parentZoneId)
       );
     });
-  }, [wards, zoneIds]);
+  }, [
+    wards,
+    zoneIds,
+    isSingleZoneRole
+  ]);
 
   const handleZoneChange = (
     newZoneIds: string[]
   ) => {
-    setZoneIds(newZoneIds);
+    const nextZoneIds =
+      isSingleZoneRole
+        ? newZoneIds.slice(-1)
+        : newZoneIds;
 
-    if (newZoneIds.length > 0) {
+    setZoneIds(nextZoneIds);
+
+    if (nextZoneIds.length > 0) {
       setWardIds((currentWardIds) =>
         currentWardIds.filter((wardId) => {
           const ward = wards.find(
@@ -2203,19 +2263,80 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
           return (
             !parentZoneId ||
-            newZoneIds.includes(
+            nextZoneIds.includes(
               parentZoneId
             )
           );
         })
       );
+    } else {
+      setWardIds([]);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (
+      fetchingData ||
+      !isSingleZoneRole ||
+      zoneIds.length <= 1
+    ) {
+      return;
+    }
+
+    const retainedZoneId =
+      zoneIds[0];
+
+    setZoneIds([retainedZoneId]);
+
+    setWardIds((currentWardIds) =>
+      currentWardIds.filter((wardId) => {
+        const ward = wards.find(
+          (item: any) =>
+            item.id === wardId
+        );
+
+        if (!ward) {
+          return false;
+        }
+
+        const parentZoneId =
+          ward.parentId ||
+          ward.parent?.id;
+
+        return (
+          !parentZoneId ||
+          parentZoneId ===
+          retainedZoneId
+        );
+      })
+    );
+  }, [
+    fetchingData,
+    isSingleZoneRole,
+    zoneIds,
+    wards
+  ]);
+
+  const handleSubmit = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
-    setLoading(true);
     setStatusMsg(null);
+
+    if (
+      isSingleZoneRole &&
+      zoneIds.length !== 1
+    ) {
+      setStatusMsg({
+        type: "error",
+        text:
+          "Supervisor and QC users must be assigned to exactly one zone."
+      });
+
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const enabledModuleKeys = new Set(
@@ -2750,14 +2871,23 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
             {/* Geographic Access Control (Zones & Wards) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <MultiSelectDropdown
-                label="Assigned Zones"
+                label={
+                  isSingleZoneRole
+                    ? "Assigned Zone"
+                    : "Assigned Zones"
+                }
                 options={zones.map((z) => ({
                   id: z.id,
                   name: z.name
                 }))}
                 selectedIds={zoneIds}
                 onChange={handleZoneChange}
-                placeholder="Select zones..."
+                placeholder={
+                  isSingleZoneRole
+                    ? "Select one zone..."
+                    : "Select zones..."
+                }
+                singleSelect={isSingleZoneRole}
                 openUpward
               />
 
@@ -2769,7 +2899,12 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                 }))}
                 selectedIds={wardIds}
                 onChange={setWardIds}
-                placeholder="Select assigned wards..."
+                placeholder={
+                  isSingleZoneRole &&
+                    zoneIds.length === 0
+                    ? "Select zone first..."
+                    : "Select assigned wards..."
+                }
                 openUpward
               />
             </div>
@@ -2777,11 +2912,10 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
             {/* Status Message Alert Box */}
             {statusMsg && (
               <div
-                className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2.5 shadow-2xs transition-all ${
-                  statusMsg.type === "success"
-                    ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                    : "bg-red-50 border-red-300 text-red-800"
-                }`}
+                className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2.5 shadow-2xs transition-all ${statusMsg.type === "success"
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                  : "bg-red-50 border-red-300 text-red-800"
+                  }`}
               >
                 {statusMsg.type === "success" ? (
                   <CheckCircle2 size={17} className="text-emerald-600 shrink-0" />

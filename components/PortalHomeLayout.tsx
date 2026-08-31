@@ -2948,17 +2948,13 @@ function PortalHomeLayoutContent({
                   </div>
 
 
-                  {isCityAdmin ? (
-                    <ChevronRight
-                      size={16}
-                      className={`shrink-0 text-slate-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}
-                    />
-                  ) : (
+                  {!isCityAdmin && (
                     <ChevronDown
                       size={16}
-                      className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${swachhOpen
-                        ? 'rotate-180 text-purple-600'
-                        : 'text-slate-400'
+                      className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''
+                        } ${swachhOpen
+                          ? 'rotate-180 text-purple-600'
+                          : 'text-slate-400'
                         }`}
                     />
                   )}
