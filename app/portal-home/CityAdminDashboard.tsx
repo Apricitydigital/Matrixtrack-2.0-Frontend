@@ -9,6 +9,8 @@ import {
   AreaBeatApi,
   CityUserApi,
   RegistrationApi,
+  SupervisorAssignmentApi,
+  type SupervisorAssignmentStatus,
 } from "@lib/apiClient";
 import swachhApi from "../../modules/swachh-ranking/api/axios";
 
@@ -17,20 +19,29 @@ import {
   AlertTriangle,
   ArrowRight,
   Bell,
+  Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Download,
+  Eye,
   Filter,
   Flame,
   Layers3,
+  LayoutDashboard,
+  LucideIcon,
+  Map as MapIcon,
   MapPin,
+  RefreshCcw,
   RefreshCw,
   Search,
+  Settings,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Toilet,
   Trash2,
+  TrendingUp,
   Trophy,
   Truck,
   UserPlus,
@@ -54,6 +65,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import UserPerformanceModal from "@components/ui/UserPerformanceModal";
 
 type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "TASKFORCE";
 type GeoLevel = "zone" | "ward" | "area";
@@ -236,37 +248,44 @@ function inactivityLabel(days: number) {
   return days >= 3 ? "3+ days" : `${days} day${days === 1 ? "" : "s"}`;
 }
 
-const MODULES: Record<
+import { useAuth } from "@hooks/useAuth";
+
+const ALL_MODULES: Record<
   ModuleKey,
-  { name: string; short: string; color: string; soft: string }
+  { name: string; short: string; color: string; soft: string; matchKeys: string[] }
 > = {
   SWEEPING: {
     name: "Sweeping",
     short: "Sweeping",
     color: "#10b981",
     soft: "#ecfdf5",
+    matchKeys: ["SWEEPING", "SWEEP", "SWEEPING_ASSESSMENT"],
   },
   TOILET: {
     name: "Cleanliness of Toilets",
     short: "Toilets",
     color: "#3b82f6",
     soft: "#eff6ff",
+    matchKeys: ["TOILET", "TOILETS", "TOILET_INSPECTION", "CLEANLINESS_OF_TOILETS"],
   },
   TWINBIN: {
     name: "Litter Bins",
     short: "Litter Bins",
     color: "#f59e0b",
     soft: "#fffbeb",
+    matchKeys: ["TWINBIN", "LITTERBINS", "LITTER_BINS", "LITTERBIN", "LITTER_BIN"],
   },
   TASKFORCE: {
     name: "GVP",
     short: "GVP",
     color: "#8b5cf6",
     soft: "#f5f3ff",
+    matchKeys: ["TASKFORCE", "GVP", "TASKFORCE_20", "TASKFORCE_FEEDER", "CTU"],
   },
 };
 
-const KEYS = Object.keys(MODULES) as ModuleKey[];
+const MODULES = ALL_MODULES;
+const ALL_KEYS = Object.keys(ALL_MODULES) as ModuleKey[];
 const LIVE_REFRESH_MS = 60_000;
 const HEAT_PAGE_SIZE = 5;
 const SUPERVISOR_PAGE_SIZE = 5;
@@ -376,6 +395,7 @@ export default function CityAdminDashboard({
   userCityName?: string;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const reportRef = useRef<HTMLDivElement>(null);
   const liveRefreshInFlightRef = useRef(false);
   const recordsRequestIdRef = useRef(0);
@@ -383,6 +403,64 @@ export default function CityAdminDashboard({
   const moduleRecordsRequestIdRef = useRef(0);
 
   const today = useMemo(() => dayKey(new Date()), []);
+
+  const [cityModules, setCityModules] = useState<any[]>([]);
+
+  // Compute allowed module keys for this City Admin based on user's assigned modules and city's active modules
+  const allowedKeys = useMemo<ModuleKey[]>(() => {
+    const rawUserTokens: string[] = [
+      ...(Array.isArray(user?.roles) ? user.roles : []),
+      ...(Array.isArray((user as any)?.assignedModules) ? (user as any).assignedModules : []),
+      ...(Array.isArray((user as any)?.modules) ? (user as any).modules : []),
+      ...(Array.isArray((user as any)?.permissions) ? (user as any).permissions : []),
+    ]
+      .map((item: any) =>
+        norm(
+          typeof item === "string"
+            ? item
+            : item?.key ?? item?.name ?? item?.code ?? item?.moduleId ?? ""
+        ).toUpperCase()
+      )
+      .filter(Boolean);
+
+    const isSuperAdmin = rawUserTokens.some((r) =>
+      ["SUPER_ADMIN", "HMS_SUPER_ADMIN"].includes(r)
+    );
+
+    // If city modules are fetched from backend, gather enabled keys
+    const activeCityModuleKeys = cityModules
+      .filter((cm) => cm.enabled !== false)
+      .map((cm) => norm(cm.key || cm.name || "").toUpperCase());
+
+    return ALL_KEYS.filter((key) => {
+      const def = ALL_MODULES[key];
+      // Check city module status if city modules have loaded
+      if (activeCityModuleKeys.length > 0) {
+        const cityEnabled = def.matchKeys.some((mk) =>
+          activeCityModuleKeys.some((cmk) => cmk.includes(mk) || mk.includes(cmk))
+        );
+        if (!cityEnabled) return false;
+      }
+
+      // If user has specific assigned modules, check user authorization
+      if (!isSuperAdmin && rawUserTokens.length > 0) {
+        const hasExplicitModules = rawUserTokens.some((r) =>
+          ["SWEEPING", "SWEEP", "TOILET", "TOILETS", "TWINBIN", "LITTER", "LITTERBINS", "TASKFORCE", "GVP", "CTU"].some((m) =>
+            r.includes(m)
+          )
+        );
+        if (hasExplicitModules) {
+          return def.matchKeys.some((mk) =>
+            rawUserTokens.some((token) => token.includes(mk) || mk.includes(token))
+          );
+        }
+      }
+
+      return true;
+    });
+  }, [user, cityModules]);
+
+  const KEYS = allowedKeys.length > 0 ? allowedKeys : ALL_KEYS;
 
   const [zone, setZone] = useState("ALL");
   const [ward, setWard] = useState("ALL");
@@ -395,6 +473,9 @@ export default function CityAdminDashboard({
   const [beats, setBeats] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [records, setRecords] = useState<any[]>([]);
+  const [assignmentStatus, setAssignmentStatus] =
+    useState<SupervisorAssignmentStatus | null>(null);
+  const [assignmentDetailsOpen, setAssignmentDetailsOpen] = useState(false);
   const [swachh, setSwachh] = useState<any>({});
 
   const [search, setSearch] = useState("");
@@ -417,7 +498,10 @@ export default function CityAdminDashboard({
   );
   const [supervisorRecords, setSupervisorRecords] = useState<any[]>([]);
   const [supervisorPerformanceLoading, setSupervisorPerformanceLoading] = useState(false);
-  const [moduleMonthOffset, setModuleMonthOffset] = useState(0);
+  const [moduleMonthOffset, setModuleMonthOffset] = useState<number | "CUSTOM_MONTH" | "CUSTOM_RANGE">(0);
+  const [moduleCustomMonth, setModuleCustomMonth] = useState<string>(today.slice(0, 7));
+  const [moduleCustomFromDate, setModuleCustomFromDate] = useState<string>(today);
+  const [moduleCustomToDate, setModuleCustomToDate] = useState<string>(today);
   const [moduleZone, setModuleZone] = useState("ALL");
   const [moduleWard, setModuleWard] = useState("ALL");
   const [moduleRecords, setModuleRecords] = useState<any[]>([]);
@@ -439,11 +523,32 @@ export default function CityAdminDashboard({
     count: number;
     labels: string[];
   } | null>(null);
-  const [snapshotDetail, setSnapshotDetail] =
-    useState<SnapshotDetailKey | null>(null);
+  const [snapshotDetail, setSnapshotDetail] = useState<SnapshotDetailKey | null>(null);
+  const [selectedPerformanceUser, setSelectedPerformanceUser] = useState<any>(null);
+  
+  const [overall30DayRecords, setOverall30DayRecords] = useState<any[]>([]);
+  const [overall30DayLoading, setOverall30DayLoading] = useState(false);
+  const [overallTimeframe, setOverallTimeframe] = useState<15 | 30 | "CUSTOM">(30);
+  const [customDateStart, setCustomDateStart] = useState<string>("");
+  const [customDateEnd, setCustomDateEnd] = useState<string>("");
+  const [personnelTab, setPersonnelTab] = useState<"SUPERVISOR">("SUPERVISOR");
+  const [operationalReviewTab, setOperationalReviewTab] = useState<"ACTION_REQUIRED" | "REJECTED" | "NEEDS_ATTENTION">("ACTION_REQUIRED");
+  const [operationalReviewOpen, setOperationalReviewOpen] = useState(true);
+  const [operationalReviewPage, setOperationalReviewPage] = useState(1);
+  const [directoryPage, setDirectoryPage] = useState(1);
+  const DIRECTORY_PAGE_SIZE = 10;
 
+  const [leaderboardEmployeeTop, setLeaderboardEmployeeTop] = useState(true);
+  const [leaderboardSupervisorTop, setLeaderboardSupervisorTop] = useState(true);
+  const [leaderboardWardTop, setLeaderboardWardTop] = useState(true);
+  const [leaderboardZoneTop, setLeaderboardZoneTop] = useState(true);
+  const [leaderboardTimeframe, setLeaderboardTimeframe] = useState<"TODAY" | "WEEK" | "MONTH">("TODAY");
+  const [leaderboardZone, setLeaderboardZone] = useState("ALL");
+  const [leaderboardWard, setLeaderboardWard] = useState("ALL");
+  const [leaderboardMonthOffset, setLeaderboardMonthOffset] = useState(0);
+  const [attendanceEmployees, setAttendanceEmployees] = useState<any[]>([]);
   useEffect(() => {
-    if (!snapshotDetail) return;
+    if (!snapshotDetail && !selectedPerformanceUser) return;
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -451,21 +556,23 @@ export default function CityAdminDashboard({
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [snapshotDetail]);
+  }, [snapshotDetail, selectedPerformanceUser]);
 
-  // City Admin operational analytics are always based on today.
-  // Inspection Trend is intentionally the only chart that uses a rolling 7-day window.
-  const activeFromDate = today;
-  const activeToDate = today;
-  const trendFromDate = addDays(today, -6);
+  const [reportDate, setReportDate] = useState<string>(today);
+
+  // City Admin operational analytics are based on selected reportDate (defaults to today).
+  // Inspection Trend is a rolling 7-day window ending on reportDate.
+  const activeFromDate = reportDate;
+  const activeToDate = reportDate;
+  const trendFromDate = addDays(reportDate, -6);
   const reportScopeLabel = useMemo(
     () =>
-      new Date(`${today}T00:00:00`).toLocaleDateString("en-GB", {
+      new Date(`${reportDate}T00:00:00`).toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       }),
-    [today]
+    [reportDate]
   );
 
   const monthPresets = useMemo(
@@ -597,7 +704,7 @@ const beatRequests = (
   }
 
   async function loadBase() {
-    const [userResponse, beatResponse, zoneResponse, wardResponse, areaResponse, swachhResponse] =
+    const [userResponse, beatResponse, zoneResponse, wardResponse, areaResponse, swachhResponse, assignmentResponse, modulesResponse] =
       await Promise.all([
         CityUserApi.list().catch(() => ({ users: [] })),
         AreaBeatApi.list().catch(() => ({ beats: [] })),
@@ -611,6 +718,8 @@ const beatRequests = (
           nodes: [],
         })),
         swachhApi.get("/admin/stats").catch(() => ({ data: {} })),
+        SupervisorAssignmentApi.status().catch(() => null),
+        apiFetch<any[]>("/city/modules").catch(() => []),
       ]);
 
     setUsers(userResponse?.users || []);
@@ -619,16 +728,19 @@ const beatRequests = (
     setWards(wardResponse?.nodes || []);
     setAreas(areaResponse?.nodes || []);
     setSwachh(swachhResponse?.data || {});
+    setAssignmentStatus(assignmentResponse);
+    if (Array.isArray(modulesResponse)) {
+      setCityModules(modulesResponse);
+    }
   }
 
   async function loadRecords() {
     const requestId = ++recordsRequestIdRef.current;
 
-    // Fetch exactly the rolling 7-day window needed by Inspection Trend.
-    // Today's cards use only today's rows from this same live snapshot.
-    const startDate = new Date(`${trendFromDate}T00:00:00`).toISOString();
-    const endDate = new Date(`${addDays(today, 1)}T00:00:00`).toISOString();
-    const params = new URLSearchParams({ startDate, endDate });
+    // Fetch rolling 7-day window relative to reportDate.
+    const queryStart = `${trendFromDate}T00:00:00.000Z`;
+    const queryEnd = `${addDays(reportDate, 1)}T23:59:59.999Z`;
+    const params = new URLSearchParams({ startDate: queryStart, endDate: queryEnd });
 
     try {
       const response = await apiFetch<{ data: any[] }>(
@@ -680,9 +792,26 @@ const beatRequests = (
     const requestId = ++moduleRecordsRequestIdRef.current;
     if (!silent) setModulePerformanceLoading(true);
 
-    const preset = monthPreset(today, moduleMonthOffset);
-    const startDate = new Date(`${preset.from}T00:00:00`).toISOString();
-    const endDate = new Date(`${addDays(preset.to, 1)}T00:00:00`).toISOString();
+    let fromStr = today;
+    let toStr = today;
+
+    if (typeof moduleMonthOffset === "number") {
+      const preset = monthPreset(today, moduleMonthOffset);
+      fromStr = preset.from;
+      toStr = preset.to;
+    } else if (moduleMonthOffset === "CUSTOM_MONTH") {
+      const [y, m] = moduleCustomMonth.split("-").map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0);
+      fromStr = dayKey(start);
+      toStr = dayKey(end);
+    } else if (moduleMonthOffset === "CUSTOM_RANGE") {
+      fromStr = moduleCustomFromDate || today;
+      toStr = moduleCustomToDate || today;
+    }
+
+    const startDate = new Date(`${fromStr}T00:00:00`).toISOString();
+    const endDate = new Date(`${addDays(toStr, 1)}T00:00:00`).toISOString();
     const params = new URLSearchParams({ startDate, endDate });
     if (moduleZone !== "ALL") params.set("zoneId", moduleZone);
     if (moduleWard !== "ALL") params.set("wardId", moduleWard);
@@ -703,6 +832,73 @@ const beatRequests = (
     }
   }
 
+  async function loadOverallPerformanceData(silent = false) {
+    if (!silent) setOverall30DayLoading(true);
+
+    let start = new Date(`${today}T00:00:00`);
+    let end = new Date(`${today}T00:00:00`);
+    end.setDate(end.getDate() + 1);
+
+    if (overallTimeframe === "CUSTOM") {
+      if (customDateStart && customDateEnd) {
+        start = new Date(`${customDateStart}T00:00:00`);
+        end = new Date(`${customDateEnd}T00:00:00`);
+        end.setDate(end.getDate() + 1);
+      } else {
+        start.setDate(start.getDate() - 30);
+      }
+    } else {
+      start.setDate(start.getDate() - Number(overallTimeframe));
+    }
+
+    const params = new URLSearchParams({ 
+      startDate: start.toISOString(), 
+      endDate: end.toISOString() 
+    });
+
+    try {
+      const response = await apiFetch<{ data: any[] }>(
+        `/city/dashboard/inspection-records?${params.toString()}`
+      );
+      setOverall30DayRecords(response?.data || []);
+    } catch (error) {
+      console.error("Overall performance refresh failed:", error);
+    } finally {
+      if (!silent) setOverall30DayLoading(false);
+    }
+  }
+
+  async function loadLeaderboardAttendance() {
+    try {
+      let fromDate = today;
+      let toDate = addDays(today, 1);
+      if (leaderboardTimeframe === "WEEK") {
+        fromDate = addDays(today, -7);
+      } else if (leaderboardTimeframe === "MONTH") {
+        const preset = monthPreset(today, leaderboardMonthOffset);
+        fromDate = preset.from;
+        toDate = preset.to;
+      }
+
+      const params = new URLSearchParams({
+        from: fromDate,
+        to: toDate,
+        pageSize: "100",
+      });
+
+      const response = await apiFetch<any>(`/city/attendance/dashboard?${params.toString()}`);
+      if (response?.topEmployees && Array.isArray(response.topEmployees)) {
+        setAttendanceEmployees(response.topEmployees);
+      } else if (response?.records && Array.isArray(response.records)) {
+        setAttendanceEmployees(response.records);
+      } else {
+        setAttendanceEmployees([]);
+      }
+    } catch (error) {
+      console.error("Leaderboard attendance fetch failed:", error);
+    }
+  }
+
   async function loadAll(initial = false, silent = false) {
     if (liveRefreshInFlightRef.current) return;
 
@@ -712,7 +908,14 @@ const beatRequests = (
     else if (!silent) setRefreshing(true);
 
     try {
-      await Promise.all([loadBase(), loadRecords(), loadNotificationData(), loadModulePerformanceData(true)]);
+      await Promise.all([
+        loadBase(), 
+        loadRecords(), 
+        loadNotificationData(), 
+        loadModulePerformanceData(true),
+        loadOverallPerformanceData(true),
+        loadLeaderboardAttendance(),
+      ]);
     } finally {
       liveRefreshInFlightRef.current = false;
       setLoading(false);
@@ -731,6 +934,7 @@ const beatRequests = (
         void loadAll(false, true);
         void loadSupervisorPerformanceData(true);
         void loadModulePerformanceData(true);
+        void loadOverallPerformanceData(true);
       }
     };
 
@@ -760,6 +964,21 @@ const beatRequests = (
 
 
   useEffect(() => {
+    void loadRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportDate]);
+
+  useEffect(() => {
+    void loadOverallPerformanceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overallTimeframe, customDateStart, customDateEnd]);
+
+  useEffect(() => {
+    void loadLeaderboardAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaderboardTimeframe, leaderboardMonthOffset, leaderboardZone, leaderboardWard]);
+
+  useEffect(() => {
     void loadSupervisorPerformanceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supervisorFromDate, supervisorToDate]);
@@ -767,7 +986,7 @@ const beatRequests = (
   useEffect(() => {
     void loadModulePerformanceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moduleMonthOffset, moduleZone, moduleWard]);
+  }, [moduleMonthOffset, moduleCustomMonth, moduleCustomFromDate, moduleCustomToDate, moduleZone, moduleWard]);
 
   const scoped = useMemo(() => {
     if (area === "ALL") return records;
@@ -780,8 +999,8 @@ const beatRequests = (
   }, [records, area, geoMap]);
 
   const selected = useMemo(
-    () => scoped.filter((record) => recordDate(record) === today),
-    [scoped, today]
+    () => scoped.filter((record) => recordDate(record) === reportDate),
+    [scoped, reportDate]
   );
 
   const status = useMemo(() => {
@@ -1068,7 +1287,7 @@ const beatRequests = (
 
   const trend = useMemo(
     () =>
-      Array.from({ length: 7 }, (_, index) => addDays(today, index - 6)).map(
+      Array.from({ length: 7 }, (_, index) => addDays(reportDate, index - 6)).map(
         (dateValue) => {
           const row: any = {
             date: new Date(`${dateValue}T00:00:00`).toLocaleDateString("en-GB", {
@@ -1086,7 +1305,7 @@ const beatRequests = (
           return row;
         }
       ),
-    [records, today]
+    [records, reportDate]
   );
 
   const modulePerformance = useMemo(
@@ -1121,10 +1340,30 @@ const beatRequests = (
       heatLevel === "zone" ? zones : heatLevel === "ward" ? visibleWards : visibleAreas;
 
     baseNodes.forEach((node) => {
+      // Calculate assigned expected target (beats/assets registered in this zone/ward)
+      const assignedBeatsCount = (beats || []).filter((b: any) => {
+        if (heatLevel === "zone") return norm(b.zoneId) === norm(node.id) || b.zone?.name === node.name;
+        if (heatLevel === "ward") return norm(b.wardId) === norm(node.id) || b.ward?.name === node.name;
+        return norm(b.areaId) === norm(node.id) || b.area?.name === node.name;
+      }).length;
+
+      // Also count assigned users in this jurisdiction
+      const assignedUsersCount = (users || []).filter((u: any) => {
+        if (heatLevel === "zone") return norm(u.assignedZoneId || u.zoneId) === norm(node.id) || u.assignedZone?.name === node.name;
+        if (heatLevel === "ward") return norm(u.assignedWardId || u.wardId) === norm(node.id) || u.assignedWard?.name === node.name;
+        return norm(u.assignedAreaId || u.areaId) === norm(node.id) || u.assignedArea?.name === node.name;
+      }).length;
+
+      const expectedTarget = Math.max(1, assignedBeatsCount || assignedUsersCount || 5);
+
       map[node.id] = {
         id: node.id,
         name: node.name,
         total: 0,
+        expected: expectedTarget,
+        approved: 0,
+        rejected: 0,
+        actionRequired: 0,
         exceptions: 0,
         modules: { SWEEPING: 0, TOILET: 0, TWINBIN: 0, TASKFORCE: 0 },
       };
@@ -1140,6 +1379,10 @@ const beatRequests = (
             geoName(record, heatLevel, geoMap) ||
             `Unmapped ${heatLevelLabel}`,
           total: 0,
+          expected: 5,
+          approved: 0,
+          rejected: 0,
+          actionRequired: 0,
           exceptions: 0,
           modules: {
             SWEEPING: 0,
@@ -1153,28 +1396,25 @@ const beatRequests = (
       map[id].total += 1;
       map[id].modules[record.__module] += 1;
 
-      if (rejected(record.status) || actionRequired(record.status)) {
+      const st = up(record.status);
+      if (["APPROVED", "RESOLVED", "ACTION_TAKEN"].includes(st)) {
+        map[id].approved += 1;
+      } else if (st === "REJECTED") {
+        map[id].rejected += 1;
+        map[id].exceptions += 1;
+      } else if (actionRequired(record.status)) {
+        map[id].actionRequired += 1;
         map[id].exceptions += 1;
       }
     });
 
-    return Object.values(map).sort((a: any, b: any) => b.total - a.total);
-  }, [selected, geoMap, heatLevel, heatLevelLabel, zones, visibleWards, visibleAreas]);
+    const result = Object.values(map);
+    return result.length > 0 ? result.sort((a: any, b: any) => b.total - a.total || (a.name || "").localeCompare(b.name || "")) : [];
+  }, [selected, geoMap, heatLevel, heatLevelLabel, zones, visibleWards, visibleAreas, beats, users]);
 
   const heatRows = useMemo(
-    () =>
-      heat.length
-        ? heat
-        : [
-            {
-              id: "NO_REGISTERED_SCOPE",
-              name: `No registered ${heatLevelLabel.toLowerCase()}s`,
-              total: 0,
-              exceptions: 0,
-              modules: { SWEEPING: 0, TOILET: 0, TWINBIN: 0, TASKFORCE: 0 },
-            },
-          ],
-    [heat, heatLevelLabel]
+    () => heat,
+    [heat]
   );
 
   const maxHeat = useMemo(
@@ -1299,7 +1539,10 @@ const beatRequests = (
 
       return (
         active &&
-        (roles.includes("SUPERVISOR") || roles.includes("EMPLOYEE"))
+        (roles.includes("QC") ||
+          roles.includes("ACTION_OFFICER") ||
+          roles.includes("SUPERVISOR") ||
+          roles.includes("EMPLOYEE"))
       );
     });
 
@@ -1339,16 +1582,35 @@ const beatRequests = (
       (record?.assignedEmployees || []).forEach((person: any) => addId(person?.id));
     });
 
-    // Module access is permission, not a work assignment.
-    // Assigned/unassigned is therefore calculated only from actual live work links.
-    const hasAssignment = (user: any) => assignedIds.has(norm(user?.id));
+    // Include persistent assignments from auto-assignment modules.
+    (assignmentStatus?.supervisors.assignedIds || []).forEach(addId);
 
-    const buildRole = (role: "SUPERVISOR" | "EMPLOYEE") => {
+    // QC and AO users are considered assigned if they have mapped zone/ward scopes, module access, or active inspection linkages
+    const hasAssignment = (user: any, roleKey: string) => {
+      const uid = norm(user?.id);
+      if (assignedIds.has(uid)) return true;
+
+      // Check if user has assigned zones/wards or assigned modules configured
+      if (roleKey === "QC" || roleKey === "ACTION_OFFICER") {
+        const hasZoneWard =
+          (Array.isArray(user?.zoneIds) && user.zoneIds.length > 0) ||
+          (Array.isArray(user?.wardIds) && user.wardIds.length > 0) ||
+          Boolean(user?.assignedZoneId || user?.zoneId || user?.assignedWardId || user?.wardId);
+        const hasModules =
+          (Array.isArray(user?.assignedModules) && user.assignedModules.length > 0) ||
+          (Array.isArray(user?.modules) && user.modules.length > 0);
+        return hasZoneWard || hasModules;
+      }
+
+      return false;
+    };
+
+    const buildRole = (role: "QC" | "ACTION_OFFICER" | "SUPERVISOR" | "EMPLOYEE") => {
       const roleUsers = operationalUsers.filter((user) =>
         [user?.role, ...(user?.roles || [])].map(up).includes(role)
       );
 
-      const assigned = roleUsers.filter(hasAssignment).length;
+      const assigned = roleUsers.filter((u) => hasAssignment(u, role)).length;
       const total = roleUsers.length;
       const available = Math.max(0, total - assigned);
       const allocation = total ? Math.round((assigned * 100) / total) : 0;
@@ -1362,10 +1624,12 @@ const beatRequests = (
     };
 
     return {
+      qc: buildRole("QC"),
+      ao: buildRole("ACTION_OFFICER"),
       supervisors: buildRole("SUPERVISOR"),
       employees: buildRole("EMPLOYEE"),
     };
-  }, [users, beats, records]);
+  }, [users, beats, records, assignmentStatus]);
 
   const noActivityAlerts = useMemo(
     () => buildNoActivityAlerts(records, zones, wards, areas, today),
@@ -1560,36 +1824,49 @@ const beatRequests = (
     );
   }, [headerNotificationCount]);
 
+  const supervisorsList = useMemo(
+    () => users.filter((u) => getUserRoleLabels(u).includes("SUPERVISOR")),
+    [users]
+  );
+
   const directoryRoleOptions = useMemo(
     () =>
       Array.from(
-        new Set(users.flatMap((user) => getUserRoleLabels(user)))
+        new Set(supervisorsList.flatMap((user) => getUserRoleLabels(user)))
       ).sort(),
-    [users]
+    [supervisorsList]
   );
 
   const directoryModuleOptions = useMemo(
     () =>
       Array.from(
-        new Set(users.flatMap((user) => getUserModuleLabels(user)))
+        new Set(supervisorsList.flatMap((user) => getUserModuleLabels(user)))
       ).sort(),
-    [users]
+    [supervisorsList]
   );
 
   const directoryStatusOptions = useMemo(
     () =>
       Array.from(
         new Set(
-          users
+          supervisorsList
             .map((user) => getUserStatus(user))
             .filter(Boolean)
         )
       ).sort(),
-    [users]
+    [supervisorsList]
   );
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
+    
+    // Compute activity score for ranking
+    const userActivityScore: Record<string, number> = {};
+    overall30DayRecords.forEach(record => {
+      if (record.employeeId) userActivityScore[record.employeeId] = (userActivityScore[record.employeeId] || 0) + 1;
+      if (record.supervisorId) userActivityScore[record.supervisorId] = (userActivityScore[record.supervisorId] || 0) + 1;
+      if (record.createdById) userActivityScore[record.createdById] = (userActivityScore[record.createdById] || 0) + 1;
+    });
 
     return users.filter((user) => {
       const roles = getUserRoleLabels(user);
@@ -1613,12 +1890,19 @@ const beatRequests = (
       const matchesStatus =
         directoryStatus === "ALL" || statusLabel === directoryStatus;
 
+      const matchesTab = roles.includes("SUPERVISOR");
+
       return (
         matchesSearch &&
         matchesRole &&
         matchesModule &&
-        matchesStatus
+        matchesStatus &&
+        matchesTab
       );
+    }).sort((a, b) => {
+      const scoreA = userActivityScore[a.id] || 0;
+      const scoreB = userActivityScore[b.id] || 0;
+      return scoreB - scoreA;
     });
   }, [
     users,
@@ -1626,9 +1910,12 @@ const beatRequests = (
     directoryRole,
     directoryModule,
     directoryStatus,
+    personnelTab,
+    overall30DayRecords
   ]);
 
-  const visibleDirectoryUsers = filteredUsers.slice(0, 10);
+  const directoryTotalPages = Math.max(1, Math.ceil(filteredUsers.length / DIRECTORY_PAGE_SIZE));
+  const visibleDirectoryUsers = filteredUsers.slice((directoryPage - 1) * DIRECTORY_PAGE_SIZE, directoryPage * DIRECTORY_PAGE_SIZE);
 
 
   const insightTopGeo: any = heat[0];
@@ -1664,7 +1951,401 @@ const beatRequests = (
       value: status.actionRequired,
       color: "#f97316",
     },
-  ];
+  ]
+
+  const overallChartData = useMemo(() => {
+    const dailyData: Record<string, { date: string; employeeInspections: number; supervisorInspections: number }> = {};
+    
+    if (overallTimeframe === "CUSTOM") {
+      if (customDateStart && customDateEnd) {
+        const start = new Date(`${customDateStart}T00:00:00`);
+        const end = new Date(`${customDateEnd}T00:00:00`);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          dailyData[dateStr] = {
+            date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+            employeeInspections: 0,
+            supervisorInspections: 0
+          };
+        }
+      }
+    } else {
+      for (let i = overallTimeframe - 1; i >= 0; i--) {
+        const d = new Date(`${today}T00:00:00`);
+        d.setDate(d.getDate() - i);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        dailyData[dateStr] = {
+          date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          employeeInspections: 0,
+          supervisorInspections: 0
+        };
+      }
+    }
+
+    overall30DayRecords.forEach((record) => {
+      const rDate = new Date(record.createdAt);
+      if (!Number.isNaN(rDate.getTime())) {
+        const dateStr = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, "0")}-${String(rDate.getDate()).padStart(2, "0")}`;
+        if (dailyData[dateStr]) {
+          if (record.employeeId || record.submittedById) {
+             dailyData[dateStr].employeeInspections++;
+          }
+          if (record.supervisorId || (record.createdById && !record.employeeId)) {
+             dailyData[dateStr].supervisorInspections++;
+          }
+        }
+      }
+    });
+
+    return Object.values(dailyData);
+  }, [overall30DayRecords, today, overallTimeframe, customDateStart, customDateEnd]);
+
+  const overallTrendMetrics = useMemo(() => {
+    let totalSupervisorInspections = 0;
+    let approved = 0;
+    let rejected = 0;
+    let pending = 0;
+    const activeSupervisorIds = new Set<string>();
+    const moduleCounts: Record<string, number> = {
+      SWEEPING: 0,
+      TOILET: 0,
+      TWINBIN: 0,
+      TASKFORCE: 0,
+    };
+
+    overall30DayRecords.forEach((record) => {
+      const isSupervisor = record.supervisorId || (record.createdById && !record.employeeId) || record.supervisor;
+      if (isSupervisor) {
+        totalSupervisorInspections++;
+        const sId = record.supervisorId || record.createdById || record.supervisor?.id;
+        if (sId) activeSupervisorIds.add(norm(sId));
+
+        const st = up(record.status);
+        if (["APPROVED", "RESOLVED", "ACTION_TAKEN"].includes(st)) {
+          approved++;
+        } else if (st === "REJECTED") {
+          rejected++;
+        } else {
+          pending++;
+        }
+
+        if (record.__module && moduleCounts[record.__module] !== undefined) {
+          moduleCounts[record.__module]++;
+        }
+      }
+    });
+
+    const approvalRate = totalSupervisorInspections > 0 ? Math.round((approved * 100) / totalSupervisorInspections) : 0;
+    const rejectionRate = totalSupervisorInspections > 0 ? Math.round((rejected * 100) / totalSupervisorInspections) : 0;
+
+    // Top module
+    let topModuleName = "None";
+    let topModuleCount = 0;
+    Object.entries(moduleCounts).forEach(([mod, count]) => {
+      if (count > topModuleCount) {
+        topModuleCount = count;
+        topModuleName = MODULES[mod as ModuleKey]?.short || mod;
+      }
+    });
+
+    const registeredSupervisorsCount = users.filter((u) => getUserRoleLabels(u).includes("SUPERVISOR")).length;
+    const activeCoveragePercent = registeredSupervisorsCount > 0 
+      ? Math.round((activeSupervisorIds.size * 100) / registeredSupervisorsCount) 
+      : 0;
+
+    return {
+      total: totalSupervisorInspections,
+      approved,
+      rejected,
+      pending,
+      approvalRate,
+      rejectionRate,
+      topModuleName,
+      topModuleCount,
+      activeSupervisorsOnGround: activeSupervisorIds.size,
+      registeredSupervisorsCount,
+      activeCoveragePercent,
+    };
+  }, [overall30DayRecords, users]);
+
+  interface LeaderboardScoreItem {
+    name: string;
+    inspections: number;
+    approved: number;
+    rejected: number;
+    rate: number;
+    score: number;
+    isAttendance?: boolean;
+  }
+
+  const dailyLeaderboards = useMemo(() => {
+    const employeeScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    const supervisorScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    const wardScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    const zoneScores: Record<string, { total: number; approved: number; rejected: number }> = {};
+    
+    const tDateObj = new Date(`${today}T00:00:00`);
+    const tStr = `${tDateObj.getFullYear()}-${String(tDateObj.getMonth() + 1).padStart(2, "0")}-${String(tDateObj.getDate()).padStart(2, "0")}`;
+    
+    const filteredRecords = overall30DayRecords.filter(r => {
+      const rDate = new Date(r.createdAt);
+      if (Number.isNaN(rDate.getTime())) return false;
+      
+      // Zone / Ward filtering
+      if (leaderboardZone !== "ALL") {
+        const rZoneId = norm(r?.zoneId ?? r?.zone_id ?? r?.zone?.id ?? r?.location?.zoneId);
+        const rZoneName = geoName(r, "zone", geoMap);
+        const matchedZone = zones.find(z => z.id === leaderboardZone);
+        if (rZoneId !== leaderboardZone && (!matchedZone || rZoneName !== matchedZone.name)) {
+          return false;
+        }
+      }
+      if (leaderboardWard !== "ALL") {
+        const rWardId = norm(r?.wardId ?? r?.ward_id ?? r?.ward?.id ?? r?.location?.wardId);
+        const rWardName = geoName(r, "ward", geoMap);
+        const matchedWard = wards.find(w => w.id === leaderboardWard);
+        if (rWardId !== leaderboardWard && (!matchedWard || rWardName !== matchedWard.name)) {
+          return false;
+        }
+      }
+
+      const rDateStr = recordDate(r);
+      if (!rDateStr) return false;
+
+      if (leaderboardTimeframe === "TODAY") {
+        return rDateStr === today;
+      } else if (leaderboardTimeframe === "WEEK") {
+        const rTime = new Date(`${rDateStr}T00:00:00`).getTime();
+        const tTime = tDateObj.getTime();
+        const diffDays = Math.round((tTime - rTime) / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 7;
+      } else if (leaderboardTimeframe === "MONTH") {
+        const preset = monthPreset(today, leaderboardMonthOffset);
+        return rDateStr >= preset.from && rDateStr <= preset.to;
+      }
+      return true;
+    });
+
+    const findUser = (id?: string) => {
+      if (!id) return null;
+      const target = norm(id);
+      return users.find(u => 
+        norm(u.id) === target || 
+        norm(u._id) === target || 
+        norm(u.userId) === target || 
+        norm(u.employeeId) === target ||
+        norm(u.mobile) === target
+      );
+    };
+
+    const addScore = (
+      bucket: Record<string, { total: number; approved: number; rejected: number }>,
+      name: string,
+      statusVal: string
+    ) => {
+      if (!name) return;
+      if (!bucket[name]) {
+        bucket[name] = { total: 0, approved: 0, rejected: 0 };
+      }
+      bucket[name].total += 1;
+      if (approved(statusVal)) bucket[name].approved += 1;
+      if (rejected(statusVal)) bucket[name].rejected += 1;
+    };
+
+    filteredRecords.forEach((record) => {
+      const empId = record.employeeId || record.submittedById;
+      const supId = record.supervisorId || record.createdById;
+      const recStatus = record.status || "";
+
+      // 1. Supervisor attribution
+      const supervisorName = 
+        record.supervisorName || 
+        record.supervisor?.name || 
+        (supId ? findUser(supId)?.name : null) || 
+        record.createdByUser?.name || 
+        ownerName(record) ||
+        submitterNameForRecord(record);
+
+      if (supervisorName && supervisorName !== "Unknown submitter" && supervisorName !== "Field Personnel") {
+        addScore(supervisorScores, supervisorName, recStatus);
+      }
+
+      // 2. Employee attribution
+      if (empId) {
+        const empUser = findUser(empId);
+        const roles = empUser ? getUserRoleLabels(empUser) : [];
+        if (!roles.includes("SUPERVISOR")) {
+          const name = empUser?.name || record?.employee?.name || record?.submittedBy?.name || "Field Employee";
+          addScore(employeeScores, name, recStatus);
+        }
+      }
+      
+      const wardName = geoName(record, "ward", geoMap) || record.wardName || record.ward?.name;
+      if (wardName) addScore(wardScores, wardName, recStatus);
+      
+      const zoneName = geoName(record, "zone", geoMap) || record.zoneName || record.zone?.name;
+      if (zoneName) addScore(zoneScores, zoneName, recStatus);
+    });
+
+    // Employee ranking STRICTLY based on Attendance Analytics (attendanceId matched with employeeId)
+    const employeeAttendanceScores: Record<string, { total: number; approved: number; rejected: number; rate: number; isAttendance?: boolean }> = {};
+    
+    // Map of users for quick ID matching
+    const empMapById = new Map<string, any>();
+    users.forEach(u => {
+      if (u.employeeId) empMapById.set(norm(u.employeeId), u);
+      if (u.attendanceId) empMapById.set(norm(u.attendanceId), u);
+      if (u.id) empMapById.set(norm(u.id), u);
+    });
+
+    attendanceEmployees.forEach((emp: any) => {
+      const attId = norm(emp.attendanceId || emp.employeeId || emp.empId || "");
+      const matchedUser = attId ? empMapById.get(attId) : null;
+      
+      // Use matched employee's official name, or attendance recorded name
+      const name = matchedUser?.name || emp.employeeName || emp.name;
+      if (!name) return;
+      
+      const present = Number(emp.presentDays ?? (emp.status === "PRESENT" || emp.status === "P" ? 1 : 0));
+      const absent = Number(emp.absentDays ?? (emp.status === "ABSENT" || emp.status === "A" ? 1 : 0));
+      const total = Number(emp.totalDays ?? (present + absent || 1));
+      const rate = Number(emp.attendanceRate ?? (total > 0 ? Math.round((present * 100) / total) : 0));
+
+      employeeAttendanceScores[name] = {
+        total: present, // Primary display = total present days
+        approved: present,
+        rejected: absent,
+        rate,
+        isAttendance: true,
+      };
+    });
+
+    const getTopBottom = (scores: Record<string, { total: number; approved: number; rejected: number; rate?: number; isAttendance?: boolean }>, isAttendanceMode = false) => {
+      const items: LeaderboardScoreItem[] = Object.entries(scores).map(([name, data]) => {
+        const rate = data.rate !== undefined ? data.rate : (data.total > 0 ? Math.round((data.approved * 100) / data.total) : 0);
+        const score = isAttendanceMode 
+          ? (data.approved * 10) + rate 
+          : (data.approved * 2) + data.total - (data.rejected * 2);
+
+        return {
+          name,
+          inspections: data.total,
+          approved: data.approved,
+          rejected: data.rejected,
+          rate,
+          score,
+          isAttendance: Boolean(data.isAttendance || isAttendanceMode),
+        };
+      });
+
+      // Sort by volume + approval / attendance rate
+      const sortedByPerformance = [...items].sort((a, b) => b.inspections - a.inspections || b.rate - a.rate);
+
+      if (sortedByPerformance.length === 0) {
+        return { top: [], bottom: [] };
+      }
+
+      const top5 = sortedByPerformance.slice(0, Math.min(5, sortedByPerformance.length));
+
+      let bottomPool = sortedByPerformance.slice(top5.length);
+      if (bottomPool.length === 0 && sortedByPerformance.length > 1) {
+        bottomPool = sortedByPerformance.slice(1);
+      }
+
+      const bottom5 = [...bottomPool].sort((a, b) => a.inspections - b.inspections || a.rate - b.rate).slice(0, 5);
+
+      return {
+        top: top5,
+        bottom: bottom5,
+      };
+    };
+
+    return {
+      employees: getTopBottom(employeeAttendanceScores, true),
+      supervisors: getTopBottom(supervisorScores, false),
+      wards: getTopBottom(wardScores, false),
+      zones: getTopBottom(zoneScores, false),
+    };
+  }, [overall30DayRecords, today, users, leaderboardTimeframe, leaderboardZone, leaderboardWard, leaderboardMonthOffset, wards, attendanceEmployees]);
+
+  const renderLeaderboardList = (data: LeaderboardScoreItem[], isTop: boolean, category: string) => {
+    if (data.length === 0) {
+      return (
+        <div className="h-64 flex flex-col items-center justify-center text-center p-6">
+          <div className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 mb-2">
+            <Trophy size={18} />
+          </div>
+          <p className="text-xs font-bold text-slate-400">No records to display</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Performance requires multiple recorded activities</p>
+        </div>
+      );
+    }
+
+    const maxInspections = Math.max(...data.map(d => d.inspections), 1);
+
+    return (
+      <div className="space-y-2.5 p-2">
+        {data.map((item, idx) => {
+          const rank = idx + 1;
+          const percentage = Math.round((item.inspections / maxInspections) * 100);
+          
+          let rankBadgeBg = "bg-slate-100 text-slate-600 border-slate-200";
+          if (isTop) {
+            if (rank === 1) rankBadgeBg = "bg-amber-100 text-amber-700 border-amber-300 font-black shadow-xs";
+            else if (rank === 2) rankBadgeBg = "bg-slate-200 text-slate-700 border-slate-300 font-bold";
+            else if (rank === 3) rankBadgeBg = "bg-orange-100 text-orange-700 border-orange-200 font-bold";
+          } else {
+            rankBadgeBg = "bg-rose-50 text-rose-600 border-rose-200 font-bold";
+          }
+
+          return (
+            <div 
+              key={`${item.name}-${idx}`} 
+              className="group flex flex-col p-3 rounded-xl bg-slate-50/70 hover:bg-white border border-slate-100 hover:border-slate-200 hover:shadow-xs transition duration-150"
+            >
+              <div className="flex items-center justify-between gap-3 mb-1.5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={`w-5 h-5 rounded-lg border flex items-center justify-center text-[10px] shrink-0 ${rankBadgeBg}`}>
+                    {rank}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-xs font-black text-slate-800 truncate block" title={item.name}>
+                      {item.name}
+                    </span>
+                    <span className="text-[8px] font-semibold text-slate-400 block">
+                      {item.isAttendance
+                        ? `${item.approved} Present • ${item.rejected} Absent (${item.rate}% rate)`
+                        : `${item.approved} approved • ${item.rejected} rejected (${item.rate}%)`}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs font-black text-slate-900">
+                    {item.inspections}
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase">
+                    {item.isAttendance ? (item.inspections === 1 ? 'day' : 'days') : (item.inspections === 1 ? 'insp' : 'insps')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full h-1.5 rounded-full bg-slate-200/60 overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isTop 
+                      ? rank === 1 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-emerald-500' 
+                      : 'bg-gradient-to-r from-rose-500 to-rose-400'
+                  }`}
+                  style={{ width: `${Math.max(percentage, 6)}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   async function downloadPdf() {
     if (!reportRef.current) return;
@@ -1726,7 +2407,7 @@ const beatRequests = (
   return (
     <div
       ref={reportRef}
-      className="space-y-5 pb-12 max-w-[1500px] mx-auto"
+      className="space-y-5 pb-12 w-full"
     >
       {newNotificationNotice && (
         <div className="fixed left-1/2 top-6 z-[100] w-[min(92vw,390px)] -translate-x-1/2 rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.22)]">
@@ -1791,11 +2472,33 @@ const beatRequests = (
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3">
-              <Filter size={12} className="text-blue-600" />
-              <div className="leading-none">
-                <div className="text-[7px] font-black uppercase tracking-wide text-blue-500">Report Scope</div>
-                <div className="mt-1 text-[10px] font-black text-slate-700">Today • {reportScopeLabel}</div>
+            <div className="flex h-9 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-2.5 shadow-xs transition hover:border-blue-300">
+              <Calendar size={13} className="text-blue-600 shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <div className="leading-none">
+                  <div className="text-[7px] font-black uppercase tracking-wide text-blue-600">Report Scope Date</div>
+                  <input
+                    type="date"
+                    value={reportDate}
+                    max={today}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setReportDate(e.target.value);
+                      }
+                    }}
+                    className="mt-0.5 bg-transparent text-[11px] font-black text-slate-800 outline-none cursor-pointer p-0 border-none h-4"
+                  />
+                </div>
+                {reportDate !== today && (
+                  <button
+                    type="button"
+                    onClick={() => setReportDate(today)}
+                    className="ml-1 rounded-lg bg-blue-600 px-1.5 py-0.5 text-[8px] font-black text-white hover:bg-blue-700 transition"
+                    title="Reset to today"
+                  >
+                    Today
+                  </button>
+                )}
               </div>
             </div>
 
@@ -2161,6 +2864,309 @@ const beatRequests = (
         )}
       </section>
 
+      {/* 3 DEDICATED OPERATIONAL REVIEW SECTIONS: ACTION REQUIRED, REJECTED, INACTIVE LOCATIONS */}
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-6">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-100 shadow-xs shrink-0">
+              <ShieldAlert size={16} />
+            </span>
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800 truncate">
+              Operational Action & Quality Hub
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* 3 Distinct Segmented Tabs in a single line */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shadow-inner gap-1">
+              <button
+                onClick={() => { setOperationalReviewTab("ACTION_REQUIRED"); setOperationalReviewPage(1); if (!operationalReviewOpen) setOperationalReviewOpen(true); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                  operationalReviewTab === "ACTION_REQUIRED"
+                    ? "bg-amber-500 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <AlertTriangle size={13} />
+                Action Required
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "ACTION_REQUIRED" ? "bg-amber-600 text-white" : "bg-slate-200 text-slate-700"}`}>
+                  {records.filter(r => actionRequired(r.status)).length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => { setOperationalReviewTab("REJECTED"); setOperationalReviewPage(1); if (!operationalReviewOpen) setOperationalReviewOpen(true); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                  operationalReviewTab === "REJECTED"
+                    ? "bg-rose-500 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <XCircle size={13} />
+                Rejected Reports
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "REJECTED" ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-700"}`}>
+                  {records.filter(r => rejected(r.status)).length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => { setOperationalReviewTab("NEEDS_ATTENTION"); setOperationalReviewPage(1); if (!operationalReviewOpen) setOperationalReviewOpen(true); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black transition ${
+                  operationalReviewTab === "NEEDS_ATTENTION"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Eye size={13} />
+                Inactive Locations
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] ${operationalReviewTab === "NEEDS_ATTENTION" ? "bg-blue-700 text-white" : "bg-slate-200 text-slate-700"}`}>
+                  {noActivityAlerts.length}
+                </span>
+              </button>
+            </div>
+
+            {/* Expand / Shrink Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setOperationalReviewOpen(prev => !prev)}
+              title={operationalReviewOpen ? "Collapse section" : "Expand section"}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 hover:text-slate-900 transition shrink-0"
+            >
+              {operationalReviewOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+          </div>
+        </div>
+
+        {operationalReviewOpen && (
+          <>
+            {/* Tab 1: ACTION REQUIRED TABLE */}
+        {operationalReviewTab === "ACTION_REQUIRED" && (
+          <div className="p-5">
+            {records.filter(r => actionRequired(r.status)).length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-100">
+                <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
+                <div className="text-xs font-black text-slate-700">No Action Required Issues</div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-1">All inspection points are operating without immediate field flags.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {records.filter(r => actionRequired(r.status)).slice((operationalReviewPage - 1) * 6, operationalReviewPage * 6).map((item: any) => (
+                    <div key={item.id} className="p-4 rounded-xl border border-amber-200 bg-amber-50/30 flex flex-col justify-between hover:bg-amber-50/60 transition shadow-2xs">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                            {item.__module || "INSPECTION"}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">
+                            {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-800">
+                          {item.locationName || item.beatName || item.areaName || "Operational Point"}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-500 mt-1">
+                          {[geoName(item, "zone", geoMap), geoName(item, "ward", geoMap), geoName(item, "area", geoMap)].filter(Boolean).join(" • ") || "City Jurisdiction"}
+                        </div>
+                        <div className="text-[10px] text-amber-700 font-bold mt-2 bg-amber-100/60 p-2 rounded-lg border border-amber-200/50">
+                          ⚠️ {item.actionOfficerRemark || item.remarks || item.issueDescription || "No remarks provided"}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-amber-100">
+                        <span className="text-[9px] font-bold text-slate-500">
+                          Inspector: <strong className="text-slate-700">{item.supervisorName || item.supervisor?.name || item.employee?.name || "Assigned Officer"}</strong>
+                        </span>
+                        <button
+                          onClick={() => router.push("/city")}
+                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-black transition flex items-center gap-1 shadow-xs"
+                        >
+                          Resolve <ArrowRight size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {Math.ceil(records.filter(r => actionRequired(r.status)).length / 6) > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Showing {(operationalReviewPage - 1) * 6 + 1} to {Math.min(operationalReviewPage * 6, records.filter(r => actionRequired(r.status)).length)} of {records.filter(r => actionRequired(r.status)).length} issues
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setOperationalReviewPage(p => Math.max(1, p - 1))}
+                        disabled={operationalReviewPage === 1}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setOperationalReviewPage(p => p + 1)}
+                        disabled={operationalReviewPage * 6 >= records.filter(r => actionRequired(r.status)).length}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 2: REJECTED REPORTS TABLE */}
+        {operationalReviewTab === "REJECTED" && (
+          <div className="p-5">
+            {records.filter(r => rejected(r.status)).length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-100">
+                <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
+                <div className="text-xs font-black text-slate-700">No Rejected Reports</div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-1">All submitted inspections satisfy QC specifications.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {records.filter(r => rejected(r.status)).slice((operationalReviewPage - 1) * 6, operationalReviewPage * 6).map((item: any) => (
+                    <div key={item.id} className="p-4 rounded-xl border border-rose-200 bg-rose-50/30 flex flex-col justify-between hover:bg-rose-50/60 transition shadow-2xs">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-200">
+                            {item.__module || "INSPECTION"}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400">
+                            {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-800">
+                          {item.locationName || item.beatName || item.areaName || "Inspection Submission"}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-500 mt-1">
+                          {[geoName(item, "zone", geoMap), geoName(item, "ward", geoMap), geoName(item, "area", geoMap)].filter(Boolean).join(" • ") || "City Jurisdiction"}
+                        </div>
+                        <div className="text-[10px] text-rose-700 font-bold mt-2 bg-rose-100/60 p-2 rounded-lg border border-rose-200/50">
+                          ❌ {item.rejectionReason || item.remarks || "No remarks provided"}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-rose-100">
+                        <span className="text-[9px] font-bold text-slate-500">
+                          Submitted by: <strong className="text-slate-700">{item.supervisorName || item.supervisor?.name || item.employee?.name || "Field Personnel"}</strong>
+                        </span>
+                        <button
+                          onClick={() => router.push("/city")}
+                          className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black transition flex items-center gap-1 shadow-xs"
+                        >
+                          View Report <ArrowRight size={10} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {Math.ceil(records.filter(r => rejected(r.status)).length / 6) > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Showing {(operationalReviewPage - 1) * 6 + 1} to {Math.min(operationalReviewPage * 6, records.filter(r => rejected(r.status)).length)} of {records.filter(r => rejected(r.status)).length} rejected reports
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setOperationalReviewPage(p => Math.max(1, p - 1))}
+                        disabled={operationalReviewPage === 1}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setOperationalReviewPage(p => p + 1)}
+                        disabled={operationalReviewPage * 6 >= records.filter(r => rejected(r.status)).length}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: NEEDS ATTENTION / INACTIVITY TABLE */}
+        {operationalReviewTab === "NEEDS_ATTENTION" && (
+          <div className="p-5">
+            {noActivityAlerts.length === 0 ? (
+              <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-100">
+                <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
+                <div className="text-xs font-black text-slate-700">Full Operational Coverage</div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-1">All registered zones and wards have recent report activity.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {noActivityAlerts.slice((operationalReviewPage - 1) * 6, operationalReviewPage * 6).map((alert: any) => (
+                    <div key={alert.id} className="p-4 rounded-xl border border-blue-200 bg-blue-50/30 flex flex-col justify-between hover:bg-blue-50/60 transition shadow-2xs">
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200">
+                            {alert.level} INACTIVE
+                          </span>
+                          <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                            {inactivityLabel(alert.daysInactive)}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-800">
+                          {alert.name}
+                        </div>
+                        <div className="text-[10px] font-semibold text-slate-500 mt-1">
+                          {[alert.zone, alert.ward, alert.area].filter(Boolean).filter((val, i, arr) => arr.indexOf(val) === i).join(" • ")}
+                        </div>
+                        <div className="text-[10px] text-blue-700 font-semibold mt-2 bg-blue-100/60 p-2 rounded-lg border border-blue-200/50">
+                          {alert.lastActivityDate ? `Last reported: ${new Date(`${alert.lastActivityDate}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}` : "No report logged in the last 7 days."}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-100">
+                        <span className="text-[9px] font-bold text-slate-500">
+                          Recommended Action: <strong className="text-slate-700">Assign Field Inspection</strong>
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {Math.ceil(noActivityAlerts.length / 6) > 1 && (
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Showing {(operationalReviewPage - 1) * 6 + 1} to {Math.min(operationalReviewPage * 6, noActivityAlerts.length)} of {noActivityAlerts.length} inactive locations
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setOperationalReviewPage(p => Math.max(1, p - 1))}
+                        disabled={operationalReviewPage === 1}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setOperationalReviewPage(p => p + 1)}
+                        disabled={operationalReviewPage * 6 >= noActivityAlerts.length}
+                        className="px-2 py-1 rounded bg-slate-100 text-[10px] font-black disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+          </>
+        )}
+      </section>
+
       {/* WORKFORCE ALLOCATION - SEPARATE SECTION */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-4">
@@ -2173,7 +3179,7 @@ const beatRequests = (
                 Workforce Allocation
               </h3>
               <p className="text-[9px] font-semibold text-slate-400 mt-0.5">
-                Current supervisor and employee work assignments
+                Current QC, Action Officer, supervisor and employee work assignments
               </p>
             </div>
           </div>
@@ -2189,7 +3195,30 @@ const beatRequests = (
         </div>
 
         <div className="p-4 lg:p-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {/* 1. QC */}
+            <WorkforceRoleCard
+              title="QC Officers"
+              total={workforce.qc.total}
+              assigned={workforce.qc.assigned}
+              unassigned={workforce.qc.available}
+              allocation={workforce.qc.allocation}
+              color="#0284c7"
+              soft="#f0f9ff"
+            />
+
+            {/* 2. AO (Action Officer) */}
+            <WorkforceRoleCard
+              title="Action Officers"
+              total={workforce.ao.total}
+              assigned={workforce.ao.assigned}
+              unassigned={workforce.ao.available}
+              allocation={workforce.ao.allocation}
+              color="#d97706"
+              soft="#fffbeb"
+            />
+
+            {/* 3. Supervisors */}
             <WorkforceRoleCard
               title="Supervisors"
               total={workforce.supervisors.total}
@@ -2200,6 +3229,7 @@ const beatRequests = (
               soft="#f5f3ff"
             />
 
+            {/* 4. Employees */}
             <WorkforceRoleCard
               title="Employees"
               total={workforce.employees.total}
@@ -2211,21 +3241,133 @@ const beatRequests = (
             />
           </div>
 
-          {(workforce.supervisors.available > 0 || workforce.employees.available > 0) && (
+          {(workforce.qc.available > 0 || workforce.ao.available > 0 || workforce.supervisors.available > 0 || workforce.employees.available > 0) && (
             <button
               type="button"
-              onClick={() => router.push("/portal-home/registered-users")}
+              onClick={() => setAssignmentDetailsOpen((current) => !current)}
               className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left hover:bg-amber-100/70 transition"
             >
-              <div className="flex items-center gap-2 text-[10px] font-black text-amber-800">
-                <AlertTriangle size={13} />
-                Unassigned workforce
-              </div>
-              <div className="text-[9px] font-semibold text-amber-600 mt-1 pl-5">
-                {workforce.supervisors.available} supervisor(s) and{" "}
-                {workforce.employees.available} employee(s) are currently unassigned from active work.
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-[10px] font-black text-amber-800">
+                    <AlertTriangle size={13} />
+                    Unassigned workforce
+                  </div>
+                  <div className="text-[9px] font-semibold text-amber-600 mt-1 pl-5">
+                    {[
+                      workforce.qc.available ? `${workforce.qc.available} QC(s)` : null,
+                      workforce.ao.available ? `${workforce.ao.available} AO(s)` : null,
+                      workforce.supervisors.available ? `${workforce.supervisors.available} supervisor(s)` : null,
+                      workforce.employees.available ? `${workforce.employees.available} employee(s)` : null,
+                    ].filter(Boolean).join(", ")}{" "}
+                    currently unassigned from active work.
+                  </div>
+                </div>
+                {assignmentDetailsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
             </button>
+          )}
+
+          {assignmentDetailsOpen && assignmentStatus && (
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-[11px] font-black text-slate-800">Supervisor Assignment Audit</h4>
+                  <p className="mt-0.5 text-[9px] font-semibold text-slate-500">
+                    Live assignment status across Sweeping, Toilet, and Litter Bin
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push("/portal-home/registered-users")}
+                  className="text-[9px] font-black text-blue-600 hover:text-blue-700"
+                >
+                  Open user management →
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {([
+                  ["SWEEPING", "Sweeping"],
+                  ["TOILET", "Toilet"],
+                  ["LITTERBINS", "Litter Bin"],
+                ] as const).map(([key, label]) => {
+                  const module = assignmentStatus.modules[key];
+                  return (
+                    <div key={key} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="text-[9px] font-black uppercase text-slate-500">{label}</div>
+                      <div className="mt-1 text-sm font-black text-slate-900">
+                        {module.assignedAssets}/{module.totalAssets} assigned
+                      </div>
+                      <div className={`mt-1 text-[9px] font-bold ${module.unassignedAssets ? "text-amber-600" : "text-emerald-600"}`}>
+                        {module.unassignedAssets} unassigned asset(s)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-[10px] font-black text-slate-800">
+                    Unassigned Supervisors ({assignmentStatus.supervisors.unassigned})
+                  </div>
+                  <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {assignmentStatus.supervisors.unassignedItems.length ? (
+                      assignmentStatus.supervisors.unassignedItems.map((supervisor) => (
+                        <div key={supervisor.id} className="rounded-lg border border-amber-100 bg-amber-50/60 p-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="text-[10px] font-black text-slate-800">{supervisor.name}</div>
+                            <div className="text-[8px] font-bold text-slate-400">{supervisor.phone || "No phone"}</div>
+                          </div>
+                          <div className="mt-1 text-[8px] font-semibold text-amber-700">{supervisor.reason}</div>
+                          <div className="mt-1 text-[8px] font-semibold text-slate-500">
+                            Modules: {supervisor.moduleKeys.length ? supervisor.moduleKeys.map((key) => key === "LITTERBINS" ? "Litter Bin" : key === "TOILET" ? "Toilet" : "Sweeping").join(", ") : "None"}
+                            {` • ${supervisor.zoneIds.length} zone(s) • ${supervisor.wardIds.length} ward(s)`}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
+                        All supervisors have at least one active asset assignment.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-[10px] font-black text-slate-800">Unassigned Assets</div>
+                  <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {([
+                      ["SWEEPING", "Sweeping"],
+                      ["TOILET", "Toilet"],
+                      ["LITTERBINS", "Litter Bin"],
+                    ] as const).flatMap(([key, label]) =>
+                      assignmentStatus.modules[key].unassignedItems.map((asset) => ({
+                        ...asset,
+                        moduleLabel: label,
+                      }))
+                    ).map((asset) => (
+                      <div key={`${asset.moduleLabel}:${asset.id}`} className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-[10px] font-black text-slate-800">{asset.name}</div>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[8px] font-black text-slate-500">{asset.moduleLabel}</span>
+                        </div>
+                        <div className="mt-1 text-[8px] font-semibold text-slate-500">
+                          Zone: {asset.zoneId ? geoMap[asset.zoneId] || asset.zoneId : "Not set"}
+                          {` • Ward: ${asset.wardId ? geoMap[asset.wardId] || asset.wardId : "Not set"}`}
+                        </div>
+                      </div>
+                    ))}
+                    {Object.values(assignmentStatus.modules).every((module) => module.unassignedAssets === 0) && (
+                      <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
+                        Every approved Sweeping, Toilet, and Litter Bin asset has a supervisor.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </section>
@@ -2382,36 +3524,92 @@ const beatRequests = (
           height="h-[340px]"
         >
           <div className="flex h-full flex-col">
-            <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <label>
-                <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Month</span>
+            <div className="mb-2 flex flex-wrap items-end gap-2">
+              <label className="flex-1 min-w-[140px]">
+                <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Timeframe / Month</span>
                 <select
                   value={moduleMonthOffset}
-                  onChange={(event) => setModuleMonthOffset(Number(event.target.value))}
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400"
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    if (val === "CUSTOM_MONTH" || val === "CUSTOM_RANGE") {
+                      setModuleMonthOffset(val);
+                    } else {
+                      setModuleMonthOffset(Number(val));
+                    }
+                  }}
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400 cursor-pointer"
                 >
-                  {monthPresets.map((preset) => (
-                    <option key={preset.offset} value={preset.offset}>{preset.label}</option>
-                  ))}
+                  <option value={0}>Current Month ({monthPresets[0]?.label || "This Month"})</option>
+                  <option value={-1}>Last Month ({monthPresets[1]?.label || "Last Month"})</option>
+                  <option value={-2}>{monthPresets[2]?.label || "2 Months Ago"}</option>
+                  <option value="CUSTOM_MONTH">📅 Pick Specific Month</option>
+                  <option value="CUSTOM_RANGE">📆 Custom Date Range</option>
                 </select>
               </label>
-              <label>
+
+              {moduleMonthOffset === "CUSTOM_MONTH" && (
+                <label className="min-w-[120px]">
+                  <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-blue-600">Select Month</span>
+                  <input
+                    type="month"
+                    value={moduleCustomMonth}
+                    max={today.slice(0, 7)}
+                    onChange={(e) => {
+                      if (e.target.value) setModuleCustomMonth(e.target.value);
+                    }}
+                    className="h-8 w-full rounded-lg border border-blue-200 bg-blue-50/50 px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
+                  />
+                </label>
+              )}
+
+              {moduleMonthOffset === "CUSTOM_RANGE" && (
+                <>
+                  <label className="min-w-[110px]">
+                    <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-blue-600">From Date</span>
+                    <input
+                      type="date"
+                      value={moduleCustomFromDate}
+                      max={moduleCustomToDate || today}
+                      onChange={(e) => {
+                        if (e.target.value) setModuleCustomFromDate(e.target.value);
+                      }}
+                      className="h-8 w-full rounded-lg border border-blue-200 bg-blue-50/50 px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
+                    />
+                  </label>
+                  <label className="min-w-[110px]">
+                    <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-blue-600">To Date</span>
+                    <input
+                      type="date"
+                      value={moduleCustomToDate}
+                      min={moduleCustomFromDate}
+                      max={today}
+                      onChange={(e) => {
+                        if (e.target.value) setModuleCustomToDate(e.target.value);
+                      }}
+                      className="h-8 w-full rounded-lg border border-blue-200 bg-blue-50/50 px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
+                    />
+                  </label>
+                </>
+              )}
+
+              <label className="flex-1 min-w-[110px]">
                 <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Zone</span>
                 <select
                   value={moduleZone}
                   onChange={(event) => { setModuleZone(event.target.value); setModuleWard("ALL"); }}
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400"
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400 cursor-pointer"
                 >
                   <option value="ALL">All Zones</option>
                   {zones.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
-              <label>
+
+              <label className="flex-1 min-w-[110px]">
                 <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Ward</span>
                 <select
                   value={moduleWard}
                   onChange={(event) => setModuleWard(event.target.value)}
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400"
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400 cursor-pointer"
                 >
                   <option value="ALL">All Wards</option>
                   {moduleVisibleWards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -2503,112 +3701,183 @@ const beatRequests = (
 
       
 
-      {/* ADAPTIVE HEAT MAP + SUPERVISOR RANKING */}
-      <section className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] items-stretch gap-5">
-        <div className="h-[530px] rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
-          <Head
-            title={`${heatLevelLabel} Activity Heat Map`}
-            sub={`Today's report count by ${heatLevelLabel.toLowerCase()} and module • ${reportScopeLabel}`}
-            icon={<Layers3 size={17} />}
-          />
+      {/* OPERATIONAL LEADERBOARDS & PERFORMANCE (2x2 Grid with Common Filters) */}
+      <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-slate-800 tracking-tight">Leaderboards & Operational Insights</h2>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Clean Direct Filters without text labels */}
+            <select
+              value={leaderboardMonthOffset}
+              onChange={(e) => {
+                setLeaderboardMonthOffset(Number(e.target.value));
+                setLeaderboardTimeframe("MONTH");
+              }}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              {monthPresets.map((preset) => (
+                <option key={preset.offset} value={preset.offset}>{preset.label}</option>
+              ))}
+            </select>
 
-          <div className="overflow-x-auto p-4 flex-1 flex flex-col">
-              <div className="min-w-[560px] w-full">
-                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[8px] font-bold text-slate-500">
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-emerald-500" />Sweeping</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-blue-500" />Toilets</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-amber-500" />Litter Bins</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-violet-500" />GVP</span>
-                  <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded bg-rose-500" />Needs Attention</span>
-                </div>
+            <select
+              value={leaderboardZone}
+              onChange={(e) => {
+                setLeaderboardZone(e.target.value);
+                setLeaderboardWard("ALL");
+              }}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">All Zones</option>
+              {zones.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
 
-                <div className="space-y-2">
-                <div className="grid grid-cols-[118px_repeat(4,minmax(64px,1fr))_96px] gap-1.5 text-[8px] font-black uppercase text-slate-400 mb-2">
-                  <div>{heatLevelLabel}</div>
-                  <div className="text-center">Sweeping</div>
-                  <div className="text-center">Toilets</div>
-                  <div className="text-center">Litter Bins</div>
-                  <div className="text-center">GVP</div>
-                  <div className="text-center">Needs Attention</div>
-                </div>
+            <select
+              value={leaderboardWard}
+              onChange={(e) => setLeaderboardWard(e.target.value)}
+              className="h-8 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">All Wards</option>
+              {(leaderboardZone === "ALL" ? wards : wards.filter(w => parentId(w) === leaderboardZone)).map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
 
-                {visibleHeatRows.map((row: any) => (
-                  <div
-                    key={row.id}
-                    className="grid grid-cols-[118px_repeat(4,minmax(64px,1fr))_96px] gap-1.5"
-                  >
-                    <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
-                      <div className="font-black text-[11px] text-slate-800">
-                        {row.name}
-                      </div>
-
-                      <div className="text-[9px] text-slate-400">
-                        {row.total} total
-                      </div>
-                    </div>
-
-                    {KEYS.map((key) => {
-                      const value = row.modules[key];
-                      const ratio = value / maxHeat;
-
-                      return (
-                        <div
-                          key={key}
-                          title={`${row.name}: ${value} ${MODULES[key].short} report${value === 1 ? "" : "s"}`}
-                          className="rounded-xl border border-slate-100 flex items-center justify-center font-black text-sm transition"
-                          style={{
-                            background: value
-                              ? ratio > 0.7
-                                ? MODULES[key].color
-                                : MODULES[key].soft
-                              : "#f8fafc",
-                            color:
-                              value && ratio > 0.7
-                                ? "#fff"
-                                : value
-                                  ? MODULES[key].color
-                                  : "#94a3b8",
-                          }}
-                        >
-                          {value}
-                        </div>
-                      );
-                    })}
-
-                    <div
-                      title={`${row.name}: ${row.exceptions} report${row.exceptions === 1 ? "" : "s"} need attention`}
-                      className={`rounded-xl flex items-center justify-center font-black text-xs border ${
-                        row.exceptions
-                          ? "bg-rose-50 text-rose-600 border-rose-200"
-                          : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                      }`}
-                    >
-                      {row.exceptions}
-                    </div>
-                  </div>
-                ))}
-                </div>
-              </div>
-
-              <div className="mt-auto pt-3">
-                <div className="min-w-[560px] border-t border-slate-100 pt-2 text-[8px] font-semibold text-slate-400">
-                  Showing {visibleHeatRows.length} of {heatRows.length} registered {heatLevelLabel.toLowerCase()}{heatRows.length === 1 ? "" : "s"}. Each number is the report count; red shows rejected or action-required reports.
-                </div>
-              </div>
-
-              {heatPageCount > 1 && (
-                <Pager
-                  page={heatPage}
-                  pages={heatPageCount}
-                  onPrev={() => setHeatPage((page) => Math.max(1, page - 1))}
-                  onNext={() => setHeatPage((page) => Math.min(heatPageCount, page + 1))}
-                  label={`${heatLevelLabel}s`}
-                />
-              )}
+            {/* Quick Timeframe pills */}
+            <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200 ml-1">
+              <button
+                onClick={() => setLeaderboardTimeframe("TODAY")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "TODAY" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setLeaderboardTimeframe("WEEK")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "WEEK" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                7 Days
+              </button>
+              <button
+                onClick={() => setLeaderboardTimeframe("MONTH")}
+                className={`px-3 py-1 text-[10px] font-black rounded-lg transition ${
+                  leaderboardTimeframe === "MONTH" ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                30 Days
+              </button>
+            </div>
           </div>
         </div>
+        
+        {/* 2 x 2 Division Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           {/* Employee Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-blue-100/80 text-blue-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <Users size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Employees</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Attendance & presence rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardEmployeeTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardEmployeeTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardEmployeeTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardEmployeeTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardEmployeeTop ? dailyLeaderboards.employees.top : dailyLeaderboards.employees.bottom, leaderboardEmployeeTop, 'Employees')}
+             </div>
+           </div>
+           
+           {/* Supervisor Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-purple-100/80 text-purple-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <Users size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Supervisors</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Inspection submission rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardSupervisorTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardSupervisorTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardSupervisorTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardSupervisorTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardSupervisorTop ? dailyLeaderboards.supervisors.top : dailyLeaderboards.supervisors.bottom, leaderboardSupervisorTop, 'Supervisors')}
+             </div>
+           </div>
 
-        <div className="h-[530px] rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
+           {/* Ward Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-orange-100/80 text-orange-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <MapPin size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Wards</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Jurisdiction activity rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardWardTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardWardTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardWardTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardWardTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardWardTop ? dailyLeaderboards.wards.top : dailyLeaderboards.wards.bottom, leaderboardWardTop, 'Wards')}
+             </div>
+           </div>
+
+           {/* Zone Ranking Card */}
+           <div className="bg-slate-50/40 rounded-2xl border border-slate-200 p-5 flex flex-col hover:border-slate-300 transition shadow-xs">
+             <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
+                   <MapIcon size={16} />
+                 </div>
+                 <div>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Zones</h3>
+                   <span className="text-[9px] text-slate-400 font-semibold">Zone-wide operational rank</span>
+                 </div>
+               </div>
+               <div className="flex bg-slate-200/60 p-0.5 rounded-lg shrink-0">
+                 <button onClick={() => setLeaderboardZoneTop(true)} className={`px-2.5 py-1 text-[9px] font-black rounded ${leaderboardZoneTop ? 'bg-white shadow-xs text-emerald-600 font-black' : 'text-slate-500'}`}>Highest 5</button>
+                 <button onClick={() => setLeaderboardZoneTop(false)} className={`px-2.5 py-1 text-[9px] font-black rounded ${!leaderboardZoneTop ? 'bg-white shadow-xs text-rose-600 font-black' : 'text-slate-500'}`}>Least 5</button>
+               </div>
+             </div>
+             <div className="flex-1">
+                {renderLeaderboardList(leaderboardZoneTop ? dailyLeaderboards.zones.top : dailyLeaderboards.zones.bottom, leaderboardZoneTop, 'Zones')}
+             </div>
+           </div>
+        </div>
+      </section>
+
+      {/* SUPERVISOR PERFORMANCE (FULL WIDTH BELOW LEADERBOARDS) */}
+      <section className="w-full mb-6">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
           <Head
             title="Supervisor Performance"
             sub="Supervisor report results for the selected month, zone and ward"
@@ -2684,7 +3953,7 @@ const beatRequests = (
                 <span>Supervisor</span>
                 <span>Approval</span>
               </div>
-              <div className="space-y-1.5 flex-1 min-h-0 overflow-hidden">
+              <div className="space-y-1.5 flex-1 min-h-0 max-h-[360px] overflow-y-auto pr-1">
               {supervisorPerformance.length === 0 ? (
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-center">
                   <div className="text-[11px] font-black text-slate-600">No supervisors found</div>
@@ -2708,7 +3977,7 @@ const beatRequests = (
                       </div>
 
                       <div className="text-[9px] text-slate-400 mt-1">
-                        Reports {item.total} • Approved {item.approved} • Rejected {item.rejected} • Needs attention {item.action}
+                        Reports {item.total} • Approved {item.approved} • Rejected {item.rejected} • Action required {item.action}
                       </div>
                     </div>
 
@@ -2750,87 +4019,297 @@ const beatRequests = (
         </div>
       </section>
 
-      {/* EXTRA CITY INSIGHTS */}
-      
+      {/* OVERALL CITY PERFORMANCE: SPLIT CONTAINERS (SUPERVISOR VS EMPLOYEE) */}
+      <section className="mb-6 space-y-4">
+        {/* Universal Timeframe Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-sm">
+              <Activity size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-black text-slate-800 tracking-tight">Overall City Operational Performance</h2>
+              <p className="text-[11px] font-semibold text-slate-400">Independent inspection analytics & trends for Field Supervisors</p>
+            </div>
+          </div>
 
-      {/* PLATFORM USER DIRECTORY - 10 ROW PREVIEW */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200/60">
+              <button
+                onClick={() => setOverallTimeframe(15)}
+                className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition ${
+                  overallTimeframe === 15 
+                    ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                15 Days
+              </button>
+              <button
+                onClick={() => setOverallTimeframe(30)}
+                className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition ${
+                  overallTimeframe === 30 
+                    ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                30 Days
+              </button>
+              <button
+                onClick={() => setOverallTimeframe("CUSTOM")}
+                className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition ${
+                  overallTimeframe === "CUSTOM" 
+                    ? "bg-white shadow-sm text-blue-600 border border-slate-200/60" 
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Custom
+              </button>
+            </div>
+
+            {overallTimeframe === "CUSTOM" && (
+              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                <input
+                  type="date"
+                  value={customDateStart}
+                  onChange={(e) => setCustomDateStart(e.target.value)}
+                  className="h-7 px-2 text-[10px] font-bold rounded-lg border-none outline-none text-slate-700 bg-white"
+                />
+                <span className="text-[10px] font-black text-slate-400">to</span>
+                <input
+                  type="date"
+                  value={customDateEnd}
+                  onChange={(e) => setCustomDateEnd(e.target.value)}
+                  className="h-7 px-2 text-[10px] font-bold rounded-lg border-none outline-none text-slate-700 bg-white"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Supervisor Inspection Trends Container (Full Width) */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col hover:border-slate-300 transition">
+          <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-xs">
+                <Users size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800">Supervisor Inspection Trends</h3>
+                <p className="text-[10px] font-bold text-slate-400">Inspections submitted by supervisors across Beats, Toilets, Litter Bins</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-1.5 shadow-xs">
+                <Users size={14} className="text-purple-600" />
+                <div className="leading-tight">
+                  <div className="text-[8px] font-black uppercase text-purple-600">Supervisors on Ground</div>
+                  <div className="text-[11px] font-black text-slate-800">
+                    {overallTrendMetrics.activeSupervisorsOnGround} Active <span className="text-slate-400 font-bold">/ {overallTrendMetrics.registeredSupervisorsCount} Registered ({overallTrendMetrics.activeCoveragePercent}%)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 shadow-xs">
+                <Activity size={14} className="text-indigo-600" />
+                <div className="leading-tight">
+                  <div className="text-[8px] font-black uppercase text-indigo-600">Total Inspections</div>
+                  <div className="text-[11px] font-black text-indigo-950">
+                    {overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0)} Submitted
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick High-Value KPI Stats (5 Cards) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+            {/* 1. Daily Average */}
+            <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-slate-400">Daily Average</span>
+                <TrendingUp size={13} className="text-slate-400" />
+              </div>
+              <div className="text-lg font-black text-slate-800 mt-1">
+                {overallChartData.length ? Math.round(overallChartData.reduce((sum, d) => sum + d.supervisorInspections, 0) / overallChartData.length) : 0} <span className="text-[10px] font-bold text-slate-400">/day</span>
+              </div>
+              <div className="text-[8px] font-semibold text-slate-400 mt-0.5">Average inspections daily</div>
+            </div>
+
+            {/* 2. Peak Day */}
+            <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-sky-600">Peak Inspection Day</span>
+                <Sparkles size={13} className="text-sky-500" />
+              </div>
+              <div className="text-lg font-black text-sky-950 mt-1">
+                {Math.max(...overallChartData.map(d => d.supervisorInspections), 0)} <span className="text-[10px] font-bold text-sky-600">insps</span>
+              </div>
+              <div className="text-[8px] font-semibold text-sky-700/80 mt-0.5">Highest volume day</div>
+            </div>
+
+            {/* 3. Approval Rate */}
+            <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-emerald-600">Approval Quality</span>
+                <CheckCircle2 size={13} className="text-emerald-500" />
+              </div>
+              <div className="text-lg font-black text-emerald-950 mt-1">
+                {overallTrendMetrics.approvalRate}%
+              </div>
+              <div className="text-[8px] font-semibold text-emerald-700/80 mt-0.5">
+                {overallTrendMetrics.approved} approved inspections
+              </div>
+            </div>
+
+            {/* 4. Rejected / Issues */}
+            <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-rose-600">Rejections</span>
+                <XCircle size={13} className="text-rose-500" />
+              </div>
+              <div className="text-lg font-black text-rose-950 mt-1">
+                {overallTrendMetrics.rejected} <span className="text-[10px] font-bold text-rose-600">({overallTrendMetrics.rejectionRate}%)</span>
+              </div>
+              <div className="text-[8px] font-semibold text-rose-700/80 mt-0.5">Field corrections needed</div>
+            </div>
+
+            {/* 5. Top Module */}
+            <div className="p-3.5 rounded-xl bg-purple-50/60 border border-purple-100 hover:bg-white hover:shadow-xs transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[8px] font-black uppercase tracking-wider text-purple-600">Top Active Module</span>
+                <Filter size={13} className="text-purple-500" />
+              </div>
+              <div className="text-lg font-black text-purple-950 mt-1 truncate" title={overallTrendMetrics.topModuleName}>
+                {overallTrendMetrics.topModuleName}
+              </div>
+              <div className="text-[8px] font-semibold text-purple-700/80 mt-0.5">
+                {overallTrendMetrics.topModuleCount} inspections logged
+              </div>
+            </div>
+          </div>
+
+          {/* Area / Bar Chart */}
+          <div className="h-[280px] w-full mt-auto">
+            {overall30DayLoading && overall30DayRecords.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400 animate-pulse">
+                Loading supervisor inspection trends...
+              </div>
+            ) : overallChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={overallChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorSupervisor" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} dx={-8} allowDecimals={false} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 700 }}
+                    cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  />
+                  <Area type="monotone" dataKey="supervisorInspections" name="Supervisor Inspections" stroke="#8b5cf6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSupervisor)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400">
+                No supervisor activity found for this timeframe.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {selectedPerformanceUser && typeof document !== 'undefined' && createPortal(
+        <UserPerformanceModal 
+          isOpen={Boolean(selectedPerformanceUser)}
+          user={selectedPerformanceUser} 
+          onClose={() => setSelectedPerformanceUser(null)} 
+        />,
+        document.body
+      )}
+      {/* PERSONNEL PERFORMANCE DIRECTORY */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/80 p-5">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <Users size={16} className="text-blue-600" />
-
                 <h3 className="text-sm font-black text-slate-800">
-                  Recent users / Registered employees
+                  Supervisor Performance Directory
                 </h3>
-
-                <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
-                  {filteredUsers.length}
+                <span className="rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[9px] font-black text-purple-700">
+                  {filteredUsers.length} Supervisors
                 </span>
               </div>
-
               <p className="text-[10px] uppercase text-slate-400 font-bold mt-1">
-                List of recently added employees
+                View analytics for individual supervisors
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[210px] flex-1 xl:flex-none">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search personnel..."
-                  className="h-9 w-full xl:w-60 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[10px] font-bold outline-none focus:border-blue-400"
-                />
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Supervisor Selector Dropdown with Integrated Search */}
+              <div className="relative">
+                <select
+                  value={
+                    search && supervisorsList.some(s => (s.name || s.email) === search)
+                      ? search
+                      : search
+                        ? "CUSTOM_SEARCH"
+                        : "ALL"
+                  }
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    if (val === "ALL") {
+                      setSearch("");
+                    } else if (val !== "CUSTOM_SEARCH") {
+                      setSearch(val);
+                    }
+                    setDirectoryPage(1);
+                  }}
+                  className="h-9 w-64 rounded-xl border border-slate-200 bg-white px-3 pr-8 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-400 shadow-sm appearance-none cursor-pointer"
+                >
+                  <option value="ALL">All Supervisors ({supervisorsList.length})</option>
+                  {supervisorsList.map((sup) => (
+                    <option key={sup.id} value={sup.name || sup.email || sup.id}>
+                      {sup.name || "Unnamed Supervisor"} {sup.email ? `(${sup.email})` : ""}
+                    </option>
+                  ))}
+                  {search && !supervisorsList.some(s => (s.name || s.email) === search) && (
+                    <option value="CUSTOM_SEARCH">Filtered: "{search}"</option>
+                  )}
+                </select>
+                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               </div>
 
-              <select
-                value={directoryRole}
-                onChange={(event) => setDirectoryRole(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Roles</option>
-
-                {directoryRoleOptions.map((role) => (
-                  <option key={role} value={role}>
-                    {role.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={directoryModule}
-                onChange={(event) => setDirectoryModule(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Modules</option>
-
-                {directoryModuleOptions.map((module) => (
-                  <option key={module} value={module}>
-                    {prettyModuleName(module)}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={directoryStatus}
-                onChange={(event) => setDirectoryStatus(event.target.value)}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600 outline-none"
-              >
-                <option value="ALL">All Status</option>
-
-                {directoryStatusOptions.map((statusValue) => (
-                  <option key={statusValue} value={statusValue}>
-                    {statusValue}
-                  </option>
-                ))}
-              </select>
+              {/* Quick Search inside Dropdown area */}
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setDirectoryPage(1);
+                  }}
+                  placeholder="Type to filter..."
+                  className="h-9 w-44 rounded-xl border border-slate-200 bg-slate-50/70 pl-8 pr-2.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-400 focus:bg-white shadow-xs"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setDirectoryPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
 
               <button
                 type="button"
@@ -2842,11 +4321,46 @@ const beatRequests = (
               </button>
             </div>
           </div>
+          
+          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-200/50">
+            <Filter size={12} className="text-slate-400" />
+            <select
+              value={directoryRole}
+              onChange={(event) => setDirectoryRole(event.target.value)}
+              className="h-7 rounded-lg border-none bg-slate-200/50 px-2 text-[9px] font-bold text-slate-600 outline-none"
+            >
+              <option value="ALL">All Roles</option>
+              {directoryRoleOptions.map((role) => (
+                <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+
+            <select
+              value={directoryModule}
+              onChange={(event) => setDirectoryModule(event.target.value)}
+              className="h-7 rounded-lg border-none bg-slate-200/50 px-2 text-[9px] font-bold text-slate-600 outline-none"
+            >
+              <option value="ALL">All Modules</option>
+              {directoryModuleOptions.map((module) => (
+                <option key={module} value={module}>{prettyModuleName(module)}</option>
+              ))}
+            </select>
+
+            <select
+              value={directoryStatus}
+              onChange={(event) => setDirectoryStatus(event.target.value)}
+              className="h-7 rounded-lg border-none bg-slate-200/50 px-2 text-[9px] font-bold text-slate-600 outline-none"
+            >
+              <option value="ALL">All Status</option>
+              {directoryStatusOptions.map((statusValue) => (
+                <option key={statusValue} value={statusValue}>{statusValue}</option>
+              ))}
+            </select>
+          </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
             <span>
-              Showing {Math.min(10, filteredUsers.length)} of {filteredUsers.length} matching user
-              {filteredUsers.length === 1 ? "" : "s"}
+              Showing {filteredUsers.length > 0 ? (directoryPage - 1) * DIRECTORY_PAGE_SIZE + 1 : 0} - {Math.min(directoryPage * DIRECTORY_PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length} matching supervisors
             </span>
 
             {(search ||
@@ -2873,10 +4387,12 @@ const beatRequests = (
           <table className="w-full min-w-[900px] text-left text-xs">
             <thead className="bg-white">
               <tr className="border-b border-slate-200 text-[9px] font-black uppercase tracking-wider text-slate-400">
-                <th className="p-4">Personnel</th>
+                <th className="p-4 w-12 text-center">Rank</th>
+                <th className="p-4">Name</th>
                 <th className="p-4">System Roles</th>
                 <th className="p-4">Active Modules</th>
-                <th className="p-4 text-right">Status</th>
+                <th className="p-4">Status</th>
+                <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
 
@@ -2886,19 +4402,38 @@ const beatRequests = (
                 const modules = getUserModuleLabels(user);
                 const statusValue = getUserStatus(user);
 
+                const userId = user.id || user.email || index.toString();
+                const isExpanded = selectedPerformanceUser?.id === user.id;
+
                 return (
+                  <React.Fragment key={userId}>
                   <tr
-                    key={user.id || user.email || index}
-                    className="hover:bg-slate-50 transition"
+                    className={`transition ${isExpanded ? 'bg-blue-50/30' : 'hover:bg-slate-50'}`}
                   >
+                    <td className="p-4 text-center font-black text-slate-400">
+                      #{index + 1}
+                    </td>
                     <td className="p-4">
-                      <div className="font-black text-[11px] text-slate-900">
+                      <button 
+                        onClick={() => setSelectedPerformanceUser(user)}
+                        className="font-black text-[11px] text-blue-600 hover:text-blue-700 hover:underline text-left"
+                      >
                         {user.name || "Unnamed Personnel"}
-                      </div>
+                      </button>
 
                       <div className="mt-1 text-[9px] font-semibold text-slate-400">
                         {user.email || user.phone || "-"}
                       </div>
+                      
+                      {/* Assigned Location */}
+                      {(user.assignedZone || user.assignedWard || user.assignedArea) && (
+                        <div className="mt-1 text-[8px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                          <MapPin size={9} />
+                          {[user.assignedZone?.name, user.assignedWard?.name, user.assignedArea?.name]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-4">
@@ -2945,7 +4480,7 @@ const beatRequests = (
                       </div>
                     </td>
 
-                    <td className="p-4 text-right">
+                    <td className="p-4">
                       <span
                         className={`rounded-md border px-2 py-1 text-[8px] font-black ${
                           statusValue === "ACTIVE"
@@ -2956,14 +4491,28 @@ const beatRequests = (
                         {statusValue}
                       </span>
                     </td>
+                    
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => setSelectedPerformanceUser(isExpanded ? null : user)}
+                        className={`inline-flex px-2.5 py-1.5 rounded-lg border text-[10px] font-black transition items-center gap-1.5 shadow-sm ${
+                          isExpanded 
+                            ? "bg-slate-800 text-white border-slate-900 hover:bg-slate-700" 
+                            : "bg-blue-50/50 text-blue-600 border-blue-100 hover:bg-blue-100 hover:border-blue-200"
+                        }`}
+                      >
+                        <Activity size={12} /> {isExpanded ? 'Close' : 'Performance'}
+                      </button>
+                    </td>
                   </tr>
+                  </React.Fragment>
                 );
               })}
 
               {visibleDirectoryUsers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={6}
                     className="py-14 text-center text-[10px] font-bold text-slate-400"
                   >
                     No personnel records match the selected filters.
@@ -2974,20 +4523,31 @@ const beatRequests = (
           </table>
         </div>
 
-        {filteredUsers.length > 10 && (
+        {/* Pagination Footer */}
+        {filteredUsers.length > 0 && (
           <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 flex items-center justify-between gap-3">
-            <span className="text-[9px] font-bold text-slate-400">
-              Preview is limited to 10 users for a cleaner dashboard.
+            <span className="text-[10px] font-bold text-slate-500">
+              Page {directoryPage} of {directoryTotalPages} ({filteredUsers.length} total records)
             </span>
 
-            <button
-              type="button"
-              onClick={() => router.push("/portal-home/registered-users")}
-              className="text-[9px] font-black text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              Open full directory
-              <ArrowRight size={11} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDirectoryPage(p => Math.max(1, p - 1))}
+                disabled={directoryPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[10px] font-black text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition shadow-sm"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectoryPage(p => Math.min(directoryTotalPages, p + 1))}
+                disabled={directoryPage >= directoryTotalPages}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[10px] font-black text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition shadow-sm"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </section>

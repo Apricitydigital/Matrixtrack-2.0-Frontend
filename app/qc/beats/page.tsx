@@ -248,8 +248,8 @@ export default function BeatsManagementPage() {
 
     // --- Styling Variables ---
     const mapTileUrl = isDarkMode
-        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+        ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+        : "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
 
     const bgColor = isDarkMode ? "#0f172a" : "#f1f5f9";
     const cardColor = isDarkMode ? "#1e293b" : "#ffffff";

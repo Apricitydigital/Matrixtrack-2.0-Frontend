@@ -567,16 +567,16 @@ function UploadModal({
   if (!open || typeof document === "undefined") return null;
 
   const acceptFiles = (nextFiles: File[]) => {
-    const csvFiles = nextFiles.filter((file) =>
-      file.name.toLowerCase().endsWith(".csv")
+    const attendanceFiles = nextFiles.filter((file) =>
+      /\.(csv|xlsx)$/i.test(file.name) && file.size <= 15 * 1024 * 1024
     );
 
-    if (!csvFiles.length) return;
+    if (!attendanceFiles.length) return;
 
     setFiles((current) => {
       const merged = [...current];
 
-      csvFiles.forEach((file) => {
+      attendanceFiles.forEach((file) => {
         if (
           !merged.some(
             (item) =>
@@ -636,11 +636,11 @@ function UploadModal({
 
             <div className="min-w-0">
               <h2 className="text-[15px] font-black tracking-tight text-slate-900">
-                Upload attendance CSVs
+                Upload attendance files
               </h2>
 
               <p className="mt-0.5 text-[10.5px] font-semibold text-slate-500">
-                Upload Present and Absent exports together or separately
+                Upload Present and Absent CSV/XLSX exports together or separately
               </p>
             </div>
           </div>
@@ -661,7 +661,7 @@ function UploadModal({
             ref={inputRef}
             type="file"
             multiple
-            accept=".csv,text/csv"
+            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={(event) =>
               acceptFiles(
@@ -704,11 +704,11 @@ function UploadModal({
             </div>
 
             <p className="text-xs font-black text-slate-800">
-              Drop Present + Absent CSVs here
+              Drop Present + Absent CSV/XLSX files here
             </p>
 
             <p className="mt-1 text-[10.5px] font-medium text-slate-500">
-              Select multiple CSV files · maximum 15 MB each
+              Select multiple CSV or XLSX files · maximum 15 MB each
             </p>
           </button>
 
@@ -879,7 +879,7 @@ function UploadCalendarModal({
               <CalendarDays size={18} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-[15px] font-black tracking-tight text-slate-900">Attendance CSV calendar</h2>
+              <h2 className="text-[15px] font-black tracking-tight text-slate-900">Attendance upload calendar</h2>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-slate-500">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 ring-1 ring-emerald-200">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Uploaded
@@ -946,8 +946,8 @@ function UploadCalendarModal({
                 : cell.future
                   ? "Future date"
                   : cell.uploaded
-                    ? `${cell.upload?.completedUploads || 0} CSV ${cell.upload?.completedUploads === 1 ? "file" : "files"} uploaded`
-                    : "CSV not uploaded";
+                    ? `${cell.upload?.completedUploads || 0} attendance ${cell.upload?.completedUploads === 1 ? "file" : "files"} uploaded`
+                    : "Attendance file not uploaded";
 
               return (
                 <div
@@ -1478,8 +1478,16 @@ function WorkDurationEmployeesPopup({
 function AttendanceDashboard() {
   const { user } = useAuth();
   const hmsSuperAdmin = isHmsSuperAdmin(user);
-  const isUlbOfficer =
-    user?.roles?.some((role) => String(role).toUpperCase() === "ULB_OFFICER") ?? false;
+  const attendanceRoles = new Set(
+    [user?.role, ...(user?.roles || [])]
+      .filter(Boolean)
+      .map((role) => String(role).toUpperCase())
+  );
+  const isUlbOfficer = attendanceRoles.has("ULB_OFFICER");
+  const canUploadAttendance =
+    hmsSuperAdmin ||
+    attendanceRoles.has("CITY_ADMIN") ||
+    attendanceRoles.has("COMMISSIONER");
   const [cities, setCities] = useState<AttendanceCity[]>([]);
   const [selectedCityId, setSelectedCityId] = useState("");
   const [citiesLoading, setCitiesLoading] = useState(false);
@@ -2017,9 +2025,14 @@ function AttendanceDashboard() {
   };
 
   const handleUpload = async (files: File[]) => {
-    const csvFiles = files.filter((file) => file.name.toLowerCase().endsWith(".csv"));
-    if (!csvFiles.length) {
-      setError("Please choose at least one CSV file");
+    if (!canUploadAttendance) {
+      setError("Only City Admin, Commissioner, or HMS Super Admin can upload attendance files.");
+      return;
+    }
+
+    const attendanceFiles = files.filter((file) => /\.(csv|xlsx)$/i.test(file.name));
+    if (!attendanceFiles.length) {
+      setError("Please choose at least one CSV or XLSX file");
       return;
     }
 
@@ -2030,7 +2043,7 @@ function AttendanceDashboard() {
     try {
       const results: AttendanceUploadResponse[] = [];
 
-      for (const file of csvFiles) {
+      for (const file of attendanceFiles) {
         const result = await AttendanceApi.upload(
           file,
           hmsSuperAdmin ? selectedCityId : undefined
@@ -2045,7 +2058,7 @@ function AttendanceDashboard() {
 
       setUploadOpen(false);
       setNotice(
-        `${results.length} CSV ${results.length === 1 ? "file" : "files"} imported for ${dates.join(", ")} · ${numberFormatter.format(insertedRows)} new · ${numberFormatter.format(updatedRows)} updated${invalidRows ? ` · ${numberFormatter.format(invalidRows)} rejected` : ""
+        `${results.length} attendance ${results.length === 1 ? "file" : "files"} imported for ${dates.join(", ")} · ${numberFormatter.format(insertedRows)} new · ${numberFormatter.format(updatedRows)} updated${invalidRows ? ` · ${numberFormatter.format(invalidRows)} rejected` : ""
         }`
       );
       setPage(1);
@@ -2053,7 +2066,7 @@ function AttendanceDashboard() {
       setAppliedFilters({ ...emptyFilters });
       setUploadTrackingVersion((current) => current + 1);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "CSV import failed");
+      setError(err instanceof ApiError ? err.message : "Attendance file import failed");
     } finally {
       setUploading(false);
     }
@@ -2169,7 +2182,7 @@ function AttendanceDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-[1780px] space-y-4 pb-8">
-      {!isUlbOfficer && (
+      {canUploadAttendance && (
         <UploadModal
           open={uploadOpen}
           uploading={uploading}
@@ -2320,7 +2333,7 @@ function AttendanceDashboard() {
             Upload calendar
           </button>
 
-          {!isUlbOfficer && (
+          {canUploadAttendance && (
             <button
               type="button"
               onClick={() => setUploadOpen(true)}
@@ -2329,7 +2342,7 @@ function AttendanceDashboard() {
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-black text-white shadow-md shadow-blue-600/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
             >
               <UploadCloud size={14} />
-              Upload CSVs
+              Upload files
             </button>
           )}
         </div>
@@ -2375,12 +2388,12 @@ function AttendanceDashboard() {
                 }`}
             >
               {todayUploadLoading
-                ? "Checking today's CSV upload..."
+                ? "Checking today's attendance upload..."
                 : todayUploadData && todayUploaded
-                  ? "Today's CSV uploaded"
+                  ? "Today's attendance uploaded"
                   : todayUploadData
-                    ? "Today's CSV not uploaded"
-                    : "Today's CSV upload status unavailable"}
+                    ? "Today's attendance not uploaded"
+                    : "Today's attendance upload status unavailable"}
             </p>
             <span className="hidden h-1 w-1 shrink-0 rounded-full bg-current opacity-30 sm:block" />
             <p
@@ -2392,9 +2405,9 @@ function AttendanceDashboard() {
                 }`}
             >
               {todayUploadData && todayUploaded
-                ? `${todayUpload?.completedUploads || 0} CSV ${todayUpload?.completedUploads === 1 ? "file" : "files"} uploaded for ${formatShortDate(todayKey)}.`
+                ? `${todayUpload?.completedUploads || 0} attendance ${todayUpload?.completedUploads === 1 ? "file" : "files"} uploaded for ${formatShortDate(todayKey)}.`
                 : todayUploadData
-                  ? `No completed attendance CSV has been uploaded for ${formatShortDate(todayKey)}.`
+                  ? `No completed attendance file has been uploaded for ${formatShortDate(todayKey)}.`
                   : `Attendance upload status for ${formatShortDate(todayKey)} could not be confirmed.`}
             </p>
           </div>
@@ -2550,14 +2563,14 @@ function AttendanceDashboard() {
           </div>
           <h2 className="text-xl font-black tracking-tight text-slate-900">No attendance data yet</h2>
           <p className="mt-2 max-w-md text-sm font-medium leading-6 text-slate-500">
-            Upload the first daily CSV. The data will be saved city-wise in PostgreSQL and this dashboard will populate automatically.
+            Upload the first daily CSV or XLSX file. The data will be saved city-wise in PostgreSQL and this dashboard will populate automatically.
           </p>
           <button
             type="button"
             onClick={() => setUploadOpen(true)}
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700"
           >
-            <UploadCloud size={16} /> Upload first CSV
+            <UploadCloud size={16} /> Upload first file
           </button>
         </section>
       ) : (
@@ -2746,7 +2759,7 @@ function AttendanceDashboard() {
                     </Pie>
                     <Tooltip
                       contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
-                      formatter={(value: number, name: string) => [numberFormatter.format(value as number), name]}
+                      formatter={(value, name) => [numberFormatter.format(Number(value ?? 0)), String(name ?? "")]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -2808,10 +2821,10 @@ function AttendanceDashboard() {
                       <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} tickLine={false} axisLine={false} />
                       <Tooltip
                         contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
-                        formatter={(value: number, _name, item: any) => {
-                          if (!isMultiDayRange) return [numberFormatter.format(value as number), "Employees"];
+                        formatter={(value, _name, item: any) => {
+                          if (!isMultiDayRange) return [numberFormatter.format(Number(value ?? 0)), "Employees"];
                           const raw = item?.payload?.rawCount ?? 0;
-                          return [`${numberFormatter.format(value as number)}/day (${averageFormula(raw, rangeDayCount)})`, "Employees avg"];
+                          return [`${numberFormatter.format(Number(value ?? 0))}/day (${averageFormula(raw, rangeDayCount)})`, "Employees avg"];
                         }}
                       />
                       <Bar
@@ -3044,10 +3057,10 @@ function AttendanceDashboard() {
                     <YAxis tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} tickLine={false} axisLine={false} />
                     <Tooltip
                       contentStyle={{ borderRadius: 14, border: "1px solid #e2e8f0", fontSize: 12 }}
-                      formatter={(value: number, _name, item: any) => {
-                        if (!isMultiDayRange) return [numberFormatter.format(value as number), "Punch Ins"];
+                      formatter={(value, _name, item: any) => {
+                        if (!isMultiDayRange) return [numberFormatter.format(Number(value ?? 0)), "Punch Ins"];
                         const raw = item?.payload?.rawCount ?? 0;
-                        return [`${numberFormatter.format(value as number)}/day (${averageFormula(raw, rangeDayCount)})`, "Punch Ins avg"];
+                        return [`${numberFormatter.format(Number(value ?? 0))}/day (${averageFormula(raw, rangeDayCount)})`, "Punch Ins avg"];
                       }}
                     />
                     <Bar dataKey="count" name="Punch Ins" fill="url(#checkInBars)" radius={[7, 7, 2, 2]} maxBarSize={26} animationDuration={900} />
@@ -3558,7 +3571,7 @@ function AttendanceDashboard() {
 
 export default function AttendanceAnalyticsPage() {
   return (
-    <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER"]}>
+    <RoleGuard roles={["CITY_ADMIN", "HMS_SUPER_ADMIN", "ULB_OFFICER", "COMMISSIONER"]}>
       <AttendanceDashboard />
     </RoleGuard>
   );

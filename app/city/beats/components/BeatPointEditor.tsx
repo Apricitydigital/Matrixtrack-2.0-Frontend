@@ -103,7 +103,7 @@ export default function BeatPointEditor({ beat, onClose, onSuccess }: Props) {
                     </aside>
                     <section>
                         <MapContainer center={[22.7196, 75.8577]} zoom={14} style={{ width: "100%", height: "100%" }}>
-                            <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                            <TileLayer attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>' url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}" maxZoom={20} />
                             <FitEditorBounds beat={beat} points={points} />
                             {beat.geometry && <GeoJSON data={beat.geometry} style={{ color: "#2563eb", weight: 5, opacity: .9 }} />}
                             {points.map((point, index) => (

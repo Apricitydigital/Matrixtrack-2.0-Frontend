@@ -511,11 +511,12 @@ export const CityApi = {
       };
     }>(`/city/stats${query}`);
   },
-  autoAssignSupervisors: () =>
+  autoAssignSupervisors: (modules: Array<"SWEEPING" | "TOILET" | "LITTERBINS">) =>
     apiFetch<{
       success: boolean;
       summary: {
         cityId: string;
+        selectedModules: Array<"SWEEPING" | "TOILET" | "LITTERBINS">;
         beats: {
           eligibleSupervisors: number;
           supervisorsWithoutScope: number;
@@ -540,6 +541,7 @@ export const CityApi = {
       };
     }>("/city/auto-assign-supervisors", {
       method: "POST",
+      body: JSON.stringify({ modules }),
     })
 };
 
@@ -816,6 +818,46 @@ export const CityModulesApi = {
   list: () => apiFetch<{ id: string; key: string; name: string; enabled: boolean }[]>("/city/modules")
 };
 
+export type SupervisorAssignmentStatus = {
+  cityId: string;
+  supervisors: {
+    total: number;
+    assigned: number;
+    unassigned: number;
+    assignedIds: string[];
+    unassignedItems: Array<{
+      id: string;
+      name: string;
+      phone: string | null;
+      moduleKeys: Array<"SWEEPING" | "TOILET" | "LITTERBINS">;
+      zoneIds: string[];
+      wardIds: string[];
+      reason: string;
+    }>;
+  };
+  modules: Record<
+    "SWEEPING" | "TOILET" | "LITTERBINS",
+    {
+      totalAssets: number;
+      assignedAssets: number;
+      unassignedAssets: number;
+      unassignedItems: Array<{
+        id: string;
+        name: string;
+        zoneId: string | null;
+        wardId: string | null;
+      }>;
+    }
+  >;
+};
+
+export const SupervisorAssignmentApi = {
+  status: () =>
+    apiFetch<SupervisorAssignmentStatus>(
+      "/city/supervisor-assignment-status"
+    ),
+};
+
 // Module resolution cache (expects backend to expose module listing)
 let moduleMap: Record<string, string> | null = null;
 async function ensureModuleMap() {
@@ -893,10 +935,11 @@ export const TaskforceApi = {
 };
 
 export const StorageApi = {
-  upload: async (file: File) => {
+  upload: async (file: File, moduleName: string) => {
     const formData = new FormData();
+    formData.append("module", moduleName);
     formData.append("photo", file);
-    return apiFetch<{ url: string }>("/storage/upload", {
+    return apiFetch<{ url: string; key: string; module: string }>("/storage/upload", {
       method: "POST",
       body: formData,
       headers: {} // Let browser set boundary
@@ -1044,6 +1087,10 @@ export const EmployeesApi = {
 };
 
 export const TwinbinApi = {
+  all: (cityId?: string) => {
+    const query = cityId ? `?cityId=${encodeURIComponent(cityId)}` : "";
+    return apiFetch<{ bins: any[] }>(`/modules/twinbin/bins/all${query}`);
+  },
   deleteBin: (id: string) => apiFetch<{ success: boolean }>(`/modules/twinbin/bins/${id}`, { method: "DELETE" }),
   bulkImport: (csvText: string) =>
     apiFetch<{ count: number }>("/modules/twinbin/bulk-import", { method: "POST", body: JSON.stringify({ csvText }) }),
@@ -1140,6 +1187,3 @@ export const TwinbinApi = {
       body: JSON.stringify(body || {})
     })
 };
-
-
-

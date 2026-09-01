@@ -387,7 +387,11 @@ export default function QCBeatStatusPage() {
                     {!loading && view === "map" && (
                         <div style={{ height: "68vh", borderRadius: 14, overflow: "hidden", border: "1px solid #e2e8f0", position: "relative" }}>
                             <MapContainer center={mapCenter} zoom={13} ref={mapRef} style={{ height: "100%", width: "100%" }}>
-                                <TileLayer attribution="© CARTO" url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                                <TileLayer
+                                    attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+                                    url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                                    maxZoom={20}
+                                />
                                 {filtered.map(beat => {
                                     const coords = getBeatCoords(beat);
                                     const pointMarkers = getBeatPointMarkers(beat);

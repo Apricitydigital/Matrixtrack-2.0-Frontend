@@ -30,7 +30,7 @@ export function getDefaultModuleAccess(role: string): {
     };
   }
 
-  if (r === "COMMISSIONER" || r === "CITY_ADMIN") {
+  if (r === "COMMISSIONER" || r === "CITY_ADMIN" || r === "ULB_OFFICER" || r === "ACTION_OFFICER") {
     return {
       taskforceAccess: "WRITE",
       swachhAccess: "WRITE",

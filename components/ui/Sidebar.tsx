@@ -31,6 +31,7 @@ import {
   Building2,
   CheckCircle2,
   ChartNoAxesCombined,
+  Award,
 } from "lucide-react";
 import { UserProfileModal } from "./UserProfileModal";
 
@@ -270,11 +271,28 @@ export default function Sidebar() {
         }
       );
     } else if (isCommissioner) {
-      links.push({
-        label: "Executive Dashboard",
-        href: "/municipal/commissioner",
-        icon: <LayoutDashboard size={18} />,
-      });
+      links.push(
+        {
+          label: "Executive Dashboard",
+          href: "/municipal/commissioner",
+          icon: <LayoutDashboard size={18} />,
+        },
+        {
+          label: "Operations Map",
+          href: "/municipal/commissioner/home-2",
+          icon: <Map size={18} />,
+        },
+        {
+          label: "Attendance Analytics",
+          href: "/municipal/commissioner/attendance",
+          icon: <ChartNoAxesCombined size={18} />,
+        },
+        {
+          label: "Ward Ranking",
+          href: "/municipal/commissioner/ward-ranking",
+          icon: <Award size={18} />,
+        },
+      );
     } else if (isCityAdmin) {
       links.push({
         label: "City Dashboard",
@@ -286,6 +304,11 @@ export default function Sidebar() {
           label: "Attendance Analytics",
           href: "/city/attendance",
           icon: <ChartNoAxesCombined size={18} />,
+        });
+        links.push({
+          label: "Ward Ranking",
+          href: "/ulb/ward-ranking",
+          icon: <Award size={18} />,
         });
       }
       links.push({
@@ -324,6 +347,10 @@ export default function Sidebar() {
   const isActive = (href: string) => {
     if (href === "/hms") {
       return pathname === "/hms";
+    }
+
+    if (href === "/municipal/commissioner") {
+      return pathname === href;
     }
 
     return (

@@ -154,8 +154,9 @@ export default function BeatMapViewerModal({
                             style={{ height: "100%", width: "100%" }}
                         >
                             <TileLayer
-                                attribution='&copy; CARTO'
-                                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                                attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+                                url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                                maxZoom={20}
                             />
                             {/* Outer glow effect */}
                             <Polyline

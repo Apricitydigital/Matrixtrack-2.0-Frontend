@@ -7,7 +7,8 @@ import {
   IntegratedRegistrationPayload,
   PublicGeoApi,
   CityModulesApi,
-  CityUserApi
+  CityUserApi,
+  CityApi
 } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import { getUserPermissions } from "@lib/userPermissions";
@@ -19,11 +20,9 @@ import {
   AlertCircle,
   Building2,
   ShieldCheck,
-  Layers,
   ArrowRight,
   UploadCloud,
   Download,
-  Trash2,
   RefreshCw,
   Sparkles,
   Lock
@@ -36,6 +35,21 @@ interface CommonRegistrationModalProps {
   asPage?: boolean;
 }
 
+type RegistrationRole =
+  | "SUPERVISOR"
+  | "QC"
+  | "ULB_OFFICER"
+  | "ACTION_OFFICER"
+  | "COMMISSIONER"
+  | "CITY_ADMIN";
+
+type CityModuleOption = {
+  id: string;
+  key: string;
+  name: string;
+  enabled: boolean;
+};
+
 export default function CommonRegistrationModal({
   isOpen,
   onClose,
@@ -45,6 +59,7 @@ export default function CommonRegistrationModal({
   const { user } = useAuth();
   const userPerms = getUserPermissions(user);
   const [activeTab, setActiveTab] = useState<"single" | "bulk">("single");
+  const [registrationRole, setRegistrationRole] = useState<RegistrationRole>("SUPERVISOR");
 
   // Config options from API
   const [config, setConfig] = useState<{
@@ -86,6 +101,7 @@ export default function CommonRegistrationModal({
   const [zones, setZones] = useState<{ id: string; name: string }[]>([]);
   const [wards, setWards] = useState<{ id: string; name: string }[]>([]);
   const [loadingGeo, setLoadingGeo] = useState(false);
+  const [cityModuleOptions, setCityModuleOptions] = useState<CityModuleOption[]>([]);
 
   // Single Registration Form State
   const [form, setForm] = useState<{
@@ -130,6 +146,22 @@ export default function CommonRegistrationModal({
   const [existingUserEmails, setExistingUserEmails] = useState<Set<string>>(new Set());
   const [existingUserPhones, setExistingUserPhones] = useState<Set<string>>(new Set());
 
+  const isSimpleOfficerRole =
+    registrationRole === "COMMISSIONER" || registrationRole === "ULB_OFFICER";
+
+  const registrationRoleLabel =
+    registrationRole === "QC"
+      ? "Quality Controller"
+      : registrationRole === "ULB_OFFICER"
+        ? "ULB Officer"
+        : registrationRole === "ACTION_OFFICER"
+          ? "Action Officer"
+          : registrationRole === "CITY_ADMIN"
+            ? "City Admin"
+            : registrationRole === "COMMISSIONER"
+              ? "Commissioner"
+              : "Supervisor";
+
   useEffect(() => {
     if (isOpen) {
       loadConfig();
@@ -162,13 +194,16 @@ export default function CommonRegistrationModal({
       const fetchGeoConfig = async () => {
         setLoadingGeo(true);
         try {
-          let fetchedCities: any[] = [];
+          let fallbackCities: any[] = [];
           const res = await CommonRegistrationApi.getConfig();
           if (res?.cities) {
-            fetchedCities = res.cities.map((c) => ({ id: c.id, name: c.name, code: c.code || "" }));
-            setConfig((prev) => ({ ...prev, cities: fetchedCities }));
+            fallbackCities = res.cities.map((c) => ({ id: c.id, name: c.name, code: c.code || "" }));
+            setConfig((prev) => ({ ...prev, cities: fallbackCities }));
           }
         } catch { }
+        finally {
+          setLoadingGeo(false);
+        }
       };
       fetchGeoConfig();
     }
@@ -184,6 +219,7 @@ export default function CommonRegistrationModal({
     try {
       const modulesRes = await CityModulesApi.list();
       if (Array.isArray(modulesRes)) {
+        setCityModuleOptions(modulesRes);
         const map: Record<string, boolean> = {};
         modulesRes.forEach((m: any) => {
           if (m.key || m.name) {
@@ -193,6 +229,7 @@ export default function CommonRegistrationModal({
         setCityModulesMap(map);
       }
     } catch {
+      setCityModuleOptions([]);
       setCityModulesMap(null);
     }
   };
@@ -272,6 +309,19 @@ export default function CommonRegistrationModal({
     }
   };
 
+  const handleRegistrationRoleChange = (role: RegistrationRole) => {
+    setRegistrationRole(role);
+    setErrorMsg("");
+    setStatusMsg("");
+    setForm((f) => ({
+      ...f,
+      taskforceRole: role,
+      ...(role === "COMMISSIONER" || role === "ULB_OFFICER"
+        ? { zoneId: "", wardId: "" }
+        : {})
+    }));
+  };
+
   const toggleTargetSystem = (system: "TASKFORCE_20" | "SWACHH_RANKING") => {
     setForm((f) => {
       const current = f.targetSystems;
@@ -294,12 +344,101 @@ export default function CommonRegistrationModal({
     });
   };
 
+  const resetSingleUserFields = () => {
+    setForm((f) => ({
+      ...f,
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      aadharNumber: ""
+    }));
+  };
+
   const handleSingleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
     setStatusMsg("");
 
-    // Validate mobile number (exactly 10 digits)
+    const cleanName = form.name.trim();
+    const email = form.email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!cleanName || cleanName.length < 2) {
+      setErrorMsg("Please enter the user's full name");
+      return;
+    }
+
+    // Commissioner and ULB Officer use the simplified city-level registration flow.
+    if (isSimpleOfficerRole) {
+      if (!email || !emailRegex.test(email)) {
+        setErrorMsg("Please enter a valid email address (e.g. name@domain.com)");
+        return;
+      }
+
+      if (!form.password.trim()) {
+        setErrorMsg("Password is required for Commissioner and ULB Officer registration");
+        return;
+      }
+
+      if (!form.cityId) {
+        setErrorMsg("Please select a city");
+        return;
+      }
+
+      if (existingUserEmails.has(email)) {
+        setErrorMsg("A user with this email address already exists");
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        if (registrationRole === "COMMISSIONER") {
+          await CityApi.createCommissioner(form.cityId, {
+            name: cleanName,
+            email,
+            password: form.password.trim()
+          });
+
+          setStatusMsg(`Commissioner "${cleanName}" registered successfully.`);
+        } else {
+          const enabledModules = cityModuleOptions
+            .filter((m) => m.enabled !== false)
+            .map((m) => ({
+              moduleId: m.id,
+              canWrite: true
+            }));
+
+          await CityUserApi.create({
+            name: cleanName,
+            email,
+            password: form.password.trim(),
+            role: "ULB_OFFICER",
+            cityId: form.cityId,
+            zoneIds: [],
+            wardIds: [],
+            modules: enabledModules
+          });
+
+          setStatusMsg(`ULB Officer "${cleanName}" registered successfully.`);
+        }
+
+        resetSingleUserFields();
+        if (onSuccess) onSuccess();
+      } catch (err: any) {
+        setErrorMsg(
+          err?.message ||
+          `Failed to register ${registrationRole === "COMMISSIONER" ? "Commissioner" : "ULB Officer"}`
+        );
+      } finally {
+        setLoading(false);
+      }
+
+      return;
+    }
+
+    // Existing operational-user flow remains unchanged below.
     const phoneDigits = form.phone.replace(/\D/g, "");
     if (phoneDigits.length !== 10) {
       setErrorMsg("Mobile number must be exactly 10 digits");
@@ -307,15 +446,12 @@ export default function CommonRegistrationModal({
     }
 
     // Auto-generate email from mobile number if email is empty
-    let submitEmail = form.email.trim();
+    let submitEmail = email;
     if (!submitEmail) {
       submitEmail = `${phoneDigits}@matrixtrack20.in`;
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(submitEmail)) {
-        setErrorMsg("Please enter a valid email address (e.g. name@domain.com)");
-        return;
-      }
+    } else if (!emailRegex.test(submitEmail)) {
+      setErrorMsg("Please enter a valid email address (e.g. name@domain.com)");
+      return;
     }
 
     // Validate Aadhaar number (exactly 12 digits if provided)
@@ -331,7 +467,7 @@ export default function CommonRegistrationModal({
 
     try {
       const payload: IntegratedRegistrationPayload = {
-        name: form.name,
+        name: cleanName,
         email: submitEmail,
         phone: form.phone,
         password: form.password || undefined,
@@ -343,7 +479,7 @@ export default function CommonRegistrationModal({
         ...(form.targetSystems.includes("TASKFORCE_20")
           ? {
             taskforceConfig: {
-              role: form.taskforceRole,
+              role: registrationRole,
               moduleKeys: form.taskforceModules
             }
           }
@@ -363,14 +499,7 @@ export default function CommonRegistrationModal({
       const res = await CommonRegistrationApi.register(payload);
       if (res.success) {
         setStatusMsg(res.message || "User registered successfully!");
-        setForm((f) => ({
-          ...f,
-          name: "",
-          email: "",
-          phone: "",
-          password: "",
-          aadharNumber: ""
-        }));
+        resetSingleUserFields();
         if (onSuccess) onSuccess();
       } else {
         setErrorMsg(res.message || "Registration failed");
@@ -385,10 +514,10 @@ export default function CommonRegistrationModal({
   // Smart Auto-Password Generator: [Name_Prefix]@[Last_4_Mobile]
   const generateAutoPassword = (name: string, phone: string) => {
     const cleanName = (name || "").trim().replace(/[^a-zA-Z]/g, "");
-    const prefix = cleanName.length >= 4 
-      ? cleanName.slice(0, 4) 
-      : cleanName.length > 0 
-        ? cleanName 
+    const prefix = cleanName.length >= 4
+      ? cleanName.slice(0, 4)
+      : cleanName.length > 0
+        ? cleanName
         : "User";
     const capitalizedPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
     const digits = (phone || "").replace(/\D/g, "");
@@ -464,7 +593,7 @@ export default function CommonRegistrationModal({
       const roleRaw = getCol("role", "taskforcerole") || "SUPERVISOR";
       const modulesStr = getCol("modules", "module") || "SWEEPING;LITTERBINS;TOILET;GVP";
 
-      const moduleKeys = modulesStr.toUpperCase() === "ALL" 
+      const moduleKeys = modulesStr.toUpperCase() === "ALL"
         ? ["SWEEPING", "LITTERBINS", "TOILET", "TASKFORCE"]
         : modulesStr.split(/[;,]+/).map((m) => m.trim().toUpperCase()).filter(Boolean);
 
@@ -646,9 +775,10 @@ export default function CommonRegistrationModal({
 
   const downloadSampleCsv = () => {
     const sample = `full_name,email,mobile_number,password,aadhaar_number,zone_name,ward_name,role,modules
-Ramesh Kumar,ramesh.kumar@example.com,9876543210,,123456789012,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP
-Priya Patel,priya.patel@example.com,9812345678,Pass@9876,,Zone 1,Ward 2,QUALITY_CONTROLLER,SWEEPING;LITTERBINS
-Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`;
+Priya Patel,priya.qc@example.com,9812345678,Pass@9876,123456789011,Zone 1,Ward 2,QC,SWEEPING;LITTERBINS;TOILET;GVP
+Amit Kumar,amit.ao@example.com,9765432109,Pass@9876,123456789012,Zone 2,Ward 5,ACTION_OFFICER,ALL
+Ramesh Kumar,ramesh.sup@example.com,9876543210,,123456789013,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP
+Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOYEE,SWEEPING`;
     const blob = new Blob([sample], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -659,6 +789,10 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
   };
 
   if (!isOpen && !asPage) return null;
+
+  const singleSubmitLabel = isSimpleOfficerRole
+    ? `Register ${registrationRoleLabel}`
+    : "Register User Across Selected Modules";
 
   return (
     <div
@@ -884,141 +1018,182 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
           {/* TAB 1: SINGLE EMPLOYEE FORM */}
           {activeTab === "single" && (
             <form onSubmit={handleSingleSubmit}>
-              {/* Target Systems Selection */}
-              <div style={{ marginBottom: "24px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#334155",
-                    marginBottom: "10px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.03em"
-                  }}
-                >
-                  Permitted Workspace Modules
+              {/* Registration Role - master role selector */}
+              <div
+                style={{
+                  marginBottom: "24px",
+                  padding: "18px",
+                  borderRadius: "16px",
+                  border: "1px solid #dbeafe",
+                  background: "linear-gradient(135deg, #f8fbff 0%, #eff6ff 100%)"
+                }}
+              >
+                <label className="form-label" style={{ color: "#1e3a8a", marginBottom: "8px" }}>
+                  Registration Role
                 </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                  {/* Taskforce 2.0 Card */}
-                  {isTaskforcePermitted ? (
-                    <div
-                      onClick={() => toggleTargetSystem("TASKFORCE_20")}
-                      style={{
-                        padding: "16px",
-                        borderRadius: "16px",
-                        border: form.targetSystems.includes("TASKFORCE_20")
-                          ? "2px solid #3b82f6"
-                          : "1.5px solid #e2e8f0",
-                        background: form.targetSystems.includes("TASKFORCE_20") ? "#eff6ff" : "#f8fafc",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        display: "flex",
-                        gap: "12px",
-                        alignItems: "flex-start"
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.targetSystems.includes("TASKFORCE_20")}
-                        onChange={() => { }}
-                        style={{ marginTop: "3px", accentColor: "#2563eb" }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#1e3a8a", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <ShieldCheck size={16} /> Inspection and performance system
-                        </div>
-                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
-                          Assign to Inspection and performance System's module - litterbin , sweeping , and toilets.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        padding: "16px",
-                        borderRadius: "16px",
-                        border: "1.5px dashed #cbd5e1",
-                        background: "#f1f5f9",
-                        opacity: 0.65,
-                        cursor: "not-allowed",
-                        display: "flex",
-                        gap: "12px",
-                        alignItems: "flex-start"
-                      }}
-                    >
-                      <Lock size={16} style={{ marginTop: "3px", color: "#64748b" }} />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
-                          Taskforce 2.0 (Restricted)
-                        </div>
-                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#94a3b8", lineHeight: 1.4 }}>
-                          Module not assigned/enabled for this city cluster by Super Admin
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Swachh Ranking Card */}
-                  {isSwachhPermitted ? (
-                    <div
-                      onClick={() => toggleTargetSystem("SWACHH_RANKING")}
-                      style={{
-                        padding: "16px",
-                        borderRadius: "16px",
-                        border: form.targetSystems.includes("SWACHH_RANKING")
-                          ? "2px solid #10b981"
-                          : "1.5px solid #e2e8f0",
-                        background: form.targetSystems.includes("SWACHH_RANKING") ? "#ecfdf5" : "#f8fafc",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        display: "flex",
-                        gap: "12px",
-                        alignItems: "flex-start"
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.targetSystems.includes("SWACHH_RANKING")}
-                        onChange={() => { }}
-                        style={{ marginTop: "3px", accentColor: "#059669" }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#065f46", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <Building2 size={16} /> Swachh Ranking Software
-                        </div>
-                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
-                          Auto-sync user account as Assessor / Evaluator in Swachh Ward Ranking
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        padding: "16px",
-                        borderRadius: "16px",
-                        border: "1.5px dashed #cbd5e1",
-                        background: "#f1f5f9",
-                        opacity: 0.65,
-                        cursor: "not-allowed",
-                        display: "flex",
-                        gap: "12px",
-                        alignItems: "flex-start"
-                      }}
-                    >
-                      <Lock size={16} style={{ marginTop: "3px", color: "#64748b" }} />
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: "15px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
-                          Swachh Ranking (Restricted)
-                        </div>
-                        <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#94a3b8", lineHeight: 1.4 }}>
-                          Module not assigned/enabled for this city cluster by Super Admin
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <select
+                  className="form-input"
+                  value={registrationRole}
+                  onChange={(e) => handleRegistrationRoleChange(e.target.value as RegistrationRole)}
+                >
+                  {config.taskforceRoles
+                    .filter((r) => r.key !== "EMPLOYEE")
+                    .map((r) => {
+                      let labelText = r.label;
+                      if (r.key === "QC" || String(r.label).toLowerCase().includes("qc inspector")) {
+                        labelText = "Quality Controller";
+                      }
+                      return (
+                        <option key={r.key} value={r.key}>
+                          {labelText}
+                        </option>
+                      );
+                    })}
+                </select>
+                <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.45 }}>
+                  {isSimpleOfficerRole
+                    ? `${registrationRoleLabel} is a city-level role. Mobile, Aadhaar, Zone, Ward and module-selection fields are not required.`
+                    : "The selected role will be used for the Inspection & Performance System assignment below."}
+                </p>
               </div>
+
+              {/* Target Systems Selection - hidden for Commissioner / ULB Officer */}
+              {!isSimpleOfficerRole && (
+                <div style={{ marginBottom: "24px" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: "#334155",
+                      marginBottom: "10px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em"
+                    }}
+                  >
+                    Permitted Workspace Modules
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {/* Taskforce 2.0 Card */}
+                    {isTaskforcePermitted ? (
+                      <div
+                        onClick={() => toggleTargetSystem("TASKFORCE_20")}
+                        style={{
+                          padding: "16px",
+                          borderRadius: "16px",
+                          border: form.targetSystems.includes("TASKFORCE_20")
+                            ? "2px solid #3b82f6"
+                            : "1.5px solid #e2e8f0",
+                          background: form.targetSystems.includes("TASKFORCE_20") ? "#eff6ff" : "#f8fafc",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          display: "flex",
+                          gap: "12px",
+                          alignItems: "flex-start"
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.targetSystems.includes("TASKFORCE_20")}
+                          onChange={() => { }}
+                          style={{ marginTop: "3px", accentColor: "#2563eb" }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: "15px", color: "#1e3a8a", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <ShieldCheck size={16} /> Inspection and performance system
+                          </div>
+                          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
+                            Assign to Inspection and performance System's module - litterbin, sweeping, and toilets.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: "16px",
+                          borderRadius: "16px",
+                          border: "1.5px dashed #cbd5e1",
+                          background: "#f1f5f9",
+                          opacity: 0.65,
+                          cursor: "not-allowed",
+                          display: "flex",
+                          gap: "12px",
+                          alignItems: "flex-start"
+                        }}
+                      >
+                        <Lock size={16} style={{ marginTop: "3px", color: "#64748b" }} />
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: "15px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
+                            Taskforce 2.0 (Restricted)
+                          </div>
+                          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#94a3b8", lineHeight: 1.4 }}>
+                            Module not assigned/enabled for this city cluster by Super Admin
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Swachh Ranking Card */}
+                    {isSwachhPermitted ? (
+                      <div
+                        onClick={() => toggleTargetSystem("SWACHH_RANKING")}
+                        style={{
+                          padding: "16px",
+                          borderRadius: "16px",
+                          border: form.targetSystems.includes("SWACHH_RANKING")
+                            ? "2px solid #10b981"
+                            : "1.5px solid #e2e8f0",
+                          background: form.targetSystems.includes("SWACHH_RANKING") ? "#ecfdf5" : "#f8fafc",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          display: "flex",
+                          gap: "12px",
+                          alignItems: "flex-start"
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.targetSystems.includes("SWACHH_RANKING")}
+                          onChange={() => { }}
+                          style={{ marginTop: "3px", accentColor: "#059669" }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: "15px", color: "#065f46", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <Building2 size={16} /> Swachh Ranking Software
+                          </div>
+                          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
+                            Auto-sync user account as Assessor / Evaluator in Swachh Ward Ranking
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: "16px",
+                          borderRadius: "16px",
+                          border: "1.5px dashed #cbd5e1",
+                          background: "#f1f5f9",
+                          opacity: 0.65,
+                          cursor: "not-allowed",
+                          display: "flex",
+                          gap: "12px",
+                          alignItems: "flex-start"
+                        }}
+                      >
+                        <Lock size={16} style={{ marginTop: "3px", color: "#64748b" }} />
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: "15px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
+                            Swachh Ranking (Restricted)
+                          </div>
+                          <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#94a3b8", lineHeight: 1.4 }}>
+                            Module not assigned/enabled for this city cluster by Super Admin
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Personal Details Row */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4">
@@ -1030,6 +1205,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                     className="form-input"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
                   />
                 </div>
                 <div>
@@ -1040,250 +1216,305 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                     className="form-input"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    required={isSimpleOfficerRole}
                   />
                 </div>
               </div>
 
-              {/* Contact & Password Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
-                <div>
-                  <label className="form-label">Mobile Number</label>
-                  <input
-                    type="text"
-                    placeholder="10-digit Mobile Number"
-                    maxLength={10}
-                    className="form-input"
-                    value={form.phone}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                      setForm({ ...form, phone: val });
+              {isSimpleOfficerRole ? (
+                <>
+                  {/* Simplified Commissioner / ULB Officer fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-6">
+                    <div>
+                      <label className="form-label">Password</label>
+                      <input
+                        type="password"
+                        placeholder={`Enter ${registrationRoleLabel} password`}
+                        className="form-input"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">City</label>
+                      <select
+                        className="form-input"
+                        value={form.cityId}
+                        onChange={(e) => handleCityChange(e.target.value)}
+                        required
+                      >
+                        <option value="">Select City</option>
+                        {getFilteredCities().map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      marginBottom: "24px",
+                      borderRadius: "14px",
+                      border: "1px solid #dbeafe",
+                      background: "#f8fbff",
+                      padding: "14px 16px",
+                      fontSize: "12px",
+                      lineHeight: 1.55,
+                      color: "#475569"
                     }}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Password</label>
-                  <input
-                    type="password"
-                    placeholder="Enter custom password (optional)"
-                    className="form-input"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">Aadhaar Number</label>
-                  <input
-                    type="text"
-                    placeholder="12-digit Aadhaar Number"
-                    maxLength={12}
-                    className="form-input"
-                    value={form.aadharNumber}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, "").slice(0, 12);
-                      setForm({ ...form, aadharNumber: val });
-                    }}
-                  />
-                </div>
-              </div>
+                  >
+                    <strong style={{ color: "#1e3a8a" }}>{registrationRoleLabel} registration:</strong>{" "}
+                    this is a city-level account. Mobile Number, Aadhaar Number, Zone, Ward, workspace selection and manual module selection are not required.
+                    {registrationRole === "ULB_OFFICER" && (
+                      <> All currently enabled city modules will be assigned automatically.</>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Existing Contact & Password Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
+                    <div>
+                      <label className="form-label">Mobile Number</label>
+                      <input
+                        type="text"
+                        placeholder="10-digit Mobile Number"
+                        maxLength={10}
+                        className="form-input"
+                        value={form.phone}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                          setForm({ ...form, phone: val });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Password</label>
+                      <input
+                        type="password"
+                        placeholder="Enter custom password (optional)"
+                        className="form-input"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Aadhaar Number</label>
+                      <input
+                        type="text"
+                        placeholder="12-digit Aadhaar Number"
+                        maxLength={12}
+                        className="form-input"
+                        value={form.aadharNumber}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "").slice(0, 12);
+                          setForm({ ...form, aadharNumber: val });
+                        }}
+                      />
+                    </div>
+                  </div>
 
-              {/* City / Location Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
-                <div>
-                  <label className="form-label">City</label>
-                  <select
-                    className="form-input"
-                    value={form.cityId}
-                    onChange={(e) => handleCityChange(e.target.value)}
-                  >
-                    <option value="">Select City</option>
-                    {getFilteredCities().map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Zone</label>
-                  <select
-                    className="form-input"
-                    disabled={!form.cityId || loadingGeo}
-                    value={form.zoneId}
-                    onChange={(e) => handleZoneChange(e.target.value)}
-                  >
-                    <option value="">Select Zone</option>
-                    {zones.map((z) => (
-                      <option key={z.id} value={z.id}>
-                        {z.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Ward</label>
-                  <select
-                    className="form-input"
-                    disabled={!form.zoneId || loadingGeo}
-                    value={form.wardId}
-                    onChange={(e) => setForm({ ...form, wardId: e.target.value })}
-                  >
-                    <option value="">Select Ward</option>
-                    {wards.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                  {/* Existing City / Location Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+                    <div>
+                      <label className="form-label">City</label>
+                      <select
+                        className="form-input"
+                        value={form.cityId}
+                        onChange={(e) => handleCityChange(e.target.value)}
+                      >
+                        <option value="">Select City</option>
+                        {getFilteredCities().map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Zone</label>
+                      <select
+                        className="form-input"
+                        disabled={!form.cityId || loadingGeo}
+                        value={form.zoneId}
+                        onChange={(e) => handleZoneChange(e.target.value)}
+                      >
+                        <option value="">Select Zone</option>
+                        {zones.map((z) => (
+                          <option key={z.id} value={z.id}>
+                            {z.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Ward</label>
+                      <select
+                        className="form-input"
+                        disabled={!form.zoneId || loadingGeo}
+                        value={form.wardId}
+                        onChange={(e) => setForm({ ...form, wardId: e.target.value })}
+                      >
+                        <option value="">Select Ward</option>
+                        {wards.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              {/* TASKFORCE 20 CONFIG SECTION */}
-              {form.targetSystems.includes("TASKFORCE_20") && (
-                <div
-                  style={{
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "16px",
-                    padding: "24px",
-                    marginBottom: "24px",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
-                  }}
-                >
-                  <h4 style={{ margin: "0 0 16px", fontSize: "14px", fontWeight: 800, color: "#1e3a8a", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <ShieldCheck size={18} /> Inspection and Performance System Modules
-                  </h4>
-                  <div style={{ marginBottom: "16px" }}>
-                    <label className="form-label">Select Role</label>
-                    <select
-                      className="form-input"
-                      value={form.taskforceRole}
-                      onChange={(e) => setForm({ ...form, taskforceRole: e.target.value })}
+                  {/* TASKFORCE 20 CONFIG SECTION */}
+                  {form.targetSystems.includes("TASKFORCE_20") && (
+                    <div
+                      style={{
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "16px",
+                        padding: "24px",
+                        marginBottom: "24px",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                      }}
                     >
-                      {config.taskforceRoles
-                        /* Field Employee option commented out/hidden from UI dropdown */
-                        .filter((r) => r.key !== "EMPLOYEE")
-                        .map((r) => {
-                          let labelText = r.label;
-                          if (r.key === "QC" || String(r.label).toLowerCase().includes("qc inspector")) {
-                            labelText = "Quality Controller";
-                          }
-                          return (
-                            <option key={r.key} value={r.key}>
-                              {labelText}
-                            </option>
-                          );
-                        })}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ marginBottom: "12px" }}>Select Module</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      {config.modules
-                        .filter((m) => {
-                          const nameLower = (m.name || "").toLowerCase();
-                          return (
-                            !nameLower.includes("swachh ward ranking system") &&
-                            !nameLower.includes("workforce monitoring") &&
-                            !nameLower.includes("processing & mrf") &&
-                            !nameLower.includes("processing and mrf")
-                          );
-                        })
-                        .map((m) => {
-                          const isSelected = form.taskforceModules.includes(m.key);
+                      <h4 style={{ margin: "0 0 16px", fontSize: "14px", fontWeight: 800, color: "#1e3a8a", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <ShieldCheck size={18} /> Inspection and Performance System Modules
+                      </h4>
 
-                          let displayName = m.name;
-                          const nameUpper = String(m.name || '').toUpperCase();
-                          if (nameUpper.includes("SWEEPING")) displayName = "Sweeping";
-                          if (nameUpper.includes("LITTER")) displayName = "Litter Bins";
-                          if (nameUpper.includes("TOILET")) displayName = "Cleanliness of Toilets";
-                          if (nameUpper.includes("TASKFORCE") || nameUpper.includes("CTU") || nameUpper.includes("GVP")) displayName = "GVP";
+                      <div style={{ marginBottom: "16px" }}>
+                        <label className="form-label">Selected Role</label>
+                        <div
+                          style={{
+                            minHeight: "44px",
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "0 14px",
+                            borderRadius: "12px",
+                            border: "1.5px solid #bfdbfe",
+                            background: "#eff6ff",
+                            color: "#1e3a8a",
+                            fontSize: "14px",
+                            fontWeight: 800
+                          }}
+                        >
+                          {registrationRoleLabel}
+                        </div>
+                      </div>
 
-                          return (
-                            <button
-                              type="button"
-                              key={m.key}
-                              onClick={() => toggleTaskforceModule(m.key)}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "10px 12px",
-                                borderRadius: "12px",
-                                border: isSelected ? "1.5px solid #3b82f6" : "1px solid #e2e8f0",
-                                backgroundColor: isSelected ? "#eff6ff" : "#ffffff",
-                                color: isSelected ? "#1d4ed8" : "#475569",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                transition: "all 0.15s",
-                                textAlign: "left"
-                              }}
-                            >
-                              <span>{displayName}</span>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                readOnly
-                                style={{ accentColor: "#2563eb", width: "13px", height: "13px", cursor: "pointer", pointerEvents: "none" }}
-                              />
-                            </button>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </div>
-              )}
+                      <div>
+                        <label className="form-label" style={{ marginBottom: "12px" }}>Select Module</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                          {config.modules
+                            .filter((m) => {
+                              const nameLower = (m.name || "").toLowerCase();
+                              return (
+                                !nameLower.includes("swachh ward ranking system") &&
+                                !nameLower.includes("workforce monitoring") &&
+                                !nameLower.includes("processing & mrf") &&
+                                !nameLower.includes("processing and mrf")
+                              );
+                            })
+                            .map((m) => {
+                              const isSelected = form.taskforceModules.includes(m.key);
 
-              {/* SWACHH RANKING CONFIG SECTION */}
-              {form.targetSystems.includes("SWACHH_RANKING") && (
-                <div
-                  style={{
-                    background: "#f0fdf4",
-                    border: "1px solid #dcfce7",
-                    borderRadius: "16px",
-                    padding: "24px",
-                    marginBottom: "24px",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
-                  }}
-                >
-                  <h4 style={{ margin: "0 0 16px", fontSize: "14px", fontWeight: 800, color: "#166534", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Building2 size={18} /> Swachh Ranking Assignment Details
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    <div>
-                      <label className="form-label">Swachh Role</label>
-                      <select
-                        className="form-input"
-                        value={form.swachhRole}
-                        onChange={(e) =>
-                          setForm({ ...form, swachhRole: e.target.value as any })
-                        }
-                      >
-                        {config.swachhRoles.map((r) => (
-                          <option key={r.key} value={r.key}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
+                              let displayName = m.name;
+                              const nameUpper = String(m.name || '').toUpperCase();
+                              if (nameUpper.includes("SWEEPING")) displayName = "Sweeping";
+                              if (nameUpper.includes("LITTER")) displayName = "Litter Bins";
+                              if (nameUpper.includes("TOILET")) displayName = "Cleanliness of Toilets";
+                              if (nameUpper.includes("TASKFORCE") || nameUpper.includes("CTU") || nameUpper.includes("GVP")) displayName = "GVP";
+
+                              return (
+                                <button
+                                  type="button"
+                                  key={m.key}
+                                  onClick={() => toggleTaskforceModule(m.key)}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "10px 12px",
+                                    borderRadius: "12px",
+                                    border: isSelected ? "1.5px solid #3b82f6" : "1px solid #e2e8f0",
+                                    backgroundColor: isSelected ? "#eff6ff" : "#ffffff",
+                                    color: isSelected ? "#1d4ed8" : "#475569",
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    transition: "all 0.15s",
+                                    textAlign: "left"
+                                  }}
+                                >
+                                  <span>{displayName}</span>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    readOnly
+                                    style={{ accentColor: "#2563eb", width: "13px", height: "13px", cursor: "pointer", pointerEvents: "none" }}
+                                  />
+                                </button>
+                              );
+                            })}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="form-label">Accessor Category / Agency</label>
-                      <select
-                        className="form-input"
-                        value={form.swachhAccessorType}
-                        onChange={(e) =>
-                          setForm({ ...form, swachhAccessorType: e.target.value as any })
-                        }
-                      >
-                        {config.swachhAccessorTypes.map((t) => (
-                          <option key={t.key} value={t.key}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </select>
+                  )}
+
+                  {/* SWACHH RANKING CONFIG SECTION */}
+                  {form.targetSystems.includes("SWACHH_RANKING") && (
+                    <div
+                      style={{
+                        background: "#f0fdf4",
+                        border: "1px solid #dcfce7",
+                        borderRadius: "16px",
+                        padding: "24px",
+                        marginBottom: "24px",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                      }}
+                    >
+                      <h4 style={{ margin: "0 0 16px", fontSize: "14px", fontWeight: 800, color: "#166534", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <Building2 size={18} /> Swachh Ranking Assignment Details
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        <div>
+                          <label className="form-label">Swachh Role</label>
+                          <select
+                            className="form-input"
+                            value={form.swachhRole}
+                            onChange={(e) =>
+                              setForm({ ...form, swachhRole: e.target.value as any })
+                            }
+                          >
+                            {config.swachhRoles.map((r) => (
+                              <option key={r.key} value={r.key}>
+                                {r.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="form-label">Accessor Category / Agency</label>
+                          <select
+                            className="form-input"
+                            value={form.swachhAccessorType}
+                            onChange={(e) =>
+                              setForm({ ...form, swachhAccessorType: e.target.value as any })
+                            }
+                          >
+                            {config.swachhAccessorTypes.map((t) => (
+                              <option key={t.key} value={t.key}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
 
               {/* Submit Button */}
@@ -1299,7 +1530,8 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                   borderRadius: "14px",
                   fontSize: "16px",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  opacity: loading ? 0.75 : 1,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1314,14 +1546,14 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                   </>
                 ) : (
                   <>
-                    Register User Across Selected Modules <ArrowRight size={18} />
+                    {singleSubmitLabel} <ArrowRight size={18} />
                   </>
                 )}
               </button>
             </form>
           )}
 
-          {/* TAB 2: BULK IMPORT */}
+          {/* TAB 2: BULK IMPORT - EXISTING LOGIC PRESERVED */}
           {activeTab === "bulk" && (
             <div>
               <div
@@ -1407,7 +1639,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                   rows={5}
                   className="form-input"
                   style={{ fontFamily: "monospace", fontSize: "12px", height: "auto" }}
-                  placeholder="name,email,phone,password,targetSystems,taskforceRole,modules,swachhRole,accessorType..."
+                  placeholder="full_name,email,mobile_number,password,aadhaar_number,zone_name,ward_name,role,modules&#10;Priya Patel,priya.qc@example.com,9812345678,Pass@9876,,Zone 1,Ward 2,QC,ALL&#10;Amit Kumar,amit.ao@example.com,9765432109,Pass@9876,,Zone 2,Ward 5,ACTION_OFFICER,ALL"
                   value={bulkCsvText}
                   onChange={(e) => handleBulkTextChange(e.target.value)}
                 />
