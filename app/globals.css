@@ -1480,3 +1480,8 @@ html.dark-theme .no-invert {
 
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Hide Leaflet watermark & attribution overlay globally */
+.leaflet-control-attribution {
+  display: none !important;
+}
