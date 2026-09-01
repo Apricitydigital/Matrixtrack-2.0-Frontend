@@ -65,7 +65,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import UserPerformanceModal from "../../components/ui/UserPerformanceModal";
+import UserPerformanceModal from "@components/ui/UserPerformanceModal";
 
 type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "TASKFORCE";
 type GeoLevel = "zone" | "ward" | "area";
@@ -248,37 +248,44 @@ function inactivityLabel(days: number) {
   return days >= 3 ? "3+ days" : `${days} day${days === 1 ? "" : "s"}`;
 }
 
-const MODULES: Record<
+import { useAuth } from "@hooks/useAuth";
+
+const ALL_MODULES: Record<
   ModuleKey,
-  { name: string; short: string; color: string; soft: string }
+  { name: string; short: string; color: string; soft: string; matchKeys: string[] }
 > = {
   SWEEPING: {
     name: "Sweeping",
     short: "Sweeping",
     color: "#10b981",
     soft: "#ecfdf5",
+    matchKeys: ["SWEEPING", "SWEEP", "SWEEPING_ASSESSMENT"],
   },
   TOILET: {
     name: "Cleanliness of Toilets",
     short: "Toilets",
     color: "#3b82f6",
     soft: "#eff6ff",
+    matchKeys: ["TOILET", "TOILETS", "TOILET_INSPECTION", "CLEANLINESS_OF_TOILETS"],
   },
   TWINBIN: {
     name: "Litter Bins",
     short: "Litter Bins",
     color: "#f59e0b",
     soft: "#fffbeb",
+    matchKeys: ["TWINBIN", "LITTERBINS", "LITTER_BINS", "LITTERBIN", "LITTER_BIN"],
   },
   TASKFORCE: {
     name: "GVP",
     short: "GVP",
     color: "#8b5cf6",
     soft: "#f5f3ff",
+    matchKeys: ["TASKFORCE", "GVP", "TASKFORCE_20", "TASKFORCE_FEEDER", "CTU"],
   },
 };
 
-const KEYS = Object.keys(MODULES) as ModuleKey[];
+const MODULES = ALL_MODULES;
+const ALL_KEYS = Object.keys(ALL_MODULES) as ModuleKey[];
 const LIVE_REFRESH_MS = 60_000;
 const HEAT_PAGE_SIZE = 5;
 const SUPERVISOR_PAGE_SIZE = 5;
@@ -388,6 +395,7 @@ export default function CityAdminDashboard({
   userCityName?: string;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const reportRef = useRef<HTMLDivElement>(null);
   const liveRefreshInFlightRef = useRef(false);
   const recordsRequestIdRef = useRef(0);
@@ -395,6 +403,64 @@ export default function CityAdminDashboard({
   const moduleRecordsRequestIdRef = useRef(0);
 
   const today = useMemo(() => dayKey(new Date()), []);
+
+  const [cityModules, setCityModules] = useState<any[]>([]);
+
+  // Compute allowed module keys for this City Admin based on user's assigned modules and city's active modules
+  const allowedKeys = useMemo<ModuleKey[]>(() => {
+    const rawUserTokens: string[] = [
+      ...(Array.isArray(user?.roles) ? user.roles : []),
+      ...(Array.isArray((user as any)?.assignedModules) ? (user as any).assignedModules : []),
+      ...(Array.isArray((user as any)?.modules) ? (user as any).modules : []),
+      ...(Array.isArray((user as any)?.permissions) ? (user as any).permissions : []),
+    ]
+      .map((item: any) =>
+        norm(
+          typeof item === "string"
+            ? item
+            : item?.key ?? item?.name ?? item?.code ?? item?.moduleId ?? ""
+        ).toUpperCase()
+      )
+      .filter(Boolean);
+
+    const isSuperAdmin = rawUserTokens.some((r) =>
+      ["SUPER_ADMIN", "HMS_SUPER_ADMIN"].includes(r)
+    );
+
+    // If city modules are fetched from backend, gather enabled keys
+    const activeCityModuleKeys = cityModules
+      .filter((cm) => cm.enabled !== false)
+      .map((cm) => norm(cm.key || cm.name || "").toUpperCase());
+
+    return ALL_KEYS.filter((key) => {
+      const def = ALL_MODULES[key];
+      // Check city module status if city modules have loaded
+      if (activeCityModuleKeys.length > 0) {
+        const cityEnabled = def.matchKeys.some((mk) =>
+          activeCityModuleKeys.some((cmk) => cmk.includes(mk) || mk.includes(cmk))
+        );
+        if (!cityEnabled) return false;
+      }
+
+      // If user has specific assigned modules, check user authorization
+      if (!isSuperAdmin && rawUserTokens.length > 0) {
+        const hasExplicitModules = rawUserTokens.some((r) =>
+          ["SWEEPING", "SWEEP", "TOILET", "TOILETS", "TWINBIN", "LITTER", "LITTERBINS", "TASKFORCE", "GVP", "CTU"].some((m) =>
+            r.includes(m)
+          )
+        );
+        if (hasExplicitModules) {
+          return def.matchKeys.some((mk) =>
+            rawUserTokens.some((token) => token.includes(mk) || mk.includes(token))
+          );
+        }
+      }
+
+      return true;
+    });
+  }, [user, cityModules]);
+
+  const KEYS = allowedKeys.length > 0 ? allowedKeys : ALL_KEYS;
 
   const [zone, setZone] = useState("ALL");
   const [ward, setWard] = useState("ALL");
@@ -432,7 +498,10 @@ export default function CityAdminDashboard({
   );
   const [supervisorRecords, setSupervisorRecords] = useState<any[]>([]);
   const [supervisorPerformanceLoading, setSupervisorPerformanceLoading] = useState(false);
-  const [moduleMonthOffset, setModuleMonthOffset] = useState(0);
+  const [moduleMonthOffset, setModuleMonthOffset] = useState<number | "CUSTOM_MONTH" | "CUSTOM_RANGE">(0);
+  const [moduleCustomMonth, setModuleCustomMonth] = useState<string>(today.slice(0, 7));
+  const [moduleCustomFromDate, setModuleCustomFromDate] = useState<string>(today);
+  const [moduleCustomToDate, setModuleCustomToDate] = useState<string>(today);
   const [moduleZone, setModuleZone] = useState("ALL");
   const [moduleWard, setModuleWard] = useState("ALL");
   const [moduleRecords, setModuleRecords] = useState<any[]>([]);
@@ -635,7 +704,7 @@ const beatRequests = (
   }
 
   async function loadBase() {
-    const [userResponse, beatResponse, zoneResponse, wardResponse, areaResponse, swachhResponse, assignmentResponse] =
+    const [userResponse, beatResponse, zoneResponse, wardResponse, areaResponse, swachhResponse, assignmentResponse, modulesResponse] =
       await Promise.all([
         CityUserApi.list().catch(() => ({ users: [] })),
         AreaBeatApi.list().catch(() => ({ beats: [] })),
@@ -650,6 +719,7 @@ const beatRequests = (
         })),
         swachhApi.get("/admin/stats").catch(() => ({ data: {} })),
         SupervisorAssignmentApi.status().catch(() => null),
+        apiFetch<any[]>("/city/modules").catch(() => []),
       ]);
 
     setUsers(userResponse?.users || []);
@@ -659,6 +729,9 @@ const beatRequests = (
     setAreas(areaResponse?.nodes || []);
     setSwachh(swachhResponse?.data || {});
     setAssignmentStatus(assignmentResponse);
+    if (Array.isArray(modulesResponse)) {
+      setCityModules(modulesResponse);
+    }
   }
 
   async function loadRecords() {
@@ -719,9 +792,26 @@ const beatRequests = (
     const requestId = ++moduleRecordsRequestIdRef.current;
     if (!silent) setModulePerformanceLoading(true);
 
-    const preset = monthPreset(today, moduleMonthOffset);
-    const startDate = new Date(`${preset.from}T00:00:00`).toISOString();
-    const endDate = new Date(`${addDays(preset.to, 1)}T00:00:00`).toISOString();
+    let fromStr = today;
+    let toStr = today;
+
+    if (typeof moduleMonthOffset === "number") {
+      const preset = monthPreset(today, moduleMonthOffset);
+      fromStr = preset.from;
+      toStr = preset.to;
+    } else if (moduleMonthOffset === "CUSTOM_MONTH") {
+      const [y, m] = moduleCustomMonth.split("-").map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0);
+      fromStr = dayKey(start);
+      toStr = dayKey(end);
+    } else if (moduleMonthOffset === "CUSTOM_RANGE") {
+      fromStr = moduleCustomFromDate || today;
+      toStr = moduleCustomToDate || today;
+    }
+
+    const startDate = new Date(`${fromStr}T00:00:00`).toISOString();
+    const endDate = new Date(`${addDays(toStr, 1)}T00:00:00`).toISOString();
     const params = new URLSearchParams({ startDate, endDate });
     if (moduleZone !== "ALL") params.set("zoneId", moduleZone);
     if (moduleWard !== "ALL") params.set("wardId", moduleWard);
@@ -896,7 +986,7 @@ const beatRequests = (
   useEffect(() => {
     void loadModulePerformanceData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moduleMonthOffset, moduleZone, moduleWard]);
+  }, [moduleMonthOffset, moduleCustomMonth, moduleCustomFromDate, moduleCustomToDate, moduleZone, moduleWard]);
 
   const scoped = useMemo(() => {
     if (area === "ALL") return records;
@@ -1449,7 +1539,10 @@ const beatRequests = (
 
       return (
         active &&
-        (roles.includes("SUPERVISOR") || roles.includes("EMPLOYEE"))
+        (roles.includes("QC") ||
+          roles.includes("ACTION_OFFICER") ||
+          roles.includes("SUPERVISOR") ||
+          roles.includes("EMPLOYEE"))
       );
     });
 
@@ -1489,20 +1582,35 @@ const beatRequests = (
       (record?.assignedEmployees || []).forEach((person: any) => addId(person?.id));
     });
 
-    // Include persistent assignments from all three auto-assignment modules.
-    // Inspection records alone do not contain every Toilet/Litter Bin assignment.
+    // Include persistent assignments from auto-assignment modules.
     (assignmentStatus?.supervisors.assignedIds || []).forEach(addId);
 
-    // Module access is permission, not a work assignment.
-    // Assigned/unassigned is therefore calculated only from actual live work links.
-    const hasAssignment = (user: any) => assignedIds.has(norm(user?.id));
+    // QC and AO users are considered assigned if they have mapped zone/ward scopes, module access, or active inspection linkages
+    const hasAssignment = (user: any, roleKey: string) => {
+      const uid = norm(user?.id);
+      if (assignedIds.has(uid)) return true;
 
-    const buildRole = (role: "SUPERVISOR" | "EMPLOYEE") => {
+      // Check if user has assigned zones/wards or assigned modules configured
+      if (roleKey === "QC" || roleKey === "ACTION_OFFICER") {
+        const hasZoneWard =
+          (Array.isArray(user?.zoneIds) && user.zoneIds.length > 0) ||
+          (Array.isArray(user?.wardIds) && user.wardIds.length > 0) ||
+          Boolean(user?.assignedZoneId || user?.zoneId || user?.assignedWardId || user?.wardId);
+        const hasModules =
+          (Array.isArray(user?.assignedModules) && user.assignedModules.length > 0) ||
+          (Array.isArray(user?.modules) && user.modules.length > 0);
+        return hasZoneWard || hasModules;
+      }
+
+      return false;
+    };
+
+    const buildRole = (role: "QC" | "ACTION_OFFICER" | "SUPERVISOR" | "EMPLOYEE") => {
       const roleUsers = operationalUsers.filter((user) =>
         [user?.role, ...(user?.roles || [])].map(up).includes(role)
       );
 
-      const assigned = roleUsers.filter(hasAssignment).length;
+      const assigned = roleUsers.filter((u) => hasAssignment(u, role)).length;
       const total = roleUsers.length;
       const available = Math.max(0, total - assigned);
       const allocation = total ? Math.round((assigned * 100) / total) : 0;
@@ -1516,6 +1624,8 @@ const beatRequests = (
     };
 
     return {
+      qc: buildRole("QC"),
+      ao: buildRole("ACTION_OFFICER"),
       supervisors: buildRole("SUPERVISOR"),
       employees: buildRole("EMPLOYEE"),
     };
@@ -2859,7 +2969,7 @@ const beatRequests = (
                           {[geoName(item, "zone", geoMap), geoName(item, "ward", geoMap), geoName(item, "area", geoMap)].filter(Boolean).join(" • ") || "City Jurisdiction"}
                         </div>
                         <div className="text-[10px] text-amber-700 font-bold mt-2 bg-amber-100/60 p-2 rounded-lg border border-amber-200/50">
-                          ⚠️ {item.remarks || item.issueDescription || "Immediate field cleanup or repair required."}
+                          ⚠️ {item.actionOfficerRemark || item.remarks || item.issueDescription || "No remarks provided"}
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-amber-100">
@@ -2936,7 +3046,7 @@ const beatRequests = (
                           {[geoName(item, "zone", geoMap), geoName(item, "ward", geoMap), geoName(item, "area", geoMap)].filter(Boolean).join(" • ") || "City Jurisdiction"}
                         </div>
                         <div className="text-[10px] text-rose-700 font-bold mt-2 bg-rose-100/60 p-2 rounded-lg border border-rose-200/50">
-                          ❌ {item.rejectionReason || item.remarks || "Rejected due to invalid photo evidence or incomplete coverage."}
+                          ❌ {item.rejectionReason || item.remarks || "No remarks provided"}
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-rose-100">
@@ -3069,7 +3179,7 @@ const beatRequests = (
                 Workforce Allocation
               </h3>
               <p className="text-[9px] font-semibold text-slate-400 mt-0.5">
-                Current supervisor and employee work assignments
+                Current QC, Action Officer, supervisor and employee work assignments
               </p>
             </div>
           </div>
@@ -3085,7 +3195,30 @@ const beatRequests = (
         </div>
 
         <div className="p-4 lg:p-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {/* 1. QC */}
+            <WorkforceRoleCard
+              title="QC Officers"
+              total={workforce.qc.total}
+              assigned={workforce.qc.assigned}
+              unassigned={workforce.qc.available}
+              allocation={workforce.qc.allocation}
+              color="#0284c7"
+              soft="#f0f9ff"
+            />
+
+            {/* 2. AO (Action Officer) */}
+            <WorkforceRoleCard
+              title="Action Officers"
+              total={workforce.ao.total}
+              assigned={workforce.ao.assigned}
+              unassigned={workforce.ao.available}
+              allocation={workforce.ao.allocation}
+              color="#d97706"
+              soft="#fffbeb"
+            />
+
+            {/* 3. Supervisors */}
             <WorkforceRoleCard
               title="Supervisors"
               total={workforce.supervisors.total}
@@ -3096,6 +3229,7 @@ const beatRequests = (
               soft="#f5f3ff"
             />
 
+            {/* 4. Employees */}
             <WorkforceRoleCard
               title="Employees"
               total={workforce.employees.total}
@@ -3107,7 +3241,7 @@ const beatRequests = (
             />
           </div>
 
-          {(workforce.supervisors.available > 0 || workforce.employees.available > 0) && (
+          {(workforce.qc.available > 0 || workforce.ao.available > 0 || workforce.supervisors.available > 0 || workforce.employees.available > 0) && (
             <button
               type="button"
               onClick={() => setAssignmentDetailsOpen((current) => !current)}
@@ -3120,8 +3254,13 @@ const beatRequests = (
                     Unassigned workforce
                   </div>
                   <div className="text-[9px] font-semibold text-amber-600 mt-1 pl-5">
-                    {workforce.supervisors.available} supervisor(s) and{" "}
-                    {workforce.employees.available} employee(s) are currently unassigned from active work.
+                    {[
+                      workforce.qc.available ? `${workforce.qc.available} QC(s)` : null,
+                      workforce.ao.available ? `${workforce.ao.available} AO(s)` : null,
+                      workforce.supervisors.available ? `${workforce.supervisors.available} supervisor(s)` : null,
+                      workforce.employees.available ? `${workforce.employees.available} employee(s)` : null,
+                    ].filter(Boolean).join(", ")}{" "}
+                    currently unassigned from active work.
                   </div>
                 </div>
                 {assignmentDetailsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -3385,36 +3524,92 @@ const beatRequests = (
           height="h-[340px]"
         >
           <div className="flex h-full flex-col">
-            <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <label>
-                <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Month</span>
+            <div className="mb-2 flex flex-wrap items-end gap-2">
+              <label className="flex-1 min-w-[140px]">
+                <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Timeframe / Month</span>
                 <select
                   value={moduleMonthOffset}
-                  onChange={(event) => setModuleMonthOffset(Number(event.target.value))}
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400"
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    if (val === "CUSTOM_MONTH" || val === "CUSTOM_RANGE") {
+                      setModuleMonthOffset(val);
+                    } else {
+                      setModuleMonthOffset(Number(val));
+                    }
+                  }}
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400 cursor-pointer"
                 >
-                  {monthPresets.map((preset) => (
-                    <option key={preset.offset} value={preset.offset}>{preset.label}</option>
-                  ))}
+                  <option value={0}>Current Month ({monthPresets[0]?.label || "This Month"})</option>
+                  <option value={-1}>Last Month ({monthPresets[1]?.label || "Last Month"})</option>
+                  <option value={-2}>{monthPresets[2]?.label || "2 Months Ago"}</option>
+                  <option value="CUSTOM_MONTH">📅 Pick Specific Month</option>
+                  <option value="CUSTOM_RANGE">📆 Custom Date Range</option>
                 </select>
               </label>
-              <label>
+
+              {moduleMonthOffset === "CUSTOM_MONTH" && (
+                <label className="min-w-[120px]">
+                  <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-blue-600">Select Month</span>
+                  <input
+                    type="month"
+                    value={moduleCustomMonth}
+                    max={today.slice(0, 7)}
+                    onChange={(e) => {
+                      if (e.target.value) setModuleCustomMonth(e.target.value);
+                    }}
+                    className="h-8 w-full rounded-lg border border-blue-200 bg-blue-50/50 px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
+                  />
+                </label>
+              )}
+
+              {moduleMonthOffset === "CUSTOM_RANGE" && (
+                <>
+                  <label className="min-w-[110px]">
+                    <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-blue-600">From Date</span>
+                    <input
+                      type="date"
+                      value={moduleCustomFromDate}
+                      max={moduleCustomToDate || today}
+                      onChange={(e) => {
+                        if (e.target.value) setModuleCustomFromDate(e.target.value);
+                      }}
+                      className="h-8 w-full rounded-lg border border-blue-200 bg-blue-50/50 px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
+                    />
+                  </label>
+                  <label className="min-w-[110px]">
+                    <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-blue-600">To Date</span>
+                    <input
+                      type="date"
+                      value={moduleCustomToDate}
+                      min={moduleCustomFromDate}
+                      max={today}
+                      onChange={(e) => {
+                        if (e.target.value) setModuleCustomToDate(e.target.value);
+                      }}
+                      className="h-8 w-full rounded-lg border border-blue-200 bg-blue-50/50 px-2 text-[9px] font-bold text-slate-700 outline-none focus:border-blue-400 cursor-pointer"
+                    />
+                  </label>
+                </>
+              )}
+
+              <label className="flex-1 min-w-[110px]">
                 <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Zone</span>
                 <select
                   value={moduleZone}
                   onChange={(event) => { setModuleZone(event.target.value); setModuleWard("ALL"); }}
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400"
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400 cursor-pointer"
                 >
                   <option value="ALL">All Zones</option>
                   {zones.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </label>
-              <label>
+
+              <label className="flex-1 min-w-[110px]">
                 <span className="mb-1 block text-[7px] font-black uppercase tracking-wide text-slate-400">Ward</span>
                 <select
                   value={moduleWard}
                   onChange={(event) => setModuleWard(event.target.value)}
-                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400"
+                  className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-[9px] font-bold text-slate-600 outline-none focus:border-blue-400 cursor-pointer"
                 >
                   <option value="ALL">All Wards</option>
                   {moduleVisibleWards.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -4056,17 +4251,64 @@ const beatRequests = (
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {/* Supervisor Selector Dropdown with Integrated Search */}
               <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <select
+                  value={
+                    search && supervisorsList.some(s => (s.name || s.email) === search)
+                      ? search
+                      : search
+                        ? "CUSTOM_SEARCH"
+                        : "ALL"
+                  }
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    if (val === "ALL") {
+                      setSearch("");
+                    } else if (val !== "CUSTOM_SEARCH") {
+                      setSearch(val);
+                    }
+                    setDirectoryPage(1);
+                  }}
+                  className="h-9 w-64 rounded-xl border border-slate-200 bg-white px-3 pr-8 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-400 shadow-sm appearance-none cursor-pointer"
+                >
+                  <option value="ALL">All Supervisors ({supervisorsList.length})</option>
+                  {supervisorsList.map((sup) => (
+                    <option key={sup.id} value={sup.name || sup.email || sup.id}>
+                      {sup.name || "Unnamed Supervisor"} {sup.email ? `(${sup.email})` : ""}
+                    </option>
+                  ))}
+                  {search && !supervisorsList.some(s => (s.name || s.email) === search) && (
+                    <option value="CUSTOM_SEARCH">Filtered: "{search}"</option>
+                  )}
+                </select>
+                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
+
+              {/* Quick Search inside Dropdown area */}
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
                   onChange={(event) => {
                     setSearch(event.target.value);
                     setDirectoryPage(1);
                   }}
-                  placeholder="Search supervisor by name..."
-                  className="h-9 w-64 rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-[10px] font-bold outline-none focus:border-blue-400 shadow-sm"
+                  placeholder="Type to filter..."
+                  className="h-9 w-44 rounded-xl border border-slate-200 bg-slate-50/70 pl-8 pr-2.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-400 focus:bg-white shadow-xs"
                 />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setDirectoryPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
               <button

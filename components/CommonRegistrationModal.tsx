@@ -775,9 +775,10 @@ export default function CommonRegistrationModal({
 
   const downloadSampleCsv = () => {
     const sample = `full_name,email,mobile_number,password,aadhaar_number,zone_name,ward_name,role,modules
-Ramesh Kumar,ramesh.kumar@example.com,9876543210,,123456789012,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP
-Priya Patel,priya.patel@example.com,9812345678,Pass@9876,,Zone 1,Ward 2,QUALITY_CONTROLLER,SWEEPING;LITTERBINS
-Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`;
+Priya Patel,priya.qc@example.com,9812345678,Pass@9876,123456789011,Zone 1,Ward 2,QC,SWEEPING;LITTERBINS;TOILET;GVP
+Amit Kumar,amit.ao@example.com,9765432109,Pass@9876,123456789012,Zone 2,Ward 5,ACTION_OFFICER,ALL
+Ramesh Kumar,ramesh.sup@example.com,9876543210,,123456789013,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP
+Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOYEE,SWEEPING`;
     const blob = new Blob([sample], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1638,7 +1639,7 @@ Amit Kumar,amit.kumar@example.com,9765432109,,,Zone 2,Ward 5,ACTION_OFFICER,ALL`
                   rows={5}
                   className="form-input"
                   style={{ fontFamily: "monospace", fontSize: "12px", height: "auto" }}
-                  placeholder="name,email,phone,password,targetSystems,taskforceRole,modules,swachhRole,accessorType..."
+                  placeholder="full_name,email,mobile_number,password,aadhaar_number,zone_name,ward_name,role,modules&#10;Priya Patel,priya.qc@example.com,9812345678,Pass@9876,,Zone 1,Ward 2,QC,ALL&#10;Amit Kumar,amit.ao@example.com,9765432109,Pass@9876,,Zone 2,Ward 5,ACTION_OFFICER,ALL"
                   value={bulkCsvText}
                   onChange={(e) => handleBulkTextChange(e.target.value)}
                 />

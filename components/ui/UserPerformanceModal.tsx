@@ -27,10 +27,49 @@ export default function UserPerformanceModal({
   isOpen,
   onClose,
 }: UserPerformanceModalProps) {
-  const [timeframe, setTimeframe] = useState<15 | 30>(30);
+  // Filter mode: 'preset' (15/30 days), 'month' (specific month/year), 'custom' (custom start/end date)
+  const [filterMode, setFilterMode] = useState<"15" | "30" | "month" | "custom">("30");
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [customStart, setCustomStart] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [customEnd, setCustomEnd] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<{ present: number; absent: number; total: number } | null | undefined>(undefined);
+
+  // Compute start/end dates
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    if (filterMode === "15") {
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 15);
+      return { start, end };
+    } else if (filterMode === "30") {
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+      return { start, end };
+    } else if (filterMode === "month") {
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 1); // 1st of next month
+      return { start, end };
+    } else {
+      // custom
+      const start = customStart ? new Date(`${customStart}T00:00:00.000Z`) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+      const end = customEnd ? new Date(`${customEnd}T23:59:59.999Z`) : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      return { start, end };
+    }
+  }, [filterMode, selectedMonth, customStart, customEnd]);
 
   useEffect(() => {
     let isActive = true;
@@ -40,12 +79,10 @@ export default function UserPerformanceModal({
       
       setLoading(true);
       try {
-        const now = new Date();
-        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - timeframe);
+        const { start, end } = dateRange;
 
-        const startDateIso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}T00:00:00.000Z`;
-        const endDateIso = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}T23:59:59.999Z`;
+        const startDateIso = start.toISOString();
+        const endDateIso = end.toISOString();
 
         const params = new URLSearchParams({
           startDate: startDateIso,
@@ -76,7 +113,6 @@ export default function UserPerformanceModal({
 
           if (attRes.status === "fulfilled" && attRes.value) {
             const attData = attRes.value;
-            // Check topEmployees or summary or records
             let present = 0;
             let absent = 0;
 
@@ -123,11 +159,23 @@ export default function UserPerformanceModal({
     return () => {
       isActive = false;
     };
-  }, [isOpen, user?.id, user?._id, user?.userId, timeframe, user?.name]);
+  }, [isOpen, user?.id, user?._id, user?.userId, dateRange, user?.name]);
+
+  // Generate Month Options (e.g. past 12 months)
+  const monthOptions = useMemo(() => {
+    const list: { label: string; value: string }[] = [];
+    const d = new Date();
+    for (let i = 0; i < 12; i++) {
+      const cur = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      const val = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`;
+      const label = cur.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      list.push({ label, value: val });
+    }
+    return list;
+  }, []);
 
   // Aggregate metrics
   const formatModule = (m: any) => {
-    // Handle case where m is an object (e.g. { name: "TWINBIN" })
     const str = typeof m === "string" ? m : (m?.name || m?.module || String(m));
     const up = (str || "").toUpperCase();
     if (up === "TWINBIN" || up === "LITTERBIN") return "Litterbin";
@@ -146,11 +194,14 @@ export default function UserPerformanceModal({
     const byModule: Record<string, number> = {};
     const byDate: Record<string, number> = {};
 
-    // Initialize daily chart data
-    const dailyData: { date: string; inspections: any }[] = [];
-    for (let i = timeframe - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+    // Initialize daily chart data across the dateRange
+    const startTime = dateRange.start.getTime();
+    const endTime = Math.min(dateRange.end.getTime(), Date.now() + 86400000);
+    const dayDiff = Math.max(1, Math.min(90, Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24))));
+
+    for (let i = 0; i < dayDiff; i++) {
+      const d = new Date(startTime);
+      d.setDate(d.getDate() + i);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       byDate[dateStr] = 0;
     }
@@ -171,11 +222,14 @@ export default function UserPerformanceModal({
          const dateStr = `${rDate.getFullYear()}-${String(rDate.getMonth() + 1).padStart(2, "0")}-${String(rDate.getDate()).padStart(2, "0")}`;
          if (byDate[dateStr] !== undefined) {
            byDate[dateStr]++;
+         } else {
+           byDate[dateStr] = 1;
          }
       }
     });
 
-    Object.keys(byDate).forEach(date => {
+    const dailyData: { date: string; inspections: any }[] = [];
+    Object.keys(byDate).sort().forEach(date => {
       dailyData.push({
         date: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         inspections: byDate[date]
@@ -193,7 +247,7 @@ export default function UserPerformanceModal({
     }));
 
     return { total, approved, rejected, pending, approvalRate, topModule, dailyData, moduleData };
-  }, [records, timeframe]);
+  }, [records, dateRange]);
 
   const isEmployee = useMemo(() => {
     const roles = [
@@ -215,7 +269,7 @@ export default function UserPerformanceModal({
       >
         {/* Header (Compact & Slim) */}
         <div className="bg-[#1e2336] px-6 py-4 relative shrink-0">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
              <div className="flex items-center gap-3 min-w-0">
                <div className="min-w-0">
                  <div className="flex items-center gap-2 mb-1">
@@ -236,32 +290,89 @@ export default function UserPerformanceModal({
                </div>
              </div>
 
-             <div className="flex items-center gap-3 shrink-0">
-               <div className="flex bg-black/30 p-0.5 rounded-lg border border-white/5">
+             {/* Date / Month / Custom Filter Controls */}
+             <div className="flex flex-wrap items-center gap-2 shrink-0">
+               {/* Segmented Control Bar */}
+               <div className="flex items-center bg-slate-900/90 p-1 rounded-2xl border border-white/10 shadow-inner gap-1">
+                 {/* 30 Days Preset */}
                  <button
-                   onClick={() => setTimeframe(15)}
-                   className={`px-3 py-1 text-[10px] font-black rounded-md transition ${
-                     timeframe === 15 
-                       ? "bg-white text-slate-900 shadow-sm" 
-                       : "text-white/60 hover:text-white hover:bg-white/10"
-                   }`}
-                 >
-                   15 Days
-                 </button>
-                 <button
-                   onClick={() => setTimeframe(30)}
-                   className={`px-3 py-1 text-[10px] font-black rounded-md transition ${
-                     timeframe === 30 
-                       ? "bg-white text-slate-900 shadow-sm" 
-                       : "text-white/60 hover:text-white hover:bg-white/10"
+                   onClick={() => setFilterMode("30")}
+                   className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all duration-150 ${
+                     filterMode === "30"
+                       ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                       : "text-slate-300 hover:text-white hover:bg-white/5"
                    }`}
                  >
                    30 Days
                  </button>
+
+                 {/* Month Dropdown Pill */}
+                 <div
+                   className={`relative flex items-center rounded-xl px-3 py-1.5 transition-all duration-150 ${
+                     filterMode === "month"
+                       ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                       : "text-slate-300 hover:text-white hover:bg-white/5"
+                   }`}
+                 >
+                   <span className="text-[11px] font-bold mr-1.5 flex items-center gap-1 pointer-events-none">
+                     <Calendar size={12} className={filterMode === "month" ? "text-white" : "text-slate-400"} />
+                     {filterMode === "month" 
+                       ? (monthOptions.find(o => o.value === selectedMonth)?.label || "Select Month")
+                       : "Month"}
+                   </span>
+                   <select
+                     value={filterMode === "month" ? selectedMonth : ""}
+                     onChange={(e) => {
+                       setSelectedMonth(e.target.value);
+                       setFilterMode("month");
+                     }}
+                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-[11px]"
+                   >
+                     <option value="" disabled className="text-slate-900">Select Month</option>
+                     {monthOptions.map((opt) => (
+                       <option key={opt.value} value={opt.value} className="text-slate-900 font-semibold">
+                         {opt.label}
+                       </option>
+                     ))}
+                   </select>
+                 </div>
+
+                 {/* Custom Range Toggle */}
+                 <button
+                   onClick={() => setFilterMode(filterMode === "custom" ? "30" : "custom")}
+                   className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all duration-150 ${
+                     filterMode === "custom"
+                       ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                       : "text-slate-300 hover:text-white hover:bg-white/5"
+                   }`}
+                 >
+                   Custom Range
+                 </button>
                </div>
+
+               {/* Custom Date Inputs inline when custom is active */}
+               {filterMode === "custom" && (
+                 <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 px-3 rounded-2xl border border-blue-500/40 shadow-inner text-[11px] text-white animate-in fade-in zoom-in-95 duration-150">
+                   <input
+                     type="date"
+                     value={customStart}
+                     onChange={(e) => setCustomStart(e.target.value)}
+                     className="bg-white/10 hover:bg-white/15 border border-white/20 rounded-lg px-2 py-1 text-[10px] font-semibold text-white outline-none focus:border-blue-400 cursor-pointer"
+                   />
+                   <span className="text-slate-400 text-[10px] font-bold">to</span>
+                   <input
+                     type="date"
+                     value={customEnd}
+                     onChange={(e) => setCustomEnd(e.target.value)}
+                     className="bg-white/10 hover:bg-white/15 border border-white/20 rounded-lg px-2 py-1 text-[10px] font-semibold text-white outline-none focus:border-blue-400 cursor-pointer"
+                   />
+                 </div>
+               )}
+
+               {/* Close Button */}
                <button
                  onClick={onClose}
-                 className="w-8 h-8 flex items-center justify-center rounded-full border border-white/20 text-white/60 hover:bg-white/10 hover:text-white transition"
+                 className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/15 hover:text-white transition shadow-sm ml-1"
                >
                  <X size={16} />
                </button>
@@ -323,7 +434,7 @@ export default function UserPerformanceModal({
                     <div className="mt-2 text-2xl font-black text-orange-950">
                       {attendance ? attendance.total : (attendance === undefined ? "..." : "-")}
                     </div>
-                    <div className="text-[10px] font-semibold text-orange-600/80 mt-1">Last {timeframe} Days</div>
+                    <div className="text-[10px] font-semibold text-orange-600/80 mt-1">Selected Period</div>
                   </div>
 
                   <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 shadow-sm">
@@ -361,7 +472,7 @@ export default function UserPerformanceModal({
                 </div>
               ) : (
                 /* SUPERVISOR SPECIFIC STATS */
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 shadow-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase text-blue-600">Total Activity</span>
@@ -397,31 +508,6 @@ export default function UserPerformanceModal({
                     <div className="mt-2 text-lg font-black text-purple-900 truncate" title={metrics.topModule}>{metrics.topModule}</div>
                     <div className="text-[10px] font-semibold text-purple-600/80 mt-1">Most frequent</div>
                   </div>
-
-                  <div className="p-4 rounded-xl bg-orange-50 border border-orange-100 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-orange-600">Attendance</span>
-                      <Calendar size={14} className="text-orange-500" />
-                    </div>
-                    {attendance === undefined ? (
-                      <>
-                        <div className="mt-2 flex h-8 items-center">
-                          <Activity className="w-5 h-5 animate-pulse text-orange-400" />
-                        </div>
-                        <div className="text-[10px] font-semibold text-orange-600/80 mt-1">Loading...</div>
-                      </>
-                    ) : attendance ? (
-                      <>
-                        <div className="mt-2 text-2xl font-black text-orange-900">{attendance.present}<span className="text-sm font-bold text-orange-700/60"> / {attendance.total}</span></div>
-                        <div className="text-[10px] font-semibold text-orange-600/80 mt-1">{attendance.present} Present • {attendance.absent} Absent</div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="mt-2 text-2xl font-black text-orange-900">-</div>
-                        <div className="text-[10px] font-semibold text-orange-600/80 mt-1">No data available</div>
-                      </>
-                    )}
-                  </div>
                 </div>
               )}
 
@@ -429,7 +515,7 @@ export default function UserPerformanceModal({
               {!isEmployee ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <h3 className="text-xs font-black text-slate-800 mb-4 uppercase">Daily Inspection Activity Trend ({timeframe} Days)</h3>
+                    <h3 className="text-xs font-black text-slate-800 mb-4 uppercase">Daily Inspection Activity Trend</h3>
                     <div className="h-56 w-full">
                       {metrics.dailyData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
@@ -519,7 +605,7 @@ export default function UserPerformanceModal({
                   {/* Assigned Beat Inspection Results */}
                   <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xs font-black text-slate-800 uppercase">Assigned Beat Inspection History ({timeframe} Days)</h3>
+                      <h3 className="text-xs font-black text-slate-800 uppercase">Assigned Beat Inspection History</h3>
                       <span className="text-[10px] font-bold text-slate-400">Inspections conducted by beat supervisor</span>
                     </div>
 
