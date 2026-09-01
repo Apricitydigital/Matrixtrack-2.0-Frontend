@@ -286,9 +286,13 @@ export default function CommonRegistrationModal({
       const fetchedZones = res.zones || [];
       setZones(fetchedZones);
 
-      const wardPromises = fetchedZones.map(z => PublicGeoApi.wards(z.id).catch(() => ({ wards: [] })));
+      const wardPromises = fetchedZones.map(z =>
+        PublicGeoApi.wards(z.id)
+          .then(wRes => (wRes.wards || []).map((w: any) => ({ ...w, parentId: z.id })))
+          .catch(() => [])
+      );
       const wardResults = await Promise.all(wardPromises);
-      const allCityWards = wardResults.flatMap(wRes => wRes.wards || []);
+      const allCityWards = wardResults.flat();
       setWards(allCityWards);
     } finally {
       setLoadingGeo(false);
@@ -613,20 +617,41 @@ export default function CommonRegistrationModal({
       let isValid = true;
       let validationError: string | undefined = undefined;
 
-      const matchGeoNode = (nodes: any[], queryStr: string) => {
+      const matchGeoNode = (nodes: any[], queryStr: string, parentZoneId?: string) => {
         if (!queryStr || !nodes || nodes.length === 0) return null;
         const q = queryStr.trim().toLowerCase();
         const qNum = q.replace(/\D/g, "");
-        return nodes.find((n) => {
+
+        // Filter nodes by parent zone if provided and present on nodes
+        const candidateNodes = (parentZoneId && nodes.some(n => n.parentId || n.parent?.id))
+          ? nodes.filter(n => (n.parentId || n.parent?.id) === parentZoneId)
+          : nodes;
+
+        const searchPool = candidateNodes.length > 0 ? candidateNodes : nodes;
+
+        // 1. Exact Name match
+        let found = searchPool.find((n) => (n.name || "").trim().toLowerCase() === q);
+        if (found) return found;
+
+        // 2. Exact Number match
+        if (qNum.length > 0) {
+          found = searchPool.find((n) => {
+            const nNum = (n.name || "").replace(/\D/g, "");
+            return nNum === qNum;
+          });
+          if (found) return found;
+        }
+
+        // 3. Fallback: contains match
+        return searchPool.find((n) => {
           const nName = (n.name || "").trim().toLowerCase();
-          const nNum = nName.replace(/\D/g, "");
-          return nName === q || (qNum && nNum === qNum) || nName.includes(q) || q.includes(nName);
+          return nName.includes(q);
         });
       };
 
       const matchedZone = matchGeoNode(zones, zoneName);
-      const matchedWard = matchGeoNode(wards, wardName);
-      const finalZoneId = matchedZone?.id || zoneName || form.zoneId || undefined;
+      const matchedWard = matchGeoNode(wards, wardName, matchedZone?.id);
+      const finalZoneId = matchedZone?.id || matchedWard?.parentId || zoneName || form.zoneId || undefined;
       const finalWardId = matchedWard?.id || wardName || form.wardId || undefined;
       const emailLower = (email || "").toLowerCase().trim();
 

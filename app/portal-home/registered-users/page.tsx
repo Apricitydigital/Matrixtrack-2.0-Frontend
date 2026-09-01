@@ -2275,41 +2275,31 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   };
 
   useEffect(() => {
-    if (
-      fetchingData ||
-      !isSingleZoneRole ||
-      zoneIds.length <= 1
-    ) {
+    if (fetchingData || wards.length === 0) {
       return;
     }
 
-    const retainedZoneId =
-      zoneIds[0];
+    if (isSingleZoneRole && zoneIds.length > 1) {
+      const retainedZoneId = zoneIds[0];
+      setZoneIds([retainedZoneId]);
+    }
 
-    setZoneIds([retainedZoneId]);
+    if (zoneIds.length > 0) {
+      setWardIds((currentWardIds) => {
+        const cleaned = currentWardIds.filter((wardId) => {
+          const ward = wards.find((item: any) => item.id === wardId);
+          if (!ward) return true; // Keep if not loaded yet
+          const parentZoneId = ward.parentId || ward.parent?.id;
+          return !parentZoneId || zoneIds.includes(parentZoneId);
+        });
 
-    setWardIds((currentWardIds) =>
-      currentWardIds.filter((wardId) => {
-        const ward = wards.find(
-          (item: any) =>
-            item.id === wardId
-        );
-
-        if (!ward) {
-          return false;
+        // If wards changed, update state
+        if (cleaned.length !== currentWardIds.length) {
+          return cleaned;
         }
-
-        const parentZoneId =
-          ward.parentId ||
-          ward.parent?.id;
-
-        return (
-          !parentZoneId ||
-          parentZoneId ===
-          retainedZoneId
-        );
-      })
-    );
+        return currentWardIds;
+      });
+    }
   }, [
     fetchingData,
     isSingleZoneRole,
