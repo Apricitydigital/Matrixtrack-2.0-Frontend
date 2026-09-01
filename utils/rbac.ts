@@ -34,7 +34,7 @@ export function canWriteModule(user: AuthUser | null, module: ModuleName) {
   if (user.roles.includes("HMS_SUPER_ADMIN")) return true;
   const assignment = getModuleAssignment(user, module);
   if (!assignment) return false;
-  if (user.roles.includes("CITY_ADMIN")) return true;
+  if (user.roles.includes("CITY_ADMIN") || user.roles.includes("ULB_OFFICER") || user.roles.includes("ACTION_OFFICER")) return true;
   return Boolean(assignment?.canWrite);
 }
 
