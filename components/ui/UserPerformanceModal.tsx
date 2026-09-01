@@ -510,7 +510,6 @@ export default function UserPerformanceModal({
                   </div>
                 </div>
               )}
-
               {/* Charts or Detailed View */}
               {!isEmployee ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -541,7 +540,6 @@ export default function UserPerformanceModal({
                       )}
                     </div>
                   </div>
-
                   <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <h3 className="text-xs font-black text-slate-800 mb-4 uppercase">Module Breakdown</h3>
                     <div className="h-56 w-full">
@@ -630,7 +628,6 @@ export default function UserPerformanceModal({
                   </div>
                 </div>
               )}
-
           </div>
         )}
       </div>
@@ -638,3 +635,6 @@ export default function UserPerformanceModal({
     </div>
   );
 }
+
+
+

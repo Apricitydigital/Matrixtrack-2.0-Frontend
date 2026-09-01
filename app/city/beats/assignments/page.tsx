@@ -18,6 +18,8 @@ import {
   Filter,
   RotateCcw,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { AreaBeatApi } from "@lib/apiClient";
@@ -62,6 +64,9 @@ export default function BeatAssignmentsPage() {
   const [wardFilter, setWardFilter] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [selectedBeat, setSelectedBeat] = useState<any | null>(null);
 
   /* =========================================================
@@ -83,6 +88,11 @@ export default function BeatAssignmentsPage() {
   useEffect(() => {
     loadBeats();
   }, [loadBeats]);
+
+  // Reset pagination on filter or view change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, zoneFilter, wardFilter, areaFilter, currentView]);
 
   /* =========================================================
      FILTER OPTIONS
@@ -182,7 +192,16 @@ export default function BeatAssignmentsPage() {
     }).length;
   }, [filteredBeats]);
 
-  const employeeAssignedCount = useMemo(() => {
+  const partiallyAssignedEmployeeCount = useMemo(() => {
+    return filteredBeats.filter((beat) => {
+      const assignedSegments = (beat.segments || []).filter(
+        (segment: any) => !!segment.employeeAssignedToId
+      ).length;
+      return assignedSegments > 0;
+    }).length;
+  }, [filteredBeats]);
+
+  const fullyStaffedEmployeeCount = useMemo(() => {
     return filteredBeats.filter((beat) => {
       const totalSegments =
         beat.totalSegments || beat.segments?.length || 0;
@@ -193,6 +212,16 @@ export default function BeatAssignmentsPage() {
       return totalSegments > 0 && assignedSegments === totalSegments;
     }).length;
   }, [filteredBeats]);
+
+  /* =========================================================
+     PAGINATION CALCULATION
+  ========================================================= */
+
+  const totalPages = Math.max(1, Math.ceil(filteredBeats.length / pageSize));
+  const paginatedBeats = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredBeats.slice(start, start + pageSize);
+  }, [filteredBeats, currentPage, pageSize]);
 
   /* =========================================================
      PAGE TEXT
@@ -242,12 +271,11 @@ export default function BeatAssignmentsPage() {
 
         <div
           style={{
-            background:
-              "linear-gradient(135deg, #ffffff 0%, #f8fbff 100%)",
+            backgroundColor: "#ffffff",
             border: "1px solid #e2e8f0",
-            borderRadius: "22px",
-            padding: "22px 24px",
-            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.05)",
+            borderRadius: "20px",
+            padding: "20px 24px",
+            boxShadow: "0 4px 20px rgba(15, 23, 42, 0.04)",
             marginBottom: "18px",
           }}
         >
@@ -255,45 +283,46 @@ export default function BeatAssignmentsPage() {
             style={{
               display: "flex",
               justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: "20px",
+              alignItems: "center",
+              gap: "16px",
               flexWrap: "wrap",
             }}
           >
-            <div style={{ flex: 1, minWidth: "280px" }}>
+            <div style={{ flex: 1, minWidth: "260px" }}>
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "12px",
-                  fontSize: "0.72rem",
-                  fontWeight: 800,
+                  gap: "6px",
+                  marginBottom: "8px",
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
                   color: "#64748b",
                   textTransform: "uppercase",
-                  letterSpacing: "0.06em",
+                  letterSpacing: "0.05em",
                 }}
               >
                 <span>CITY ADMIN</span>
                 <span>/</span>
                 <span>BEATS</span>
                 <span>/</span>
-                <span style={{ color: "#2563eb" }}>{pageTitle.toUpperCase()}</span>
+                <span style={{ color: isSupervisorView ? "#2563eb" : "#059669", fontWeight: 800 }}>
+                  {pageTitle.toUpperCase()}
+                </span>
               </div>
 
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "16px",
-                  flexWrap: "wrap",
+                  gap: "12px",
                 }}
               >
                 <div
                   style={{
-                    width: "58px",
-                    height: "58px",
-                    borderRadius: "18px",
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "12px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -304,73 +333,52 @@ export default function BeatAssignmentsPage() {
                       ? "1px solid #bfdbfe"
                       : "1px solid #a7f3d0",
                     color: isSupervisorView ? "#2563eb" : "#059669",
-                    boxShadow: "0 8px 18px rgba(37, 99, 235, 0.08)",
                     flexShrink: 0,
                   }}
                 >
                   {isSupervisorView ? (
-                    <UserCheck2 size={26} />
+                    <UserCheck2 size={20} />
                   ) : (
-                    <Users size={26} />
+                    <Users size={20} />
                   )}
                 </div>
 
-                <div>
-                  <h1
-                    style={{
-                      margin: 0,
-                      fontSize: "1.85rem",
-                      fontWeight: 900,
-                      color: "#0f172a",
-                      letterSpacing: "-0.03em",
-                      lineHeight: 1.15,
-                    }}
-                  >
-                    {pageTitle}
-                  </h1>
-
-                  <p
-                    style={{
-                      margin: "6px 0 0",
-                      fontSize: "0.92rem",
-                      fontWeight: 500,
-                      color: "#64748b",
-                    }}
-                  >
-                    {pageDescription}
-                  </p>
-                </div>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: "1.25rem",
+                    fontWeight: 800,
+                    color: "#0f172a",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {pageTitle}
+                </h1>
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
+            <div>
               <button
                 type="button"
                 onClick={loadBeats}
                 style={{
-                  display: "flex",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: "8px",
-                  height: "42px",
-                  padding: "0 16px",
-                  borderRadius: "12px",
+                  gap: "7px",
+                  height: "38px",
+                  padding: "0 14px",
+                  borderRadius: "10px",
                   border: "1px solid #cbd5e1",
                   backgroundColor: "#ffffff",
                   color: "#334155",
-                  fontSize: "0.82rem",
+                  fontSize: "0.78rem",
                   fontWeight: 700,
                   cursor: "pointer",
+                  transition: "all 0.15s ease",
                 }}
               >
                 <RefreshCw
-                  size={15}
+                  size={14}
                   className={loading ? "animate-spin" : ""}
                 />
                 Refresh
@@ -381,28 +389,30 @@ export default function BeatAssignmentsPage() {
           {/* STATS */}
           <div
             style={{
-              display: "flex",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
               gap: "12px",
-              flexWrap: "wrap",
               marginTop: "18px",
             }}
           >
             <div
               style={{
-                minWidth: "170px",
-                padding: "12px 14px",
-                backgroundColor: "#ffffff",
+                padding: "14px 18px",
+                backgroundColor: "#f8fafc",
                 border: "1px solid #e2e8f0",
                 borderRadius: "14px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
               }}
             >
               <div
                 style={{
                   fontSize: "0.68rem",
                   fontWeight: 800,
-                  color: "#94a3b8",
+                  color: "#64748b",
                   textTransform: "uppercase",
-                  letterSpacing: "0.05em",
+                  letterSpacing: "0.06em",
                 }}
               >
                 Total Beats
@@ -410,78 +420,161 @@ export default function BeatAssignmentsPage() {
               <div
                 style={{
                   marginTop: "4px",
-                  fontSize: "1.35rem",
+                  fontSize: "1.45rem",
                   fontWeight: 900,
                   color: "#0f172a",
+                  lineHeight: 1.1,
                 }}
               >
                 {totalBeats}
               </div>
             </div>
 
-            <div
-              style={{
-                minWidth: "170px",
-                padding: "12px 14px",
-                backgroundColor: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "14px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.68rem",
-                  fontWeight: 800,
-                  color: "#94a3b8",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Supervisors Assigned
-              </div>
-              <div
-                style={{
-                  marginTop: "4px",
-                  fontSize: "1.35rem",
-                  fontWeight: 900,
-                  color: "#2563eb",
-                }}
-              >
-                {assignedSupervisorCount}
-              </div>
-            </div>
+            {isSupervisorView ? (
+              <>
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    backgroundColor: "#eff6ff",
+                    border: "1px solid #dbeafe",
+                    borderRadius: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 800,
+                      color: "#2563eb",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Supervisors Assigned
+                  </div>
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      fontSize: "1.45rem",
+                      fontWeight: 900,
+                      color: "#1d4ed8",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {assignedSupervisorCount}
+                  </div>
+                </div>
 
-            <div
-              style={{
-                minWidth: "170px",
-                padding: "12px 14px",
-                backgroundColor: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: "14px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "0.68rem",
-                  fontWeight: 800,
-                  color: "#94a3b8",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Fully Staffed Beats
-              </div>
-              <div
-                style={{
-                  marginTop: "4px",
-                  fontSize: "1.35rem",
-                  fontWeight: 900,
-                  color: "#059669",
-                }}
-              >
-                {employeeAssignedCount}
-              </div>
-            </div>
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    backgroundColor: totalBeats - assignedSupervisorCount > 0 ? "#fff1f2" : "#f0fdf4",
+                    border: totalBeats - assignedSupervisorCount > 0 ? "1px solid #ffe4e6" : "1px solid #dcfce7",
+                    borderRadius: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 800,
+                      color: totalBeats - assignedSupervisorCount > 0 ? "#e11d48" : "#16a34a",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Unassigned Beats
+                  </div>
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      fontSize: "1.45rem",
+                      fontWeight: 900,
+                      color: totalBeats - assignedSupervisorCount > 0 ? "#be123c" : "#15803d",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {Math.max(0, totalBeats - assignedSupervisorCount)}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    backgroundColor: "#ecfdf5",
+                    border: "1px solid #d1fae5",
+                    borderRadius: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 800,
+                      color: "#059669",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Employees Assigned
+                  </div>
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      fontSize: "1.45rem",
+                      fontWeight: 900,
+                      color: "#047857",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {partiallyAssignedEmployeeCount}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    backgroundColor: "#f0fdf4",
+                    border: "1px solid #dcfce7",
+                    borderRadius: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 800,
+                      color: "#16a34a",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    Fully Staffed Beats
+                  </div>
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      fontSize: "1.45rem",
+                      fontWeight: 900,
+                      color: "#15803d",
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    {fullyStaffedEmployeeCount}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -729,7 +822,7 @@ export default function BeatAssignmentsPage() {
                 </thead>
 
                 <tbody>
-                  {filteredBeats.map((beat) => {
+                  {paginatedBeats.map((beat) => {
                     const supervisors =
                       beat.supervisorsSummary ||
                       (beat.assignedToName
@@ -926,6 +1019,148 @@ export default function BeatAssignmentsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* PAGINATION FOOTER */}
+          {!loading && filteredBeats.length > 0 && (
+            <div
+              style={{
+                padding: "14px 24px",
+                borderTop: "1px solid #f1f5f9",
+                backgroundColor: "#fcfdfe",
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "0.8125rem", color: "#64748b", fontWeight: 600 }}>
+                  Showing{" "}
+                  <strong style={{ color: "#0f172a" }}>
+                    {(currentPage - 1) * pageSize + 1}
+                  </strong>{" "}
+                  to{" "}
+                  <strong style={{ color: "#0f172a" }}>
+                    {Math.min(currentPage * pageSize, filteredBeats.length)}
+                  </strong>{" "}
+                  of{" "}
+                  <strong style={{ color: "#0f172a" }}>
+                    {filteredBeats.length}
+                  </strong>{" "}
+                  beats
+                </span>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>Per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      backgroundColor: "white",
+                      color: "#334155",
+                      outline: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    backgroundColor: currentPage === 1 ? "#f8fafc" : "white",
+                    color: currentPage === 1 ? "#cbd5e1" : "#334155",
+                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => {
+                    if (totalPages <= 5) return true;
+                    if (p === 1 || p === totalPages) return true;
+                    return Math.abs(p - currentPage) <= 1;
+                  })
+                  .map((p, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    const showEllipsis = prev && p - prev > 1;
+
+                    return (
+                      <React.Fragment key={p}>
+                        {showEllipsis && (
+                          <span style={{ padding: "0 4px", color: "#94a3b8", fontSize: "0.75rem" }}>
+                            ...
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          style={{
+                            minWidth: "32px",
+                            height: "32px",
+                            padding: "0 8px",
+                            borderRadius: "8px",
+                            border: p === currentPage ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                            backgroundColor: p === currentPage ? "#2563eb" : "white",
+                            color: p === currentPage ? "white" : "#334155",
+                            fontSize: "0.78rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    backgroundColor: currentPage === totalPages ? "#f8fafc" : "white",
+                    color: currentPage === totalPages ? "#cbd5e1" : "#334155",
+                    cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>
