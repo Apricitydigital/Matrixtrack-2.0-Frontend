@@ -651,8 +651,8 @@ export default function CommonRegistrationModal({
 
       const matchedZone = matchGeoNode(zones, zoneName);
       const matchedWard = matchGeoNode(wards, wardName, matchedZone?.id);
-      const finalZoneId = matchedZone?.id || matchedWard?.parentId || zoneName || form.zoneId || undefined;
-      const finalWardId = matchedWard?.id || wardName || form.wardId || undefined;
+      const finalZoneId = matchedZone?.id || (matchedWard?.parentId || undefined) || form.zoneId || undefined;
+      const finalWardId = matchedWard?.id || form.wardId || undefined;
       const emailLower = (email || "").toLowerCase().trim();
 
       let isExistingUser = false;
@@ -675,12 +675,12 @@ export default function CommonRegistrationModal({
         isExistingUser = true;
         isValid = true;
       } else if (zoneName || wardName) {
-        if (zones.length > 0 && zoneName && !matchedZone && !finalZoneId) {
+        if (zones.length > 0 && zoneName && !matchedZone) {
           isValid = false;
-          validationError = "Unregistered Zone";
-        } else if (wards.length > 0 && wardName && !matchedWard && !finalWardId) {
+          validationError = `Zone "${zoneName}" not found in City Master`;
+        } else if (wards.length > 0 && wardName && !matchedWard) {
           isValid = false;
-          validationError = "Unregistered Ward";
+          validationError = `Ward "${wardName}" not found in City Master`;
         }
       }
 
