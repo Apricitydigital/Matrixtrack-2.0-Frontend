@@ -404,7 +404,7 @@ export default function CityAdminDashboard({
 
   const today = useMemo(() => dayKey(new Date()), []);
 
-  const [cityModules, setCityModules] = useState<any[]>([]);
+  const [cityModules, setCityModules] = useState<any[] | null>(null);
 
   // Compute allowed module keys for this City Admin based on user's assigned modules and city's active modules
   const allowedKeys = useMemo<ModuleKey[]>(() => {
@@ -428,14 +428,14 @@ export default function CityAdminDashboard({
     );
 
     // If city modules are fetched from backend, gather enabled keys
-    const activeCityModuleKeys = cityModules
+    const activeCityModuleKeys = (cityModules || [])
       .filter((cm) => cm.enabled !== false)
       .map((cm) => norm(cm.key || cm.name || "").toUpperCase());
 
     return ALL_KEYS.filter((key) => {
       const def = ALL_MODULES[key];
       // Check city module status if city modules have loaded
-      if (activeCityModuleKeys.length > 0) {
+      if (cityModules !== null) {
         const cityEnabled = def.matchKeys.some((mk) =>
           activeCityModuleKeys.some((cmk) => cmk.includes(mk) || mk.includes(cmk))
         );
@@ -460,7 +460,7 @@ export default function CityAdminDashboard({
     });
   }, [user, cityModules]);
 
-  const KEYS = allowedKeys.length > 0 ? allowedKeys : ALL_KEYS;
+  const KEYS = allowedKeys;
 
   const [zone, setZone] = useState("ALL");
   const [ward, setWard] = useState("ALL");
