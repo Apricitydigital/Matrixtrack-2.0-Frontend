@@ -209,11 +209,10 @@ function SearchableSelect({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(option)}
-                className={`flex items-center w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${
-                  isSelected(option.value)
+                className={`flex items-center w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${isSelected(option.value)
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {isMultiSelect && (
                   <div className={`w-3 h-3 mr-2 rounded-[3px] border flex items-center justify-center shrink-0 ${isSelected(option.value) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
@@ -302,10 +301,10 @@ function StatusPill({ status }: { status: string }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${present
-          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
-          : absent
-            ? "bg-rose-50 text-rose-700 ring-1 ring-rose-100"
-            : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+        ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+        : absent
+          ? "bg-rose-50 text-rose-700 ring-1 ring-rose-100"
+          : "bg-slate-100 text-slate-600 ring-1 ring-slate-200"
         }`}
     >
       <span
@@ -351,7 +350,7 @@ function KpiSparkline({ tone }: { tone: "blue" | "emerald" | "rose" | "violet" |
 function KpiCard({
   label,
   value,
-  detail,
+  // detail,
   icon,
   tone,
   onClick,
@@ -359,7 +358,7 @@ function KpiCard({
 }: {
   label: string;
   value: string;
-  detail: string;
+  // detail: string;
   icon: React.ReactNode;
   tone: "blue" | "emerald" | "rose" | "violet" | "teal" | "amber" | "slate";
   onClick?: () => void;
@@ -403,8 +402,8 @@ function KpiCard({
       type="button"
       onClick={onClick}
       className={`group relative flex min-h-[170px] w-full flex-col overflow-hidden rounded-[18px] border bg-white px-3.5 pb-2.5 pt-3.5 text-left shadow-[0_6px_18px_rgba(15,23,42,0.055)] transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-100 ${active
-          ? "-translate-y-0.5 border-blue-300 shadow-[0_14px_32px_rgba(37,99,235,0.12)] ring-2 ring-blue-100"
-          : "border-slate-200/90 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.09)]"
+        ? "-translate-y-0.5 border-blue-300 shadow-[0_14px_32px_rgba(37,99,235,0.12)] ring-2 ring-blue-100"
+        : "border-slate-200/90 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_14px_32px_rgba(15,23,42,0.09)]"
         }`}
       aria-label={`View ${label} records`}
     >
@@ -424,9 +423,9 @@ function KpiCard({
         <p className="whitespace-nowrap text-[24px] font-black tabular-nums leading-none tracking-[-0.04em] text-slate-950 2xl:text-[26px]">
           {value}
         </p>
-        <p className="mt-1.5 min-h-[28px] text-[9.5px] font-semibold leading-[14px] text-slate-500">
+        {/* <p className="mt-1.5 min-h-[28px] text-[9.5px] font-semibold leading-[14px] text-slate-500">
           {detail}
-        </p>
+        </p> */}
       </div>
 
       <div className="mt-auto -mx-1 pt-1.5">
@@ -695,8 +694,8 @@ function UploadModal({
               );
             }}
             className={`flex w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed px-5 py-6 text-center transition ${dragging
-                ? "border-blue-500 bg-blue-50"
-                : "border-slate-200 bg-slate-50/70 hover:border-blue-300 hover:bg-blue-50/40"
+              ? "border-blue-500 bg-blue-50"
+              : "border-slate-200 bg-slate-50/70 hover:border-blue-300 hover:bg-blue-50/40"
               }`}
           >
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200">
@@ -1492,9 +1491,21 @@ function AttendanceDashboard() {
   const [selectedCityId, setSelectedCityId] = useState("");
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [data, setData] = useState<AttendanceDashboardResponse | null>(null);
-  const [draftFilters, setDraftFilters] = useState<FilterState>(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState<FilterState>(emptyFilters);
-  const [employeeGroup, setEmployeeGroup] = useState<"ALL" | "HEALTH_WORKERS">("ALL");
+  const initialUrlFilters = (): FilterState => {
+    if (typeof window === "undefined") return emptyFilters;
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from") || "";
+    const to = params.get("to") || "";
+    if (!from && !to) return emptyFilters;
+    return { ...emptyFilters, from, to };
+  };
+  const [draftFilters, setDraftFilters] = useState<FilterState>(initialUrlFilters);
+  const [appliedFilters, setAppliedFilters] = useState<FilterState>(initialUrlFilters);
+  const [employeeGroup, setEmployeeGroup] = useState<"ALL" | "HEALTH_WORKERS">(() => {
+    if (typeof window === "undefined") return "ALL";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("group") === "HEALTH_WORKERS" ? "HEALTH_WORKERS" : "ALL";
+  });
   const [page, setPage] = useState(1);
   const [employeePageSize, setEmployeePageSize] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -2251,22 +2262,20 @@ function AttendanceDashboard() {
           <div className="flex bg-slate-100/50 p-1 rounded-xl shadow-inner border border-slate-200/60 ring-1 ring-white/50">
             <button
               onClick={() => setEmployeeGroup("ALL")}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
-                employeeGroup === "ALL" 
-                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80" 
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${employeeGroup === "ALL"
+                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80"
                   : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-              }`}
+                }`}
             >
               <Sparkles size={12} className={employeeGroup === "ALL" ? "text-blue-500" : "text-slate-400"} />
               All Employees
             </button>
             <button
               onClick={() => setEmployeeGroup("HEALTH_WORKERS")}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
-                employeeGroup === "HEALTH_WORKERS" 
-                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80" 
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${employeeGroup === "HEALTH_WORKERS"
+                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80"
                   : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
-              }`}
+                }`}
             >
               <Building2 size={12} className={employeeGroup === "HEALTH_WORKERS" ? "text-blue-500" : "text-slate-400"} />
               Health Workers
@@ -2351,22 +2360,22 @@ function AttendanceDashboard() {
       {(!hmsSuperAdmin || selectedCityId) && (
         <section
           className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 shadow-[0_5px_16px_rgba(15,23,42,0.03)] ${todayUploadLoading
-              ? "border-slate-200 bg-white"
-              : todayUploadData && todayUploaded
-                ? "border-emerald-200 bg-emerald-50/75"
-                : todayUploadData
-                  ? "border-rose-200 bg-rose-50/75"
-                  : "border-amber-200 bg-amber-50/75"
+            ? "border-slate-200 bg-white"
+            : todayUploadData && todayUploaded
+              ? "border-emerald-200 bg-emerald-50/75"
+              : todayUploadData
+                ? "border-rose-200 bg-rose-50/75"
+                : "border-amber-200 bg-amber-50/75"
             }`}
         >
           <div
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${todayUploadLoading
-                ? "bg-slate-100 text-slate-500"
-                : todayUploadData && todayUploaded
-                  ? "bg-emerald-100 text-emerald-700"
-                  : todayUploadData
-                    ? "bg-rose-100 text-rose-700"
-                    : "bg-amber-100 text-amber-700"
+              ? "bg-slate-100 text-slate-500"
+              : todayUploadData && todayUploaded
+                ? "bg-emerald-100 text-emerald-700"
+                : todayUploadData
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-amber-100 text-amber-700"
               }`}
           >
             {todayUploadLoading
@@ -2379,12 +2388,12 @@ function AttendanceDashboard() {
           <div className="min-w-0 flex flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
             <p
               className={`shrink-0 text-xs font-black ${todayUploadLoading
-                  ? "text-slate-800"
-                  : todayUploadData && todayUploaded
-                    ? "text-emerald-900"
-                    : todayUploadData
-                      ? "text-rose-900"
-                      : "text-amber-900"
+                ? "text-slate-800"
+                : todayUploadData && todayUploaded
+                  ? "text-emerald-900"
+                  : todayUploadData
+                    ? "text-rose-900"
+                    : "text-amber-900"
                 }`}
             >
               {todayUploadLoading
@@ -2398,10 +2407,10 @@ function AttendanceDashboard() {
             <span className="hidden h-1 w-1 shrink-0 rounded-full bg-current opacity-30 sm:block" />
             <p
               className={`truncate text-[10.5px] font-semibold ${todayUploadData && todayUploaded
-                  ? "text-emerald-700"
-                  : todayUploadData
-                    ? "text-rose-700"
-                    : "text-slate-500"
+                ? "text-emerald-700"
+                : todayUploadData
+                  ? "text-rose-700"
+                  : "text-slate-500"
                 }`}
             >
               {todayUploadData && todayUploaded
@@ -2417,8 +2426,8 @@ function AttendanceDashboard() {
       {(error || notice) && (
         <div
           className={`flex items-start justify-between gap-4 rounded-2xl border px-4 py-3.5 ${error
-              ? "border-rose-200 bg-rose-50 text-rose-800"
-              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+            ? "border-rose-200 bg-rose-50 text-rose-800"
+            : "border-emerald-200 bg-emerald-50 text-emerald-800"
             }`}
         >
           <div className="flex items-start gap-2.5">
@@ -2579,11 +2588,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Total employees"
               value={numberFormatter.format(summary.uniqueEmployees)}
-              detail={
-                isMultiDayRange
-                  ? `Avg ${formatAverageValue(avgTotalRecords)} records/day (${averageFormula(summary.totalRecords, rangeDayCount)})`
-                  : `${numberFormatter.format(summary.totalRecords)} attendance records`
-              }
+              // detail={
+              //   isMultiDayRange
+              //     ? `Avg ${formatAverageValue(avgTotalRecords)} records/day (${averageFormula(summary.totalRecords, rangeDayCount)})`
+              //     : `${numberFormatter.format(summary.totalRecords)} attendance records`
+              // }
               icon={<UsersRound size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "ALL"}
@@ -2598,11 +2607,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Present"
               value={isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
-              detail={
-                isMultiDayRange
-                  ? `Avg/day (${averageFormula(summary.present, rangeDayCount)})`
-                  : `${summary.attendanceRate.toFixed(1)}% attendance`
-              }
+              // detail={
+              //   isMultiDayRange
+              //     ? `Avg/day (${averageFormula(summary.present, rangeDayCount)})`
+              //     : `${summary.attendanceRate.toFixed(1)}% attendance`
+              // }
               icon={<UserCheck size={18} />}
               tone="emerald"
               active={kpiDrilldown?.key === "PRESENT"}
@@ -2618,11 +2627,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Absent"
               value={isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
-              detail={
-                isMultiDayRange
-                  ? `Avg/day (${averageFormula(summary.absent, rangeDayCount)})`
-                  : `${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`
-              }
+              // detail={
+              //   isMultiDayRange
+              //     ? `Avg/day (${averageFormula(summary.absent, rangeDayCount)})`
+              //     : `${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`
+              // }
               icon={<UserRoundX size={18} />}
               tone="rose"
               active={kpiDrilldown?.key === "ABSENT"}
@@ -2638,7 +2647,7 @@ function AttendanceDashboard() {
             <KpiCard
               label="Attendance rate"
               value={`${summary.attendanceRate.toFixed(1)}%`}
-              detail="Present ÷ total records"
+              // detail="Present ÷ total records"
               icon={<Activity size={18} />}
               tone="violet"
               active={kpiDrilldown?.key === "RATE"}
@@ -2654,11 +2663,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Punch In"
               value={isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount)}
-              detail={
-                isMultiDayRange
-                  ? `Avg/day (${averageFormula(punchInCount, rangeDayCount)})`
-                  : `${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`
-              }
+              // detail={
+              //   isMultiDayRange
+              //     ? `Avg/day (${averageFormula(punchInCount, rangeDayCount)})`
+              //     : `${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`
+              // }
               icon={<Clock3 size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "PUNCH_IN"}
@@ -2674,11 +2683,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Punch Out"
               value={isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(summary.checkedOut)}
-              detail={
-                isMultiDayRange
-                  ? `Avg/day (${averageFormula(summary.checkedOut, rangeDayCount)})`
-                  : "Completed Punch In / Punch Out cycle"
-              }
+              // detail={
+              //   isMultiDayRange
+              //     ? `Avg/day (${averageFormula(summary.checkedOut, rangeDayCount)})`
+              //     : "Completed Punch In / Punch Out cycle"
+              // }
               icon={<CheckCircle2 size={18} />}
               tone="teal"
               active={kpiDrilldown?.key === "PUNCH_OUT"}
@@ -2694,11 +2703,11 @@ function AttendanceDashboard() {
             <KpiCard
               label="Not punched out"
               value={isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
-              detail={
-                isMultiDayRange
-                  ? `Avg/day (${averageFormula(summary.openCheckIns, rangeDayCount)})`
-                  : "Punch In recorded · Punch Out pending"
-              }
+              // detail={
+              //   isMultiDayRange
+              //     ? `Avg/day (${averageFormula(summary.openCheckIns, rangeDayCount)})`
+              //     : "Punch In recorded · Punch Out pending"
+              // }
               icon={<TimerReset size={18} />}
               tone="amber"
               active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
@@ -3112,9 +3121,8 @@ function AttendanceDashboard() {
                       key={bucket.key}
                       type="button"
                       onClick={() => setDesignationRateFilter((current) => (current === bucket.key ? "ALL" : bucket.key))}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold transition ${
-                        active ? "bg-white text-slate-900 ring-1 ring-slate-300 shadow-sm" : "text-slate-600 hover:bg-white/70"
-                      }`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold transition ${active ? "bg-white text-slate-900 ring-1 ring-slate-300 shadow-sm" : "text-slate-600 hover:bg-white/70"
+                        }`}
                     >
                       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: bucket.color }} />
                       {bucket.label}
@@ -3264,11 +3272,10 @@ function AttendanceDashboard() {
                           setEmployeePageSize(size);
                           setPage(1);
                         }}
-                        className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${
-                          employeePageSize === size
+                        className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${employeePageSize === size
                             ? "bg-blue-600 text-white shadow-sm"
                             : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                        }`}
+                          }`}
                       >
                         {size}
                       </button>

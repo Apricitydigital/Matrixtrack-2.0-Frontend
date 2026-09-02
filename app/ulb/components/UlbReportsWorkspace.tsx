@@ -1,6 +1,7 @@
 'use client';
 
 import {
+    Fragment,
     useEffect,
     useMemo,
     useState,
@@ -13,31 +14,36 @@ import {
     AlertTriangle,
     ArrowRight,
     Award,
+    BarChart3,
     Building2,
     CalendarDays,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
     ChevronDown,
+    CircleAlert,
     ClipboardCheck,
     Clock3,
+    Copy,
     Eye,
     FileCheck2,
     Filter,
+    Gauge,
     Image as ImageIcon,
     Layers3,
     MapPin,
+    MessageCircle,
     RefreshCw,
     Search,
     ShieldCheck,
     Sparkles,
+    Target,
     TimerReset,
     TrendingUp,
     Trophy,
     UserCheck,
     UserRoundX,
     UsersRound,
-    Wrench,
     X,
     XCircle,
 } from 'lucide-react';
@@ -49,6 +55,9 @@ import {
     BarChart,
     CartesianGrid,
     Cell,
+    ComposedChart,
+    Legend,
+    Line,
     Pie,
     PieChart,
     ResponsiveContainer,
@@ -76,6 +85,11 @@ import {
     AttendanceApi,
     type AttendanceDashboardResponse,
 } from '@lib/attendanceApi';
+
+import {
+    WardRankingApi,
+    type WardRankingSummaryResponse,
+} from '@lib/wardRankingApi';
 
 
 /* =========================================================
@@ -157,7 +171,7 @@ const VIEW_CONFIG: Record<
             'QC Approved Reports',
 
         description:
-            'Review QC-approved reports. If corrective work is still required, send the report to the mapped Action Officer with a clear instruction.',
+            'Review QC-approved reports. If action is still required, send the report to the mapped Action Officer with a clear instruction.',
 
         status:
             'APPROVED',
@@ -171,7 +185,7 @@ const VIEW_CONFIG: Record<
             'QC Rejected Reports',
 
         description:
-            'Review QC-rejected reports and escalate only the cases that require municipal corrective action.',
+            'Review QC-rejected reports and escalate only the cases that require municipal action.',
 
         status:
             'REJECTED',
@@ -182,10 +196,10 @@ const VIEW_CONFIG: Record<
 
     ACTION_REQUIRED: {
         title:
-            'Corrective Actions Pending',
+            'Action Required',
 
         description:
-            'Track reports already sent to Action Officers. The original ULB instruction remains visible while corrective work is pending.',
+            'Track reports already sent to Action Officers. The original ULB instruction remains visible while action is pending.',
 
         status:
             'ACTION_REQUIRED',
@@ -199,7 +213,7 @@ const VIEW_CONFIG: Record<
             'Action Taken History',
 
         description:
-            'Review completed corrective-action cases with the original ULB instruction, Action Officer response and submitted evidence.',
+            'Review Action Taken reports with the original ULB instruction, Action Officer response and submitted evidence.',
 
         status:
             'ACTION_TAKEN',
@@ -1149,6 +1163,26 @@ function closureRateOf(
         : null;
 }
 
+/*
+ * Any report that isn't yet in one of the four tracked buckets
+ * (approved / rejected / action required / action taken) is still
+ * awaiting its first QC review. Deriving it as a remainder keeps
+ * row.total === approved + rejected + actionRequired + actionTaken
+ * + pending always true, without a second pass over the records.
+ */
+function pendingOf(
+    row: LeaderboardRow
+): number {
+    return Math.max(
+        0,
+        row.total -
+        row.approved -
+        row.rejected -
+        row.actionRequired -
+        row.actionTaken
+    );
+}
+
 function buildLeaderboard(
     records: any[],
     identityFn: (item: any) => string | null,
@@ -1178,10 +1212,6 @@ function wardIdentity(item: any) {
     return item?.wardName || item?.bin?.wardName || null;
 }
 
-function employeeIdentity(item: any) {
-    return item?.employee?.name || null;
-}
-
 function supervisorIdentity(item: any) {
     return item?.supervisor?.name || null;
 }
@@ -1204,11 +1234,14 @@ function actionOfficerIdentity(
     }
 
     if (moduleKey === 'LITTERBINS') {
+        if (item?.actionOfficer?.name) {
+            return item.actionOfficer.name;
+        }
+
         /*
-         * Litter Bin records only carry actionOfficerId
-         * (no joined name from the API today), so the
-         * officer is identified by a short id badge
-         * rather than a fabricated name.
+         * Fallback for records assigned before the API started
+         * joining the officer's name - still show a short id
+         * badge instead of hiding the assignment entirely.
          */
         if (
             item?.actionOfficerId &&
@@ -1224,10 +1257,11 @@ function actionOfficerIdentity(
     }
 
     /*
-     * Sweeping records carry no relational Action Officer
-     * identity at all (only a free-text remark).
+     * Sweeping's own record has no actionOfficerId column - the
+     * assignment lives in the ActionOfficerTask ledger, which the
+     * records API now joins and returns as `actionOfficer`.
      */
-    return null;
+    return item?.actionOfficer?.name || null;
 }
 
 function formatMinutes(
@@ -1264,6 +1298,152 @@ function formatDateOnly(
     });
 }
 
+function scoreBandFor(
+    value: number
+) {
+    if (value >= 85) {
+        return {
+            label: 'Strong Performance',
+            text: 'text-emerald-700',
+            bg: 'bg-emerald-50',
+            border: 'border-emerald-200',
+            ring: 'ring-emerald-100',
+            dot: 'bg-emerald-500',
+            dotLight: 'bg-emerald-300',
+            bar: 'bg-emerald-500',
+        };
+    }
+
+    if (value >= 70) {
+        return {
+            label: 'Needs Attention',
+            text: 'text-amber-700',
+            bg: 'bg-amber-50',
+            border: 'border-amber-200',
+            ring: 'ring-amber-100',
+            dot: 'bg-amber-500',
+            dotLight: 'bg-amber-300',
+            bar: 'bg-amber-500',
+        };
+    }
+
+    return {
+        label: 'Critical',
+        text: 'text-rose-700',
+        bg: 'bg-rose-50',
+        border: 'border-rose-200',
+        ring: 'ring-rose-100',
+        dot: 'bg-rose-500',
+        dotLight: 'bg-rose-300',
+        bar: 'bg-rose-500',
+    };
+}
+
+
+function toLocalISODate(
+    date: Date
+) {
+    const year = date.getFullYear();
+
+    const month =
+        String(date.getMonth() + 1)
+            .padStart(2, '0');
+
+    const day =
+        String(date.getDate())
+            .padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+
+
+/*
+ * Default landing filter for the dashboard overview - "This
+ * Month", same rolling 30-day window as the "This Month" preset
+ * button in the date filter, so the page loads already showing
+ * that preset applied and highlighted.
+ */
+function defaultDashboardDateRange() {
+    const today = new Date();
+
+    const start = new Date(today);
+    start.setDate(start.getDate() - 30);
+
+    return {
+        from: toLocalISODate(start),
+        to: toLocalISODate(today),
+    };
+}
+
+
+function dashboardPeriodLabel(
+    from: string,
+    to: string
+) {
+    if (!from && !to) {
+        return 'All time';
+    }
+
+    const format = (value: string) =>
+        value
+            ? new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+            })
+            : '—';
+
+    if (from === to) {
+        return format(from);
+    }
+
+    if (!from) {
+        return `Up to ${format(to)}`;
+    }
+
+    if (!to) {
+        return `From ${format(from)}`;
+    }
+
+    return `${format(from)} – ${format(to)}`;
+}
+
+
+const dashboardNumberFormatter =
+    new Intl.NumberFormat('en-IN');
+
+
+/*
+ * Same averaging convention as the Attendance Analytics screen:
+ * when the selected date range spans more than one day, KPI
+ * cards show a per-day average instead of the raw range total.
+ */
+function formatAverageValue(
+    value: number
+) {
+    if (!Number.isFinite(value) || value <= 0) {
+        return '0';
+    }
+
+    if (value >= 100 || Number.isInteger(value)) {
+        return dashboardNumberFormatter.format(
+            Math.round(value)
+        );
+    }
+
+    return value.toFixed(1);
+}
+
+
+function averageFormula(
+    total: number,
+    days: number
+) {
+    return `${dashboardNumberFormatter.format(total)} ÷ ${days} ${days === 1 ? 'day' : 'days'
+        }`;
+}
+
+
 function buildReportsTrend(
     records: any[],
     days = 14
@@ -1277,6 +1457,9 @@ function buildReportsTrend(
             rejected: number;
             actionRequired: number;
             actionTaken: number;
+            TOILET: number;
+            SWEEPING: number;
+            LITTERBINS: number;
         }
     >();
 
@@ -1295,6 +1478,9 @@ function buildReportsTrend(
             rejected: 0,
             actionRequired: 0,
             actionTaken: 0,
+            TOILET: 0,
+            SWEEPING: 0,
+            LITTERBINS: 0,
         });
     }
 
@@ -1307,6 +1493,11 @@ function buildReportsTrend(
         if (!bucket) return;
 
         bucket.total += 1;
+
+        const moduleKey = item.dashboardModule as ModuleKey;
+        if (moduleKey === 'TOILET') bucket.TOILET += 1;
+        else if (moduleKey === 'SWEEPING') bucket.SWEEPING += 1;
+        else if (moduleKey === 'LITTERBINS') bucket.LITTERBINS += 1;
 
         const status = effectiveStatus(item);
 
@@ -1391,44 +1582,44 @@ export default function UlbOperationsWorkspace({
     ] = useState('');
 
 
-    const [
-        fromDate,
-        setFromDate,
-    ] = useState('');
-
-
-    const [
-        toDate,
-        setToDate,
-    ] = useState('');
-
-
     /* ===========================
        DASHBOARD DATE FILTER
+
+       Defaults to "This Month" (rolling 30 days) rather than
+       All Time, so the dashboard lands already scoped to
+       recent activity.
     =========================== */
 
     const [
         dashFromDate,
         setDashFromDate,
-    ] = useState('');
+    ] = useState(
+        () => defaultDashboardDateRange().from
+    );
 
 
     const [
         dashToDate,
         setDashToDate,
-    ] = useState('');
+    ] = useState(
+        () => defaultDashboardDateRange().to
+    );
 
 
     const [
         appliedDashFromDate,
         setAppliedDashFromDate,
-    ] = useState('');
+    ] = useState(
+        () => defaultDashboardDateRange().from
+    );
 
 
     const [
         appliedDashToDate,
         setAppliedDashToDate,
-    ] = useState('');
+    ] = useState(
+        () => defaultDashboardDateRange().to
+    );
 
 
     const [
@@ -1512,6 +1703,30 @@ export default function UlbOperationsWorkspace({
     const [
         attendanceError,
         setAttendanceError,
+    ] = useState('');
+
+
+    /* ===========================
+       WARD RANKING SUMMARY
+    =========================== */
+
+    const [
+        wardSummary,
+        setWardSummary,
+    ] = useState<
+        WardRankingSummaryResponse | null
+    >(null);
+
+
+    const [
+        wardSummaryLoading,
+        setWardSummaryLoading,
+    ] = useState(true);
+
+
+    const [
+        wardSummaryError,
+        setWardSummaryError,
     ] = useState('');
 
 
@@ -1609,7 +1824,10 @@ export default function UlbOperationsWorkspace({
        fetched for the status list pages.
     ========================================================= */
 
-    async function loadAttendance() {
+    async function loadAttendance(
+        from?: string,
+        to?: string
+    ) {
         setAttendanceLoading(true);
         setAttendanceError('');
 
@@ -1617,6 +1835,16 @@ export default function UlbOperationsWorkspace({
             const result =
                 await AttendanceApi.dashboard({
                     pageSize: 1,
+                    from: from || undefined,
+                    to: to || undefined,
+
+                    /*
+                     * This workspace's Attendance Performance
+                     * container is scoped to Health Workers only,
+                     * matching the "Health Workers" tab on the
+                     * full Attendance Analytics screen.
+                     */
+                    employeeGroup: 'HEALTH_WORKERS',
                 });
 
             setAttendance(result);
@@ -1641,11 +1869,67 @@ export default function UlbOperationsWorkspace({
     }
 
 
+    /* =========================================================
+       LOAD WARD RANKING SUMMARY
+
+       Same idea as attendance - only needed for the dashboard
+       overview, and refreshed whenever the dashboard date
+       filter is applied.
+    ========================================================= */
+
+    async function loadWardSummary(
+        from?: string,
+        to?: string
+    ) {
+        setWardSummaryLoading(true);
+        setWardSummaryError('');
+
+        try {
+            const result =
+                await WardRankingApi.summary({
+                    from: from || undefined,
+                    to: to || undefined,
+                });
+
+            setWardSummary(result);
+
+        } catch (
+        err: any
+        ) {
+
+            console.error(
+                'ULB ward ranking summary load failed',
+                err
+            );
+
+            setWardSummaryError(
+                err?.message ||
+                'Unable to load ward ranking summary.'
+            );
+
+        } finally {
+            setWardSummaryLoading(false);
+        }
+    }
+
+
     useEffect(() => {
         if (view === 'DASHBOARD') {
-            loadAttendance();
+            loadAttendance(
+                appliedDashFromDate,
+                appliedDashToDate
+            );
+
+            loadWardSummary(
+                appliedDashFromDate,
+                appliedDashToDate
+            );
         }
-    }, [view]);
+    }, [
+        view,
+        appliedDashFromDate,
+        appliedDashToDate,
+    ]);
 
 
     /*
@@ -1660,8 +1944,8 @@ export default function UlbOperationsWorkspace({
         selectedZone,
         selectedWard,
         search,
-        fromDate,
-        toDate,
+        appliedDashFromDate,
+        appliedDashToDate,
     ]);
 
 
@@ -1722,8 +2006,49 @@ export default function UlbOperationsWorkspace({
 
 
     /* =========================================================
-       DASHBOARD FILTERED RECORDS (WITH DATE FILTER)
+       DASHBOARD FILTERED RECORDS
+
+       Zone, Ward and Search are applied here (in addition to the
+       Module filter already baked into moduleRecords) so that
+       every dashboard section - stat cards, charts, trend and
+       leaderboards - reflects the full filter bar, not just the
+       Module dropdown.
     ========================================================= */
+
+    const geoFilteredRecords =
+        useMemo(() => {
+
+            const query =
+                search
+                    .trim()
+                    .toLowerCase();
+
+            return moduleRecords
+                .filter((item) =>
+                    selectedZone === 'ALL'
+                        ? true
+                        : getRecordZone(item) === selectedZone
+                )
+                .filter((item) =>
+                    selectedWard === 'ALL'
+                        ? true
+                        : getRecordWard(item) === selectedWard
+                )
+                .filter((item) =>
+                    query
+                        ? reportSearchText(
+                            item,
+                            item.dashboardModule
+                        ).includes(query)
+                        : true
+                );
+        }, [
+            moduleRecords,
+            selectedZone,
+            selectedWard,
+            search,
+        ]);
+
 
     const dashboardRecords =
         useMemo(() => {
@@ -1731,11 +2056,11 @@ export default function UlbOperationsWorkspace({
                 !appliedDashFromDate &&
                 !appliedDashToDate
             ) {
-                return moduleRecords;
+                return geoFilteredRecords;
             }
 
 
-            return moduleRecords.filter(
+            return geoFilteredRecords.filter(
                 (item) =>
                     isWithinRange(
                         item,
@@ -1744,7 +2069,7 @@ export default function UlbOperationsWorkspace({
                     )
             );
         }, [
-            moduleRecords,
+            geoFilteredRecords,
             appliedDashFromDate,
             appliedDashToDate,
         ]);
@@ -1836,17 +2161,38 @@ export default function UlbOperationsWorkspace({
                 ).length;
 
 
+            /*
+             * Any record whose effective status is none of the
+             * four known workflow states hasn't been reviewed by
+             * QC yet (raw backend status such as SUBMITTED /
+             * PENDING_QC) - this is the "QC Pending" count, same
+             * concept as the Inspection & Performance screen.
+             */
+            const pending =
+                dashboardRecords.length -
+                (
+                    approved +
+                    rejected +
+                    actionRequired +
+                    actionTaken
+                );
+
+
             return {
                 approved,
                 rejected,
                 actionRequired,
                 actionTaken,
+                pending,
 
                 total:
                     approved +
                     rejected +
                     actionRequired +
                     actionTaken,
+
+                grandTotal:
+                    dashboardRecords.length,
             };
 
         }, [
@@ -1933,8 +2279,8 @@ export default function UlbOperationsWorkspace({
                     ) =>
                         isWithinRange(
                             item,
-                            fromDate,
-                            toDate
+                            appliedDashFromDate,
+                            appliedDashToDate
                         )
                 )
 
@@ -1962,8 +2308,8 @@ export default function UlbOperationsWorkspace({
             selectedZone,
             selectedWard,
             search,
-            fromDate,
-            toDate,
+            appliedDashFromDate,
+            appliedDashToDate,
         ]);
 
 
@@ -2306,15 +2652,15 @@ export default function UlbOperationsWorkspace({
 
     const zoneLeaderboard =
         useMemo(
-            () => buildLeaderboard(moduleRecords, zoneIdentity, 8),
-            [moduleRecords]
+            () => buildLeaderboard(dashboardRecords, zoneIdentity, 8),
+            [dashboardRecords]
         );
 
 
     const wardLeaderboard =
         useMemo(
-            () => buildLeaderboard(moduleRecords, wardIdentity, 10),
-            [moduleRecords]
+            () => buildLeaderboard(dashboardRecords, wardIdentity, 10),
+            [dashboardRecords]
         );
 
 
@@ -2322,32 +2668,25 @@ export default function UlbOperationsWorkspace({
         useMemo(
             () =>
                 buildLeaderboard(
-                    moduleRecords,
+                    dashboardRecords,
                     (item) => moduleShortLabel(item.dashboardModule),
                     MODULES.length
                 ),
-            [moduleRecords]
-        );
-
-
-    const employeeLeaderboard =
-        useMemo(
-            () => buildLeaderboard(moduleRecords, employeeIdentity, 8),
-            [moduleRecords]
+            [dashboardRecords]
         );
 
 
     const supervisorLeaderboard =
         useMemo(
-            () => buildLeaderboard(moduleRecords, supervisorIdentity, 8),
-            [moduleRecords]
+            () => buildLeaderboard(dashboardRecords, supervisorIdentity, 8),
+            [dashboardRecords]
         );
 
 
     const qcLeaderboard =
         useMemo(
-            () => buildLeaderboard(moduleRecords, qcReviewerIdentity, 8),
-            [moduleRecords]
+            () => buildLeaderboard(dashboardRecords, qcReviewerIdentity, 8),
+            [dashboardRecords]
         );
 
 
@@ -2355,19 +2694,282 @@ export default function UlbOperationsWorkspace({
         useMemo(
             () =>
                 buildLeaderboard(
-                    moduleRecords,
+                    dashboardRecords,
                     (item) => actionOfficerIdentity(item, item.dashboardModule),
                     8
                 ),
-            [moduleRecords]
+            [dashboardRecords]
         );
 
 
     const reportsTrend =
         useMemo(
-            () => buildReportsTrend(moduleRecords, 14),
-            [moduleRecords]
+            () => buildReportsTrend(geoFilteredRecords, 14),
+            [geoFilteredRecords]
         );
+
+
+    /* =========================================================
+       DASHBOARD DATE RANGE (for "avg per day" stat cards)
+    ========================================================= */
+
+    const rangeDayCount =
+        useMemo(() => {
+            if (
+                !appliedDashFromDate ||
+                !appliedDashToDate
+            ) {
+                return 1;
+            }
+
+            const start =
+                new Date(
+                    `${appliedDashFromDate}T00:00:00`
+                ).getTime();
+
+            const end =
+                new Date(
+                    `${appliedDashToDate}T00:00:00`
+                ).getTime();
+
+            const days =
+                Math.round(
+                    (end - start) / 86400000
+                ) + 1;
+
+            return Math.max(1, days);
+        }, [
+            appliedDashFromDate,
+            appliedDashToDate,
+        ]);
+
+
+    const isMultiDayRange =
+        rangeDayCount > 1;
+
+
+    /* =========================================================
+       EXECUTIVE SUMMARY DERIVATIVES
+       (QC approval rate, zone needing attention, oldest
+       pending corrective case, management briefing narrative)
+    ========================================================= */
+
+    const approvalRate =
+        useMemo(() => {
+            const decided =
+                stats.approved +
+                stats.rejected;
+
+            return decided > 0
+                ? Math.round(
+                    (stats.approved / decided) * 100
+                )
+                : null;
+        }, [stats]);
+
+
+    const overallBand =
+        scoreBandFor(
+            approvalRate ?? 0
+        );
+
+
+    const attentionZone =
+        useMemo(() => {
+            const rated = zoneLeaderboard
+                .map((zone) => ({
+                    ...zone,
+                    rate: approvalRateOf(zone),
+                }))
+                .filter((zone) => zone.rate !== null) as Array<
+                    LeaderboardRow & { rate: number }
+                >;
+
+            if (!rated.length) {
+                return zoneLeaderboard[0] || null;
+            }
+
+            return [...rated].sort(
+                (a, b) => a.rate - b.rate
+            )[0];
+        }, [zoneLeaderboard]);
+
+
+    const oldestPendingDays =
+        useMemo(() => {
+            const oldest = actionRequiredRecords[0];
+            if (!oldest) return null;
+
+            const value = recordDate(oldest);
+            if (!value) return null;
+
+            const diffMs =
+                Date.now() -
+                new Date(value).getTime();
+
+            return Math.max(
+                0,
+                Math.floor(diffMs / (1000 * 60 * 60 * 24))
+            );
+        }, [actionRequiredRecords]);
+
+
+    const briefingSummary =
+        useMemo(() => {
+            if (!dashboardRecords.length) {
+                return {
+                    tone: 'amber' as const,
+                    text:
+                        'No reports have been recorded yet for this selection, so a performance summary is not available.',
+                };
+            }
+
+            const sentences: string[] = [];
+
+            if (approvalRate !== null) {
+                sentences.push(
+                    `Out of ${stats.approved + stats.rejected} QC-reviewed reports, ${approvalRate}% were QC Approved${approvalRate < 70 ? ', which is below the healthy threshold and needs review' : ''}.`
+                );
+            }
+
+            if (correctiveTotal > 0) {
+                sentences.push(
+                    `${stats.actionTaken} of ${correctiveTotal} reports needing action have had Action Taken (${closureRate}% Action)${stats.actionRequired > 0 ? `, with ${stats.actionRequired} still Action Required` : ''}.`
+                );
+            }
+
+            if (highestCorrectiveModule.count > 0) {
+                sentences.push(
+                    `${highestCorrectiveModule.label} has the most Action Required reports (${highestCorrectiveModule.count}).`
+                );
+            }
+
+            if (oldestPendingDays !== null && oldestPendingDays > 0) {
+                sentences.push(
+                    `The oldest Action Required report has been open for ${oldestPendingDays} day${oldestPendingDays === 1 ? '' : 's'}.`
+                );
+            }
+
+            if (!sentences.length) {
+                sentences.push(
+                    'All reviewed reports are QC Approved and no report is currently Action Required.'
+                );
+            }
+
+            const tone: 'rose' | 'amber' | 'emerald' =
+                (approvalRate !== null && approvalRate < 70) ||
+                    (oldestPendingDays !== null && oldestPendingDays > 7)
+                    ? 'rose'
+                    : stats.actionRequired > 0
+                        ? 'amber'
+                        : 'emerald';
+
+            return {
+                tone,
+                text: sentences.join(' '),
+            };
+        }, [
+            dashboardRecords,
+            approvalRate,
+            correctiveTotal,
+            stats,
+            closureRate,
+            highestCorrectiveModule,
+            oldestPendingDays,
+        ]);
+
+
+    /* =========================================================
+       COMMISSIONER SUMMARY (shareable text)
+
+       Mirrors the Inspection & Performance / Attendance / Ward
+       Ranking sections shown on the dashboard, so the shared
+       text always matches what's on screen for the same filters.
+    ========================================================= */
+
+    function buildCommissionerSummaryText() {
+        const lines: string[] = [];
+
+        lines.push('MatrixTrack — Commissioner Summary');
+
+        lines.push(
+            `Period: ${dashboardPeriodLabel(
+                appliedDashFromDate,
+                appliedDashToDate
+            )}${isMultiDayRange ? ` (${rangeDayCount} days)` : ''}`
+        );
+
+        const activeFilterParts: string[] = [];
+
+        if (moduleFilter !== 'ALL') activeFilterParts.push(`Module: ${moduleLabel(moduleFilter)}`);
+        if (selectedZone !== 'ALL') activeFilterParts.push(`Zone: ${selectedZone}`);
+        if (selectedWard !== 'ALL') activeFilterParts.push(`Ward: ${selectedWard}`);
+        if (search.trim()) activeFilterParts.push(`Search: "${search.trim()}"`);
+
+        lines.push(
+            `Filters: ${activeFilterParts.length ? activeFilterParts.join(' · ') : 'None (all reports)'}`
+        );
+
+        lines.push('');
+        lines.push('INSPECTION & PERFORMANCE');
+        lines.push(`Total Inspections: ${dashboardNumberFormatter.format(stats.grandTotal)}${isMultiDayRange ? ` (avg ${formatAverageValue(stats.grandTotal / rangeDayCount)}/day)` : ''}`);
+        lines.push(`QC Approved: ${dashboardNumberFormatter.format(stats.approved)}${approvalRate !== null ? ` — ${approvalRate}% Approval %` : ''}`);
+        lines.push(`QC Rejected: ${dashboardNumberFormatter.format(stats.rejected)}`);
+        lines.push(`QC Pending: ${dashboardNumberFormatter.format(stats.pending)}`);
+        lines.push(`Action Required: ${dashboardNumberFormatter.format(stats.actionRequired)}`);
+        lines.push(`Action Taken: ${dashboardNumberFormatter.format(stats.actionTaken)}${correctiveTotal > 0 ? ` — ${closureRate}% Action` : ''}`);
+
+        if (highestCorrectiveModule.count > 0) {
+            lines.push(`Most Action Required reports: ${highestCorrectiveModule.label} (${highestCorrectiveModule.count})`);
+        }
+
+        if (attentionZone) {
+            const zoneRate = approvalRateOf(attentionZone);
+            lines.push(`Zone needing attention: ${attentionZone.label}${zoneRate !== null ? ` (${zoneRate}% Approval %)` : ''}`);
+        }
+
+        if (oldestPendingDays !== null && oldestPendingDays > 0) {
+            lines.push(`Oldest Action Required report: ${oldestPendingDays} day${oldestPendingDays === 1 ? '' : 's'} old`);
+        }
+
+        lines.push('');
+        lines.push('ATTENDANCE — HEALTH WORKERS');
+
+        if (attendance?.hasData && attendance.summary) {
+            const s = attendance.summary;
+
+            lines.push(`Total Employees: ${dashboardNumberFormatter.format(s.uniqueEmployees)}`);
+            lines.push(`Present: ${isMultiDayRange ? `avg ${formatAverageValue(s.present / rangeDayCount)}/day` : dashboardNumberFormatter.format(s.present)}`);
+            lines.push(`Absent: ${isMultiDayRange ? `avg ${formatAverageValue(s.absent / rangeDayCount)}/day` : dashboardNumberFormatter.format(s.absent)}`);
+            lines.push(`Attendance Rate: ${Number(s.attendanceRate).toFixed(1)}%`);
+            lines.push(`Avg Work Duration: ${formatMinutes(s.avgWorkMinutes)}`);
+        } else {
+            lines.push('No attendance data available for this period.');
+        }
+
+        lines.push('');
+        lines.push('WARD RANKING');
+
+        if (wardSummary && wardSummary.totalWards > 0) {
+            const ranked = wardSummary.green + wardSummary.amber + wardSummary.red;
+
+            lines.push(`Total Wards: ${dashboardNumberFormatter.format(wardSummary.totalWards)} (${ranked} ranked)`);
+            lines.push(`Top Ranked (85+): ${dashboardNumberFormatter.format(wardSummary.green)}`);
+            lines.push(`Average (70–84.99): ${dashboardNumberFormatter.format(wardSummary.amber)}`);
+            lines.push(`Below Average (<70): ${dashboardNumberFormatter.format(wardSummary.red)}`);
+            lines.push(`City Average Score: ${Number(wardSummary.averageScore).toFixed(1)}`);
+        } else {
+            lines.push('No ward ranking data available for this period.');
+        }
+
+        lines.push('');
+        lines.push(briefingSummary.text);
+
+        lines.push('');
+        lines.push(`Generated ${new Date().toLocaleString()} · MatrixTrack ULB Dashboard`);
+
+        return lines.join('\n');
+    }
 
 
     /* =========================================================
@@ -2498,7 +3100,7 @@ export default function UlbOperationsWorkspace({
 
         if (!remark) {
             setError(
-                'Please enter a corrective-action instruction before submitting.'
+                'Please enter an Action Required instruction before submitting.'
             );
 
             return;
@@ -2693,12 +3295,7 @@ export default function UlbOperationsWorkspace({
             ================================================= */}
 
                         {
-                            view === 'DASHBOARD' ? (
-                                <DashboardHeader
-                                    loading={loading}
-                                    loadRecords={loadRecords}
-                                />
-                            ) : (
+                            view === 'DASHBOARD' ? null : (
                                 <StatusHeader
                                     view={view}
                                     loading={loading}
@@ -2738,65 +3335,6 @@ export default function UlbOperationsWorkspace({
                                             size={16}
                                         />
                                     </button>
-
-                                </div>
-
-                            ) : null
-                        }
-
-
-                        {/* =================================================
-                LATEST REPORT ALERT FOR ULB OFFICER
-            ================================================= */}
-
-                        {
-                            latestReport && !loading ? (
-
-                                <div className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-slate-800 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-
-                                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-
-                                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold uppercase text-amber-900 border border-amber-500/30">
-                                            <span className="relative flex h-2 w-2 mr-0.5">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600" />
-                                            </span>
-                                            Latest Alert
-                                        </span>
-
-                                        <span className="font-black text-slate-900">
-                                            {recordTitle(latestReport, latestReport.dashboardModule)}
-                                        </span>
-
-                                        <span className="text-slate-400">•</span>
-
-                                        <span className="text-slate-600">
-                                            {moduleShortLabel(latestReport.dashboardModule)} ({recordArea(latestReport)})
-                                        </span>
-
-                                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase ${statusBadge(effectiveStatus(latestReport))}`}>
-                                            {effectiveStatus(latestReport).replace(/_/g, ' ')}
-                                        </span>
-
-                                    </div>
-
-
-                                    <div className="flex items-center gap-3 shrink-0">
-
-                                        <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">
-                                            Updated: {formatDate(recordDate(latestReport))}
-                                        </span>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => openDetail(latestReport)}
-                                            className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1 text-xs font-bold text-white shadow-xs transition hover:bg-slate-800 cursor-pointer active:scale-95"
-                                        >
-                                            <Eye size={13} />
-                                            View Details
-                                        </button>
-
-                                    </div>
 
                                 </div>
 
@@ -2878,11 +3416,155 @@ export default function UlbOperationsWorkspace({
                                 view === 'DASHBOARD' ? (
                                     <>
 
+
                                         {/* =========================================
-                        KPI
+                        COMMISSIONER SUMMARY
                     ========================================= */}
 
-                                        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                                        <CommissionerSummary
+                                            periodLabel={dashboardPeriodLabel(appliedDashFromDate, appliedDashToDate)}
+                                            rangeDayCount={rangeDayCount}
+                                            isMultiDayRange={isMultiDayRange}
+
+                                            moduleFilter={moduleFilter}
+                                            selectedZone={selectedZone}
+                                            selectedWard={selectedWard}
+                                            search={search}
+
+                                            stats={stats}
+                                            approvalRate={approvalRate}
+                                            closureRate={closureRate}
+                                            correctiveTotal={correctiveTotal}
+                                            attentionZone={attentionZone}
+                                            oldestPendingDays={oldestPendingDays}
+                                            briefingSummary={briefingSummary}
+                                            highestCorrectiveModule={highestCorrectiveModule}
+
+                                            attendance={attendance}
+                                            attendanceLoading={attendanceLoading}
+                                            attendanceError={attendanceError}
+
+                                            wardSummary={wardSummary}
+                                            wardSummaryLoading={wardSummaryLoading}
+                                            wardSummaryError={wardSummaryError}
+
+                                            onBuildSummaryText={buildCommissionerSummaryText}
+
+                                            onOpenInspection={() =>
+                                                router.push('/ulb/inspection-performance')
+                                            }
+
+                                            onOpenAttendance={() =>
+                                                router.push(
+                                                    `/ulb/attendance?group=HEALTH_WORKERS${appliedDashFromDate ? `&from=${appliedDashFromDate}` : ''
+                                                    }${appliedDashToDate ? `&to=${appliedDashToDate}` : ''
+                                                    }`
+                                                )
+                                            }
+
+                                            onOpenWardRanking={() =>
+                                                router.push('/ulb/ward-ranking')
+                                            }
+                                        />
+
+
+                                        {/* =========================================
+                        INSPECTION & PERFORMANCE
+
+                        Wraps the QC workflow stat cards, the module
+                        breakdown charts and the 14-day reports trend
+                        into one titled section, so it reads as its
+                        own domain alongside Attendance and Ward
+                        Ranking below.
+                    ========================================= */}
+
+                                        <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+
+                                            <SectionHeading
+                                                icon={ClipboardCheck}
+                                                title="Inspection & Performance Overview"
+                                                description="QC workflow position, module breakdown and reports trend across all sanitation modules."
+                                                action={
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => router.push('/ulb/inspection-performance')}
+                                                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                                                    >
+                                                        Open Inspection & Performance
+                                                        <ArrowRight size={14} />
+                                                    </button>
+                                                }
+                                            />
+
+                                            <div className="space-y-5 p-5">
+
+                                        {/* =========================================
+                        QC WORKFLOW STAT CARDS
+
+                        Naming matches the Inspection & Performance
+                        screen (Total Inspection / QC Pending / QC
+                        Approved / QC Rejected / Action Required /
+                        Action Taken) so the two screens read as one
+                        vocabulary. When a multi-day date range is
+                        applied, each card shows a per-day average
+                        the same way Attendance Analytics does.
+                    ========================================= */}
+
+                                        <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
+
+                                            <ExecutiveKpi
+                                                label="Total Inspection"
+
+                                                value={
+                                                    stats.grandTotal
+                                                }
+
+                                                // note={
+                                                //     isMultiDayRange
+                                                //         ? `Avg ${formatAverageValue(stats.grandTotal / rangeDayCount)}/day (${averageFormula(stats.grandTotal, rangeDayCount)})`
+                                                //         : selectedModuleName
+                                                // }
+
+                                                icon={
+                                                    Layers3
+                                                }
+
+                                                tone="navy"
+
+                                                onClick={() =>
+                                                    router.push(
+                                                        '/ulb/inspection-performance'
+                                                    )
+                                                }
+                                            />
+
+
+                                            <ExecutiveKpi
+                                                label="QC Pending"
+
+                                                value={
+                                                    stats.pending
+                                                }
+
+                                                // note={
+                                                //     isMultiDayRange
+                                                //         ? `Avg ${formatAverageValue(stats.pending / rangeDayCount)}/day (${averageFormula(stats.pending, rangeDayCount)})`
+                                                //         : 'Awaiting QC review'
+                                                // }
+
+                                                icon={
+                                                    Clock3
+                                                }
+
+                                                tone="gold"
+
+                                                onClick={() =>
+                                                    router.push(
+                                                        '/ulb/inspection-performance?status=PENDING'
+                                                    )
+                                                }
+                                            />
+
 
                                             <ExecutiveKpi
                                                 label="QC Approved"
@@ -2891,7 +3573,11 @@ export default function UlbOperationsWorkspace({
                                                     stats.approved
                                                 }
 
-                                                note="Reviewed and accepted by QC"
+                                                // note={
+                                                //     isMultiDayRange
+                                                //         ? `Avg ${formatAverageValue(stats.approved / rangeDayCount)}/day (${averageFormula(stats.approved, rangeDayCount)})`
+                                                //         : 'Reviewed and accepted by QC'
+                                                // }
 
                                                 icon={
                                                     CheckCircle2
@@ -2901,7 +3587,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/approved'
+                                                        '/ulb/inspection-performance?status=APPROVED'
                                                     )
                                                 }
                                             />
@@ -2914,7 +3600,11 @@ export default function UlbOperationsWorkspace({
                                                     stats.rejected
                                                 }
 
-                                                note="Rejected during QC review"
+                                                // note={
+                                                //     isMultiDayRange
+                                                //         ? `Avg ${formatAverageValue(stats.rejected / rangeDayCount)}/day (${averageFormula(stats.rejected, rangeDayCount)})`
+                                                //         : 'Rejected during QC review'
+                                                // }
 
                                                 icon={
                                                     XCircle
@@ -2924,7 +3614,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/rejected'
+                                                        '/ulb/inspection-performance?status=REJECTED'
                                                     )
                                                 }
                                             />
@@ -2934,21 +3624,52 @@ export default function UlbOperationsWorkspace({
                                                 label="Action Required"
 
                                                 value={
-                                                    stats
-                                                        .actionRequired
+                                                    correctiveTotal
                                                 }
 
-                                                note="Awaiting corrective response"
+                                                // note={
+                                                //     isMultiDayRange
+                                                //         ? `Avg ${formatAverageValue(correctiveTotal / rangeDayCount)}/day (${averageFormula(correctiveTotal, rangeDayCount)})`
+                                                //         : 'Ever required corrective action'
+                                                // }
 
                                                 icon={
                                                     AlertTriangle
                                                 }
 
-                                                tone="gold"
+                                                tone="orange"
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/action-required'
+                                                        '/ulb/inspection-performance?status=ACTION_REQUIRED'
+                                                    )
+                                                }
+                                            />
+
+
+                                            <ExecutiveKpi
+                                                label="Pending Action"
+
+                                                value={
+                                                    stats
+                                                        .actionRequired
+                                                }
+
+                                                // note={
+                                                //     isMultiDayRange
+                                                //         ? `Avg ${formatAverageValue(stats.actionRequired / rangeDayCount)}/day (${averageFormula(stats.actionRequired, rangeDayCount)})`
+                                                //         : 'Awaiting corrective response'
+                                                // }
+
+                                                icon={
+                                                    Clock3
+                                                }
+
+                                                tone="cyan"
+
+                                                onClick={() =>
+                                                    router.push(
+                                                        '/ulb/inspection-performance?status=PENDING_ACTION'
                                                     )
                                                 }
                                             />
@@ -2962,141 +3683,26 @@ export default function UlbOperationsWorkspace({
                                                         .actionTaken
                                                 }
 
-                                                note="Corrective work completed"
+                                                // note={
+                                                //     isMultiDayRange
+                                                //         ? `Avg ${formatAverageValue(stats.actionTaken / rangeDayCount)}/day (${averageFormula(stats.actionTaken, rangeDayCount)})`
+                                                //         : 'Corrective work completed'
+                                                // }
 
                                                 icon={
                                                     FileCheck2
                                                 }
 
-                                                tone="blue"
+                                                tone="indigo"
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/action-taken'
+                                                        '/ulb/inspection-performance?status=ACTION_TAKEN'
                                                     )
                                                 }
                                             />
 
-
-                                            <ExecutiveKpi
-                                                label="QC Processed"
-
-                                                value={
-                                                    stats.total
-                                                }
-
-                                                note={
-                                                    selectedModuleName
-                                                }
-
-                                                icon={
-                                                    Layers3
-                                                }
-
-                                                tone="navy"
-                                            />
-
                                         </section>
-
-
-                                        {/* =========================================
-                        INSIGHTS
-                    ========================================= */}
-
-                                        <section className="grid gap-4 md:grid-cols-3">
-
-                                            <InsightCard
-                                                icon={
-                                                    TrendingUp
-                                                }
-
-                                                eyebrow="Corrective closure"
-
-                                                value={`${closureRate}%`}
-
-                                                note={`${stats.actionTaken} completed of ${correctiveTotal} corrective cases`}
-                                            >
-
-                                                <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-
-                                                    <div
-                                                        className="h-full rounded-full bg-blue-600 transition-all"
-
-                                                        style={{
-                                                            width:
-                                                                `${closureRate}%`,
-                                                        }}
-                                                    />
-
-                                                </div>
-
-                                            </InsightCard>
-
-
-                                            <InsightCard
-                                                icon={
-                                                    AlertTriangle
-                                                }
-
-                                                eyebrow="Highest open load"
-
-                                                value={
-                                                    highestCorrectiveModule
-                                                        .label
-                                                }
-
-                                                note={`${highestCorrectiveModule.count} pending corrective ${highestCorrectiveModule.count ===
-                                                        1
-                                                        ? 'case'
-                                                        : 'cases'
-                                                    }`}
-                                            />
-
-
-                                            <InsightCard
-                                                icon={
-                                                    Clock3
-                                                }
-
-                                                eyebrow="Latest workflow update"
-
-                                                value={
-                                                    recentRecords[0]
-                                                        ? moduleShortLabel(
-                                                            recentRecords[0]
-                                                                .dashboardModule
-                                                        )
-                                                        : '—'
-                                                }
-
-                                                note={
-                                                    recentRecords[0]
-                                                        ? `${effectiveStatus(
-                                                            recentRecords[0]
-                                                        ).replace(
-                                                            /_/g,
-                                                            ' '
-                                                        )} • ${formatDate(
-                                                            recordDate(
-                                                                recentRecords[0]
-                                                            )
-                                                        )}`
-                                                        : 'No workflow update available'
-                                                }
-                                            />
-
-                                        </section>
-
-
-                                        {/* =========================================
-                        ATTENDANCE
-                    ========================================= */}
-
-                                        <AttendanceOverview
-                                            data={attendance}
-                                            loading={attendanceLoading}
-                                            error={attendanceError}
-                                        />
 
 
                                         {/* =========================================
@@ -3112,15 +3718,6 @@ export default function UlbOperationsWorkspace({
 
                                                 <div className="mb-5 flex flex-col gap-1">
 
-                                                    <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
-
-                                                        <Activity
-                                                            size={15}
-                                                        />
-
-                                                        Service control summary
-
-                                                    </div>
 
 
                                                     <h2 className="text-lg font-black text-slate-900">
@@ -3129,7 +3726,7 @@ export default function UlbOperationsWorkspace({
 
 
                                                     <p className="text-xs font-medium text-slate-500">
-                                                        Compare QC decisions and corrective-action progress across all three sanitation modules.
+                                                        Compare QC decisions and Action Required / Action Taken progress across all three sanitation modules.
                                                     </p>
 
                                                 </div>
@@ -3270,12 +3867,12 @@ export default function UlbOperationsWorkspace({
 
                                                     <LegendDot
                                                         color="#b7791f"
-                                                        label="Corrective action pending"
+                                                        label="Action Required"
                                                     />
 
                                                     <LegendDot
                                                         color="#2563eb"
-                                                        label="Corrective action completed"
+                                                        label="Action Taken"
                                                     />
 
                                                 </div>
@@ -3287,15 +3884,7 @@ export default function UlbOperationsWorkspace({
 
                                             <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
 
-                                                <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
 
-                                                    <ShieldCheck
-                                                        size={15}
-                                                    />
-
-                                                    Portfolio status
-
-                                                </div>
 
 
                                                 <h2 className="mt-1 text-lg font-black text-slate-900">
@@ -3426,98 +4015,132 @@ export default function UlbOperationsWorkspace({
                                             data={reportsTrend}
                                         />
 
-
-                                        {/* =========================================
-                        ZONE / WARD PERFORMANCE
-                    ========================================= */}
-
-                                        <section className="grid gap-5 xl:grid-cols-2">
-
-                                            <GeoPerformanceTable
-                                                icon={Building2}
-                                                eyebrow="Zone-wise performance"
-                                                title="QC & Corrective Performance by Zone"
-                                                description="Approval and corrective-closure rates for every zone with submitted reports."
-                                                rows={zoneLeaderboard}
-                                                emptyMessage="No zone information is available on the current reports."
-                                            />
-
-                                            <GeoPerformanceTable
-                                                icon={MapPin}
-                                                eyebrow="Ward-wise performance"
-                                                title="QC & Corrective Performance by Ward"
-                                                description="Top wards ranked by submitted-report volume."
-                                                rows={wardLeaderboard}
-                                                emptyMessage="No ward information is available on the current reports."
-                                                scroll
-                                            />
+                                            </div>
 
                                         </section>
 
 
                                         {/* =========================================
-                        MODULE DEEP DIVE
+                        ATTENDANCE
                     ========================================= */}
 
-                                        <GeoPerformanceTable
-                                            icon={Layers3}
-                                            eyebrow="Module-wise performance"
-                                            title="Sanitation Module Deep Dive"
-                                            description="Toilets, Sweeping and Litter Bins compared on approval rate and corrective-closure rate."
-                                            rows={modulePerformanceRows}
-                                            emptyMessage="No module data available."
+                                        <AttendanceOverview
+                                            data={attendance}
+                                            loading={attendanceLoading}
+                                            error={attendanceError}
+                                            isMultiDayRange={isMultiDayRange}
+                                            rangeDayCount={rangeDayCount}
+                                            onOpenAttendance={() =>
+                                                router.push(
+                                                    `/ulb/attendance?group=HEALTH_WORKERS${appliedDashFromDate ? `&from=${appliedDashFromDate}` : ''
+                                                    }${appliedDashToDate ? `&to=${appliedDashToDate}` : ''
+                                                    }`
+                                                )
+                                            }
                                         />
 
 
                                         {/* =========================================
-                        PEOPLE PERFORMANCE
+                        WARD RANKING SNAPSHOT
                     ========================================= */}
 
-                                        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                                        <WardPerformanceOverview
+                                            summary={wardSummary}
+                                            loading={wardSummaryLoading}
+                                            error={wardSummaryError}
+                                            onOpenWardRanking={(status) =>
+                                                router.push(
+                                                    status
+                                                        ? `/ulb/ward-ranking?status=${status}`
+                                                        : '/ulb/ward-ranking'
+                                                )
+                                            }
+                                        />
 
-                                            <PeopleLeaderboardCard
-                                                icon={Wrench}
-                                                eyebrow="Field employees"
-                                                title="Employee Performance"
-                                                rows={employeeLeaderboard}
-                                                rateType="approval"
-                                                emptyMessage="No records are attributed to a named employee yet."
+
+                                        {/* =========================================
+                        PERFORMANCE BREAKDOWN
+
+                        Wraps the Zone/Ward leaderboards and the
+                        Supervisor/QC Reviewer/Action Officer
+                        leaderboards into one titled section, so all
+                        five performance rankings read as one domain.
+                    ========================================= */}
+
+                                        <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+
+                                            <SectionHeading
+                                                icon={Trophy}
+                                                eyebrow="Performance leaderboards"
+                                                title="Performance Breakdown"
+                                                description="Zone, ward, supervisor, QC reviewer and Action Officer performance across all sanitation modules."
                                             />
 
-                                            <PeopleLeaderboardCard
-                                                icon={UsersRound}
-                                                eyebrow="Field supervisors"
-                                                title="Supervisor Performance"
-                                                rows={supervisorLeaderboard}
-                                                rateType="approval"
-                                                emptyMessage="No records are attributed to a named supervisor yet."
-                                            />
+                                            <div className="space-y-5 p-5">
 
-                                            <PeopleLeaderboardCard
-                                                icon={ShieldCheck}
-                                                eyebrow="Quality control"
-                                                title="QC Reviewer Performance"
-                                                rows={qcLeaderboard}
-                                                rateType="approval"
-                                                emptyMessage="No QC reviewer identity is available yet."
-                                                note="Currently available for Toilet inspections only — other modules don't expose reviewer identity via the API yet."
-                                            />
+                                                <div className="grid gap-5 xl:grid-cols-2">
 
-                                            <PeopleLeaderboardCard
-                                                icon={Award}
-                                                eyebrow="Corrective closure"
-                                                title="Action Officer Performance"
-                                                rows={actionOfficerLeaderboard}
-                                                rateType="closure"
-                                                emptyMessage="No Action Officer identity is available yet."
-                                                note="Named officers are shown for Toilets; Litter Bin closures show an officer ID (name not returned by the API). Sweeping doesn't expose officer identity yet."
-                                            />
+                                                    <PerformanceLeaderboardCard
+                                                        icon={Building2}
+                                                        tone="blue"
+                                                        title="Zone Performance"
+                                                        description="Ranked by QC approval rate."
+                                                        rows={zoneLeaderboard}
+                                                        emptyMessage="No zone information is available on the current reports."
+                                                    />
+
+                                                    <PerformanceLeaderboardCard
+                                                        icon={MapPin}
+                                                        tone="cyan"
+                                                        title="Ward Performance"
+                                                        description="Ranked by QC approval rate."
+                                                        rows={wardLeaderboard}
+                                                        emptyMessage="No ward information is available on the current reports."
+                                                        scroll
+                                                    />
+
+                                                </div>
+
+                                                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+
+                                                    <PeopleLeaderboardCard
+                                                        icon={UsersRound}
+                                                        tone="indigo"
+                                                        title="Supervisor Performance"
+                                                        rows={supervisorLeaderboard}
+                                                        rateType="approval"
+                                                        emptyMessage="No records are attributed to a named supervisor yet."
+                                                    />
+
+                                                    <PeopleLeaderboardCard
+                                                        icon={ShieldCheck}
+                                                        tone="teal"
+                                                        title="QC Reviewer Performance"
+                                                        rows={qcLeaderboard}
+                                                        rateType="approval"
+                                                        emptyMessage="No QC reviewer identity is available yet."
+                                                        note="Currently available for Toilet inspections only — other modules don't expose reviewer identity via the API yet."
+                                                    />
+
+                                                    <PeopleLeaderboardCard
+                                                        icon={Award}
+                                                        tone="amber"
+                                                        title="Action Officer Performance"
+                                                        rows={actionOfficerLeaderboard}
+                                                        rateType="closure"
+                                                        emptyMessage="No Action Officer identity is available yet."
+                                                        note="Named officers are shown for Toilets, Litter Bins and Sweeping. Litter Bin records assigned before this data was joined may still fall back to a short officer ID."
+                                                    />
+
+                                                </div>
+
+                                            </div>
 
                                         </section>
 
 
                                         {/* =========================================
-                        CORRECTIVE QUEUE
+                        ACTION REQUIRED QUEUE
                     ========================================= */}
 
                                         <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
@@ -3527,9 +4150,7 @@ export default function UlbOperationsWorkspace({
                                                     AlertTriangle
                                                 }
 
-                                                eyebrow="Corrective action queue"
-
-                                                title="Oldest Pending Corrective Cases"
+                                                title="Oldest Action Pending Reports"
 
                                                 description="Reports already sent to Action Officers and still awaiting a response."
 
@@ -3540,7 +4161,7 @@ export default function UlbOperationsWorkspace({
 
                                                         onClick={() =>
                                                             router.push(
-                                                                '/ulb/action-required'
+                                                                '/ulb/reports/action-required'
                                                             )
                                                         }
 
@@ -3576,52 +4197,14 @@ export default function UlbOperationsWorkspace({
                                                     beginActionRequired
                                                 }
 
-                                                emptyMessage="No corrective actions are pending."
+                                                emptyMessage="No reports are Action Required."
                                             />
 
                                         </section>
 
 
-                                        {/* =========================================
-                        RECENT WORKFLOW
-                    ========================================= */}
 
-                                        <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-
-                                            <SectionHeading
-                                                icon={
-                                                    ClipboardCheck
-                                                }
-
-                                                eyebrow="Latest activity"
-
-                                                title="Recent QC & Corrective Workflow"
-
-                                                description="Latest report movement across all assigned sanitation modules."
-                                            />
-
-
-                                            <RecordsTable
-                                                records={
-                                                    recentRecords
-                                                }
-
-                                                loading={
-                                                    loading
-                                                }
-
-                                                onView={
-                                                    openDetail
-                                                }
-
-                                                onActionRequired={
-                                                    beginActionRequired
-                                                }
-
-                                                emptyMessage="No processed reports found."
-                                            />
-
-                                        </section>
+                                     
 
                                     </>
                                 ) : (
@@ -3666,11 +4249,11 @@ export default function UlbOperationsWorkspace({
 
 
                                             <CompactSummary
-                                                label="Corrective Closure"
+                                                label="Action Rate"
 
                                                 value={`${closureRate}%`}
 
-                                                note={`${stats.actionTaken} completed corrective cases`}
+                                                note={`${stats.actionTaken} Action Taken reports`}
 
                                                 icon={
                                                     TrendingUp
@@ -3678,9 +4261,6 @@ export default function UlbOperationsWorkspace({
                                             />
 
                                         </section>
-
-
-
 
 
                                         {/* =============================================
@@ -3697,8 +4277,8 @@ export default function UlbOperationsWorkspace({
 
                                                         <span
                                                             className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${VIEW_CONFIG[
-                                                                    view
-                                                                ].badgeClass
+                                                                view
+                                                            ].badgeClass
                                                                 }`}
                                                         >
 
@@ -4011,25 +4591,168 @@ export default function UlbOperationsWorkspace({
 
 
 /* =========================================================
-   DASHBOARD HEADER
+   SCORE RING
 ========================================================= */
 
-function DashboardHeader({ loading, loadRecords }: any) {
-    return (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center justify-between">
-            <h1 className="text-xl font-black tracking-tight text-slate-900">
-                ULB Operations Dashboard
-            </h1>
+function ScoreRing({
+    score,
+    size = 92,
+    trackColor,
+    progressColor,
+}: {
+    score: number;
+    size?: number;
+    trackColor?: string;
+    progressColor?: string;
+}) {
 
-            <button
-                type="button"
-                onClick={loadRecords}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 cursor-pointer shadow-2xs"
-            >
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                Refresh
-            </button>
-        </section>
+    const strokeWidth = 7;
+
+    const radius =
+        (size - strokeWidth) / 2;
+
+    const circumference =
+        2 * Math.PI * radius;
+
+    const clamped =
+        Math.max(0, Math.min(100, score));
+
+    const offset =
+        circumference * (1 - clamped / 100);
+
+    const strokeColor =
+        progressColor ||
+        (clamped >= 85
+            ? '#10b981'
+            : clamped >= 70
+                ? '#f59e0b'
+                : '#f43f5e');
+
+    return (
+        <svg
+            width={size}
+            height={size}
+            viewBox={`0 0 ${size} ${size}`}
+            className="-rotate-90"
+        >
+            <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={trackColor || '#eef2f7'}
+                strokeWidth={strokeWidth}
+            />
+
+            <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="none"
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                style={{
+                    transition: 'stroke-dashoffset 700ms ease',
+                }}
+            />
+        </svg>
+    );
+}
+
+
+/* =========================================================
+   QUICK ANSWER CARD
+========================================================= */
+
+function QuickAnswerCard({
+    icon,
+    iconTone,
+    label,
+    title,
+    value,
+    valueTone,
+    onClick,
+}: {
+    icon: any;
+    iconTone: 'amber' | 'rose' | 'blue' | 'slate';
+    label: string;
+    title: string;
+    value: string;
+    valueTone: string;
+    onClick?: () => void;
+}) {
+
+    const cardTones: Record<
+        string,
+        { bg: string; border: string; icon: string }
+    > = {
+        amber: {
+            bg: 'bg-amber-50/60',
+            border: 'border-amber-100',
+            icon: 'bg-amber-100 text-amber-600',
+        },
+        rose: {
+            bg: 'bg-rose-50/60',
+            border: 'border-rose-100',
+            icon: 'bg-rose-100 text-rose-600',
+        },
+        blue: {
+            bg: 'bg-blue-50/60',
+            border: 'border-blue-100',
+            icon: 'bg-blue-100 text-blue-600',
+        },
+        slate: {
+            bg: 'bg-slate-100/60',
+            border: 'border-slate-200',
+            icon: 'bg-slate-200 text-slate-600',
+        },
+    };
+
+    const tone =
+        cardTones[iconTone] || cardTones.slate;
+
+    const Wrapper: any =
+        onClick ? 'button' : 'div';
+
+    return (
+        <Wrapper
+            type={onClick ? 'button' : undefined}
+            onClick={onClick}
+            className={`group flex items-center gap-3 rounded-xl border ${tone.border} ${tone.bg} px-3.5 py-3 text-left shadow-sm transition ${onClick
+                ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md'
+                : ''
+                }`}
+        >
+
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tone.icon}`}>
+                {icon}
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <div className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-400">
+                    {label}
+                </div>
+                <div className="truncate text-[13px] font-black text-slate-900">
+                    {title}
+                </div>
+            </div>
+
+            <div className="shrink-0 text-right">
+                <div className={`text-[10px] font-black ${valueTone}`}>
+                    {value}
+                </div>
+                {onClick && (
+                    <ChevronRight
+                        size={13}
+                        className="ml-auto mt-0.5 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-600"
+                    />
+                )}
+            </div>
+
+        </Wrapper>
     );
 }
 
@@ -4090,6 +4813,7 @@ function ExecutiveKpi({
             icon: string;
             bg: string;
             border: string;
+            accent: string;
         }
     > = {
 
@@ -4102,6 +4826,9 @@ function ExecutiveKpi({
 
             border:
                 'hover:border-teal-200',
+
+            accent:
+                'bg-teal-500',
         },
 
 
@@ -4114,6 +4841,9 @@ function ExecutiveKpi({
 
             border:
                 'hover:border-rose-200',
+
+            accent:
+                'bg-rose-500',
         },
 
 
@@ -4126,6 +4856,9 @@ function ExecutiveKpi({
 
             border:
                 'hover:border-amber-200',
+
+            accent:
+                'bg-amber-500',
         },
 
 
@@ -4138,6 +4871,9 @@ function ExecutiveKpi({
 
             border:
                 'hover:border-blue-200',
+
+            accent:
+                'bg-blue-500',
         },
 
 
@@ -4150,6 +4886,54 @@ function ExecutiveKpi({
 
             border:
                 'hover:border-slate-300',
+
+            accent:
+                'bg-slate-500',
+        },
+
+
+        orange: {
+            icon:
+                'text-orange-700',
+
+            bg:
+                'bg-orange-50',
+
+            border:
+                'hover:border-orange-200',
+
+            accent:
+                'bg-orange-500',
+        },
+
+
+        indigo: {
+            icon:
+                'text-indigo-700',
+
+            bg:
+                'bg-indigo-50',
+
+            border:
+                'hover:border-indigo-200',
+
+            accent:
+                'bg-indigo-500',
+        },
+
+
+        cyan: {
+            icon:
+                'text-cyan-700',
+
+            bg:
+                'bg-cyan-50',
+
+            border:
+                'hover:border-cyan-200',
+
+            accent:
+                'bg-cyan-500',
         },
 
     };
@@ -4172,25 +4956,36 @@ function ExecutiveKpi({
                 !onClick
             }
 
-            className={`group w-full rounded-[22px] border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 ${selected.border} ${onClick
-                    ? 'hover:-translate-y-0.5 hover:shadow-md'
-                    : 'cursor-default'
+            className={`group relative flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 ${selected.border} ${onClick
+                ? 'hover:-translate-y-0.5 hover:shadow-md'
+                : 'cursor-default'
                 }`}
         >
 
-            <div className="flex items-start justify-between">
+            <div className={`absolute bottom-0 left-0 top-0 w-[3px] ${selected.accent}`} />
 
-                <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${selected.bg}`}
-                >
+            <div className="flex items-center justify-between gap-2">
 
-                    <Icon
-                        size={19}
+                <div className="flex min-w-0 items-center gap-3">
 
-                        className={
-                            selected.icon
-                        }
-                    />
+                    <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${selected.bg}`}
+                    >
+
+                        <Icon
+                            size={19}
+
+                            className={
+                                selected.icon
+                            }
+                        />
+
+                    </div>
+
+
+                    <div className="truncate text-[26px] font-black leading-none tracking-tight text-slate-900 tabular-nums">
+                        {value}
+                    </div>
 
                 </div>
 
@@ -4199,9 +4994,9 @@ function ExecutiveKpi({
                     onClick ? (
 
                         <ChevronRight
-                            size={16}
+                            size={15}
 
-                            className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500"
+                            className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500"
                         />
 
                     ) : null
@@ -4210,67 +5005,20 @@ function ExecutiveKpi({
             </div>
 
 
-            <div className="mt-4 text-2xl font-black tracking-tight text-slate-900">
-                {value}
-            </div>
-
-
-            <div className="mt-1 text-xs font-black text-slate-700">
+            <div className="mt-2.5 truncate text-[11px] font-black text-slate-700">
                 {label}
             </div>
 
 
-            <div className="mt-1 text-[10px] font-semibold leading-4 text-slate-400">
-                {note}
-            </div>
+            {
+                note ? (
+                    <div className="mt-0.5 truncate text-[10px] font-semibold leading-tight text-slate-400">
+                        {note}
+                    </div>
+                ) : null
+            }
 
         </button>
-    );
-}
-
-
-/* =========================================================
-   INSIGHT
-========================================================= */
-
-function InsightCard({
-    icon: Icon,
-    eyebrow,
-    value,
-    note,
-    children,
-}: any) {
-
-    return (
-        <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
-
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-
-                <Icon
-                    size={17}
-                />
-
-            </div>
-
-
-            <div className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
-                {eyebrow}
-            </div>
-
-
-            <div className="mt-1 text-xl font-black text-slate-900">
-                {value}
-            </div>
-
-
-            <div className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                {note}
-            </div>
-
-
-            {children}
-
-        </div>
     );
 }
 
@@ -4284,21 +5032,36 @@ function CompactSummary({
     value,
     note,
     icon: Icon,
+    onClick,
 }: any) {
 
+    const Wrapper: any =
+        onClick ? 'button' : 'div';
+
     return (
-        <div className="flex items-center gap-4 rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm">
+        <Wrapper
+            type={onClick ? 'button' : undefined}
+            onClick={onClick}
+            className={`group flex w-full items-center gap-4 rounded-[20px] border border-slate-200 bg-white p-4 text-left shadow-sm transition ${onClick
+                ? 'cursor-pointer hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md'
+                : ''
+                }`}
+        >
 
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+            {
+                Icon ? (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
 
-                <Icon
-                    size={19}
-                />
+                        <Icon
+                            size={19}
+                        />
 
-            </div>
+                    </div>
+                ) : null
+            }
 
 
-            <div>
+            <div className="min-w-0 flex-1">
 
                 <div className="text-xl font-black text-slate-900">
                     {value}
@@ -4316,7 +5079,17 @@ function CompactSummary({
 
             </div>
 
-        </div>
+
+            {
+                onClick ? (
+                    <ChevronRight
+                        size={15}
+                        className="shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500"
+                    />
+                ) : null
+            }
+
+        </Wrapper>
     );
 }
 
@@ -4327,7 +5100,6 @@ function CompactSummary({
 
 function SectionHeading({
     icon: Icon,
-    eyebrow,
     title,
     description,
     action,
@@ -4344,7 +5116,6 @@ function SectionHeading({
                         size={14}
                     />
 
-                    {eyebrow}
 
                 </div>
 
@@ -4446,6 +5217,579 @@ function RateBar({
 
 
 /* =========================================================
+   COMMISSIONER SUMMARY
+
+   A single, shareable "at a glance" briefing combining
+   Inspection & Performance, Health Worker Attendance and Ward
+   Ranking for the currently applied filters - so a Commissioner
+   gets the full picture, and a WhatsApp-ready export, without
+   opening three separate screens.
+========================================================= */
+
+function CommissionerSummary({
+    periodLabel,
+    rangeDayCount,
+    isMultiDayRange,
+
+    moduleFilter,
+    selectedZone,
+    selectedWard,
+    search,
+
+    stats,
+    approvalRate,
+    closureRate,
+    correctiveTotal,
+    attentionZone,
+    oldestPendingDays,
+    briefingSummary,
+    highestCorrectiveModule,
+
+    attendance,
+    attendanceLoading,
+    attendanceError,
+
+    wardSummary,
+    wardSummaryLoading,
+    wardSummaryError,
+
+    onBuildSummaryText,
+    onOpenInspection,
+    onOpenAttendance,
+    onOpenWardRanking,
+}: any) {
+
+    const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+
+
+    const handleCopy = async () => {
+        const text = onBuildSummaryText();
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+
+            setCopyState('copied');
+        } catch {
+            setCopyState('error');
+        }
+
+        setTimeout(() => setCopyState('idle'), 2500);
+    };
+
+
+    const handleWhatsApp = () => {
+        const text = onBuildSummaryText();
+
+        window.open(
+            `https://wa.me/?text=${encodeURIComponent(text)}`,
+            '_blank',
+            'noopener,noreferrer'
+        );
+    };
+
+
+    const activeFilters: Array<{ label: string; tone: string }> = [
+        moduleFilter !== 'ALL' ? { label: `Module: ${moduleLabel(moduleFilter)}`, tone: 'blue' } : null,
+        selectedZone !== 'ALL' ? { label: `Zone: ${selectedZone}`, tone: 'cyan' } : null,
+        selectedWard !== 'ALL' ? { label: `Ward: ${selectedWard}`, tone: 'emerald' } : null,
+        search.trim() ? { label: `Search: "${search.trim()}"`, tone: 'violet' } : null,
+    ].filter(Boolean) as Array<{ label: string; tone: string }>;
+
+    const toneChip: Record<string, string> = {
+        blue: 'border-white/25 bg-white/10 text-blue-50',
+        cyan: 'border-white/25 bg-white/10 text-cyan-50',
+        emerald: 'border-white/25 bg-white/10 text-emerald-50',
+        violet: 'border-white/25 bg-white/10 text-violet-50',
+    };
+
+    const attendanceSummary =
+        attendance?.hasData && attendance.summary
+            ? attendance.summary
+            : null;
+
+    const wardRanked =
+        wardSummary
+            ? wardSummary.green + wardSummary.amber + wardSummary.red
+            : 0;
+
+    const attentionZoneRate =
+        attentionZone
+            ? approvalRateOf(attentionZone)
+            : null;
+
+    const inspectionLegendData = useMemo(
+        () =>
+            [
+                { key: 'approved', label: 'approved', value: stats.approved, color: '#10b981', dot: 'bg-emerald-500' },
+                { key: 'rejected', label: 'rejected', value: stats.rejected, color: '#f43f5e', dot: 'bg-rose-500' },
+                { key: 'pending', label: 'pending', value: stats.pending, color: '#f59e0b', dot: 'bg-amber-500' },
+                { key: 'actionRequired', label: 'action req.', value: stats.actionRequired, color: '#f97316', dot: 'bg-orange-500' },
+                { key: 'actionTaken', label: 'action taken', value: stats.actionTaken, color: '#3b82f6', dot: 'bg-blue-500' },
+            ].map((d) => ({
+                ...d,
+                pct: stats.grandTotal > 0 ? ((d.value / stats.grandTotal) * 100).toFixed(1) : '0.0',
+            })),
+        [stats]
+    );
+
+    const inspectionPieData = useMemo(
+        () => inspectionLegendData.filter((d) => d.value > 0),
+        [inspectionLegendData]
+    );
+
+    const attendancePieData = useMemo(() => {
+        if (!attendanceSummary) return [];
+        const rate = Math.max(0, Math.min(100, Number(attendanceSummary.attendanceRate) || 0));
+        return [
+            { key: 'present', name: 'Present', value: rate, color: '#10b981' },
+            { key: 'remainder', name: 'Remainder', value: 100 - rate, color: '#e2e8f0' },
+        ];
+    }, [attendanceSummary]);
+
+    const wardBarData = useMemo(() => {
+        if (!wardSummary) return [];
+        return [
+            { key: 'green', name: 'Top', value: wardSummary.green, color: '#10b981' },
+            { key: 'amber', name: 'Avg', value: wardSummary.amber, color: '#f59e0b' },
+            { key: 'red', name: 'Below', value: wardSummary.red, color: '#f43f5e' },
+        ];
+    }, [wardSummary]);
+
+
+    return (
+        <section
+            className="relative overflow-hidden rounded-[28px] border border-slate-800 shadow-[0_20px_60px_rgba(2,6,23,0.4)]"
+            style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' }}
+        >
+
+            <div className="h-1 w-full bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500" />
+
+            <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-[42%] opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 75% 55%, rgba(255,255,255,0.65) 0 1px, transparent 1.5px)', backgroundSize: '16px 16px' }} />
+            <div className="pointer-events-none absolute bottom-0 right-0 h-40 w-72 rounded-tl-[100%] border-l border-t border-white/20 opacity-50" />
+
+            <div className="relative p-6 sm:p-7">
+
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+
+                    <div className="min-w-0">
+
+
+                        <h2 className="mt-1.5 text-xl font-black tracking-tight text-white sm:text-2xl">
+                            Exclusive Summary
+                        </h2>
+
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] font-bold">
+
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-white shadow-sm backdrop-blur-sm">
+                                <CalendarDays size={12} />
+                                {periodLabel}
+                                {isMultiDayRange ? ` · ${rangeDayCount} days` : ''}
+                            </span>
+
+                            {
+                                activeFilters.map((f) => (
+                                    <span
+                                        key={f.label}
+                                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${toneChip[f.tone]}`}
+                                    >
+                                        {f.label}
+                                    </span>
+                                ))
+                            }
+
+                        </div>
+
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+
+                        <button
+                            type="button"
+                            onClick={handleCopy}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-white/40 bg-white/10 px-3.5 py-2.5 text-xs font-black text-white shadow-sm backdrop-blur transition hover:bg-white/20"
+                        >
+                            {
+                                copyState === 'copied' ? (
+                                    <CheckCircle2 size={14} className="text-emerald-300" />
+                                ) : (
+                                    <Copy size={14} />
+                                )
+                            }
+                            {
+                                copyState === 'copied'
+                                    ? 'Copied'
+                                    : copyState === 'error'
+                                        ? 'Try again'
+                                        : 'Copy'
+                            }
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleWhatsApp}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-900/30 transition hover:-translate-y-0.5"
+                        >
+                            <MessageCircle size={14} />
+                            Share on WhatsApp
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                {/* ACTION-DRIVEN HEADLINE TILES */}
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+
+                    <button
+                        type="button"
+                        onClick={onOpenInspection}
+                        className="group rounded-2xl border border-blue-200/80 bg-gradient-to-br from-blue-50 to-blue-100/70 p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-blue-700">
+                            <Clock3 size={13} />
+                            QC Pending
+                        </div>
+                        <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+                            {dashboardNumberFormatter.format(stats.pending)}
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-blue-700/60">
+                            Awaiting first QC review
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onOpenInspection}
+                        className="group rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50 to-orange-100/70 p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-orange-700">
+                            <AlertTriangle size={13} />
+                            Action Required
+                        </div>
+                        <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+                            {dashboardNumberFormatter.format(stats.actionRequired)}
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-orange-700/60">
+                            {correctiveTotal > 0 ? `${closureRate}% Action` : 'No Action Required reports yet'}
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onOpenWardRanking}
+                        className="group rounded-2xl border border-rose-200/80 bg-gradient-to-br from-rose-50 to-pink-100/70 p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-rose-700">
+                            <Award size={13} />
+                            Wards Below Average
+                        </div>
+                        <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+                            {wardSummary ? dashboardNumberFormatter.format(wardSummary.red) : '—'}
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-rose-700/60">
+                            {wardSummary ? `of ${dashboardNumberFormatter.format(wardSummary.totalWards)} total wards` : 'No ranking data yet'}
+                        </div>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onOpenAttendance}
+                        className="group rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-teal-100/70 p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+                    >
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                            <UserCheck size={13} />
+                            Health Worker Attendance
+                        </div>
+                        <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+                            {attendanceSummary ? `${Number(attendanceSummary.attendanceRate).toFixed(1)}%` : '—'}
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-emerald-700/60">
+                            {attendanceSummary ? `${dashboardNumberFormatter.format(attendanceSummary.uniqueEmployees)} employees tracked` : 'No attendance data yet'}
+                        </div>
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            {/* DETAILED BREAKDOWN */}
+
+            <div className="relative grid gap-px overflow-hidden rounded-b-[28px] border-t border-white/25 bg-white/25 md:grid-cols-3">
+
+                {/* INSPECTION & PERFORMANCE */}
+
+                <button
+                    type="button"
+                    onClick={onOpenInspection}
+                    className="group flex flex-col gap-2 bg-white p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md"
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-blue-700">
+                            <ClipboardCheck size={13} />
+                            Inspection &amp; Performance
+                        </div>
+                        <ArrowRight size={14} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500" />
+                    </div>
+
+                    {
+                        isMultiDayRange ? (
+                            <div className="text-[10px] font-semibold text-slate-400">
+                                {dashboardNumberFormatter.format(stats.grandTotal)} total reports · avg {formatAverageValue(stats.grandTotal / rangeDayCount)}/day
+                            </div>
+                        ) : null
+                    }
+
+                    <div className="flex items-center gap-3">
+
+                        <div className="relative h-[76px] w-[76px] shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={inspectionPieData}
+                                        dataKey="value"
+                                        nameKey="label"
+                                        innerRadius={24}
+                                        outerRadius={38}
+                                        paddingAngle={2}
+                                        stroke="none"
+                                    >
+                                        {
+                                            inspectionPieData.map((entry) => (
+                                                <Cell key={entry.key} fill={entry.color} />
+                                            ))
+                                        }
+                                    </Pie>
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                <span className="text-sm font-black text-slate-900 tabular-nums">{dashboardNumberFormatter.format(stats.grandTotal)}</span>
+                                <span className="text-[8px] font-bold uppercase tracking-wide text-slate-400">Reports</span>
+                            </div>
+                        </div>
+
+                        <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-[11px] font-bold text-slate-600">
+                            {
+                                inspectionLegendData.map((row) => (
+                                    <Fragment key={row.key}>
+                                        <span className="flex items-center gap-1.5 truncate">
+                                            <span className={`h-2 w-2 shrink-0 rounded-full ${row.dot}`} />
+                                            {dashboardNumberFormatter.format(row.value)} {row.label}
+                                        </span>
+                                        <span className="shrink-0 text-right text-slate-400">
+                                            {row.pct}%
+                                        </span>
+                                    </Fragment>
+                                ))
+                            }
+                        </div>
+
+                    </div>
+
+                    <div className="mt-0 flex items-center gap-2 border-t border-slate-100 pt-2">
+                        <span className="rounded-lg bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-700">
+                            {approvalRate !== null ? `${approvalRate}% approval` : 'No decisions yet'}
+                        </span>
+                        {
+                            attentionZone ? (
+                                <span className="truncate text-[10px] font-semibold text-slate-400">
+                                    Needs attention: {attentionZone.label}{attentionZoneRate !== null ? ` (${attentionZoneRate}%)` : ''}
+                                </span>
+                            ) : null
+                        }
+                    </div>
+                </button>
+
+
+                {/* ATTENDANCE - HEALTH WORKERS */}
+
+                <button
+                    type="button"
+                    onClick={onOpenAttendance}
+                    className="group flex flex-col gap-2 bg-white p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:bg-emerald-50 hover:shadow-md"
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                            <UsersRound size={13} />
+                            Attendance — Health Workers
+                        </div>
+                        <ArrowRight size={14} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-500" />
+                    </div>
+
+                    {
+                        attendanceLoading ? (
+                            <div className="flex items-center gap-2 py-3 text-xs font-bold text-slate-400">
+                                <RefreshCw size={14} className="animate-spin" />
+                                Loading attendance...
+                            </div>
+                        ) : attendanceError ? (
+                            <div className="text-xs font-bold text-amber-700">
+                                Attendance unavailable: {attendanceError}
+                            </div>
+                        ) : !attendanceSummary ? (
+                            <div className="py-3 text-xs font-semibold text-slate-400">
+                                No attendance data uploaded yet.
+                            </div>
+                        ) : (
+                            <>
+                                <div className="text-lg font-black text-slate-900 tabular-nums">
+                                    {Number(attendanceSummary.attendanceRate).toFixed(1)}%
+                                    <span className="ml-1.5 text-[11px] font-bold text-slate-400">attendance rate</span>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+
+                                    <div className="relative h-[76px] w-[76px] shrink-0">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={attendancePieData}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    innerRadius={24}
+                                                    outerRadius={38}
+                                                    startAngle={90}
+                                                    endAngle={-270}
+                                                    stroke="none"
+                                                >
+                                                    {
+                                                        attendancePieData.map((entry) => (
+                                                            <Cell key={entry.key} fill={entry.color} />
+                                                        ))
+                                                    }
+                                                </Pie>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                            <span className="text-sm font-black text-emerald-600 tabular-nums">{Number(attendanceSummary.attendanceRate).toFixed(0)}%</span>
+                                            <span className="text-[8px] font-bold uppercase tracking-wide text-slate-400">Attendance</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid min-w-0 flex-1 grid-cols-1 gap-1.5 text-[11px] font-bold text-slate-600">
+                                        <span className="flex items-center gap-2 truncate">
+                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"><UsersRound size={11} /></span>
+                                            {dashboardNumberFormatter.format(attendanceSummary.uniqueEmployees)} employees
+                                        </span>
+                                        <span className="flex items-center gap-2 truncate">
+                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"><CheckCircle2 size={11} /></span>
+                                            {isMultiDayRange ? `${formatAverageValue(attendanceSummary.present / rangeDayCount)}/day` : dashboardNumberFormatter.format(attendanceSummary.present)} present
+                                        </span>
+                                        <span className="flex items-center gap-2 truncate">
+                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-white"><UserRoundX size={11} /></span>
+                                            {isMultiDayRange ? `${formatAverageValue(attendanceSummary.absent / rangeDayCount)}/day` : dashboardNumberFormatter.format(attendanceSummary.absent)} absent
+                                        </span>
+                                        <span className="flex items-center gap-2 truncate">
+                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-white"><Clock3 size={11} /></span>
+                                            {formatMinutes(attendanceSummary.avgWorkMinutes)} avg shift
+                                        </span>
+                                    </div>
+
+                                </div>
+
+                                <div className="mt-0 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-400">
+                                    {isMultiDayRange ? `Daily averages across ${rangeDayCount} days` : 'Figures are exact for the selected date'}
+                                </div>
+                            </>
+                        )
+                    }
+                </button>
+
+
+                {/* WARD RANKING */}
+
+                <button
+                    type="button"
+                    onClick={onOpenWardRanking}
+                    className="group flex flex-col gap-2 bg-white p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:bg-amber-50 hover:shadow-md"
+                >
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-amber-700">
+                            <Award size={13} />
+                            Ward Ranking
+                        </div>
+                        <ArrowRight size={14} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-amber-500" />
+                    </div>
+
+                    {
+                        wardSummaryLoading ? (
+                            <div className="flex items-center gap-2 py-3 text-xs font-bold text-slate-400">
+                                <RefreshCw size={14} className="animate-spin" />
+                                Loading ward ranking...
+                            </div>
+                        ) : wardSummaryError ? (
+                            <div className="text-xs font-bold text-amber-700">
+                                Ward ranking unavailable: {wardSummaryError}
+                            </div>
+                        ) : !wardSummary || !wardSummary.totalWards ? (
+                            <div className="py-3 text-xs font-semibold text-slate-400">
+                                No ward ranking data available yet.
+                            </div>
+                        ) : (
+                            <>
+                                <div className="text-lg font-black text-slate-900 tabular-nums">
+                                    {Number(wardSummary.averageScore).toFixed(1)}
+                                    <span className="ml-1.5 text-[11px] font-bold text-slate-400">city average score</span>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+
+                                    <div className="h-[76px] flex-1">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={wardBarData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+                                                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={9} interval={0} />
+                                                <YAxis hide allowDecimals={false} />
+                                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                                    {
+                                                        wardBarData.map((entry) => (
+                                                            <Cell key={entry.key} fill={entry.color} />
+                                                        ))
+                                                    }
+                                                </Bar>
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                    <div className="grid shrink-0 grid-cols-1 gap-1 text-[10px] font-bold text-slate-600">
+                                        <span className="flex items-center gap-1.5"><span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" /> {dashboardNumberFormatter.format(wardSummary.green)} top</span>
+                                        <span className="flex items-center gap-1.5"><span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" /> {dashboardNumberFormatter.format(wardSummary.amber)} avg</span>
+                                        <span className="flex items-center gap-1.5"><span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" /> {dashboardNumberFormatter.format(wardSummary.red)} below</span>
+                                    </div>
+
+                                </div>
+
+                                <div className="mt-0 border-t border-slate-100 pt-2 text-[10px] font-semibold text-slate-400">
+                                    {wardRanked} of {dashboardNumberFormatter.format(wardSummary.totalWards)} wards ranked this period
+                                </div>
+                            </>
+                        )
+                    }
+                </button>
+
+            </div>
+
+        </section>
+    );
+}
+
+
+/* =========================================================
    ATTENDANCE OVERVIEW
 ========================================================= */
 
@@ -4453,10 +5797,16 @@ function AttendanceOverview({
     data,
     loading,
     error,
+    isMultiDayRange,
+    rangeDayCount,
+    onOpenAttendance,
 }: {
     data: AttendanceDashboardResponse | null;
     loading: boolean;
     error: string;
+    isMultiDayRange: boolean;
+    rangeDayCount: number;
+    onOpenAttendance: () => void;
 }) {
 
     return (
@@ -4464,12 +5814,17 @@ function AttendanceOverview({
 
             <SectionHeading
                 icon={UsersRound}
-                eyebrow="Workforce attendance"
                 title="Attendance Performance"
                 description={
                     data?.range
                         ? `Reporting window ${formatDateOnly(data.range.from)} – ${formatDateOnly(data.range.to)}`
                         : 'CSV-imported attendance across zones and wards.'
+                }
+                action={
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-blue-700">
+                        <UsersRound size={12} />
+                        Health Workers
+                    </span>
                 }
             />
 
@@ -4491,90 +5846,127 @@ function AttendanceOverview({
 
                     ) : !data?.hasData || !data?.summary ? (
 
-                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs font-semibold text-slate-400">
-                            No attendance data has been uploaded for this city yet.
+                        <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-14 text-center">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                                <UsersRound size={18} />
+                            </div>
+                            <p className="text-xs font-bold text-slate-500">
+                                No health worker attendance data yet
+                            </p>
+                            <p className="max-w-xs text-[11px] font-medium text-slate-400">
+                                CSV-imported attendance for health workers will appear here once it has been uploaded for this city.
+                            </p>
                         </div>
 
                     ) : (
 
                         <>
 
-                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
 
-                                <CompactSummary
+                                <ExecutiveKpi
+                                    label="Total Employees"
+                                    value={data.summary.uniqueEmployees}
+                                    note="Health workers tracked"
+                                    icon={UsersRound}
+                                    tone="navy"
+                                    onClick={onOpenAttendance}
+                                />
+
+                                <ExecutiveKpi
+                                    label="Present"
+                                    value={
+                                        isMultiDayRange
+                                            ? formatAverageValue(data.summary.present / rangeDayCount)
+                                            : data.summary.present
+                                    }
+                                    // note={
+                                    //     isMultiDayRange
+                                    //         ? `Avg/day · ${averageFormula(data.summary.present, rangeDayCount)}`
+                                    //         : `${data.summary.checkedOut} checked out`
+                                    // }
+                                    icon={CheckCircle2}
+                                    tone="teal"
+                                    onClick={onOpenAttendance}
+                                />
+
+                                <ExecutiveKpi
+                                    label="Absent"
+                                    value={
+                                        isMultiDayRange
+                                            ? formatAverageValue(data.summary.absent / rangeDayCount)
+                                            : data.summary.absent
+                                    }
+                                    // note={
+                                    //     isMultiDayRange
+                                    //         ? `Avg/day · ${averageFormula(data.summary.absent, rangeDayCount)}`
+                                    //         : `${data.summary.openCheckIns} open check-ins`
+                                    // }
+                                    icon={UserRoundX}
+                                    tone="rose"
+                                    onClick={onOpenAttendance}
+                                />
+
+                                <ExecutiveKpi
                                     label="Attendance Rate"
                                     value={`${Number(data.summary.attendanceRate).toFixed(2)}%`}
-                                    note={`${data.summary.uniqueEmployees} employees tracked`}
+                                    //note={`${data.summary.uniqueEmployees} employees tracked`}
                                     icon={UserCheck}
+                                    tone="blue"
+                                    onClick={onOpenAttendance}
                                 />
 
-                                <CompactSummary
-                                    label="Present"
-                                    value={data.summary.present}
-                                    note={`${data.summary.checkedOut} checked out`}
-                                    icon={CheckCircle2}
-                                />
-
-                                <CompactSummary
-                                    label="Absent"
-                                    value={data.summary.absent}
-                                    note={`${data.summary.openCheckIns} open check-ins`}
-                                    icon={UserRoundX}
-                                />
-
-                                <CompactSummary
+                                <ExecutiveKpi
                                     label="Avg Work Duration"
                                     value={formatMinutes(data.summary.avgWorkMinutes)}
                                     note="Per completed shift"
                                     icon={TimerReset}
+                                    tone="indigo"
+                                    onClick={onOpenAttendance}
                                 />
 
                             </div>
 
-                            <div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
+                            <div className="mt-5">
 
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4">
+                                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
 
-                                    <div className="mb-3 text-xs font-black text-slate-700">
-                                        Daily Attendance Trend
-                                    </div>
+                                    <div className="h-1 w-full bg-gradient-to-r from-teal-500 via-emerald-400 to-transparent" />
 
-                                    <div className="h-[220px]">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={data.dailyTrend}>
-                                                <defs>
-                                                    <linearGradient id="ulbPresentGradient" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#0f766e" stopOpacity={0.35} />
-                                                        <stop offset="95%" stopColor="#0f766e" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid vertical={false} stroke="#eef2f7" strokeDasharray="3 3" />
-                                                <XAxis dataKey="date" tickFormatter={(v) => formatDateOnly(v)} axisLine={false} tickLine={false} fontSize={10} />
-                                                <YAxis axisLine={false} tickLine={false} fontSize={11} allowDecimals={false} />
-                                                <Tooltip labelFormatter={(v) => formatDateOnly(String(v))} />
-                                                <Area type="monotone" dataKey="present" name="Present" stroke="#0f766e" fill="url(#ulbPresentGradient)" strokeWidth={2} />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
+                                    <div className="p-4">
 
-                                </div>
+                                        <div className="mb-3 flex items-center gap-2.5">
+                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                                                <Activity size={14} />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-black text-slate-800">
+                                                    Daily Attendance Trend
+                                                </div>
+                                                <div className="text-[10px] font-semibold text-slate-400">
+                                                    Health workers present per day
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4">
+                                        <div className="h-[220px]">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={data.dailyTrend}>
+                                                    <defs>
+                                                        <linearGradient id="ulbPresentGradient" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#0f766e" stopOpacity={0.35} />
+                                                            <stop offset="95%" stopColor="#0f766e" stopOpacity={0} />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <CartesianGrid vertical={false} stroke="#eef2f7" strokeDasharray="3 3" />
+                                                    <XAxis dataKey="date" tickFormatter={(v) => formatDateOnly(v)} axisLine={false} tickLine={false} fontSize={10} />
+                                                    <YAxis axisLine={false} tickLine={false} fontSize={11} allowDecimals={false} />
+                                                    <Tooltip labelFormatter={(v) => formatDateOnly(String(v))} />
+                                                    <Area type="monotone" dataKey="present" name="Present" stroke="#0f766e" fill="url(#ulbPresentGradient)" strokeWidth={2} />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        </div>
 
-                                    <div className="mb-3 text-xs font-black text-slate-700">
-                                        Attendance by Designation
-                                    </div>
-
-                                    <div className="h-[220px]">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={data.designationBreakdown.slice(0, 6)}>
-                                                <CartesianGrid vertical={false} stroke="#eef2f7" strokeDasharray="3 3" />
-                                                <XAxis dataKey="designation" axisLine={false} tickLine={false} fontSize={9} interval={0} angle={-15} textAnchor="end" height={50} />
-                                                <YAxis axisLine={false} tickLine={false} fontSize={11} allowDecimals={false} />
-                                                <Tooltip />
-                                                <Bar dataKey="present" fill="#2563eb" radius={[5, 5, 0, 0]} />
-                                            </BarChart>
-                                        </ResponsiveContainer>
                                     </div>
 
                                 </div>
@@ -4584,40 +5976,67 @@ function AttendanceOverview({
                             {
                                 data.topEmployees.length ? (
 
-                                    <div className="mt-5 rounded-2xl border border-slate-100 p-4">
+                                    <div className="mt-5 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
 
-                                        <div className="mb-3 flex items-center gap-2 text-xs font-black text-slate-700">
-                                            <Trophy size={14} className="text-amber-500" />
-                                            Top Attendance Performers
-                                        </div>
+                                        <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-orange-300 to-transparent" />
 
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full min-w-[640px]">
-                                                <thead>
-                                                    <tr className="text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                                        <th className="py-2 pr-3">Employee</th>
-                                                        <th className="py-2 pr-3">Designation</th>
-                                                        <th className="py-2 pr-3">Zone / Ward</th>
-                                                        <th className="py-2 pr-3">Attendance</th>
-                                                        <th className="py-2">Avg Work</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {
-                                                        data.topEmployees.slice(0, 8).map((emp) => (
-                                                            <tr key={emp.attendanceId} className="border-t border-slate-100">
-                                                                <td className="py-2.5 pr-3 text-xs font-black text-slate-800">{emp.employeeName}</td>
-                                                                <td className="py-2.5 pr-3 text-xs font-semibold text-slate-500">{emp.designation || '—'}</td>
-                                                                <td className="py-2.5 pr-3 text-xs font-semibold text-slate-500">
-                                                                    {[...(emp.zones || []), ...(emp.wards || [])].slice(0, 2).join(', ') || '—'}
-                                                                </td>
-                                                                <td className="py-2.5 pr-3"><RateBar value={emp.attendanceRate} tone="emerald" /></td>
-                                                                <td className="py-2.5 text-xs font-bold text-slate-600">{formatMinutes(emp.avgWorkMinutes)}</td>
-                                                            </tr>
-                                                        ))
-                                                    }
-                                                </tbody>
-                                            </table>
+                                        <div className="p-4">
+
+                                            <div className="mb-3 flex items-center gap-2.5">
+                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                                                    <Trophy size={14} />
+                                                </div>
+                                                <div>
+                                                    <div className="text-xs font-black text-slate-800">
+                                                        Top Attendance Performers
+                                                    </div>
+                                                    <div className="text-[10px] font-semibold text-slate-400">
+                                                        Highest attendance rate health workers in range
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full min-w-[640px] border-collapse">
+                                                    <thead>
+                                                        <tr className="text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                            <th className="py-2 pr-3">Employee</th>
+                                                            <th className="py-2 pr-3">Designation</th>
+                                                            <th className="py-2 pr-3">Zone / Ward</th>
+                                                            <th className="py-2 pr-3">Attendance</th>
+                                                            <th className="py-2">Avg Work</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {
+                                                            data.topEmployees.slice(0, 8).map((emp) => (
+                                                                <tr
+                                                                    key={emp.attendanceId}
+                                                                    className="border-t border-slate-100 transition-colors odd:bg-white even:bg-slate-50/40 hover:bg-blue-50/50"
+                                                                >
+                                                                    <td className="py-2.5 pr-3">
+                                                                        <div className="flex items-center gap-2.5">
+                                                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 text-[10px] font-black text-blue-700 ring-1 ring-blue-100">
+                                                                                {emp.employeeName?.slice(0, 1).toUpperCase() || '—'}
+                                                                            </div>
+                                                                            <span className="text-xs font-black text-slate-800">
+                                                                                {emp.employeeName}
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="py-2.5 pr-3 text-xs font-semibold text-slate-500">{emp.designation || '—'}</td>
+                                                                    <td className="py-2.5 pr-3 text-xs font-semibold text-slate-500">
+                                                                        {[...(emp.zones || []), ...(emp.wards || [])].slice(0, 2).join(', ') || '—'}
+                                                                    </td>
+                                                                    <td className="py-2.5 pr-3"><RateBar value={emp.attendanceRate} tone="emerald" /></td>
+                                                                    <td className="py-2.5 text-xs font-bold text-slate-600">{formatMinutes(emp.avgWorkMinutes)}</td>
+                                                                </tr>
+                                                            ))
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
                                         </div>
 
                                     </div>
@@ -4626,6 +6045,156 @@ function AttendanceOverview({
                             }
 
                         </>
+
+                    )
+                }
+
+            </div>
+
+        </section>
+    );
+}
+
+
+/* =========================================================
+   WARD RANKING SNAPSHOT
+
+   Naming matches the Ward Ranking screen's own executive
+   summary stat cards (Total Wards / Ranking Completed / Top
+   Ranked Wards / Average Ranked Wards / Below Average Ranked
+   Wards / Ranking Pending). Ward scores are a point-in-time
+   band per ward, not a daily count, so per-day averaging
+   (unlike the QC and attendance cards above) doesn't apply
+   here.
+========================================================= */
+
+function WardPerformanceOverview({
+    summary,
+    loading,
+    error,
+    onOpenWardRanking,
+}: {
+    summary: WardRankingSummaryResponse | null;
+    loading: boolean;
+    error: string;
+    onOpenWardRanking: (status?: string) => void;
+}) {
+
+    const ranked =
+        summary
+            ? summary.green + summary.amber + summary.red
+            : 0;
+
+    const noData =
+        summary
+            ? Math.max(0, summary.totalWards - ranked)
+            : 0;
+
+    return (
+        <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+
+            <SectionHeading
+                icon={Award}
+                title="Ward Ranking Snapshot"
+                description={
+                    summary?.period
+                        ? `Ranking period ${formatDateOnly(summary.period.from)} – ${formatDateOnly(summary.period.to)}`
+                        : 'City-wide ward scoring across sanitation modules and staff roles.'
+                }
+
+                action={
+                    <button
+                        type="button"
+                        onClick={() => onOpenWardRanking()}
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                    >
+                        Open Ward Ranking
+                        <ArrowRight size={14} />
+                    </button>
+                }
+            />
+
+            <div className="p-5">
+
+                {
+                    loading ? (
+
+                        <div className="flex items-center justify-center gap-3 py-14 text-sm font-bold text-slate-400">
+                            <RefreshCw size={18} className="animate-spin" />
+                            Loading ward ranking summary...
+                        </div>
+
+                    ) : error ? (
+
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800">
+                            Ward ranking summary unavailable: {error}
+                        </div>
+
+                    ) : !summary || !summary.totalWards ? (
+
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs font-semibold text-slate-400">
+                            No ward ranking data is available for this city yet.
+                        </div>
+
+                    ) : (
+
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+
+                            <ExecutiveKpi
+                                label="Total Wards"
+                                value={summary.totalWards}
+                                note={`${ranked} ranked`}
+                                icon={Building2}
+                                tone="blue"
+                                onClick={() => onOpenWardRanking('ALL')}
+                            />
+
+                            <ExecutiveKpi
+                                label="Ranking Completed"
+                                value={ranked}
+                                note="Have data to rank"
+                                icon={ClipboardCheck}
+                                tone="indigo"
+                                onClick={() => onOpenWardRanking('RANKED')}
+                            />
+
+                            <ExecutiveKpi
+                                label="Top Ranked Wards"
+                                value={summary.green}
+                                note="85 and above"
+                                icon={Trophy}
+                                tone="teal"
+                                onClick={() => onOpenWardRanking('GREEN')}
+                            />
+
+                            <ExecutiveKpi
+                                label="Average Ranked Wards"
+                                value={summary.amber}
+                                note="70 to 84.99"
+                                icon={Gauge}
+                                tone="gold"
+                                onClick={() => onOpenWardRanking('AMBER')}
+                            />
+
+                            <ExecutiveKpi
+                                label="Below Average Ranked Wards"
+                                value={summary.red}
+                                note="Below 70"
+                                icon={AlertTriangle}
+                                tone="rose"
+                                onClick={() => onOpenWardRanking('RED')}
+                            />
+
+                            <ExecutiveKpi
+                                label="Ranking Pending"
+                                value={noData}
+                                note="Awaiting data"
+                                icon={Clock3}
+                                tone="navy"
+                                onClick={() => onOpenWardRanking('NODATA')}
+                            />
+
+                        </div>
 
                     )
                 }
@@ -4650,10 +6219,6 @@ function ReportsTrendChart({
     return (
         <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
 
-            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
-                <TrendingUp size={15} />
-                Inspection activity
-            </div>
 
             <h3 className="mt-1 text-lg font-black text-slate-900">
                 Reports Submitted — Last 14 Days
@@ -4663,12 +6228,12 @@ function ReportsTrendChart({
                 Daily volume of QC-processed reports across all sanitation modules.
             </p>
 
-            <div className="mt-4 h-[260px]">
+            <div className="mt-4 h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data}>
+                    <ComposedChart data={data}>
                         <defs>
                             <linearGradient id="ulbTotalReportsGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.35} />
+                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
                                 <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                             </linearGradient>
                         </defs>
@@ -4676,8 +6241,19 @@ function ReportsTrendChart({
                         <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={11} />
                         <YAxis axisLine={false} tickLine={false} fontSize={11} allowDecimals={false} />
                         <Tooltip />
-                        <Area type="monotone" dataKey="total" name="Reports" stroke="#2563eb" fill="url(#ulbTotalReportsGradient)" strokeWidth={2.5} />
-                    </AreaChart>
+                        <Legend
+                            verticalAlign="top"
+                            align="right"
+                            height={28}
+                            iconType="circle"
+                            iconSize={8}
+                            wrapperStyle={{ fontSize: 11, fontWeight: 700 }}
+                        />
+                        <Area type="monotone" dataKey="total" name="Total" stroke="#2563eb" fill="url(#ulbTotalReportsGradient)" strokeWidth={2.5} />
+                        <Line type="monotone" dataKey="TOILET" name="Cleanliness of Toilets" stroke="#0f766e" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="SWEEPING" name="Sweeping" stroke="#7c3aed" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="LITTERBINS" name="Litter Bins" stroke="#d97706" strokeWidth={2} dot={false} />
+                    </ComposedChart>
                 </ResponsiveContainer>
             </div>
 
@@ -4687,13 +6263,25 @@ function ReportsTrendChart({
 
 
 /* =========================================================
-   GEO / MODULE PERFORMANCE TABLE
+   PERFORMANCE LEADERBOARD CARD
    (reused for Zone, Ward and Module breakdowns)
+
+   Rows are ordered by QC approval rate, highest first, so the
+   best-performing zones/wards/modules surface at the top of
+   the card.
 ========================================================= */
 
-function GeoPerformanceTable({
+const LEADERBOARD_TONES: Record<string, { bg: string; text: string; gradient: string }> = {
+    blue: { bg: 'bg-blue-50', text: 'text-blue-700', gradient: 'from-blue-500 via-indigo-400 to-transparent' },
+    cyan: { bg: 'bg-cyan-50', text: 'text-cyan-700', gradient: 'from-cyan-500 via-sky-400 to-transparent' },
+    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-700', gradient: 'from-indigo-500 via-violet-400 to-transparent' },
+    teal: { bg: 'bg-teal-50', text: 'text-teal-700', gradient: 'from-teal-500 via-emerald-400 to-transparent' },
+    amber: { bg: 'bg-amber-50', text: 'text-amber-700', gradient: 'from-amber-500 via-orange-400 to-transparent' },
+};
+
+function PerformanceLeaderboardCard({
     icon: Icon,
-    eyebrow,
+    tone = 'blue',
     title,
     description,
     rows,
@@ -4701,7 +6289,7 @@ function GeoPerformanceTable({
     scroll,
 }: {
     icon: any;
-    eyebrow: string;
+    tone?: string;
     title: string;
     description: string;
     rows: LeaderboardRow[];
@@ -4709,15 +6297,36 @@ function GeoPerformanceTable({
     scroll?: boolean;
 }) {
 
-    return (
-        <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+    const sorted =
+        useMemo(
+            () =>
+                [...rows].sort((a, b) => {
+                    const rateA = approvalRateOf(a);
+                    const rateB = approvalRateOf(b);
 
-            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
-                <Icon size={15} />
-                {eyebrow}
+                    if (rateA === null && rateB === null) return b.total - a.total;
+                    if (rateA === null) return 1;
+                    if (rateB === null) return -1;
+
+                    return rateB - rateA;
+                }),
+            [rows]
+        );
+
+    const toneColors = LEADERBOARD_TONES[tone] || LEADERBOARD_TONES.blue;
+
+    return (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+            <div className={`h-1 w-full bg-gradient-to-r ${toneColors.gradient}`} />
+
+            <div className="p-5 sm:p-6">
+
+            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${toneColors.bg} ${toneColors.text}`}>
+                <Icon size={16} />
             </div>
 
-            <h3 className="mt-1 text-lg font-black text-slate-900">
+            <h3 className="mt-3 text-lg font-black text-slate-900">
                 {title}
             </h3>
 
@@ -4725,8 +6334,12 @@ function GeoPerformanceTable({
                 {description}
             </p>
 
+            <p className="mt-1 text-[10px] font-medium leading-4 text-slate-400">
+                Approval % = approved ÷ (approved + rejected), so pending/action rows don't skew it. Action % = action taken ÷ (action required + action taken).
+            </p>
+
             {
-                rows.length === 0 ? (
+                sorted.length === 0 ? (
 
                     <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs font-semibold text-slate-400">
                         {emptyMessage}
@@ -4734,39 +6347,93 @@ function GeoPerformanceTable({
 
                 ) : (
 
-                    <div className={`mt-4 overflow-x-auto ${scroll ? 'max-h-[360px] overflow-y-auto' : ''}`}>
-                        <table className="w-full min-w-[560px]">
-                            <thead>
-                                <tr className="text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                    <th className="py-2 pr-3">Name</th>
-                                    <th className="py-2 pr-3">Total</th>
-                                    <th className="py-2 pr-3">Approved</th>
-                                    <th className="py-2 pr-3">Rejected</th>
-                                    <th className="py-2 pr-3">Action Req.</th>
-                                    <th className="py-2 pr-3">Approval</th>
-                                    <th className="py-2">Closure</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {
-                                    rows.map((row) => (
-                                        <tr key={row.key} className="border-t border-slate-100">
-                                            <td className="py-2.5 pr-3 max-w-[180px] truncate text-xs font-black text-slate-800">{row.label}</td>
-                                            <td className="py-2.5 pr-3 text-xs font-bold text-slate-600">{row.total}</td>
-                                            <td className="py-2.5 pr-3 text-xs font-bold text-emerald-700">{row.approved}</td>
-                                            <td className="py-2.5 pr-3 text-xs font-bold text-rose-700">{row.rejected}</td>
-                                            <td className="py-2.5 pr-3 text-xs font-bold text-amber-700">{row.actionRequired}</td>
-                                            <td className="py-2.5 pr-3"><RateBar value={approvalRateOf(row)} tone="emerald" /></td>
-                                            <td className="py-2.5"><RateBar value={closureRateOf(row)} tone="blue" /></td>
-                                        </tr>
-                                    ))
-                                }
-                            </tbody>
-                        </table>
+                    <div className={`mt-4 space-y-2.5 ${scroll ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
+                        {
+                            sorted.map((row, index) => {
+                                const rate = approvalRateOf(row);
+                                const closure = closureRateOf(row);
+                                const hasRate = rate !== null;
+                                const band = scoreBandFor(rate ?? 0);
+                                const pending = pendingOf(row);
+
+                                const breakdown = [
+                                    `${row.approved} approved`,
+                                    `${row.rejected} rejected`,
+                                ];
+
+                                if (row.actionRequired > 0) breakdown.push(`${row.actionRequired} action req.`);
+                                if (row.actionTaken > 0) breakdown.push(`${row.actionTaken} action taken`);
+                                if (pending > 0) breakdown.push(`${pending} pending`);
+
+                                return (
+                                    <div
+                                        key={row.key}
+                                        className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3.5 py-3"
+                                    >
+
+                                        <div
+                                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ring-1 ${hasRate
+                                                ? `${band.bg} ${band.text} ${band.ring}`
+                                                : 'bg-slate-100 text-slate-400 ring-slate-200'
+                                                }`}
+                                        >
+                                            {index + 1}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+
+                                            <div className="truncate text-[11px] font-black text-slate-800">
+                                                {row.label}
+                                            </div>
+
+                                            <div className="mt-0.5 text-[9px] font-bold leading-4 text-slate-400">
+                                                {row.total} report{row.total === 1 ? '' : 's'} · {breakdown.join(' · ')}
+                                            </div>
+
+                                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                                                <div
+                                                    className={`h-full rounded-full transition-all duration-700 ${hasRate ? band.bar : 'bg-slate-300'}`}
+                                                    style={{
+                                                        width: hasRate
+                                                            ? `${Math.min(100, Math.max(0, rate as number))}%`
+                                                            : '0%',
+                                                    }}
+                                                />
+                                            </div>
+
+                                        </div>
+
+                                        <div className="flex shrink-0 flex-col items-end gap-1">
+
+                                            <span
+                                                className={`rounded-lg px-2 py-1 text-[10px] font-black ${hasRate
+                                                    ? `${band.bg} ${band.text}`
+                                                    : 'bg-slate-100 text-slate-500'
+                                                    }`}
+                                            >
+                                                {hasRate ? `${rate}%` : 'N/A'}
+                                            </span>
+
+                                            {
+                                                closure !== null ? (
+                                                    <span className="text-[8px] font-bold text-slate-400">
+                                                        {closure}% action
+                                                    </span>
+                                                ) : null
+                                            }
+
+                                        </div>
+
+                                    </div>
+                                );
+                            })
+                        }
                     </div>
 
                 )
             }
+
+            </div>
 
         </div>
     );
@@ -4780,7 +6447,7 @@ function GeoPerformanceTable({
 
 function PeopleLeaderboardCard({
     icon: Icon,
-    eyebrow,
+    tone = 'blue',
     title,
     rows,
     rateType,
@@ -4788,7 +6455,7 @@ function PeopleLeaderboardCard({
     note,
 }: {
     icon: any;
-    eyebrow: string;
+    tone?: string;
     title: string;
     rows: LeaderboardRow[];
     rateType: 'approval' | 'closure';
@@ -4796,15 +6463,20 @@ function PeopleLeaderboardCard({
     note?: string;
 }) {
 
-    return (
-        <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
+    const toneColors = LEADERBOARD_TONES[tone] || LEADERBOARD_TONES.blue;
 
-            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">
+    return (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+            <div className={`h-1 w-full bg-gradient-to-r ${toneColors.gradient}`} />
+
+            <div className="p-5">
+
+            <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneColors.bg} ${toneColors.text}`}>
                 <Icon size={15} />
-                {eyebrow}
             </div>
 
-            <h3 className="mt-1 text-base font-black text-slate-900">
+            <h3 className="mt-2.5 text-base font-black text-slate-900">
                 {title}
             </h3>
 
@@ -4827,32 +6499,53 @@ function PeopleLeaderboardCard({
 
                     <div className="mt-4 space-y-2">
                         {
-                            rows.map((row, index) => (
-                                <div key={row.key} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+                            rows.map((row, index) => {
+                                const rate =
+                                    rateType === 'approval'
+                                        ? approvalRateOf(row)
+                                        : closureRateOf(row);
 
-                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[10px] font-black text-slate-500">
-                                        {index + 1}
-                                    </div>
+                                const hasRate = rate !== null;
+                                const band = scoreBandFor(rate ?? 0);
 
-                                    <div className="min-w-0 flex-1">
-                                        <div className="truncate text-xs font-black text-slate-800">{row.label}</div>
-                                        <div className="text-[10px] font-semibold text-slate-400">
-                                            {row.total} report{row.total === 1 ? '' : 's'}
+                                return (
+                                    <div key={row.key} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+
+                                        <div
+                                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-black ring-1 ${hasRate
+                                                ? `${band.bg} ${band.text} ${band.ring}`
+                                                : 'border border-slate-200 bg-white text-slate-500 ring-slate-100'
+                                                }`}
+                                        >
+                                            {index + 1}
                                         </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate text-xs font-black text-slate-800">{row.label}</div>
+                                            <div className="text-[10px] font-semibold text-slate-400">
+                                                {row.total} report{row.total === 1 ? '' : 's'}
+                                            </div>
+                                        </div>
+
+                                        <div className="shrink-0 text-right">
+                                            <div className={`text-xs font-black ${hasRate ? band.text : 'text-slate-400'}`}>
+                                                {hasRate ? `${rate}%` : '—'}
+                                            </div>
+                                            <div className="text-[8px] font-bold uppercase tracking-wide text-slate-400">
+                                                {rateType === 'approval' ? 'approval' : 'action'}
+                                            </div>
+                                        </div>
+
                                     </div>
-
-                                    <RateBar
-                                        value={rateType === 'approval' ? approvalRateOf(row) : closureRateOf(row)}
-                                        tone={rateType === 'approval' ? 'emerald' : 'blue'}
-                                    />
-
-                                </div>
-                            ))
+                                );
+                            })
                         }
                     </div>
 
                 )
             }
+
+            </div>
 
         </div>
     );
@@ -4945,7 +6638,7 @@ function RecordsTable({
                         </th>
 
                         <th className="px-4 py-3">
-                            Workflow Note
+                            Note
                         </th>
 
                         <th className="px-4 py-3">
@@ -6096,7 +7789,7 @@ function ActionRequiredModal({
                     <div>
 
                         <div className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">
-                            Corrective Instruction
+                            Action Required Instruction
                         </div>
 
 
@@ -6349,7 +8042,15 @@ function UnifiedFilterBar({
 }: any) {
     const [openDatePopover, setOpenDatePopover] = useState(false);
     const [customMode, setCustomMode] = useState<'SINGLE' | 'RANGE'>('RANGE');
-    const [presetName, setPresetName] = useState<string>('All Time');
+    const [presetName, setPresetName] = useState<string>(
+        /*
+         * The dashboard now lands with "This Month" pre-applied
+         * (see defaultDashboardDateRange), so if a range is
+         * already applied on first mount, label it as such
+         * instead of falling back to a raw date range.
+         */
+        () => (appliedFromDate || appliedToDate) ? 'This Month' : 'All Time'
+    );
 
     const formatDateYYYYMMDD = (d: Date) => {
         const year = d.getFullYear();
@@ -6468,11 +8169,10 @@ function UnifiedFilterBar({
                     <button
                         type="button"
                         onClick={() => setOpenDatePopover(!openDatePopover)}
-                        className={`flex h-10 items-center justify-between gap-2.5 rounded-xl border px-3 text-xs font-bold transition cursor-pointer shadow-2xs whitespace-nowrap ${
-                            appliedFromDate || appliedToDate
-                                ? 'border-blue-300 bg-blue-50/80 text-blue-700'
-                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                        }`}
+                        className={`flex h-10 items-center justify-between gap-2.5 rounded-xl border px-3 text-xs font-bold transition cursor-pointer shadow-2xs whitespace-nowrap ${appliedFromDate || appliedToDate
+                            ? 'border-blue-300 bg-blue-50/80 text-blue-700'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
                     >
                         <span className="flex items-center gap-1.5">
                             <CalendarDays size={15} className={appliedFromDate || appliedToDate ? 'text-blue-600' : 'text-slate-500'} />
@@ -6527,18 +8227,16 @@ function UnifiedFilterBar({
                                         <button
                                             type="button"
                                             onClick={() => setCustomMode('SINGLE')}
-                                            className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                                                customMode === 'SINGLE' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
-                                            }`}
+                                            className={`px-2 py-0.5 rounded-md transition cursor-pointer ${customMode === 'SINGLE' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                                                }`}
                                         >
                                             Single
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setCustomMode('RANGE')}
-                                            className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                                                customMode === 'RANGE' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
-                                            }`}
+                                            className={`px-2 py-0.5 rounded-md transition cursor-pointer ${customMode === 'RANGE' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+                                                }`}
                                         >
                                             Range
                                         </button>

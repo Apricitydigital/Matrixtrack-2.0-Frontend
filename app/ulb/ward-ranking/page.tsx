@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+
 import {
   Protected,
   RoleGuard,
@@ -21,7 +23,9 @@ export default function Page() {
         ]}
       >
         <PortalHomeLayout>
-          <WardRankingWorkspace />
+          <Suspense fallback={null}>
+            <WardRankingWorkspace />
+          </Suspense>
         </PortalHomeLayout>
       </RoleGuard>
     </Protected>

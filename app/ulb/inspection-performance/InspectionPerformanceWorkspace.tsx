@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
@@ -874,11 +875,18 @@ function statusClasses(status: string) {
 }
 
 export default function InspectionPerformanceWorkspace() {
+  const searchParams = useSearchParams();
+
   const [records, setRecords] = useState<DashboardRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [activeStatus, setActiveStatus] = useState<StatusKey>('TOTAL');
+  const [activeStatus, setActiveStatus] = useState<StatusKey>(() => {
+    const requested = searchParams.get('status')?.toUpperCase();
+    return requested && (STATUS_ORDER as string[]).includes(requested)
+      ? (requested as StatusKey)
+      : 'TOTAL';
+  });
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>('ALL');
   const [datePreset, setDatePreset] = useState<DatePreset>('MONTH');
   const [customStart, setCustomStart] = useState('');

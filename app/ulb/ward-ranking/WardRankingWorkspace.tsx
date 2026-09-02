@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useSearchParams } from 'next/navigation';
 import WardExecutiveOverview
   from './WardExecutiveOverview';
 import {
@@ -810,7 +811,18 @@ function ChartEmptyState({
   );
 }
 
+const STATUS_FILTER_VALUES: StatusFilter[] = [
+  'ALL',
+  'RANKED',
+  'NODATA',
+  'GREEN',
+  'AMBER',
+  'RED',
+];
+
 export default function WardRankingWorkspace() {
+  const searchParams = useSearchParams();
+
   const [
     periodType,
     setPeriodType,
@@ -874,7 +886,19 @@ export default function WardRankingWorkspace() {
     setStatusFilter,
   ] =
     useState<StatusFilter>(
-      'ALL'
+      () => {
+        const requested =
+          searchParams
+            .get('status')
+            ?.toUpperCase();
+
+        return requested &&
+          STATUS_FILTER_VALUES.includes(
+            requested as StatusFilter
+          )
+          ? (requested as StatusFilter)
+          : 'ALL';
+      }
     );
 
   const [
