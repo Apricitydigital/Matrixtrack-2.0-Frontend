@@ -52,6 +52,8 @@ import {
 import { moduleEntryPath } from '@utils/modules';
 import { setAuthCookie } from '@lib/auth';
 import { UserProfileModal } from '@components/ui/UserProfileModal';
+import { TrashHubModal } from '@components/TrashHubModal';
+import { AuditLogsModal } from '@components/AuditLogsModal';
 
 
 function PortalHomeLayoutContent({
@@ -61,6 +63,8 @@ function PortalHomeLayoutContent({
 }) {
   const { user } = useAuth();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
+  const [isAuditLogsOpen, setIsAuditLogsOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -3179,11 +3183,40 @@ function PortalHomeLayoutContent({
 
           <button
             onClick={toggleDarkMode}
-            className={`flex items-center justify-center w-full py-2.5 px-4 rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200`}
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
             title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
-            {isDarkMode ? <Sun size={20} className="shrink-0" /> : <Moon size={20} className="shrink-0" />}
+            {isDarkMode ? <Sun size={16} className="shrink-0 text-amber-500" /> : <Moon size={16} className="shrink-0 text-slate-600" />}
+            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            </span>
           </button>
+
+          <Link
+            href="/portal-home/trash"
+            title="10-Day Trash & Recovery Hub"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
+              pathname.startsWith('/portal-home/trash')
+                ? 'bg-amber-600 text-white shadow-amber-500/20'
+                : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'
+            } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
+          >
+            <Trash2 size={16} className={`shrink-0 ${pathname.startsWith('/portal-home/trash') ? 'text-white' : 'text-amber-600'}`} />
+            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Trash Hub</span>
+          </Link>
+
+          <Link
+            href="/portal-home/audit-logs"
+            title="Audit Logs & Active Devices"
+            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
+              pathname.startsWith('/portal-home/audit-logs')
+                ? 'bg-indigo-600 text-white shadow-indigo-500/20'
+                : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
+            } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
+          >
+            <Activity size={16} className={`shrink-0 ${pathname.startsWith('/portal-home/audit-logs') ? 'text-white' : 'text-indigo-600'}`} />
+            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Audit Logs</span>
+          </Link>
 
           <Link
             href="/portal-home/profile"
@@ -3346,6 +3379,19 @@ function PortalHomeLayoutContent({
 
       </main>
 
+      {/* 10-Day Trash & Recovery Hub Modal */}
+      <TrashHubModal
+        isOpen={isTrashOpen}
+        onClose={() => setIsTrashOpen(false)}
+      />
+
+      {/* Comprehensive Audit Logs & Active Sessions Modal */}
+      <AuditLogsModal
+        isOpen={isAuditLogsOpen}
+        onClose={() => setIsAuditLogsOpen(false)}
+        cityId={user?.cityId}
+        isSuperAdmin={isSuperAdmin}
+      />
     </div>
   );
 }

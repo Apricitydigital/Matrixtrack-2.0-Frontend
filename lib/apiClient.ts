@@ -1187,3 +1187,36 @@ export const TwinbinApi = {
       body: JSON.stringify(body || {})
     })
 };
+
+export const auditLogApi = {
+  getLogs: (params?: { action?: string; module?: string; userId?: string; cityId?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.action) query.set("action", params.action);
+    if (params?.module) query.set("module", params.module);
+    if (params?.userId) query.set("userId", params.userId);
+    if (params?.cityId) query.set("cityId", params.cityId);
+    if (params?.startDate) query.set("startDate", params.startDate);
+    if (params?.endDate) query.set("endDate", params.endDate);
+    if (params?.page) query.set("page", params.page.toString());
+    if (params?.limit) query.set("limit", params.limit.toString());
+    return apiFetch<{ ok: boolean; data: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/audit-logs/logs?${query.toString()}`);
+  },
+  getSessions: (cityId?: string) => {
+    const query = cityId ? `?cityId=${encodeURIComponent(cityId)}` : "";
+    return apiFetch<{ ok: boolean; data: any[] }>(`/audit-logs/sessions${query}`);
+  },
+  revokeSession: (sessionId: string) =>
+    apiFetch<{ ok: boolean; message: string }>(`/audit-logs/sessions/${sessionId}/revoke`, { method: "POST" }),
+  getTrash: () => apiFetch<{ ok: boolean; data: any[] }>("/audit-logs/trash"),
+  restoreTrash: (id: string, type: "User" | "City") =>
+    apiFetch<{ ok: boolean; message: string; data: any }>("/audit-logs/trash/restore", {
+      method: "POST",
+      body: JSON.stringify({ id, type }),
+    }),
+  softDelete: (id: string, type: "User" | "City") =>
+    apiFetch<{ ok: boolean; message: string; data: any }>("/audit-logs/trash/soft-delete", {
+      method: "POST",
+      body: JSON.stringify({ id, type }),
+    }),
+};
+
