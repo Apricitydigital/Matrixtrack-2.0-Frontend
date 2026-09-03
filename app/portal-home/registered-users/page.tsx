@@ -768,15 +768,32 @@ export default function RegisteredUsersPage() {
   }, [filteredUsers, safePage, pageSize]);
 
   // Delete User Confirmation
+  // The backend soft-deletes users: they move to Trash Hub,
+  // remain recoverable for 10 days, and are purged afterwards.
   const confirmDeleteUser = async () => {
     if (!deleteTarget) return;
+
+    const target = deleteTarget;
+
     try {
-      await CityUserApi.remove(deleteTarget.id);
-      showToast({ title: "User deleted", description: `${deleteTarget.name} was removed.`, tone: "success" });
+      await CityUserApi.remove(target.id);
+
+      // Close the dialog only after the backend confirms success.
       setDeleteTarget(null);
+
+      showToast({
+        title: "Moved to Trash",
+        description: `${target.name} can be restored from Trash Hub for the next 10 days.`,
+        tone: "success"
+      });
+
       await loadData();
     } catch (err: any) {
-      showToast({ title: "Delete failed", description: err?.message || "Failed to delete user.", tone: "error" });
+      showToast({
+        title: "Move to Trash failed",
+        description: err?.message || "Failed to move this user to Trash.",
+        tone: "error"
+      });
     }
   };
 
@@ -1356,19 +1373,17 @@ export default function RegisteredUsersPage() {
       </div >
 
       {/* ── DELETE USER CONFIRM DIALOG ── */}
-      {
-        deleteTarget && (
-          <ConfirmDialog
-            open={!!deleteTarget}
-            title="Delete User"
-            message={`Are you sure you want to permanently delete registered user "${deleteTarget.name}"? This action cannot be undone.`}
-            confirmLabel="Delete User"
-            tone="danger"
-            onCancel={() => setDeleteTarget(null)}
-            onConfirm={confirmDeleteUser}
-          />
-        )
-      }
+      {deleteTarget && (
+        <ConfirmDialog
+          open={true}
+          title="Move User to Trash?"
+          message={`Are you sure you want to delete registered user "${deleteTarget.name}"? The user will be moved to Trash Hub and can be restored for the next 10 days. After 10 days, the user will be permanently deleted automatically.`}
+          confirmLabel="Move to Trash"
+          tone="danger"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDeleteUser}
+        />
+      )}
 
       {/* ── EDIT USER CONFIGURATION MODAL ── */}
       {
