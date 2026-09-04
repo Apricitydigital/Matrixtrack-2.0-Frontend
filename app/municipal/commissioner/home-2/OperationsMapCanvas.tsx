@@ -154,31 +154,22 @@ function FitAssets({
     type Candidate = {
       center: L.LatLng;
       bounds?: L.LatLngBounds;
+      isStarted: boolean;
     };
 
     const candidates: Candidate[] = [];
 
     beats.forEach((beat) => {
-      const feature = geometryToFeature(
-        beat.geometry,
-      );
-
+      const feature = geometryToFeature(beat.geometry);
       if (!feature) return;
 
       try {
-        const beatBounds =
-          L.geoJSON(feature).getBounds();
-
+        const beatBounds = L.geoJSON(feature).getBounds();
         if (!beatBounds.isValid()) return;
 
-        const center =
-          beatBounds.getCenter();
-
-        const northEast =
-          beatBounds.getNorthEast();
-
-        const southWest =
-          beatBounds.getSouthWest();
+        const center = beatBounds.getCenter();
+        const northEast = beatBounds.getNorthEast();
+        const southWest = beatBounds.getSouthWest();
 
         const hasValidCoordinates =
           Math.abs(center.lat) <= 90 &&
@@ -186,26 +177,15 @@ function FitAssets({
           Math.abs(center.lat) > 0.01 &&
           Math.abs(center.lng) > 0.01;
 
-        /*
-         * Reject abnormally large legacy polygons.
-         * Municipal beats should never span hundreds
-         * of kilometres.
-         */
         const hasReasonableAssetSize =
-          Math.abs(
-            northEast.lat - southWest.lat,
-          ) <= 0.5 &&
-          Math.abs(
-            northEast.lng - southWest.lng,
-          ) <= 0.5;
+          Math.abs(northEast.lat - southWest.lat) <= 0.5 &&
+          Math.abs(northEast.lng - southWest.lng) <= 0.5;
 
-        if (
-          hasValidCoordinates &&
-          hasReasonableAssetSize
-        ) {
+        if (hasValidCoordinates && hasReasonableAssetSize) {
           candidates.push({
             center,
             bounds: beatBounds,
+            isStarted: beat.state !== 'NOT_STARTED',
           });
         }
       } catch {
@@ -213,70 +193,37 @@ function FitAssets({
       }
     });
 
-    [...toilets, ...bins].forEach(
-      (item) => {
-        const latitude =
-          Number(item.latitude);
+    [...toilets, ...bins].forEach((item) => {
+      const latitude = Number(item.latitude);
+      const longitude = Number(item.longitude);
 
-        const longitude =
-          Number(item.longitude);
-
-        if (
-          Number.isFinite(latitude) &&
-          Number.isFinite(longitude) &&
-          Math.abs(latitude) <= 90 &&
-          Math.abs(longitude) <= 180 &&
-          Math.abs(latitude) > 0.01 &&
-          Math.abs(longitude) > 0.01
-        ) {
-          candidates.push({
-            center: L.latLng(
-              latitude,
-              longitude,
-            ),
-          });
-        }
-      },
-    );
+      if (
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        Math.abs(latitude) <= 90 &&
+        Math.abs(longitude) <= 180 &&
+        Math.abs(latitude) > 0.01 &&
+        Math.abs(longitude) > 0.01
+      ) {
+        candidates.push({
+          center: L.latLng(latitude, longitude),
+          isStarted: item.state !== 'NOT_STARTED',
+        });
+      }
+    });
 
     if (!candidates.length) return;
 
-    const median = (
-      values: number[],
-    ) => {
-      const sorted = [...values].sort(
-        (a, b) => a - b,
-      );
-
-      return sorted[
-        Math.floor(sorted.length / 2)
-      ];
+    const median = (values: number[]) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)];
     };
 
-    /*
-     * Robust city centre.
-     * A single wrong coordinate cannot pull
-     * the map hundreds of kilometres away.
-     */
     const cityCenter = L.latLng(
-      median(
-        candidates.map(
-          (candidate) =>
-            candidate.center.lat,
-        ),
-      ),
-      median(
-        candidates.map(
-          (candidate) =>
-            candidate.center.lng,
-        ),
-      ),
+      median(candidates.map((candidate) => candidate.center.lat)),
+      median(candidates.map((candidate) => candidate.center.lng)),
     );
 
-    /*
-     * Automatically tighten the valid radius
-     * as the user applies filters.
-     */
     const radiusMeters =
       focusLevel === 'WARD'
         ? 12000
@@ -286,69 +233,49 @@ function FitAssets({
             ? 20000
             : 35000;
 
-    const nearbyCandidates =
-      candidates.filter(
-        (candidate) =>
-          cityCenter.distanceTo(
-            candidate.center,
-          ) <= radiusMeters,
-      );
+    const nearbyCandidates = candidates.filter(
+      (candidate) => cityCenter.distanceTo(candidate.center) <= radiusMeters,
+    );
 
-    /*
-     * Only use the tight cluster if it contains
-     * most of the returned assets.
-     */
-    const requiredClusterSize =
-      Math.max(
-        1,
-        Math.ceil(
-          candidates.length * 0.6,
-        ),
-      );
+    const requiredClusterSize = Math.max(1, Math.ceil(candidates.length * 0.6));
 
-    const usableCandidates =
-      nearbyCandidates.length >=
-        requiredClusterSize
+    const clusterCandidates =
+      nearbyCandidates.length >= requiredClusterSize
         ? nearbyCandidates
         : candidates;
 
-    const bounds =
-      L.latLngBounds([]);
-
-    usableCandidates.forEach(
-      (candidate) => {
-        bounds.extend(
-          candidate.bounds ||
-          candidate.center,
-        );
-      },
+    /*
+     * ALWAYS include submitted/active assets in map bounds
+     * so they are never cut off by clustering!
+     */
+    const startedCandidates = candidates.filter((c) => c.isStarted);
+    const usableMapCandidates = Array.from(
+      new Set([...startedCandidates, ...clusterCandidates]),
     );
+
+    const bounds = L.latLngBounds([]);
+    usableMapCandidates.forEach((candidate) => {
+      bounds.extend(candidate.bounds || candidate.center);
+    });
 
     if (!bounds.isValid()) return;
 
     const maxZoom =
       focusLevel === 'WARD'
         ? 17
-        : focusLevel ===
-          'SUPERVISOR'
+        : focusLevel === 'SUPERVISOR'
           ? 16
           : focusLevel === 'ZONE'
             ? 15
-            : 14;
+            : 15;
 
     map.fitBounds(bounds, {
-      padding: [55, 55],
+      padding: [45, 45],
       maxZoom,
       animate: true,
       duration: 0.6,
     });
-  }, [
-    map,
-    beats,
-    toilets,
-    bins,
-    focusLevel,
-  ]);
+  }, [map, beats, toilets, bins, focusLevel]);
 
   return null;
 }
@@ -416,20 +343,18 @@ export default function OperationsMapCanvas({
       {visible.beats && beats.map((beat) => {
         const feature = geometryToFeature(beat.geometry);
         if (!feature) return null;
-        const statusColor = STATE_COLORS[beat.state] || STATE_COLORS.NOT_STARTED;
         const isNotStarted = beat.state === 'NOT_STARTED';
+        const statusColor = STATE_COLORS[beat.state] || STATE_COLORS.NOT_STARTED;
+        const color = isNotStarted ? '#64748b' : statusColor;
         return (
           <GeoJSON
             key={`${beat.id}-${beat.state}`}
             data={feature}
             style={{
-              color: statusColor,
-              weight: isNotStarted ? 3.5 : 5,
-              fillColor: statusColor,
-              fillOpacity:
-                isNotStarted
-                  ? 0.18
-                  : 0.42,
+              color: color,
+              weight: isNotStarted ? 3 : 6,
+              fillColor: color,
+              fillOpacity: isNotStarted ? 0.15 : 0.52,
             }}
           >
             <Popup>
@@ -439,6 +364,9 @@ export default function OperationsMapCanvas({
                 <div className="mt-2 text-xs text-slate-600">{beat.zoneName} · {beat.wardName}</div>
                 <div className="mt-1 text-xs text-slate-600">Supervisor: {supervisorsText(beat)}</div>
                 <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                  <span>Status</span><b style={{ color: color }}>{beat.state}</b>
+                </div>
+                <div className="mt-1 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
                   <span>Segments reported</span><b>{beat.reportedSegments}/{beat.totalSegments}</b>
                 </div>
               </div>
@@ -454,6 +382,7 @@ export default function OperationsMapCanvas({
               <div className="mt-1 text-base font-bold text-slate-900">{toilet.name}</div>
               <div className="mt-2 text-xs text-slate-600">{toilet.zoneName} · {toilet.wardName}</div>
               <div className="mt-1 text-xs text-slate-600">Supervisor: {supervisorsText(toilet)}</div>
+              <div className="mt-2 text-xs font-bold text-slate-700">Status: <span style={{ color: STATE_COLORS[toilet.state] }}>{toilet.state}</span></div>
             </div>
           </Popup>
         </Marker>
@@ -466,6 +395,7 @@ export default function OperationsMapCanvas({
               <div className="mt-1 text-base font-bold text-slate-900">{bin.name}</div>
               <div className="mt-2 text-xs text-slate-600">{bin.zoneName} · {bin.wardName}</div>
               <div className="mt-1 text-xs text-slate-600">Supervisor: {supervisorsText(bin)}</div>
+              <div className="mt-2 text-xs font-bold text-slate-700">Status: <span style={{ color: STATE_COLORS[bin.state] }}>{bin.state}</span></div>
             </div>
           </Popup>
         </Marker>
