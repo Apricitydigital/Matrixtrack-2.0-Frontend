@@ -115,23 +115,71 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
         }
     };
 
+    // Toilet API returns zoneId and wardId directly on every toilet record.
+    // The nested ward object is display-only and does not reliably contain ids,
+    // so filtering must use the direct ids first.
+    const getToiletZoneId = (toilet: any) =>
+        String(
+            toilet?.zoneId ||
+            toilet?.ward?.parentId ||
+            toilet?.ward?.parent?.id ||
+            ""
+        );
+
+    const getToiletWardId = (toilet: any) =>
+        String(
+            toilet?.wardId ||
+            toilet?.ward?.id ||
+            ""
+        );
+
     const applyFilters = () => {
         let filtered = [...toilets];
+
         if (cityId && cityId !== 'ALL') {
-            filtered = filtered.filter(t => t.cityId === cityId || t.city?.id === cityId || t.location?.cityId === cityId);
-        }
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(t =>
-                t.name?.toLowerCase().includes(query) ||
-                t.code?.toLowerCase().includes(query) ||
-                t.ward?.name?.toLowerCase().includes(query)
+            filtered = filtered.filter(
+                (t) =>
+                    String(t.cityId || t.city?.id || t.location?.cityId || "") ===
+                    String(cityId)
             );
         }
-        if (typeFilter !== 'ALL') filtered = filtered.filter(t => t.type === typeFilter);
-        if (statusFilter !== 'ALL') filtered = filtered.filter(t => (t.status || '').toUpperCase() === statusFilter);
-        if (zoneFilter !== 'ALL' && wardFilter === 'ALL') filtered = filtered.filter(t => t.ward?.parentId === zoneFilter || t.ward?.id === zoneFilter);
-        if (wardFilter !== 'ALL') filtered = filtered.filter(t => t.wardId === wardFilter || t.ward?.parentId === wardFilter);
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.trim().toLowerCase();
+            filtered = filtered.filter((t) =>
+                String(t.name || "").toLowerCase().includes(query) ||
+                String(t.code || "").toLowerCase().includes(query) ||
+                String(t.ward?.name || "").toLowerCase().includes(query) ||
+                String(t.ward?.parent?.name || "").toLowerCase().includes(query)
+            );
+        }
+
+        if (typeFilter !== 'ALL') {
+            filtered = filtered.filter(
+                (t) => String(t.type || '').toUpperCase() === typeFilter
+            );
+        }
+
+        if (statusFilter !== 'ALL') {
+            filtered = filtered.filter(
+                (t) => String(t.status || '').toUpperCase() === statusFilter
+            );
+        }
+
+        // Zone and Ward are independent filters. If both are selected,
+        // a toilet must match both.
+        if (zoneFilter !== 'ALL') {
+            filtered = filtered.filter(
+                (t) => getToiletZoneId(t) === String(zoneFilter)
+            );
+        }
+
+        if (wardFilter !== 'ALL') {
+            filtered = filtered.filter(
+                (t) => getToiletWardId(t) === String(wardFilter)
+            );
+        }
+
         setFilteredToilets(filtered);
     };
 

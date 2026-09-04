@@ -237,6 +237,21 @@ function PortalHomeLayoutContent({
     setPortalToolsOpen,
   ] = useState(true);
 
+  /* =========================================================
+     SYSTEM MANAGEMENT / ACCOUNT TOOLS
+  ========================================================= */
+
+  const isSystemManagementActive =
+    pathname.startsWith('/portal-home/trash') ||
+    pathname.startsWith('/portal-home/audit-logs') ||
+    pathname === '/portal-home/profile' ||
+    pathname === '/profile';
+
+  const [
+    systemManagementOpen,
+    setSystemManagementOpen,
+  ] = useState(true);
+
 
   /* =========================================================
      WORKSPACE AUTO OPEN
@@ -253,6 +268,10 @@ function PortalHomeLayoutContent({
 
     if (isWorkforceActive) {
       setWorkforceOpen(true);
+    }
+
+    if (isSystemManagementActive) {
+      setSystemManagementOpen(true);
     }
   }, []);
 
@@ -3158,13 +3177,102 @@ function PortalHomeLayoutContent({
 
             )}
 
+
+            {/* =================================================
+                SYSTEM & ACCOUNT
+            ================================================= */}
+
+            <div className={`px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-5 mb-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+              System & Account
+            </div>
+
+            <div className="flex flex-col">
+              <button
+                type="button"
+                title="System Management"
+                onClick={() => handleMenuClick(setSystemManagementOpen)}
+                className={`flex items-center justify-between w-full px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer ${isSystemManagementActive
+                  ? 'bg-blue-50 text-blue-700 font-extrabold'
+                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                  } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+              >
+                <div className="flex items-center gap-3 text-left min-w-0">
+                  <Settings
+                    size={18}
+                    className={`shrink-0 ${isSystemManagementActive ? 'text-blue-600' : 'text-slate-500'}`}
+                  />
+
+                  <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                    System Management
+                  </span>
+                </div>
+
+                <ChevronDown
+                  size={16}
+                  className={`shrink-0 transition-transform duration-200 ${sidebarCollapsed ? 'lg:hidden' : ''} ${systemManagementOpen
+                    ? 'rotate-180 text-blue-600'
+                    : 'text-slate-400'
+                    }`}
+                />
+              </button>
+
+              {systemManagementOpen && (
+                <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                  <Link
+                    href="/portal-home/trash"
+                    title="10-Day Trash & Recovery Hub"
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/portal-home/trash')
+                      ? 'bg-amber-600 text-white font-bold shadow-sm shadow-amber-500/20'
+                      : 'text-slate-600 hover:bg-amber-50 hover:text-amber-700'
+                      }`}
+                  >
+                    <Trash2
+                      size={15}
+                      className={`shrink-0 ${pathname.startsWith('/portal-home/trash') ? 'text-white' : 'text-amber-500'}`}
+                    />
+                    <span>Trash & Recovery</span>
+                  </Link>
+
+                  <Link
+                    href="/portal-home/audit-logs"
+                    title="Audit Logs & Active Devices"
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/portal-home/audit-logs')
+                      ? 'bg-indigo-600 text-white font-bold shadow-sm shadow-indigo-500/20'
+                      : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+                      }`}
+                  >
+                    <Activity
+                      size={15}
+                      className={`shrink-0 ${pathname.startsWith('/portal-home/audit-logs') ? 'text-white' : 'text-indigo-500'}`}
+                    />
+                    <span>Audit Logs</span>
+                  </Link>
+
+                  <Link
+                    href="/portal-home/profile"
+                    title="My Profile"
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname === '/portal-home/profile' || pathname === '/profile'
+                      ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                      : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
+                      }`}
+                  >
+                    <UserCheck
+                      size={15}
+                      className={`shrink-0 ${pathname === '/portal-home/profile' || pathname === '/profile' ? 'text-white' : 'text-blue-500'}`}
+                    />
+                    <span>My Profile</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+
           </nav>
 
         </div>
 
 
         {/* =====================================================
-            LOGOUT & PROFILE & EXPAND TOGGLE
+            DISPLAY & SESSION CONTROLS
         ===================================================== */}
 
         <div className="flex flex-col gap-2.5 border-t border-slate-200 pt-4 mt-6">
@@ -3191,44 +3299,6 @@ function PortalHomeLayoutContent({
               {isDarkMode ? 'Light Mode' : 'Dark Mode'}
             </span>
           </button>
-
-          <Link
-            href="/portal-home/trash"
-            title="10-Day Trash & Recovery Hub"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
-              pathname.startsWith('/portal-home/trash')
-                ? 'bg-amber-600 text-white shadow-amber-500/20'
-                : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'
-            } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
-          >
-            <Trash2 size={16} className={`shrink-0 ${pathname.startsWith('/portal-home/trash') ? 'text-white' : 'text-amber-600'}`} />
-            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Trash Hub</span>
-          </Link>
-
-          <Link
-            href="/portal-home/audit-logs"
-            title="Audit Logs & Active Devices"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${
-              pathname.startsWith('/portal-home/audit-logs')
-                ? 'bg-indigo-600 text-white shadow-indigo-500/20'
-                : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
-            } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
-          >
-            <Activity size={16} className={`shrink-0 ${pathname.startsWith('/portal-home/audit-logs') ? 'text-white' : 'text-indigo-600'}`} />
-            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Audit Logs</span>
-          </Link>
-
-          <Link
-            href="/portal-home/profile"
-            title="My Profile"
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm ${pathname === '/portal-home/profile' || pathname === '/profile'
-              ? 'bg-blue-600 text-white shadow-blue-500/20'
-              : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
-              } ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
-          >
-            <UserCheck size={16} className="shrink-0" />
-            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>My Profile</span>
-          </Link>
 
           <button
             onClick={handleLogout}
