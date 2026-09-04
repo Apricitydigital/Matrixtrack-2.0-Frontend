@@ -35,7 +35,17 @@ function markerIcon(
       ? MODULE_COLORS.toilet
       : MODULE_COLORS.bin;
 
-  const statusColor = STATE_COLORS[state];
+  const statusColor = STATE_COLORS[state] || STATE_COLORS.NOT_STARTED;
+  const isStarted = state !== 'NOT_STARTED';
+
+  /*
+   * If report is submitted/approved/attention, make the entire marker icon box
+   * background and surrounding ring reflect the status color (e.g. #2563eb Blue).
+   */
+  const bgColor = isStarted ? statusColor : moduleColor;
+  const ringStyle = isStarted
+    ? `0 0 0 3.5px ${statusColor}, 0 4px 14px ${statusColor}70`
+    : `0 3px 9px rgba(15,23,42,.25)`;
 
   /*
    * Match the Map Layers icons:
@@ -90,12 +100,12 @@ function markerIcon(
       <div
         style="
           position:relative;
-          width:30px;
-          height:30px;
-          border-radius:9px;
-          background:${moduleColor};
+          width:32px;
+          height:32px;
+          border-radius:10px;
+          background:${bgColor};
           border:2px solid white;
-          box-shadow:0 3px 9px rgba(15,23,42,.25);
+          box-shadow:${ringStyle};
           display:flex;
           align-items:center;
           justify-content:center;
@@ -107,21 +117,21 @@ function markerIcon(
         <span
           style="
             position:absolute;
-            right:-3px;
-            bottom:-3px;
-            width:8px;
-            height:8px;
+            right:-4px;
+            bottom:-4px;
+            width:10px;
+            height:10px;
             border-radius:50%;
             background:${statusColor};
-            border:1.5px solid white;
-            box-shadow:0 1px 4px rgba(15,23,42,.22);
+            border:2px solid white;
+            box-shadow:0 1px 4px rgba(15,23,42,.3);
           "
         ></span>
       </div>
     `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -17],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -18],
   });
 }
 
