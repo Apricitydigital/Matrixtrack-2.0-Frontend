@@ -406,20 +406,20 @@ export default function OperationsMapCanvas({
       {visible.beats && beats.map((beat) => {
         const feature = geometryToFeature(beat.geometry);
         if (!feature) return null;
-        const statusColor = STATE_COLORS[beat.state];
-        const moduleColor = MODULE_COLORS.beat;
+        const statusColor = STATE_COLORS[beat.state] || STATE_COLORS.NOT_STARTED;
+        const isNotStarted = beat.state === 'NOT_STARTED';
         return (
           <GeoJSON
             key={`${beat.id}-${beat.state}`}
             data={feature}
             style={{
               color: statusColor,
-              weight: 3.5,
-              fillColor: moduleColor,
+              weight: isNotStarted ? 3.5 : 5,
+              fillColor: statusColor,
               fillOpacity:
-                beat.state === 'NOT_STARTED'
-                  ? 0.16
-                  : 0.28,
+                isNotStarted
+                  ? 0.18
+                  : 0.42,
             }}
           >
             <Popup>

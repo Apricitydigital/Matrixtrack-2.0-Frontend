@@ -5,7 +5,7 @@ import OperationsMapDashboard from '../../municipal/commissioner/home-2/page';
 export default function Page() {
   return (
     <Protected>
-      <RoleGuard roles={['ULB_OFFICER']}>
+      <RoleGuard roles={['ULB_OFFICER', 'CITY_ADMIN', 'COMMISSIONER', 'HMS_SUPER_ADMIN', 'ACTION_OFFICER']}>
         <PortalHomeLayout>
           <OperationsMapDashboard />
         </PortalHomeLayout>

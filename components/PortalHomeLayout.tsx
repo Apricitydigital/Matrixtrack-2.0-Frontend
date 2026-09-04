@@ -2601,30 +2601,53 @@ function PortalHomeLayoutContent({
 
               )}
             {/* =================================================
-    ATTENDANCE ANALYTICS - CITY ADMIN
+    MAP VIEW DASHBOARD & ATTENDANCE ANALYTICS - CITY ADMIN
 ================================================= */}
 
             {isCityAdmin && (
-              <Link
-                href="/city/attendance"
-                title="Attendance Analytics"
-                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
-                  ? 'bg-blue-600 text-white font-extrabold shadow-md shadow-blue-500/20'
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                  } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
-              >
-                <ChartNoAxesCombined
-                  size={18}
-                  className={`shrink-0 ${pathname.startsWith('/city/attendance')
-                    ? 'text-white'
-                    : 'text-slate-500'
-                    }`}
-                />
+              <>
+                <Link
+                  href="/ulb/map-view-dashboard"
+                  title="Map View Dashboard"
+                  className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/ulb/map-view-dashboard')
+                    ? 'bg-blue-600 text-white font-extrabold shadow-md shadow-blue-500/20'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                >
+                  <Map
+                    size={18}
+                    className={`shrink-0 ${pathname.startsWith('/ulb/map-view-dashboard')
+                      ? 'text-white'
+                      : 'text-slate-500'
+                      }`}
+                  />
 
-                <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-                  Attendance Analytics
-                </span>
-              </Link>
+                  <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                    Map View Dashboard
+                  </span>
+                </Link>
+
+                <Link
+                  href="/city/attendance"
+                  title="Attendance Analytics"
+                  className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/city/attendance')
+                    ? 'bg-blue-600 text-white font-extrabold shadow-md shadow-blue-500/20'
+                    : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                >
+                  <ChartNoAxesCombined
+                    size={18}
+                    className={`shrink-0 ${pathname.startsWith('/city/attendance')
+                      ? 'text-white'
+                      : 'text-slate-500'
+                      }`}
+                  />
+
+                  <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                    Attendance Analytics
+                  </span>
+                </Link>
+              </>
             )}
 
 

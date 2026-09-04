@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { ApiError } from "@lib/apiClient";
+import { apiFetch, ApiError } from "@lib/apiClient";
 
 import {
   TargetsApi,
@@ -454,6 +454,9 @@ export default function TargetAssignmentPage() {
       EmployeeTargetPerformance[]
     >([]);
 
+  const [zones, setZones] = useState<Array<{ id: string; name: string }>>([]);
+  const [wards, setWards] = useState<Array<{ id: string; zoneId?: string | null; name: string }>>([]);
+
   /* =======================================================
      CREATE TARGET FORM
   ======================================================= */
@@ -500,9 +503,15 @@ export default function TargetAssignmentPage() {
   ] =
     useState("");
 
+  const [formZoneId, setFormZoneId] = useState("");
+  const [formWardId, setFormWardId] = useState("");
+
   /* =======================================================
      FILTERS
   ======================================================= */
+
+  const [filterZoneId, setFilterZoneId] = useState("ALL");
+  const [filterWardId, setFilterWardId] = useState("ALL");
 
   const [
     searchTerm,
@@ -678,6 +687,16 @@ export default function TargetAssignmentPage() {
       ],
     );
 
+  const formWards = useMemo(
+    () => wards.filter((w) => !formZoneId || w.zoneId === formZoneId),
+    [wards, formZoneId],
+  );
+
+  const tableWards = useMemo(
+    () => wards.filter((w) => filterZoneId === "ALL" || !filterZoneId || w.zoneId === filterZoneId),
+    [wards, filterZoneId],
+  );
+
   /* =======================================================
      LOAD OPTIONS
   ======================================================= */
@@ -690,8 +709,10 @@ export default function TargetAssignmentPage() {
         );
 
         try {
-          const response =
-            await TargetsApi.options();
+          const [response, opsMap] = await Promise.all([
+            TargetsApi.options(),
+            apiFetch<any>("/city/dashboard/operations-map").catch(() => null),
+          ]);
 
           setSupervisors(
             response.supervisors ??
@@ -702,6 +723,11 @@ export default function TargetAssignmentPage() {
             response.qcUsers ??
             [],
           );
+
+          if (opsMap?.filters) {
+            setZones(opsMap.filters.zones || []);
+            setWards(opsMap.filters.wards || []);
+          }
         } catch (err) {
           setError(
             getErrorMessage(
@@ -1524,7 +1550,7 @@ export default function TargetAssignmentPage() {
               className="p-5 sm:p-6"
             >
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
 
                 {/* ROLE */}
 
@@ -1550,6 +1576,47 @@ export default function TargetAssignmentPage() {
                     <option value="QC">
                       QC
                     </option>
+                  </select>
+                </FormField>
+
+                {/* ZONE */}
+
+                <FormField
+                  label="Zone"
+                >
+                  <select
+                    value={formZoneId}
+                    onChange={(event) => {
+                      setFormZoneId(event.target.value);
+                      setFormWardId("");
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">All Zones</option>
+                    {zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+
+                {/* WARD */}
+
+                <FormField
+                  label="Ward"
+                >
+                  <select
+                    value={formWardId}
+                    onChange={(event) => setFormWardId(event.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">All Wards</option>
+                    {formWards.map((ward) => (
+                      <option key={ward.id} value={ward.id}>
+                        {ward.name}
+                      </option>
+                    ))}
                   </select>
                 </FormField>
 
@@ -1869,6 +1936,39 @@ export default function TargetAssignmentPage() {
                       className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 sm:w-[220px]"
                     />
                   </div>
+
+                  {/* ZONE FILTER */}
+
+                  <select
+                    value={filterZoneId}
+                    onChange={(event) => {
+                      setFilterZoneId(event.target.value);
+                      setFilterWardId("ALL");
+                    }}
+                    className={filterClass}
+                  >
+                    <option value="ALL">All Zones</option>
+                    {zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* WARD FILTER */}
+
+                  <select
+                    value={filterWardId}
+                    onChange={(event) => setFilterWardId(event.target.value)}
+                    className={filterClass}
+                  >
+                    <option value="ALL">All Wards</option>
+                    {tableWards.map((ward) => (
+                      <option key={ward.id} value={ward.id}>
+                        {ward.name}
+                      </option>
+                    ))}
+                  </select>
 
                   {/* ROLE */}
 
