@@ -16,6 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  List,
+  Map as MapIcon,
   MapPin,
   Minus,
   RefreshCw,
@@ -58,6 +60,8 @@ import {
 } from '@lib/wardRankingApi';
 
 import WardDrilldownDrawer from './WardDrilldownDrawer';
+import WardRankingOperationsMap
+  from './WardRankingOperationsMap';
 
 
 type ModuleFilter =
@@ -956,6 +960,14 @@ export default function WardRankingWorkspace() {
     setPage,
   ] =
     useState(1);
+
+  const [
+    rankingView,
+    setRankingView,
+  ] =
+    useState<'list' | 'map'>(
+      'map'
+    );
 
 
   const [
@@ -2356,18 +2368,74 @@ export default function WardRankingWorkspace() {
             <h3 className="text-sm font-black text-slate-900">
               Ward Ranking
             </h3>
+            <p className="mt-1 max-w-3xl text-[10px] font-semibold text-slate-500">
+              N/A means no applicable asset, attendance upload, target or task exists for that component and period; it is excluded from the score.
+            </p>
           </div>
 
-          <div className="text-[11px] font-bold text-slate-500">
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+              {([
+                ['list', 'List', List],
+                ['map', 'Map', MapIcon],
+              ] as const).map(([
+                key,
+                label,
+                Icon,
+              ]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    setRankingView(key)
+                  }
+                  className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-[10px] font-black transition ${rankingView === key
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:bg-white hover:text-slate-800'
+                    }`}
+                >
+                  <Icon size={13} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="text-[11px] font-bold text-slate-500">
             Showing{' '}
             {displayedFrom}
             {'–'}
             {displayedTo}
             {' of '}
             {filteredRows.length}
+            </div>
           </div>
         </div>
 
+
+        {rankingView === 'map' ? (
+          <WardRankingOperationsMap
+            date={dateRange.to}
+            zoneId={
+              selectedZoneId ||
+              undefined
+            }
+            wardId={
+              selectedWardId ||
+              undefined
+            }
+            module={
+              moduleFilter === 'ALL'
+                ? undefined
+                : moduleFilter
+            }
+            rankingWardIds={
+              filteredRows.map(
+                (item) => item.wardId
+              )
+            }
+          />
+        ) : (
+          <>
 
         {/* DESKTOP TABLE */}
 
@@ -2520,6 +2588,11 @@ export default function WardRankingWorkspace() {
                         >
                           <button
                             type="button"
+                            title={
+                              component?.applicable
+                                ? 'Open component details'
+                                : 'Not applicable: no scoring denominator exists for this Ward and period'
+                            }
                             disabled={
                               !component?.applicable
                             }
@@ -2843,6 +2916,8 @@ export default function WardRankingWorkspace() {
               </div>
             </div>
           )}
+          </>
+        )}
       </section>
 
       <WardDrilldownDrawer

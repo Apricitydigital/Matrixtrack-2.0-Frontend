@@ -225,6 +225,9 @@ export default function EmployeesPage() {
     const [selectedWardId, setSelectedWardId] =
         useState("");
 
+    const [selectedEmploymentType, setSelectedEmploymentType] =
+        useState("");
+
     const [currentPage, setCurrentPage] =
         useState(1);
 
@@ -527,6 +530,13 @@ export default function EmployeesPage() {
                 return false;
             }
 
+            if (selectedEmploymentType) {
+                const norm = normalizeEmploymentType(employee.employmentType);
+                if (norm !== selectedEmploymentType) {
+                    return false;
+                }
+            }
+
 
             if (!query) {
                 return true;
@@ -567,6 +577,7 @@ export default function EmployeesPage() {
         searchQuery,
         selectedZoneId,
         selectedWardId,
+        selectedEmploymentType,
         zoneNameMap,
         wardNameMap,
     ]);
@@ -582,7 +593,7 @@ export default function EmployeesPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, selectedZoneId, selectedWardId]);
+    }, [searchQuery, selectedZoneId, selectedWardId, selectedEmploymentType]);
 
     const paginatedEmployees = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
@@ -1847,77 +1858,54 @@ export default function EmployeesPage() {
                         HEADER
                     ================================================= */}
 
-                    <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-                        <div className="flex items-center gap-3">
-
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-                                <Users size={21} />
+                    <div className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3.5">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+                                    <Users size={22} />
+                                </div>
+                                <div>
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Master Control</div>
+                                    <h1 className="text-xl font-black text-slate-900 tracking-tight">
+                                        Employee Master
+                                    </h1>
+                                </div>
                             </div>
 
-                            <div>
-                                <h1 className="text-2xl font-bold text-slate-900">
-                                    Employee Master
-                                </h1>
+                            {/* ACTIONS */}
+                            {!isHmsAdmin && (
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                    {selectedEmployeeIds.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowBulkDeleteConfirm(true)}
+                                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-xs font-bold text-red-600 shadow-sm transition hover:bg-red-100 cursor-pointer"
+                                        >
+                                            <Trash2 size={15} />
+                                            Delete Selected ({selectedEmployeeIds.length})
+                                        </button>
+                                    )}
 
-                                <p className="text-sm text-slate-500">
-                                    Register employees and configure beat assignments.
-                                </p>
-                            </div>
-
-                        </div>
-
-
-                        {/* ACTIONS */}
-
-                        {!isHmsAdmin && (
-                            <div className="flex flex-wrap items-center gap-2">
-
-                                {selectedEmployeeIds.length > 0 && (
                                     <button
                                         type="button"
-                                        onClick={() => setShowBulkDeleteConfirm(true)}
-                                        className="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-600 shadow-sm transition hover:bg-red-100 cursor-pointer"
+                                        onClick={() => setShowEmployeeImport(true)}
+                                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 cursor-pointer"
                                     >
-                                        <Trash2 size={17} />
-                                        Delete Selected ({selectedEmployeeIds.length})
+                                        <FileSpreadsheet size={15} className="text-emerald-600" />
+                                        Import Excel
                                     </button>
-                                )}
 
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setShowEmployeeImport(
-                                            true
-                                        )
-                                    }
-                                    className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 cursor-pointer"
-                                >
-                                    <FileSpreadsheet
-                                        size={17}
-                                    />
-                                    Import Excel
-                                </button>
-
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setShowRegisterEmployee(
-                                            true
-                                        )
-                                    }
-                                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 cursor-pointer"
-                                >
-                                    <UserPlus
-                                        size={17}
-                                    />
-                                    Register Employee
-                                </button>
-
-                            </div>
-                        )}
-
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRegisterEmployee(true)}
+                                        className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-md shadow-blue-500/20 transition hover:bg-blue-700 cursor-pointer"
+                                    >
+                                        <UserPlus size={15} />
+                                        Register Employee
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
 
@@ -1925,36 +1913,36 @@ export default function EmployeesPage() {
                         SUMMARY
                     ================================================= */}
 
-                    <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                                 Registered Employees
                             </p>
 
-                            <p className="mt-1 text-2xl font-bold text-slate-900">
+                            <p className="mt-1 text-2xl font-black text-slate-900">
                                 {employees.length}
                             </p>
                         </div>
 
 
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 shadow-sm">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-500">
                                 Filtered Results
                             </p>
 
-                            <p className="mt-1 text-2xl font-bold text-blue-600">
+                            <p className="mt-1 text-2xl font-black text-blue-600">
                                 {filteredEmployees.length}
                             </p>
                         </div>
 
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                                 Wards Covered
                             </p>
 
-                            <p className="mt-1 text-2xl font-bold text-slate-900">
+                            <p className="mt-1 text-2xl font-black text-slate-900">
                                 {
                                     new Set(
                                         employees.flatMap(
@@ -1975,13 +1963,13 @@ export default function EmployeesPage() {
 
                     <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 
-                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_220px_220px_auto]">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_170px_170px_190px_auto]">
 
                             <div className="relative">
 
                                 <Search
-                                    size={17}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                    size={16}
+                                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                                 />
 
                                 <input
@@ -1992,8 +1980,8 @@ export default function EmployeesPage() {
                                             e.target.value
                                         )
                                     }
-                                    placeholder="Search name, employee ID, mobile, aadhaar, employment type, zone or ward..."
-                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    placeholder="Search name, ID, phone, aadhaar..."
+                                    className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                 />
 
                             </div>
@@ -2006,7 +1994,7 @@ export default function EmployeesPage() {
                                         e.target.value
                                     )
                                 }
-                                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                             >
                                 <option value="">
                                     All Zones
@@ -2031,7 +2019,7 @@ export default function EmployeesPage() {
                                         e.target.value
                                     )
                                 }
-                                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                             >
                                 <option value="">
                                     All Wards
@@ -2050,14 +2038,40 @@ export default function EmployeesPage() {
 
                             </select>
 
+                            <select
+                                value={selectedEmploymentType}
+                                onChange={(e) =>
+                                    setSelectedEmploymentType(
+                                        e.target.value
+                                    )
+                                }
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            >
+                                <option value="">
+                                    All Appointment Types
+                                </option>
+                                <option value="Permanent">
+                                    Permanent / स्थायी
+                                </option>
+                                <option value="Regularized">
+                                    Regularized / विनियमित
+                                </option>
+                                <option value="Temporary">
+                                    Temporary / अस्थायी
+                                </option>
+                                <option value="Outsource">
+                                    Outsource / आउटसोर्स
+                                </option>
+                            </select>
+
 
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={loadData}
-                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+                                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
                                 >
-                                    <RefreshCw size={16} />
+                                    <RefreshCw size={14} />
                                     Refresh
                                 </button>
 

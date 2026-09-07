@@ -220,38 +220,58 @@ export default function CommissionerHome2Page() {
     }
   };
 
+  const [stateFilter, setStateFilter] = useState<'ALL' | 'NOT_STARTED' | 'SUBMITTED' | 'APPROVED'>('ALL');
+
+  const filteredBeats = useMemo(() => {
+    if (!data?.beats) return [];
+    if (stateFilter === 'ALL') return data.beats;
+    return data.beats.filter((b) => b.state === stateFilter);
+  }, [data, stateFilter]);
+
+  const filteredToilets = useMemo(() => {
+    if (!data?.toilets) return [];
+    if (stateFilter === 'ALL') return data.toilets;
+    return data.toilets.filter((t) => t.state === stateFilter);
+  }, [data, stateFilter]);
+
+  const filteredBins = useMemo(() => {
+    if (!data?.bins) return [];
+    if (stateFilter === 'ALL') return data.bins;
+    return data.bins.filter((b) => b.state === stateFilter);
+  }, [data, stateFilter]);
+
   const kpis = [
     {
+      id: 'ALL',
       label: 'Total Mapped',
       value: summary?.total || 0,
-      helper: 'Assets visible on city map',
+      helper: 'Click to view all assets',
       icon: MapPinned,
-      accent:
-        'from-blue-600 to-indigo-600',
+      accent: 'from-blue-600 to-indigo-600',
     },
     {
+      id: 'NOT_STARTED',
       label: 'Awaiting Work',
       value: summary?.notStarted || 0,
-      helper: 'No work reported today',
+      helper: 'Click to filter pending assets',
       icon: Clock3,
-      accent:
-        'from-amber-500 to-orange-600',
+      accent: 'from-amber-500 to-orange-600',
     },
     {
+      id: 'SUBMITTED',
       label: 'Reports Submitted',
       value: summary?.submitted || 0,
-      helper: 'Awaiting workflow decision',
+      helper: 'Click to zoom to submitted assets',
       icon: RefreshCw,
-      accent:
-        'from-sky-500 to-blue-600',
+      accent: 'from-sky-500 to-blue-600',
     },
     {
+      id: 'APPROVED',
       label: 'QC Approved',
       value: summary?.approved || 0,
       helper: `${completion}% approved coverage`,
       icon: CheckCircle2,
-      accent:
-        'from-emerald-500 to-teal-600',
+      accent: 'from-emerald-500 to-teal-600',
     },
   ];
 
@@ -370,11 +390,18 @@ export default function CommissionerHome2Page() {
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {kpis.map((kpi) => {
             const Icon = kpi.icon;
+            const isActive = stateFilter === kpi.id;
 
             return (
-              <div
+              <button
+                type="button"
                 key={kpi.label}
-                className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+                onClick={() => setStateFilter(kpi.id as any)}
+                className={`group relative text-left overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${
+                  isActive
+                    ? 'border-blue-600 ring-2 ring-blue-500/20'
+                    : 'border-slate-200/80 hover:border-slate-300'
+                }`}
               >
                 <div
                   className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${kpi.accent}`}
@@ -402,10 +429,15 @@ export default function CommissionerHome2Page() {
                   </div>
                 </div>
 
-                <div className="mt-2 text-[11px] font-semibold leading-4 text-slate-500">
-                  {kpi.helper}
+                <div className="mt-2 flex items-center justify-between text-[11px] font-semibold leading-4 text-slate-500">
+                  <span>{kpi.helper}</span>
+                  {isActive && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                      Active
+                    </span>
+                  )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </section>
@@ -567,9 +599,9 @@ export default function CommissionerHome2Page() {
             }`}
         >
           <OperationsMapCanvas
-            beats={data?.beats || []}
-            toilets={data?.toilets || []}
-            bins={data?.bins || []}
+            beats={filteredBeats}
+            toilets={filteredToilets}
+            bins={filteredBins}
             visible={visible}
             focusLevel={mapFocusLevel}
           />

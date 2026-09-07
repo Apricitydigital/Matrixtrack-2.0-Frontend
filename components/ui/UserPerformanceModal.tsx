@@ -76,7 +76,7 @@ export default function UserPerformanceModal({
     const fetchPerformance = async () => {
       const targetUserId = user?.id || user?._id || user?.userId;
       if (!isOpen || !targetUserId) return;
-      
+
       setLoading(true);
       try {
         const { start, end } = dateRange;
@@ -103,7 +103,7 @@ export default function UserPerformanceModal({
           apiFetch<{ data: any[] }>(`/city/dashboard/inspection-records?${params.toString()}`),
           apiFetch<any>(`/city/attendance/dashboard?${attParams.toString()}`)
         ]);
-        
+
         if (isActive) {
           if (recordsRes.status === "fulfilled" && recordsRes.value?.data) {
             setRecords(recordsRes.value.data);
@@ -124,7 +124,7 @@ export default function UserPerformanceModal({
               });
               setAttendance({ present, absent, total: present + absent });
             } else if (Array.isArray(attData?.topEmployees) && attData.topEmployees.length > 0) {
-              const matchedEmp = attData.topEmployees.find((e: any) => 
+              const matchedEmp = attData.topEmployees.find((e: any) =>
                 (user.name && e.employeeName?.toLowerCase().trim() === user.name.toLowerCase().trim()) ||
                 (user.employeeId && e.attendanceId === user.employeeId) ||
                 (user.id && e.matrixTrackUserId === user.id)
@@ -190,7 +190,7 @@ export default function UserPerformanceModal({
     let approved = 0;
     let rejected = 0;
     let pending = 0;
-    
+
     const byModule: Record<string, number> = {};
     const byDate: Record<string, number> = {};
 
@@ -237,7 +237,7 @@ export default function UserPerformanceModal({
     });
 
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
-    
+
     const rawTopModule = Object.entries(byModule).sort((a, b) => b[1] - a[1])[0]?.[0] || "None";
     const topModule = rawTopModule !== "None" ? formatModule(rawTopModule) : "None";
 
@@ -263,7 +263,7 @@ export default function UserPerformanceModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] p-4 sm:p-6 animate-in fade-in duration-200" onClick={onClose}>
-      <div 
+      <div
         className="w-full max-w-5xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
@@ -510,7 +510,6 @@ export default function UserPerformanceModal({
                   </div>
                 </div>
               )}
-
               {/* Charts or Detailed View */}
               {!isEmployee ? (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -529,7 +528,7 @@ export default function UserPerformanceModal({
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                             <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} dy={10} />
                             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} dx={-10} allowDecimals={false} />
-                            <Tooltip 
+                            <Tooltip
                               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 700 }}
                               cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
                             />
@@ -541,7 +540,6 @@ export default function UserPerformanceModal({
                       )}
                     </div>
                   </div>
-
                   <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <h3 className="text-xs font-black text-slate-800 mb-4 uppercase">Module Breakdown</h3>
                     <div className="h-56 w-full">
@@ -551,7 +549,7 @@ export default function UserPerformanceModal({
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                             <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }} allowDecimals={false} />
                             <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b', fontWeight: 700 }} width={80} />
-                            <Tooltip 
+                            <Tooltip
                               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 700 }}
                               cursor={{ fill: '#f8fafc' }}
                             />
@@ -630,7 +628,6 @@ export default function UserPerformanceModal({
                   </div>
                 </div>
               )}
-
           </div>
         )}
       </div>
@@ -638,3 +635,6 @@ export default function UserPerformanceModal({
     </div>
   );
 }
+
+
+
