@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  ShieldCheck,
   User,
   X,
   XCircle,
@@ -2247,6 +2248,7 @@ export function DetailModal({
               <DetailRow icon={MapPin} label="Ward" value={report?.wardName || report?.bin?.wardName || '—'} />
             </div>
           </section>
+          <ReportJourneySection report={report} />
           <AiInsightsSection report={report} />
           {(qcRemark || actionRequiredRemark || actionTakenRemark || actionTakenPhotos.length > 0) && (
             <section className="mt-5">
@@ -2496,6 +2498,126 @@ function RemarkBox({
       <div className="text-[9px] font-black uppercase tracking-[0.12em] opacity-70">{label}</div>
       <div className="mt-1 text-sm font-semibold">{displayAnswer(value)}</div>
     </div>
+  );
+}
+
+/* =========================================================
+   REPORT JOURNEY
+   Mirrors the mobile app's Report Journey timeline
+   (Submitted -> QC AI Assessment -> QC Review -> Intelligence
+   Suggest). Renders for every module - TOILET, SWEEPING and
+   LITTERBINS - since autoQcResult/qcDecision/actionAiResult
+   are populated the same way across all three.
+========================================================= */
+
+function ReportJourneySection({
+  report,
+}: {
+  report: DashboardRecord;
+}) {
+  const autoQc = getAutoQcResult(report);
+  const actionAi = getActionAiResult(report);
+  const qcDecision = getQcDecision(report);
+
+  const autoDecision = String(autoQc?.decision || '').toUpperCase();
+  const autoRejected = autoDecision === 'REJECTED';
+
+  const actionRecommendation = String(actionAi?.recommendation || '').toUpperCase();
+  const actionRequired = actionRecommendation === 'ACTION_REQUIRED';
+
+  type Step = {
+    key: string;
+    color: string;
+    icon: any;
+    title: string;
+    time: string;
+    description: string;
+    descriptionColor?: string;
+  };
+
+  const steps: Step[] = [
+    {
+      key: 'submitted',
+      color: 'bg-blue-600',
+      icon: Clock3,
+      title: 'Submitted',
+      time: formatFullDate(report?.createdAt || report?.submittedAt || report?.visitedAt),
+      description: 'Supervisor submitted report',
+    },
+  ];
+
+  if (autoQc) {
+    steps.push({
+      key: 'auto-qc',
+      color: autoRejected ? 'bg-rose-500' : 'bg-emerald-500',
+      icon: Sparkles,
+      title: 'QC AI Assessment',
+      time: formatFullDate(report?.autoQcAt || report?.createdAt),
+      description: autoRejected ? 'Suggested Reject' : 'Suggested Approve',
+      descriptionColor: autoRejected ? 'text-rose-600' : 'text-emerald-600',
+    });
+  }
+
+  if (qcDecision) {
+    steps.push({
+      key: 'qc-review',
+      color: qcDecision === 'REJECTED' ? 'bg-rose-500' : 'bg-emerald-500',
+      icon: ShieldCheck,
+      title: 'QC Review',
+      time: formatFullDate(report?.qcReviewedAt || report?.reviewedAt),
+      description: qcDecision === 'REJECTED' ? 'Rejected' : 'Approved',
+      descriptionColor: qcDecision === 'REJECTED' ? 'text-rose-600' : 'text-emerald-600',
+    });
+  }
+
+  if (actionAi) {
+    steps.push({
+      key: 'action-ai',
+      color: actionRequired ? 'bg-amber-500' : 'bg-emerald-500',
+      icon: Sparkles,
+      title: 'Intelligence Suggest',
+      time: formatFullDate(report?.actionAiAt),
+      description: actionRequired ? 'Action Required Recommended' : 'No Action Required',
+      descriptionColor: actionRequired ? 'text-amber-600' : 'text-emerald-600',
+    });
+  }
+
+  return (
+    <section className="mt-5">
+      <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+        Report Journey
+      </h3>
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        {steps.map((step, index) => (
+          <div key={step.key} className="flex gap-3">
+            <div className="flex flex-col items-center">
+              <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${step.color}`}>
+                <step.icon className="h-3.5 w-3.5 text-white" />
+              </div>
+
+              {index < steps.length - 1 && (
+                <div className="mt-1 w-px flex-1 bg-slate-300" />
+              )}
+            </div>
+
+            <div className={index < steps.length - 1 ? 'flex-1 pb-4' : 'flex-1'}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-black text-slate-800">{step.title}</div>
+
+                {step.time !== '—' && (
+                  <div className="text-[10px] font-semibold text-slate-400">{step.time}</div>
+                )}
+              </div>
+
+              <div className={`mt-0.5 text-[11px] font-semibold ${step.descriptionColor || 'text-slate-500'}`}>
+                {step.description}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
