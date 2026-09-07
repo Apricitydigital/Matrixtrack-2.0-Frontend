@@ -501,6 +501,69 @@ function formatDate(
 }
 
 
+/* =========================================================
+   REPORT JOURNEY / AI DATA
+   Same field contract as the mobile app (autoQcResult,
+   actionAiResult, qcDecision, *At timestamps) - shared across
+   TOILET, SWEEPING and LITTERBINS records.
+========================================================= */
+
+function parseAiObject(value: any) {
+    if (!value) return null;
+
+    if (typeof value === 'object') {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch {
+            return null;
+        }
+    }
+
+    return null;
+}
+
+function getAutoQcResult(item: any) {
+    return parseAiObject(
+        item?.autoQcResult ??
+        item?.payload?.autoQcResult
+    );
+}
+
+function getActionAiResult(item: any) {
+    return parseAiObject(
+        item?.actionAiResult ??
+        item?.payload?.actionAiResult
+    );
+}
+
+function getQcDecision(item: any) {
+    const decision = String(item?.qcDecision || '').toUpperCase();
+    if (decision === 'APPROVED' || decision === 'REJECTED') {
+        return decision;
+    }
+
+    const status = effectiveStatus(item);
+    if (status === 'APPROVED' || status === 'REJECTED') {
+        return status;
+    }
+
+    return '';
+}
+
+function formatAiConfidence(value: any) {
+    const confidence = Number(value);
+    if (!Number.isFinite(confidence)) {
+        return '';
+    }
+
+    return `${Math.round(confidence <= 1 ? confidence * 100 : confidence)}%`;
+}
+
 function submittedByName(
     item: any
 ) {
@@ -6932,6 +6995,175 @@ function RecordsTable({
 
 
 /* =========================================================
+   REPORT JOURNEY
+   Mirrors the mobile app's Report Journey timeline
+   (Submitted -> QC AI Assessment -> QC Review -> Intelligence
+   Suggest). Renders for every ULB report module - not just
+   SWEEPING - since autoQcResult/qcDecision/actionAiResult are
+   populated the same way across TOILET, SWEEPING and
+   LITTERBINS records.
+========================================================= */
+
+function ReportJourneySection({
+    item,
+}: {
+    item: any;
+}) {
+    const autoQc = getAutoQcResult(item);
+    const actionAi = getActionAiResult(item);
+    const qcDecision = getQcDecision(item);
+
+    const autoDecision = String(autoQc?.decision || '').toUpperCase();
+    const autoRejected = autoDecision === 'REJECTED';
+
+    const actionRecommendation = String(actionAi?.recommendation || '').toUpperCase();
+    const actionRequired = actionRecommendation === 'ACTION_REQUIRED';
+
+    type Step = {
+        key: string;
+        color: string;
+        icon: any;
+        title: string;
+        time: string;
+        description: string;
+        descriptionColor?: string;
+    };
+
+    const steps: Step[] = [
+        {
+            key: 'submitted',
+            color: 'bg-blue-600',
+            icon: Clock3,
+            title: 'Submitted',
+            time: formatDate(item?.createdAt),
+            description: 'Supervisor submitted report',
+        },
+    ];
+
+    if (autoQc) {
+        steps.push({
+            key: 'auto-qc',
+            color: autoRejected ? 'bg-rose-500' : 'bg-emerald-500',
+            icon: Sparkles,
+            title: 'QC AI Assessment',
+            time: formatDate(item?.autoQcAt || item?.createdAt),
+            description: autoRejected ? 'Suggested Reject' : 'Suggested Approve',
+            descriptionColor: autoRejected ? 'text-rose-600' : 'text-emerald-600',
+        });
+    }
+
+    if (qcDecision) {
+        steps.push({
+            key: 'qc-review',
+            color: qcDecision === 'REJECTED' ? 'bg-rose-500' : 'bg-emerald-500',
+            icon: ShieldCheck,
+            title: 'QC Review',
+            time: formatDate(item?.qcReviewedAt || item?.reviewedAt),
+            description: qcDecision === 'REJECTED' ? 'Rejected' : 'Approved',
+            descriptionColor: qcDecision === 'REJECTED' ? 'text-rose-600' : 'text-emerald-600',
+        });
+    }
+
+    if (actionAi) {
+        steps.push({
+            key: 'action-ai',
+            color: actionRequired ? 'bg-amber-500' : 'bg-emerald-500',
+            icon: Sparkles,
+            title: 'Intelligence Suggest',
+            time: formatDate(item?.actionAiAt),
+            description: actionRequired ? 'Action Required Recommended' : 'No Action Required',
+            descriptionColor: actionRequired ? 'text-amber-600' : 'text-emerald-600',
+        });
+    }
+
+    return (
+        <section className="mt-5">
+            <h3 className="mb-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                Report Journey
+            </h3>
+
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                {steps.map((step, index) => (
+                    <div key={step.key} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${step.color}`}>
+                                <step.icon className="h-3.5 w-3.5 text-white" />
+                            </div>
+
+                            {index < steps.length - 1 && (
+                                <div className="mt-1 w-px flex-1 bg-slate-200" />
+                            )}
+                        </div>
+
+                        <div className={index < steps.length - 1 ? 'flex-1 pb-4' : 'flex-1'}>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-xs font-black text-slate-800">{step.title}</div>
+
+                                {step.time !== '—' && (
+                                    <div className="text-[10px] font-semibold text-slate-400">{step.time}</div>
+                                )}
+                            </div>
+
+                            <div className={`mt-0.5 text-[11px] font-semibold ${step.descriptionColor || 'text-slate-500'}`}>
+                                {step.description}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+
+                {autoQc && (autoQc.summary || (Array.isArray(autoQc.reasons) && autoQc.reasons.length > 0)) && (
+                    <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-3">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="text-[9px] font-black uppercase tracking-wider text-violet-500">QC AI Assessment</div>
+
+                            {formatAiConfidence(autoQc.confidence) && (
+                                <div className="text-[10px] font-black text-violet-700">
+                                    Confidence: {formatAiConfidence(autoQc.confidence)}
+                                </div>
+                            )}
+                        </div>
+
+                        {autoQc.summary && (
+                            <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-700">{autoQc.summary}</p>
+                        )}
+
+                        {Array.isArray(autoQc.reasons) && autoQc.reasons.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                                {autoQc.reasons.map((reason: any, index: number) => (
+                                    <div key={index} className="flex items-start gap-1.5 text-[11px] font-medium leading-5 text-slate-600">
+                                        <span className="mt-[6px] h-1 w-1 shrink-0 rounded-full bg-violet-400" />
+                                        <span>{String(reason)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {actionAi && (actionAi.summary || formatAiConfidence(actionAi.confidence)) && (
+                    <div className={`mt-3 rounded-xl border px-3 py-3 ${actionRequired ? 'border-amber-100 bg-amber-50/60' : 'border-emerald-100 bg-emerald-50/60'}`}>
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="text-[9px] font-black uppercase tracking-wider text-slate-500">Intelligence Suggest</div>
+
+                            {formatAiConfidence(actionAi.confidence) && (
+                                <div className="text-[10px] font-black text-slate-700">
+                                    Confidence: {formatAiConfidence(actionAi.confidence)}
+                                </div>
+                            )}
+                        </div>
+
+                        {actionAi.summary && (
+                            <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-700">{actionAi.summary}</p>
+                        )}
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+}
+
+
+/* =========================================================
    REPORT DETAIL MODAL
 ========================================================= */
 
@@ -7204,6 +7436,13 @@ function ReportDetailModal({
                         />
 
                     </div>
+
+
+                    {/* =========================================
+              REPORT JOURNEY
+          ========================================= */}
+
+                    <ReportJourneySection item={item} />
 
 
                     {/* =========================================
