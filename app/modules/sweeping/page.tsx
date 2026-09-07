@@ -367,7 +367,7 @@ export default function SweepingModulePage() {
                                         transition: "all 0.15s"
                                     }}
                                 >
-                                    Beat Staff Assignments
+                                    Beat Assignment
                                 </button>
                             </div>
                         </div>
@@ -478,7 +478,17 @@ export default function SweepingModulePage() {
                                     </div>
                                     {viewMode === 'table' ? (
                                         <BeatTable
-                                            beats={beats}
+                                            // beats={beats}
+                                            beats={[...beats].sort((a, b) =>
+    String(a.beatName || "").localeCompare(
+        String(b.beatName || ""),
+        undefined,
+        {
+            sensitivity: "base",
+            numeric: true,
+        }
+    )
+)}
                                             onRefresh={loadBeats}
                                             onView={setViewingBeat}
                                             onEdit={setEditingBeat}

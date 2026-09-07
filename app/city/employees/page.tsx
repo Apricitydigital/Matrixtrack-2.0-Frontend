@@ -228,6 +228,9 @@ export default function EmployeesPage() {
     const [selectedEmploymentType, setSelectedEmploymentType] =
         useState("");
 
+    const [selectedDate, setSelectedDate] =
+        useState("");
+
     const [currentPage, setCurrentPage] =
         useState(1);
 
@@ -537,6 +540,28 @@ export default function EmployeesPage() {
                 }
             }
 
+            if (selectedDate) {
+                if (!employee.createdAt) {
+                    return false;
+                }
+
+                const createdDate = new Date(employee.createdAt);
+
+                if (Number.isNaN(createdDate.getTime())) {
+                    return false;
+                }
+
+                const createdDateKey = [
+                    createdDate.getFullYear(),
+                    String(createdDate.getMonth() + 1).padStart(2, "0"),
+                    String(createdDate.getDate()).padStart(2, "0"),
+                ].join("-");
+
+                if (createdDateKey !== selectedDate) {
+                    return false;
+                }
+            }
+
 
             if (!query) {
                 return true;
@@ -570,7 +595,13 @@ export default function EmployeesPage() {
             return searchableText.includes(
                 query
             );
-        });
+        }).sort((a, b) =>
+    String(a.name || "").localeCompare(
+        String(b.name || ""),
+        undefined,
+        { sensitivity: "base", numeric: true }
+    )
+);
 
     }, [
         employees,
@@ -578,6 +609,7 @@ export default function EmployeesPage() {
         selectedZoneId,
         selectedWardId,
         selectedEmploymentType,
+        selectedDate,
         zoneNameMap,
         wardNameMap,
     ]);
@@ -593,7 +625,7 @@ export default function EmployeesPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, selectedZoneId, selectedWardId, selectedEmploymentType]);
+    }, [searchQuery, selectedZoneId, selectedWardId, selectedEmploymentType, selectedDate]);
 
     const paginatedEmployees = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
@@ -1963,7 +1995,7 @@ export default function EmployeesPage() {
 
                     <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
 
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_170px_170px_190px_auto]">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_170px_170px_190px_165px_auto]">
 
                             <div className="relative">
 
@@ -2063,6 +2095,19 @@ export default function EmployeesPage() {
                                     Outsource / आउटसोर्स
                                 </option>
                             </select>
+
+                            <input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) =>
+                                    setSelectedDate(
+                                        e.target.value
+                                    )
+                                }
+                                aria-label="Filter by registration date"
+                                title="Filter by registration date"
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            />
 
 
                             <div className="flex items-center gap-2">

@@ -37,9 +37,14 @@ export default function AuditLogsPage() {
   const [actionFilter, setActionFilter] = useState<string>("");
   const [moduleFilter, setModuleFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  // Search for Sessions
+  const [sessionSearchQuery, setSessionSearchQuery] = useState<string>("");
 
   const fetchLogs = async () => {
     try {
@@ -48,6 +53,8 @@ export default function AuditLogsPage() {
         action: actionFilter || undefined,
         module: moduleFilter || undefined,
         cityId: user?.cityId,
+        startDate: startDate ? new Date(startDate).toISOString() : undefined,
+        endDate: endDate ? new Date(endDate).toISOString() : undefined,
         page,
         limit: 30,
       });
@@ -82,7 +89,7 @@ export default function AuditLogsPage() {
     } else {
       fetchSessions();
     }
-  }, [activeTab, actionFilter, moduleFilter, page]);
+  }, [activeTab, actionFilter, moduleFilter, startDate, endDate, page]);
 
   const handleRevokeSession = async (sessionId: string) => {
     if (!confirm("Are you sure you want to force logout this device session?")) return;
@@ -110,9 +117,42 @@ export default function AuditLogsPage() {
     );
   });
 
+  // Helper to sanitize IP strings (clean IPv6 prefix)
+  const cleanIp = (ip?: string) => {
+    if (!ip) return "Unknown";
+    if (ip.startsWith("::ffff:")) return ip.replace("::ffff:", "");
+    if (ip === "::1") return "127.0.0.1 (Localhost)";
+    return ip;
+  };
+
+  // Accurate Mobile vs Web detection
+  const isMobileSession = (s: any) => {
+    const role = (s.user?.role || "").toUpperCase();
+    const roles: string[] = (s.user?.roles || []).map((r: any) => String(r).toUpperCase());
+    const isMobileRole =
+      ["SUPERVISOR", "INSPECTOR", "SURVEYOR", "QC_INSPECTOR", "CITIZEN"].includes(role) ||
+      roles.some((r) => ["SUPERVISOR", "INSPECTOR", "SURVEYOR", "QC_INSPECTOR", "CITIZEN"].includes(r));
+    const email = (s.user?.email || "").toLowerCase();
+    const isMobileEmail = email.includes(".tf") || email.includes("supervisor") || email.includes("inspector");
+    const ua = (s.userAgent || "").toLowerCase();
+    const isAppUA =
+      ua.includes("okhttp") ||
+      ua.includes("expo") ||
+      ua.includes("react-native") ||
+      ua.includes("android") ||
+      ua.includes("iphone") ||
+      ua.includes("dalvik") ||
+      ua.includes("matrixtrack-app");
+    const isAppDevice =
+      s.deviceType === "Mobile" ||
+      s.deviceType === "Tablet" ||
+      s.browser?.toLowerCase().includes("app");
+    return isAppDevice || isAppUA || isMobileRole || isMobileEmail;
+  };
+
   // Separate Sessions into Web vs Mobile App
-  const webSessions = sessions.filter((s) => s.deviceType === "Desktop" || s.userAgent?.toLowerCase().includes("windows") || s.userAgent?.toLowerCase().includes("macintosh"));
-  const appSessions = sessions.filter((s) => s.deviceType === "Mobile" || s.deviceType === "Tablet" || s.userAgent?.toLowerCase().includes("android") || s.userAgent?.toLowerCase().includes("iphone") || s.userAgent?.toLowerCase().includes("expo") || s.userAgent?.toLowerCase().includes("okhttp"));
+  const webSessions = sessions.filter((s) => !isMobileSession(s));
+  const appSessions = sessions.filter((s) => isMobileSession(s));
 
   const displayedSessions =
     devicePlatformFilter === "WEB"
@@ -120,6 +160,25 @@ export default function AuditLogsPage() {
       : devicePlatformFilter === "APP"
       ? appSessions
       : sessions;
+
+  // Filter sessions by search query
+  const finalSessions = displayedSessions.filter((s) => {
+    if (!sessionSearchQuery) return true;
+    const q = sessionSearchQuery.toLowerCase();
+    const role = (s.user?.role || "").toLowerCase();
+    const roles = (s.user?.roles || []).map((r: any) => String(r).toLowerCase()).join(" ");
+    return (
+      s.user?.name?.toLowerCase().includes(q) ||
+      s.user?.email?.toLowerCase().includes(q) ||
+      s.user?.phone?.toLowerCase().includes(q) ||
+      role.includes(q) ||
+      roles.includes(q) ||
+      s.ipAddress?.toLowerCase().includes(q) ||
+      s.deviceType?.toLowerCase().includes(q) ||
+      s.browser?.toLowerCase().includes(q) ||
+      s.os?.toLowerCase().includes(q)
+    );
+  });
 
   // Counts for Top KPI Cards
   const totalLoginsToday = logs.filter((l) => l.action === "LOGIN").length;
@@ -235,43 +294,64 @@ export default function AuditLogsPage() {
             </button>
           </div>
 
-          {/* Sub-Filters for Sessions: Separate Web vs Mobile App */}
+          {/* Sub-Filters & Search for Sessions */}
           {activeTab === "SESSIONS" && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
-                Platform:
-              </span>
+            <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+              <div className="relative flex-1 sm:w-60">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                <input
+                  type="text"
+                  placeholder="Search user, email, IP, role..."
+                  value={sessionSearchQuery}
+                  onChange={(e) => setSessionSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
+                  Platform:
+                </span>
+                <button
+                  onClick={() => setDevicePlatformFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    devicePlatformFilter === "ALL"
+                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                  }`}
+                >
+                  All ({sessions.length})
+                </button>
+                <button
+                  onClick={() => setDevicePlatformFilter("WEB")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    devicePlatformFilter === "WEB"
+                      ? "bg-blue-600 text-white shadow-xs shadow-blue-500/20"
+                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                  }`}
+                >
+                  <Laptop size={13} />
+                  Web ({webSessions.length})
+                </button>
+                <button
+                  onClick={() => setDevicePlatformFilter("APP")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    devicePlatformFilter === "APP"
+                      ? "bg-purple-600 text-white shadow-xs shadow-purple-500/20"
+                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                  }`}
+                >
+                  <Smartphone size={13} />
+                  App ({appSessions.length})
+                </button>
+              </div>
+
               <button
-                onClick={() => setDevicePlatformFilter("ALL")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  devicePlatformFilter === "ALL"
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                }`}
+                onClick={fetchSessions}
+                className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+                title="Refresh Sessions"
               >
-                All Devices ({sessions.length})
-              </button>
-              <button
-                onClick={() => setDevicePlatformFilter("WEB")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  devicePlatformFilter === "WEB"
-                    ? "bg-blue-600 text-white shadow-xs shadow-blue-500/20"
-                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                }`}
-              >
-                <Laptop size={13} />
-                Web Portal Users ({webSessions.length})
-              </button>
-              <button
-                onClick={() => setDevicePlatformFilter("APP")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  devicePlatformFilter === "APP"
-                    ? "bg-purple-600 text-white shadow-xs shadow-purple-500/20"
-                    : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                }`}
-              >
-                <Smartphone size={13} />
-                Mobile App Users ({appSessions.length})
+                <RotateCcw size={14} className={loading ? "animate-spin" : ""} />
               </button>
             </div>
           )}
@@ -279,7 +359,7 @@ export default function AuditLogsPage() {
           {/* Filters for Activity Logs */}
           {activeTab === "LOGS" && (
             <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-              <div className="relative flex-1 sm:w-64">
+              <div className="relative flex-1 sm:w-52">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                 <input
                   type="text"
@@ -290,10 +370,39 @@ export default function AuditLogsPage() {
                 />
               </div>
 
+              {/* Date Filter */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                <Calendar size={13} className="text-slate-400 shrink-0" />
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                  className="bg-transparent text-slate-700 dark:text-slate-200 text-xs focus:outline-none cursor-pointer"
+                  title="From Date"
+                />
+                <span className="text-slate-400 text-xs font-semibold">to</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                  className="bg-transparent text-slate-700 dark:text-slate-200 text-xs focus:outline-none cursor-pointer"
+                  title="To Date"
+                />
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => { setStartDate(""); setEndDate(""); setPage(1); }}
+                    className="text-[10px] text-rose-500 hover:text-rose-600 font-bold ml-1 cursor-pointer"
+                    title="Clear Date Filter"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
               <select
                 value={actionFilter}
                 onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
+                className="px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
               >
                 <option value="">All Actions</option>
                 <option value="LOGIN">LOGIN</option>
@@ -307,7 +416,7 @@ export default function AuditLogsPage() {
               <select
                 value={moduleFilter}
                 onChange={(e) => { setModuleFilter(e.target.value); setPage(1); }}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
+                className="px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none"
               >
                 <option value="">All Modules</option>
                 <option value="AUTH">AUTH</option>
@@ -315,7 +424,7 @@ export default function AuditLogsPage() {
                 <option value="CITIES">CITIES</option>
                 <option value="TOILETS">TOILETS</option>
                 <option value="SWEEPING">SWEEPING</option>
-                <option value="TWINBIN">TWINBIN</option>
+                <option value="LITTERBIN">LITTERBIN</option>
                 <option value="WARD_RANKING">WARD RANKING</option>
               </select>
 
@@ -417,7 +526,7 @@ export default function AuditLogsPage() {
                             {log.deviceType} • {log.browser} ({log.os})
                           </div>
                           <div className="font-mono text-slate-400 text-[10px] mt-0.5">
-                            IP: {log.ipAddress || "Unknown"}
+                            IP: {cleanIp(log.ipAddress)}
                           </div>
                         </td>
                       </tr>
@@ -435,22 +544,38 @@ export default function AuditLogsPage() {
                 <div className="inline-block animate-spin text-2xl mb-2">⏳</div>
                 <div>Fetching active device sessions...</div>
               </div>
-            ) : displayedSessions.length === 0 ? (
+            ) : finalSessions.length === 0 ? (
               <div className="py-20 text-center">
                 <div className="text-4xl mb-3">
-                  {devicePlatformFilter === "APP" ? "📱" : devicePlatformFilter === "WEB" ? "💻" : "🛡️"}
+                  {sessionSearchQuery ? "🔍" : devicePlatformFilter === "APP" ? "📱" : devicePlatformFilter === "WEB" ? "💻" : "🛡️"}
                 </div>
                 <h3 className="text-base font-bold text-slate-700 dark:text-slate-200">
-                  No Active {devicePlatformFilter === "APP" ? "Mobile App" : devicePlatformFilter === "WEB" ? "Web Portal" : ""} Sessions Found
+                  {sessionSearchQuery
+                    ? "No Matching Sessions Found"
+                    : `No Active ${devicePlatformFilter === "APP" ? "Mobile App" : devicePlatformFilter === "WEB" ? "Web Portal" : ""} Sessions Found`}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                  There are currently no active logins matching this filter. Once users log in from the web portal or mobile app, their live device session will appear here.
+                  {sessionSearchQuery
+                    ? `No active device sessions matched "${sessionSearchQuery}". Try a different name, email, or IP.`
+                    : "There are currently no active logins matching this filter. Once users log in from the web portal or mobile app, their live device session will appear here."}
                 </p>
+                {sessionSearchQuery && (
+                  <button
+                    onClick={() => setSessionSearchQuery("")}
+                    className="mt-3 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors"
+                  >
+                    Clear Search
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {displayedSessions.map((sess) => {
-                  const isMobile = sess.deviceType === "Mobile" || sess.deviceType === "Tablet" || sess.userAgent?.toLowerCase().includes("android") || sess.userAgent?.toLowerCase().includes("iphone");
+                {finalSessions.map((sess) => {
+                  const isMobile = isMobileSession(sess);
+                  const displayPlatform = isMobile ? "Mobile App" : "Web Portal";
+                  const displayDevice = isMobile ? (sess.deviceType === "Desktop" ? "Mobile Device" : sess.deviceType) : sess.deviceType;
+                  const displayOs = isMobile && (sess.os === "Other" || !sess.os) ? "Android / iOS" : (sess.os || "Other");
+                  const displayBrowser = isMobile && (sess.browser === "Other" || !sess.browser) ? "Mobile App Client" : (sess.browser || "Browser");
 
                   return (
                     <div
@@ -473,7 +598,7 @@ export default function AuditLogsPage() {
                                 ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300"
                                 : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300"
                             }`}>
-                              {isMobile ? "Mobile App" : "Web Portal"}
+                              {displayPlatform}
                             </span>
                           </div>
 
@@ -487,8 +612,13 @@ export default function AuditLogsPage() {
                         <div className="font-bold text-slate-900 dark:text-white text-base">
                           {sess.user?.name || "Logged In User"}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                          {sess.user?.email || sess.user?.phone || "No Email"}
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-3 flex items-center justify-between">
+                          <span>{sess.user?.email || sess.user?.phone || "No Email"}</span>
+                          {sess.user?.role && (
+                            <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                              {sess.user.role}
+                            </span>
+                          )}
                         </div>
 
                         {/* Meta Specifications */}
@@ -496,19 +626,19 @@ export default function AuditLogsPage() {
                           <div className="flex justify-between">
                             <span className="text-slate-400">Device Platform:</span>
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              {sess.deviceType} ({sess.os})
+                              {displayDevice} ({displayOs})
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">Browser / Client:</span>
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              {sess.browser || "App Client"}
+                              {displayBrowser}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">IP Address:</span>
                             <span className="font-mono text-slate-700 dark:text-slate-300">
-                              {sess.ipAddress || "Unknown"}
+                              {cleanIp(sess.ipAddress)}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -542,23 +672,24 @@ export default function AuditLogsPage() {
         )}
 
         {/* Pagination Footer */}
-        {activeTab === "LOGS" && totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 text-xs">
+        {activeTab === "LOGS" && (
+          <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-3 bg-slate-50/50 dark:bg-slate-900/50 text-xs">
             <span className="text-slate-500 font-medium">
-              Page {page} of {totalPages}
+              Showing Page <span className="font-bold text-slate-800 dark:text-slate-200">{page}</span> of{" "}
+              <span className="font-bold text-slate-800 dark:text-slate-200">{Math.max(1, totalPages)}</span> ({filteredLogs.length} logs loaded)
             </span>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <button
-                disabled={page <= 1}
+                disabled={page <= 1 || loading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold cursor-pointer"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 Previous
               </button>
               <button
-                disabled={page >= totalPages}
+                disabled={page >= totalPages || loading}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold cursor-pointer"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 font-bold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 Next
               </button>

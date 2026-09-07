@@ -656,9 +656,14 @@ export default function CommonRegistrationModal({
       const emailLower = (email || "").toLowerCase().trim();
 
       let isExistingUser = false;
+      const hasBrokenNameEncoding = name.includes("\uFFFD") || /\?{2,}/.test(name);
+
       if (!name || name.length < 2) {
         isValid = false;
         validationError = "Invalid Name";
+      } else if (hasBrokenNameEncoding) {
+        isValid = false;
+        validationError = "Name encoding issue. Please upload an Excel (.xlsx) file or UTF-8 CSV.";
       } else if (!emailRegex.test(email)) {
         isValid = false;
         validationError = "Invalid Email";
@@ -736,10 +741,36 @@ export default function CommonRegistrationModal({
   };
 
   const handleBulkTextChange = (text: string) => {
-    setBulkCsvText(text);
-    const { records, rows } = parseCsvData(text);
+    // Remove a UTF-8/Unicode BOM if present so the first CSV header is parsed normally.
+    // This does not alter valid Hindi/Unicode characters in the file.
+    const normalizedText = text.replace(/^\uFEFF/, "");
+
+    setBulkCsvText(normalizedText);
+    const { records, rows } = parseCsvData(normalizedText);
     setParsedEmployees(records);
     setParsedRows(rows);
+  };
+
+  const decodeCsvBuffer = (buffer: ArrayBuffer) => {
+    const bytes = new Uint8Array(buffer);
+
+    // UTF-8 BOM
+    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+      return new TextDecoder("utf-8").decode(bytes.subarray(3));
+    }
+
+    // UTF-16 LE BOM (some Excel CSV exports use this format)
+    if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+      return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+    }
+
+    // UTF-16 BE BOM
+    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+      return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+    }
+
+    // Standard Google Sheets / modern CSV export.
+    return new TextDecoder("utf-8").decode(bytes);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -766,10 +797,22 @@ export default function CommonRegistrationModal({
     } else {
       const reader = new FileReader();
       reader.onload = (evt) => {
-        const content = evt.target?.result as string;
-        handleBulkTextChange(content);
+        try {
+          const result = evt.target?.result;
+          if (!(result instanceof ArrayBuffer)) {
+            throw new Error("Unable to read CSV file");
+          }
+
+          const content = decodeCsvBuffer(result);
+          handleBulkTextChange(content);
+        } catch (err: any) {
+          setErrorMsg("Failed to read CSV file: " + (err?.message || "Invalid CSV encoding"));
+        }
       };
-      reader.readAsText(file, "UTF-8");
+      reader.onerror = () => {
+        setErrorMsg("Failed to read CSV file");
+      };
+      reader.readAsArrayBuffer(file);
     }
   };
 
@@ -804,7 +847,8 @@ Priya Patel,priya.qc@example.com,9812345678,Pass@9876,123456789011,Zone 1,Ward 2
 Amit Kumar,amit.ao@example.com,9765432109,Pass@9876,123456789012,Zone 2,Ward 5,ACTION_OFFICER,ALL
 Ramesh Kumar,ramesh.sup@example.com,9876543210,,123456789013,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP
 Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOYEE,SWEEPING`;
-    const blob = new Blob([sample], { type: "text/csv" });
+    // UTF-8 BOM makes Excel recognize the sample as Unicode, so Hindi names are preserved.
+    const blob = new Blob(["\uFEFF", sample], { type: "text/csv;charset=utf-8;" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

@@ -3218,6 +3218,7 @@ function PortalHomeLayoutContent({
 
               {systemManagementOpen && (
                 <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                  {(isSuperAdmin || isCityAdmin) && (
                   <Link
                     href="/portal-home/trash"
                     title="10-Day Trash & Recovery Hub"
@@ -3232,7 +3233,9 @@ function PortalHomeLayoutContent({
                     />
                     <span>Trash & Recovery</span>
                   </Link>
+                  )}
 
+                  {(isSuperAdmin || isCityAdmin) && (
                   <Link
                     href="/portal-home/audit-logs"
                     title="Audit Logs & Active Devices"
@@ -3247,6 +3250,7 @@ function PortalHomeLayoutContent({
                     />
                     <span>Audit Logs</span>
                   </Link>
+                  )}
 
                   <Link
                     href="/portal-home/profile"

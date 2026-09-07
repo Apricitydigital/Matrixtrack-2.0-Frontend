@@ -253,11 +253,38 @@ export default function TwinbinStaffAssignmentsTab() {
         });
 
         // Group / Sort by Supervisor (assigned supervisor rows together, unassigned at bottom)
-        return filtered.sort((a, b) => {
-            if (a.isAssigned && !b.isAssigned) return -1;
-            if (!a.isAssigned && b.isAssigned) return 1;
-            return (a.supervisorName || '').localeCompare(b.supervisorName || '');
-        });
+       return [...filtered].sort((a, b) => {
+    // Existing behaviour preserved:
+    // assigned records first, unassigned records at bottom.
+    if (a.isAssigned && !b.isAssigned) return -1;
+    if (!a.isAssigned && b.isAssigned) return 1;
+
+    // Supervisor A-Z
+    const supervisorCompare = String(a.supervisorName || "")
+        .localeCompare(
+            String(b.supervisorName || ""),
+            undefined,
+            {
+                sensitivity: "base",
+                numeric: true,
+            }
+        );
+
+    if (supervisorCompare !== 0) {
+        return supervisorCompare;
+    }
+
+    // Same supervisor ke andar Litterbin Area A-Z
+    return String(a.areaName || a.locationName || "")
+        .localeCompare(
+            String(b.areaName || b.locationName || ""),
+            undefined,
+            {
+                sensitivity: "base",
+                numeric: true,
+            }
+        );
+});
     }, [assignmentRows, selectedZone, selectedWard, selectedSupervisor, searchQuery, zones, allWards]);
 
     useEffect(() => {
