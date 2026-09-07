@@ -31,6 +31,17 @@ type UserModule = {
   canWrite: boolean;
 };
 
+function formatPersonName(value: string | null | undefined): string {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("en-IN");
+
+  return normalized.replace(/(^|[\s'-])([a-z])/g, (_match, prefix, letter) => {
+    return `${prefix}${String(letter).toUpperCase()}`;
+  });
+}
+
 type UserRecord = {
   id: string;
   name: string;
@@ -335,6 +346,7 @@ export default function RegisteredUsersPage() {
 
         return {
           ...u,
+          name: formatPersonName(u.name),
           cityName:
             u.cityName ||
             city?.name ||
@@ -768,8 +780,6 @@ export default function RegisteredUsersPage() {
   }, [filteredUsers, safePage, pageSize]);
 
   // Delete User Confirmation
-  // The backend soft-deletes users: they move to Trash Hub,
-  // remain recoverable for 10 days, and are purged afterwards.
   const confirmDeleteUser = async () => {
     if (!deleteTarget) return;
 
@@ -777,16 +787,12 @@ export default function RegisteredUsersPage() {
 
     try {
       await CityUserApi.remove(target.id);
-
-      // Close the dialog only after the backend confirms success.
       setDeleteTarget(null);
-
       showToast({
         title: "Moved to Trash",
         description: `${target.name} can be restored from Trash Hub for the next 10 days.`,
         tone: "success"
       });
-
       await loadData();
     } catch (err: any) {
       showToast({
@@ -1373,17 +1379,19 @@ export default function RegisteredUsersPage() {
       </div >
 
       {/* ── DELETE USER CONFIRM DIALOG ── */}
-      {deleteTarget && (
-        <ConfirmDialog
-          open={true}
-          title="Move User to Trash?"
-          message={`Are you sure you want to delete registered user "${deleteTarget.name}"? The user will be moved to Trash Hub and can be restored for the next 10 days. After 10 days, the user will be permanently deleted automatically.`}
-          confirmLabel="Move to Trash"
-          tone="danger"
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={confirmDeleteUser}
-        />
-      )}
+      {
+        deleteTarget && (
+          <ConfirmDialog
+            open={!!deleteTarget}
+            title="Move User to Trash?"
+            message={`Are you sure you want to delete registered user "${deleteTarget.name}"? The user will be moved to Trash Hub and can be restored for the next 10 days. After 10 days, the user will be permanently deleted automatically.`}
+            confirmLabel="Move to Trash"
+            tone="danger"
+            onCancel={() => setDeleteTarget(null)}
+            onConfirm={confirmDeleteUser}
+          />
+        )
+      }
 
       {/* ── EDIT USER CONFIGURATION MODAL ── */}
       {
@@ -2373,8 +2381,10 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
         })
       );
 
+      const normalizedName = formatPersonName(name);
+
       await CityUserApi.update(user.id, {
-        name: name.trim(),
+        name: normalizedName,
         ...(password.trim()
           ? { password: password.trim() }
           : {}),
@@ -2386,12 +2396,12 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
       setStatusMsg({
         type: "success",
-        text: `User details and access permissions for "${name}" updated successfully!`
+        text: `User details and access permissions for "${normalizedName}" updated successfully!`
       });
 
       showToast({
         title: "Access Saved",
-        description: `Updated access permissions for ${name}.`,
+        description: `Updated access permissions for ${normalizedName}.`,
         tone: "success"
       });
 

@@ -271,9 +271,35 @@ export default function AdminDashboard() {
                 if (!loc.includes(q)) return false;
             }
 
-            return true;
-        });
-    }, [combinedBins, typeFilter, statusFilter, zoneFilter, wardFilter, searchQuery, zones, allWards]);
+return true;
+}).sort((a, b) => {
+    const aName = String(
+        a.areaName || a.locationName || ""
+    );
+
+    const bName = String(
+        b.areaName || b.locationName || ""
+    );
+
+    return aName.localeCompare(
+        bName,
+        undefined,
+        {
+            sensitivity: "base",
+            numeric: true,
+        }
+    );
+});
+}, [
+    combinedBins,
+    typeFilter,
+    statusFilter,
+    zoneFilter,
+    wardFilter,
+    searchQuery,
+    zones,
+    allWards,
+]);
 
     // Registered Bins Pagination State
     const [binPage, setBinPage] = useState(1);
@@ -292,8 +318,20 @@ export default function AdminDashboard() {
 
     // Approval & Verification Requests
     const registrationRequests = useMemo(() => {
-        return records.filter(r => r.type === 'BIN_REQUEST' || r.type === 'BIN_REGISTRATION');
-    }, [records]);
+    return records
+        .filter(r => r.type === 'BIN_REQUEST' || r.type === 'BIN_REGISTRATION')
+        .sort((a, b) =>
+            String(a.locationName || a.areaName || "")
+                .localeCompare(
+                    String(b.locationName || b.areaName || ""),
+                    undefined,
+                    {
+                        sensitivity: "base",
+                        numeric: true,
+                    }
+                )
+        );
+}, [records]);
 
     // CSV Export for Bins
     const exportCSV = () => {
