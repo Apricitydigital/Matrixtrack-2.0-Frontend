@@ -174,7 +174,13 @@ export default function BeatAssignmentsPage() {
         matchesWard &&
         matchesArea
       );
-    });
+    }).sort((a, b) =>
+  String(a.beatName || "").localeCompare(
+    String(b.beatName || ""),
+    undefined,
+    { sensitivity: "base", numeric: true }
+  )
+);
   }, [beats, search, zoneFilter, wardFilter, areaFilter]);
 
   /* =========================================================
