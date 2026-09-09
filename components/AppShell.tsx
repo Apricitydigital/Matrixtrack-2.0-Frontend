@@ -8,6 +8,10 @@ import { Topbar } from "@components/ui/Topbar";
 
 const STANDALONE_PATHS = [
   "/",
+  "/privacy-policy",
+  "/privacy",
+  "/terms-and-conditions",
+  "/terms",
   "/unified-login",
   "/register",
   "/create-account",
@@ -59,22 +63,22 @@ export function AppShell({
 
       <div
         className={`fixed inset-0 z-50 lg:hidden ${drawerOpen
-            ? "pointer-events-auto"
-            : "pointer-events-none"
+          ? "pointer-events-auto"
+          : "pointer-events-none"
           }`}
       >
         <div
           onClick={() => setDrawerOpen(false)}
           className={`absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300 ${drawerOpen
-              ? "opacity-100"
-              : "opacity-0"
+            ? "opacity-100"
+            : "opacity-0"
             }`}
         />
 
         <div
           className={`absolute left-0 top-0 h-full shadow-2xl transition-transform duration-300 ease-out ${drawerOpen
-              ? "translate-x-0"
-              : "-translate-x-full"
+            ? "translate-x-0"
+            : "-translate-x-full"
             }`}
         >
           <div className="relative h-full">

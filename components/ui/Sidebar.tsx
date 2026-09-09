@@ -548,6 +548,22 @@ export default function Sidebar() {
             Login
           </Link>
         )}
+
+        <div className="pt-2 text-center border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-400">
+          <Link
+            href="/privacy-policy"
+            className="inline-flex items-center gap-1 hover:text-primary hover:underline transition"
+          >
+            <Shield size={12} /> Privacy
+          </Link>
+          <span>•</span>
+          <Link
+            href="/terms-and-conditions"
+            className="inline-flex items-center gap-1 hover:text-primary hover:underline transition"
+          >
+            <FileText size={12} /> Terms
+          </Link>
+        </div>
       </div>
     </aside>
   );

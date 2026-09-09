@@ -3242,37 +3242,37 @@ function PortalHomeLayoutContent({
               {systemManagementOpen && (
                 <div className={`ml-4 mt-1 pl-3 border-l-2 border-blue-200 flex flex-col gap-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
                   {(isSuperAdmin || isCityAdmin) && (
-                  <Link
-                    href="/portal-home/trash"
-                    title="10-Day Trash & Recovery Hub"
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/portal-home/trash')
-                      ? 'bg-amber-600 text-white font-bold shadow-sm shadow-amber-500/20'
-                      : 'text-slate-600 hover:bg-amber-50 hover:text-amber-700'
-                      }`}
-                  >
-                    <Trash2
-                      size={15}
-                      className={`shrink-0 ${pathname.startsWith('/portal-home/trash') ? 'text-white' : 'text-amber-500'}`}
-                    />
-                    <span>Trash & Recovery</span>
-                  </Link>
+                    <Link
+                      href="/portal-home/trash"
+                      title="10-Day Trash & Recovery Hub"
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/portal-home/trash')
+                        ? 'bg-amber-600 text-white font-bold shadow-sm shadow-amber-500/20'
+                        : 'text-slate-600 hover:bg-amber-50 hover:text-amber-700'
+                        }`}
+                    >
+                      <Trash2
+                        size={15}
+                        className={`shrink-0 ${pathname.startsWith('/portal-home/trash') ? 'text-white' : 'text-amber-500'}`}
+                      />
+                      <span>Trash & Recovery</span>
+                    </Link>
                   )}
 
                   {(isSuperAdmin || isCityAdmin) && (
-                  <Link
-                    href="/portal-home/audit-logs"
-                    title="Audit Logs & Active Devices"
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/portal-home/audit-logs')
-                      ? 'bg-indigo-600 text-white font-bold shadow-sm shadow-indigo-500/20'
-                      : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
-                      }`}
-                  >
-                    <Activity
-                      size={15}
-                      className={`shrink-0 ${pathname.startsWith('/portal-home/audit-logs') ? 'text-white' : 'text-indigo-500'}`}
-                    />
-                    <span>Audit Logs</span>
-                  </Link>
+                    <Link
+                      href="/portal-home/audit-logs"
+                      title="Audit Logs & Active Devices"
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/portal-home/audit-logs')
+                        ? 'bg-indigo-600 text-white font-bold shadow-sm shadow-indigo-500/20'
+                        : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+                        }`}
+                    >
+                      <Activity
+                        size={15}
+                        className={`shrink-0 ${pathname.startsWith('/portal-home/audit-logs') ? 'text-white' : 'text-indigo-500'}`}
+                      />
+                      <span>Audit Logs</span>
+                    </Link>
                   )}
 
                   <Link
@@ -3472,6 +3472,37 @@ function PortalHomeLayoutContent({
               children
             }
           </div>
+
+          {/* MAIN DASHBOARD PLATFORM FOOTER */}
+          <footer className="mt-12 border-t border-slate-200/80 pt-6 pb-8 px-4 text-center space-y-2 text-slate-500">
+            <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-slate-600">
+              <span className="flex items-center gap-1.5 font-bold text-slate-800">
+                <Shield size={14} className="text-blue-600" /> MatrixTrack 2.0
+              </span>
+              <span>•</span>
+              <span className="text-slate-500">Apricity Digital Labs Pvt Ltd</span>
+              <span>•</span>
+              <Link
+                href="/privacy-policy"
+                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline font-bold transition"
+              >
+                <ShieldCheck size={13} /> Privacy Policy
+              </Link>
+              <span>•</span>
+              <Link
+                href="/terms-and-conditions"
+                className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 hover:underline font-bold transition"
+              >
+                <FileText size={13} /> Terms & Conditions
+              </Link>
+            </div>
+            <p className="text-[11px] text-slate-400 font-medium">
+              Workforce • Attendance • Inspections • Municipal Operations • Analytics • Performance Management
+            </p>
+            <p className="text-[10px] text-slate-400">
+              © 2026 Apricity Digital Labs Pvt Ltd. All rights reserved.
+            </p>
+          </footer>
         </div>
 
       </main>
