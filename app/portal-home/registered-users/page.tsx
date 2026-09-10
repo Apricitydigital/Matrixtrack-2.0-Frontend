@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
   CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, ChevronDown, X, Lock, Activity,
-  Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical, Download, Key, Copy, Check, Sparkles
+  Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical, Download, Key, Copy, Check, Sparkles,
+  Route, Droplet, BarChart3, AlertTriangle, Briefcase
 } from "lucide-react";
-import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch } from "@lib/apiClient";
+import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch, AreaBeatApi, TwinbinApi, ToiletApi, type UserWorkSummaryResponse } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
 import { ConfirmDialog } from "@components/ui/ConfirmDialog";
 import { TableExportDropdown } from '@components/ui/TableExportDropdown';
@@ -71,6 +73,442 @@ type UserRecord = {
   permissions?: string[];
 };
 
+function drilldownRoleBadgeStyle(role: string) {
+  switch (role) {
+    case 'HMS_SUPER_ADMIN': return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'COMMISSIONER': return 'bg-sky-50 text-sky-700 border-sky-200';
+    case 'CITY_ADMIN': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    case 'QC': return 'bg-purple-50 text-purple-700 border-purple-200';
+    case 'ACTION_OFFICER': return 'bg-orange-50 text-orange-700 border-orange-200';
+    case 'SUPERVISOR': return 'bg-amber-50 text-amber-700 border-amber-200';
+    default: return 'bg-slate-100 text-slate-700 border-slate-200';
+  }
+}
+
+function DrilldownStatCard({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  tone: "blue" | "emerald" | "amber" | "rose";
+}) {
+  const toneClasses: Record<string, string> = {
+    blue: "bg-blue-400/15 text-blue-200 ring-blue-300/20",
+    emerald: "bg-emerald-400/15 text-emerald-200 ring-emerald-300/20",
+    amber: "bg-amber-400/15 text-amber-200 ring-amber-300/20",
+    rose: "bg-rose-400/15 text-rose-200 ring-rose-300/20",
+  };
+  return (
+    <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ring-1 ${toneClasses[tone]}`}>
+      <span className="opacity-80">{icon}</span>
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-black text-white">{value}</span>
+        <span className="text-[9.5px] font-bold uppercase tracking-wide opacity-80">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+function DrilldownChipSection({
+  title,
+  icon,
+  colorClass,
+  items,
+  emptyLabel,
+  onAddClick,
+  onRemove,
+  busyKey,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  colorClass: string;
+  items: { key: string; primary: string; secondary?: string }[];
+  emptyLabel: string;
+  onAddClick?: () => void;
+  onRemove?: (key: string) => void;
+  busyKey?: string | null;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {icon}
+          <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+            {title} ({items.length})
+          </h5>
+        </div>
+        {onAddClick && (
+          <button
+            type="button"
+            onClick={onAddClick}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-black text-blue-600 shadow-xs transition hover:bg-blue-50 cursor-pointer"
+          >
+            <PlusCircle size={12} /> Assign
+          </button>
+        )}
+      </div>
+      {items.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-center text-[11px] font-semibold text-slate-400">
+          {emptyLabel}
+        </div>
+      ) : (
+        <div className={`flex flex-wrap gap-1.5 rounded-xl border p-3 max-h-44 overflow-y-auto ${colorClass}`}>
+          {items.map((item) => {
+            const isBusy = busyKey === item.key;
+            return (
+              <span
+                key={item.key}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs"
+                title={item.secondary ? `${item.primary} · ${item.secondary}` : item.primary}
+              >
+                {item.primary}
+                {item.secondary && (
+                  <span className="text-[9.5px] font-semibold text-slate-400">· {item.secondary}</span>
+                )}
+                {onRemove && (
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => onRemove(item.key)}
+                    className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 cursor-pointer"
+                    aria-label={`Remove ${item.primary}`}
+                  >
+                    {isBusy ? <RefreshCw size={10} className="animate-spin" /> : <X size={10} />}
+                  </button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type AssignPickerType = "ZONE" | "WARD" | "BEAT" | "BIN" | "TOILET";
+
+type AssignPickerItem = { id: string; label: string; sublabel?: string };
+
+function AssignPickerModal({
+  open,
+  title,
+  loading,
+  items,
+  onPick,
+  onClose,
+  picking,
+}: {
+  open: boolean;
+  title: string;
+  loading: boolean;
+  items: AssignPickerItem[];
+  onPick: (item: AssignPickerItem) => void;
+  onClose: () => void;
+  picking: string | null;
+}) {
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (open) setSearch("");
+  }, [open]);
+
+  const filtered = items.filter((item) =>
+    !search.trim() ||
+    item.label.toLowerCase().includes(search.trim().toLowerCase()) ||
+    item.sublabel?.toLowerCase().includes(search.trim().toLowerCase())
+  );
+
+  return (
+    <Modal open={open} onClose={onClose} title={title} size="md">
+      <div className="flex flex-col gap-3">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search..."
+            className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+          />
+        </div>
+        <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-100">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400">
+              <RefreshCw size={18} className="animate-spin text-blue-600" />
+              <p className="text-xs font-bold">Loading options...</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-center">
+              <Info size={18} className="text-slate-300" />
+              <p className="text-xs font-bold text-slate-500">No matching items found</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {filtered.map((item) => {
+                const isBusy = picking === item.id;
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => onPick(item)}
+                      className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left transition hover:bg-blue-50/60 disabled:opacity-50 cursor-pointer"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-bold text-slate-800">{item.label}</span>
+                        {item.sublabel && (
+                          <span className="block truncate text-[10.5px] font-semibold text-slate-400">{item.sublabel}</span>
+                        )}
+                      </span>
+                      {isBusy ? (
+                        <RefreshCw size={14} className="shrink-0 animate-spin text-blue-600" />
+                      ) : (
+                        <PlusCircle size={14} className="shrink-0 text-blue-500" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function UserWorkDrilldownDrawer({
+  open,
+  user,
+  data,
+  loading,
+  error,
+  onClose,
+  busyKey,
+  onAddZone,
+  onAddWard,
+  onAddBeat,
+  onAddBin,
+  onAddToilet,
+  onRemoveZone,
+  onRemoveWard,
+  onRemoveBeat,
+  onRemoveBin,
+  onRemoveToilet,
+}: {
+  open: boolean;
+  user: UserRecord | null;
+  data: UserWorkSummaryResponse | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+  busyKey: string | null;
+  onAddZone: () => void;
+  onAddWard: () => void;
+  onAddBeat: () => void;
+  onAddBin: () => void;
+  onAddToilet: () => void;
+  onRemoveZone: (id: string) => void;
+  onRemoveWard: (id: string) => void;
+  onRemoveBeat: (id: string) => void;
+  onRemoveBin: (id: string) => void;
+  onRemoveToilet: (id: string) => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  if (!open || !user || typeof document === "undefined") return null;
+
+  const overall = data?.workSummary.overall;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[35] bg-slate-950/35 backdrop-blur-[2px]"
+      onMouseDown={onClose}
+    >
+      <aside
+        className="fixed bottom-5 left-4 right-4 top-[124px] flex flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)] animate-[attendanceDrawer_.3s_cubic-bezier(.2,.8,.2,1)] sm:left-5 sm:right-5 lg:left-[calc(18rem+1.25rem)] lg:top-[136px]"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 px-5 py-5 text-white sm:px-7">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">
+                  User drill-down
+                </span>
+                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${drilldownRoleBadgeStyle(user.role)}`}>
+                  {user.role}
+                </span>
+              </div>
+              <h2 className="text-xl font-black tracking-[-0.03em] sm:text-2xl">{user.name}</h2>
+              <p className="mt-1.5 max-w-3xl text-xs font-semibold leading-5 text-blue-100/75">
+                {user.phone ? `Mobile: ${user.phone}` : ""}{user.phone && user.email && !user.email.includes('@internal.') ? " · " : ""}{user.email && !user.email.includes('@internal.') ? user.email : ""}
+              </p>
+              {overall && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <DrilldownStatCard label="Total work" value={overall.total} icon={<Briefcase size={14} />} tone="blue" />
+                  <DrilldownStatCard label="Approved" value={overall.approved} icon={<CheckCircle2 size={14} />} tone="emerald" />
+                  <DrilldownStatCard label="Pending" value={overall.pending} icon={<Activity size={14} />} tone="amber" />
+                  <DrilldownStatCard label="Rejected" value={overall.attention} icon={<AlertTriangle size={14} />} tone="rose" />
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+              aria-label="Close user drilldown"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-50/55">
+          {loading && !data ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 text-slate-500">
+              <RefreshCw size={22} className="animate-spin text-blue-600" />
+              <p className="text-sm font-bold">Loading assignments & work summary...</p>
+            </div>
+          ) : error ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center gap-2 px-6 text-center">
+              <AlertCircle size={26} className="text-rose-400" />
+              <p className="text-sm font-black text-slate-700">Couldn't load this user's details</p>
+              <p className="max-w-sm text-xs font-medium text-slate-400">{error}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5 p-4 sm:p-6">
+              <div className="grid grid-cols-1 gap-4 rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-[0_12px_35px_rgba(15,23,42,0.06)] sm:grid-cols-2 sm:p-5">
+                <DrilldownChipSection
+                  title="Assigned Zones"
+                  icon={<Map size={15} className="text-indigo-600" />}
+                  colorClass="border-indigo-100 bg-indigo-50/40"
+                  items={(data?.scope.zones || []).map((z) => ({ key: z.id, primary: z.name }))}
+                  emptyLabel="No zones assigned"
+                  onAddClick={onAddZone}
+                  onRemove={onRemoveZone}
+                  busyKey={busyKey?.startsWith("zone:") ? busyKey.slice(5) : null}
+                />
+                <DrilldownChipSection
+                  title="Assigned Wards"
+                  icon={<MapPin size={15} className="text-amber-600" />}
+                  colorClass="border-amber-100 bg-amber-50/40"
+                  items={(data?.scope.wards || []).map((w) => ({ key: w.id, primary: w.name }))}
+                  emptyLabel="No wards assigned"
+                  onAddClick={onAddWard}
+                  onRemove={onRemoveWard}
+                  busyKey={busyKey?.startsWith("ward:") ? busyKey.slice(5) : null}
+                />
+                <DrilldownChipSection
+                  title="Assigned Beats"
+                  icon={<Route size={15} className="text-violet-600" />}
+                  colorClass="border-violet-100 bg-violet-50/40"
+                  items={(data?.assignments.beats || []).map((b) => ({
+                    key: b.id,
+                    primary: b.name,
+                    secondary: [b.zoneName, b.wardName].filter(Boolean).join(" / ") || undefined,
+                  }))}
+                  emptyLabel="No beats assigned"
+                  onAddClick={onAddBeat}
+                  onRemove={onRemoveBeat}
+                  busyKey={busyKey?.startsWith("beat:") ? busyKey.slice(5) : null}
+                />
+                <DrilldownChipSection
+                  title="Assigned Litter Bins"
+                  icon={<Trash2 size={15} className="text-emerald-600" />}
+                  colorClass="border-emerald-100 bg-emerald-50/40"
+                  items={(data?.assignments.litterBins || []).map((b) => ({
+                    key: b.id,
+                    primary: b.name,
+                    secondary: [b.zoneName, b.wardName].filter(Boolean).join(" / ") || undefined,
+                  }))}
+                  emptyLabel="No litter bins assigned"
+                  onAddClick={onAddBin}
+                  onRemove={onRemoveBin}
+                  busyKey={busyKey?.startsWith("bin:") ? busyKey.slice(4) : null}
+                />
+                <div className="sm:col-span-2">
+                  <DrilldownChipSection
+                    title="Assigned Toilets"
+                    icon={<Droplet size={15} className="text-sky-600" />}
+                    colorClass="border-sky-100 bg-sky-50/40"
+                    items={(data?.assignments.toilets || []).map((t) => ({
+                      key: t.id,
+                      primary: t.name,
+                      secondary: [t.zoneName, t.wardName].filter(Boolean).join(" / ") || undefined,
+                    }))}
+                    emptyLabel="No toilets assigned"
+                    onAddClick={onAddToilet}
+                    onRemove={onRemoveToilet}
+                    busyKey={busyKey?.startsWith("toilet:") ? busyKey.slice(7) : null}
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3.5">
+                  <BarChart3 size={15} className="text-blue-600" />
+                  <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Work Summary</h5>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[520px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-left">
+                        {['Module', 'Total', 'Approved', 'Pending', 'Rejected'].map((heading) => (
+                          <th key={heading} className="border-b border-slate-100 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: 'Sweeping', counts: data?.workSummary.sweeping },
+                        { label: 'Toilets', counts: data?.workSummary.toilet },
+                        { label: 'Litter Bins', counts: data?.workSummary.litterBin },
+                      ].map((row) => (
+                        <tr key={row.label} className="border-b border-slate-100 odd:bg-white even:bg-slate-50/35 last:border-b-0">
+                          <td className="px-4 py-3 text-xs font-bold text-slate-700">{row.label}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-slate-600">{row.counts?.total ?? 0}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">{row.counts?.approved ?? 0}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-black text-amber-700 ring-1 ring-amber-100">{row.counts?.pending ?? 0}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">{row.counts?.attention ?? 0}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {overall && overall.total === 0 && (
+                  <div className="flex flex-col items-center justify-center gap-1.5 px-6 py-8 text-center">
+                    <Info size={20} className="text-slate-300" />
+                    <p className="text-xs font-bold text-slate-500">No work records found for this user yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+    </div>,
+    document.body
+  );
+}
+
 export default function RegisteredUsersPage() {
   const { showToast } = useToast();
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -107,6 +545,17 @@ export default function RegisteredUsersPage() {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
   const [selectedUserGeoModal, setSelectedUserGeoModal] = useState<{ user: UserRecord; zoneList: string[]; wardList: string[] } | null>(null);
+
+  // User work drilldown (assignments + work summary) — opened by clicking a user's name
+  const [userDrilldown, setUserDrilldown] = useState<UserRecord | null>(null);
+  const [userDrilldownData, setUserDrilldownData] = useState<UserWorkSummaryResponse | null>(null);
+  const [userDrilldownLoading, setUserDrilldownLoading] = useState(false);
+  const [userDrilldownError, setUserDrilldownError] = useState<string | null>(null);
+  const [drilldownBusyKey, setDrilldownBusyKey] = useState<string | null>(null);
+  const [assignPicker, setAssignPicker] = useState<{ type: AssignPickerType; title: string } | null>(null);
+  const [assignPickerLoading, setAssignPickerLoading] = useState(false);
+  const [assignPickerItems, setAssignPickerItems] = useState<AssignPickerItem[]>([]);
+  const [assignPickerPicking, setAssignPickerPicking] = useState<string | null>(null);
 
   // Reset Password State
   const [resetPasswordTarget, setResetPasswordTarget] = useState<UserRecord | null>(null);
@@ -385,6 +834,203 @@ export default function RegisteredUsersPage() {
   useEffect(() => {
     setPage(1);
   }, [searchQuery, filterRole, filterZone, filterWard, filterWorkspace, statusFilter, filterDate]);
+
+  useEffect(() => {
+    if (!userDrilldown) {
+      setUserDrilldownData(null);
+      setUserDrilldownError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setUserDrilldownLoading(true);
+    setUserDrilldownError(null);
+
+    CityUserApi.workSummary(userDrilldown.id)
+      .then((result) => {
+        if (!cancelled) setUserDrilldownData(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setUserDrilldownError(err instanceof ApiError ? err.message : "Unable to load this user's assignments and work summary");
+      })
+      .finally(() => {
+        if (!cancelled) setUserDrilldownLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userDrilldown]);
+
+  const openUserDrilldown = (u: UserRecord) => {
+    setUserDrilldownData(null);
+    setUserDrilldownError(null);
+    setUserDrilldown(u);
+  };
+
+  const refreshUserDrilldown = async () => {
+    if (!userDrilldown) return;
+    try {
+      const result = await CityUserApi.workSummary(userDrilldown.id);
+      setUserDrilldownData(result);
+    } catch (err) {
+      showToast({
+        title: "Refresh failed",
+        description: err instanceof ApiError ? err.message : "Unable to refresh the latest assignments.",
+        tone: "error"
+      });
+    }
+  };
+
+  const beatTargetRoleFor = (role: string): "SUPERVISOR" | "EMPLOYEE" => (role === "EMPLOYEE" ? "EMPLOYEE" : "SUPERVISOR");
+
+  const runDrilldownAction = async (busyKey: string, action: () => Promise<void>, successMessage: string) => {
+    setDrilldownBusyKey(busyKey);
+    try {
+      await action();
+      await refreshUserDrilldown();
+      showToast({ title: "Updated", description: successMessage, tone: "success" });
+    } catch (err) {
+      showToast({
+        title: "Action failed",
+        description: err instanceof ApiError ? err.message : "This change could not be completed.",
+        tone: "error"
+      });
+    } finally {
+      setDrilldownBusyKey(null);
+    }
+  };
+
+  const handleRemoveZone = (zoneId: string) => {
+    if (!userDrilldown) return;
+    const remaining = (userDrilldownData?.scope.zones || []).filter((z) => z.id !== zoneId).map((z) => z.id);
+    void runDrilldownAction(`zone:${zoneId}`, async () => {
+      await CityUserApi.update(userDrilldown.id, { zoneIds: remaining });
+    }, "Zone unassigned from user.");
+  };
+
+  const handleRemoveWard = (wardId: string) => {
+    if (!userDrilldown) return;
+    const remaining = (userDrilldownData?.scope.wards || []).filter((w) => w.id !== wardId).map((w) => w.id);
+    void runDrilldownAction(`ward:${wardId}`, async () => {
+      await CityUserApi.update(userDrilldown.id, { wardIds: remaining });
+    }, "Ward unassigned from user.");
+  };
+
+  const handleRemoveBeat = (beatId: string) => {
+    if (!userDrilldown) return;
+    void runDrilldownAction(`beat:${beatId}`, async () => {
+      await AreaBeatApi.assign(beatId, null, undefined, undefined, beatTargetRoleFor(userDrilldown.role));
+    }, "Beat unassigned from user.");
+  };
+
+  const handleRemoveBin = (binId: string) => {
+    if (!userDrilldown) return;
+    const bin = userDrilldownData?.assignments.litterBins.find((b) => b.id === binId);
+    const remaining = (bin?.assignedEmployeeIds || []).filter((id) => id !== userDrilldown.id);
+    void runDrilldownAction(`bin:${binId}`, async () => {
+      await TwinbinApi.assign(binId, { assignedEmployeeIds: remaining });
+    }, "Litter bin unassigned from user.");
+  };
+
+  const handleRemoveToilet = (toiletId: string) => {
+    if (!userDrilldown) return;
+    void runDrilldownAction(`toilet:${toiletId}`, async () => {
+      await ToiletApi.unassignToilet(userDrilldown.id, toiletId);
+    }, "Toilet unassigned from user.");
+  };
+
+  const assignPickerTitles: Record<AssignPickerType, string> = {
+    ZONE: "Assign a zone",
+    WARD: "Assign a ward",
+    BEAT: "Assign a beat",
+    BIN: "Assign a litter bin",
+    TOILET: "Assign a toilet",
+  };
+
+  const openAssignPicker = async (type: AssignPickerType) => {
+    if (!userDrilldown) return;
+    setAssignPicker({ type, title: assignPickerTitles[type] });
+    setAssignPickerItems([]);
+    setAssignPickerLoading(true);
+    try {
+      if (type === "ZONE") {
+        const assignedIds = new Set((userDrilldownData?.scope.zones || []).map((z) => z.id));
+        setAssignPickerItems(zones.filter((z) => !assignedIds.has(z.id)).map((z) => ({ id: z.id, label: z.name })));
+      } else if (type === "WARD") {
+        const assignedIds = new Set((userDrilldownData?.scope.wards || []).map((w) => w.id));
+        setAssignPickerItems(wards.filter((w) => !assignedIds.has(w.id)).map((w) => ({ id: w.id, label: w.name })));
+      } else if (type === "BEAT") {
+        const result = await AreaBeatApi.list();
+        setAssignPickerItems((result.beats || []).map((b: any) => ({
+          id: b.id,
+          label: b.beatName,
+          sublabel: [b.zoneName, b.wardName].filter(Boolean).join(" / ") + (b.assignedToName ? ` · currently: ${b.assignedToName}` : " · unassigned"),
+        })));
+      } else if (type === "BIN") {
+        const result = await TwinbinApi.all();
+        setAssignPickerItems((result.bins || [])
+          .filter((b: any) => b.status === "APPROVED")
+          .map((b: any) => ({
+            id: b.id,
+            label: b.locationName,
+            sublabel: [b.zoneName, b.wardName].filter(Boolean).join(" / ") + (b.assignedEmployees?.length ? ` · ${b.assignedEmployees.length} assigned` : " · unassigned"),
+          })));
+      } else if (type === "TOILET") {
+        const result = await ToiletApi.listAllToilets();
+        setAssignPickerItems((result.toilets || [])
+          .filter((t: any) => t.status === "APPROVED")
+          .map((t: any) => ({
+            id: t.id,
+            label: t.name,
+            sublabel: [t.zoneName, t.wardName].filter(Boolean).join(" / ") + (t.assignments?.length ? ` · currently: ${t.assignments[0]?.supervisor?.name}` : " · unassigned"),
+          })));
+      }
+    } catch (err) {
+      showToast({
+        title: "Couldn't load options",
+        description: err instanceof ApiError ? err.message : "Unable to load assignable items.",
+        tone: "error"
+      });
+    } finally {
+      setAssignPickerLoading(false);
+    }
+  };
+
+  const handleAssignPick = async (item: AssignPickerItem) => {
+    if (!userDrilldown || !assignPicker) return;
+    setAssignPickerPicking(item.id);
+    try {
+      if (assignPicker.type === "ZONE") {
+        const next = Array.from(new Set([...(userDrilldownData?.scope.zones || []).map((z) => z.id), item.id]));
+        await CityUserApi.update(userDrilldown.id, { zoneIds: next });
+      } else if (assignPicker.type === "WARD") {
+        const next = Array.from(new Set([...(userDrilldownData?.scope.wards || []).map((w) => w.id), item.id]));
+        await CityUserApi.update(userDrilldown.id, { wardIds: next });
+      } else if (assignPicker.type === "BEAT") {
+        await AreaBeatApi.assign(item.id, userDrilldown.id, undefined, undefined, beatTargetRoleFor(userDrilldown.role));
+      } else if (assignPicker.type === "BIN") {
+        const result = await TwinbinApi.all();
+        const bin = (result.bins || []).find((b: any) => b.id === item.id);
+        const existing: string[] = bin?.assignedEmployeeIds || [];
+        const next = Array.from(new Set([...existing, userDrilldown.id]));
+        await TwinbinApi.assign(item.id, { assignedEmployeeIds: next });
+      } else if (assignPicker.type === "TOILET") {
+        await ToiletApi.bulkAssignToilets(userDrilldown.id, [item.id], "GENERAL");
+      }
+      await refreshUserDrilldown();
+      showToast({ title: "Assigned", description: `${item.label} has been assigned to ${userDrilldown.name}.`, tone: "success" });
+      setAssignPicker(null);
+    } catch (err) {
+      showToast({
+        title: "Assignment failed",
+        description: err instanceof ApiError ? err.message : "This item could not be assigned.",
+        tone: "error"
+      });
+    } finally {
+      setAssignPickerPicking(null);
+    }
+  };
 
   // Derived Ward Options filtered by selected Zone
   const availableWards = useMemo(() => {
@@ -1136,7 +1782,14 @@ export default function RegisteredUsersPage() {
 
                       {/* User Name */}
                       <td className="px-3 py-3 align-middle">
-                        <span className="truncate text-xs font-black text-slate-900 block">{u.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => openUserDrilldown(u)}
+                          className="truncate text-xs font-black text-slate-900 block hover:text-blue-600 hover:underline cursor-pointer transition text-left"
+                          title="View assignments & work summary"
+                        >
+                          {u.name}
+                        </button>
                       </td>
 
                       {/* User Email */}
@@ -1487,6 +2140,37 @@ export default function RegisteredUsersPage() {
           </Modal>
         )
       }
+
+      {/* ── USER WORK DRILLDOWN (assignments + work summary) ── */}
+      <UserWorkDrilldownDrawer
+        open={Boolean(userDrilldown)}
+        user={userDrilldown}
+        data={userDrilldownData}
+        loading={userDrilldownLoading}
+        error={userDrilldownError}
+        onClose={() => setUserDrilldown(null)}
+        busyKey={drilldownBusyKey}
+        onAddZone={() => openAssignPicker("ZONE")}
+        onAddWard={() => openAssignPicker("WARD")}
+        onAddBeat={() => openAssignPicker("BEAT")}
+        onAddBin={() => openAssignPicker("BIN")}
+        onAddToilet={() => openAssignPicker("TOILET")}
+        onRemoveZone={handleRemoveZone}
+        onRemoveWard={handleRemoveWard}
+        onRemoveBeat={handleRemoveBeat}
+        onRemoveBin={handleRemoveBin}
+        onRemoveToilet={handleRemoveToilet}
+      />
+
+      <AssignPickerModal
+        open={Boolean(assignPicker)}
+        title={assignPicker?.title || ""}
+        loading={assignPickerLoading}
+        items={assignPickerItems}
+        picking={assignPickerPicking}
+        onPick={handleAssignPick}
+        onClose={() => setAssignPicker(null)}
+      />
 
       {/* ── RESET PASSWORD MODAL ── */}
       {resetPasswordTarget && (
