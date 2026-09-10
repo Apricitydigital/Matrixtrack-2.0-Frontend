@@ -816,12 +816,16 @@ export const CityUserApi = {
     apiFetch<UserWorkSummaryResponse>(`/city/users/${id}/work-summary`),
   assignmentOptions: (id: string, type: UserAssignmentType, role: string) =>
     apiFetch<{ items: UserAssignmentOption[] }>(`/city/users/${encodeURIComponent(id)}/assignments/options?${new URLSearchParams({ type, role })}`),
-  addAssignment: (id: string, body: { type: UserAssignmentType; role: string; itemId: string }) =>
+  addAssignment: (id: string, body: { type: UserAssignmentType; role: string; itemId: string; extendScope?: boolean; enableModule?: boolean; reassign?: boolean; expectedAssigneeIds?: string[] }) =>
     apiFetch<{ success: boolean }>(`/city/users/${encodeURIComponent(id)}/assignments/add`, { method: "POST", body: JSON.stringify(body) })
 };
 
 export type UserAssignmentType = "ZONE" | "WARD" | "BEAT" | "BIN" | "TOILET";
-export type UserAssignmentOption = { id: string; label: string; sublabel?: string };
+export type UserAssignmentOption = {
+  id: string; label: string; sublabel?: string;
+  requiresScopeExtension?: boolean; requiresModuleAccess?: boolean; requiresReassignment?: boolean;
+  currentAssigneeIds?: string[]; currentAssigneeNames?: string[]; disabledReason?: string;
+};
 
 export type UserWorkSummaryCounts = { total: number; approved: number; completed?: number; pending: number; attention: number };
 

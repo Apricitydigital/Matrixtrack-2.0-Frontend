@@ -2,7 +2,7 @@ const fs = require("node:fs"), path = require("node:path"), vm = require("node:v
 const source = fs.readFileSync(path.join(__dirname, "../components/users/UserAssignmentPicker.tsx"), "utf8");
 const code = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.React, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true } }).outputText;
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
-function mount(api) {
+function mount(api, overrides = {}) {
   let cursor = 0; const hooks = [], effects = [], calls = [];
   const fakeReact = { ...React,
     useState(initial) { const i = cursor++; if (!(i in hooks)) hooks[i] = initial; return [hooks[i], value => { hooks[i] = typeof value === "function" ? value(hooks[i]) : value; }]; },
@@ -11,7 +11,7 @@ function mount(api) {
   };
   const ctx = { exports: {}, require(name) { if (name === "react") return fakeReact; if (name === "@lib/apiClient") return { CityUserApi: api }; throw Error(name); } };
   vm.runInNewContext(code, ctx);
-  const props = { userId: "target", userName: "Test User", type: "BIN", roles: ["SUPERVISOR", "EMPLOYEE"], initialRole: "SUPERVISOR", onCancel: () => calls.push("cancel"), onAssigned: async () => { calls.push("assigned"); }, onBusyChange: value => calls.push(value) };
+  const props = { userId: "target", userName: "Test User", type: "BIN", roles: ["SUPERVISOR", "EMPLOYEE"], initialRole: "SUPERVISOR", onCancel: () => calls.push("cancel"), onAssigned: async () => { calls.push("assigned"); }, onBusyChange: value => calls.push(value), ...overrides };
   return { calls, render() { cursor = 0; const tree = ctx.exports.UserAssignmentPicker(props); while (effects.length) effects.shift()(); return tree; } };
 }
 function nodes(tree, predicate) { const out = []; function walk(node) { if (!node || typeof node !== "object") return; if (predicate(node)) out.push(node); React.Children.forEach(node.props?.children, walk); } walk(tree); return out; }
@@ -35,5 +35,15 @@ function text(node) { if (typeof node === "string" || typeof node === "number") 
   bad.render(); await flush(); tree = bad.render(); nodes(tree, n => n.type === "button" && text(n) === "Assign")[0].props.onClick(); await flush(); tree = bad.render();
   assert(nodes(tree, n => n.props?.role === "alert").length === 1); assert(!bad.calls.includes("assigned"));
   const denied = mount({ assignmentOptions: async () => { throw new Error("Forbidden"); } }); denied.render(); await flush(); assert(nodes(denied.render(), n => n.props?.role === "alert").length === 1);
-  console.log("PASS: picker loading, search, explicit role, additive payload, duplicate-submit lock, success refresh, save error, options error");
+  const confirmed = [];
+  const confirmApp = mount({ assignmentOptions: async () => ({ items: [{ id: "occupied", label: "Beat 2", requiresScopeExtension: true, requiresModuleAccess: true, requiresReassignment: true, currentAssigneeIds: ["previous"], currentAssigneeNames: ["Previous Supervisor"] }] }), addAssignment: async (...args) => { confirmed.push(args); } }, { type: "BEAT", roles: ["SUPERVISOR"] });
+  confirmApp.render(); await flush(); tree = confirmApp.render();
+  assert.equal(nodes(tree, n => n.type === "select").length, 0);
+  assert(text(tree).includes("Previous Supervisor"));
+  nodes(tree, n => n.type === "button" && text(n) === "Assign")[0].props.onClick(); tree = confirmApp.render();
+  assert.equal(confirmed.length, 0); assert(text(tree).includes("Reassign this beat"));
+  nodes(tree, n => n.type === "button" && text(n) === "Confirm assignment")[0].props.onClick(); await flush();
+  assert.equal(confirmed.length, 1);
+  assert.equal(JSON.stringify(confirmed[0][1]), JSON.stringify({ type: "BEAT", role: "SUPERVISOR", itemId: "occupied", extendScope: true, enableModule: true, reassign: true, expectedAssigneeIds: ["previous"] }));
+  console.log("PASS: picker loading, search, explicit role, additive payload, duplicate-submit lock, success refresh, save error, options error, single-role display, explicit access/reassignment confirmation");
 })().catch(e => { console.error(e); process.exitCode = 1; });
