@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = [
+  "/privacy-policy",
+  "/privacy",
+  "/terms-and-conditions",
+  "/terms",
   "/unified-login",
   "/register",
-  "/unified-login",
   "/create-account",
   "/_next",
   "/api",
@@ -27,7 +30,7 @@ const UNIFIED_PREFIXES = [
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  
+
   if (pathname.includes("%20") || pathname.includes(" ")) {
     const cleanPathname = pathname.replace(/(%20|\s)+/g, "-");
     const cleanUrl = new URL(cleanPathname, req.url);

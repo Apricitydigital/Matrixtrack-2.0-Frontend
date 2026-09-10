@@ -42,6 +42,19 @@ import type {
     WardRankingRow,
 } from '@lib/wardRankingApi';
 
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+
 
 export type WardStatCardFilter =
     | 'ALL'
@@ -938,6 +951,30 @@ export default function WardExecutiveOverview({
         }, [analytics]);
 
 
+    const pieDistributionData = useMemo(() => [
+        { name: 'Top Performer (>=85)', value: analytics.green, color: '#10b981' },
+        { name: 'Average (70-84.9)', value: analytics.amber, color: '#f59e0b' },
+        { name: 'Below Average (<70)', value: analytics.red, color: '#f43f5e' },
+        { name: 'Ranking Pending', value: analytics.noData, color: '#94a3b8' },
+    ], [analytics.green, analytics.amber, analytics.red, analytics.noData]);
+
+    const topWardsChartData = useMemo(() => {
+        return analytics.ranked.slice(0, 8).map((ward) => ({
+            name: ward.wardName || 'Unnamed Ward',
+            score: safeNumber(ward.finalScore),
+            band: ward.performanceBand || 'RED',
+        }));
+    }, [analytics.ranked]);
+
+    const componentChartData = useMemo(() => {
+        return analytics.components.map((comp) => ({
+            name: comp.label,
+            average: safeNumber(comp.average),
+            group: comp.group,
+        }));
+    }, [analytics.components]);
+
+
     const briefingTone = {
         rose:
             'border-rose-200 bg-rose-50/80 text-rose-800',
@@ -1308,6 +1345,120 @@ export default function WardExecutiveOverview({
 
                 </div>
 
+            </section>
+
+
+            {/* =====================================================
+          WARD PERFORMANCE VISUAL ANALYTICS & GRAPHS
+      ===================================================== */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 space-y-6">
+                <SectionHeading
+                    title="Ward Performance Visual Analytics"
+                    subtitle="Interactive graphs displaying city-wide performance distribution, top ward scores, and component health."
+                />
+
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* CHART 1: PERFORMANCE BAND DISTRIBUTION */}
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 shadow-inner">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-800">Performance Band Distribution</span>
+                            <span className="text-[10px] font-bold text-slate-400">{rows.length} Total Wards</span>
+                        </div>
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={pieDistributionData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={55}
+                                        outerRadius={85}
+                                        paddingAngle={4}
+                                        dataKey="value"
+                                    >
+                                        {pieDistributionData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                        formatter={(val: any) => [`${val} Wards`, 'Count']}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-[10px] font-bold text-slate-600">
+                            {pieDistributionData.map((item) => (
+                                <div key={item.name} className="flex items-center gap-1.5">
+                                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                                    <span>{item.name}: <strong className="text-slate-900">{item.value}</strong></span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* CHART 2: TOP WARD SCORES */}
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 shadow-inner">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-800">Top Ranked Wards Leaderboard</span>
+                            <span className="text-[10px] font-bold text-slate-400">Score out of 100</span>
+                        </div>
+                        {topWardsChartData.length > 0 ? (
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={topWardsChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} interval={0} angle={-25} textAnchor="end" />
+                                        <YAxis domain={[0, 100]} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                            formatter={(val: any) => [`${val} / 100`, 'Score']}
+                                        />
+                                        <Bar dataKey="score" radius={[6, 6, 0, 0]}>
+                                            {topWardsChartData.map((entry, index) => (
+                                                <Cell key={`bar-${index}`} fill={entry.score >= 85 ? '#10b981' : entry.score >= 70 ? '#f59e0b' : '#f43f5e'} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="flex h-64 items-center justify-center text-xs font-bold text-slate-400">
+                                No ranked wards available for charting
+                            </div>
+                        )}
+                    </div>
+
+                    {/* CHART 3: COMPONENT HEALTH BREAKDOWN */}
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 shadow-inner lg:col-span-2">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-black uppercase tracking-wider text-slate-800">Average Score by Operational Component (%)</span>
+                            <span className="text-[10px] font-bold text-slate-400">All Wards Average</span>
+                        </div>
+                        <div className="h-56 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={componentChartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 700, fill: '#334155' }} />
+                                    <YAxis domain={[0, 100]} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                        formatter={(val: any) => [`${val}%`, 'Avg Score']}
+                                    />
+                                    <Bar dataKey="average" radius={[8, 8, 0, 0]}>
+                                        {componentChartData.map((entry, index) => (
+                                            <Cell key={`comp-${index}`} fill={entry.group === 'MODULE' ? '#3b82f6' : '#8b5cf6'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="mt-2 flex items-center justify-center gap-6 text-[10px] font-bold text-slate-500">
+                            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Field Operations</span>
+                            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-violet-500" /> Staff Roles & Supervision</span>
+                        </div>
+                    </div>
+                </div>
             </section>
 
 

@@ -966,7 +966,7 @@ export default function WardRankingWorkspace() {
     setRankingView,
   ] =
     useState<'list' | 'map'>(
-      'map'
+      'list'
     );
 
 
@@ -2192,7 +2192,7 @@ export default function WardRankingWorkspace() {
         <ChartCard
           title="Ward Performance Trend"
           subtitle="Current score vs 7-day and 30-day averages."
-          // badge="Trend"
+        // badge="Trend"
         >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
@@ -2401,12 +2401,12 @@ export default function WardRankingWorkspace() {
             </div>
 
             <div className="text-[11px] font-bold text-slate-500">
-            Showing{' '}
-            {displayedFrom}
-            {'–'}
-            {displayedTo}
-            {' of '}
-            {filteredRows.length}
+              Showing{' '}
+              {displayedFrom}
+              {'–'}
+              {displayedTo}
+              {' of '}
+              {filteredRows.length}
             </div>
           </div>
         </div>
@@ -2437,119 +2437,252 @@ export default function WardRankingWorkspace() {
         ) : (
           <>
 
-        {/* DESKTOP TABLE */}
+            {/* DESKTOP TABLE */}
 
-        <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-[1540px] w-full border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/80 text-left">
-                {[
-                  'Rank',
-                  'Ward',
-                  'Zone',
-                  'Final Score',
-                  'Status',
-                  'Workforce',
-                  'Beat',
-                  'Toilet',
-                  'Litter Bin',
-                  'Supervisor',
-                  'QC',
-                  'AO',
-                  'Trend',
-                ].map(
-                  (heading) => (
-                    <th
-                      key={
-                        heading
-                      }
-                      className="whitespace-nowrap px-4 py-3 text-[10px] font-black uppercase tracking-[0.06em] text-slate-400"
-                    >
-                      {heading}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="min-w-[1540px] w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/80 text-left">
+                    {[
+                      'Rank',
+                      'Ward',
+                      'Zone',
+                      'Final Score',
+                      'Status',
+                      'Workforce',
+                      'Beat',
+                      'Toilet',
+                      'Litter Bin',
+                      'Supervisor',
+                      'QC',
+                      'AO',
+                      'Trend',
+                    ].map(
+                      (heading) => (
+                        <th
+                          key={
+                            heading
+                          }
+                          className="whitespace-nowrap px-4 py-3 text-[10px] font-black uppercase tracking-[0.06em] text-slate-400"
+                        >
+                          {heading}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
 
-            <tbody>
+                <tbody>
+                  {pagedRows.map(
+                    (item) => (
+                      <tr
+                        key={
+                          item.wardId
+                        }
+                        className="border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/70"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="inline-flex min-w-9 items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-black text-slate-700">
+                            {item.rankable
+                              ? item.cityRank ??
+                              '—'
+                              : '—'}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="min-w-[150px]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openWardDrilldown(
+                                  item
+                                );
+                              }}
+                              className="text-left text-xs font-black text-slate-800 transition hover:text-blue-700 hover:underline"
+                            >
+                              {item.wardName ||
+                                'Unnamed Ward'}
+                            </button>
+
+                            {item.zoneRank !==
+                              null &&
+                              item.zoneRank !==
+                              undefined && (
+                                <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                                  Zone Rank #{item.zoneRank}
+                                </div>
+                              )}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-slate-600">
+                            <MapPin
+                              size={12}
+                              className="text-slate-400"
+                            />
+
+                            {item.zoneName ||
+                              '—'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          {item.rankable ? (
+                            <div>
+                              <div className="text-base font-black text-slate-900">
+                                {formatScore(
+                                  item.finalScore,
+                                  2
+                                )}
+                              </div>
+
+                              <div className="text-[9px] font-bold uppercase text-slate-400">
+                                / 100
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-black text-slate-400">
+                              N/A
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <BandBadge
+                            band={
+                              item.performanceBand
+                            }
+                            rankable={
+                              item.rankable
+                            }
+                          />
+                        </td>
+
+                        {[
+                          item.components
+                            ?.workforce,
+                          item.components
+                            ?.beat,
+                          item.components
+                            ?.toilet,
+                          item.components
+                            ?.litterBin,
+                          item.components
+                            ?.supervisor,
+                          item.components
+                            ?.qc,
+                          item.components
+                            ?.actionOfficer,
+                        ].map(
+                          (
+                            component,
+                            index
+                          ) => (
+                            <td
+                              key={
+                                `${item.wardId}-${index}`
+                              }
+                              className="px-4 py-3"
+                            >
+                              <button
+                                type="button"
+                                title={
+                                  component?.applicable
+                                    ? 'Open component details'
+                                    : 'Not applicable: no scoring denominator exists for this Ward and period'
+                                }
+                                disabled={
+                                  !component?.applicable
+                                }
+                                onClick={() => {
+                                  if (
+                                    component?.applicable
+                                  ) {
+                                    openWardDrilldown(
+                                      item,
+                                      COMPONENT_DRILLDOWN_KEYS[
+                                      index
+                                      ]
+                                    );
+                                  }
+                                }}
+                                className={`whitespace-nowrap rounded-lg px-2 py-1 text-[11px] font-black transition ${component?.applicable
+                                  ? 'cursor-pointer text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                                  : 'cursor-not-allowed text-slate-400'
+                                  }`}
+                              >
+                                {componentScoreLabel(
+                                  component
+                                )}
+                              </button>
+                            </td>
+                          )
+                        )}
+
+                        <td className="px-4 py-3">
+                          <TrendIndicator
+                            item={
+                              item
+                            }
+                          />
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+
+            {/* MOBILE / TABLET CARDS */}
+
+            <div className="divide-y divide-slate-100 lg:hidden">
               {pagedRows.map(
                 (item) => (
-                  <tr
+                  <div
                     key={
                       item.wardId
                     }
-                    className="border-b border-slate-100 transition last:border-b-0 hover:bg-slate-50/70"
+                    className="p-4"
                   >
-                    <td className="px-4 py-3">
-                      <div className="inline-flex min-w-9 items-center justify-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-black text-slate-700">
-                        {item.rankable
-                          ? item.cityRank ??
-                          '—'
-                          : '—'}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <div className="min-w-[150px]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            openWardDrilldown(
-                              item
-                            );
-                          }}
-                          className="text-left text-xs font-black text-slate-800 transition hover:text-blue-700 hover:underline"
-                        >
-                          {item.wardName ||
-                            'Unnamed Ward'}
-                        </button>
-
-                        {item.zoneRank !==
-                          null &&
-                          item.zoneRank !==
-                          undefined && (
-                            <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                              Zone Rank #{item.zoneRank}
-                            </div>
-                          )}
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-slate-600">
-                        <MapPin
-                          size={12}
-                          className="text-slate-400"
-                        />
-
-                        {item.zoneName ||
-                          '—'}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3">
-                      {item.rankable ? (
-                        <div>
-                          <div className="text-base font-black text-slate-900">
-                            {formatScore(
-                              item.finalScore,
-                              2
-                            )}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black text-slate-700">
+                            {item.rankable
+                              ? item.cityRank ??
+                              '—'
+                              : '—'}
                           </div>
 
-                          <div className="text-[9px] font-bold uppercase text-slate-400">
-                            / 100
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openWardDrilldown(
+                                  item
+                                );
+                              }}
+                              className="block max-w-full truncate text-left text-sm font-black text-slate-900 transition hover:text-blue-700"
+                            >
+                              {item.wardName ||
+                                'Unnamed Ward'}
+                            </button>
+
+                            <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                              <MapPin
+                                size={10}
+                              />
+
+                              {item.zoneName ||
+                                'Zone unavailable'}
+                            </div>
                           </div>
                         </div>
-                      ) : (
-                        <span className="text-xs font-black text-slate-400">
-                          N/A
-                        </span>
-                      )}
-                    </td>
+                      </div>
 
-                    <td className="px-4 py-3">
                       <BandBadge
                         band={
                           item.performanceBand
@@ -2558,47 +2691,117 @@ export default function WardRankingWorkspace() {
                           item.rankable
                         }
                       />
-                    </td>
+                    </div>
 
-                    {[
-                      item.components
-                        ?.workforce,
-                      item.components
-                        ?.beat,
-                      item.components
-                        ?.toilet,
-                      item.components
-                        ?.litterBin,
-                      item.components
-                        ?.supervisor,
-                      item.components
-                        ?.qc,
-                      item.components
-                        ?.actionOfficer,
-                    ].map(
-                      (
-                        component,
-                        index
-                      ) => (
-                        <td
-                          key={
-                            `${item.wardId}-${index}`
-                          }
-                          className="px-4 py-3"
-                        >
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className="rounded-xl bg-slate-50 p-2.5">
+                        <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                          Score
+                        </div>
+
+                        <div className="mt-1 text-sm font-black text-slate-900">
+                          {item.rankable
+                            ? formatScore(
+                              item.finalScore,
+                              2
+                            )
+                            : 'N/A'}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-50 p-2.5">
+                        <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                          7D Avg
+                        </div>
+
+                        <div className="mt-1 text-sm font-black text-slate-900">
+                          {item.rankable &&
+                            item.trend
+                              ?.sevenDayAverage !==
+                            undefined
+                            ? formatScore(
+                              item.trend
+                                .sevenDayAverage,
+                              1
+                            )
+                            : '—'}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-50 p-2.5">
+                        <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                          Trend
+                        </div>
+
+                        <div className="mt-1">
+                          <TrendIndicator
+                            item={
+                              item
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                      {[
+                        [
+                          'Workforce',
+                          item.components
+                            ?.workforce,
+                        ],
+                        [
+                          'Beat',
+                          item.components
+                            ?.beat,
+                        ],
+                        [
+                          'Toilet',
+                          item.components
+                            ?.toilet,
+                        ],
+                        [
+                          'Litter Bin',
+                          item.components
+                            ?.litterBin,
+                        ],
+                        [
+                          'Supervisor',
+                          item.components
+                            ?.supervisor,
+                        ],
+                        [
+                          'QC',
+                          item.components
+                            ?.qc,
+                        ],
+                        [
+                          'AO',
+                          item.components
+                            ?.actionOfficer,
+                        ],
+                      ].map(
+                        ([
+                          label,
+                          component,
+                        ], index) => (
                           <button
                             type="button"
-                            title={
-                              component?.applicable
-                                ? 'Open component details'
-                                : 'Not applicable: no scoring denominator exists for this Ward and period'
+                            key={
+                              String(label)
                             }
                             disabled={
-                              !component?.applicable
+                              !(
+                                component as WardComponentScore
+                              )?.applicable
                             }
                             onClick={() => {
                               if (
-                                component?.applicable
+                                (
+                                  component as WardComponentScore
+                                )?.applicable
                               ) {
                                 openWardDrilldown(
                                   item,
@@ -2608,314 +2811,111 @@ export default function WardRankingWorkspace() {
                                 );
                               }
                             }}
-                            className={`whitespace-nowrap rounded-lg px-2 py-1 text-[11px] font-black transition ${component?.applicable
-                              ? 'cursor-pointer text-slate-700 hover:bg-blue-50 hover:text-blue-700'
-                              : 'cursor-not-allowed text-slate-400'
-                              }`}
+                            className="flex items-center justify-between gap-2 border-b border-slate-100 py-1.5 text-left transition enabled:hover:text-blue-700 disabled:cursor-not-allowed"
                           >
-                            {componentScoreLabel(
-                              component
-                            )}
-                          </button>
-                        </td>
-                      )
-                    )}
+                            <span className="text-[10px] font-bold text-slate-400">
+                              {String(
+                                label
+                              )}
+                            </span>
 
-                    <td className="px-4 py-3">
-                      <TrendIndicator
-                        item={
-                          item
-                        }
-                      />
-                    </td>
-                  </tr>
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
-
-
-        {/* MOBILE / TABLET CARDS */}
-
-        <div className="divide-y divide-slate-100 lg:hidden">
-          {pagedRows.map(
-            (item) => (
-              <div
-                key={
-                  item.wardId
-                }
-                className="p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-100 px-2 text-xs font-black text-slate-700">
-                        {item.rankable
-                          ? item.cityRank ??
-                          '—'
-                          : '—'}
-                      </div>
-
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            openWardDrilldown(
-                              item
-                            );
-                          }}
-                          className="block max-w-full truncate text-left text-sm font-black text-slate-900 transition hover:text-blue-700"
-                        >
-                          {item.wardName ||
-                            'Unnamed Ward'}
-                        </button>
-
-                        <div className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                          <MapPin
-                            size={10}
-                          />
-
-                          {item.zoneName ||
-                            'Zone unavailable'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <BandBadge
-                    band={
-                      item.performanceBand
-                    }
-                    rankable={
-                      item.rankable
-                    }
-                  />
-                </div>
-
-
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <div className="rounded-xl bg-slate-50 p-2.5">
-                    <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
-                      Score
-                    </div>
-
-                    <div className="mt-1 text-sm font-black text-slate-900">
-                      {item.rankable
-                        ? formatScore(
-                          item.finalScore,
-                          2
-                        )
-                        : 'N/A'}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-2.5">
-                    <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
-                      7D Avg
-                    </div>
-
-                    <div className="mt-1 text-sm font-black text-slate-900">
-                      {item.rankable &&
-                        item.trend
-                          ?.sevenDayAverage !==
-                        undefined
-                        ? formatScore(
-                          item.trend
-                            .sevenDayAverage,
-                          1
-                        )
-                        : '—'}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-slate-50 p-2.5">
-                    <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
-                      Trend
-                    </div>
-
-                    <div className="mt-1">
-                      <TrendIndicator
-                        item={
-                          item
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-
-                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-                  {[
-                    [
-                      'Workforce',
-                      item.components
-                        ?.workforce,
-                    ],
-                    [
-                      'Beat',
-                      item.components
-                        ?.beat,
-                    ],
-                    [
-                      'Toilet',
-                      item.components
-                        ?.toilet,
-                    ],
-                    [
-                      'Litter Bin',
-                      item.components
-                        ?.litterBin,
-                    ],
-                    [
-                      'Supervisor',
-                      item.components
-                        ?.supervisor,
-                    ],
-                    [
-                      'QC',
-                      item.components
-                        ?.qc,
-                    ],
-                    [
-                      'AO',
-                      item.components
-                        ?.actionOfficer,
-                    ],
-                  ].map(
-                    ([
-                      label,
-                      component,
-                    ], index) => (
-                      <button
-                        type="button"
-                        key={
-                          String(label)
-                        }
-                        disabled={
-                          !(
-                            component as WardComponentScore
-                          )?.applicable
-                        }
-                        onClick={() => {
-                          if (
-                            (
+                            <span className={`text-[10px] font-black ${(
                               component as WardComponentScore
                             )?.applicable
-                          ) {
-                            openWardDrilldown(
-                              item,
-                              COMPONENT_DRILLDOWN_KEYS[
-                              index
-                              ]
-                            );
-                          }
-                        }}
-                        className="flex items-center justify-between gap-2 border-b border-slate-100 py-1.5 text-left transition enabled:hover:text-blue-700 disabled:cursor-not-allowed"
-                      >
-                        <span className="text-[10px] font-bold text-slate-400">
-                          {String(
-                            label
-                          )}
-                        </span>
+                              ? 'text-slate-700'
+                              : 'text-slate-400'
+                              }`}>
+                              {componentScoreLabel(
+                                component as WardComponentScore
+                              )}
+                            </span>
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
 
-                        <span className={`text-[10px] font-black ${(
-                          component as WardComponentScore
-                        )?.applicable
-                          ? 'text-slate-700'
-                          : 'text-slate-400'
-                          }`}>
-                          {componentScoreLabel(
-                            component as WardComponentScore
-                          )}
-                        </span>
-                      </button>
-                    )
-                  )}
+
+            {!pagedRows.length && (
+              <div className="px-6 py-16 text-center">
+                <Award
+                  size={32}
+                  className="mx-auto text-slate-300"
+                />
+
+                <div className="mt-3 text-sm font-black text-slate-600">
+                  No wards match your filters.
                 </div>
               </div>
-            )
-          )}
-        </div>
+            )}
 
 
-        {!pagedRows.length && (
-          <div className="px-6 py-16 text-center">
-            <Award
-              size={32}
-              className="mx-auto text-slate-300"
-            />
+            {filteredRows.length >
+              PAGE_SIZE && (
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+                  <div className="text-[11px] font-bold text-slate-400">
+                    Page{' '}
+                    {safePage}
+                    {' of '}
+                    {totalPages}
+                  </div>
 
-            <div className="mt-3 text-sm font-black text-slate-600">
-              No wards match your filters.
-            </div>
-          </div>
-        )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={
+                        safePage <=
+                        1
+                      }
+                      onClick={() => {
+                        setPage(
+                          (
+                            current
+                          ) =>
+                            Math.max(
+                              1,
+                              current -
+                              1
+                            )
+                        );
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft
+                        size={15}
+                      />
+                    </button>
 
-
-        {filteredRows.length >
-          PAGE_SIZE && (
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
-              <div className="text-[11px] font-bold text-slate-400">
-                Page{' '}
-                {safePage}
-                {' of '}
-                {totalPages}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={
-                    safePage <=
-                    1
-                  }
-                  onClick={() => {
-                    setPage(
-                      (
-                        current
-                      ) =>
-                        Math.max(
-                          1,
-                          current -
-                          1
-                        )
-                    );
-                  }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft
-                    size={15}
-                  />
-                </button>
-
-                <button
-                  type="button"
-                  disabled={
-                    safePage >=
-                    totalPages
-                  }
-                  onClick={() => {
-                    setPage(
-                      (
-                        current
-                      ) =>
-                        Math.min(
-                          totalPages,
-                          current +
-                          1
-                        )
-                    );
-                  }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronRight
-                    size={15}
-                  />
-                </button>
-              </div>
-            </div>
-          )}
+                    <button
+                      type="button"
+                      disabled={
+                        safePage >=
+                        totalPages
+                      }
+                      onClick={() => {
+                        setPage(
+                          (
+                            current
+                          ) =>
+                            Math.min(
+                              totalPages,
+                              current +
+                              1
+                            )
+                        );
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronRight
+                        size={15}
+                      />
+                    </button>
+                  </div>
+                </div>
+              )}
           </>
         )}
       </section>

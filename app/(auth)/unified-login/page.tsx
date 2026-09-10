@@ -2421,8 +2421,14 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="mt-auth-footer">
-              <ShieldCheck size={12} /> MatrixTrack 2.0 · © 2026
+            <div className="mt-auth-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <ShieldCheck size={12} /> MatrixTrack 2.0 · © 2026 Apricity Digital Labs
+              </span>
+              <span>·</span>
+              <a href="/privacy-policy" style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 700 }}>Privacy Policy</a>
+              <span>·</span>
+              <a href="/terms-and-conditions" style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 700 }}>Terms & Conditions</a>
             </div>
           </div>
         </aside>
