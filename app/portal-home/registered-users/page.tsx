@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
@@ -8,7 +8,7 @@ import {
   Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical, Download, Key, Copy, Check, Sparkles,
   Route, Droplet, BarChart3, AlertTriangle, Briefcase
 } from "lucide-react";
-import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch, AreaBeatApi, TwinbinApi, ToiletApi, type UserWorkSummaryResponse } from "@lib/apiClient";
+import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch, type UserWorkSummaryResponse } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
 import { ConfirmDialog } from "@components/ui/ConfirmDialog";
 import { TableExportDropdown } from '@components/ui/TableExportDropdown';
@@ -113,216 +113,56 @@ function DrilldownStatCard({
   );
 }
 
-function DrilldownChipSection({
-  title,
-  icon,
-  colorClass,
-  items,
-  emptyLabel,
-  onAddClick,
-  onRemove,
-  busyKey,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  colorClass: string;
-  items: { key: string; primary: string; secondary?: string }[];
-  emptyLabel: string;
-  onAddClick?: () => void;
-  onRemove?: (key: string) => void;
-  busyKey?: string | null;
+function DrilldownChipSection({ title, icon, colorClass, items, emptyLabel }: {
+  title: string; icon: React.ReactNode; colorClass: string;
+  items: { key: string; primary: string; secondary?: string }[]; emptyLabel: string;
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {icon}
-          <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-            {title} ({items.length})
-          </h5>
-        </div>
-        {onAddClick && (
-          <button
-            type="button"
-            onClick={onAddClick}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-black text-blue-600 shadow-xs transition hover:bg-blue-50 cursor-pointer"
-          >
-            <PlusCircle size={12} /> Assign
-          </button>
-        )}
-      </div>
-      {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-center text-[11px] font-semibold text-slate-400">
-          {emptyLabel}
-        </div>
-      ) : (
-        <div className={`flex flex-wrap gap-1.5 rounded-xl border p-3 max-h-44 overflow-y-auto ${colorClass}`}>
-          {items.map((item) => {
-            const isBusy = busyKey === item.key;
-            return (
-              <span
-                key={item.key}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs"
-                title={item.secondary ? `${item.primary} · ${item.secondary}` : item.primary}
-              >
-                {item.primary}
-                {item.secondary && (
-                  <span className="text-[9.5px] font-semibold text-slate-400">· {item.secondary}</span>
-                )}
-                {onRemove && (
-                  <button
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => onRemove(item.key)}
-                    className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 cursor-pointer"
-                    aria-label={`Remove ${item.primary}`}
-                  >
-                    {isBusy ? <RefreshCw size={10} className="animate-spin" /> : <X size={10} />}
-                  </button>
-                )}
-              </span>
-            );
-          })}
+      <div className="flex items-center gap-2">{icon}<h5 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">{title} ({items.length})</h5></div>
+      {items.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-xs text-slate-500">{emptyLabel}</p> : (
+        <div className={`flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-xl border p-3 ${colorClass}`}>
+          {items.map((item) => <span key={item.key} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700">{item.primary}{item.secondary && <span className="ml-1 text-[10px] font-medium text-slate-500"> / {item.secondary}</span>}</span>)}
         </div>
       )}
     </div>
   );
 }
 
-type AssignPickerType = "ZONE" | "WARD" | "BEAT" | "BIN" | "TOILET";
-
-type AssignPickerItem = { id: string; label: string; sublabel?: string };
-
-function AssignPickerModal({
-  open,
-  title,
-  loading,
-  items,
-  onPick,
-  onClose,
-  picking,
-}: {
-  open: boolean;
-  title: string;
-  loading: boolean;
-  items: AssignPickerItem[];
-  onPick: (item: AssignPickerItem) => void;
-  onClose: () => void;
-  picking: string | null;
-}) {
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    if (open) setSearch("");
-  }, [open]);
-
-  const filtered = items.filter((item) =>
-    !search.trim() ||
-    item.label.toLowerCase().includes(search.trim().toLowerCase()) ||
-    item.sublabel?.toLowerCase().includes(search.trim().toLowerCase())
-  );
-
-  return (
-    <Modal open={open} onClose={onClose} title={title} size="md">
-      <div className="flex flex-col gap-3">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..."
-            className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-          />
-        </div>
-        <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-100">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400">
-              <RefreshCw size={18} className="animate-spin text-blue-600" />
-              <p className="text-xs font-bold">Loading options...</p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-1.5 py-10 text-center">
-              <Info size={18} className="text-slate-300" />
-              <p className="text-xs font-bold text-slate-500">No matching items found</p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {filtered.map((item) => {
-                const isBusy = picking === item.id;
-                return (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => onPick(item)}
-                      className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left transition hover:bg-blue-50/60 disabled:opacity-50 cursor-pointer"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-bold text-slate-800">{item.label}</span>
-                        {item.sublabel && (
-                          <span className="block truncate text-[10.5px] font-semibold text-slate-400">{item.sublabel}</span>
-                        )}
-                      </span>
-                      {isBusy ? (
-                        <RefreshCw size={14} className="shrink-0 animate-spin text-blue-600" />
-                      ) : (
-                        <PlusCircle size={14} className="shrink-0 text-blue-500" />
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function UserWorkDrilldownDrawer({
-  open,
-  user,
-  data,
-  loading,
-  error,
-  onClose,
-  busyKey,
-  onAddZone,
-  onAddWard,
-  onAddBeat,
-  onAddBin,
-  onAddToilet,
-  onRemoveZone,
-  onRemoveWard,
-  onRemoveBeat,
-  onRemoveBin,
-  onRemoveToilet,
-}: {
+function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: {
   open: boolean;
   user: UserRecord | null;
   data: UserWorkSummaryResponse | null;
   loading: boolean;
   error: string | null;
   onClose: () => void;
-  busyKey: string | null;
-  onAddZone: () => void;
-  onAddWard: () => void;
-  onAddBeat: () => void;
-  onAddBin: () => void;
-  onAddToilet: () => void;
-  onRemoveZone: (id: string) => void;
-  onRemoveWard: (id: string) => void;
-  onRemoveBeat: (id: string) => void;
-  onRemoveBin: (id: string) => void;
-  onRemoveToilet: (id: string) => void;
 }) {
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
     document.body.style.overflow = "hidden";
+    drawerRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeRef.current(); }
+      if (event.key !== "Tab") return;
+      const controls = drawerRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), [tabindex="0"]');
+      if (!controls?.length) { event.preventDefault(); return; }
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === drawerRef.current)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === drawerRef.current)) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKey);
+      previousFocus?.focus();
     };
   }, [open]);
 
@@ -336,6 +176,11 @@ function UserWorkDrilldownDrawer({
       onMouseDown={onClose}
     >
       <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-drilldown-title"
+        tabIndex={-1}
         className="fixed bottom-5 left-4 right-4 top-[124px] flex flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)] animate-[attendanceDrawer_.3s_cubic-bezier(.2,.8,.2,1)] sm:left-5 sm:right-5 lg:left-[calc(18rem+1.25rem)] lg:top-[136px]"
         onMouseDown={(event) => event.stopPropagation()}
       >
@@ -348,10 +193,10 @@ function UserWorkDrilldownDrawer({
                   User drill-down
                 </span>
                 <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${drilldownRoleBadgeStyle(user.role)}`}>
-                  {user.role}
+                  {(data?.user.roles?.length ? data.user.roles : [user.role]).join(" / ")}
                 </span>
               </div>
-              <h2 className="text-xl font-black tracking-[-0.03em] sm:text-2xl">{user.name}</h2>
+              <h2 id="user-drilldown-title" className="text-xl font-black tracking-[-0.03em] sm:text-2xl">{data?.user.name || user.name}</h2>
               <p className="mt-1.5 max-w-3xl text-xs font-semibold leading-5 text-blue-100/75">
                 {user.phone ? `Mobile: ${user.phone}` : ""}{user.phone && user.email && !user.email.includes('@internal.') ? " · " : ""}{user.email && !user.email.includes('@internal.') ? user.email : ""}
               </p>
@@ -359,8 +204,9 @@ function UserWorkDrilldownDrawer({
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <DrilldownStatCard label="Total work" value={overall.total} icon={<Briefcase size={14} />} tone="blue" />
                   <DrilldownStatCard label="Approved" value={overall.approved} icon={<CheckCircle2 size={14} />} tone="emerald" />
+                  <DrilldownStatCard label="Completed" value={overall.completed ?? 0} icon={<CheckCircle2 size={14} />} tone="emerald" />
                   <DrilldownStatCard label="Pending" value={overall.pending} icon={<Activity size={14} />} tone="amber" />
-                  <DrilldownStatCard label="Rejected" value={overall.attention} icon={<AlertTriangle size={14} />} tone="rose" />
+                  <DrilldownStatCard label="Needs attention" value={overall.attention} icon={<AlertTriangle size={14} />} tone="rose" />
                 </div>
               )}
             </div>
@@ -396,9 +242,9 @@ function UserWorkDrilldownDrawer({
                   colorClass="border-indigo-100 bg-indigo-50/40"
                   items={(data?.scope.zones || []).map((z) => ({ key: z.id, primary: z.name }))}
                   emptyLabel="No zones assigned"
-                  onAddClick={onAddZone}
-                  onRemove={onRemoveZone}
-                  busyKey={busyKey?.startsWith("zone:") ? busyKey.slice(5) : null}
+
+
+
                 />
                 <DrilldownChipSection
                   title="Assigned Wards"
@@ -406,9 +252,9 @@ function UserWorkDrilldownDrawer({
                   colorClass="border-amber-100 bg-amber-50/40"
                   items={(data?.scope.wards || []).map((w) => ({ key: w.id, primary: w.name }))}
                   emptyLabel="No wards assigned"
-                  onAddClick={onAddWard}
-                  onRemove={onRemoveWard}
-                  busyKey={busyKey?.startsWith("ward:") ? busyKey.slice(5) : null}
+
+
+
                 />
                 <DrilldownChipSection
                   title="Assigned Beats"
@@ -420,9 +266,9 @@ function UserWorkDrilldownDrawer({
                     secondary: [b.zoneName, b.wardName].filter(Boolean).join(" / ") || undefined,
                   }))}
                   emptyLabel="No beats assigned"
-                  onAddClick={onAddBeat}
-                  onRemove={onRemoveBeat}
-                  busyKey={busyKey?.startsWith("beat:") ? busyKey.slice(5) : null}
+
+
+
                 />
                 <DrilldownChipSection
                   title="Assigned Litter Bins"
@@ -434,9 +280,9 @@ function UserWorkDrilldownDrawer({
                     secondary: [b.zoneName, b.wardName].filter(Boolean).join(" / ") || undefined,
                   }))}
                   emptyLabel="No litter bins assigned"
-                  onAddClick={onAddBin}
-                  onRemove={onRemoveBin}
-                  busyKey={busyKey?.startsWith("bin:") ? busyKey.slice(4) : null}
+
+
+
                 />
                 <div className="sm:col-span-2">
                   <DrilldownChipSection
@@ -449,9 +295,9 @@ function UserWorkDrilldownDrawer({
                       secondary: [t.zoneName, t.wardName].filter(Boolean).join(" / ") || undefined,
                     }))}
                     emptyLabel="No toilets assigned"
-                    onAddClick={onAddToilet}
-                    onRemove={onRemoveToilet}
-                    busyKey={busyKey?.startsWith("toilet:") ? busyKey.slice(7) : null}
+
+
+
                   />
                 </div>
               </div>
@@ -459,13 +305,13 @@ function UserWorkDrilldownDrawer({
               <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3.5">
                   <BarChart3 size={15} className="text-blue-600" />
-                  <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Work Summary</h5>
+                  <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Work Summary (all time)</h5>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[520px] border-collapse">
                     <thead>
                       <tr className="bg-slate-50 text-left">
-                        {['Module', 'Total', 'Approved', 'Pending', 'Rejected'].map((heading) => (
+                        {['Module', 'Total', 'Approved', 'Completed', 'Pending', 'Needs attention'].map((heading) => (
                           <th key={heading} className="border-b border-slate-100 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
                         ))}
                       </tr>
@@ -482,6 +328,7 @@ function UserWorkDrilldownDrawer({
                           <td className="px-4 py-3">
                             <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">{row.counts?.approved ?? 0}</span>
                           </td>
+                          <td className="px-4 py-3 text-xs font-semibold text-emerald-700">{row.counts?.completed ?? 0}</td>
                           <td className="px-4 py-3">
                             <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-black text-amber-700 ring-1 ring-amber-100">{row.counts?.pending ?? 0}</span>
                           </td>
@@ -551,12 +398,6 @@ export default function RegisteredUsersPage() {
   const [userDrilldownData, setUserDrilldownData] = useState<UserWorkSummaryResponse | null>(null);
   const [userDrilldownLoading, setUserDrilldownLoading] = useState(false);
   const [userDrilldownError, setUserDrilldownError] = useState<string | null>(null);
-  const [drilldownBusyKey, setDrilldownBusyKey] = useState<string | null>(null);
-  const [assignPicker, setAssignPicker] = useState<{ type: AssignPickerType; title: string } | null>(null);
-  const [assignPickerLoading, setAssignPickerLoading] = useState(false);
-  const [assignPickerItems, setAssignPickerItems] = useState<AssignPickerItem[]>([]);
-  const [assignPickerPicking, setAssignPickerPicking] = useState<string | null>(null);
-
   // Reset Password State
   const [resetPasswordTarget, setResetPasswordTarget] = useState<UserRecord | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -865,171 +706,8 @@ export default function RegisteredUsersPage() {
   const openUserDrilldown = (u: UserRecord) => {
     setUserDrilldownData(null);
     setUserDrilldownError(null);
+    setUserDrilldownLoading(true);
     setUserDrilldown(u);
-  };
-
-  const refreshUserDrilldown = async () => {
-    if (!userDrilldown) return;
-    try {
-      const result = await CityUserApi.workSummary(userDrilldown.id);
-      setUserDrilldownData(result);
-    } catch (err) {
-      showToast({
-        title: "Refresh failed",
-        description: err instanceof ApiError ? err.message : "Unable to refresh the latest assignments.",
-        tone: "error"
-      });
-    }
-  };
-
-  const beatTargetRoleFor = (role: string): "SUPERVISOR" | "EMPLOYEE" => (role === "EMPLOYEE" ? "EMPLOYEE" : "SUPERVISOR");
-
-  const runDrilldownAction = async (busyKey: string, action: () => Promise<void>, successMessage: string) => {
-    setDrilldownBusyKey(busyKey);
-    try {
-      await action();
-      await refreshUserDrilldown();
-      showToast({ title: "Updated", description: successMessage, tone: "success" });
-    } catch (err) {
-      showToast({
-        title: "Action failed",
-        description: err instanceof ApiError ? err.message : "This change could not be completed.",
-        tone: "error"
-      });
-    } finally {
-      setDrilldownBusyKey(null);
-    }
-  };
-
-  const handleRemoveZone = (zoneId: string) => {
-    if (!userDrilldown) return;
-    const remaining = (userDrilldownData?.scope.zones || []).filter((z) => z.id !== zoneId).map((z) => z.id);
-    void runDrilldownAction(`zone:${zoneId}`, async () => {
-      await CityUserApi.update(userDrilldown.id, { zoneIds: remaining });
-    }, "Zone unassigned from user.");
-  };
-
-  const handleRemoveWard = (wardId: string) => {
-    if (!userDrilldown) return;
-    const remaining = (userDrilldownData?.scope.wards || []).filter((w) => w.id !== wardId).map((w) => w.id);
-    void runDrilldownAction(`ward:${wardId}`, async () => {
-      await CityUserApi.update(userDrilldown.id, { wardIds: remaining });
-    }, "Ward unassigned from user.");
-  };
-
-  const handleRemoveBeat = (beatId: string) => {
-    if (!userDrilldown) return;
-    void runDrilldownAction(`beat:${beatId}`, async () => {
-      await AreaBeatApi.assign(beatId, null, undefined, undefined, beatTargetRoleFor(userDrilldown.role));
-    }, "Beat unassigned from user.");
-  };
-
-  const handleRemoveBin = (binId: string) => {
-    if (!userDrilldown) return;
-    const bin = userDrilldownData?.assignments.litterBins.find((b) => b.id === binId);
-    const remaining = (bin?.assignedEmployeeIds || []).filter((id) => id !== userDrilldown.id);
-    void runDrilldownAction(`bin:${binId}`, async () => {
-      await TwinbinApi.assign(binId, { assignedEmployeeIds: remaining });
-    }, "Litter bin unassigned from user.");
-  };
-
-  const handleRemoveToilet = (toiletId: string) => {
-    if (!userDrilldown) return;
-    void runDrilldownAction(`toilet:${toiletId}`, async () => {
-      await ToiletApi.unassignToilet(userDrilldown.id, toiletId);
-    }, "Toilet unassigned from user.");
-  };
-
-  const assignPickerTitles: Record<AssignPickerType, string> = {
-    ZONE: "Assign a zone",
-    WARD: "Assign a ward",
-    BEAT: "Assign a beat",
-    BIN: "Assign a litter bin",
-    TOILET: "Assign a toilet",
-  };
-
-  const openAssignPicker = async (type: AssignPickerType) => {
-    if (!userDrilldown) return;
-    setAssignPicker({ type, title: assignPickerTitles[type] });
-    setAssignPickerItems([]);
-    setAssignPickerLoading(true);
-    try {
-      if (type === "ZONE") {
-        const assignedIds = new Set((userDrilldownData?.scope.zones || []).map((z) => z.id));
-        setAssignPickerItems(zones.filter((z) => !assignedIds.has(z.id)).map((z) => ({ id: z.id, label: z.name })));
-      } else if (type === "WARD") {
-        const assignedIds = new Set((userDrilldownData?.scope.wards || []).map((w) => w.id));
-        setAssignPickerItems(wards.filter((w) => !assignedIds.has(w.id)).map((w) => ({ id: w.id, label: w.name })));
-      } else if (type === "BEAT") {
-        const result = await AreaBeatApi.list();
-        setAssignPickerItems((result.beats || []).map((b: any) => ({
-          id: b.id,
-          label: b.beatName,
-          sublabel: [b.zoneName, b.wardName].filter(Boolean).join(" / ") + (b.assignedToName ? ` · currently: ${b.assignedToName}` : " · unassigned"),
-        })));
-      } else if (type === "BIN") {
-        const result = await TwinbinApi.all();
-        setAssignPickerItems((result.bins || [])
-          .filter((b: any) => b.status === "APPROVED")
-          .map((b: any) => ({
-            id: b.id,
-            label: b.locationName,
-            sublabel: [b.zoneName, b.wardName].filter(Boolean).join(" / ") + (b.assignedEmployees?.length ? ` · ${b.assignedEmployees.length} assigned` : " · unassigned"),
-          })));
-      } else if (type === "TOILET") {
-        const result = await ToiletApi.listAllToilets();
-        setAssignPickerItems((result.toilets || [])
-          .filter((t: any) => t.status === "APPROVED")
-          .map((t: any) => ({
-            id: t.id,
-            label: t.name,
-            sublabel: [t.zoneName, t.wardName].filter(Boolean).join(" / ") + (t.assignments?.length ? ` · currently: ${t.assignments[0]?.supervisor?.name}` : " · unassigned"),
-          })));
-      }
-    } catch (err) {
-      showToast({
-        title: "Couldn't load options",
-        description: err instanceof ApiError ? err.message : "Unable to load assignable items.",
-        tone: "error"
-      });
-    } finally {
-      setAssignPickerLoading(false);
-    }
-  };
-
-  const handleAssignPick = async (item: AssignPickerItem) => {
-    if (!userDrilldown || !assignPicker) return;
-    setAssignPickerPicking(item.id);
-    try {
-      if (assignPicker.type === "ZONE") {
-        const next = Array.from(new Set([...(userDrilldownData?.scope.zones || []).map((z) => z.id), item.id]));
-        await CityUserApi.update(userDrilldown.id, { zoneIds: next });
-      } else if (assignPicker.type === "WARD") {
-        const next = Array.from(new Set([...(userDrilldownData?.scope.wards || []).map((w) => w.id), item.id]));
-        await CityUserApi.update(userDrilldown.id, { wardIds: next });
-      } else if (assignPicker.type === "BEAT") {
-        await AreaBeatApi.assign(item.id, userDrilldown.id, undefined, undefined, beatTargetRoleFor(userDrilldown.role));
-      } else if (assignPicker.type === "BIN") {
-        const result = await TwinbinApi.all();
-        const bin = (result.bins || []).find((b: any) => b.id === item.id);
-        const existing: string[] = bin?.assignedEmployeeIds || [];
-        const next = Array.from(new Set([...existing, userDrilldown.id]));
-        await TwinbinApi.assign(item.id, { assignedEmployeeIds: next });
-      } else if (assignPicker.type === "TOILET") {
-        await ToiletApi.bulkAssignToilets(userDrilldown.id, [item.id], "GENERAL");
-      }
-      await refreshUserDrilldown();
-      showToast({ title: "Assigned", description: `${item.label} has been assigned to ${userDrilldown.name}.`, tone: "success" });
-      setAssignPicker(null);
-    } catch (err) {
-      showToast({
-        title: "Assignment failed",
-        description: err instanceof ApiError ? err.message : "This item could not be assigned.",
-        tone: "error"
-      });
-    } finally {
-      setAssignPickerPicking(null);
-    }
   };
 
   // Derived Ward Options filtered by selected Zone
@@ -2149,30 +1827,9 @@ export default function RegisteredUsersPage() {
         loading={userDrilldownLoading}
         error={userDrilldownError}
         onClose={() => setUserDrilldown(null)}
-        busyKey={drilldownBusyKey}
-        onAddZone={() => openAssignPicker("ZONE")}
-        onAddWard={() => openAssignPicker("WARD")}
-        onAddBeat={() => openAssignPicker("BEAT")}
-        onAddBin={() => openAssignPicker("BIN")}
-        onAddToilet={() => openAssignPicker("TOILET")}
-        onRemoveZone={handleRemoveZone}
-        onRemoveWard={handleRemoveWard}
-        onRemoveBeat={handleRemoveBeat}
-        onRemoveBin={handleRemoveBin}
-        onRemoveToilet={handleRemoveToilet}
       />
 
-      <AssignPickerModal
-        open={Boolean(assignPicker)}
-        title={assignPicker?.title || ""}
-        loading={assignPickerLoading}
-        items={assignPickerItems}
-        picking={assignPickerPicking}
-        onPick={handleAssignPick}
-        onClose={() => setAssignPicker(null)}
-      />
 
-      {/* ── RESET PASSWORD MODAL ── */}
       {resetPasswordTarget && (
         <Modal
           open={!!resetPasswordTarget}

@@ -816,13 +816,14 @@ export const CityUserApi = {
     apiFetch<UserWorkSummaryResponse>(`/city/users/${id}/work-summary`)
 };
 
-export type UserWorkSummaryCounts = { total: number; approved: number; pending: number; attention: number };
+export type UserWorkSummaryCounts = { total: number; approved: number; completed?: number; pending: number; attention: number };
 
 export type UserWorkSummaryResponse = {
   user: {
     id: string;
     name: string;
     role: string;
+    roles?: string[];
     email: string | null;
     phone: string | null;
     employeeId?: string | null;
