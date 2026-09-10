@@ -2,13 +2,14 @@
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { UserAssignmentPicker } from "@components/users/UserAssignmentPicker";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
   CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, ChevronDown, X, Lock, Activity,
   Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical, Download, Key, Copy, Check, Sparkles,
   Route, Droplet, BarChart3, AlertTriangle, Briefcase
 } from "lucide-react";
-import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch, type UserWorkSummaryResponse } from "@lib/apiClient";
+import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch, type UserWorkSummaryResponse, type UserAssignmentType } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
 import { ConfirmDialog } from "@components/ui/ConfirmDialog";
 import { TableExportDropdown } from '@components/ui/TableExportDropdown';
@@ -113,13 +114,14 @@ function DrilldownStatCard({
   );
 }
 
-function DrilldownChipSection({ title, icon, colorClass, items, emptyLabel }: {
+function DrilldownChipSection({ title, icon, colorClass, items, emptyLabel, onAssign }: {
+  onAssign?: () => void;
   title: string; icon: React.ReactNode; colorClass: string;
   items: { key: string; primary: string; secondary?: string }[]; emptyLabel: string;
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">{icon}<h5 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">{title} ({items.length})</h5></div>
+      <div className="flex items-center gap-2">{icon}<h5 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">{title} ({items.length})</h5>{onAssign && <button type="button" onClick={onAssign} className="ml-auto inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700" aria-label={`Assign ${title.replace("Assigned ", "")}`}><PlusCircle size={13} /> Assign</button>}</div>
       {items.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-xs text-slate-500">{emptyLabel}</p> : (
         <div className={`flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-xl border p-3 ${colorClass}`}>
           {items.map((item) => <span key={item.key} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700">{item.primary}{item.secondary && <span className="ml-1 text-[10px] font-medium text-slate-500"> / {item.secondary}</span>}</span>)}
@@ -129,7 +131,8 @@ function DrilldownChipSection({ title, icon, colorClass, items, emptyLabel }: {
   );
 }
 
-function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: {
+function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose, onRefresh }: {
+  onRefresh: () => Promise<void>;
   open: boolean;
   user: UserRecord | null;
   data: UserWorkSummaryResponse | null;
@@ -137,9 +140,13 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
   error: string | null;
   onClose: () => void;
 }) {
+  const [assignmentType, setAssignmentType] = useState<UserAssignmentType | null>(null);
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  useEffect(() => { setAssignmentType(null); }, [user?.id, open]);
   const drawerRef = useRef<HTMLElement>(null);
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  const closeDrawer = () => { if (!assignmentSaving) { if (assignmentType) setAssignmentType(null); else onClose(); } };
+  closeRef.current = closeDrawer;
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
@@ -173,7 +180,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
   return createPortal(
     <div
       className="fixed inset-0 z-[35] bg-slate-950/35 backdrop-blur-[2px]"
-      onMouseDown={onClose}
+      onMouseDown={closeDrawer}
     >
       <aside
         ref={drawerRef}
@@ -212,7 +219,8 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={closeDrawer}
+              disabled={assignmentSaving}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
               aria-label="Close user drilldown"
             >
@@ -222,7 +230,15 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto bg-slate-50/55">
-          {loading && !data ? (
+          {assignmentType ? (
+            <UserAssignmentPicker
+              key={`${user.id}:${assignmentType}`}
+              userId={user.id} userName={user.name} type={assignmentType}
+              roles={data?.user.roles?.length ? data.user.roles : [user.role]} initialRole={user.role}
+              onCancel={() => setAssignmentType(null)} onBusyChange={setAssignmentSaving}
+              onAssigned={async () => { await onRefresh(); setAssignmentType(null); }}
+            />
+          ) : loading && !data ? (
             <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 text-slate-500">
               <RefreshCw size={22} className="animate-spin text-blue-600" />
               <p className="text-sm font-bold">Loading assignments & work summary...</p>
@@ -238,6 +254,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
               <div className="grid grid-cols-1 gap-4 rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-[0_12px_35px_rgba(15,23,42,0.06)] sm:grid-cols-2 sm:p-5">
                 <DrilldownChipSection
                   title="Assigned Zones"
+                  onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("ZONE") : undefined}
                   icon={<Map size={15} className="text-indigo-600" />}
                   colorClass="border-indigo-100 bg-indigo-50/40"
                   items={(data?.scope.zones || []).map((z) => ({ key: z.id, primary: z.name }))}
@@ -248,6 +265,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
                 />
                 <DrilldownChipSection
                   title="Assigned Wards"
+                  onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("WARD") : undefined}
                   icon={<MapPin size={15} className="text-amber-600" />}
                   colorClass="border-amber-100 bg-amber-50/40"
                   items={(data?.scope.wards || []).map((w) => ({ key: w.id, primary: w.name }))}
@@ -258,6 +276,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
                 />
                 <DrilldownChipSection
                   title="Assigned Beats"
+                  onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("BEAT") : undefined}
                   icon={<Route size={15} className="text-violet-600" />}
                   colorClass="border-violet-100 bg-violet-50/40"
                   items={(data?.assignments.beats || []).map((b) => ({
@@ -272,6 +291,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
                 />
                 <DrilldownChipSection
                   title="Assigned Litter Bins"
+                  onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("BIN") : undefined}
                   icon={<Trash2 size={15} className="text-emerald-600" />}
                   colorClass="border-emerald-100 bg-emerald-50/40"
                   items={(data?.assignments.litterBins || []).map((b) => ({
@@ -287,6 +307,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: 
                 <div className="sm:col-span-2">
                   <DrilldownChipSection
                     title="Assigned Toilets"
+                  onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("TOILET") : undefined}
                     icon={<Droplet size={15} className="text-sky-600" />}
                     colorClass="border-sky-100 bg-sky-50/40"
                     items={(data?.assignments.toilets || []).map((t) => ({
@@ -708,6 +729,19 @@ export default function RegisteredUsersPage() {
     setUserDrilldownError(null);
     setUserDrilldownLoading(true);
     setUserDrilldown(u);
+  };
+
+  const refreshUserDrilldownAfterAssignment = async () => {
+    if (!userDrilldown) return;
+    try {
+      const result = await CityUserApi.workSummary(userDrilldown.id);
+      setUserDrilldownData(result);
+      showToast({ title: "Assigned", description: "New assignment added successfully.", tone: "success" });
+    } catch {
+      setUserDrilldownData(null);
+      setUserDrilldownError("Assignment saved. Close and reopen this user to refresh their details.");
+      showToast({ title: "Assignment saved", description: "Reopen the user to refresh the summary.", tone: "success" });
+    }
   };
 
   // Derived Ward Options filtered by selected Zone
@@ -1827,6 +1861,7 @@ export default function RegisteredUsersPage() {
         loading={userDrilldownLoading}
         error={userDrilldownError}
         onClose={() => setUserDrilldown(null)}
+        onRefresh={refreshUserDrilldownAfterAssignment}
       />
 
 
