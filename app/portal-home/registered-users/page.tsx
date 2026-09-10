@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Users, UserPlus, Shield, Search, Filter, RefreshCw, PlusCircle, Edit2, Trash2,
   CheckCircle2, AlertCircle, Building2, ChevronLeft, ChevronRight, ChevronDown, X, Lock, Activity,
-  Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical, Download, Key, Copy, Check, Sparkles
+  Trash, Info, Eye, Layers, ShieldCheck, MapPin, Globe, Award, Map, MoreVertical, Download, Key, Copy, Check, Sparkles,
+  Route, Droplet, BarChart3, AlertTriangle, Briefcase
 } from "lucide-react";
-import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch } from "@lib/apiClient";
+import { CityUserApi, CityApi, CityModulesApi, GeoApi, ApiError, apiFetch, type UserWorkSummaryResponse } from "@lib/apiClient";
 import { useToast } from "@components/ui/ToastProvider";
 import { ConfirmDialog } from "@components/ui/ConfirmDialog";
 import { TableExportDropdown } from '@components/ui/TableExportDropdown';
@@ -71,6 +73,289 @@ type UserRecord = {
   permissions?: string[];
 };
 
+function drilldownRoleBadgeStyle(role: string) {
+  switch (role) {
+    case 'HMS_SUPER_ADMIN': return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'COMMISSIONER': return 'bg-sky-50 text-sky-700 border-sky-200';
+    case 'CITY_ADMIN': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    case 'QC': return 'bg-purple-50 text-purple-700 border-purple-200';
+    case 'ACTION_OFFICER': return 'bg-orange-50 text-orange-700 border-orange-200';
+    case 'SUPERVISOR': return 'bg-amber-50 text-amber-700 border-amber-200';
+    default: return 'bg-slate-100 text-slate-700 border-slate-200';
+  }
+}
+
+function DrilldownStatCard({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  tone: "blue" | "emerald" | "amber" | "rose";
+}) {
+  const toneClasses: Record<string, string> = {
+    blue: "bg-blue-400/15 text-blue-200 ring-blue-300/20",
+    emerald: "bg-emerald-400/15 text-emerald-200 ring-emerald-300/20",
+    amber: "bg-amber-400/15 text-amber-200 ring-amber-300/20",
+    rose: "bg-rose-400/15 text-rose-200 ring-rose-300/20",
+  };
+  return (
+    <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ring-1 ${toneClasses[tone]}`}>
+      <span className="opacity-80">{icon}</span>
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-black text-white">{value}</span>
+        <span className="text-[9.5px] font-bold uppercase tracking-wide opacity-80">{label}</span>
+      </div>
+    </div>
+  );
+}
+
+function DrilldownChipSection({ title, icon, colorClass, items, emptyLabel }: {
+  title: string; icon: React.ReactNode; colorClass: string;
+  items: { key: string; primary: string; secondary?: string }[]; emptyLabel: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">{icon}<h5 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">{title} ({items.length})</h5></div>
+      {items.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-xs text-slate-500">{emptyLabel}</p> : (
+        <div className={`flex max-h-44 flex-wrap gap-1.5 overflow-y-auto rounded-xl border p-3 ${colorClass}`}>
+          {items.map((item) => <span key={item.key} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700">{item.primary}{item.secondary && <span className="ml-1 text-[10px] font-medium text-slate-500"> / {item.secondary}</span>}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose }: {
+  open: boolean;
+  user: UserRecord | null;
+  data: UserWorkSummaryResponse | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    drawerRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeRef.current(); }
+      if (event.key !== "Tab") return;
+      const controls = drawerRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), [tabindex="0"]');
+      if (!controls?.length) { event.preventDefault(); return; }
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === drawerRef.current)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === drawerRef.current)) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      document.removeEventListener("keydown", onKey);
+      previousFocus?.focus();
+    };
+  }, [open]);
+
+  if (!open || !user || typeof document === "undefined") return null;
+
+  const overall = data?.workSummary.overall;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[35] bg-slate-950/35 backdrop-blur-[2px]"
+      onMouseDown={onClose}
+    >
+      <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-drilldown-title"
+        tabIndex={-1}
+        className="fixed bottom-5 left-4 right-4 top-[124px] flex flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)] animate-[attendanceDrawer_.3s_cubic-bezier(.2,.8,.2,1)] sm:left-5 sm:right-5 lg:left-[calc(18rem+1.25rem)] lg:top-[136px]"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="relative overflow-hidden border-b border-slate-100 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 px-5 py-5 text-white sm:px-7">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-full bg-gradient-to-r from-blue-600 to-cyan-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white">
+                  User drill-down
+                </span>
+                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${drilldownRoleBadgeStyle(user.role)}`}>
+                  {(data?.user.roles?.length ? data.user.roles : [user.role]).join(" / ")}
+                </span>
+              </div>
+              <h2 id="user-drilldown-title" className="text-xl font-black tracking-[-0.03em] sm:text-2xl">{data?.user.name || user.name}</h2>
+              <p className="mt-1.5 max-w-3xl text-xs font-semibold leading-5 text-blue-100/75">
+                {user.phone ? `Mobile: ${user.phone}` : ""}{user.phone && user.email && !user.email.includes('@internal.') ? " · " : ""}{user.email && !user.email.includes('@internal.') ? user.email : ""}
+              </p>
+              {overall && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <DrilldownStatCard label="Total work" value={overall.total} icon={<Briefcase size={14} />} tone="blue" />
+                  <DrilldownStatCard label="Approved" value={overall.approved} icon={<CheckCircle2 size={14} />} tone="emerald" />
+                  <DrilldownStatCard label="Completed" value={overall.completed ?? 0} icon={<CheckCircle2 size={14} />} tone="emerald" />
+                  <DrilldownStatCard label="Pending" value={overall.pending} icon={<Activity size={14} />} tone="amber" />
+                  <DrilldownStatCard label="Needs attention" value={overall.attention} icon={<AlertTriangle size={14} />} tone="rose" />
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+              aria-label="Close user drilldown"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-50/55">
+          {loading && !data ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 text-slate-500">
+              <RefreshCw size={22} className="animate-spin text-blue-600" />
+              <p className="text-sm font-bold">Loading assignments & work summary...</p>
+            </div>
+          ) : error ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center gap-2 px-6 text-center">
+              <AlertCircle size={26} className="text-rose-400" />
+              <p className="text-sm font-black text-slate-700">Couldn't load this user's details</p>
+              <p className="max-w-sm text-xs font-medium text-slate-400">{error}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5 p-4 sm:p-6">
+              <div className="grid grid-cols-1 gap-4 rounded-[24px] border border-slate-200/80 bg-white p-4 shadow-[0_12px_35px_rgba(15,23,42,0.06)] sm:grid-cols-2 sm:p-5">
+                <DrilldownChipSection
+                  title="Assigned Zones"
+                  icon={<Map size={15} className="text-indigo-600" />}
+                  colorClass="border-indigo-100 bg-indigo-50/40"
+                  items={(data?.scope.zones || []).map((z) => ({ key: z.id, primary: z.name }))}
+                  emptyLabel="No zones assigned"
+
+
+
+                />
+                <DrilldownChipSection
+                  title="Assigned Wards"
+                  icon={<MapPin size={15} className="text-amber-600" />}
+                  colorClass="border-amber-100 bg-amber-50/40"
+                  items={(data?.scope.wards || []).map((w) => ({ key: w.id, primary: w.name }))}
+                  emptyLabel="No wards assigned"
+
+
+
+                />
+                <DrilldownChipSection
+                  title="Assigned Beats"
+                  icon={<Route size={15} className="text-violet-600" />}
+                  colorClass="border-violet-100 bg-violet-50/40"
+                  items={(data?.assignments.beats || []).map((b) => ({
+                    key: b.id,
+                    primary: b.name,
+                    secondary: [b.zoneName, b.wardName].filter(Boolean).join(" / ") || undefined,
+                  }))}
+                  emptyLabel="No beats assigned"
+
+
+
+                />
+                <DrilldownChipSection
+                  title="Assigned Litter Bins"
+                  icon={<Trash2 size={15} className="text-emerald-600" />}
+                  colorClass="border-emerald-100 bg-emerald-50/40"
+                  items={(data?.assignments.litterBins || []).map((b) => ({
+                    key: b.id,
+                    primary: b.name,
+                    secondary: [b.zoneName, b.wardName].filter(Boolean).join(" / ") || undefined,
+                  }))}
+                  emptyLabel="No litter bins assigned"
+
+
+
+                />
+                <div className="sm:col-span-2">
+                  <DrilldownChipSection
+                    title="Assigned Toilets"
+                    icon={<Droplet size={15} className="text-sky-600" />}
+                    colorClass="border-sky-100 bg-sky-50/40"
+                    items={(data?.assignments.toilets || []).map((t) => ({
+                      key: t.id,
+                      primary: t.name,
+                      secondary: [t.zoneName, t.wardName].filter(Boolean).join(" / ") || undefined,
+                    }))}
+                    emptyLabel="No toilets assigned"
+
+
+
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3.5">
+                  <BarChart3 size={15} className="text-blue-600" />
+                  <h5 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">Work Summary (all time)</h5>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[520px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-left">
+                        {['Module', 'Total', 'Approved', 'Completed', 'Pending', 'Needs attention'].map((heading) => (
+                          <th key={heading} className="border-b border-slate-100 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: 'Sweeping', counts: data?.workSummary.sweeping },
+                        { label: 'Toilets', counts: data?.workSummary.toilet },
+                        { label: 'Litter Bins', counts: data?.workSummary.litterBin },
+                      ].map((row) => (
+                        <tr key={row.label} className="border-b border-slate-100 odd:bg-white even:bg-slate-50/35 last:border-b-0">
+                          <td className="px-4 py-3 text-xs font-bold text-slate-700">{row.label}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-slate-600">{row.counts?.total ?? 0}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">{row.counts?.approved ?? 0}</span>
+                          </td>
+                          <td className="px-4 py-3 text-xs font-semibold text-emerald-700">{row.counts?.completed ?? 0}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-black text-amber-700 ring-1 ring-amber-100">{row.counts?.pending ?? 0}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">{row.counts?.attention ?? 0}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {overall && overall.total === 0 && (
+                  <div className="flex flex-col items-center justify-center gap-1.5 px-6 py-8 text-center">
+                    <Info size={20} className="text-slate-300" />
+                    <p className="text-xs font-bold text-slate-500">No work records found for this user yet.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+    </div>,
+    document.body
+  );
+}
+
 export default function RegisteredUsersPage() {
   const { showToast } = useToast();
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -108,6 +393,11 @@ export default function RegisteredUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
   const [selectedUserGeoModal, setSelectedUserGeoModal] = useState<{ user: UserRecord; zoneList: string[]; wardList: string[] } | null>(null);
 
+  // User work drilldown (assignments + work summary) — opened by clicking a user's name
+  const [userDrilldown, setUserDrilldown] = useState<UserRecord | null>(null);
+  const [userDrilldownData, setUserDrilldownData] = useState<UserWorkSummaryResponse | null>(null);
+  const [userDrilldownLoading, setUserDrilldownLoading] = useState(false);
+  const [userDrilldownError, setUserDrilldownError] = useState<string | null>(null);
   // Reset Password State
   const [resetPasswordTarget, setResetPasswordTarget] = useState<UserRecord | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -385,6 +675,40 @@ export default function RegisteredUsersPage() {
   useEffect(() => {
     setPage(1);
   }, [searchQuery, filterRole, filterZone, filterWard, filterWorkspace, statusFilter, filterDate]);
+
+  useEffect(() => {
+    if (!userDrilldown) {
+      setUserDrilldownData(null);
+      setUserDrilldownError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setUserDrilldownLoading(true);
+    setUserDrilldownError(null);
+
+    CityUserApi.workSummary(userDrilldown.id)
+      .then((result) => {
+        if (!cancelled) setUserDrilldownData(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setUserDrilldownError(err instanceof ApiError ? err.message : "Unable to load this user's assignments and work summary");
+      })
+      .finally(() => {
+        if (!cancelled) setUserDrilldownLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userDrilldown]);
+
+  const openUserDrilldown = (u: UserRecord) => {
+    setUserDrilldownData(null);
+    setUserDrilldownError(null);
+    setUserDrilldownLoading(true);
+    setUserDrilldown(u);
+  };
 
   // Derived Ward Options filtered by selected Zone
   const availableWards = useMemo(() => {
@@ -1136,7 +1460,14 @@ export default function RegisteredUsersPage() {
 
                       {/* User Name */}
                       <td className="px-3 py-3 align-middle">
-                        <span className="truncate text-xs font-black text-slate-900 block">{u.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => openUserDrilldown(u)}
+                          className="truncate text-xs font-black text-slate-900 block hover:text-blue-600 hover:underline cursor-pointer transition text-left"
+                          title="View assignments & work summary"
+                        >
+                          {u.name}
+                        </button>
                       </td>
 
                       {/* User Email */}
@@ -1488,7 +1819,17 @@ export default function RegisteredUsersPage() {
         )
       }
 
-      {/* ── RESET PASSWORD MODAL ── */}
+      {/* ── USER WORK DRILLDOWN (assignments + work summary) ── */}
+      <UserWorkDrilldownDrawer
+        open={Boolean(userDrilldown)}
+        user={userDrilldown}
+        data={userDrilldownData}
+        loading={userDrilldownLoading}
+        error={userDrilldownError}
+        onClose={() => setUserDrilldown(null)}
+      />
+
+
       {resetPasswordTarget && (
         <Modal
           open={!!resetPasswordTarget}

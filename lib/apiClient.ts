@@ -811,7 +811,38 @@ export const CityUserApi = {
       modules?: { moduleId: string; canWrite: boolean; zoneIds?: string[]; wardIds?: string[] }[];
     }
   ) => apiFetch<{ success: boolean }>(`/city/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-  remove: (id: string) => apiFetch<{ success: boolean }>(`/city/users/${id}`, { method: "DELETE" })
+  remove: (id: string) => apiFetch<{ success: boolean }>(`/city/users/${id}`, { method: "DELETE" }),
+  workSummary: (id: string) =>
+    apiFetch<UserWorkSummaryResponse>(`/city/users/${id}/work-summary`)
+};
+
+export type UserWorkSummaryCounts = { total: number; approved: number; completed?: number; pending: number; attention: number };
+
+export type UserWorkSummaryResponse = {
+  user: {
+    id: string;
+    name: string;
+    role: string;
+    roles?: string[];
+    email: string | null;
+    phone: string | null;
+    employeeId?: string | null;
+  };
+  scope: {
+    zones: { id: string; name: string }[];
+    wards: { id: string; name: string }[];
+  };
+  assignments: {
+    beats: { id: string; name: string; code?: string | null; zoneName: string | null; wardName: string | null }[];
+    litterBins: { id: string; name: string; areaName?: string | null; zoneName: string | null; wardName: string | null; assignedEmployeeIds?: string[] }[];
+    toilets: { id: string; name: string; type?: string | null; zoneName: string | null; wardName: string | null }[];
+  };
+  workSummary: {
+    overall: UserWorkSummaryCounts;
+    sweeping: UserWorkSummaryCounts;
+    toilet: UserWorkSummaryCounts;
+    litterBin: UserWorkSummaryCounts;
+  };
 };
 
 export const CityModulesApi = {
