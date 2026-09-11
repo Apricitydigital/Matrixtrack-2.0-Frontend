@@ -112,6 +112,7 @@ export type AttendanceDashboardResponse = {
   } | null;
   records: AttendanceRecord[];
   employees: AttendanceEmployeeSummary[];
+  allEmployees?: AttendanceEmployeeSummary[];
   pagination: {
     page: number;
     pageSize: number;
@@ -130,6 +131,36 @@ export type AttendanceDashboardResponse = {
     divisionUnits: string[];
   };
   uploads: AttendanceUpload[];
+};
+
+export type RegisteredEmployee = {
+  userId: string;
+  name: string;
+  aadhaarSuffix: string;
+  rawAadhaar: string;
+  zones: string[];
+  wards: string[];
+  attendanceId: string | null;
+  attendanceName: string | null;
+  status: string | null;
+  inTime: string | null;
+  outTime: string | null;
+  isMatched: boolean;
+  presentDays: number;
+  absentDays: number;
+  totalDays: number;
+  attendanceRate: number;
+};
+
+export type RegisteredEmployeesResponse = {
+  range?: { from: string; to: string };
+  totalRegistered: number;
+  totalWithAadhaar: number;
+  totalMatched: number;
+  totalPresent: number;
+  totalAbsent: number;
+  totalUnmatched: number;
+  employees: RegisteredEmployee[];
 };
 
 export type AttendanceDashboardQuery = {
@@ -289,6 +320,15 @@ export const AttendanceApi = {
     apiFetch<AttendanceDashboardResponse>(
       `/city/attendance/dashboard${toQueryString(query)}`
     ),
+
+  registeredEmployees: (query: { cityId?: string; from?: string; to?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (query.cityId) params.set("cityId", query.cityId);
+    if (query.from) params.set("from", query.from);
+    if (query.to) params.set("to", query.to);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<RegisteredEmployeesResponse>(`/city/attendance/registered-employees${qs}`);
+  },
 
   upload: (file: File, cityId?: string) => {
     const formData = new FormData();
