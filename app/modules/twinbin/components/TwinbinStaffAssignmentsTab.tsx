@@ -163,12 +163,12 @@ export default function TwinbinStaffAssignmentsTab() {
                         zoneId: b.zoneId,
                         wardId: b.wardId,
                         supervisorId: sup.id,
-                        supervisorName: sup.name || 'Supervisor',
+                        supervisorName: sup.name || 'Daroga',
                         supervisorPhone: sup.phone || sup.mobile || '9893001122',
                         supervisorEmail: sup.email || 'supervisor@indore.gov.in',
                         supervisorAadhar: sup.aadhar || sup.aadhaar || sup.employeeCode || `EMP-${String(sup.id).slice(0, 6)}`,
-                        qcOfficer: b.qcOfficer?.name || 'QC Litterbin Team',
-                        actionOfficer: b.actionOfficer?.name || 'AO Division',
+                        qcOfficer: b.qcOfficer?.name || 'SI Litterbin Team',
+                        actionOfficer: b.actionOfficer?.name || 'IEC Division',
                         isAssigned: true
                     });
                 });
@@ -186,12 +186,12 @@ export default function TwinbinStaffAssignmentsTab() {
                     zoneId: null,
                     wardId: null,
                     supervisorId: sup.id,
-                    supervisorName: sup.name || 'Supervisor',
+                    supervisorName: sup.name || 'Daroga',
                     supervisorPhone: sup.phone || sup.mobile || '9893001122',
                     supervisorEmail: sup.email || 'supervisor@indore.gov.in',
                     supervisorAadhar: sup.aadhar || sup.aadhaar || sup.employeeCode || `EMP-${String(sup.id).slice(0, 6)}`,
-                    qcOfficer: 'QC Litterbin Team',
-                    actionOfficer: 'AO Division',
+                    qcOfficer: 'SI Litterbin Team',
+                    actionOfficer: 'IEC Division',
                     isAssigned: false
                 });
             }
@@ -219,8 +219,8 @@ export default function TwinbinStaffAssignmentsTab() {
                     supervisorPhone: '—',
                     supervisorEmail: '—',
                     supervisorAadhar: '—',
-                    qcOfficer: b.qcOfficer?.name || 'QC Litterbin Team',
-                    actionOfficer: b.actionOfficer?.name || 'AO Division',
+                    qcOfficer: b.qcOfficer?.name || 'SI Litterbin Team',
+                    actionOfficer: b.actionOfficer?.name || 'IEC Division',
                     isAssigned: false
                 });
             }
@@ -299,7 +299,7 @@ export default function TwinbinStaffAssignmentsTab() {
 
     const handleExportCSV = () => {
         if (filteredRows.length === 0) return alert("No data available to export.");
-        const headers = ["Supervisor Name", "Supervisor Phone", "Litterbin Area", "Location Name", "Zone", "Ward", "QC Officer", "Action Officer"];
+        const headers = ["Daroga Name", "Daroga Phone", "Litterbin Area", "Location Name", "Zone", "Ward", "SI Officer", "IEC Member"];
         const csvRows = [
             headers.join(","),
             ...filteredRows.map(r => [
@@ -318,7 +318,7 @@ export default function TwinbinStaffAssignmentsTab() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.setAttribute("download", `Litterbin_Supervisor_Assignments_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute("download", `Litterbin_Daroga_Assignments_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -329,7 +329,7 @@ export default function TwinbinStaffAssignmentsTab() {
     const handleAssignSave = async () => {
         if (!selectedBinToAssign || !targetSupervisorId) return;
         setAssigning(true);
-        setProcessingText('Saving supervisor assignment...');
+        setProcessingText('Saving daroga assignment...');
         try {
             await TwinbinApi.assign(selectedBinToAssign.id, { assignedEmployeeIds: [targetSupervisorId] });
             setShowAssignModal(false);
@@ -351,7 +351,7 @@ export default function TwinbinStaffAssignmentsTab() {
 
     const confirmUnassignAction = async () => {
         if (!unassignConfirmRow || !unassignConfirmRow.binId) return;
-        setProcessingText('Unassigning supervisor...');
+        setProcessingText('Unassigning daroga...');
         try {
             await TwinbinApi.assign(unassignConfirmRow.binId, { assignedEmployeeIds: [] });
             setUnassignConfirmRow(null);
@@ -365,7 +365,7 @@ export default function TwinbinStaffAssignmentsTab() {
 
     const exportCSV = () => {
         if (filteredRows.length === 0) return;
-        const headers = ['S.No', 'Supervisor Name', 'Phone', 'Email', 'Aadhar/Emp Code', 'Bin Location', 'Bin ID', 'Zone', 'Ward', 'Latitude', 'Longitude', 'QC Officer', 'Action Officer'];
+        const headers = ['S.No', 'Daroga Name', 'Phone', 'Email', 'Aadhar/Emp Code', 'Bin Location', 'Bin ID', 'Zone', 'Ward', 'Latitude', 'Longitude', 'SI Officer', 'IEC Member'];
         const rows = filteredRows.map((r, i) => [
             i + 1,
             `"${r.supervisorName}"`,
@@ -419,7 +419,7 @@ export default function TwinbinStaffAssignmentsTab() {
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', flex: 1, minWidth: 300 }}>
                         <input
                             type="text"
-                            placeholder="🔍 Search supervisor, phone, bin..."
+                            placeholder="🔍 Search daroga, phone, bin..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="filter-select"
@@ -437,7 +437,7 @@ export default function TwinbinStaffAssignmentsTab() {
                         </select>
 
                         <select value={selectedSupervisor} onChange={e => setSelectedSupervisor(e.target.value)} className="filter-select">
-                            <option value="">All Supervisors</option>
+                            <option value="">All Darogas</option>
                             {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
 
@@ -473,19 +473,19 @@ export default function TwinbinStaffAssignmentsTab() {
                                 boxShadow: '0 2px 6px rgba(37,99,235,0.2)'
                             }}
                         >
-                            ➕ Assign Supervisor
+                            ➕ Assign Daroga
                         </button>
                     </div>
                 </div>
 
                 <div style={{ marginTop: 10, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', background: '#f8fafc', padding: '8px 14px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, color: '#475569', fontWeight: 500 }}>
-                    <span>👨‍💼 Total Supervisors: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{supervisors.length}</strong></span>
+                    <span>👨‍💼 Total Darogas: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{supervisors.length}</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
                     <span>📍 Litterbin Points: <strong style={{ color: '#2563eb', fontWeight: 700 }}>{bins.length || filteredRows.length} Points</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span>✅ Total Assigned Supervisors: <strong style={{ color: '#16a34a', fontWeight: 700 }}>{new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size}</strong></span>
+                    <span>✅ Total Assigned Darogas: <strong style={{ color: '#16a34a', fontWeight: 700 }}>{new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size}</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
-                    <span>👥 Unassigned Supervisors: <strong style={{ color: '#d97706', fontWeight: 700 }}>{Math.max(0, supervisors.length - new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size)}</strong></span>
+                    <span>👥 Unassigned Darogas: <strong style={{ color: '#d97706', fontWeight: 700 }}>{Math.max(0, supervisors.length - new Set(filteredRows.filter(r => r.isAssigned && r.supervisorId).map(r => r.supervisorId)).size)}</strong></span>
                     <span style={{ color: '#cbd5e1' }}>•</span>
                     <span>⚠️ Unassigned Locations: <strong style={{ color: '#dc2626', fontWeight: 700 }}>{filteredRows.filter(r => !r.isAssigned || !r.supervisorId || r.supervisorName === 'Unassigned').length}</strong></span>
                 </div>
@@ -495,11 +495,11 @@ export default function TwinbinStaffAssignmentsTab() {
             {loading ? (
                 <div style={{ padding: 40, textAlign: 'center', background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0' }}>
                     <div className="animate-spin" style={{ width: 28, height: 28, border: '3px solid #f3f3f3', borderTop: '3px solid #2563eb', borderRadius: '50%', margin: '0 auto' }} />
-                    <p style={{ marginTop: 12, color: '#64748b', fontSize: 13, fontWeight: 500 }}>Loading supervisor deployments...</p>
+                    <p style={{ marginTop: 12, color: '#64748b', fontSize: 13, fontWeight: 500 }}>Loading daroga deployments...</p>
                 </div>
             ) : filteredRows.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0', color: '#94a3b8' }}>
-                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#334155' }}>No supervisor assignments found</h4>
+                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#334155' }}>No daroga assignments found</h4>
                     <p style={{ fontSize: 12, margin: '4px 0 0' }}>Try adjusting your filters above or add a new assignment.</p>
                 </div>
             ) : (
@@ -508,11 +508,11 @@ export default function TwinbinStaffAssignmentsTab() {
                         <thead>
                             <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>S.NO.</th>
-                                <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>SUPERVISOR</th>
+                                <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>DAROGA</th>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>LITTERBIN AREA AND LOCATION</th>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ZONE & WARD</th>
                                 <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>GPS COORDINATES</th>
-                                <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>QC & ACTION OFFICER</th>
+                                <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>SI & IEC MEMBER</th>
                                 <th style={{ padding: '12px 14px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#64748b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>ACTIONS</th>
                             </tr>
                         </thead>
@@ -556,8 +556,8 @@ export default function TwinbinStaffAssignmentsTab() {
 
                                     {/* QC & Action Officer */}
                                     <td style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9' }}>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>QC: {row.qcOfficer}</div>
-                                        <div style={{ fontSize: 11, color: '#64748b' }}>AO: {row.actionOfficer}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>SI: {row.qcOfficer}</div>
+                                        <div style={{ fontSize: 11, color: '#64748b' }}>IEC: {row.actionOfficer}</div>
                                     </td>
 
                                     {/* Actions Column (3-Dots Menu) */}
@@ -596,7 +596,7 @@ export default function TwinbinStaffAssignmentsTab() {
                                                         cursor: 'pointer', borderRadius: 6
                                                     }}
                                                 >
-                                                    🔄 Reassign Supervisor
+                                                    🔄 Reassign Daroga
                                                 </button>
                                                 {row.isAssigned && (
                                                     <button
@@ -607,7 +607,7 @@ export default function TwinbinStaffAssignmentsTab() {
                                                             cursor: 'pointer', borderRadius: 6
                                                         }}
                                                     >
-                                                        ❌ Unassign Supervisor
+                                                        ❌ Unassign Daroga
                                                     </button>
                                                 )}
                                             </div>
@@ -647,7 +647,7 @@ export default function TwinbinStaffAssignmentsTab() {
                 <div onClick={() => setShowAssignModal(false)} style={{ position: 'fixed', inset: 0, zIndex: 99999, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
                     <div onClick={e => e.stopPropagation()} style={{ backgroundColor: '#ffffff', borderRadius: 16, width: '100%', maxWidth: 500, padding: 24, boxShadow: '0 25px 60px rgba(0,0,0,0.25)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Assign Supervisor to Litterbin</h3>
+                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Assign Daroga to Litterbin</h3>
                             <button onClick={() => setShowAssignModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Close</button>
                         </div>
 
@@ -675,14 +675,14 @@ export default function TwinbinStaffAssignmentsTab() {
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Select Supervisor</label>
+                                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Select Daroga</label>
                                 <select
                                     value={targetSupervisorId}
                                     onChange={e => setTargetSupervisorId(e.target.value)}
                                     className="filter-select"
                                     style={{ width: '100%' }}
                                 >
-                                    <option value="">Choose Supervisor...</option>
+                                    <option value="">Choose Daroga...</option>
                                     {supervisors.map(s => {
                                         const phone = s.phone || s.mobile || s.contactNo;
                                         return (
@@ -710,7 +710,7 @@ export default function TwinbinStaffAssignmentsTab() {
                                     fontSize: 13, fontWeight: 600, cursor: assigning ? 'not-allowed' : 'pointer'
                                 }}
                             >
-                                {assigning ? 'Saving Assignment...' : 'Save Supervisor Assignment'}
+                                {assigning ? 'Saving Assignment...' : 'Save Daroga Assignment'}
                             </button>
                         </div>
                     </div>
@@ -725,9 +725,9 @@ export default function TwinbinStaffAssignmentsTab() {
                         <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, margin: '0 auto 12px' }}>
                             ⚠️
                         </div>
-                        <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800, color: '#0f172a' }}>Unassign Supervisor</h3>
+                        <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 800, color: '#0f172a' }}>Unassign Daroga</h3>
                         <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
-                            Are you sure you want to unassign the supervisor from <strong style={{ color: '#0f172a' }}>{unassignConfirmRow.binName}</strong>?
+                            Are you sure you want to unassign the daroga from <strong style={{ color: '#0f172a' }}>{unassignConfirmRow.binName}</strong>?
                         </p>
                         <div style={{ display: 'flex', gap: 10 }}>
                             <button

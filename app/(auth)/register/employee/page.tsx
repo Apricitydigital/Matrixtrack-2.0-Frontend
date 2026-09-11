@@ -156,7 +156,7 @@ export default function EmployeeRegisterPage() {
                 </form>
 
                 <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-                    <a href="/register" style={{ color: "#1d4ed8", fontWeight: 700, textDecoration: "none" }}>Back To Supervisor Registration</a>
+                    <a href="/register" style={{ color: "#1d4ed8", fontWeight: 700, textDecoration: "none" }}>Back To Daroga Registration</a>
                     <a href="/unified-login" style={{ color: "#0f172a", fontWeight: 700, textDecoration: "none" }}>Back To Login</a>
                 </div>
             </div>

@@ -12,6 +12,7 @@ import {
   SupervisorAssignmentApi,
   type SupervisorAssignmentStatus,
 } from "@lib/apiClient";
+import { roleLabel } from "@lib/labels";
 import swachhApi from "../../modules/swachh-ranking/api/axios";
 
 import {
@@ -1212,7 +1213,7 @@ const beatRequests = (
     if (snapshotDetail === "supervisors") {
       const rows: SnapshotDetailRow[] = snapshotSupervisors.map((user, index) => ({
         id: norm(user?.id) || norm(user?.email) || `supervisor-${index}`,
-        title: norm(user?.name ?? user?.displayName) || "Unnamed Supervisor",
+        title: norm(user?.name ?? user?.displayName) || "Unnamed Daroga",
         meta: norm(user?.email ?? user?.phone) || "No contact information",
         secondary: getUserModuleLabels(user).length
           ? getUserModuleLabels(user).map(prettyModuleName).join(", ")
@@ -1221,8 +1222,8 @@ const beatRequests = (
         route: "/portal-home/registered-users",
       }));
       return {
-        title: "Total Supervisors",
-        subtitle: "Active registered supervisors",
+        title: "Total Darogas",
+        subtitle: "Active registered Darogas",
         count: snapshotSupervisors.length,
         rows,
       };
@@ -2537,7 +2538,7 @@ const beatRequests = (
             { key: "rejected" as SnapshotDetailKey, label: "Rejected Reports", value: snapshotReportStats.rejected, icon: <XCircle size={16} />, tone: "text-rose-600", bubble: "bg-rose-100/80", card: "bg-rose-50/45 border-rose-100" },
             { key: "actionRequired" as SnapshotDetailKey, label: "Action Required", value: snapshotReportStats.actionRequired, icon: <AlertTriangle size={16} />, tone: "text-orange-600", bubble: "bg-orange-100/80", card: "bg-orange-50/45 border-orange-100" },
             { key: "resolved" as SnapshotDetailKey, label: "Resolved Reports", value: snapshotReportStats.resolved, icon: <ShieldCheck size={16} />, tone: "text-teal-600", bubble: "bg-teal-100/80", card: "bg-teal-50/45 border-teal-100" },
-            { key: "supervisors" as SnapshotDetailKey, label: "Total Supervisors", value: snapshotSupervisors.length, icon: <Users size={16} />, tone: "text-indigo-600", bubble: "bg-indigo-100/80", card: "bg-indigo-50/45 border-indigo-100" },
+            { key: "supervisors" as SnapshotDetailKey, label: "Total Darogas", value: snapshotSupervisors.length, icon: <Users size={16} />, tone: "text-indigo-600", bubble: "bg-indigo-100/80", card: "bg-indigo-50/45 border-indigo-100" },
           ].map((item) => (
             <button
               key={item.key}
@@ -3023,7 +3024,7 @@ const beatRequests = (
               <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-100">
                 <CheckCircle2 size={24} className="mx-auto text-emerald-500 mb-2" />
                 <div className="text-xs font-black text-slate-700">No Rejected Reports</div>
-                <div className="text-[10px] font-semibold text-slate-400 mt-1">All submitted inspections satisfy QC specifications.</div>
+                <div className="text-[10px] font-semibold text-slate-400 mt-1">All submitted inspections satisfy SI specifications.</div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -3179,7 +3180,7 @@ const beatRequests = (
                 Workforce Allocation
               </h3>
               <p className="text-[9px] font-semibold text-slate-400 mt-0.5">
-                Current QC, Action Officer, supervisor and employee work assignments
+                Current SI, IEC Member, Daroga and employee work assignments
               </p>
             </div>
           </div>
@@ -3198,7 +3199,7 @@ const beatRequests = (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {/* 1. QC */}
             <WorkforceRoleCard
-              title="QC Officers"
+              title="SI Officers"
               total={workforce.qc.total}
               assigned={workforce.qc.assigned}
               unassigned={workforce.qc.available}
@@ -3209,7 +3210,7 @@ const beatRequests = (
 
             {/* 2. AO (Action Officer) */}
             <WorkforceRoleCard
-              title="Action Officers"
+              title="IEC Members"
               total={workforce.ao.total}
               assigned={workforce.ao.assigned}
               unassigned={workforce.ao.available}
@@ -3220,7 +3221,7 @@ const beatRequests = (
 
             {/* 3. Supervisors */}
             <WorkforceRoleCard
-              title="Supervisors"
+              title="Darogas"
               total={workforce.supervisors.total}
               assigned={workforce.supervisors.assigned}
               unassigned={workforce.supervisors.available}
@@ -3255,9 +3256,9 @@ const beatRequests = (
                   </div>
                   <div className="text-[9px] font-semibold text-amber-600 mt-1 pl-5">
                     {[
-                      workforce.qc.available ? `${workforce.qc.available} QC(s)` : null,
-                      workforce.ao.available ? `${workforce.ao.available} AO(s)` : null,
-                      workforce.supervisors.available ? `${workforce.supervisors.available} supervisor(s)` : null,
+                      workforce.qc.available ? `${workforce.qc.available} SI(s)` : null,
+                      workforce.ao.available ? `${workforce.ao.available} IEC(s)` : null,
+                      workforce.supervisors.available ? `${workforce.supervisors.available} Daroga(s)` : null,
                       workforce.employees.available ? `${workforce.employees.available} employee(s)` : null,
                     ].filter(Boolean).join(", ")}{" "}
                     currently unassigned from active work.
@@ -3272,7 +3273,7 @@ const beatRequests = (
             <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h4 className="text-[11px] font-black text-slate-800">Supervisor Assignment Audit</h4>
+                  <h4 className="text-[11px] font-black text-slate-800">Daroga Assignment Audit</h4>
                   <p className="mt-0.5 text-[9px] font-semibold text-slate-500">
                     Live assignment status across Sweeping, Toilet, and Litter Bin
                   </p>
@@ -3310,7 +3311,7 @@ const beatRequests = (
               <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <div className="text-[10px] font-black text-slate-800">
-                    Unassigned Supervisors ({assignmentStatus.supervisors.unassigned})
+                    Unassigned Darogas ({assignmentStatus.supervisors.unassigned})
                   </div>
                   <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
                     {assignmentStatus.supervisors.unassignedItems.length ? (
@@ -3329,7 +3330,7 @@ const beatRequests = (
                       ))
                     ) : (
                       <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
-                        All supervisors have at least one active asset assignment.
+                        All Darogas have at least one active asset assignment.
                       </div>
                     )}
                   </div>
@@ -3361,7 +3362,7 @@ const beatRequests = (
                     ))}
                     {Object.values(assignmentStatus.modules).every((module) => module.unassignedAssets === 0) && (
                       <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
-                        Every approved Sweeping, Toilet, and Litter Bin asset has a supervisor.
+                        Every approved Sweeping, Toilet, and Litter Bin asset has a Daroga.
                       </div>
                     )}
                   </div>
@@ -3815,7 +3816,7 @@ const beatRequests = (
                    <Users size={16} />
                  </div>
                  <div>
-                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Supervisors</h3>
+                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">Darogas</h3>
                    <span className="text-[9px] text-slate-400 font-semibold">Inspection submission rank</span>
                  </div>
                </div>
@@ -3825,7 +3826,7 @@ const beatRequests = (
                </div>
              </div>
              <div className="flex-1">
-                {renderLeaderboardList(leaderboardSupervisorTop ? dailyLeaderboards.supervisors.top : dailyLeaderboards.supervisors.bottom, leaderboardSupervisorTop, 'Supervisors')}
+                {renderLeaderboardList(leaderboardSupervisorTop ? dailyLeaderboards.supervisors.top : dailyLeaderboards.supervisors.bottom, leaderboardSupervisorTop, 'Darogas')}
              </div>
            </div>
 
@@ -3879,8 +3880,8 @@ const beatRequests = (
       <section className="w-full mb-6">
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
           <Head
-            title="Supervisor Performance"
-            sub="Supervisor report results for the selected month, zone and ward"
+            title="Daroga Performance"
+            sub="Daroga report results for the selected month, zone and ward"
             icon={<Trophy size={17} />}
           />
 
@@ -3950,13 +3951,13 @@ const beatRequests = (
 
           <div className="p-4 flex-1 flex flex-col min-h-0">
               <div className="grid grid-cols-[1fr_auto] gap-3 px-1 pb-2 text-[8px] font-black uppercase tracking-wider text-slate-400">
-                <span>Supervisor</span>
+                <span>Daroga</span>
                 <span>Approval</span>
               </div>
               <div className="space-y-1.5 flex-1 min-h-0 max-h-[360px] overflow-y-auto pr-1">
               {supervisorPerformance.length === 0 ? (
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-center">
-                  <div className="text-[11px] font-black text-slate-600">No supervisors found</div>
+                  <div className="text-[11px] font-black text-slate-600">No Darogas found</div>
                   <div className="mt-1 text-[9px] font-semibold text-slate-400">Reports 0 • Approved 0 • Rejected 0 • Action Required 0</div>
                 </div>
               ) : (
@@ -4007,11 +4008,11 @@ const beatRequests = (
                 onNext={() =>
                   setSupervisorPage((page) => Math.min(supervisorPageCount, page + 1))
                 }
-                label="Supervisors"
+                label="Darogas"
               />
             ) : (
               <div className="border-t border-slate-100 pt-2 text-[8px] font-semibold text-slate-400">
-                Showing {supervisorPerformance.length} supervisor{supervisorPerformance.length === 1 ? "" : "s"}. Approval % = approved reports divided by total reports.
+                Showing {supervisorPerformance.length} Daroga{supervisorPerformance.length === 1 ? "" : "s"}. Approval % = approved reports divided by total reports.
               </div>
             )}
             </div>
@@ -4029,7 +4030,7 @@ const beatRequests = (
             </div>
             <div>
               <h2 className="text-base font-black text-slate-800 tracking-tight">Overall City Operational Performance</h2>
-              <p className="text-[11px] font-semibold text-slate-400">Independent inspection analytics & trends for Field Supervisors</p>
+              <p className="text-[11px] font-semibold text-slate-400">Independent inspection analytics & trends for Field Darogas</p>
             </div>
           </div>
 
@@ -4095,15 +4096,15 @@ const beatRequests = (
                 <Users size={18} />
               </div>
               <div>
-                <h3 className="text-sm font-black text-slate-800">Supervisor Inspection Trends</h3>
-                <p className="text-[10px] font-bold text-slate-400">Inspections submitted by supervisors across Beats, Toilets, Litter Bins</p>
+                <h3 className="text-sm font-black text-slate-800">Daroga Inspection Trends</h3>
+                <p className="text-[10px] font-bold text-slate-400">Inspections submitted by Darogas across Beats, Toilets, Litter Bins</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50/80 px-3 py-1.5 shadow-xs">
                 <Users size={14} className="text-purple-600" />
                 <div className="leading-tight">
-                  <div className="text-[8px] font-black uppercase text-purple-600">Supervisors on Ground</div>
+                  <div className="text-[8px] font-black uppercase text-purple-600">Darogas on Ground</div>
                   <div className="text-[11px] font-black text-slate-800">
                     {overallTrendMetrics.activeSupervisorsOnGround} Active <span className="text-slate-400 font-bold">/ {overallTrendMetrics.registeredSupervisorsCount} Registered ({overallTrendMetrics.activeCoveragePercent}%)</span>
                   </div>
@@ -4193,7 +4194,7 @@ const beatRequests = (
           <div className="h-[280px] w-full mt-auto">
             {overall30DayLoading && overall30DayRecords.length === 0 ? (
               <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400 animate-pulse">
-                Loading supervisor inspection trends...
+                Loading Daroga inspection trends...
               </div>
             ) : overallChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -4211,12 +4212,12 @@ const beatRequests = (
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 700 }}
                     cursor={{ stroke: '#8b5cf6', strokeWidth: 1, strokeDasharray: '4 4' }}
                   />
-                  <Area type="monotone" dataKey="supervisorInspections" name="Supervisor Inspections" stroke="#8b5cf6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSupervisor)" />
+                  <Area type="monotone" dataKey="supervisorInspections" name="Daroga Inspections" stroke="#8b5cf6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSupervisor)" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-xs font-bold text-slate-400">
-                No supervisor activity found for this timeframe.
+                No Daroga activity found for this timeframe.
               </div>
             )}
           </div>
@@ -4239,19 +4240,19 @@ const beatRequests = (
               <div className="flex items-center gap-2">
                 <Users size={16} className="text-blue-600" />
                 <h3 className="text-sm font-black text-slate-800">
-                  Supervisor Performance Directory
+                  Daroga Performance Directory
                 </h3>
                 <span className="rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[9px] font-black text-purple-700">
-                  {filteredUsers.length} Supervisors
+                  {filteredUsers.length} Darogas
                 </span>
               </div>
               <p className="text-[10px] uppercase text-slate-400 font-bold mt-1">
-                View analytics for individual supervisors
+                View analytics for individual Darogas
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {/* Supervisor Selector Dropdown with Integrated Search */}
+              {/* Daroga Selector Dropdown with Integrated Search */}
               <div className="relative">
                 <select
                   value={
@@ -4272,10 +4273,10 @@ const beatRequests = (
                   }}
                   className="h-9 w-64 rounded-xl border border-slate-200 bg-white px-3 pr-8 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-400 shadow-sm appearance-none cursor-pointer"
                 >
-                  <option value="ALL">All Supervisors ({supervisorsList.length})</option>
+                  <option value="ALL">All Darogas ({supervisorsList.length})</option>
                   {supervisorsList.map((sup) => (
                     <option key={sup.id} value={sup.name || sup.email || sup.id}>
-                      {sup.name || "Unnamed Supervisor"} {sup.email ? `(${sup.email})` : ""}
+                      {sup.name || "Unnamed Daroga"} {sup.email ? `(${sup.email})` : ""}
                     </option>
                   ))}
                   {search && !supervisorsList.some(s => (s.name || s.email) === search) && (
@@ -4331,7 +4332,7 @@ const beatRequests = (
             >
               <option value="ALL">All Roles</option>
               {directoryRoleOptions.map((role) => (
-                <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
+                <option key={role} value={role}>{roleLabel(role)}</option>
               ))}
             </select>
 
@@ -4360,7 +4361,7 @@ const beatRequests = (
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
             <span>
-              Showing {filteredUsers.length > 0 ? (directoryPage - 1) * DIRECTORY_PAGE_SIZE + 1 : 0} - {Math.min(directoryPage * DIRECTORY_PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length} matching supervisors
+              Showing {filteredUsers.length > 0 ? (directoryPage - 1) * DIRECTORY_PAGE_SIZE + 1 : 0} - {Math.min(directoryPage * DIRECTORY_PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length} matching Darogas
             </span>
 
             {(search ||
@@ -4444,7 +4445,7 @@ const beatRequests = (
                               key={role}
                               className="rounded-md border border-violet-100 bg-violet-50 px-2 py-0.5 text-[8px] font-black text-violet-700"
                             >
-                              {role.replace(/_/g, " ")}
+                              {roleLabel(role)}
                             </span>
                           ))
                         ) : (

@@ -117,7 +117,7 @@ export default function QCDashboard() {
     async function handleAction(record: RecordItem, action: 'APPROVE' | 'REJECT' | 'ACTION_REQUIRED', assignedEmployeeIds?: string[]) {
         let remark = "";
         if (action === 'ACTION_REQUIRED' && record.type === 'VISIT_REPORT') {
-            remark = prompt("Enter remark for Action Officer:") || "";
+            remark = prompt("Enter remark for IEC Member:") || "";
             if (!remark) return;
         } else if (action === 'APPROVE' && record.type === 'BIN_REQUEST' && !assignedEmployeeIds) {
             // If no IDs passed (called from direct button without modal), open modal
@@ -264,10 +264,10 @@ export default function QCDashboard() {
                 <div className="flex justify-between items-center">
                     <div>
                         <p className="eyebrow">Module - Litter Bins</p>
-                        <h1 className="text-2xl font-bold mb-1">QC Dashboard</h1>
+                        <h1 className="text-2xl font-bold mb-1">SI Dashboard</h1>
                         <p className="muted text-sm mb-0">Unified queue: bin requests and daily reports.</p>
                     </div>
-                    <div className="badge badge-warning">QC Access</div>
+                    <div className="badge badge-warning">SI Access</div>
                 </div>
             </section>
 
@@ -377,7 +377,7 @@ function AssignModal({ supervisors, record, onClose, onAssign, loading }: {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white p-6 rounded-lg shadow-xl w-96">
                 <h3 className="text-lg font-bold mb-4">Assign Bin</h3>
-                <p className="mb-4 text-sm">Select an supervisor to assign this bin to. This will also approve the request.</p>
+                <p className="mb-4 text-sm">Select a Daroga to assign this bin to. This will also approve the request.</p>
 
                 <div className="form-control w-full mb-4">
                     <label className="label">
@@ -397,7 +397,7 @@ function AssignModal({ supervisors, record, onClose, onAssign, loading }: {
                     </select>
                     {displayedEmployees.length === 0 && (
                         <div className="text-xs text-error mt-1">
-                            No supervisors found in this zone.
+                            No Darogas found in this zone.
                         </div>
                     )}
                 </div>

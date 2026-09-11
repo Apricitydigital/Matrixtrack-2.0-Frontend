@@ -47,7 +47,7 @@ const SupervisorAttendanceAudit = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (logPageView) logPageView("Supervisor Attendance Audit", "/supervisor-audit");
+    if (logPageView) logPageView("Daroga Attendance Audit", "/supervisor-audit");
   }, [logPageView]);
   const [isManualReloading, setIsManualReloading] = useState(false);
   const [error, setError] = useState("");
@@ -270,7 +270,7 @@ const SupervisorAttendanceAudit = () => {
 
       return {
         supervisor_id: sup.user_id,
-        supervisor_name: sup.name || sup.fullName || sup.full_name || "Supervisor",
+        supervisor_name: sup.name || sup.fullName || sup.full_name || "Daroga",
         supervisor_phone: sup.phone || sup.mobile || "-",
         city_name: auditRow.city_name || auditRow.city || city?.city_name || city?.name || "",
         zone_name: auditRow.zone_name || zone?.zone_name || zone?.name || "",
@@ -300,7 +300,7 @@ const SupervisorAttendanceAudit = () => {
     if (!filteredData.length) return;
     const headers = [
       "S.No.", "City", "Zone", "Ward", "Kothi",
-      "Supervisor Name", "Mobile No", "Total Punch In", "Total Punch Out",
+      "Daroga Name", "Mobile No", "Total Punch In", "Total Punch Out",
     ];
     const rows = filteredData.map((row, idx) => [
       idx + 1,
@@ -353,12 +353,12 @@ p-6
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Supervisor Attendance Audit</h1>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Daroga Attendance Audit</h1>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-black bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30">
                 {filteredData.length} Total
               </span>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 text-sm">Review attendance-taking activity of supervisors</p>
+            <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 text-sm">Review attendance-taking activity of darogas</p>
           </div>
         </div>
 
@@ -480,7 +480,7 @@ p-5
             </div>
             <input
               type="text"
-              placeholder="Search by supervisor name or mobile..."
+              placeholder="Search by daroga name or mobile..."
               className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -557,7 +557,7 @@ p-5
               <UserCheck size={32} />
             </div>
             <h3 className="text-lg font-bold text-slate-900 mb-2">No records found</h3>
-            <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">No supervisor activity recorded for the selected period.</p>
+            <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500">No daroga activity recorded for the selected period.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -608,7 +608,7 @@ dark:border-slate-700
       </th>
 
       <th className="px-4 py-3 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-        Supervisor Name
+        Daroga Name
       </th>
 
       <th className="px-4 py-3 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider whitespace-nowrap">
@@ -815,7 +815,7 @@ justify-between
             Showing {filteredData.length} records
           </p>
           <div className="text-xs text-slate-400 dark:text-slate-500 italic">
-            This report summarizes the activity of supervisors in their assigned locations
+            This report summarizes the activity of darogas in their assigned locations
           </div>
         </div>
       </div>

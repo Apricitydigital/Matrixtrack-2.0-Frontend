@@ -1536,7 +1536,7 @@ export default function TargetAssignmentPage() {
                   </h2>
 
                   <p className="mt-1 text-sm font-medium text-slate-500">
-                    Set operational expectations for an individual Supervisor or QC user.
+                    Set operational expectations for an individual Daroga or SI user.
                   </p>
                 </div>
 
@@ -1570,11 +1570,11 @@ export default function TargetAssignmentPage() {
                     className={inputClass}
                   >
                     <option value="SUPERVISOR">
-                      Supervisor
+                      Daroga
                     </option>
 
                     <option value="QC">
-                      QC
+                      SI
                     </option>
                   </select>
                 </FormField>
@@ -1905,7 +1905,7 @@ export default function TargetAssignmentPage() {
                   </div>
 
                   <p className="mt-1 text-sm font-medium text-slate-500">
-                    Live achievement calculated from operational submissions and QC review activity.
+                    Live achievement calculated from operational submissions and SI review activity.
                   </p>
                 </div>
 
@@ -1993,11 +1993,11 @@ export default function TargetAssignmentPage() {
                     </option>
 
                     <option value="SUPERVISOR">
-                      Supervisor
+                      Daroga
                     </option>
 
                     <option value="QC">
-                      QC
+                      SI
                     </option>
                   </select>
 
@@ -2447,8 +2447,8 @@ export default function TargetAssignmentPage() {
                     value={
                       editingTarget.role ===
                         "SUPERVISOR"
-                        ? "Supervisor"
-                        : "QC"
+                        ? "Daroga"
+                        : "SI"
                     }
                   />
 
@@ -3035,8 +3035,8 @@ function TargetRow({
           >
             {target.role ===
               "SUPERVISOR"
-              ? "Supervisor"
-              : "QC"}
+              ? "Daroga"
+              : "SI"}
           </span>
 
         </div>

@@ -61,7 +61,7 @@ export default function EmployeeSweepingPage() {
                                 </div>
                                 <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#1e293b" }}>No active assignments</h2>
                                 <p style={{ color: "#64748b", maxWidth: "400px", margin: "12px auto 0" }}>
-                                    You don't have any assigned beats or road segments at the moment. Please contact your supervisor (QC) for new assignments.
+                                    You don't have any assigned beats or road segments at the moment. Please contact your daroga (SI) for new assignments.
                                 </p>
                             </div>
                         ) : (

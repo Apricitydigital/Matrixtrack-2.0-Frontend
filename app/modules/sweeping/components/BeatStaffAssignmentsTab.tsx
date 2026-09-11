@@ -119,7 +119,7 @@ export default function BeatStaffAssignmentsTab() {
       "Zone",
       "Ward",
       "Total Segments",
-      "Supervisors / Staff",
+      "Darogas / Staff",
     ];
     const rows = filteredBeats.map((b, i) => [
       i + 1,
@@ -247,7 +247,7 @@ export default function BeatStaffAssignmentsTab() {
                     : "none",
                 }}
               >
-                Supervisor View
+                Daroga View
               </button>
               <button
                 onClick={() => setViewMode("employee")}
@@ -271,7 +271,7 @@ export default function BeatStaffAssignmentsTab() {
 
             <input
               type="text"
-              placeholder="🔍 Search beat, supervisor, ward..."
+              placeholder="🔍 Search beat, daroga, ward..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="filter-select"
@@ -372,7 +372,7 @@ export default function BeatStaffAssignmentsTab() {
               color: "#1e40af",
             }}
           >
-            👨‍💼 Total Supervisors: <strong>{totalSupervisors}</strong>
+            👨‍💼 Total Darogas: <strong>{totalSupervisors}</strong>
           </div>
           <div
             style={{
@@ -523,7 +523,7 @@ export default function BeatStaffAssignmentsTab() {
                   }}
                 >
                   {isSupervisorView
-                    ? "ASSIGNED SUPERVISORS"
+                    ? "ASSIGNED DAROGAS"
                     : "ASSIGNED EMPLOYEES"}
                 </th>
                 <th
@@ -766,7 +766,7 @@ export default function BeatStaffAssignmentsTab() {
                         }}
                       >
                         {isSupervisorView
-                          ? "Assign Supervisor"
+                          ? "Assign Daroga"
                           : "Assign Employee"}
                       </button>
                     </td>

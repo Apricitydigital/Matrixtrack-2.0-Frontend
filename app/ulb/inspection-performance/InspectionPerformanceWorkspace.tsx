@@ -125,24 +125,24 @@ const STATUS_CONFIG: Record<
     icon: FileText,
   },
   PENDING: {
-    label: 'QC Pending Reports',
-    shortLabel: 'QC Pending',
+    label: 'SI Pending Reports',
+    shortLabel: 'SI Pending',
     text: 'text-amber-600',
     bg: 'bg-amber-50',
     border: 'border-amber-500',
     icon: Clock3,
   },
   APPROVED: {
-    label: 'QC Approved Reports',
-    shortLabel: 'QC Approved',
+    label: 'SI Approved Reports',
+    shortLabel: 'SI Approved',
     text: 'text-emerald-600',
     bg: 'bg-emerald-50',
     border: 'border-emerald-500',
     icon: CheckCircle2,
   },
   REJECTED: {
-    label: 'QC Rejected Reports',
-    shortLabel: 'QC Rejected',
+    label: 'SI Rejected Reports',
+    shortLabel: 'SI Rejected',
     text: 'text-rose-600',
     bg: 'bg-rose-50',
     border: 'border-rose-500',
@@ -1565,7 +1565,7 @@ export default function InspectionPerformanceWorkspace() {
       await loadRecords();
     } catch (err: any) {
       console.error('Unable to mark Action Required', err);
-      setError(err?.message || 'Unable to send this report to the Action Officer.');
+      setError(err?.message || 'Unable to send this report to the IEC Member.');
     } finally {
       setActionSubmitting(false);
     }
@@ -2133,7 +2133,7 @@ function ReportCard({
           disabled={!actionEnabled}
           title={
             actionEnabled
-              ? 'Send this QC-processed report for corrective action'
+              ? 'Send this SI-processed report for corrective action'
               : 'Action Required can only be raised from Approved or Rejected reports'
           }
           className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${actionEnabled
@@ -2297,17 +2297,17 @@ export function DetailModal({
                 Workflow Remarks
               </h3>
               <div className="space-y-2">
-                {qcRemark && <RemarkBox label="QC Remark" value={qcRemark} tone="blue" />}
+                {qcRemark && <RemarkBox label="SI Remark" value={qcRemark} tone="blue" />}
                 {actionRequiredRemark && (
                   <RemarkBox label="ULB Action Required Instruction" value={actionRequiredRemark} tone="orange" />
                 )}
                 {actionTakenRemark && (
-                  <RemarkBox label="Action Officer Response" value={actionTakenRemark} tone="indigo" />
+                  <RemarkBox label="IEC Member Response" value={actionTakenRemark} tone="indigo" />
                 )}
                 {actionTakenPhotos.length > 0 && (
                   <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
                     <div className="text-[9px] font-black uppercase tracking-[0.12em] text-indigo-500">
-                      Action Officer Uploaded Photos
+                      IEC Member Uploaded Photos
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                       {actionTakenPhotos.map((url) => (
@@ -2336,7 +2336,7 @@ export function DetailModal({
               <section className="mt-5">
 
                 <h3 className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                  QC Review
+                  SI Review
                 </h3>
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -2388,7 +2388,7 @@ export function DetailModal({
                           </div>
 
                           <div className="text-[9px] font-bold text-slate-400">
-                            QC Officer
+                            SI Officer
                           </div>
                         </div>
                       </div>
@@ -2415,7 +2415,7 @@ export function DetailModal({
                   {qcRemark && (
                     <div className="mt-4 border-t border-slate-200 pt-3">
                       <div className="text-[9px] font-black uppercase tracking-wide text-slate-400">
-                        QC Remark
+                        SI Remark
                       </div>
 
                       <div className="mt-1 text-sm font-semibold leading-6 text-slate-700">
@@ -2583,7 +2583,7 @@ function ReportJourneySection({
       icon: Clock3,
       title: 'Submitted',
       time: formatFullDate(report?.createdAt || report?.submittedAt || report?.visitedAt),
-      description: 'Supervisor submitted report',
+      description: 'Daroga submitted report',
     },
   ];
 
@@ -2592,7 +2592,7 @@ function ReportJourneySection({
       key: 'auto-qc',
       color: autoRejected ? 'bg-rose-500' : 'bg-emerald-500',
       icon: Sparkles,
-      title: 'QC AI Assessment',
+      title: 'SI AI Assessment',
       time: formatFullDate(report?.autoQcAt || report?.createdAt),
       description: autoRejected ? 'Suggested Reject' : 'Suggested Approve',
       descriptionColor: autoRejected ? 'text-rose-600' : 'text-emerald-600',
@@ -2604,7 +2604,7 @@ function ReportJourneySection({
       key: 'qc-review',
       color: qcDecision === 'REJECTED' ? 'bg-rose-500' : 'bg-emerald-500',
       icon: ShieldCheck,
-      title: 'QC Review',
+      title: 'SI Review',
       time: formatFullDate(report?.qcReviewedAt || report?.reviewedAt),
       description: qcDecision === 'REJECTED' ? 'Rejected' : 'Approved',
       descriptionColor: qcDecision === 'REJECTED' ? 'text-rose-600' : 'text-emerald-600',
@@ -2773,7 +2773,7 @@ function AiInsightsSection({
 
                 <div className="rounded-xl border border-white/80 bg-white/80 px-3 py-2.5">
                   <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                    Source QC Decision
+                    Source SI Decision
                   </div>
 
                   <div className="mt-1 text-sm font-black text-slate-800">
@@ -2855,7 +2855,7 @@ function AiInsightsSection({
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100 px-4 py-3">
               <div>
                 <div className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-500">
-                  QC AI Verification
+                  SI AI Verification
                 </div>
 
                 <div className="mt-1 text-sm font-black text-slate-800">
@@ -3146,7 +3146,7 @@ function SweepingPointEvidenceSection({
 
                         <div className="rounded-lg bg-slate-50 px-3 py-2">
                           <div className="text-[8px] font-black uppercase text-slate-400">
-                            QC AI
+                            SI AI
                           </div>
 
                           <div className="mt-1 font-bold text-slate-700">
@@ -3165,7 +3165,7 @@ function SweepingPointEvidenceSection({
                       {finding?.reason && (
                         <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2.5">
                           <div className="text-[8px] font-black uppercase tracking-wider text-violet-500">
-                            QC AI Finding
+                            SI AI Finding
                           </div>
 
                           <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">
@@ -3248,7 +3248,7 @@ function ActionRequiredModal({
               <div>
                 <h2 className="text-lg font-black text-slate-900">Mark Action Required</h2>
                 <p className="mt-0.5 text-xs font-medium text-slate-500">
-                  Send this QC-processed report to the mapped Action Officer.
+                  Send this SI-processed report to the mapped IEC Member.
                 </p>
               </div>
             </div>
@@ -3300,7 +3300,7 @@ function ActionRequiredModal({
               className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Send to Action Officer
+              Send to IEC Member
             </button>
           </div>
         </div>

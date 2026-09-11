@@ -89,17 +89,17 @@ const COMPONENTS: Array<{
     {
       key: 'SUPERVISOR',
       field: 'supervisor',
-      label: 'Supervisor',
+      label: 'Daroga',
     },
     {
       key: 'QC',
       field: 'qc',
-      label: 'QC',
+      label: 'SI',
     },
     {
       key: 'ACTION_OFFICER',
       field: 'actionOfficer',
-      label: 'Action Officer',
+      label: 'IEC Member',
     },
   ];
 
@@ -223,9 +223,9 @@ function operationalStatusLabel(
       CHECKED: 'Submitted',
       NOT_CHECKED: 'Not Submitted',
       IN_PROGRESS: 'In Progress',
-      PENDING_QC: 'QC Pending',
-      APPROVED: 'QC Approved',
-      REJECTED: 'QC Rejected',
+      PENDING_QC: 'SI Pending',
+      APPROVED: 'SI Approved',
+      REJECTED: 'SI Rejected',
     };
 
     return labels[status] || humanize(status);
@@ -633,13 +633,13 @@ function displayedRecordStatusLabel(
         return 'Submitted';
 
       case 'PENDING_QC':
-        return 'QC Pending';
+        return 'SI Pending';
 
       case 'APPROVED':
-        return 'QC Approved';
+        return 'SI Approved';
 
       case 'REJECTED':
-        return 'QC Rejected';
+        return 'SI Rejected';
     }
   }
 
@@ -2893,7 +2893,7 @@ export default function WardDrilldownDrawer({
               </div>
 
               <div className="mt-1 text-xs font-semibold text-slate-400">
-                Open Workforce, Beat, Toilet, Litter Bin, Supervisor, QC or Action Officer to see the underlying operational records.
+                Open Workforce, Beat, Toilet, Litter Bin, Daroga, SI or IEC Member to see the underlying operational records.
               </div>
             </div>
           )}
@@ -3130,7 +3130,7 @@ export default function WardDrilldownDrawer({
 
                                 <div>
                                   <div className="text-[8px] font-black uppercase tracking-[0.1em] text-blue-600">
-                                    Supervisor Availability
+                                    Daroga Availability
                                   </div>
 
                                   <div className="mt-1 text-xl font-black text-slate-900">
@@ -3363,7 +3363,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-amber-100 bg-amber-50/40 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-amber-600">
-                                QC Pending
+                                SI Pending
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-amber-700">
@@ -3379,7 +3379,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-emerald-600">
-                                QC Approved
+                                SI Approved
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-emerald-700">
@@ -3395,7 +3395,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-rose-100 bg-rose-50/50 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-rose-600">
-                                QC Rejected
+                                SI Rejected
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-rose-700">
@@ -3687,7 +3687,7 @@ export default function WardDrilldownDrawer({
                             {/* QC PENDING */}
                             <div className="rounded-xl border border-amber-100 bg-amber-50/40 px-3 py-2">
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-amber-600">
-                                QC Pending
+                                SI Pending
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-amber-700">
@@ -3701,7 +3701,7 @@ export default function WardDrilldownDrawer({
                             {/* APPROVED */}
                             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2">
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-emerald-600">
-                                QC Approved
+                                SI Approved
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-emerald-700">
@@ -3715,7 +3715,7 @@ export default function WardDrilldownDrawer({
                             {/* REJECTED */}
                             <div className="rounded-xl border border-rose-100 bg-rose-50/50 px-3 py-2">
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-rose-600">
-                                QC Rejected
+                                SI Rejected
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-rose-700">
@@ -3844,7 +3844,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-amber-100 bg-amber-50/40 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-amber-600">
-                                QC Pending
+                                SI Pending
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-amber-700">
@@ -3860,7 +3860,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-emerald-600">
-                                QC Approved
+                                SI Approved
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-emerald-700">
@@ -3876,7 +3876,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-rose-100 bg-rose-50/50 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-rose-600">
-                                QC Rejected
+                                SI Rejected
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-rose-700">
@@ -3957,7 +3957,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-amber-100 bg-amber-50/50 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-amber-600">
-                                QC Pending
+                                SI Pending
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-amber-700">
@@ -3973,7 +3973,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-emerald-600">
-                                QC Approved
+                                SI Approved
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-emerald-700">
@@ -3989,7 +3989,7 @@ export default function WardDrilldownDrawer({
                             <div className="rounded-xl border border-rose-100 bg-rose-50/50 px-3 py-2">
 
                               <div className="text-[7px] font-black uppercase tracking-[0.1em] text-rose-600">
-                                QC Rejected
+                                SI Rejected
                               </div>
 
                               <div className="mt-0.5 text-lg font-black text-rose-700">
@@ -4431,11 +4431,11 @@ export default function WardDrilldownDrawer({
                     <div>
 
                       <div className="text-xs font-black text-slate-800">
-                        Supervisor Availability
+                        Daroga Availability
                       </div>
 
                       <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                        Supervisors mapped to operational responsibilities in this Ward
+                        Darogas mapped to operational responsibilities in this Ward
                       </div>
 
 
@@ -4505,7 +4505,7 @@ export default function WardDrilldownDrawer({
                                       <div className="min-w-0">
                                         <div className="truncate text-xs font-black text-slate-900">
                                           {supervisor.name ||
-                                            'Unnamed Supervisor'}
+                                            'Unnamed Daroga'}
                                         </div>
 
                                         <div className="mt-0.5 text-[8px] font-bold text-slate-400">
@@ -4684,11 +4684,11 @@ export default function WardDrilldownDrawer({
                         <div className="flex flex-wrap items-center gap-3">
 
                           <div className="text-xs font-black text-slate-800">
-                            Supervisor Availability
+                            Daroga Availability
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Present Supervisors ÷ Expected Supervisors
+                            Present Darogas ÷ Expected Darogas
                           </div>
 
                         </div>
@@ -4730,7 +4730,7 @@ export default function WardDrilldownDrawer({
                         ) : (
 
                           <div className="mt-2 text-[10px] font-bold text-slate-400">
-                            No Supervisor obligation — this factor is N/A
+                            No Daroga obligation — this factor is N/A
                           </div>
 
                         )}
@@ -4919,7 +4919,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                            Inspection Coverage + QC Approval + Complete Beat Coverage
+                            Inspection Coverage + SI Approval + Complete Beat Coverage
                           </div>
                         </div>
 
@@ -5018,11 +5018,11 @@ export default function WardDrilldownDrawer({
                           <div className="flex flex-wrap items-center gap-3">
 
                             <div className="text-xs font-black text-slate-800">
-                              QC Approval
+                              SI Approval
                             </div>
 
                             <div className="text-[9px] font-semibold text-slate-400">
-                              QC Approved ÷ QC Reviewed
+                              SI Approved ÷ SI Reviewed
                             </div>
 
                           </div>
@@ -5051,7 +5051,7 @@ export default function WardDrilldownDrawer({
                           ) : (
 
                             <div className="mt-2 text-[10px] font-bold text-slate-400">
-                              No Beat report has been reviewed by QC — this factor is N/A
+                              No Beat report has been reviewed by SI — this factor is N/A
                             </div>
 
                           )}
@@ -5208,7 +5208,7 @@ export default function WardDrilldownDrawer({
                         </div>
 
                         <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                          Coverage + QC Compliance + AI Evidence Quality
+                          Coverage + SI Compliance + AI Evidence Quality
                         </div>
                       </div>
 
@@ -5302,11 +5302,11 @@ export default function WardDrilldownDrawer({
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 
                           <div className="text-xs font-black text-slate-800">
-                            QC Compliance
+                            SI Compliance
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Approved ÷ QC Reviewed
+                            Approved ÷ SI Reviewed
                           </div>
 
                         </div>
@@ -5348,7 +5348,7 @@ export default function WardDrilldownDrawer({
                           ) : (
 
                             <span className="text-[10px] font-black text-slate-400">
-                              Pending QC
+                              Pending SI
                             </span>
 
                           )}
@@ -5370,7 +5370,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[8px] font-bold text-slate-400">
-                            QC score
+                            SI score
                           </div>
 
                         </div>
@@ -5448,7 +5448,7 @@ export default function WardDrilldownDrawer({
                         ) : (
 
                           <div className="mt-2 text-[10px] font-bold text-slate-400">
-                            Auto-QC evidence evaluation unavailable
+                            Auto-SI evidence evaluation unavailable
                           </div>
 
                         )}
@@ -5551,7 +5551,7 @@ export default function WardDrilldownDrawer({
 
                       <div>
                         <div className="text-xs font-black text-slate-800">
-                          QC Breakdown
+                          SI Breakdown
                         </div>
 
                         <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
@@ -5713,7 +5713,7 @@ export default function WardDrilldownDrawer({
                       <div>
 
                         <div className="text-xs font-black text-slate-800">
-                          Action Officer Breakdown
+                          IEC Member Breakdown
                         </div>
 
                         <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
@@ -5875,7 +5875,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[7px] font-black uppercase tracking-wide text-slate-400">
-                            QC
+                            SI
                           </div>
 
                           <div className="text-right text-[7px] font-black uppercase tracking-wide text-slate-400">
@@ -6052,7 +6052,7 @@ export default function WardDrilldownDrawer({
                                   <div>
 
                                     <div className="text-[8px] font-bold uppercase text-slate-400 md:hidden">
-                                      QC
+                                      SI
                                     </div>
 
                                     {Number(
@@ -6060,7 +6060,7 @@ export default function WardDrilldownDrawer({
                                     ) > 0 ? (
 
                                       <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[8px] font-black text-rose-700">
-                                        QC Rejected
+                                        SI Rejected
                                       </span>
 
                                     ) : Number(
@@ -6068,7 +6068,7 @@ export default function WardDrilldownDrawer({
                                     ) > 0 ? (
 
                                       <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-700">
-                                        QC Approved
+                                        SI Approved
                                       </span>
 
                                     ) : Number(
@@ -6076,7 +6076,7 @@ export default function WardDrilldownDrawer({
                                     ) > 0 ? (
 
                                       <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[8px] font-black text-amber-700">
-                                        QC Pending
+                                        SI Pending
                                       </span>
 
                                     ) : (
@@ -6153,11 +6153,11 @@ export default function WardDrilldownDrawer({
                       <div>
 
                         <div className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-600">
-                          QC Scoring Logic
+                          SI Scoring Logic
                         </div>
 
                         <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                          QC performance is based on completion of required report reviews.
+                          SI performance is based on completion of required report reviews.
                         </div>
 
                       </div>
@@ -6190,7 +6190,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Reviewed reports ÷ Total reports requiring QC
+                            Reviewed reports ÷ Total reports requiring SI
                           </div>
 
                         </div>
@@ -6221,7 +6221,7 @@ export default function WardDrilldownDrawer({
 
 
                         <div className="mt-2 text-[9px] font-semibold text-slate-400">
-                          Both Approved and Rejected are completed QC decisions. Pending reports reduce review coverage.
+                          Both Approved and Rejected are completed SI decisions. Pending reports reduce review coverage.
                         </div>
 
                       </div>
@@ -6277,7 +6277,7 @@ export default function WardDrilldownDrawer({
                           Pending
                         </div>
                         <div className="mt-0.5 text-[9px] font-bold text-slate-500">
-                          Awaiting QC
+                          Awaiting SI
                         </div>
                       </div>
 
@@ -6290,11 +6290,11 @@ export default function WardDrilldownDrawer({
                       <div>
 
                         <div className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-600">
-                          Total QC Score
+                          Total SI Score
                         </div>
 
                         <div className="mt-0.5 text-[9px] font-semibold text-slate-400">
-                          Based only on QC review completion
+                          Based only on SI review completion
                         </div>
 
                       </div>
@@ -6325,11 +6325,11 @@ export default function WardDrilldownDrawer({
                     <div className="border-b border-slate-100 bg-blue-50/50 px-4 py-3">
 
                       <div className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-600">
-                        Action Officer Workflow Guide
+                        IEC Member Workflow Guide
                       </div>
 
                       <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                        Current Action Officer workflow from Action Required to Action Taken.
+                        Current IEC Member workflow from Action Required to Action Taken.
                       </div>
 
                     </div>
@@ -6345,7 +6345,7 @@ export default function WardDrilldownDrawer({
                         </div>
 
                         <div className="mt-0.5 text-[9px] font-semibold text-slate-400">
-                          Reports assigned to the Action Officer for corrective action.
+                          Reports assigned to the IEC Member for corrective action.
                         </div>
 
                       </div>
@@ -6404,7 +6404,7 @@ export default function WardDrilldownDrawer({
                         </div>
 
                         <div className="mt-0.5 text-[9px] font-semibold text-slate-400">
-                          Corrective action completed and submitted by the Action Officer.
+                          Corrective action completed and submitted by the IEC Member.
                         </div>
 
                       </div>
@@ -6475,11 +6475,11 @@ export default function WardDrilldownDrawer({
                       <div>
 
                         <div className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-600">
-                          Supervisor Scoring Logic
+                          Daroga Scoring Logic
                         </div>
 
                         <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                          Supervisor performance is based on completion of assigned reporting responsibilities.
+                          Daroga performance is based on completion of assigned reporting responsibilities.
                         </div>
 
                       </div>
@@ -6546,7 +6546,7 @@ export default function WardDrilldownDrawer({
 
 
                         <div className="mt-1.5 text-[9px] font-semibold text-slate-400">
-                          Missing assigned reports reduce the Supervisor score.
+                          Missing assigned reports reduce the Daroga score.
                           Reports can only be submitted for the active operational day.
                         </div>
 
@@ -6568,7 +6568,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[8px] font-bold text-slate-400">
-                            Supervisor score
+                            Daroga score
                           </div>
 
                         </div>
@@ -6584,7 +6584,7 @@ export default function WardDrilldownDrawer({
                       <div>
 
                         <div className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-600">
-                          Total Supervisor Score
+                          Total Daroga Score
                         </div>
 
                         <div className="mt-0.5 text-[9px] font-semibold text-slate-400">
@@ -6620,7 +6620,7 @@ export default function WardDrilldownDrawer({
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                       <div>
                         <div className="text-xs font-black text-slate-800">
-                          Supervisor Breakdown
+                          Daroga Breakdown
                         </div>
 
                         <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
@@ -6638,7 +6638,7 @@ export default function WardDrilldownDrawer({
                           }
                           className="text-[10px] font-black text-blue-600 transition hover:text-blue-700"
                         >
-                          Show All Supervisors
+                          Show All Darogas
                         </button>
                       )}
                     </div>
@@ -6702,7 +6702,7 @@ export default function WardDrilldownDrawer({
                                       <div className="min-w-0">
                                         <div className="truncate text-sm font-black text-slate-900">
                                           {row.supervisorName ||
-                                            'Unnamed Supervisor'}
+                                            'Unnamed Daroga'}
                                         </div>
 
                                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[9px] font-bold text-slate-400">
@@ -6888,11 +6888,11 @@ export default function WardDrilldownDrawer({
                         />
 
                         <div className="mt-2 text-xs font-black text-slate-600">
-                          No Supervisor assignments found
+                          No Daroga assignments found
                         </div>
 
                         <div className="mt-1 text-[10px] font-semibold text-slate-400">
-                          No Supervisor could be mapped to the reporting obligations in this ward.
+                          No Daroga could be mapped to the reporting obligations in this ward.
                         </div>
                       </div>
                     )}

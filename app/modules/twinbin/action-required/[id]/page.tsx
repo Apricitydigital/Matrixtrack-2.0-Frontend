@@ -77,7 +77,7 @@ export default function TwinbinActionRequiredDetailPage() {
               <p className="muted">
                 Bin: {visit.bin?.areaName} / {visit.bin?.locationName}
               </p>
-              <p className="muted">QC Remark: {visit.qcRemark || "-"}</p>
+              <p className="muted">SI Remark: {visit.qcRemark || "-"}</p>
               <div className="grid grid-2" style={{ gap: 12 }}>
                 {normalizeInspectionAnswers(visit.inspectionAnswers, {
                   q1: "Are adequate litter bins provided in the area?",

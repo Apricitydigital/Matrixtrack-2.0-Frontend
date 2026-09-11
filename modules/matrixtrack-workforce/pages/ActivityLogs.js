@@ -167,13 +167,13 @@ export default function ActivityLogs() {
       return "Modified Admin Management Settings";
     }
     if (lowerUrl.includes("/api/app/supervisor/wards") || lowerUrl.includes("supervisor/wards")) {
-      return "Assigned Ward Areas to Supervisor";
+      return "Assigned Ward Areas to Daroga";
     }
     if (lowerUrl.includes("/api/supervisor") || lowerUrl.includes("/api/supervisors")) {
-      if (method === "POST") return "Created Supervisor Profile";
-      if (method === "PUT") return "Updated Supervisor Details";
-      if (method === "DELETE") return "Deleted Supervisor Profile";
-      return "Modified Supervisor Settings";
+      if (method === "POST") return "Created Daroga Profile";
+      if (method === "PUT") return "Updated Daroga Details";
+      if (method === "DELETE") return "Deleted Daroga Profile";
+      return "Modified Daroga Settings";
     }
     if (lowerUrl.includes("/api/employees")) {
       if (method === "POST") return "Created Employee Profile";
@@ -216,7 +216,7 @@ export default function ActivityLogs() {
     if (lowerUrl.includes("/api/auth")) return "Security Center / Authentication";
     if (lowerUrl.includes("/api/admin-management")) return "Admin Management Panel";
     if (lowerUrl.includes("/api/app/supervisor") || lowerUrl.includes("/api/supervisor") || lowerUrl.includes("supervisor")) {
-      return "Supervisors Control";
+      return "Darogas Control";
     }
     if (lowerUrl.includes("/api/employees")) return "Employee Master List";
     if (lowerUrl.includes("/api/geofencing")) return "GeoFencing Settings";
@@ -256,7 +256,7 @@ export default function ActivityLogs() {
     { id: "all", label: "All Modules", icon: <Activity size={13} /> },
     { id: "security", label: "Security & Login", icon: <Key size={13} /> },
     { id: "admin", label: "Admin Panel", icon: <ShieldCheck size={13} /> },
-    { id: "supervisors", label: "Supervisors Control", icon: <User size={13} /> },
+    { id: "supervisors", label: "Darogas Control", icon: <User size={13} /> },
     { id: "employees", label: "Employees Master", icon: <Users size={13} /> },
     { id: "geofencing", label: "GeoFencing Settings", icon: <MapPin size={13} /> },
     { id: "announcements", label: "Announcements", icon: <Megaphone size={13} /> },
@@ -279,8 +279,8 @@ export default function ActivityLogs() {
 
     // Map raw payload keys to human-readable labels
     const friendlyKeyMap = {
-      user_id: "Supervisor / User",
-      userId: "Supervisor / User",
+      user_id: "Daroga / User",
+      userId: "Daroga / User",
       ward_id: "Ward / Kothi",
       wardId: "Ward / Kothi",
       kothi_id: "Kothi",
@@ -299,8 +299,8 @@ export default function ActivityLogs() {
       departmentId: "Department",
       designation_id: "Designation",
       designationId: "Designation",
-      supervisor_id: "Supervisor",
-      supervisorId: "Supervisor",
+      supervisor_id: "Daroga",
+      supervisorId: "Daroga",
       pageName: "Page Visited",
       pageUrl: "Page URL",
       actionName: "Action Performed",
@@ -317,8 +317,8 @@ export default function ActivityLogs() {
       sector_name: "Ward / Sector Name",
       department_name: "Department Name",
       designation_name: "Designation Name",
-      supervisor_name: "Supervisor Name",
-      supervisorName: "Supervisor Name",
+      supervisor_name: "Daroga Name",
+      supervisorName: "Daroga Name",
       employee_name: "Employee Name",
       address: "Address",
       latitude: "Latitude",

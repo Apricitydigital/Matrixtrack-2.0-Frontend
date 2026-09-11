@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { CityModulesApi, RegistrationApi, ApiError } from "@lib/apiClient";
+import { roleLabel } from "@lib/labels";
 
 type Request = {
     id: string;
@@ -141,7 +142,7 @@ export default function RegistrationRequestDetailPage({ params }: { params: { id
                                 onChange={(e) => setRole(e.target.value as any)}
                             >
                                 <option value="">Select Role...</option>
-                                {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                                {ROLE_OPTIONS.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
                             </select>
                         </div>
 

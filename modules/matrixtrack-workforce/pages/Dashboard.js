@@ -872,7 +872,7 @@ function Dashboard() {
 
         if (!supResponse.ok) {
           throw new Error(
-            payload?.error || payload?.message || "Unable to load supervisors."
+            payload?.error || payload?.message || "Unable to load darogas."
           );
         }
 
@@ -909,7 +909,7 @@ function Dashboard() {
           setError((prev) =>
             prev
               ? prev
-              : fetchError.message || "Failed to fetch supervisors."
+              : fetchError.message || "Failed to fetch darogas."
           );
           setSupervisors([]);
           if (isAdmin) {
@@ -1355,18 +1355,18 @@ function Dashboard() {
 
   if (selectedSupervisorId === "ALL" && isAdmin) {
     supervisorLabel = selectedCity
-      ? `Viewing all supervisors in ${selectedCity.city_name}.`
-      : "Viewing all supervisors across all cities.";
+      ? `Viewing all darogas in ${selectedCity.city_name}.`
+      : "Viewing all darogas across all cities.";
   } else if (selectedSupervisor) {
-    const baseLabel = `${selectedSupervisor.name ?? "Supervisor"}${selectedSupervisor.emp_code ? ` • ${selectedSupervisor.emp_code}` : ""
+    const baseLabel = `${selectedSupervisor.name ?? "Daroga"}${selectedSupervisor.emp_code ? ` • ${selectedSupervisor.emp_code}` : ""
       }`;
     supervisorLabel = selectedCity
       ? `${baseLabel} • ${selectedCity.city_name}`
       : baseLabel;
   } else if (isAdmin) {
     supervisorLabel = selectedCity
-      ? `Select a supervisor in ${selectedCity.city_name} to view their data.`
-      : "Select a supervisor to view their data.";
+      ? `Select a daroga in ${selectedCity.city_name} to view their data.`
+      : "Select a daroga to view their data.";
   }
 
   return (
@@ -1830,7 +1830,7 @@ shadow-sm
 
             <div className="flex-1">
               <label htmlFor="supervisor-filter" className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
-                Admin Supervisor View
+                Admin Daroga View
               </label>
               <select
                 id="supervisor-filter"
@@ -1883,9 +1883,9 @@ shadow-sm
                 }}
                 disabled={supervisorLoading}
               >
-                <option value="ALL">All Supervisors</option>
-                {supervisorLoading && <option value="">Loading supervisors...</option>}
-                {!supervisorLoading && supervisors.length === 0 && <option value="">No supervisors found.</option>}
+                <option value="ALL">All Darogas</option>
+                {supervisorLoading && <option value="">Loading darogas...</option>}
+                {!supervisorLoading && supervisors.length === 0 && <option value="">No darogas found.</option>}
                 {!supervisorLoading && supervisors.map((supervisor) => (
                   <option key={supervisor.user_id} value={supervisor.user_id}>
                     {supervisor.name} {supervisor.emp_code ? `(${supervisor.emp_code})` : ""}

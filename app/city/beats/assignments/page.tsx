@@ -234,11 +234,11 @@ export default function BeatAssignmentsPage() {
   ========================================================= */
 
   const pageTitle = isSupervisorView
-    ? "Supervisor Assignment"
+    ? "Daroga Assignment"
     : "Employee Assignment";
 
   const pageDescription = isSupervisorView
-    ? "Manage supervisor allocation across registered beats."
+    ? "Manage daroga allocation across registered beats."
     : "Manage employee allocation across beat segments.";
 
   /* =========================================================
@@ -458,7 +458,7 @@ export default function BeatAssignmentsPage() {
                       letterSpacing: "0.06em",
                     }}
                   >
-                    Supervisors Assigned
+                    Darogas Assigned
                   </div>
                   <div
                     style={{
@@ -667,7 +667,7 @@ export default function BeatAssignmentsPage() {
               />
               <input
                 type="text"
-                placeholder="Search beats, supervisors, location..."
+                placeholder="Search beats, darogas, location..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={inputStyleWithIcon}
@@ -821,7 +821,7 @@ export default function BeatAssignmentsPage() {
                   >
                     <th style={headCell}>Beat Name</th>
                     <th style={headCell}>Location</th>
-                    <th style={headCell}>Supervisor</th>
+                    <th style={headCell}>Daroga</th>
                     <th style={headCell}>Employee Assignment</th>
                     <th style={{ ...headCell, textAlign: "right" }}>Action</th>
                   </tr>
@@ -990,8 +990,8 @@ export default function BeatAssignmentsPage() {
                               >
                                 <UserCheck2 size={14} />
                                 {supervisors.length > 0
-                                  ? "Manage Supervisor"
-                                  : "Assign Supervisor"}
+                                  ? "Manage Daroga"
+                                  : "Assign Daroga"}
                               </button>
                             ) : (
                               <button

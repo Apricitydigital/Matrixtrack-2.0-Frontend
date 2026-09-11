@@ -25,13 +25,13 @@ export default function TaskforceModulePage() {
     return (
       <div className="card">
         <h3>Unauthorized for this module</h3>
-        <p className="muted">Action Officer access is not allowed on Employee workspaces.</p>
+        <p className="muted">IEC Member access is not allowed on Employee workspaces.</p>
       </div>
     );
   }
 
   if (isQc) {
-    return <div className="p-8 text-center text-gray-500">Redirecting to QC Dashboard...</div>;
+    return <div className="p-8 text-center text-gray-500">Redirecting to SI Dashboard...</div>;
   }
 
   return (

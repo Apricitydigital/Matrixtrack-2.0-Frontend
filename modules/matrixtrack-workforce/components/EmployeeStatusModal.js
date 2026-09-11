@@ -8,7 +8,7 @@ const STATUS_LABELS = {
   notMarked: "Not Punched",
   onLeave: "On Leave",
   present: "Present",
-  supervisors: "Supervisors",
+  supervisors: "Darogas",
 };
 
 const STATUS_STYLES = {
@@ -44,10 +44,10 @@ const handleDownloadExcel = () => {
   XLSX.utils.book_append_sheet(
     workbook,
     worksheet,
-    "Supervisors"
+    "Darogas"
   );
 
-  XLSX.writeFile(workbook, "Supervisors.xlsx");
+  XLSX.writeFile(workbook, "Darogas.xlsx");
 };
   const totalPages = Math.max(
     1,

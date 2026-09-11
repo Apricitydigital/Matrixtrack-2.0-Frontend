@@ -362,7 +362,7 @@ export default function OperationsMapCanvas({
                 <div className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-400">Sweeping beat</div>
                 <div className="mt-1 text-base font-bold text-slate-900">{beat.name}</div>
                 <div className="mt-2 text-xs text-slate-600">{beat.zoneName} · {beat.wardName}</div>
-                <div className="mt-1 text-xs text-slate-600">Supervisor: {supervisorsText(beat)}</div>
+                <div className="mt-1 text-xs text-slate-600">Daroga: {supervisorsText(beat)}</div>
                 <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
                   <span>Status</span><b style={{ color: color }}>{beat.state}</b>
                 </div>
@@ -381,7 +381,7 @@ export default function OperationsMapCanvas({
               <div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-600">Toilet · {toilet.type}</div>
               <div className="mt-1 text-base font-bold text-slate-900">{toilet.name}</div>
               <div className="mt-2 text-xs text-slate-600">{toilet.zoneName} · {toilet.wardName}</div>
-              <div className="mt-1 text-xs text-slate-600">Supervisor: {supervisorsText(toilet)}</div>
+              <div className="mt-1 text-xs text-slate-600">Daroga: {supervisorsText(toilet)}</div>
               <div className="mt-2 text-xs font-bold text-slate-700">Status: <span style={{ color: STATE_COLORS[toilet.state] }}>{toilet.state}</span></div>
             </div>
           </Popup>
@@ -394,7 +394,7 @@ export default function OperationsMapCanvas({
               <div className="text-[10px] font-bold uppercase tracking-[.18em] text-violet-600">Litter bin</div>
               <div className="mt-1 text-base font-bold text-slate-900">{bin.name}</div>
               <div className="mt-2 text-xs text-slate-600">{bin.zoneName} · {bin.wardName}</div>
-              <div className="mt-1 text-xs text-slate-600">Supervisor: {supervisorsText(bin)}</div>
+              <div className="mt-1 text-xs text-slate-600">Daroga: {supervisorsText(bin)}</div>
               <div className="mt-2 text-xs font-bold text-slate-700">Status: <span style={{ color: STATE_COLORS[bin.state] }}>{bin.state}</span></div>
             </div>
           </Popup>

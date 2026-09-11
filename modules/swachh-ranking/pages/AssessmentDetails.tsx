@@ -178,7 +178,7 @@ const AssessmentDetails = () => {
                                 </div>
                                 <div>
                                     <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-                                        QC Status
+                                        SI Status
                                     </div>
                                     <span className="badge" style={{ textTransform: 'uppercase', fontWeight: 800 }}>{assessment.status}</span>
                                 </div>
@@ -226,7 +226,7 @@ const AssessmentDetails = () => {
                                                     </div>
                                                     <div style={{ background: '#fff', borderRadius: '12px', padding: '1rem 1.25rem', border: '2px solid #bbf7d0' }}>
                                                         <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', color: '#6b7280', marginBottom: '0.35rem' }}>Score Source</div>
-                                                        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1d4ed8' }}>{assessment.finalScoreSource === 'QC' ? 'QC Reviewed Score' : 'Self Assessment Score'}</div>
+                                                        <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1d4ed8' }}>{assessment.finalScoreSource === 'QC' ? 'SI Reviewed Score' : 'Self Assessment Score'}</div>
                                                     </div>
                                                 </>
                                             )}
@@ -253,7 +253,7 @@ const AssessmentDetails = () => {
                                                 <div style={{ fontSize: '0.8rem', color: '#9a3412', fontWeight: 600 }}>/ {maxScore}</div>
                                             </div>
                                             <div style={{ background: '#eff6ff', borderRadius: '12px', padding: '1rem 1.25rem', border: '2px solid #bfdbfe', textAlign: 'center' }}>
-                                                <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#1e3a8a', marginBottom: '0.35rem' }}>QC Reviewed Score</div>
+                                                <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#1e3a8a', marginBottom: '0.35rem' }}>SI Reviewed Score</div>
                                                 <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#1d4ed8' }}>{qcScore !== null ? qcScore : '—'}</div>
                                                 <div style={{ fontSize: '0.8rem', color: '#1e3a8a', fontWeight: 600 }}>/ {maxScore}</div>
                                             </div>
@@ -275,8 +275,8 @@ const AssessmentDetails = () => {
                                                 </label>
                                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: qcScore !== null ? 'pointer' : 'not-allowed', padding: '0.75rem 1rem', borderRadius: '10px', border: `2px solid ${selectedScoreSource === 'QC' ? '#3b82f6' : '#e5e7eb'}`, background: selectedScoreSource === 'QC' ? '#eff6ff' : qcScore === null ? '#f9fafb' : '#fff', fontWeight: 700, transition: 'all 0.15s', opacity: qcScore === null ? 0.5 : 1 }}>
                                                     <input type="radio" name="scoreSource" value="QC" checked={selectedScoreSource === 'QC'} onChange={() => setSelectedScoreSource('QC')} disabled={qcScore === null} style={{ accentColor: '#3b82f6', width: '16px', height: '16px' }} />
-                                                    <span>QC Reviewed Score</span>
-                                                    {qcScore === null && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#9ca3af', fontWeight: 600 }}>(QC not completed)</span>}
+                                                    <span>SI Reviewed Score</span>
+                                                    {qcScore === null && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: '#9ca3af', fontWeight: 600 }}>(SI not completed)</span>}
                                                     <span style={{ marginLeft: 'auto', fontWeight: 900, color: '#1d4ed8' }}>{qcScore !== null ? `${qcScore}/${maxScore}` : '—'}</span>
                                                 </label>
                                             </div>
@@ -315,7 +315,7 @@ const AssessmentDetails = () => {
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                                         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Score Source</span>
                                                         <span style={{ fontWeight: 800, color: selectedScoreSource === 'QC' ? '#1d4ed8' : '#c2410c' }}>
-                                                            {selectedScoreSource === 'QC' ? 'QC Reviewed Score' : 'Self Assessment Score'}
+                                                            {selectedScoreSource === 'QC' ? 'SI Reviewed Score' : 'Self Assessment Score'}
                                                         </span>
                                                     </div>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -368,10 +368,10 @@ const AssessmentDetails = () => {
                                             <tr>
                                                 <th>Question</th>
                                                 <th style={{ width: '90px' }}>Submitted</th>
-                                                <th style={{ width: '90px' }}>QC Score</th>
+                                                <th style={{ width: '90px' }}>SI Score</th>
                                                 <th style={{ width: '80px' }}>Diff</th>
-                                                <th style={{ width: '100px' }}>QC Status</th>
-                                                <th>QC Remarks</th>
+                                                <th style={{ width: '100px' }}>SI Status</th>
+                                                <th>SI Remarks</th>
                                                 <th>Reviewed By</th>
                                                 <th>Reviewed At</th>
                                                 <th>Images</th>
@@ -439,7 +439,7 @@ const AssessmentDetails = () => {
 
                         {(assessment.reviewRemarks || assessment.qcRemarks) && (
                             <div className="card shadow-lg" style={{ padding: '1.5rem', marginTop: '2rem', border: 'none', boxShadow: 'var(--shadow-lg)' }}>
-                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.5rem' }}>QC Remarks</h3>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.5rem' }}>SI Remarks</h3>
                                 {assessment.reviewRemarks && (
                                     <p style={{ marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
                                         <strong>Review:</strong> {assessment.reviewRemarks}
@@ -447,7 +447,7 @@ const AssessmentDetails = () => {
                                 )}
                                 {assessment.qcRemarks && (
                                     <p style={{ color: 'var(--text-primary)' }}>
-                                        <strong>QC:</strong> {assessment.qcRemarks}
+                                        <strong>SI:</strong> {assessment.qcRemarks}
                                     </p>
                                 )}
                             </div>
@@ -457,7 +457,7 @@ const AssessmentDetails = () => {
                         {assessment.qcReviewComplete && (
                             <div className="card shadow-lg" style={{ padding: '1.5rem', marginTop: '2rem', border: 'none', boxShadow: 'var(--shadow-lg)' }}>
                                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <ShieldCheck size={18} style={{ color: '#16a34a' }} /> QC Review Summary
+                                    <ShieldCheck size={18} style={{ color: '#16a34a' }} /> SI Review Summary
                                 </h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                                     <div>
@@ -465,7 +465,7 @@ const AssessmentDetails = () => {
                                         <div style={{ fontWeight: 900, fontSize: '1.2rem' }}>{assessment.totalScore}</div>
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>QC Score</div>
+                                        <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>SI Score</div>
                                         <div style={{ fontWeight: 900, fontSize: '1.2rem', color: '#1d4ed8' }}>{assessment.qcTotalScore ?? '—'}</div>
                                     </div>
                                     <div>
@@ -491,7 +491,7 @@ const AssessmentDetails = () => {
                         {/* QC Audit Trail */}
                         {auditLogs.length > 0 && (
                             <div className="card shadow-lg" style={{ padding: '1.5rem', marginTop: '2rem', border: 'none', boxShadow: 'var(--shadow-lg)' }}>
-                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1rem' }}>QC Audit Trail</h3>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1rem' }}>SI Audit Trail</h3>
                                 <div className="table-container" style={{ border: 'none' }}>
                                     <table>
                                         <thead>

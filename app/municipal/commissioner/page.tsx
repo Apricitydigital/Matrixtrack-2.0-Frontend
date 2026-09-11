@@ -260,7 +260,7 @@ export default function CommissionerDashboard() {
     if (totals.pending > 0) {
       items.push({
         title: `${totals.pending} inspections awaiting review`,
-        detail: 'Pending QC / review workload across the active inspection modules.',
+        detail: 'Pending SI / review workload across the active inspection modules.',
         tone: 'border-blue-200 bg-blue-50 text-blue-900',
       });
     }
@@ -308,7 +308,7 @@ export default function CommissionerDashboard() {
     {
       label: 'Pending Review',
       value: totals.pending.toLocaleString('en-IN'),
-      helper: 'Awaiting QC / workflow decision',
+      helper: 'Awaiting SI / workflow decision',
       icon: <Clock3 size={18} />,
       accent: 'from-sky-500 to-blue-600',
     },
@@ -586,7 +586,7 @@ export default function CommissionerDashboard() {
             <div className="mt-4 grid grid-cols-2 gap-3">
               {[
                 { label: 'Open Exceptions', value: totals.actionRequired, helper: 'Action required', className: 'text-amber-300' },
-                { label: 'Pending Review', value: totals.pending, helper: 'QC / workflow', className: 'text-blue-300' },
+                { label: 'Pending Review', value: totals.pending, helper: 'SI / workflow', className: 'text-blue-300' },
                 { label: 'Closed Records', value: totals.approved, helper: 'Approved / resolved', className: 'text-emerald-300' },
                 { label: 'Active Modules', value: modules.length, helper: 'Reporting now', className: 'text-violet-300' },
               ].map((item) => (

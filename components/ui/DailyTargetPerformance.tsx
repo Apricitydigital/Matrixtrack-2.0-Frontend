@@ -2334,7 +2334,7 @@ export default function DailyTargetPerformance({
                 value={
                   summary.approved
                 }
-                help="QC approved"
+                help="SI approved"
                 color="#16a34a"
               />
 

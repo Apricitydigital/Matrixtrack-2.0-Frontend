@@ -204,7 +204,7 @@ export default function TaskforceQCDashboard() {
                 if (action === 'APPROVE') await TaskforceApi.approveReport(record.id);
                 else await TaskforceApi.rejectReport(record.id);
             } else {
-                alert("Unsupported record type for Taskforce QC.");
+                alert("Unsupported record type for Taskforce SI.");
             }
             await loadData();
         } catch (err) {
@@ -217,7 +217,7 @@ export default function TaskforceQCDashboard() {
     async function handleAssign(record: TaskforceRecord, supervisorId?: string) {
         const targetId = supervisorId || assignSelection[record.id] || supervisors[0]?.id;
         if (!targetId) {
-            alert("Select an supervisor to assign");
+            alert("Select a Daroga to assign");
             return;
         }
         setActionLoading(record.id);
@@ -333,7 +333,7 @@ export default function TaskforceQCDashboard() {
                 <div className="section-header">
                     <div>
                         <p className="eyebrow">Module - Taskforce</p>
-                        <h1 className="text-2xl font-bold mb-1">QC Dashboard</h1>
+                        <h1 className="text-2xl font-bold mb-1">SI Dashboard</h1>
                         <div className="muted text-sm flex flex-col gap-1">
                             <div className="flex gap-2">
                                 <span className="font-semibold text-base-content w-16">Zones:</span>
@@ -364,7 +364,7 @@ export default function TaskforceQCDashboard() {
                         >
                             Employees
                         </button>
-                        <div className="badge badge-warning">QC Access</div>
+                        <div className="badge badge-warning">SI Access</div>
                     </div>
                 </div>
 
@@ -385,7 +385,7 @@ export default function TaskforceQCDashboard() {
                         <h2 className="text-xl font-bold">Assigned Employees</h2>
                         <input
                             type="text"
-                            placeholder="Search supervisors..."
+                            placeholder="Search Darogas..."
                             className="input input-sm input-bordered w-64"
                             value={empSearch}
                             onChange={(e) => setEmpSearch(e.target.value)}
@@ -409,7 +409,7 @@ export default function TaskforceQCDashboard() {
                                     </thead>
                                     <tbody>
                                         {paginatedEmployees.length === 0 ? (
-                                            <tr><td colSpan={5} className="text-center p-4 muted">No supervisors found.</td></tr>
+                                            <tr><td colSpan={5} className="text-center p-4 muted">No Darogas found.</td></tr>
                                         ) : (
                                             paginatedEmployees.map((e) => (
                                                 <tr key={e.id} className="hover">

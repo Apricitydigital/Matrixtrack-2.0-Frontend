@@ -207,7 +207,7 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
             alert('No toilets available to export.');
             return;
         }
-        const headers = ['Toilet Name', 'Code', 'Category', 'Seats', 'Zone', 'Ward', 'Status', 'Assigned Supervisor'];
+        const headers = ['Toilet Name', 'Code', 'Category', 'Seats', 'Zone', 'Ward', 'Status', 'Assigned Daroga'];
         const rows = filteredToilets.map(t => [
             `"${t.name || ''}"`,
             `"${t.code || ''}"`,
@@ -493,10 +493,10 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
                             {/* Right Column: Supervisor & Registration Metadata */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                 <div style={{ background: '#f8fafc', padding: 18, borderRadius: 14, border: '1px solid #e2e8f0' }}>
-                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>Assigned Supervisor</h3>
+                                    <h3 style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>Assigned Daroga</h3>
                                     {selectedToilet.assignments?.map((a: any) => (
                                         <div key={a.id} style={{ padding: '10px 12px', backgroundColor: '#ffffff', borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 8 }}>
-                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{a.supervisor?.name || 'Supervisor'}</div>
+                                            <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{a.supervisor?.name || 'Daroga'}</div>
                                             <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{a.supervisor?.email || 'Field Staff'}</div>
                                         </div>
                                     ))}
@@ -523,7 +523,7 @@ export default function AllToiletsTab({ cityId }: { cityId?: string }) {
             {showAssignModal && typeof document !== 'undefined' && createPortal(
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999 }}>
                     <div style={{ backgroundColor: 'white', borderRadius: 24, width: 440, padding: 28, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', animation: 'modalScale 0.2s ease-out' }}>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Assign Field Supervisor</h3>
+                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0f172a' }}>Assign Field Daroga</h3>
                         <p style={{ margin: '6px 0 20px 0', fontSize: 13, color: '#64748b', fontWeight: 500 }}>Delegate responsibility for <strong>{toiletToAssign?.name}</strong></p>
 
                         <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '2px' }}>

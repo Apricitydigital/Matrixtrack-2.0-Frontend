@@ -2579,7 +2579,7 @@ function AttendanceReports() {
       "City",
       "Zone",
       "Ward",
-      "Supervisor",
+      "Daroga",
     ];
 
     const rows = faceUnregisteredEmployees.map((emp) => [
@@ -3486,7 +3486,7 @@ tracking-widest
 flex
 items-center
 justify-between">
-                <span>Supervisor</span>
+                <span>Daroga</span>
                 <span className="
 text-[10px]
 font-bold
@@ -3513,8 +3513,8 @@ py-0.5
                 <div className="flex items-center justify-between p-2">
                   <span className={`text-sm truncate ${downloadFilters.supervisorId === "all" ? "text-slate-500 dark:text-slate-400" : "text-slate-900 dark:text-slate-100"}`}>
                     {downloadFilters.supervisorId === "all"
-                      ? "All Supervisors"
-                      : filteredSupervisors.find(s => String(s.user_id) === String(downloadFilters.supervisorId))?.name || "All Supervisors"
+                      ? "All Darogas"
+                      : filteredSupervisors.find(s => String(s.user_id) === String(downloadFilters.supervisorId))?.name || "All Darogas"
                     }
                   </span>
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-500 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
@@ -3528,7 +3528,7 @@ py-0.5
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
                       <input
                         type="text"
-                        placeholder="Search Supervisor..."
+                        placeholder="Search Daroga..."
                         value={supervisorSearch}
                         onChange={(e) => setSupervisorSearch(e.target.value)}
                         className="w-full bg-transparent text-sm focus:outline-none"
@@ -3549,7 +3549,7 @@ py-0.5
                         : "bg-white dark:bg-slate-900 dark:bg-slate-900 border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:hover:bg-slate-700/50 hover:border-slate-200 dark:border-slate-700 text-slate-600 font-medium"
                         }`}
                     >
-                      All Supervisors
+                      All Darogas
                     </div>
                     {filteredSupervisors
                       .filter(s => !supervisorSearch || (s.name || "").toLowerCase().includes(supervisorSearch.toLowerCase()))
@@ -3797,7 +3797,7 @@ focus:ring-indigo-500 text-[10px] font-black transition-all shadow-sm active:sca
                 }
               />
               <label htmlFor="absenteesOnly" className="font-medium">
-                Only show supervisors with absentees
+                Only show darogas with absentees
               </label>
             </div>
           )}
@@ -3972,7 +3972,7 @@ dark:border-slate-700
                   { key: "city", label: "City" },
                   { key: "zone", label: "Zone" },
                   { key: "ward", label: "Ward / Kothi" },
-                  { key: "supervisor", label: "Supervisor" },
+                  { key: "supervisor", label: "Daroga" },
                   { key: "status", label: "Status" },
                 ].map((col) => (
                   <th key={col.key} className="px-3 py-2.5 text-left font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest border-r border-slate-100 last:border-r-0 relative" style={{ width: columnWidthsFace[col.key] }}>

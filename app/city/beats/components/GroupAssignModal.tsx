@@ -53,7 +53,7 @@ export default function GroupAssignModal({ beats, title, mode, onClose, onSucces
         }
     };
 
-    const roleLabel = mode === "SUPERVISOR" ? "Supervisor" : "Employee";
+    const roleLabel = mode === "SUPERVISOR" ? "Daroga" : "Employee";
 
     return (
         <div className="group-assign-overlay">

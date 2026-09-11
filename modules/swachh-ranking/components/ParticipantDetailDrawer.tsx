@@ -576,7 +576,7 @@ const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = ({
                                                 </div>
                                                 {typeof sa.qcTotalScore === 'number' && (
                                                     <div className="metric">
-                                                        <span>QC Score</span>
+                                                        <span>SI Score</span>
                                                         <p style={{ fontWeight: 700, color: '#16a34a', fontSize: '1rem' }}>{sa.qcTotalScore}</p>
                                                     </div>
                                                 )}
@@ -585,7 +585,7 @@ const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = ({
 
                                         {sa.qcRemarks && (
                                             <div className="metric" style={{ gridColumn: '1 / -1' }}>
-                                                <span>QC Remarks</span>
+                                                <span>SI Remarks</span>
                                                 <p style={{ color: '#dc2626' }}>{sa.qcRemarks}</p>
                                             </div>
                                         )}
@@ -604,7 +604,7 @@ const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = ({
                                                     style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: '#6d28d9' }}
                                                 >
                                                     <CheckCircle2 size={14} />
-                                                    {saQcExpanded ? 'Hide QC Review' : 'View Per-Question QC Review'}
+                                                    {saQcExpanded ? 'Hide SI Review' : 'View Per-Question SI Review'}
                                                 </button>
 
                                                 {saQcExpanded && (
@@ -631,7 +631,7 @@ const ParticipantDetailDrawer: React.FC<ParticipantDetailDrawerProps> = ({
                                                                                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                                                                         <span style={{ fontSize: '0.72rem', fontWeight: 700, background: statusBg[st], color: statusClr[st] || '#6b7280', border: `1px solid ${statusClr[st] || '#e5e7eb'}`, borderRadius: 5, padding: '1px 7px', textTransform: 'capitalize' }}>{st === 'edited' ? 'Rescored' : st}</span>
                                                                                         <div style={{ fontSize: '0.78rem', color: '#374151', fontWeight: 700, marginTop: 3 }}>
-                                                                                            QC: {typeof ans.qcScore === 'number' ? ans.qcScore : '—'} / {q.marks}
+                                                                                            SI: {typeof ans.qcScore === 'number' ? ans.qcScore : '—'} / {q.marks}
                                                                                             {typeof ans.score === 'number' && typeof ans.qcScore === 'number' && ans.score !== ans.qcScore && (
                                                                                                 <span style={{ color: ans.qcScore < ans.score ? '#ef4444' : '#10b981', marginLeft: 4, fontSize: '0.7rem' }}>
                                                                                                     (was {ans.score})

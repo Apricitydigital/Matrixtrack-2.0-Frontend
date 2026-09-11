@@ -354,7 +354,7 @@ const handleRestore = async (id: string) => {
                         >
                             <option value="">All Roles</option>
                             <option value="admin">Administrators</option>
-                            <option value="qc">Quality Control</option>
+                            <option value="qc">Sanitary Inspector</option>
                             <option value="accessor">Field Accessors</option>
                         </select>
                     </div>
@@ -676,7 +676,7 @@ const handleRestore = async (id: string) => {
                                         onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
                                     >
                                         <option value="admin">Admin</option>
-                                        <option value="qc">QC</option>
+                                        <option value="qc">SI</option>
                                         <option value="accessor">Accessor</option>
                                     </select>
                                 </div>

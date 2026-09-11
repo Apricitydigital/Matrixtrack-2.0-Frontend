@@ -40,9 +40,9 @@ const PORTAL_ROLE_OPTIONS: Record<
   Array<{ value: string; label: string }>
 > = {
   TASKFORCE_20: [
-    { value: "SUPERVISOR", label: "Supervisor" },
-    { value: "QC", label: "Quality Controller" },
-    { value: "ACTION_OFFICER", label: "Action Officer" },
+    { value: "SUPERVISOR", label: "Daroga" },
+    { value: "QC", label: "Sanitary Inspector" },
+    { value: "ACTION_OFFICER", label: "IEC Member" },
   ],
 
   PROCESSING_PLANT: [
@@ -56,7 +56,7 @@ const PORTAL_ROLE_OPTIONS: Record<
 
   WARD_RANKING: [
     { value: "ACCESSOR", label: "Assessor / Evaluator" },
-    { value: "QC", label: "Quality Controller" },
+    { value: "QC", label: "Sanitary Inspector" },
     { value: "ADMIN", label: "Admin" },
   ],
 };

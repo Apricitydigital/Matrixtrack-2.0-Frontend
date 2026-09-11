@@ -700,7 +700,7 @@ function PortalHomeLayoutContent({
         searchParams.get('view') ===
           'employee'
           ? 'Taskforce - Employee Assignment'
-          : 'Taskforce - Supervisor Assignment';
+          : 'Taskforce - Daroga Assignment';
     }
 
     else if (
@@ -772,7 +772,7 @@ function PortalHomeLayoutContent({
       currentView === 'sa-review'
     ) {
       pageTitle =
-        'Swachh Sync - Self Assessment QC Review';
+        'Swachh Sync - Self Assessment SI Review';
     }
 
     else if (
@@ -836,7 +836,7 @@ function PortalHomeLayoutContent({
       currentView === 'supervisors'
     ) {
       pageTitle =
-        'Workforce - Supervisors Management';
+        'Workforce - Darogas Management';
     }
 
     else if (
@@ -846,7 +846,7 @@ function PortalHomeLayoutContent({
       'assign-supervisor-ward'
     ) {
       pageTitle =
-        'Workforce - Assign Supervisor Kothi';
+        'Workforce - Assign Daroga Kothi';
     }
 
     else if (
@@ -1528,12 +1528,12 @@ function PortalHomeLayoutContent({
 
     {
       group:
-        'Staff & Supervisors',
+        'Staff & Darogas',
 
       items: [
         {
           name:
-            'Supervisors Management',
+            'Darogas Management',
 
           href:
             '/workforce-monitoring?view=supervisors',
@@ -1554,7 +1554,7 @@ function PortalHomeLayoutContent({
 
         {
           name:
-            'Assign Supervisor Kothi',
+            'Assign Daroga Kothi',
 
           href:
             '/workforce-monitoring?view=assignSupervisorWard',
@@ -1658,7 +1658,7 @@ function PortalHomeLayoutContent({
 
         {
           name:
-            'Supervisor Audit',
+            'Daroga Audit',
 
           href:
             '/workforce-monitoring?view=supervisor-audit',
@@ -2518,7 +2518,7 @@ function PortalHomeLayoutContent({
                                             />
 
                                             <span>
-                                              Supervisor Assignment
+                                              Daroga Assignment
                                             </span>
                                           </Link>
 

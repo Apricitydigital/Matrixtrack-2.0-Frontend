@@ -49,7 +49,7 @@ export default function ModulesLanding() {
             {hasQc && (
               <div className="card card-hover">
                 <h3>Employees</h3>
-                <p className="muted">View supervisors assigned to your modules.</p>
+                <p className="muted">View Darogas assigned to your modules.</p>
                 <Link className="btn btn-secondary btn-sm" href="/supervisors">
                   View
                 </Link>

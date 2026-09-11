@@ -1125,14 +1125,14 @@ export default function WardBeatConfigurator({
                     </div>
                     <div className="ward-config-bulk-control">
                         <select value={bulkSupervisorId} onChange={(event) => setBulkSupervisorId(event.target.value)}>
-                            <option value="">Choose supervisor</option>
+                            <option value="">Choose daroga</option>
                             {supervisors.map((supervisor) => (
                                 <option key={supervisor.id} value={supervisor.id}>{supervisor.name}</option>
                             ))}
                         </select>
                         <button type="button" disabled={!bulkSupervisorId || !selectedKeys.length}
                             onClick={() => applyBulkAssignment("SUPERVISOR")}>
-                            Assign supervisor
+                            Assign daroga
                         </button>
                     </div>
                     <div className="ward-config-bulk-control">
@@ -1638,7 +1638,7 @@ export default function WardBeatConfigurator({
                                                 13
                                             }
                                         />
-                                        Supervisor
+                                        Daroga
                                     </label>
 
                                     <select
@@ -1682,7 +1682,7 @@ export default function WardBeatConfigurator({
                                     >
                                         <option value="">
                                             Select
-                                            Supervisor
+                                            Daroga
                                         </option>
 
                                         {supervisors.map(

@@ -168,10 +168,10 @@ const VIEW_CONFIG: Record<
 > = {
     APPROVED: {
         title:
-            'QC Approved Reports',
+            'SI Approved Reports',
 
         description:
-            'Review QC-approved reports. If action is still required, send the report to the mapped Action Officer with a clear instruction.',
+            'Review SI-approved reports. If action is still required, send the report to the mapped IEC Member with a clear instruction.',
 
         status:
             'APPROVED',
@@ -182,10 +182,10 @@ const VIEW_CONFIG: Record<
 
     REJECTED: {
         title:
-            'QC Rejected Reports',
+            'SI Rejected Reports',
 
         description:
-            'Review QC-rejected reports and escalate only the cases that require municipal action.',
+            'Review SI-rejected reports and escalate only the cases that require municipal action.',
 
         status:
             'REJECTED',
@@ -199,7 +199,7 @@ const VIEW_CONFIG: Record<
             'Action Required',
 
         description:
-            'Track reports already sent to Action Officers. The original ULB instruction remains visible while action is pending.',
+            'Track reports already sent to IEC Members. The original ULB instruction remains visible while action is pending.',
 
         status:
             'ACTION_REQUIRED',
@@ -213,7 +213,7 @@ const VIEW_CONFIG: Record<
             'Action Taken History',
 
         description:
-            'Review Action Taken reports with the original ULB instruction, Action Officer response and submitted evidence.',
+            'Review Action Taken reports with the original ULB instruction, IEC Member response and submitted evidence.',
 
         status:
             'ACTION_TAKEN',
@@ -2943,7 +2943,7 @@ export default function UlbOperationsWorkspace({
 
             if (approvalRate !== null) {
                 sentences.push(
-                    `Out of ${stats.approved + stats.rejected} QC-reviewed reports, ${approvalRate}% were QC Approved${approvalRate < 70 ? ', which is below the healthy threshold and needs review' : ''}.`
+                    `Out of ${stats.approved + stats.rejected} SI-reviewed reports, ${approvalRate}% were SI Approved${approvalRate < 70 ? ', which is below the healthy threshold and needs review' : ''}.`
                 );
             }
 
@@ -2967,7 +2967,7 @@ export default function UlbOperationsWorkspace({
 
             if (!sentences.length) {
                 sentences.push(
-                    'All reviewed reports are QC Approved and no report is currently Action Required.'
+                    'All reviewed reports are SI Approved and no report is currently Action Required.'
                 );
             }
 
@@ -3028,9 +3028,9 @@ export default function UlbOperationsWorkspace({
         lines.push('');
         lines.push('INSPECTION & PERFORMANCE');
         lines.push(`Total Inspections: ${dashboardNumberFormatter.format(stats.grandTotal)}${isMultiDayRange ? ` (avg ${formatAverageValue(stats.grandTotal / rangeDayCount)}/day)` : ''}`);
-        lines.push(`QC Approved: ${dashboardNumberFormatter.format(stats.approved)}${approvalRate !== null ? ` — ${approvalRate}% Approval %` : ''}`);
-        lines.push(`QC Rejected: ${dashboardNumberFormatter.format(stats.rejected)}`);
-        lines.push(`QC Pending: ${dashboardNumberFormatter.format(stats.pending)}`);
+        lines.push(`SI Approved: ${dashboardNumberFormatter.format(stats.approved)}${approvalRate !== null ? ` — ${approvalRate}% Approval %` : ''}`);
+        lines.push(`SI Rejected: ${dashboardNumberFormatter.format(stats.rejected)}`);
+        lines.push(`SI Pending: ${dashboardNumberFormatter.format(stats.pending)}`);
         lines.push(`Action Required: ${dashboardNumberFormatter.format(stats.actionRequired)}`);
         lines.push(`Action Taken: ${dashboardNumberFormatter.format(stats.actionTaken)}${correctiveTotal > 0 ? ` — ${closureRate}% Action` : ''}`);
 
@@ -3367,7 +3367,7 @@ export default function UlbOperationsWorkspace({
 
             setError(
                 err?.message ||
-                'Unable to send this report to the Action Officer.'
+                'Unable to send this report to the IEC Member.'
             );
 
         } finally {
@@ -3598,7 +3598,7 @@ export default function UlbOperationsWorkspace({
                                             <SectionHeading
                                                 icon={ClipboardCheck}
                                                 title="Inspection & Performance Overview"
-                                                description="QC workflow position, module breakdown and reports trend across all sanitation modules."
+                                                description="SI workflow position, module breakdown and reports trend across all sanitation modules."
                                                 action={
                                                     <button
                                                         type="button"
@@ -3655,7 +3655,7 @@ export default function UlbOperationsWorkspace({
 
 
                                                     <ExecutiveKpi
-                                                        label="QC Pending"
+                                                        label="SI Pending"
 
                                                         value={
                                                             stats.pending
@@ -3682,7 +3682,7 @@ export default function UlbOperationsWorkspace({
 
 
                                                     <ExecutiveKpi
-                                                        label="QC Approved"
+                                                        label="SI Approved"
 
                                                         value={
                                                             stats.approved
@@ -3709,7 +3709,7 @@ export default function UlbOperationsWorkspace({
 
 
                                                     <ExecutiveKpi
-                                                        label="QC Rejected"
+                                                        label="SI Rejected"
 
                                                         value={
                                                             stats.rejected
@@ -3841,7 +3841,7 @@ export default function UlbOperationsWorkspace({
 
 
                                                             <p className="text-xs font-medium text-slate-500">
-                                                                Compare QC decisions and Action Required / Action Taken progress across all three sanitation modules.
+                                                                Compare SI decisions and Action Required / Action Taken progress across all three sanitation modules.
                                                             </p>
 
                                                         </div>
@@ -3972,12 +3972,12 @@ export default function UlbOperationsWorkspace({
 
                                                             <LegendDot
                                                                 color="#0f766e"
-                                                                label="QC approved"
+                                                                label="SI approved"
                                                             />
 
                                                             <LegendDot
                                                                 color="#dc2626"
-                                                                label="QC rejected"
+                                                                label="SI rejected"
                                                             />
 
                                                             <LegendDot
@@ -4188,7 +4188,7 @@ export default function UlbOperationsWorkspace({
                                                 icon={Trophy}
                                                 eyebrow="Performance leaderboards"
                                                 title="Performance Breakdown"
-                                                description="Zone, ward, supervisor, QC reviewer and Action Officer performance across all sanitation modules."
+                                                description="Zone, ward, Daroga, SI reviewer and IEC Member performance across all sanitation modules."
                                             />
 
                                             <div className="space-y-5 p-5">
@@ -4199,7 +4199,7 @@ export default function UlbOperationsWorkspace({
                                                         icon={Building2}
                                                         tone="blue"
                                                         title="Zone Performance"
-                                                        description="Ranked by QC approval rate."
+                                                        description="Ranked by SI approval rate."
                                                         rows={zoneLeaderboard}
                                                         emptyMessage="No zone information is available on the current reports."
                                                     />
@@ -4208,7 +4208,7 @@ export default function UlbOperationsWorkspace({
                                                         icon={MapPin}
                                                         tone="cyan"
                                                         title="Ward Performance"
-                                                        description="Ranked by QC approval rate."
+                                                        description="Ranked by SI approval rate."
                                                         rows={wardLeaderboard}
                                                         emptyMessage="No ward information is available on the current reports."
                                                         scroll
@@ -4221,30 +4221,30 @@ export default function UlbOperationsWorkspace({
                                                     <PeopleLeaderboardCard
                                                         icon={UsersRound}
                                                         tone="indigo"
-                                                        title="Supervisor Performance"
+                                                        title="Daroga Performance"
                                                         rows={supervisorLeaderboard}
                                                         rateType="approval"
-                                                        emptyMessage="No records are attributed to a named supervisor yet."
+                                                        emptyMessage="No records are attributed to a named Daroga yet."
                                                     />
 
                                                     <PeopleLeaderboardCard
                                                         icon={ShieldCheck}
                                                         tone="teal"
-                                                        title="QC Reviewer Performance"
+                                                        title="SI Reviewer Performance"
                                                         rows={qcLeaderboard}
                                                         rateType="approval"
-                                                        emptyMessage="No QC reviewer identity is available yet."
+                                                        emptyMessage="No SI reviewer identity is available yet."
                                                         note="Currently available for Toilet inspections only — other modules don't expose reviewer identity via the API yet."
                                                     />
 
                                                     <PeopleLeaderboardCard
                                                         icon={Award}
                                                         tone="amber"
-                                                        title="Action Officer Performance"
+                                                        title="IEC Member Performance"
                                                         rows={actionOfficerLeaderboard}
                                                         rateType="closure"
-                                                        emptyMessage="No Action Officer identity is available yet."
-                                                        note="Named officers are shown for Toilets, Litter Bins and Sweeping. Litter Bin records assigned before this data was joined may still fall back to a short officer ID."
+                                                        emptyMessage="No IEC Member identity is available yet."
+                                                        note="Named IEC Members are shown for Toilets, Litter Bins and Sweeping. Litter Bin records assigned before this data was joined may still fall back to a short IEC ID."
                                                     />
 
                                                 </div>
@@ -4267,7 +4267,7 @@ export default function UlbOperationsWorkspace({
 
                                                 title="Oldest Action Pending Reports"
 
-                                                description="Reports already sent to Action Officers and still awaiting a response."
+                                                description="Reports already sent to IEC Members and still awaiting a response."
 
                                                 action={
 
@@ -4349,7 +4349,7 @@ export default function UlbOperationsWorkspace({
 
 
                                             <CompactSummary
-                                                label="All QC Processed"
+                                                label="All SI Processed"
 
                                                 value={
                                                     stats.total
@@ -5546,13 +5546,13 @@ function CommissionerSummary({
                     >
                         <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-blue-700">
                             <Clock3 size={13} />
-                            QC Pending
+                            SI Pending
                         </div>
                         <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
                             {dashboardNumberFormatter.format(stats.pending)}
                         </div>
                         <div className="mt-0.5 text-[10px] font-semibold text-blue-700/60">
-                            Awaiting first QC review
+                            Awaiting first SI review
                         </div>
                     </button>
 
@@ -6308,7 +6308,7 @@ function ReportsTrendChart({
             </h3>
 
             <p className="mt-1 text-xs font-medium text-slate-500">
-                Daily volume of QC-processed reports across all sanitation modules.
+                Daily volume of SI-processed reports across all sanitation modules.
             </p>
 
             <div className="mt-4 h-[280px]">
@@ -7056,7 +7056,7 @@ function ReportJourneySection({
             icon: Clock3,
             title: 'Submitted',
             time: formatDate(item?.createdAt),
-            description: 'Supervisor submitted report',
+            description: 'Daroga submitted report',
         },
     ];
 
@@ -7065,7 +7065,7 @@ function ReportJourneySection({
             key: 'auto-qc',
             color: autoRejected ? 'bg-rose-500' : 'bg-emerald-500',
             icon: Sparkles,
-            title: 'QC AI Assessment',
+            title: 'SI AI Assessment',
             time: formatDate(item?.autoQcAt || item?.createdAt),
             description: autoRejected ? 'Suggested Reject' : 'Suggested Approve',
             descriptionColor: autoRejected ? 'text-rose-600' : 'text-emerald-600',
@@ -7077,7 +7077,7 @@ function ReportJourneySection({
             key: 'qc-review',
             color: qcDecision === 'REJECTED' ? 'bg-rose-500' : 'bg-emerald-500',
             icon: ShieldCheck,
-            title: 'QC Review',
+            title: 'SI Review',
             time: formatDate(item?.qcReviewedAt || item?.reviewedAt),
             description: qcDecision === 'REJECTED' ? 'Rejected' : 'Approved',
             descriptionColor: qcDecision === 'REJECTED' ? 'text-rose-600' : 'text-emerald-600',
@@ -7134,7 +7134,7 @@ function ReportJourneySection({
                 {autoQc && (autoQc.summary || (Array.isArray(autoQc.reasons) && autoQc.reasons.length > 0)) && (
                     <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-3">
                         <div className="flex items-center justify-between gap-2">
-                            <div className="text-[9px] font-black uppercase tracking-wider text-violet-500">QC AI Assessment</div>
+                            <div className="text-[9px] font-black uppercase tracking-wider text-violet-500">SI AI Assessment</div>
 
                             {formatAiConfidence(autoQc.confidence) && (
                                 <div className="text-[10px] font-black text-violet-700">
@@ -7474,7 +7474,7 @@ function ReportDetailModal({
                             ? (
 
                                 <RemarkPanel
-                                    label="QC REMARK"
+                                    label="SI REMARK"
 
                                     value={
                                         reviewRemark
@@ -7520,7 +7520,7 @@ function ReportDetailModal({
                             ? (
 
                                 <RemarkPanel
-                                    label="ACTION OFFICER RESPONSE"
+                                    label="IEC MEMBER RESPONSE"
 
                                     value={
                                         actionTaken
@@ -8053,7 +8053,7 @@ function ActionRequiredModal({
 
 
                         <h3 className="mt-1 text-lg font-black text-slate-900">
-                            Send to Action Officer
+                            Send to IEC Member
                         </h3>
 
 
@@ -8124,7 +8124,7 @@ function ActionRequiredModal({
                             )
                         }
 
-                        placeholder="Write a clear instruction for the Action Officer..."
+                        placeholder="Write a clear instruction for the IEC Member..."
 
                         rows={5}
 

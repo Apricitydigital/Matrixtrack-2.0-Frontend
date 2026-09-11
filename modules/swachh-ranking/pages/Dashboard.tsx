@@ -228,7 +228,7 @@ const Dashboard = () => {
             });
             alert(`Assessment ${status === 'under_review' ? 'Approved & Sent to Admin' : 'Sent for Reassessment'}`);
             if (status === 'under_review') {
-                fireAchievement({ type: 'approved', message: 'QC Approved!' });
+                fireAchievement({ type: 'approved', message: 'SI Approved!' });
             }
             setSelectedReview(null);
             setQCRemarks('');
@@ -645,7 +645,7 @@ const Dashboard = () => {
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem' }}>
             {[
-                { path: '/admin/users?role=qc', border: '#16a34a', iconBg: '#f0fdf4', iconColor: '#16a34a', icon: <Shield size={20} />, label: 'QC MEMBERS', value: stats?.overview?.qcMembers ?? 0, waveColor: '#16a34a' },
+                { path: '/admin/users?role=qc', border: '#16a34a', iconBg: '#f0fdf4', iconColor: '#16a34a', icon: <Shield size={20} />, label: 'SI MEMBERS', value: stats?.overview?.qcMembers ?? 0, waveColor: '#16a34a' },
                 { path: '/admin/users?role=accessor', border: '#2563eb', iconBg: '#eff6ff', iconColor: '#2563eb', icon: <Users2 size={20} />, label: 'ASSESSORS', value: stats?.overview?.assessors ?? 0, waveColor: '#2563eb' },
                 { path: '/admin/users?role=admin', border: '#9333ea', iconBg: '#faf5ff', iconColor: '#9333ea', icon: <Users size={20} />, label: 'ADMINS', value: stats?.overview?.admins ?? 0, waveColor: '#9333ea' },
                 { path: '/admin/participants', border: '#db2777', iconBg: '#fdf2f8', iconColor: '#db2777', icon: <Building2 size={20} />, label: 'PARTICIPANTS', value: totalParticipants ?? 0, waveColor: '#db2777' },
@@ -1007,8 +1007,8 @@ const Dashboard = () => {
                                     {([
                                         { label: 'Not Started', value: assessorActivity.notStarted, icon: <Clock size={20} />, color: '#92400e', accent: '#fbbf24', bg: 'linear-gradient(145deg, #fffbeb 0%, #ffffff 100%)', border: '#fde68a', desc: 'Awaiting field visit', filterFn: (r: any) => !r.status || r.status === 'pending' },
                                         { label: 'In Progress', value: assessorActivity.inProgress, icon: <Activity size={20} />, color: '#1d4ed8', accent: '#60a5fa', bg: 'linear-gradient(145deg, #eff6ff 0%, #ffffff 100%)', border: '#bfdbfe', desc: 'Currently active', filterFn: (r: any) => r.status === 'in_progress' },
-                                        { label: 'Completed', value: assessorActivity.completed, icon: <CheckCircle2 size={20} />, color: '#065f46', accent: '#22c55e', bg: 'linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%)', border: '#bbf7d0', desc: 'QC review pending', filterFn: (r: any) => r.status === 'completed' },
-                                        { label: 'QC Verified', value: assessorActivity.qcVerified, icon: <Shield size={20} />, color: '#7c3aed', accent: '#a78bfa', bg: 'linear-gradient(145deg, #f5f3ff 0%, #ffffff 100%)', border: '#ddd6fe', desc: 'Fully verified', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
+                                        { label: 'Completed', value: assessorActivity.completed, icon: <CheckCircle2 size={20} />, color: '#065f46', accent: '#22c55e', bg: 'linear-gradient(145deg, #f0fdf4 0%, #ffffff 100%)', border: '#bbf7d0', desc: 'SI review pending', filterFn: (r: any) => r.status === 'completed' },
+                                        { label: 'SI Verified', value: assessorActivity.qcVerified, icon: <Shield size={20} />, color: '#7c3aed', accent: '#a78bfa', bg: 'linear-gradient(145deg, #f5f3ff 0%, #ffffff 100%)', border: '#ddd6fe', desc: 'Fully verified', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
                                     ] as any[]).map(({ label, value, icon, color, accent, bg, border, desc, filterFn }) => {
                                         const total = assessorActivity.totalAssigned || 1;
                                         const pct = Math.min(100, Math.round(((value || 0) / total) * 100));
@@ -1116,8 +1116,8 @@ const Dashboard = () => {
                                             {([
                                                 { label: 'Not Started', value: assessorActivity.notStarted, color: '#92400e', bar: '#fbbf24', bg: '#fffbeb', border: '#fde68a', desc: 'Awaiting field visit', filterFn: (r: any) => !r.status || r.status === 'pending' },
                                                 { label: 'In Progress', value: assessorActivity.inProgress, color: '#1d4ed8', bar: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe', desc: 'Being assessed', filterFn: (r: any) => r.status === 'in_progress' },
-                                                { label: 'Completed', value: assessorActivity.completed, color: '#065f46', bar: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', desc: 'QC pending', filterFn: (r: any) => r.status === 'completed' },
-                                                { label: 'QC Verified', value: assessorActivity.qcVerified, color: '#7c3aed', bar: '#a78bfa', bg: '#f5f3ff', border: '#ddd6fe', desc: 'Verified & approved', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
+                                                { label: 'Completed', value: assessorActivity.completed, color: '#065f46', bar: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', desc: 'SI pending', filterFn: (r: any) => r.status === 'completed' },
+                                                { label: 'SI Verified', value: assessorActivity.qcVerified, color: '#7c3aed', bar: '#a78bfa', bg: '#f5f3ff', border: '#ddd6fe', desc: 'Verified & approved', filterFn: (r: any) => ['qc_approved', 'under_review', 'published'].includes(r.status) },
                                                 { label: 'Rejected', value: assessorActivity.rejected, color: '#b91c1c', bar: '#f87171', bg: '#fef2f2', border: '#fecaca', desc: 'Needs reassessment', filterFn: (r: any) => ['reassessment', 'rejected'].includes(r.status) },
                                             ] as any[]).map(({ label, value, color, bar, bg, border, desc, filterFn }, idx) => {
                                                 const total = assessorActivity.totalAssigned || 1;
@@ -1169,7 +1169,7 @@ const Dashboard = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                             {/* Status legend */}
                                             <div style={{ display: 'flex', gap: '0.875rem', fontSize: '0.68rem', fontWeight: 700 }}>
-                                                {[{ c: '#22c55e', l: 'Completed' }, { c: '#60a5fa', l: 'In Progress' }, { c: '#a78bfa', l: 'QC Verified' }].map(({ c, l }) => (
+                                                {[{ c: '#22c55e', l: 'Completed' }, { c: '#60a5fa', l: 'In Progress' }, { c: '#a78bfa', l: 'SI Verified' }].map(({ c, l }) => (
                                                     <span key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#64748b' }}>
                                                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
                                                     </span>
@@ -1197,7 +1197,7 @@ const Dashboard = () => {
                                             const statusMap: Record<string, { label: string; color: string; bg: string; dot: string; border: string }> = {
                                                 in_progress: { label: 'In Progress', color: '#1d4ed8', bg: '#eff6ff', dot: '#60a5fa', border: '#bfdbfe' },
                                                 completed: { label: 'Completed', color: '#065f46', bg: '#f0fdf4', dot: '#22c55e', border: '#bbf7d0' },
-                                                qc_approved: { label: 'QC Approved', color: '#7c3aed', bg: '#f5f3ff', dot: '#a78bfa', border: '#ddd6fe' },
+                                                qc_approved: { label: 'SI Approved', color: '#7c3aed', bg: '#f5f3ff', dot: '#a78bfa', border: '#ddd6fe' },
                                                 under_review: { label: 'Under Review', color: '#7c3aed', bg: '#f5f3ff', dot: '#a78bfa', border: '#ddd6fe' },
                                                 published: { label: 'Published', color: '#0369a1', bg: '#f0f9ff', dot: '#38bdf8', border: '#bae6fd' },
                                                 reassessment: { label: 'Reassessment', color: '#b91c1c', bg: '#fef2f2', dot: '#f87171', border: '#fecaca' },
@@ -1720,7 +1720,7 @@ const Dashboard = () => {
                                             </div>
 
                                             <div style={{ marginBottom: '2.5rem' }}>
-                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>QC Review Feedback</label>
+                                                <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '1rem' }}>SI Review Feedback</label>
                                                 <textarea
                                                     value={qcRemarks}
                                                     onChange={(e) => setQCRemarks(e.target.value)}
@@ -1889,7 +1889,7 @@ const Dashboard = () => {
                     pending: { label: 'Not Started', color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
                     in_progress: { label: 'In Progress', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
                     completed: { label: 'Completed', color: '#065f46', bg: '#f0fdf4', border: '#bbf7d0' },
-                    qc_approved: { label: 'QC Verified', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+                    qc_approved: { label: 'SI Verified', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
                     under_review: { label: 'Under Review', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
                     published: { label: 'Published', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd' },
                     reassessment: { label: 'Reassessment', color: '#b91c1c', bg: '#fef2f2', border: '#fecaca' },

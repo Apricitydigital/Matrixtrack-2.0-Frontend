@@ -164,7 +164,7 @@ export default function TaskforceQcRequestsPage() {
                   ) : null}
 
                   <div style={{ marginTop: 12 }}>
-                    <label>Assign supervisors (comma separated IDs)</label>
+                    <label>Assign Darogas (comma separated IDs)</label>
                     <input className="input" value={assignees} onChange={(e) => setAssignees(e.target.value)} />
                     {supervisors.length > 0 && (
                       <div className="muted" style={{ marginTop: 4 }}>
