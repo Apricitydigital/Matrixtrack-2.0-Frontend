@@ -1178,6 +1178,7 @@ type LeaderboardRow = {
     rejected: number;
     actionRequired: number;
     actionTaken: number;
+    draft: number;
 };
 
 function emptyLeaderboardRow(
@@ -1191,6 +1192,7 @@ function emptyLeaderboardRow(
         rejected: 0,
         actionRequired: 0,
         actionTaken: 0,
+        draft: 0,
     };
 }
 
@@ -1206,6 +1208,7 @@ function bumpLeaderboardRow(
     else if (status === 'REJECTED') row.rejected += 1;
     else if (status === 'ACTION_REQUIRED') row.actionRequired += 1;
     else if (status === 'ACTION_TAKEN') row.actionTaken += 1;
+    else if (status === 'DRAFT') row.draft += 1;
 }
 
 function approvalRateOf(
@@ -1242,7 +1245,8 @@ function pendingOf(
         row.approved -
         row.rejected -
         row.actionRequired -
-        row.actionTaken
+        row.actionTaken -
+        row.draft
     );
 }
 
@@ -2225,11 +2229,31 @@ export default function UlbOperationsWorkspace({
 
 
             /*
+             * Sweeping beats with only 1-2 of 5 points submitted are
+             * DRAFT, not yet handed to QC. The Inspection & Performance
+             * screen keeps these out of QC Pending (they get their own
+             * Draft tab there), so they must be excluded here too or
+             * this screen's QC Pending count runs higher than that one.
+             */
+            const draft =
+                dashboardRecords.filter(
+                    (
+                        item
+                    ) =>
+                        effectiveStatus(
+                            item
+                        ) ===
+                        'DRAFT'
+                ).length;
+
+
+            /*
              * Any record whose effective status is none of the
-             * four known workflow states hasn't been reviewed by
-             * QC yet (raw backend status such as SUBMITTED /
-             * PENDING_QC) - this is the "QC Pending" count, same
-             * concept as the Inspection & Performance screen.
+             * four known workflow states (and isn't a draft) hasn't
+             * been reviewed by QC yet (raw backend status such as
+             * SUBMITTED / PENDING_QC) - this is the "QC Pending"
+             * count, same concept as the Inspection & Performance
+             * screen.
              */
             const pending =
                 dashboardRecords.length -
@@ -2237,7 +2261,8 @@ export default function UlbOperationsWorkspace({
                     approved +
                     rejected +
                     actionRequired +
-                    actionTaken
+                    actionTaken +
+                    draft
                 );
 
 
@@ -2247,6 +2272,7 @@ export default function UlbOperationsWorkspace({
                 actionRequired,
                 actionTaken,
                 pending,
+                draft,
 
                 total:
                     approved +
@@ -2254,13 +2280,39 @@ export default function UlbOperationsWorkspace({
                     actionRequired +
                     actionTaken,
 
+                /*
+                 * Excludes drafts, matching the "Total Inspection"
+                 * tile on the Inspection & Performance screen (drafts
+                 * get their own count there instead).
+                 */
                 grandTotal:
-                    dashboardRecords.length,
+                    dashboardRecords.length -
+                    draft,
             };
 
         }, [
             dashboardRecords,
         ]);
+
+
+    /*
+     * The QC-workflow KPI cards below link into the Inspection &
+     * Performance screen, which computes its own counts from its
+     * own default date range. Without carrying this dashboard's
+     * applied from/to dates along, that screen lands on a
+     * different period and shows a different number for the same
+     * stat - so every link must pass this same range.
+     */
+    function inspectionPerformanceHref(
+        status?: string
+    ) {
+        const params = new URLSearchParams();
+        if (status) params.set('status', status);
+        if (appliedDashFromDate) params.set('from', appliedDashFromDate);
+        if (appliedDashToDate) params.set('to', appliedDashToDate);
+        const qs = params.toString();
+        return `/ulb/inspection-performance${qs ? `?${qs}` : ''}`;
+    }
 
 
     /* =========================================================
@@ -3514,7 +3566,7 @@ export default function UlbOperationsWorkspace({
                                             onBuildSummaryText={buildCommissionerSummaryText}
 
                                             onOpenInspection={() =>
-                                                router.push('/ulb/inspection-performance')
+                                                router.push(inspectionPerformanceHref())
                                             }
 
                                             onOpenAttendance={() =>
@@ -3550,7 +3602,7 @@ export default function UlbOperationsWorkspace({
                                                 action={
                                                     <button
                                                         type="button"
-                                                        onClick={() => router.push('/ulb/inspection-performance')}
+                                                        onClick={() => router.push(inspectionPerformanceHref())}
                                                         className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100"
                                                     >
                                                         Open Inspection & Performance
@@ -3596,7 +3648,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/inspection-performance'
+                                                        inspectionPerformanceHref()
                                                     )
                                                 }
                                             />
@@ -3623,7 +3675,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/inspection-performance?status=PENDING'
+                                                        inspectionPerformanceHref('PENDING')
                                                     )
                                                 }
                                             />
@@ -3650,7 +3702,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/inspection-performance?status=APPROVED'
+                                                        inspectionPerformanceHref('APPROVED')
                                                     )
                                                 }
                                             />
@@ -3677,7 +3729,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/inspection-performance?status=REJECTED'
+                                                        inspectionPerformanceHref('REJECTED')
                                                     )
                                                 }
                                             />
@@ -3704,7 +3756,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/inspection-performance?status=ACTION_REQUIRED'
+                                                        inspectionPerformanceHref('ACTION_REQUIRED')
                                                     )
                                                 }
                                             />
@@ -3732,7 +3784,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/inspection-performance?status=PENDING_ACTION'
+                                                        inspectionPerformanceHref('PENDING_ACTION')
                                                     )
                                                 }
                                             />
@@ -3760,7 +3812,7 @@ export default function UlbOperationsWorkspace({
 
                                                 onClick={() =>
                                                     router.push(
-                                                        '/ulb/inspection-performance?status=ACTION_TAKEN'
+                                                        inspectionPerformanceHref('ACTION_TAKEN')
                                                     )
                                                 }
                                             />
@@ -5480,7 +5532,7 @@ function CommissionerSummary({
 
                     <div className="flex shrink-0 items-center gap-2">
 
-                        <button
+                        {/* <button
                             type="button"
                             onClick={handleCopy}
                             className="inline-flex items-center gap-1.5 rounded-xl border border-white/40 bg-white/10 px-3.5 py-2.5 text-xs font-black text-white shadow-sm backdrop-blur transition hover:bg-white/20"
@@ -5508,7 +5560,7 @@ function CommissionerSummary({
                         >
                             <MessageCircle size={14} />
                             Share on WhatsApp
-                        </button>
+                        </button> */}
 
                     </div>
 

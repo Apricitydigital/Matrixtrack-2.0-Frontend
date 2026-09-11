@@ -43,6 +43,7 @@ type ModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING';
 type ModuleFilter = 'ALL' | ModuleKey;
 type StatusKey =
   | 'TOTAL'
+  | 'DRAFT'
   | 'PENDING'
   | 'APPROVED'
   | 'REJECTED'
@@ -87,6 +88,7 @@ const DATE_PRESETS: Array<{ key: DatePreset; label: string }> = [
 
 const STATUS_ORDER: StatusKey[] = [
   'TOTAL',
+  'DRAFT',
   'PENDING',
   'APPROVED',
   'REJECTED',
@@ -112,6 +114,14 @@ const STATUS_CONFIG: Record<
     text: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-500',
+    icon: FileText,
+  },
+  DRAFT: {
+    label: 'Draft Reports',
+    shortLabel: 'Draft',
+    text: 'text-slate-600',
+    bg: 'bg-slate-100',
+    border: 'border-slate-400',
     icon: FileText,
   },
   PENDING: {
@@ -194,14 +204,22 @@ function dateRangeForPreset(
     return { start: value, end: value };
   }
 
+  /*
+   * WEEK/MONTH are rolling windows (today minus N days), not calendar
+   * week/month-to-date - this must match the ULB Dashboard's own
+   * "This Week"/"This Month" presets (see handleSelectPreset in
+   * UlbReportsWorkspace) exactly, or the same preset name shows two
+   * different record sets depending which screen you're on.
+   */
   if (preset === 'WEEK') {
     const start = new Date(today);
-    start.setDate(start.getDate() - 6);
+    start.setDate(start.getDate() - 7);
     return { start: toLocalISO(start), end: toLocalISO(today) };
   }
 
   if (preset === 'MONTH') {
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 30);
     return { start: toLocalISO(start), end: toLocalISO(today) };
   }
 
@@ -832,6 +850,14 @@ function searchText(item: DashboardRecord) {
 
 function statusClasses(status: string) {
   switch (status) {
+    case 'DRAFT':
+      return {
+        text: 'text-slate-600',
+        bg: 'bg-slate-100',
+        border: 'border-slate-200',
+        top: 'bg-slate-400',
+        icon: FileText,
+      };
     case 'APPROVED':
       return {
         text: 'text-emerald-600',
@@ -889,9 +915,17 @@ export default function InspectionPerformanceWorkspace() {
       : 'TOTAL';
   });
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>('ALL');
-  const [datePreset, setDatePreset] = useState<DatePreset>('MONTH');
-  const [customStart, setCustomStart] = useState('');
-  const [customEnd, setCustomEnd] = useState('');
+  /*
+   * The ULB dashboard's KPI cards link here with `from`/`to` so this
+   * screen lands on the exact same date range it was computed from -
+   * otherwise this screen's default ("This Month") would show a
+   * different count for the same stat.
+   */
+  const [datePreset, setDatePreset] = useState<DatePreset>(() =>
+    searchParams.get('from') && searchParams.get('to') ? 'CUSTOM' : 'MONTH'
+  );
+  const [customStart, setCustomStart] = useState(() => searchParams.get('from') || '');
+  const [customEnd, setCustomEnd] = useState(() => searchParams.get('to') || '');
   const [zones, setZones] = useState<any[]>([]);
   const [allWards, setAllWards] = useState<any[]>([]);
   const [selectedZone, setSelectedZone] = useState('');
@@ -1043,7 +1077,8 @@ export default function InspectionPerformanceWorkspace() {
 
   const counts = useMemo(() => {
     const next: Record<StatusKey, number> = {
-      TOTAL: searchableRecords.length,
+      TOTAL: searchableRecords.filter((item) => normalizedStatus(item) !== 'DRAFT').length,
+      DRAFT: 0,
       PENDING: 0,
       APPROVED: 0,
       REJECTED: 0,
@@ -1055,6 +1090,11 @@ export default function InspectionPerformanceWorkspace() {
     searchableRecords.forEach((item) => {
       const status = normalizedStatus(item);
       const decision = getQcDecision(item);
+
+      if (status === 'DRAFT') {
+        next.DRAFT += 1;
+        return;
+      }
 
       // QC Approved / QC Rejected are supersets: a report keeps its
       // original QC verdict even after it moves on to Action Required
@@ -1079,9 +1119,10 @@ export default function InspectionPerformanceWorkspace() {
 
   const filteredRecords = useMemo(() => {
     const list = searchableRecords.filter((item) => {
-      if (activeStatus === 'TOTAL') return true;
-
       const status = normalizedStatus(item);
+
+      if (activeStatus === 'TOTAL') return status !== 'DRAFT';
+      if (activeStatus === 'DRAFT') return status === 'DRAFT';
 
       if (activeStatus === 'ACTION_REQUIRED') {
         return status === 'ACTION_REQUIRED' || status === 'ACTION_TAKEN';
@@ -1749,7 +1790,7 @@ export default function InspectionPerformanceWorkspace() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-3 xl:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-3 xl:grid-cols-8">
           {STATUS_ORDER.map((statusKey) => {
             const config = STATUS_CONFIG[statusKey];
             const Icon = config.icon;
