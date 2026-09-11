@@ -7,6 +7,7 @@ import Sidebar from "@components/ui/Sidebar";
 import { Topbar } from "@components/ui/Topbar";
 
 const STANDALONE_PATHS = [
+  "/support",
   "/",
   "/privacy-policy",
   "/privacy",

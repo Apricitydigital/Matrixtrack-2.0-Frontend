@@ -1916,7 +1916,7 @@ function PortalHomeLayoutContent({
             : '-translate-x-full lg:translate-x-0'
           }`}
       >
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 flex-1 min-h-0">
 
           {/* LOGO & CLOSE / TOGGLE BUTTON */}
           <div className="flex items-center justify-between">
@@ -1962,7 +1962,7 @@ function PortalHomeLayoutContent({
           </div>
 
 
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-2 flex-1">
 
 
             {/* =================================================
@@ -3205,7 +3205,7 @@ function PortalHomeLayoutContent({
                 SYSTEM & ACCOUNT
             ================================================= */}
 
-            <div className={`px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-5 mb-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+            <div className={`px-3 text-[10px] font-black uppercase tracking-widest text-slate-400 mt-auto pt-4 mb-1 border-t border-slate-100 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
               System & Account
             </div>
 

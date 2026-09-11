@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = [
+  "/support",
   "/privacy-policy",
   "/privacy",
   "/terms-and-conditions",

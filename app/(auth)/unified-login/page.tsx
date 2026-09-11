@@ -2426,6 +2426,8 @@ export default function LoginPage() {
                 <ShieldCheck size={12} /> MatrixTrack 2.0 · © 2026 Apricity Digital Labs
               </span>
               <span>·</span>
+              <a href="/support" style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 700 }}>Support</a>
+              {' · '}
               <a href="/privacy-policy" style={{ color: '#60a5fa', textDecoration: 'none', fontWeight: 700 }}>Privacy Policy</a>
               <span>·</span>
               <a href="/terms-and-conditions" style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 700 }}>Terms & Conditions</a>
