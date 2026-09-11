@@ -3561,7 +3561,7 @@ export default function UlbOperationsWorkspace({
 
                                             <div className="space-y-5 p-5">
 
-                                        {/* =========================================
+                                                {/* =========================================
                         QC WORKFLOW STAT CARDS
 
                         Naming matches the Inspection & Performance
@@ -3573,510 +3573,510 @@ export default function UlbOperationsWorkspace({
                         the same way Attendance Analytics does.
                     ========================================= */}
 
-                                        <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
+                                                <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7">
 
-                                            <ExecutiveKpi
-                                                label="Total Inspection"
+                                                    <ExecutiveKpi
+                                                        label="Total Inspection"
 
-                                                value={
-                                                    stats.grandTotal
-                                                }
+                                                        value={
+                                                            stats.grandTotal
+                                                        }
 
-                                                // note={
-                                                //     isMultiDayRange
-                                                //         ? `Avg ${formatAverageValue(stats.grandTotal / rangeDayCount)}/day (${averageFormula(stats.grandTotal, rangeDayCount)})`
-                                                //         : selectedModuleName
-                                                // }
+                                                        // note={
+                                                        //     isMultiDayRange
+                                                        //         ? `Avg ${formatAverageValue(stats.grandTotal / rangeDayCount)}/day (${averageFormula(stats.grandTotal, rangeDayCount)})`
+                                                        //         : selectedModuleName
+                                                        // }
 
-                                                icon={
-                                                    Layers3
-                                                }
+                                                        icon={
+                                                            Layers3
+                                                        }
 
-                                                tone="navy"
+                                                        tone="navy"
 
-                                                onClick={() =>
-                                                    router.push(
-                                                        '/ulb/inspection-performance'
-                                                    )
-                                                }
-                                            />
-
-
-                                            <ExecutiveKpi
-                                                label="QC Pending"
-
-                                                value={
-                                                    stats.pending
-                                                }
-
-                                                // note={
-                                                //     isMultiDayRange
-                                                //         ? `Avg ${formatAverageValue(stats.pending / rangeDayCount)}/day (${averageFormula(stats.pending, rangeDayCount)})`
-                                                //         : 'Awaiting QC review'
-                                                // }
-
-                                                icon={
-                                                    Clock3
-                                                }
-
-                                                tone="gold"
-
-                                                onClick={() =>
-                                                    router.push(
-                                                        '/ulb/inspection-performance?status=PENDING'
-                                                    )
-                                                }
-                                            />
+                                                        onClick={() =>
+                                                            router.push(
+                                                                '/ulb/inspection-performance'
+                                                            )
+                                                        }
+                                                    />
 
 
-                                            <ExecutiveKpi
-                                                label="QC Approved"
+                                                    <ExecutiveKpi
+                                                        label="QC Pending"
 
-                                                value={
-                                                    stats.approved
-                                                }
+                                                        value={
+                                                            stats.pending
+                                                        }
 
-                                                // note={
-                                                //     isMultiDayRange
-                                                //         ? `Avg ${formatAverageValue(stats.approved / rangeDayCount)}/day (${averageFormula(stats.approved, rangeDayCount)})`
-                                                //         : 'Reviewed and accepted by QC'
-                                                // }
+                                                        // note={
+                                                        //     isMultiDayRange
+                                                        //         ? `Avg ${formatAverageValue(stats.pending / rangeDayCount)}/day (${averageFormula(stats.pending, rangeDayCount)})`
+                                                        //         : 'Awaiting QC review'
+                                                        // }
 
-                                                icon={
-                                                    CheckCircle2
-                                                }
+                                                        icon={
+                                                            Clock3
+                                                        }
 
-                                                tone="teal"
+                                                        tone="gold"
 
-                                                onClick={() =>
-                                                    router.push(
-                                                        '/ulb/inspection-performance?status=APPROVED'
-                                                    )
-                                                }
-                                            />
-
-
-                                            <ExecutiveKpi
-                                                label="QC Rejected"
-
-                                                value={
-                                                    stats.rejected
-                                                }
-
-                                                // note={
-                                                //     isMultiDayRange
-                                                //         ? `Avg ${formatAverageValue(stats.rejected / rangeDayCount)}/day (${averageFormula(stats.rejected, rangeDayCount)})`
-                                                //         : 'Rejected during QC review'
-                                                // }
-
-                                                icon={
-                                                    XCircle
-                                                }
-
-                                                tone="rose"
-
-                                                onClick={() =>
-                                                    router.push(
-                                                        '/ulb/inspection-performance?status=REJECTED'
-                                                    )
-                                                }
-                                            />
+                                                        onClick={() =>
+                                                            router.push(
+                                                                '/ulb/inspection-performance?status=PENDING'
+                                                            )
+                                                        }
+                                                    />
 
 
-                                            <ExecutiveKpi
-                                                label="Action Required"
+                                                    <ExecutiveKpi
+                                                        label="QC Approved"
 
-                                                value={
-                                                    correctiveTotal
-                                                }
+                                                        value={
+                                                            stats.approved
+                                                        }
 
-                                                // note={
-                                                //     isMultiDayRange
-                                                //         ? `Avg ${formatAverageValue(correctiveTotal / rangeDayCount)}/day (${averageFormula(correctiveTotal, rangeDayCount)})`
-                                                //         : 'Ever required corrective action'
-                                                // }
+                                                        // note={
+                                                        //     isMultiDayRange
+                                                        //         ? `Avg ${formatAverageValue(stats.approved / rangeDayCount)}/day (${averageFormula(stats.approved, rangeDayCount)})`
+                                                        //         : 'Reviewed and accepted by QC'
+                                                        // }
 
-                                                icon={
-                                                    AlertTriangle
-                                                }
+                                                        icon={
+                                                            CheckCircle2
+                                                        }
 
-                                                tone="orange"
+                                                        tone="teal"
 
-                                                onClick={() =>
-                                                    router.push(
-                                                        '/ulb/inspection-performance?status=ACTION_REQUIRED'
-                                                    )
-                                                }
-                                            />
-
-
-                                            <ExecutiveKpi
-                                                label="Pending Action"
-
-                                                value={
-                                                    stats
-                                                        .actionRequired
-                                                }
-
-                                                // note={
-                                                //     isMultiDayRange
-                                                //         ? `Avg ${formatAverageValue(stats.actionRequired / rangeDayCount)}/day (${averageFormula(stats.actionRequired, rangeDayCount)})`
-                                                //         : 'Awaiting corrective response'
-                                                // }
-
-                                                icon={
-                                                    Clock3
-                                                }
-
-                                                tone="cyan"
-
-                                                onClick={() =>
-                                                    router.push(
-                                                        '/ulb/inspection-performance?status=PENDING_ACTION'
-                                                    )
-                                                }
-                                            />
+                                                        onClick={() =>
+                                                            router.push(
+                                                                '/ulb/inspection-performance?status=APPROVED'
+                                                            )
+                                                        }
+                                                    />
 
 
-                                            <ExecutiveKpi
-                                                label="Action Taken"
+                                                    <ExecutiveKpi
+                                                        label="QC Rejected"
 
-                                                value={
-                                                    stats
-                                                        .actionTaken
-                                                }
+                                                        value={
+                                                            stats.rejected
+                                                        }
 
-                                                // note={
-                                                //     isMultiDayRange
-                                                //         ? `Avg ${formatAverageValue(stats.actionTaken / rangeDayCount)}/day (${averageFormula(stats.actionTaken, rangeDayCount)})`
-                                                //         : 'Corrective work completed'
-                                                // }
+                                                        // note={
+                                                        //     isMultiDayRange
+                                                        //         ? `Avg ${formatAverageValue(stats.rejected / rangeDayCount)}/day (${averageFormula(stats.rejected, rangeDayCount)})`
+                                                        //         : 'Rejected during QC review'
+                                                        // }
 
-                                                icon={
-                                                    FileCheck2
-                                                }
+                                                        icon={
+                                                            XCircle
+                                                        }
 
-                                                tone="indigo"
+                                                        tone="rose"
 
-                                                onClick={() =>
-                                                    router.push(
-                                                        '/ulb/inspection-performance?status=ACTION_TAKEN'
-                                                    )
-                                                }
-                                            />
-
-                                        </section>
+                                                        onClick={() =>
+                                                            router.push(
+                                                                '/ulb/inspection-performance?status=REJECTED'
+                                                            )
+                                                        }
+                                                    />
 
 
-                                        {/* =========================================
+                                                    <ExecutiveKpi
+                                                        label="Action Required"
+
+                                                        value={
+                                                            correctiveTotal
+                                                        }
+
+                                                        // note={
+                                                        //     isMultiDayRange
+                                                        //         ? `Avg ${formatAverageValue(correctiveTotal / rangeDayCount)}/day (${averageFormula(correctiveTotal, rangeDayCount)})`
+                                                        //         : 'Ever required corrective action'
+                                                        // }
+
+                                                        icon={
+                                                            AlertTriangle
+                                                        }
+
+                                                        tone="orange"
+
+                                                        onClick={() =>
+                                                            router.push(
+                                                                '/ulb/inspection-performance?status=ACTION_REQUIRED'
+                                                            )
+                                                        }
+                                                    />
+
+
+                                                    <ExecutiveKpi
+                                                        label="Pending Action"
+
+                                                        value={
+                                                            stats
+                                                                .actionRequired
+                                                        }
+
+                                                        // note={
+                                                        //     isMultiDayRange
+                                                        //         ? `Avg ${formatAverageValue(stats.actionRequired / rangeDayCount)}/day (${averageFormula(stats.actionRequired, rangeDayCount)})`
+                                                        //         : 'Awaiting corrective response'
+                                                        // }
+
+                                                        icon={
+                                                            Clock3
+                                                        }
+
+                                                        tone="cyan"
+
+                                                        onClick={() =>
+                                                            router.push(
+                                                                '/ulb/inspection-performance?status=PENDING_ACTION'
+                                                            )
+                                                        }
+                                                    />
+
+
+                                                    <ExecutiveKpi
+                                                        label="Action Taken"
+
+                                                        value={
+                                                            stats
+                                                                .actionTaken
+                                                        }
+
+                                                        // note={
+                                                        //     isMultiDayRange
+                                                        //         ? `Avg ${formatAverageValue(stats.actionTaken / rangeDayCount)}/day (${averageFormula(stats.actionTaken, rangeDayCount)})`
+                                                        //         : 'Corrective work completed'
+                                                        // }
+
+                                                        icon={
+                                                            FileCheck2
+                                                        }
+
+                                                        tone="indigo"
+
+                                                        onClick={() =>
+                                                            router.push(
+                                                                '/ulb/inspection-performance?status=ACTION_TAKEN'
+                                                            )
+                                                        }
+                                                    />
+
+                                                </section>
+
+
+                                                {/* =========================================
                         CHARTS
                     ========================================= */}
 
-                                        <section className="grid gap-5 xl:grid-cols-[1.55fr_0.85fr]">
+                                                <section className="grid gap-5 xl:grid-cols-[1.55fr_0.85fr]">
 
 
-                                            {/* MODULE CHART */}
+                                                    {/* MODULE CHART */}
 
-                                            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                                                    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
 
-                                                <div className="mb-5 flex flex-col gap-1">
+                                                        <div className="mb-5 flex flex-col gap-1">
 
 
 
-                                                    <h2 className="text-lg font-black text-slate-900">
-                                                        Module Workflow Position
-                                                    </h2>
+                                                            <h2 className="text-lg font-black text-slate-900">
+                                                                Module Workflow Position
+                                                            </h2>
 
 
-                                                    <p className="text-xs font-medium text-slate-500">
-                                                        Compare QC decisions and Action Required / Action Taken progress across all three sanitation modules.
-                                                    </p>
+                                                            <p className="text-xs font-medium text-slate-500">
+                                                                Compare QC decisions and Action Required / Action Taken progress across all three sanitation modules.
+                                                            </p>
 
-                                                </div>
+                                                        </div>
 
 
-                                                <div className="h-[330px]">
+                                                        <div className="h-[330px]">
 
-                                                    <ResponsiveContainer
-                                                        width="100%"
-                                                        height="100%"
-                                                    >
-
-                                                        <BarChart
-                                                            data={
-                                                                moduleChartData
-                                                            }
-
-                                                            barGap={3}
-                                                        >
-
-                                                            <CartesianGrid
-                                                                vertical={false}
-
-                                                                stroke="#eef2f7"
-
-                                                                strokeDasharray="3 3"
-                                                            />
-
-
-                                                            <XAxis
-                                                                dataKey="name"
-
-                                                                axisLine={
-                                                                    false
-                                                                }
-
-                                                                tickLine={
-                                                                    false
-                                                                }
-
-                                                                fontSize={11}
-                                                            />
-
-
-                                                            <YAxis
-                                                                axisLine={
-                                                                    false
-                                                                }
-
-                                                                tickLine={
-                                                                    false
-                                                                }
-
-                                                                fontSize={11}
-
-                                                                allowDecimals={
-                                                                    false
-                                                                }
-                                                            />
-
-
-                                                            <Tooltip />
-
-
-                                                            <Bar
-                                                                dataKey="Approved"
-
-                                                                fill="#0f766e"
-
-                                                                radius={[
-                                                                    5,
-                                                                    5,
-                                                                    0,
-                                                                    0,
-                                                                ]}
-                                                            />
-
-
-                                                            <Bar
-                                                                dataKey="Rejected"
-
-                                                                fill="#dc2626"
-
-                                                                radius={[
-                                                                    5,
-                                                                    5,
-                                                                    0,
-                                                                    0,
-                                                                ]}
-                                                            />
-
-
-                                                            <Bar
-                                                                dataKey="Action Required"
-
-                                                                fill="#b7791f"
-
-                                                                radius={[
-                                                                    5,
-                                                                    5,
-                                                                    0,
-                                                                    0,
-                                                                ]}
-                                                            />
-
-
-                                                            <Bar
-                                                                dataKey="Action Taken"
-
-                                                                fill="#2563eb"
-
-                                                                radius={[
-                                                                    5,
-                                                                    5,
-                                                                    0,
-                                                                    0,
-                                                                ]}
-                                                            />
-
-                                                        </BarChart>
-
-                                                    </ResponsiveContainer>
-
-                                                </div>
-
-
-                                                <div className="mt-3 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-[11px] font-bold text-slate-500">
-
-                                                    <LegendDot
-                                                        color="#0f766e"
-                                                        label="QC approved"
-                                                    />
-
-                                                    <LegendDot
-                                                        color="#dc2626"
-                                                        label="QC rejected"
-                                                    />
-
-                                                    <LegendDot
-                                                        color="#b7791f"
-                                                        label="Action Required"
-                                                    />
-
-                                                    <LegendDot
-                                                        color="#2563eb"
-                                                        label="Action Taken"
-                                                    />
-
-                                                </div>
-
-                                            </div>
-
-
-                                            {/* STATUS PIE */}
-
-                                            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-
-
-
-
-                                                <h2 className="mt-1 text-lg font-black text-slate-900">
-                                                    Workflow Distribution
-                                                </h2>
-
-
-                                                <div className="h-[240px]">
-
-                                                    <ResponsiveContainer
-                                                        width="100%"
-                                                        height="100%"
-                                                    >
-
-                                                        <PieChart>
-
-                                                            <Pie
-                                                                data={
-                                                                    statusData
-                                                                }
-
-                                                                dataKey="value"
-
-                                                                nameKey="name"
-
-                                                                innerRadius={
-                                                                    58
-                                                                }
-
-                                                                outerRadius={
-                                                                    88
-                                                                }
-
-                                                                paddingAngle={
-                                                                    3
-                                                                }
+                                                            <ResponsiveContainer
+                                                                width="100%"
+                                                                height="100%"
                                                             >
 
-                                                                {
-                                                                    statusData.map(
-                                                                        (
-                                                                            entry
-                                                                        ) => (
-
-                                                                            <Cell
-                                                                                key={
-                                                                                    entry.name
-                                                                                }
-
-                                                                                fill={
-                                                                                    entry.color
-                                                                                }
-                                                                            />
-
-                                                                        )
-                                                                    )
-                                                                }
-
-                                                            </Pie>
-
-
-                                                            <Tooltip />
-
-                                                        </PieChart>
-
-                                                    </ResponsiveContainer>
-
-                                                </div>
-
-
-                                                <div className="grid grid-cols-2 gap-2">
-
-                                                    {
-                                                        statusData.map(
-                                                            (
-                                                                item
-                                                            ) => (
-
-                                                                <div
-                                                                    key={
-                                                                        item.name
+                                                                <BarChart
+                                                                    data={
+                                                                        moduleChartData
                                                                     }
 
-                                                                    className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2"
+                                                                    barGap={3}
                                                                 >
 
-                                                                    <div className="flex items-center gap-2">
+                                                                    <CartesianGrid
+                                                                        vertical={false}
 
-                                                                        <span
-                                                                            className="h-2.5 w-2.5 rounded-full"
+                                                                        stroke="#eef2f7"
 
-                                                                            style={{
-                                                                                backgroundColor:
-                                                                                    item.color,
-                                                                            }}
-                                                                        />
+                                                                        strokeDasharray="3 3"
+                                                                    />
 
 
-                                                                        <span className="text-[10px] font-bold text-slate-500">
-                                                                            {item.name}
-                                                                        </span>
+                                                                    <XAxis
+                                                                        dataKey="name"
 
-                                                                    </div>
+                                                                        axisLine={
+                                                                            false
+                                                                        }
 
+                                                                        tickLine={
+                                                                            false
+                                                                        }
 
-                                                                    <div className="mt-1 text-lg font-black text-slate-900">
-                                                                        {item.value}
-                                                                    </div>
-
-                                                                </div>
-
-                                                            )
-                                                        )
-                                                    }
-
-                                                </div>
-
-                                            </div>
-
-                                        </section>
+                                                                        fontSize={11}
+                                                                    />
 
 
-                                        {/* =========================================
+                                                                    <YAxis
+                                                                        axisLine={
+                                                                            false
+                                                                        }
+
+                                                                        tickLine={
+                                                                            false
+                                                                        }
+
+                                                                        fontSize={11}
+
+                                                                        allowDecimals={
+                                                                            false
+                                                                        }
+                                                                    />
+
+
+                                                                    <Tooltip />
+
+
+                                                                    <Bar
+                                                                        dataKey="Approved"
+
+                                                                        fill="#0f766e"
+
+                                                                        radius={[
+                                                                            5,
+                                                                            5,
+                                                                            0,
+                                                                            0,
+                                                                        ]}
+                                                                    />
+
+
+                                                                    <Bar
+                                                                        dataKey="Rejected"
+
+                                                                        fill="#dc2626"
+
+                                                                        radius={[
+                                                                            5,
+                                                                            5,
+                                                                            0,
+                                                                            0,
+                                                                        ]}
+                                                                    />
+
+
+                                                                    <Bar
+                                                                        dataKey="Action Required"
+
+                                                                        fill="#b7791f"
+
+                                                                        radius={[
+                                                                            5,
+                                                                            5,
+                                                                            0,
+                                                                            0,
+                                                                        ]}
+                                                                    />
+
+
+                                                                    <Bar
+                                                                        dataKey="Action Taken"
+
+                                                                        fill="#2563eb"
+
+                                                                        radius={[
+                                                                            5,
+                                                                            5,
+                                                                            0,
+                                                                            0,
+                                                                        ]}
+                                                                    />
+
+                                                                </BarChart>
+
+                                                            </ResponsiveContainer>
+
+                                                        </div>
+
+
+                                                        <div className="mt-3 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-[11px] font-bold text-slate-500">
+
+                                                            <LegendDot
+                                                                color="#0f766e"
+                                                                label="QC approved"
+                                                            />
+
+                                                            <LegendDot
+                                                                color="#dc2626"
+                                                                label="QC rejected"
+                                                            />
+
+                                                            <LegendDot
+                                                                color="#b7791f"
+                                                                label="Action Required"
+                                                            />
+
+                                                            <LegendDot
+                                                                color="#2563eb"
+                                                                label="Action Taken"
+                                                            />
+
+                                                        </div>
+
+                                                    </div>
+
+
+                                                    {/* STATUS PIE */}
+
+                                                    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+
+
+
+
+                                                        <h2 className="mt-1 text-lg font-black text-slate-900">
+                                                            Workflow Distribution
+                                                        </h2>
+
+
+                                                        <div className="h-[240px]">
+
+                                                            <ResponsiveContainer
+                                                                width="100%"
+                                                                height="100%"
+                                                            >
+
+                                                                <PieChart>
+
+                                                                    <Pie
+                                                                        data={
+                                                                            statusData
+                                                                        }
+
+                                                                        dataKey="value"
+
+                                                                        nameKey="name"
+
+                                                                        innerRadius={
+                                                                            58
+                                                                        }
+
+                                                                        outerRadius={
+                                                                            88
+                                                                        }
+
+                                                                        paddingAngle={
+                                                                            3
+                                                                        }
+                                                                    >
+
+                                                                        {
+                                                                            statusData.map(
+                                                                                (
+                                                                                    entry
+                                                                                ) => (
+
+                                                                                    <Cell
+                                                                                        key={
+                                                                                            entry.name
+                                                                                        }
+
+                                                                                        fill={
+                                                                                            entry.color
+                                                                                        }
+                                                                                    />
+
+                                                                                )
+                                                                            )
+                                                                        }
+
+                                                                    </Pie>
+
+
+                                                                    <Tooltip />
+
+                                                                </PieChart>
+
+                                                            </ResponsiveContainer>
+
+                                                        </div>
+
+
+                                                        <div className="grid grid-cols-2 gap-2">
+
+                                                            {
+                                                                statusData.map(
+                                                                    (
+                                                                        item
+                                                                    ) => (
+
+                                                                        <div
+                                                                            key={
+                                                                                item.name
+                                                                            }
+
+                                                                            className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2"
+                                                                        >
+
+                                                                            <div className="flex items-center gap-2">
+
+                                                                                <span
+                                                                                    className="h-2.5 w-2.5 rounded-full"
+
+                                                                                    style={{
+                                                                                        backgroundColor:
+                                                                                            item.color,
+                                                                                    }}
+                                                                                />
+
+
+                                                                                <span className="text-[10px] font-bold text-slate-500">
+                                                                                    {item.name}
+                                                                                </span>
+
+                                                                            </div>
+
+
+                                                                            <div className="mt-1 text-lg font-black text-slate-900">
+                                                                                {item.value}
+                                                                            </div>
+
+                                                                        </div>
+
+                                                                    )
+                                                                )
+                                                            }
+
+                                                        </div>
+
+                                                    </div>
+
+                                                </section>
+
+
+                                                {/* =========================================
                         REPORTS VOLUME TREND
                     ========================================= */}
 
-                                        <ReportsTrendChart
-                                            data={reportsTrend}
-                                        />
+                                                <ReportsTrendChart
+                                                    data={reportsTrend}
+                                                />
 
                                             </div>
 
@@ -4267,7 +4267,7 @@ export default function UlbOperationsWorkspace({
 
 
 
-                                     
+
 
                                     </>
                                 ) : (
@@ -5478,39 +5478,7 @@ function CommissionerSummary({
 
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
 
-                        <button
-                            type="button"
-                            onClick={handleCopy}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-white/40 bg-white/10 px-3.5 py-2.5 text-xs font-black text-white shadow-sm backdrop-blur transition hover:bg-white/20"
-                        >
-                            {
-                                copyState === 'copied' ? (
-                                    <CheckCircle2 size={14} className="text-emerald-300" />
-                                ) : (
-                                    <Copy size={14} />
-                                )
-                            }
-                            {
-                                copyState === 'copied'
-                                    ? 'Copied'
-                                    : copyState === 'error'
-                                        ? 'Try again'
-                                        : 'Copy'
-                            }
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={handleWhatsApp}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-3.5 py-2.5 text-xs font-black text-white shadow-md shadow-emerald-900/30 transition hover:-translate-y-0.5"
-                        >
-                            <MessageCircle size={14} />
-                            Share on WhatsApp
-                        </button>
-
-                    </div>
 
                 </div>
 
@@ -6385,116 +6353,116 @@ function PerformanceLeaderboardCard({
 
             <div className="p-5 sm:p-6">
 
-            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${toneColors.bg} ${toneColors.text}`}>
-                <Icon size={16} />
-            </div>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${toneColors.bg} ${toneColors.text}`}>
+                    <Icon size={16} />
+                </div>
 
-            <h3 className="mt-3 text-lg font-black text-slate-900">
-                {title}
-            </h3>
+                <h3 className="mt-3 text-lg font-black text-slate-900">
+                    {title}
+                </h3>
 
-            <p className="mt-1 text-xs font-medium text-slate-500">
-                {description}
-            </p>
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                    {description}
+                </p>
 
-            <p className="mt-1 text-[10px] font-medium leading-4 text-slate-400">
-                Approval % = approved ÷ (approved + rejected), so pending/action rows don't skew it. Action % = action taken ÷ (action required + action taken).
-            </p>
+                <p className="mt-1 text-[10px] font-medium leading-4 text-slate-400">
+                    Approval % = approved ÷ (approved + rejected), so pending/action rows don't skew it. Action % = action taken ÷ (action required + action taken).
+                </p>
 
-            {
-                sorted.length === 0 ? (
+                {
+                    sorted.length === 0 ? (
 
-                    <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs font-semibold text-slate-400">
-                        {emptyMessage}
-                    </div>
+                        <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs font-semibold text-slate-400">
+                            {emptyMessage}
+                        </div>
 
-                ) : (
+                    ) : (
 
-                    <div className={`mt-4 space-y-2.5 ${scroll ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
-                        {
-                            sorted.map((row, index) => {
-                                const rate = approvalRateOf(row);
-                                const closure = closureRateOf(row);
-                                const hasRate = rate !== null;
-                                const band = scoreBandFor(rate ?? 0);
-                                const pending = pendingOf(row);
+                        <div className={`mt-4 space-y-2.5 ${scroll ? 'max-h-[420px] overflow-y-auto pr-1' : ''}`}>
+                            {
+                                sorted.map((row, index) => {
+                                    const rate = approvalRateOf(row);
+                                    const closure = closureRateOf(row);
+                                    const hasRate = rate !== null;
+                                    const band = scoreBandFor(rate ?? 0);
+                                    const pending = pendingOf(row);
 
-                                const breakdown = [
-                                    `${row.approved} approved`,
-                                    `${row.rejected} rejected`,
-                                ];
+                                    const breakdown = [
+                                        `${row.approved} approved`,
+                                        `${row.rejected} rejected`,
+                                    ];
 
-                                if (row.actionRequired > 0) breakdown.push(`${row.actionRequired} action req.`);
-                                if (row.actionTaken > 0) breakdown.push(`${row.actionTaken} action taken`);
-                                if (pending > 0) breakdown.push(`${pending} pending`);
+                                    if (row.actionRequired > 0) breakdown.push(`${row.actionRequired} action req.`);
+                                    if (row.actionTaken > 0) breakdown.push(`${row.actionTaken} action taken`);
+                                    if (pending > 0) breakdown.push(`${pending} pending`);
 
-                                return (
-                                    <div
-                                        key={row.key}
-                                        className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3.5 py-3"
-                                    >
-
+                                    return (
                                         <div
-                                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ring-1 ${hasRate
-                                                ? `${band.bg} ${band.text} ${band.ring}`
-                                                : 'bg-slate-100 text-slate-400 ring-slate-200'
-                                                }`}
+                                            key={row.key}
+                                            className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3.5 py-3"
                                         >
-                                            {index + 1}
-                                        </div>
 
-                                        <div className="min-w-0 flex-1">
-
-                                            <div className="truncate text-[11px] font-black text-slate-800">
-                                                {row.label}
-                                            </div>
-
-                                            <div className="mt-0.5 text-[9px] font-bold leading-4 text-slate-400">
-                                                {row.total} report{row.total === 1 ? '' : 's'} · {breakdown.join(' · ')}
-                                            </div>
-
-                                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-700 ${hasRate ? band.bar : 'bg-slate-300'}`}
-                                                    style={{
-                                                        width: hasRate
-                                                            ? `${Math.min(100, Math.max(0, rate as number))}%`
-                                                            : '0%',
-                                                    }}
-                                                />
-                                            </div>
-
-                                        </div>
-
-                                        <div className="flex shrink-0 flex-col items-end gap-1">
-
-                                            <span
-                                                className={`rounded-lg px-2 py-1 text-[10px] font-black ${hasRate
-                                                    ? `${band.bg} ${band.text}`
-                                                    : 'bg-slate-100 text-slate-500'
+                                            <div
+                                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-black ring-1 ${hasRate
+                                                    ? `${band.bg} ${band.text} ${band.ring}`
+                                                    : 'bg-slate-100 text-slate-400 ring-slate-200'
                                                     }`}
                                             >
-                                                {hasRate ? `${rate}%` : 'N/A'}
-                                            </span>
+                                                {index + 1}
+                                            </div>
 
-                                            {
-                                                closure !== null ? (
-                                                    <span className="text-[8px] font-bold text-slate-400">
-                                                        {closure}% action
-                                                    </span>
-                                                ) : null
-                                            }
+                                            <div className="min-w-0 flex-1">
+
+                                                <div className="truncate text-[11px] font-black text-slate-800">
+                                                    {row.label}
+                                                </div>
+
+                                                <div className="mt-0.5 text-[9px] font-bold leading-4 text-slate-400">
+                                                    {row.total} report{row.total === 1 ? '' : 's'} · {breakdown.join(' · ')}
+                                                </div>
+
+                                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all duration-700 ${hasRate ? band.bar : 'bg-slate-300'}`}
+                                                        style={{
+                                                            width: hasRate
+                                                                ? `${Math.min(100, Math.max(0, rate as number))}%`
+                                                                : '0%',
+                                                        }}
+                                                    />
+                                                </div>
+
+                                            </div>
+
+                                            <div className="flex shrink-0 flex-col items-end gap-1">
+
+                                                <span
+                                                    className={`rounded-lg px-2 py-1 text-[10px] font-black ${hasRate
+                                                        ? `${band.bg} ${band.text}`
+                                                        : 'bg-slate-100 text-slate-500'
+                                                        }`}
+                                                >
+                                                    {hasRate ? `${rate}%` : 'N/A'}
+                                                </span>
+
+                                                {
+                                                    closure !== null ? (
+                                                        <span className="text-[8px] font-bold text-slate-400">
+                                                            {closure}% action
+                                                        </span>
+                                                    ) : null
+                                                }
+
+                                            </div>
 
                                         </div>
+                                    );
+                                })
+                            }
+                        </div>
 
-                                    </div>
-                                );
-                            })
-                        }
-                    </div>
-
-                )
-            }
+                    )
+                }
 
             </div>
 
@@ -6535,78 +6503,78 @@ function PeopleLeaderboardCard({
 
             <div className="p-5">
 
-            <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneColors.bg} ${toneColors.text}`}>
-                <Icon size={15} />
-            </div>
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneColors.bg} ${toneColors.text}`}>
+                    <Icon size={15} />
+                </div>
 
-            <h3 className="mt-2.5 text-base font-black text-slate-900">
-                {title}
-            </h3>
+                <h3 className="mt-2.5 text-base font-black text-slate-900">
+                    {title}
+                </h3>
 
-            {
-                note ? (
-                    <p className="mt-1 text-[10px] font-semibold leading-4 text-slate-400">
-                        {note}
-                    </p>
-                ) : null
-            }
+                {
+                    note ? (
+                        <p className="mt-1 text-[10px] font-semibold leading-4 text-slate-400">
+                            {note}
+                        </p>
+                    ) : null
+                }
 
-            {
-                rows.length === 0 ? (
+                {
+                    rows.length === 0 ? (
 
-                    <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-xs font-semibold text-slate-400">
-                        {emptyMessage}
-                    </div>
+                        <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-xs font-semibold text-slate-400">
+                            {emptyMessage}
+                        </div>
 
-                ) : (
+                    ) : (
 
-                    <div className="mt-4 space-y-2">
-                        {
-                            rows.map((row, index) => {
-                                const rate =
-                                    rateType === 'approval'
-                                        ? approvalRateOf(row)
-                                        : closureRateOf(row);
+                        <div className="mt-4 space-y-2">
+                            {
+                                rows.map((row, index) => {
+                                    const rate =
+                                        rateType === 'approval'
+                                            ? approvalRateOf(row)
+                                            : closureRateOf(row);
 
-                                const hasRate = rate !== null;
-                                const band = scoreBandFor(rate ?? 0);
+                                    const hasRate = rate !== null;
+                                    const band = scoreBandFor(rate ?? 0);
 
-                                return (
-                                    <div key={row.key} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+                                    return (
+                                        <div key={row.key} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
 
-                                        <div
-                                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-black ring-1 ${hasRate
-                                                ? `${band.bg} ${band.text} ${band.ring}`
-                                                : 'border border-slate-200 bg-white text-slate-500 ring-slate-100'
-                                                }`}
-                                        >
-                                            {index + 1}
-                                        </div>
-
-                                        <div className="min-w-0 flex-1">
-                                            <div className="truncate text-xs font-black text-slate-800">{row.label}</div>
-                                            <div className="text-[10px] font-semibold text-slate-400">
-                                                {row.total} report{row.total === 1 ? '' : 's'}
+                                            <div
+                                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[10px] font-black ring-1 ${hasRate
+                                                    ? `${band.bg} ${band.text} ${band.ring}`
+                                                    : 'border border-slate-200 bg-white text-slate-500 ring-slate-100'
+                                                    }`}
+                                            >
+                                                {index + 1}
                                             </div>
-                                        </div>
 
-                                        <div className="shrink-0 text-right">
-                                            <div className={`text-xs font-black ${hasRate ? band.text : 'text-slate-400'}`}>
-                                                {hasRate ? `${rate}%` : '—'}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="truncate text-xs font-black text-slate-800">{row.label}</div>
+                                                <div className="text-[10px] font-semibold text-slate-400">
+                                                    {row.total} report{row.total === 1 ? '' : 's'}
+                                                </div>
                                             </div>
-                                            <div className="text-[8px] font-bold uppercase tracking-wide text-slate-400">
-                                                {rateType === 'approval' ? 'approval' : 'action'}
+
+                                            <div className="shrink-0 text-right">
+                                                <div className={`text-xs font-black ${hasRate ? band.text : 'text-slate-400'}`}>
+                                                    {hasRate ? `${rate}%` : '—'}
+                                                </div>
+                                                <div className="text-[8px] font-bold uppercase tracking-wide text-slate-400">
+                                                    {rateType === 'approval' ? 'approval' : 'action'}
+                                                </div>
                                             </div>
+
                                         </div>
+                                    );
+                                })
+                            }
+                        </div>
 
-                                    </div>
-                                );
-                            })
-                        }
-                    </div>
-
-                )
-            }
+                    )
+                }
 
             </div>
 
