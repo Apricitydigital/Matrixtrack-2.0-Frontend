@@ -509,7 +509,7 @@ export default function BeatRequestsPage() {
                         </td>
                         <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
                           <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>{req.requestedBy?.name || 'Field User'}</div>
-                          <div style={{ fontSize: 11, color: '#64748b' }}>{req.requestedByRole || 'Supervisor'}</div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>{req.requestedByRole || 'Daroga'}</div>
                         </td>
                         <td style={{ padding: '14px 16px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
                           <span style={{ fontSize: 12, fontWeight: 600, color: '#2563eb' }}>
@@ -527,7 +527,7 @@ export default function BeatRequestsPage() {
                             color: isApproved ? '#15803d' : isRejected ? '#b91c1c' : '#b45309',
                             border: `1px solid ${isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a'}`
                           }}>
-                            {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending QC'}
+                            {isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending SI'}
                           </span>
                         </td>
                         <td style={{ padding: '14px 16px', textAlign: 'right', borderTopRightRadius: 12, borderBottomRightRadius: 12, borderRight: '1px solid #e2e8f0', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>

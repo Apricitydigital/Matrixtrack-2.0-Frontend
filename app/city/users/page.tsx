@@ -296,13 +296,13 @@ function CityUsersPage() {
     try {
       if (usesGeoScope(role) && (newZoneIds.size === 0 || newWardIds.size === 0)) {
         setStatus("");
-        setError("QC and ULB Officer users require at least one zone and ward");
+        setError("SI and ULB Officer users require at least one zone and ward");
         return;
       }
 
       if (requiresModuleAssignment(role) && Object.keys(newUserModules).length === 0) {
         setStatus("");
-        setError("Action Officer requires at least one module assignment");
+        setError("IEC Member requires at least one module assignment");
         return;
       }
 
@@ -448,13 +448,13 @@ function CityUsersPage() {
       const cleanWardIds = Array.from(payload.wardIds).filter((id) => validWardIds.has(id));
 
       if (usesGeoScope(payload.role) && (cleanZoneIds.length === 0 || cleanWardIds.length === 0)) {
-        setError("QC and ULB Officer users require at least one zone and ward");
+        setError("SI and ULB Officer users require at least one zone and ward");
         setSavingUserId(null);
         return;
       }
 
       if (requiresModuleAssignment(payload.role) && Object.keys(payload.modules).length === 0) {
-        setError("Action Officer requires at least one module assignment");
+        setError("IEC Member requires at least one module assignment");
         setSavingUserId(null);
         return;
       }
@@ -1120,7 +1120,7 @@ function UserRow({
   // Role Badge Styling
   const getRoleStyle = (role: Role) => {
     switch (role) {
-      case 'QC': return { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', label: 'Quality Control' };
+      case 'QC': return { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', label: 'Sanitary Inspector' };
       case 'ULB_OFFICER':
         return {
           bg: '#ecfeff',
@@ -1128,10 +1128,10 @@ function UserRow({
           border: '#a5f3fc',
           label: 'ULB Officer'
         };
-      case 'ACTION_OFFICER': return { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa', label: 'Action Officer' };
+      case 'ACTION_OFFICER': return { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa', label: 'IEC Member' };
       case 'COMMISSIONER': return { bg: '#faf5ff', color: '#7e22ce', border: '#e9d5ff', label: 'Commissioner' };
       case 'CITY_ADMIN': return { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0', label: 'City Admin' };
-      case 'SUPERVISOR': return { bg: '#e0f2fe', color: '#0369a1', border: '#bae6fd', label: 'Supervisor' };
+      case 'SUPERVISOR': return { bg: '#e0f2fe', color: '#0369a1', border: '#bae6fd', label: 'Daroga' };
       default: return { bg: '#f1f5f9', color: '#475569', border: '#e2e8f0', label: 'Field Employee' };
     }
   };

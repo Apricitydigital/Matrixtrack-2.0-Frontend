@@ -221,7 +221,7 @@ export default function TaskforceAssignedDetailPage() {
           q9: { strayAnimals: q.strayAnimals === "YES", strayAnimalsPhoto: q.strayAnimalsPhoto }
         }
       });
-      setSubmitStatus("Report submitted for QC review.");
+      setSubmitStatus("Report submitted for SI review.");
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : "Failed to submit report");
     } finally {
@@ -352,7 +352,7 @@ export default function TaskforceAssignedDetailPage() {
                   disabled={!withinFence || submitting || !feeder.latitude || !feeder.longitude}
                   onClick={handleSubmit}
                 >
-                  {submitting ? "Submitting..." : withinFence ? "Submit for QC" : "Move within 100m to submit"}
+                  {submitting ? "Submitting..." : withinFence ? "Submit for SI" : "Move within 100m to submit"}
                 </button>
               </div>
             </div>

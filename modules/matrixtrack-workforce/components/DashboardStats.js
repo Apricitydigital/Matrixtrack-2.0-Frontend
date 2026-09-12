@@ -172,7 +172,7 @@ function DashboardStats({
       {
         key: "sup-supervisors",
         trend: change.supervisors ?? 0,
-        title: "Supervisors",
+        title: "Darogas",
         value: formatNumber(Number.isFinite(supervisorCount) ? supervisorCount : totalSupervisors),
         subLabel: "Active in system",
         clickKey: "supervisors",
@@ -357,7 +357,7 @@ C110 12 115 16 120 14
     {
       key: "supervisors",
       trend: change.supervisors ?? 0,
-      title: "Supervisors",
+      title: "Darogas",
       value: formatNumber(Number.isFinite(supervisorCount) ? supervisorCount : 0),
       subLabel: "Active in system",
     },

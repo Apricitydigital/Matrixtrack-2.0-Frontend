@@ -2870,7 +2870,7 @@ export default function BeatStatusPage() {
 
 
                         <input
-                            placeholder="Search beats, points, supervisors, employees, zones, wards..."
+                            placeholder="Search beats, points, darogas, employees, zones, wards..."
                             value={search}
                             onChange={
                                 e =>
@@ -3151,7 +3151,7 @@ export default function BeatStatusPage() {
                                 </span>
 
                                 <span>
-                                    Supervisor
+                                    Daroga
                                 </span>
 
                                 <span>
@@ -3477,7 +3477,7 @@ export default function BeatStatusPage() {
 
                                                                         <div>
                                                                             <b>
-                                                                                Supervisor:
+                                                                                Daroga:
                                                                             </b>
                                                                             {" "}
                                                                             {

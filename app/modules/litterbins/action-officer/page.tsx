@@ -235,7 +235,7 @@ export default function LitterbinsActionOfficerPage() {
                 </span>
               </div>
               <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#64748b', fontWeight: 500 }}>
-                Review assigned bin reports, take necessary actions, and mark them as complete to notify QC.
+                Review assigned bin reports, take necessary actions, and mark them as complete to notify SI.
               </p>
             </div>
 
@@ -334,8 +334,8 @@ export default function LitterbinsActionOfficerPage() {
               <StatCard label="TOTAL BINS" value={stats.total} sub="Registered Assets" borderColor="#2563eb" />
               <StatCard label="SUBMITTED REPORTS" value={stats.submitted} sub="Total Submitted" borderColor="#4f46e5" />
               <StatCard label="PENDING REPORTS" value={stats.pending} sub="Pending Review" borderColor="#f59e0b" />
-              <StatCard label="APPROVED REPORTS" value={stats.approved} sub="Approved by QC" borderColor="#10b981" />
-              <StatCard label="REJECTED REPORTS" value={stats.rejected} sub="Rejected by QC" borderColor="#ef4444" />
+              <StatCard label="APPROVED REPORTS" value={stats.approved} sub="Approved by SI" borderColor="#10b981" />
+              <StatCard label="REJECTED REPORTS" value={stats.rejected} sub="Rejected by SI" borderColor="#ef4444" />
               <StatCard label="ACTION REQUIRED" value={stats.actionRequired} sub="Needs Resolution" borderColor="#ea580c" />
               <StatCard label="ACTION TAKEN REPORTS" value={stats.actionTaken} sub="Action Completed" borderColor="#06b6d4" />
             </div>
@@ -458,8 +458,8 @@ export default function LitterbinsActionOfficerPage() {
                             </div>
                           </td>
                           <td style={{ padding: '14px', borderBottom: '1px solid #f1f5f9' }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{r.createdBy || r.supervisorName || "Supervisor"}</div>
-                            <div style={{ fontSize: 11, color: '#64748b' }}>Field Supervisor</div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{r.createdBy || r.supervisorName || "Daroga"}</div>
+                            <div style={{ fontSize: 11, color: '#64748b' }}>Field Daroga</div>
                           </td>
                           <td style={{ padding: '14px', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
                             <StatusBadge status={displayStatus} />
@@ -496,7 +496,7 @@ export default function LitterbinsActionOfficerPage() {
           {active && (
             <UniversalReportModal
               moduleTitle="Litter Bins"
-              moduleBadge="ACTION OFFICER"
+              moduleBadge="IEC MEMBER"
               record={active}
               isAO={true}
               onClose={() => setActive(null)}

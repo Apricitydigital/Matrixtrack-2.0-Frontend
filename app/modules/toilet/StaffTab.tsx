@@ -100,7 +100,7 @@ export default function StaffTab() {
                                     </td>
                                     <td className="py-4 px-4">
                                         <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md text-xs font-bold uppercase">
-                                            {emp.role.replace('_', ' ')}
+                                            {emp.role === 'SUPERVISOR' ? 'DAROGA' : emp.role.replace('_', ' ')}
                                         </span>
                                     </td>
                                     <td className="py-4 px-4 text-sm font-medium text-slate-600">
@@ -124,7 +124,7 @@ export default function StaffTab() {
             </div>
 
             <div className="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-500">
-                <strong>Note for QC:</strong> This list shows all supervisors with access to the Toilet Module in your jurisdiction.
+                <strong>Note for SI:</strong> This list shows all Darogas with access to the Toilet Module in your jurisdiction.
             </div>
         </div>
     );

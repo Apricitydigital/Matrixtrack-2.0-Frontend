@@ -19,7 +19,7 @@ interface BeatTableProps {
     isReadOnly?: boolean;
 }
 
-export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData, onAssign, onAssignEmployees, onViewUser, assignmentActionLabel = "Assign Supervisor", isQC = false, isAO = false, isReadOnly = false }: BeatTableProps) {
+export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData, onAssign, onAssignEmployees, onViewUser, assignmentActionLabel = "Assign Daroga", isQC = false, isAO = false, isReadOnly = false }: BeatTableProps) {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [openActionId, setOpenActionId] = useState<string | null>(null);
 
@@ -59,7 +59,7 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                             <th style={headCell()}>Created On</th>
                             <th style={headCell()}>Location</th>
                             <th style={headCell()}>Beat Name</th>
-                            <th style={headCell()}>Supervisor</th>
+                            <th style={headCell()}>Daroga</th>
                             <th style={headCell()}>Employee</th>
                             <th style={headCell()}>Status</th>
                             <th style={{ ...headCell(), textAlign: "right" }}>Actions</th>
@@ -159,9 +159,9 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                     style={{ background: "none", border: "1px dashed #cbd5e1", padding: "6px 12px", borderRadius: "8px", color: "#64748b", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px", transition: "all 0.15s ease" }}
                                                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2563eb"; e.currentTarget.style.color = "#2563eb"; e.currentTarget.style.backgroundColor = "#eff6ff"; }}
                                                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#cbd5e1"; e.currentTarget.style.color = "#64748b"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                    title="Assign Supervisor"
+                                                    title="Assign Daroga"
                                                 >
-                                                    + Assign Supervisor
+                                                    + Assign Daroga
                                                 </button>
                                             ) : (
                                                 <span style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.8rem" }}>Unassigned</span>
@@ -172,11 +172,11 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                 style={{ cursor: (!isAO && !isReadOnly && !!onAssign) ? "pointer" : "default", padding: "4px 8px", borderRadius: "8px", transition: "all 0.15s ease" }}
                                                 onMouseEnter={(e) => { if (!isAO && !isReadOnly && !!onAssign) e.currentTarget.style.backgroundColor = "#eef2ff"; }}
                                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                title="Click to manage supervisor"
+                                                title="Click to manage daroga"
                                             >
                                                 <PersonRow
                                                     name={supervisors[0].name}
-                                                    subtitle="Supervisor"
+                                                    subtitle="Daroga"
                                                     gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)"
                                                 />
                                             </div>
@@ -186,10 +186,10 @@ export default function BeatTable({ beats, onRefresh, onView, onEdit, onViewData
                                                 style={{ cursor: (!isAO && !isReadOnly && !!onAssign) ? "pointer" : "default", padding: "4px 8px", borderRadius: "8px", transition: "all 0.15s ease", display: "flex", flexDirection: "column", gap: 8 }}
                                                 onMouseEnter={(e) => { if (!isAO && !isReadOnly && !!onAssign) e.currentTarget.style.backgroundColor = "#eef2ff"; }}
                                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                                                title="Click to manage supervisors"
+                                                title="Click to manage darogas"
                                             >
                                                 {supervisors.slice(0, 2).map((supervisor: any) => (
-                                                    <PersonRow key={supervisor.id} name={supervisor.name} subtitle="Supervisor" gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
+                                                    <PersonRow key={supervisor.id} name={supervisor.name} subtitle="Daroga" gradient="linear-gradient(135deg, #6366f1 0%, #4338ca 100%)" />
                                                 ))}
                                                 {supervisors.length > 2 && <span style={{ fontSize: "0.75rem", color: "#64748b", fontWeight: 700 }}>+{supervisors.length - 2} more</span>}
                                             </div>

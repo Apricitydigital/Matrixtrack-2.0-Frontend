@@ -237,9 +237,9 @@ export default function UnifiedExecutiveDashboard({
               strokeWidth={22}
               segments={[
                 { label: 'City Administrators', value: cityAdminsCount || 14, color: '#2563eb' },
-                { label: 'Supervisors', value: supervisorsCount || 16, color: '#7c3aed' },
-                { label: 'Quality Controllers (QC)', value: qcCount || 7, color: '#059669' },
-                { label: 'Action Officers (AO)', value: aoCount || 3, color: '#d97706' },
+                { label: 'Darogas', value: supervisorsCount || 16, color: '#7c3aed' },
+                { label: 'Sanitary Inspectors (SI)', value: qcCount || 7, color: '#059669' },
+                { label: 'IEC Members (IEC)', value: aoCount || 3, color: '#d97706' },
                 { label: 'Field Staff', value: fieldStaffCount || 2, color: '#ec4899' },
               ]}
             />
@@ -381,7 +381,7 @@ export default function UnifiedExecutiveDashboard({
                   pendingRequests.slice(0, 5).map((req) => (
                     <tr key={req.id} className="hover:bg-slate-50 transition">
                       <td className="py-2.5 px-3 font-bold text-slate-900">{req.name}</td>
-                      <td className="py-2.5 px-3 text-violet-700 font-bold">{req.requestedRole || 'SUPERVISOR'}</td>
+                      <td className="py-2.5 px-3 text-violet-700 font-bold">{req.requestedRole || 'DAROGA'}</td>
                       <td className="py-2.5 px-3 text-slate-500">Registration Approval</td>
                       <td className="py-2.5 px-3 text-slate-400 text-[11px]">{new Date(req.createdAt || Date.now()).toLocaleDateString()}</td>
                       <td className="py-2.5 px-3">
@@ -474,7 +474,7 @@ export default function UnifiedExecutiveDashboard({
                   </div>
                   <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
                     <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                    <span className="truncate">QC Audit Completed</span>
+                    <span className="truncate">SI Audit Completed</span>
                   </div>
                 </>
               )}

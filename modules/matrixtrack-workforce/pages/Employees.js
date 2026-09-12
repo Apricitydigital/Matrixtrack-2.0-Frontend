@@ -1727,7 +1727,7 @@ border border-slate-200 dark:border-slate-700
               <tr className="bg-gray-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm">      <th className="p-3 text-left">Sr No</th>          <th className="p-3 text-left">Emp Code</th>
                 <th className="p-3 text-left">Name</th>
                 <th className="p-3 text-left">Aadhar No</th>
-                <th className="p-3 text-left text-indigo-700">Supervisor</th>
+                <th className="p-3 text-left text-indigo-700">Daroga</th>
                 <th className="p-3 text-left">Phone</th>
                 <th className="p-3 text-left">City</th>
                 <th className="p-3 text-left">Zone</th>

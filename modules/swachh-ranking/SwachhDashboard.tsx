@@ -272,7 +272,7 @@ export default function SwachhDashboard() {
 
                     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 22, boxShadow: '0 1px 3px rgba(15,23,42,0.06)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>QC Verified Rate</span>
+                            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>SI Verified Rate</span>
                             <CheckCircle2 size={20} style={{ color: '#10b981' }} />
                         </div>
                         <div style={{ fontSize: 32, fontWeight: 900, color: '#0f172a' }}>
@@ -356,7 +356,7 @@ export default function SwachhDashboard() {
                         <tbody>
                             {recentAssessments.length === 0 ? (
                                 [
-                                    { id: '1', ward: 'Ward 12 - Civic Center', assessor: 'QC Officer Kumar', score: '98 / 100', status: 'VERIFIED' },
+                                    { id: '1', ward: 'Ward 12 - Civic Center', assessor: 'SI Officer Kumar', score: '98 / 100', status: 'VERIFIED' },
                                     { id: '2', ward: 'Ward 04 - Station Road', assessor: 'Assessor Sharma', score: '92 / 100', status: 'VERIFIED' },
                                     { id: '3', ward: 'Ward 19 - Commercial Market', assessor: 'Assessor Verma', score: '88 / 100', status: 'PENDING_REVIEW' },
                                     { id: '4', ward: 'Ward 07 - Subhash Nagar', assessor: 'Assessor Singh', score: '95 / 100', status: 'VERIFIED' }
@@ -388,7 +388,7 @@ export default function SwachhDashboard() {
                                 recentAssessments.slice(0, 8).map((item: any) => (
                                     <tr key={item.id} style={{ borderBottom: '1px solid #f8fafc' }}>
                                         <td style={{ padding: '16px 24px', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{item.participant?.details?.name || 'Ward Assessment'}</td>
-                                        <td style={{ padding: '16px 24px', fontSize: 13, color: '#475569' }}>{item.assessor?.name || 'QC Officer'}</td>
+                                        <td style={{ padding: '16px 24px', fontSize: 13, color: '#475569' }}>{item.assessor?.name || 'SI Officer'}</td>
                                         <td style={{ padding: '16px 24px', fontSize: 13, fontWeight: 800, color: '#1e3a8a' }}>{item.score || '90/100'}</td>
                                         <td style={{ padding: '16px 24px' }}>
                                             <span style={{ fontSize: 11, fontWeight: 800, background: '#ecfdf5', color: '#047857', padding: '4px 12px', borderRadius: 12 }}>

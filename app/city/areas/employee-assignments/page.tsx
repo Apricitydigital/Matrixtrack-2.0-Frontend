@@ -49,14 +49,14 @@ export default function EmployeeAssignmentsPage() {
             </div>
             <h1 style={{ margin: 0, fontSize: "1.875rem", fontWeight: 800, color: "#0f172a" }}>Employee Deployment</h1>          </div>
           <Link href="/city/areas" style={{ textDecoration: "none", backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px 18px", color: "#0f172a", fontWeight: 700 }}>
-            Back to Supervisors
+            Back to Darogas
           </Link>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "16px", marginBottom: "28px" }}>
           {[
-            { label: "Beats Assigned to Supervisors", value: beats.length, icon: MapPinned, color: "#2563eb", bg: "#eff6ff" },
-            { label: "Total Active Supervisors", value: totalSupervisors, icon: ArrowLeftRight, color: "#7c3aed", bg: "#f5f3ff" },
+            { label: "Beats Assigned to Darogas", value: beats.length, icon: MapPinned, color: "#2563eb", bg: "#eff6ff" },
+            { label: "Total Active Darogas", value: totalSupervisors, icon: ArrowLeftRight, color: "#7c3aed", bg: "#f5f3ff" },
             { label: "Total Field Employee Deployments", value: totalEmployeeSegments, icon: Users, color: "#059669", bg: "#ecfdf5" },
           ].map((card) => (
             <div key={card.label} style={{ backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "18px", padding: "18px 20px", display: "flex", alignItems: "center", gap: "14px" }}>

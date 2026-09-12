@@ -656,7 +656,7 @@ const Results = () => {
                                     </div>
                                     {selectedResult.finalScoreSource && (
                                         <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                                            Source: {selectedResult.finalScoreSource === 'QC' ? 'QC Reviewed' : 'Self Assessment'}
+                                            Source: {selectedResult.finalScoreSource === 'QC' ? 'SI Reviewed' : 'Self Assessment'}
                                         </div>
                                     )}
                                 </div>

@@ -44,7 +44,7 @@ const BADGE_CONFIG: Record<AchievementType, {
         bg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
         border: '#3b82f6',
         color: '#1d4ed8',
-        defaultMsg: 'QC Approved!',
+        defaultMsg: 'SI Approved!',
     },
     perfect: {
         emoji: '🏆',

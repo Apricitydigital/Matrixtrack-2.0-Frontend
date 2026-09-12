@@ -212,7 +212,7 @@ function BeatGeoJSONLayer({
             }}
             onEachFeature={(feature, layer) => {
                 const props = feature?.properties;
-                const supervisorName = props?.supervisorName || beat.assignedToName || 'Unassigned Supervisor';
+                const supervisorName = props?.supervisorName || beat.assignedToName || 'Unassigned Daroga';
                 const employeeName = props?.employeeName || props?.assignedToName || 'Unassigned Worker';
                 const segHasReport = props?.hasReport;
                 const lastAss = props?.lastAssessment;
@@ -235,13 +235,13 @@ function BeatGeoJSONLayer({
                                 <div style="font-weight: 800; font-size: 12px; color: ${segHasReport ? '#047857' : '#b45309'};">
                                     ${segHasReport ? "✓ Report Submitted" : "⏱ Awaiting Report Submission"}
                                 </div>
-                                ${lastAss?.status ? `<div style="font-size: 10px; color: #475569; font-weight: 600; margin-top: 2px;">QC Status: ${lastAss.status}</div>` : ''}
+                                ${lastAss?.status ? `<div style="font-size: 10px; color: #475569; font-weight: 600; margin-top: 2px;">SI Status: ${lastAss.status}</div>` : ''}
                             </div>
                         </div>
 
                         <div style="background: #f8fafc; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px;">
                             <div>
-                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 800;">Assigned Supervisor</div>
+                                <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 800;">Assigned Daroga</div>
                                 <div style="font-weight: 700; color: #1e293b; font-size: 13px; margin-top: 1px;">
                                     👨‍💼 ${supervisorName}
                                 </div>
@@ -392,7 +392,7 @@ export default function GlobalBeatMapView({ beats }: { beats: any[] }) {
                     <Search size={16} color="#64748b" />
                     <input
                         type="text"
-                        placeholder="Search beats, supervisors, employees..."
+                        placeholder="Search beats, darogas, employees..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         style={{ border: "none", outline: "none", background: "transparent", fontSize: "13px", color: "#0f172a", width: "100%", fontWeight: 600 }}
@@ -430,7 +430,7 @@ export default function GlobalBeatMapView({ beats }: { beats: any[] }) {
                                 boxShadow: filterMode === "SUPERVISOR" ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
                             }}
                         >
-                            Supervisor View
+                            Daroga View
                         </button>
 
                         <button
@@ -456,7 +456,7 @@ export default function GlobalBeatMapView({ beats }: { beats: any[] }) {
                                 fontSize: "12px", fontWeight: 700, color: "#1d4ed8", outline: "none", cursor: "pointer"
                             }}
                         >
-                            <option value="ALL">All Supervisors ({supervisorsList.length})</option>
+                            <option value="ALL">All Darogas ({supervisorsList.length})</option>
                             {supervisorsList.map(s => (
                                 <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
@@ -598,7 +598,7 @@ export default function GlobalBeatMapView({ beats }: { beats: any[] }) {
                     <div style={{ padding: "16px", maxHeight: "300px", overflowY: "auto" }}>
                         {/* Supervisors */}
                         <div style={{ marginBottom: "14px" }}>
-                            <div style={{ fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", marginBottom: "6px" }}>Assigned Supervisor(s)</div>
+                            <div style={{ fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", marginBottom: "6px" }}>Assigned Daroga(s)</div>
                             {(selectedBeat.supervisorsSummary && selectedBeat.supervisorsSummary.length > 0) ? (
                                 selectedBeat.supervisorsSummary.map((sup: any) => (
                                     <div key={sup.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #f1f5f9", marginBottom: "4px" }}>
@@ -612,7 +612,7 @@ export default function GlobalBeatMapView({ beats }: { beats: any[] }) {
                                     </div>
                                 ))
                             ) : (
-                                <div style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic" }}>{selectedBeat.assignedToName ? `Primary: ${selectedBeat.assignedToName}` : "No supervisor assigned"}</div>
+                                <div style={{ fontSize: "12px", color: "#94a3b8", fontStyle: "italic" }}>{selectedBeat.assignedToName ? `Primary: ${selectedBeat.assignedToName}` : "No daroga assigned"}</div>
                             )}
                         </div>
 

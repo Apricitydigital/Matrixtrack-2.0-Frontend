@@ -125,7 +125,7 @@ export default function EmployeeDashboard() {
                     <p className="eyebrow">Module · Taskforce</p>
                     <h1>Operations Dashboard</h1>
                     <p className="muted" style={{ maxWidth: '600px' }}>
-                        Manage city-scoped cases, track progress, and assign tasks to action officers.
+                        Manage city-scoped cases, track progress, and assign tasks to IEC Members.
                     </p>
 
                     <div className="hero-actions">

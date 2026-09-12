@@ -326,7 +326,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
 
                         <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} className="filter-select">
                             <option value="">All Status</option>
-                            <option value="PENDING_QC">Pending QC</option>
+                            <option value="PENDING_QC">Pending SI</option>
                             <option value="APPROVED">Approved</option>
                             <option value="REJECTED">Rejected</option>
                             <option value="ACTION_REQUIRED">Action Required</option>
@@ -444,7 +444,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
                             {filteredReports.map((record, idx) => {
                                 const st = (record.status || 'SUBMITTED').toUpperCase();
                                 const statusConfig: Record<string, { bg: string; color: string; label: string }> = {
-                                    PENDING_QC: { bg: '#eff6ff', color: '#2563eb', label: 'PENDING QC' },
+                                    PENDING_QC: { bg: '#eff6ff', color: '#2563eb', label: 'PENDING SI' },
                                     SUBMITTED: { bg: '#eff6ff', color: '#2563eb', label: 'SUBMITTED' },
                                     APPROVED: { bg: '#ecfdf5', color: '#059669', label: 'APPROVED' },
                                     REJECTED: { bg: '#fef2f2', color: '#dc2626', label: 'REJECTED' },
@@ -466,7 +466,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
                                     || getStaffName(record.assignedEmployee)
                                     || getStaffName(record.payload?.submittedBy)
                                     || getStaffName(record.payload?.supervisor)
-                                    || 'Supervisor';
+                                    || 'Daroga';
                                 const reviewerText = getReviewerDisplay(record);
 
                                 const wardNameDisplay = getWardDisplay(record);
@@ -522,7 +522,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
                                                 </div>
                                             ) : (
                                                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
-                                                    {record.role || 'Supervisor'}
+                                                    {record.role || 'Daroga'}
                                                 </div>
                                             )}
                                         </td>

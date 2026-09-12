@@ -46,7 +46,7 @@ export default function TermsAndConditionsPage() {
         { id: 'sec-7', number: '7', title: 'Location Usage' },
         { id: 'sec-9', number: '9', title: 'Inspection Responsibilities' },
         { id: 'sec-10', number: '10', title: 'Inspection Modules' },
-        { id: 'sec-11', number: '11', title: 'Quality Control' },
+        { id: 'sec-11', number: '11', title: 'Sanitary Inspection' },
         { id: 'sec-12', number: '12', title: 'Action Required and Action Taken' },
         { id: 'sec-13', number: '13', title: 'AI-Assisted Suggestions and Analysis' },
         { id: 'sec-14', number: '14', title: 'Dashboards and Performance Metrics' },
@@ -246,7 +246,7 @@ export default function TermsAndConditionsPage() {
                                     'Toilet inspections',
                                     'Litter Bin / Twin Bin inspections',
                                     'Taskforce operations',
-                                    'Quality Control',
+                                    'Sanitary Inspection',
                                     'Action Required / Action Taken workflows',
                                     'Ward and zone monitoring',
                                     'Performance analytics',
@@ -286,9 +286,9 @@ export default function TermsAndConditionsPage() {
                                     'Commissioners',
                                     'City Administrators',
                                     'ULB Officers',
-                                    'Action Officers',
-                                    'QC personnel',
-                                    'Supervisors',
+                                    'IEC Members',
+                                    'SI personnel',
+                                    'Darogas',
                                     'Employees'
                                 ].map((role) => (
                                     <div key={role} className="bg-slate-900/60 border border-slate-700/40 p-2.5 rounded-xl font-medium text-center text-slate-200">
@@ -524,11 +524,11 @@ export default function TermsAndConditionsPage() {
                                 <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 font-black text-sm">
                                     11
                                 </div>
-                                <h2 className="text-xl sm:text-2xl font-black text-white">11. Quality Control</h2>
+                                <h2 className="text-xl sm:text-2xl font-black text-white">11. Sanitary Inspection</h2>
                             </div>
 
                             <p className="text-sm text-slate-300 leading-relaxed">
-                                Inspection records may be reviewed through a Quality Control process. Depending on the configured workflow, QC personnel may review inspection evidence and classify reports according to authorized statuses such as:
+                                Inspection records may be reviewed through a Sanitary Inspection process. Depending on the configured workflow, SI personnel may review inspection evidence and classify reports according to authorized statuses such as:
                             </p>
 
                             <div className="grid grid-cols-2 gap-3 text-center text-xs sm:text-sm font-bold">
@@ -541,7 +541,7 @@ export default function TermsAndConditionsPage() {
                             </div>
 
                             <p className="text-xs text-slate-400">
-                                QC users must perform reviews using the information available to them and their organization’s applicable standards.
+                                SI users must perform reviews using the information available to them and their organization’s applicable standards.
                             </p>
                         </article>
                     )}
@@ -557,7 +557,7 @@ export default function TermsAndConditionsPage() {
                             </div>
 
                             <p className="text-sm text-slate-300 leading-relaxed">
-                                Where configured, authorized ULB Officers or other designated personnel may mark qualifying reports as <strong>Action Required</strong>. Authorized Action Officers or responsible personnel may subsequently record corrective activity as <strong>Action Taken</strong> or another configured completion status.
+                                Where configured, authorized ULB Officers or other designated personnel may mark qualifying reports as <strong>Action Required</strong>. Authorized IEC Members or responsible personnel may subsequently record corrective activity as <strong>Action Taken</strong> or another configured completion status.
                             </p>
 
                             <p className="text-xs text-teal-300 font-medium">
@@ -626,7 +626,7 @@ export default function TermsAndConditionsPage() {
                                     'Action Required cases',
                                     'Action Taken cases',
                                     'Employee performance',
-                                    'Supervisor performance',
+                                    'Daroga performance',
                                     'Zone performance',
                                     'Ward performance',
                                     'Ward rankings',
@@ -660,7 +660,7 @@ export default function TermsAndConditionsPage() {
                             </p>
 
                             <p className="text-xs text-orange-300 font-medium">
-                                Certain attendance, inspection, QC or audit records may be restricted from editing after submission to maintain record integrity.
+                                Certain attendance, inspection, SI or audit records may be restricted from editing after submission to maintain record integrity.
                             </p>
                         </article>
                     )}
@@ -890,7 +890,7 @@ export default function TermsAndConditionsPage() {
                             </p>
 
                             <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-300 font-medium">
-                                Termination of an account does not necessarily result in deletion of official attendance, inspection, QC, audit or operational records that must continue to be retained.
+                                Termination of an account does not necessarily result in deletion of official attendance, inspection, SI, audit or operational records that must continue to be retained.
                             </div>
                         </article>
                     )}
@@ -954,7 +954,7 @@ export default function TermsAndConditionsPage() {
                             </div>
 
                             <p className="text-sm text-slate-300 leading-relaxed">
-                                Attendance records, inspection reports, QC decisions, Action Required records, Action Taken records and other information created through MatrixTrack may form part of an organization’s official or administrative records. Such records may therefore be retained or disclosed where required for organizational administration, government requirements, audit, investigation, legal compliance or official record keeping.
+                                Attendance records, inspection reports, SI decisions, Action Required records, Action Taken records and other information created through MatrixTrack may form part of an organization’s official or administrative records. Such records may therefore be retained or disclosed where required for organizational administration, government requirements, audit, investigation, legal compliance or official record keeping.
                             </p>
                         </article>
                     )}

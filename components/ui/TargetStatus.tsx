@@ -292,7 +292,7 @@ export default function TargetStatus({
             type="button"
             onClick={() => openDrilldown("ALL")}
             className="min-h-[62px] rounded-[14px] border border-[#dbe7fb] bg-white px-[13px] py-[11px] text-left transition hover:border-[#bcd2f8] hover:shadow-sm"
-            title="View supervisor-wise daily targets"
+            title="View daroga-wise daily targets"
           >
             <div className="text-[8px] font-black uppercase tracking-[.07em] text-[#8a98ac]">
               Overall Daily Target
@@ -301,7 +301,7 @@ export default function TargetStatus({
               {loading && !data ? "-" : overall.target}
             </div>
             <div className="mt-1.5 text-[8px] font-extrabold text-[#2f6fed]">
-              View supervisor breakdown →
+              View daroga breakdown →
             </div>
           </button>
 
@@ -348,7 +348,7 @@ export default function TargetStatus({
                   borderColor: module.border,
                   background: `linear-gradient(145deg,#fff 0%,${module.soft} 160%)`,
                 }}
-                title={`View ${module.name} supervisor targets`}
+                title={`View ${module.name} daroga targets`}
               >
                 <span
                   className="absolute inset-y-0 left-0 w-[3px]"
@@ -368,7 +368,7 @@ export default function TargetStatus({
                         {module.name}
                       </div>
                       <div className="mt-[3px] text-[9px] font-semibold text-[#8b98aa]">
-                        City-wide supervisor target
+                        City-wide daroga target
                       </div>
                     </div>
                   </div>
@@ -408,7 +408,7 @@ export default function TargetStatus({
                         <FileText size={12} /> Report Status
                       </div>
                       <span className="text-[8px] font-extrabold text-[#2f6fed]">
-                        View supervisors →
+                        View darogas →
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
@@ -437,8 +437,8 @@ export default function TargetStatus({
               <div>
                 <div className="text-[14px] font-black text-[#17243c]">
                   {drillModule === "ALL"
-                    ? "Supervisor Daily Target Breakdown"
-                    : `${MODULES.find((module) => module.key === drillModule)?.name || drillModule} - Supervisor Targets`}
+                    ? "Daroga Daily Target Breakdown"
+                    : `${MODULES.find((module) => module.key === drillModule)?.name || drillModule} - Daroga Targets`}
                 </div>
                 <div className="mt-1 text-[10px] font-semibold text-slate-400">
                   Zone and ward-wise individual target, submitted and pending reports - {displayDate}
@@ -449,7 +449,7 @@ export default function TargetStatus({
                 type="button"
                 onClick={() => setDrillModule(null)}
                 className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-[18px] font-medium text-slate-500 hover:bg-slate-50"
-                aria-label="Close supervisor target breakdown"
+                aria-label="Close daroga target breakdown"
               >
                 ×
               </button>
@@ -500,7 +500,7 @@ export default function TargetStatus({
               </select>
 
               <div className="ml-auto self-center text-[9px] font-bold text-slate-400">
-                {visibleDrillRows.length} supervisor scope row{visibleDrillRows.length === 1 ? "" : "s"}
+                {visibleDrillRows.length} daroga scope row{visibleDrillRows.length === 1 ? "" : "s"}
               </div>
             </div>
 
@@ -508,7 +508,7 @@ export default function TargetStatus({
               <table className="w-full min-w-[900px] text-left">
                 <thead className="sticky top-0 z-10 bg-slate-50">
                   <tr className="border-b border-slate-200 text-[8px] font-black uppercase tracking-wider text-slate-400">
-                    <th className="px-4 py-3">Supervisor</th>
+                    <th className="px-4 py-3">Daroga</th>
                     {drillModule === "ALL" && <th className="px-4 py-3">Module</th>}
                     <th className="px-4 py-3">Zone</th>
                     <th className="px-4 py-3">Ward</th>
@@ -534,7 +534,7 @@ export default function TargetStatus({
                           </div>
                           {isUnassigned && (
                             <div className="mt-0.5 text-[8px] font-bold text-amber-500">
-                              Needs supervisor assignment
+                              Needs daroga assignment
                             </div>
                           )}
                         </td>
@@ -568,7 +568,7 @@ export default function TargetStatus({
                         colSpan={drillModule === "ALL" ? 8 : 7}
                         className="px-5 py-12 text-center text-[11px] font-bold text-slate-400"
                       >
-                        No supervisor targets found for the selected zone and ward.
+                        No daroga targets found for the selected zone and ward.
                       </td>
                     </tr>
                   )}

@@ -43,7 +43,7 @@ export default function TwinbinActionRequiredPage() {
                   <h3>{v.bin?.areaName}</h3>
                   <p className="muted">{v.bin?.locationName}</p>
                   <p className="muted">Employee: {v.submittedBy?.name || v.submittedById}</p>
-                  <p className="muted">QC Remark: {v.qcRemark || "-"}</p>
+                  <p className="muted">SI Remark: {v.qcRemark || "-"}</p>
                   <Link className="btn btn-primary btn-sm" href={`/modules/twinbin/action-required/${v.id}`}>
                     Open
                   </Link>

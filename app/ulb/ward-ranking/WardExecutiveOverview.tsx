@@ -126,19 +126,19 @@ const EXECUTIVE_COMPONENTS: ExecutiveComponentConfig[] = [
     {
         field: 'supervisor',
         key: 'SUPERVISOR',
-        label: 'Supervisor',
+        label: 'Daroga',
         group: 'ROLE',
     },
     {
         field: 'qc',
         key: 'QC',
-        label: 'Quality Control',
+        label: 'Sanitary Inspector',
         group: 'ROLE',
     },
     {
         field: 'actionOfficer',
         key: 'ACTION_OFFICER',
-        label: 'Action Officer',
+        label: 'IEC Member',
         group: 'ROLE',
     },
 ];

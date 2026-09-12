@@ -353,9 +353,9 @@ export default function TaskforceTasksPage() {
                 <StatCard label="Total Feeder Points" value={metrics.total} sub="Identified Points" color="#3b82f6" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatusFilter === ''} />
                 <StatCard label="In Progress" value={metrics.inProgress} sub="Surveys Running" color="#8b5cf6" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatusFilter === 'SUBMITTED'} />
                 <StatCard label="Action Required" value={metrics.actionRequired} sub="Needs Attention" color="#f59e0b" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatusFilter === 'ACTION_REQUIRED'} />
-                <StatCard label="QC Approved Reports" value={metrics.approved} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatusFilter === 'APPROVED'} />
+                <StatCard label="SI Approved Reports" value={metrics.approved} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatusFilter === 'APPROVED'} />
 
-                <StatCard label="QC Rejected Reports" value={metrics.rejected} sub="Issues Found" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatusFilter === 'REJECTED'} />
+                <StatCard label="SI Rejected Reports" value={metrics.rejected} sub="Issues Found" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatusFilter === 'REJECTED'} />
                 <StatCard label="Action Taken" value={metrics.actionTaken} sub="Resolved Items" color="#0ea5e9" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={selectedStatusFilter === 'ACTION_TAKEN'} />
                 <StatCard label="Eliminated Points" value={metrics.eliminated} sub="Permanent Fix" color="#6366f1" onClick={() => handleStatClick('ELIMINATED')} isActive={selectedStatusFilter === 'ELIMINATED'} />
                 <StatCard label="System Performance" value={`${metrics.systemPerformance}%`} sub="Efficiency Score" color="#f43f5e" onClick={() => handleStatClick('TOTAL')} isActive={false} />

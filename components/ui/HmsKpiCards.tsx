@@ -141,7 +141,7 @@ export default function HmsKpiCards({
       icon: <Users size={20} />,
     },
     {
-      label: 'ACTION OFFICERS',
+      label: 'IEC MEMBERS',
       value: actionOfficers,
       subtext: 'Under Review',
       color: '#10b981',
@@ -149,7 +149,7 @@ export default function HmsKpiCards({
       icon: <UserCheck size={20} />,
     },
     {
-      label: 'QUALITY CONTROLLERS',
+      label: 'SANITARY INSPECTORS',
       value: qualityControllers,
       subtext: 'Active',
       color: '#f43f5e',
@@ -157,7 +157,7 @@ export default function HmsKpiCards({
       icon: <Target size={20} />,
     },
     {
-      label: 'SUPERVISORS',
+      label: 'DAROGAS',
       value: supervisors,
       subtext: 'Active',
       color: '#6366f1',

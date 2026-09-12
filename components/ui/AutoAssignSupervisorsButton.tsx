@@ -65,7 +65,7 @@ export default function AutoAssignSupervisorsButton({ onCompleted }: { onComplet
       window.alert(`Auto assignment completed.\n\n${formatSummary(response.summary)}`);
       onCompleted?.();
     } catch (error: any) {
-      window.alert(error?.message || "Failed to auto assign supervisors.");
+      window.alert(error?.message || "Failed to auto assign darogas.");
     } finally {
       setSubmitting(false);
     }
@@ -86,7 +86,7 @@ export default function AutoAssignSupervisorsButton({ onCompleted }: { onComplet
           boxShadow: "0 10px 24px rgba(220,38,38,0.22)", whiteSpace: "nowrap",
         }}
       >
-        Auto Assign Supervisors
+        Auto Assign Darogas
       </button>
 
       {open && (
@@ -116,10 +116,10 @@ export default function AutoAssignSupervisorsButton({ onCompleted }: { onComplet
             }}>✓</div>
 
             <h3 id="auto-assign-title" style={{ margin: 0, fontSize: 20, fontWeight: 900, color: "#0f172a" }}>
-              Auto Assign Supervisors
+              Auto Assign Darogas
             </h3>
             <p style={{ margin: "10px 0 0", fontSize: 13, lineHeight: 1.6, color: "#64748b" }}>
-              Choose which module assets you want to assign using supervisor ward and zone scope.
+              Choose which module assets you want to assign using daroga ward and zone scope.
             </p>
 
             <div style={{ marginTop: 18, borderRadius: 16, border: "1px solid #e2e8f0", background: "#f8fafc", padding: 16 }}>
@@ -159,7 +159,7 @@ export default function AutoAssignSupervisorsButton({ onCompleted }: { onComplet
               border: "1px solid #e2e8f0", fontSize: 12, lineHeight: 1.6,
               color: "#475569", fontWeight: 600,
             }}>
-              City Admin only. Supervisor scope must be correct before running this action.
+              City Admin only. Daroga scope must be correct before running this action.
             </div>
 
             <div style={{ display: "flex", gap: 12, marginTop: 22 }}>

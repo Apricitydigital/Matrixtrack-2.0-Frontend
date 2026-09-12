@@ -234,7 +234,7 @@ function buildSupervisorAttentionRows(beats: any[]) {
         rows[key] = {
           id: supervisor.id,
           name: supervisor.name,
-          role: "Supervisor",
+          role: "Daroga",
           zone,
           ward,
           missedCount: 0,
@@ -261,7 +261,7 @@ function buildRegistrationRequestRows(
     ...(toiletResponse?.toilets || []).map((item: any) => ({
       id: item.id,
       module: "Toilet",
-      requestedBy: item.requestedBy?.name || item.requestedByName || "Supervisor",
+      requestedBy: item.requestedBy?.name || item.requestedByName || "Daroga",
       approvedBy: item.approvedBy?.name || "Pending Approval",
       date: item.createdAt || new Date().toISOString(),
       zone: item.zone?.name || item.zoneName || geoName(item.zoneId, "Unknown Zone"),
@@ -271,7 +271,7 @@ function buildRegistrationRequestRows(
     ...(litterBinResponse?.data || []).map((item: any) => ({
       id: item.id,
       module: "Litter Bin",
-      requestedBy: item.requestedBy?.name || item.requestedByName || "Supervisor",
+      requestedBy: item.requestedBy?.name || item.requestedByName || "Daroga",
       approvedBy: item.approvedBy?.name || "Pending Approval",
       date: item.createdAt || new Date().toISOString(),
       zone: item.zone?.name || item.zoneName || geoName(item.zoneId, "Unknown Zone"),
@@ -625,7 +625,7 @@ export default function CityDashboardPage() {
             const uId = u.id || u.name;
             if (!supMap[uId]) {
               supMap[uId] = {
-                id: uId, name: u.name || 'Unknown', role: u.role || 'Supervisor',
+                id: uId, name: u.name || 'Unknown', role: u.role || 'Daroga',
                 zone: r.zone?.name || r.zoneName || 'Various Zones',
                 ward: r.ward?.name || r.wardName || 'Various Wards',
                 modules: new Set<string>(),
@@ -866,10 +866,10 @@ export default function CityDashboardPage() {
 
   // ─── CITY ADMIN VIEW — Premium Dashboard ──────────────────────────────────────
   const roleData = [
-    { label: "Quality Controllers", key: "qualityControllers", color: "#7c3aed", bg: "#f5f3ff", icon: <Search size={16} />, href: "/city/users?role=QC" },
+    { label: "Sanitary Inspectors", key: "qualityControllers", color: "#7c3aed", bg: "#f5f3ff", icon: <Search size={16} />, href: "/city/users?role=QC" },
     { label: "Taskforce Members", key: "taskforceMembers", color: "#d97706", bg: "#fffbeb", icon: <Users size={16} />, href: "/city/users?role=EMPLOYEE" },
     { label: "ULB Officials", key: "ulbOfficials", color: "#dc2626", bg: "#fef2f2", icon: <Landmark size={16} />, href: "/city/users?role=COMMISSIONER" },
-    { label: "Action Officers", key: "actionOfficers", color: "#059669", bg: "#f0fdf4", icon: <UserCog size={16} />, href: "/city/users?role=ACTION_OFFICER" },
+    { label: "IEC Members", key: "actionOfficers", color: "#059669", bg: "#f0fdf4", icon: <UserCog size={16} />, href: "/city/users?role=ACTION_OFFICER" },
     { label: "City Admins", key: "cityAdmins", color: "#4f46e5", bg: "#eef2ff", icon: <ShieldCheck size={16} />, href: "/city/users?role=CITY_ADMIN" },
   ];
   const quickActions = [
@@ -2040,10 +2040,10 @@ export default function CityDashboardPage() {
                 { label: "Total Areas", value: cityGeoStats?.areas, icon: <Target size={20} />, color: "#0ea5e9", href: "/city/areas" },
                 { label: "Total Beats", value: cityGeoStats?.beats, icon: <MapIcon size={20} />, color: "#0284c7", href: "/city/areas" },
                 { label: "Total Modules", value: stats?.totalModules, icon: <Package size={20} />, color: "#3b82f6", href: "/city/modules" },
-                { label: "Quality Controller", value: stats?.qualityControllers, icon: <Search size={20} />, color: "#8b5cf6", href: "/city/users?role=QC" },
+                { label: "Sanitary Inspector", value: stats?.qualityControllers, icon: <Search size={20} />, color: "#8b5cf6", href: "/city/users?role=QC" },
                 { label: "Taskforce Member", value: stats?.taskforceMembers, icon: <Users size={20} />, color: "#f59e0b", href: "/city/users?role=EMPLOYEE" },
                 { label: "ULB Officials", value: stats?.ulbOfficials, icon: <Landmark size={20} />, color: "#ef4444", href: "/city/users?role=COMMISSIONER" },
-                { label: "Action Officer", value: stats?.actionOfficers, icon: <UserCog size={20} />, color: "#10b981", href: "/city/users?role=ACTION_OFFICER" },
+                { label: "IEC Member", value: stats?.actionOfficers, icon: <UserCog size={20} />, color: "#10b981", href: "/city/users?role=ACTION_OFFICER" },
                 { label: "City Admin", value: stats?.cityAdmins, icon: <ShieldCheck size={20} />, color: "#6366f1", href: "/city/users?role=CITY_ADMIN" },
               ].map((s, i) => (
                 <Link key={i} href={s.href} style={{ textDecoration: 'none' }}>
@@ -2077,7 +2077,7 @@ export default function CityDashboardPage() {
                 { label: "Total Beats", value: sweepingDetailStats.totalBeats, icon: <Target size={20} />, color: "#3b82f6", href: "/city/areas" },
                 { label: "Total Sub-Beats", value: sweepingDetailStats.totalSegments, icon: <Database size={20} />, color: "#8b5cf6", href: "/city/areas" },
                 { label: "Assigned Sub-Beats", value: sweepingDetailStats.assignedSegments, icon: <CheckCircle size={20} />, color: "#0ea5e9", href: "/city/areas" },
-                { label: "QC Assigned", value: sweepingDetailStats.qcAssigned, icon: <ShieldCheck size={20} />, color: "#10b981", href: "/city/users?role=QC" },
+                { label: "SI Assigned", value: sweepingDetailStats.qcAssigned, icon: <ShieldCheck size={20} />, color: "#10b981", href: "/city/users?role=QC" },
                 { label: "Total Approved", value: sweepingDetailStats.totalApproved, icon: <CheckCircle size={20} />, color: "#22c55e", href: "/city/beat-status" },
                 { label: "Action Required", value: sweepingDetailStats.actionRequired, icon: <AlertCircle size={20} />, color: "#ef4444", href: "/city/beat-status" },
                 { label: "Pending Deployment", value: sweepingDetailStats.pendingDeployment, icon: <MapIcon size={20} />, color: "#f59e0b", href: "/city/areas" },
@@ -2109,10 +2109,10 @@ export default function CityDashboardPage() {
                 customStats = [
                   { label: "Toilets Registered", value: extraModuleStats.toilet.registered, icon: <Database size={20} />, color: "#8b5cf6", href: `/modules/toilet` },
                   { label: "Registration Pending", value: extraModuleStats.toilet.pendingReg, icon: <Activity size={20} />, color: "#f59e0b", href: `/modules/toilet` },
-                  { label: "Inspections Done (QC)", value: extraModuleStats.toilet.inspectionsDone, icon: <CheckCircle size={20} />, color: "#22c55e", href: `/modules/toilet` },
-                  { label: "Pending QC Inspection", value: extraModuleStats.toilet.inspectionPending, icon: <MapPin size={20} />, color: "#3b82f6", href: `/modules/toilet` },
+                  { label: "Inspections Done (SI)", value: extraModuleStats.toilet.inspectionsDone, icon: <CheckCircle size={20} />, color: "#22c55e", href: `/modules/toilet` },
+                  { label: "Pending SI Inspection", value: extraModuleStats.toilet.inspectionPending, icon: <MapPin size={20} />, color: "#3b82f6", href: `/modules/toilet` },
                   { label: "Action Required", value: extraModuleStats.toilet.actionRequired, icon: <AlertCircle size={20} />, color: "#ef4444", href: `/modules/toilet` },
-                  { label: "Action Taken by AO", value: extraModuleStats.toilet.actionTaken, icon: <CheckCircle size={20} />, color: "#10b981", href: `/modules/toilet` },
+                  { label: "Action Taken by IEC", value: extraModuleStats.toilet.actionTaken, icon: <CheckCircle size={20} />, color: "#10b981", href: `/modules/toilet` },
                   { label: "Inspection Not Started", value: extraModuleStats.toilet.uninspected, icon: <Target size={20} />, color: "#64748b", href: `/modules/toilet` },
                 ];
               } else if (keyStr === 'taskforce') {
@@ -2121,10 +2121,10 @@ export default function CityDashboardPage() {
                   { label: "GVP Points Registered", value: extraModuleStats.taskforce.registered, icon: <Database size={20} />, color: "#8b5cf6", href: `/modules/taskforce` },
                   { label: "Requests Pending", value: extraModuleStats.taskforce.pendingReg, icon: <Activity size={20} />, color: "#f59e0b", href: `/modules/taskforce` },
                   { label: "Total Inspections", value: extraModuleStats.taskforce.totalInspections, icon: <Database size={20} />, color: "#3b82f6", href: `/modules/taskforce` },
-                  { label: "Approved by QC", value: extraModuleStats.taskforce.inspectionsDone, icon: <CheckCircle size={20} />, color: "#22c55e", href: `/modules/taskforce` },
-                  { label: "Pending QC", value: extraModuleStats.taskforce.inspectionPending, icon: <MapPin size={20} />, color: "#3b82f6", href: `/modules/taskforce` },
+                  { label: "Approved by SI", value: extraModuleStats.taskforce.inspectionsDone, icon: <CheckCircle size={20} />, color: "#22c55e", href: `/modules/taskforce` },
+                  { label: "Pending SI", value: extraModuleStats.taskforce.inspectionPending, icon: <MapPin size={20} />, color: "#3b82f6", href: `/modules/taskforce` },
                   { label: "Action Required", value: extraModuleStats.taskforce.actionRequired, icon: <AlertCircle size={20} />, color: "#ef4444", href: `/modules/taskforce` },
-                  { label: "Action Taken by AO", value: extraModuleStats.taskforce.actionTaken, icon: <CheckCircle size={20} />, color: "#10b981", href: `/modules/taskforce` },
+                  { label: "Action Taken by IEC", value: extraModuleStats.taskforce.actionTaken, icon: <CheckCircle size={20} />, color: "#10b981", href: `/modules/taskforce` },
                 ];
               } else if (keyStr === 'twinbin' || keyStr === 'litterbins') {
                 displayName = 'Litterbins';
@@ -2132,10 +2132,10 @@ export default function CityDashboardPage() {
                   { label: "Litterbins Registered", value: extraModuleStats.twinbin.registered, icon: <Database size={20} />, color: "#8b5cf6", href: `/modules/twinbin` },
                   { label: "Requests Pending", value: extraModuleStats.twinbin.pendingReg, icon: <Activity size={20} />, color: "#f59e0b", href: `/modules/twinbin` },
                   { label: "Total Inspections", value: extraModuleStats.twinbin.totalInspections, icon: <Database size={20} />, color: "#3b82f6", href: `/modules/twinbin` },
-                  { label: "Approved by QC", value: extraModuleStats.twinbin.inspectionsDone, icon: <CheckCircle size={20} />, color: "#22c55e", href: `/modules/twinbin` },
-                  { label: "Pending QC", value: extraModuleStats.twinbin.inspectionPending, icon: <MapPin size={20} />, color: "#3b82f6", href: `/modules/twinbin` },
+                  { label: "Approved by SI", value: extraModuleStats.twinbin.inspectionsDone, icon: <CheckCircle size={20} />, color: "#22c55e", href: `/modules/twinbin` },
+                  { label: "Pending SI", value: extraModuleStats.twinbin.inspectionPending, icon: <MapPin size={20} />, color: "#3b82f6", href: `/modules/twinbin` },
                   { label: "Action Required", value: extraModuleStats.twinbin.actionRequired, icon: <AlertCircle size={20} />, color: "#ef4444", href: `/modules/twinbin` },
-                  { label: "Action Taken by AO", value: extraModuleStats.twinbin.actionTaken, icon: <CheckCircle size={20} />, color: "#10b981", href: `/modules/twinbin` },
+                  { label: "Action Taken by IEC", value: extraModuleStats.twinbin.actionTaken, icon: <CheckCircle size={20} />, color: "#10b981", href: `/modules/twinbin` },
                 ];
               } else {
                 customStats = [
@@ -2312,7 +2312,7 @@ export default function CityDashboardPage() {
 
               {/* AO Response Time - Real data: show action officers count and module action required stats */}
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 16 }}>Action Officer Summary</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 16 }}>IEC Member Summary</h3>
                 {(() => {
                   const aoCount = stats?.actionOfficers || 0;
                   const modAR = moduleActivity.filter(m => m.actionRequired > 0);
@@ -2322,7 +2322,7 @@ export default function CityDashboardPage() {
                         <UserCog size={22} color="#16a34a" />
                         <div>
                           <div style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{statsLoading ? '—' : aoCount}</div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>Action Officers Active</div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>IEC Members Active</div>
                         </div>
                       </div>
                       {modAR.length > 0 ? modAR.map((m, i) => (
@@ -2340,9 +2340,9 @@ export default function CityDashboardPage() {
 
               {/* QC Leaderboard - Real data from qcLeaderboard */}
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 16 }}>QC Leaderboard</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 16 }}>SI Leaderboard</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
-                  <thead><tr style={{ borderBottom: '1px solid #e2e8f0' }}><th style={{ textAlign: 'left', padding: '8px 0', fontSize: 12, color: '#94a3b8' }}>Rank</th><th style={{ textAlign: 'left', padding: '8px 0', fontSize: 12, color: '#94a3b8' }}>QC Name</th><th style={{ textAlign: 'right', padding: '8px 0', fontSize: 12, color: '#94a3b8' }}>Inspections</th></tr></thead>
+                  <thead><tr style={{ borderBottom: '1px solid #e2e8f0' }}><th style={{ textAlign: 'left', padding: '8px 0', fontSize: 12, color: '#94a3b8' }}>Rank</th><th style={{ textAlign: 'left', padding: '8px 0', fontSize: 12, color: '#94a3b8' }}>SI Name</th><th style={{ textAlign: 'right', padding: '8px 0', fontSize: 12, color: '#94a3b8' }}>Inspections</th></tr></thead>
                   <tbody>
                     {qcLeaderboard.length === 0 ? (
                       <tr><td colSpan={3} style={{ padding: 12, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>No inspection data yet</td></tr>
@@ -2435,8 +2435,8 @@ export default function CityDashboardPage() {
                       </div>
                     </div>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Approved (QC)</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{approved} ({pctApproved}%)</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Action Taken (AO)</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{actionTaken} ({pctActionTaken}%)</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Approved (SI)</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{approved} ({pctApproved}%)</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Action Taken (IEC)</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{actionTaken} ({pctActionTaken}%)</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Action Required</span><span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{actionReq} ({pctActionReq}%)</span></div>
                     </div>
                   </div>
@@ -3572,9 +3572,9 @@ export default function CityDashboardPage() {
 
                 <div className="mx-user-grid">
                   {[
-                    { key: 'ACTION_OFFICER', title: 'TOTAL ACTION OFFICERS', count: stats?.actionOfficers || stats?.ACTION_OFFICER || 0, icon: UserCog, color: '#059669', iconBg: '#d1fae5', border: '#a7f3d0', wash: '#ecfdf5', link: '/city/users?role=ACTION_OFFICER' },
-                    { key: 'QC', title: 'TOTAL QUALITY CONTROLLER', count: stats?.qualityControllers || stats?.QC || 0, icon: Search, color: '#7e22ce', iconBg: '#f3e8ff', border: '#e9d5ff', wash: '#faf5ff', link: '/city/users?role=QC' },
-                    { key: 'SUPERVISOR', title: 'TOTAL SUPERVISORS', count: stats?.taskforceMembers || stats?.SUPERVISOR || 0, icon: ShieldCheck, color: '#d97706', iconBg: '#fef3c7', border: '#fde68a', wash: '#fffbeb', link: '/city/users?role=SUPERVISOR' },
+                    { key: 'ACTION_OFFICER', title: 'TOTAL IEC MEMBERS', count: stats?.actionOfficers || stats?.ACTION_OFFICER || 0, icon: UserCog, color: '#059669', iconBg: '#d1fae5', border: '#a7f3d0', wash: '#ecfdf5', link: '/city/users?role=ACTION_OFFICER' },
+                    { key: 'QC', title: 'TOTAL SANITARY INSPECTOR', count: stats?.qualityControllers || stats?.QC || 0, icon: Search, color: '#7e22ce', iconBg: '#f3e8ff', border: '#e9d5ff', wash: '#faf5ff', link: '/city/users?role=QC' },
+                    { key: 'SUPERVISOR', title: 'TOTAL DAROGAS', count: stats?.taskforceMembers || stats?.SUPERVISOR || 0, icon: ShieldCheck, color: '#d97706', iconBg: '#fef3c7', border: '#fde68a', wash: '#fffbeb', link: '/city/users?role=SUPERVISOR' },
                     { key: 'EMPLOYEE', title: 'TOTAL EMPLOYEES', count: stats?.employees || stats?.EMPLOYEE || 0, icon: Users, color: '#2563eb', iconBg: '#dbeafe', border: '#bfdbfe', wash: '#eff6ff', link: '/city/users?role=EMPLOYEE' },
                   ].map((card, i) => (
                     <div
@@ -3857,7 +3857,7 @@ export default function CityDashboardPage() {
                             <span className="text-[14px] font-bold text-[#10b981]">{assignedToEmp}</span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-[13px] font-semibold text-[#475569]">To Supervisors</span>
+                            <span className="text-[13px] font-semibold text-[#475569]">To Darogas</span>
                             <span className="text-[14px] font-bold text-[#3b82f6]">{assignedToSup}</span>
                           </div>
                         </div>
@@ -3988,7 +3988,7 @@ export default function CityDashboardPage() {
                                         <div style={{ minWidth: 0 }}>
                                           <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                             <span className="truncate">{sup.name}</span>
-                                            <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, letterSpacing: '0.05em' }}>{sup.role === 'SUPERVISOR' ? 'SUP' : (sup.role === 'EMPLOYEE' ? 'EMP' : sup.role.substring(0, 3).toUpperCase())}</span>
+                                            <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, letterSpacing: '0.05em' }}>{sup.role === 'SUPERVISOR' ? 'DAR' : (sup.role === 'EMPLOYEE' ? 'EMP' : sup.role.substring(0, 3).toUpperCase())}</span>
                                           </div>
                                           <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sup.zone} • {sup.ward}</div>
                                         </div>
@@ -4311,7 +4311,7 @@ export default function CityDashboardPage() {
               </div>
               <div>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: '#10b981', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Action Officers</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>IEC Members</div>
                 <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Issue resolution & ground action</div>
               </div>
             </div>
@@ -4321,7 +4321,7 @@ export default function CityDashboardPage() {
               </div>
               <div style={{ zIndex: 1 }}>
                 <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{stats?.actionOfficers || stats?.ACTION_OFFICER || 0}</div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>Action Officers Active</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>IEC Members Active</div>
               </div>
               <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #d1fae5', opacity: 0.5 }}></div>
             </div>
@@ -4375,7 +4375,7 @@ export default function CityDashboardPage() {
               </div>
               <div>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: '#3b82f6', letterSpacing: '0.05em' }}>FIELD OPERATIONS</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Quality Controllers</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Sanitary Inspectors</div>
                 <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Quality monitoring & auditing</div>
               </div>
             </div>
@@ -4385,7 +4385,7 @@ export default function CityDashboardPage() {
               </div>
               <div style={{ zIndex: 1 }}>
                 <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{stats?.qualityControllers || stats?.QC || 0}</div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#3b82f6', marginTop: '4px' }}>Quality Controllers Active</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#3b82f6', marginTop: '4px' }}>Sanitary Inspectors Active</div>
               </div>
               <div style={{ position: 'absolute', right: '-20px', top: '50%', transform: 'translateY(-50%)', width: '100px', height: '100px', borderRadius: '50%', border: '20px solid #dbeafe', opacity: 0.5 }}></div>
             </div>
@@ -4698,7 +4698,7 @@ export default function CityDashboardPage() {
                   </div>
 
                   <div style={{ padding: '0 4px 8px', fontSize: 8, color: '#7b8798', fontWeight: 700 }}>
-                    Active = at least one supervisor or employee is assigned. Inactive = no member is assigned.
+                    Active = at least one daroga or employee is assigned. Inactive = no member is assigned.
                   </div>
 
                   <div style={{ borderTop: '1px solid #e5eaf1' }}>
@@ -4741,7 +4741,7 @@ export default function CityDashboardPage() {
                   .map((r: any) => String(typeof r === 'string' ? r : (r?.role || r?.key || r?.name || '')).toUpperCase());
                 const rows = cityUsers.filter((u: any) => roleOf(u).some((r: string) => wanted.includes(r)));
                 const preview = rows.slice(0, 6);
-                const roleLabel: Record<string, string> = { ACTION_OFFICER: 'Action Officers', QC: 'Quality Controllers', SUPERVISOR: 'Supervisors', EMPLOYEE: 'Employees' };
+                const roleLabel: Record<string, string> = { ACTION_OFFICER: 'IEC Members', QC: 'Sanitary Inspectors', SUPERVISOR: 'Darogas', EMPLOYEE: 'Employees' };
                 const zoneLabel = (u: any) => {
                   const ids = Array.isArray(u?.zoneIds) ? u.zoneIds : [];
                   const names = ids.map((id: any) => attentionGeoNames[String(id)]).filter(Boolean);
@@ -4755,9 +4755,9 @@ export default function CityDashboardPage() {
                 return <>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 0, marginBottom: 10 }}>
                     {[
-                      ['Action Officers', stats?.actionOfficers || stats?.ACTION_OFFICER || 0, '#059669'],
-                      ['Quality Controllers', stats?.qualityControllers || stats?.QC || 0, '#7e22ce'],
-                      ['Supervisors', stats?.taskforceMembers || stats?.SUPERVISOR || 0, '#d97706'],
+                      ['IEC Members', stats?.actionOfficers || stats?.ACTION_OFFICER || 0, '#059669'],
+                      ['Sanitary Inspectors', stats?.qualityControllers || stats?.QC || 0, '#7e22ce'],
+                      ['Darogas', stats?.taskforceMembers || stats?.SUPERVISOR || 0, '#d97706'],
                       ['Employees', stats?.employees || stats?.EMPLOYEE || 0, '#2563eb'],
                     ].map(([label, value, color], i) => <div key={String(label)} style={{ padding: '8px 10px', borderLeft: i ? '1px solid #edf1f6' : 'none', textAlign: 'center' }}><div style={{ fontSize: 18, fontWeight: 900, color: String(color) }}>{value}</div><div style={{ fontSize: 8, color: '#8a97aa', fontWeight: 900, marginTop: 2 }}>{label}</div></div>)}
                   </div>

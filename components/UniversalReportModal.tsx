@@ -166,7 +166,7 @@ export default function UniversalReportModal({
         || resolvePersonName(record.assignedEmployee)
         || resolvePersonName(record.payload?.submittedBy)
         || resolvePersonName(record.payload?.supervisor)
-        || 'Supervisor';
+        || 'Daroga';
 
     const submitterPhone = record.phone || record.supervisor?.phone || record.employee?.phone || record.user?.phone || '';
 
@@ -293,24 +293,24 @@ export default function UniversalReportModal({
     const isCityAdminUser = allRoles.includes('CITY_ADMIN') || allRoles.includes('CITYADMIN');
     const isQcUser = !isCityAdminUser && (allRoles.includes('QC') || allRoles.includes('QC_OFFICER'));
 
-    const actionPanelTitle = isUserAO 
-        ? 'AO Action Panel' 
-        : isCityAdminUser 
-            ? 'City Admin Review & Actions' 
-            : isQcUser 
-                ? 'QC Review & Actions' 
+    const actionPanelTitle = isUserAO
+        ? 'IEC Action Panel'
+        : isCityAdminUser
+            ? 'City Admin Review & Actions'
+            : isQcUser
+                ? 'SI Review & Actions'
                 : 'Review & Actions';
 
-    const remarksLabel = isCityAdminUser 
-        ? 'City Admin Remarks / Reason' 
-        : isQcUser 
-            ? 'QC Remarks / Reason' 
+    const remarksLabel = isCityAdminUser
+        ? 'City Admin Remarks / Reason'
+        : isQcUser
+            ? 'SI Remarks / Reason'
             : 'Review Remarks / Reason';
 
-    const remarksPlaceholder = isCityAdminUser 
-        ? 'Enter City Admin remarks...' 
-        : isQcUser 
-            ? 'Enter QC inspection feedback...' 
+    const remarksPlaceholder = isCityAdminUser
+        ? 'Enter City Admin remarks...'
+        : isQcUser
+            ? 'Enter SI inspection feedback...'
             : 'Enter review feedback...';
 
     const qcComment = record.qcComment || record.comment || record.reviewerNote || null;
@@ -330,15 +330,15 @@ export default function UniversalReportModal({
     let reviewerRoleText = '';
     const rawRole = record.reviewedByRole || record.approvedByRole || record.reviewedBy?.role || record.approvedBy?.role || null;
     if (rawRole) {
-        reviewerRoleText = String(rawRole).toUpperCase() === 'CITY_ADMIN' ? 'City Admin' : String(rawRole).toUpperCase() === 'QC' ? 'QC Officer' : String(rawRole);
+        reviewerRoleText = String(rawRole).toUpperCase() === 'CITY_ADMIN' ? 'City Admin' : String(rawRole).toUpperCase() === 'QC' ? 'Sanitary Inspector' : String(rawRole);
     } else if (record.reviewedByQc || record.qcReviewer) {
-        reviewerRoleText = 'QC Officer';
+        reviewerRoleText = 'Sanitary Inspector';
     }
 
     if (!reviewerName && (status === 'APPROVED' || status === 'REJECTED' || status === 'ACTION_TAKEN')) {
         if (user?.name) {
             reviewerName = user.name;
-            reviewerRoleText = isCityAdminUser ? 'City Admin' : isQcUser ? 'QC Officer' : '';
+            reviewerRoleText = isCityAdminUser ? 'City Admin' : isQcUser ? 'Sanitary Inspector' : '';
         } else {
             reviewerName = 'Reviewing Officer';
         }
@@ -616,7 +616,7 @@ export default function UniversalReportModal({
                                 <div style={{ background: '#ffffff', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', color: '#475569' }}>
                                     Report Status: <strong style={{ color: '#0f172a' }}>{status}</strong>
                                     <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#64748b' }}>
-                                        {isPending ? 'Pending review by QC / City Admin.' : 'Audit report finalized.'}
+                                        {isPending ? 'Pending review by SI / City Admin.' : 'Audit report finalized.'}
                                     </p>
                                 </div>
                             )}

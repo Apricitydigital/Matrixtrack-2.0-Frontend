@@ -26,12 +26,12 @@ const sections = [
     id: "camera", title: "Camera & photos",
     items: [
       { question: "The camera is slow or won't open.", answer: "Give the camera a moment to initialize, and avoid taking photos in rapid succession. Also check that your device has enough free storage." },
-      { question: "How many photos can I attach?", answer: "You can attach multiple photos per inspection item. At least one clear photo is required so the QC/reviewing officer can verify field conditions. Photos are automatically compressed to save data." },
+      { question: "How many photos can I attach?", answer: "You can attach multiple photos per inspection item. At least one clear photo is required so the SI/reviewing officer can verify field conditions. Photos are automatically compressed to save data." },
     ],
   },
   {
     id: "inspections", title: "Inspections & submissions",
-    items: [{ question: "Can I edit an inspection after submitting it?", answer: "No. Once submitted, an inspection goes to the review/QC team. If a correction is needed, the reviewer can reject it with remarks, which allows you to re-inspect and resubmit." }],
+    items: [{ question: "Can I edit an inspection after submitting it?", answer: "No. Once submitted, an inspection goes to the review/SI team. If a correction is needed, the reviewer can reject it with remarks, which allows you to re-inspect and resubmit." }],
   },
   {
     id: "voice", title: "Voice input",
@@ -50,7 +50,7 @@ export default function SupportPage() {
         <div className="mx-auto max-w-4xl px-6 py-12 sm:py-16">
           <Link href="/unified-login" className="text-sm font-semibold text-blue-300 underline-offset-4 hover:underline">← Back to sign in</Link>
           <h1 className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl">MatrixTrack 2.0 — Support</h1>
-          <p className="mt-5 max-w-3xl leading-7 text-slate-300">MatrixTrack 2.0 is a municipal sanitation operations app used by field employees, supervisors, quality controllers, and administrators of your municipal corporation. It is a private, role-based app — accounts are issued by your City Administrator, and there is no public sign-up.</p>
+          <p className="mt-5 max-w-3xl leading-7 text-slate-300">MatrixTrack 2.0 is a municipal sanitation operations app used by field employees, darogas, sanitary inspectors, and administrators of your municipal corporation. It is a private, role-based app — accounts are issued by your City Administrator, and there is no public sign-up.</p>
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-6 py-10">

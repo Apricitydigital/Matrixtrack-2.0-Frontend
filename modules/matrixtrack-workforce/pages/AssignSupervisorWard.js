@@ -58,7 +58,7 @@ function AssignSupervisorWard() {
   const [supervisors, setSupervisors] = useState([]);
 
   useEffect(() => {
-    if (logPageView) logPageView("Assign Supervisor Ward", "/assignSupervisorWard");
+    if (logPageView) logPageView("Assign Daroga Ward", "/assignSupervisorWard");
   }, [logPageView]);
 
   const [wards, setWards] = useState([]);
@@ -449,7 +449,7 @@ function AssignSupervisorWard() {
   XLSX.utils.book_append_sheet(
     workbook,
     worksheet,
-    "Supervisor Assignments"
+    "Daroga Assignments"
   );
 
   const excelBuffer = XLSX.write(workbook, {
@@ -462,7 +462,7 @@ function AssignSupervisorWard() {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
   });
 
-  saveAs(data, "Supervisor_Assignments.xlsx");
+  saveAs(data, "Daroga_Assignments.xlsx");
 };
 
   return (
@@ -470,7 +470,7 @@ function AssignSupervisorWard() {
       {isManualReloading && <Loader />}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-2 text-2xl font-bold">
-          <MapPin size={22} /> Assign Supervisor to Kothis
+          <MapPin size={22} /> Assign Daroga to Kothis
         </div>
         <button
           onClick={() => fetchAllData(true)}
@@ -531,7 +531,7 @@ dark:text-slate-400
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-gray-700 dark:text-slate-200">
-              Select Supervisor
+              Select Daroga
             </label>
 
             <SearchableSelect
@@ -549,7 +549,7 @@ dark:text-slate-400
                 });
               }}
 
-              placeholder="-- Select Supervisor --"
+              placeholder="-- Select Daroga --"
 
               required
 

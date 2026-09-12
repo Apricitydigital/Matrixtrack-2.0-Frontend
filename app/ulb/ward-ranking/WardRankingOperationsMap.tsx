@@ -62,7 +62,7 @@ const STATUS_LEGEND: Array<{
     },
     {
       state: 'APPROVED',
-      label: 'QC approved',
+      label: 'SI approved',
       color: '#10b981',
     },
     {

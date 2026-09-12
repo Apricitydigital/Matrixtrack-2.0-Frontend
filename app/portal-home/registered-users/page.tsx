@@ -201,7 +201,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose, on
                   User drill-down
                 </span>
                 <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${drilldownRoleBadgeStyle(user.role)}`}>
-                  {(data?.user.roles?.length ? data.user.roles : [user.role]).join(" / ")}
+                  {(data?.user.roles?.length ? data.user.roles : [user.role]).map(roleLabel).join(" / ")}
                 </span>
               </div>
               <h2 id="user-drilldown-title" className="text-xl font-black tracking-[-0.03em] sm:text-2xl">{data?.user.name || user.name}</h2>
@@ -1275,9 +1275,9 @@ export default function RegisteredUsersPage() {
               <option value="COMMISSIONER">Commissioner</option>
               <option value="ULB_OFFICER">ULB Officer</option>
               <option value="CITY_ADMIN">City Admin</option>
-              <option value="QC">Quality Controller (QC)</option>
-              <option value="ACTION_OFFICER">Action Officer</option>
-              <option value="SUPERVISOR">Supervisor</option>
+              <option value="QC">Sanitary Inspector (SI)</option>
+              <option value="ACTION_OFFICER">IEC Member</option>
+              <option value="SUPERVISOR">Daroga</option>
               <option value="EMPLOYEE">Employee</option>
             </select>
           </div>
@@ -1532,7 +1532,7 @@ export default function RegisteredUsersPage() {
                       {/* User Role */}
                       < td className="px-3 py-3 align-middle" >
                         <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-black uppercase ${getRoleBadgeStyle(u.role)}`}>
-                          {u.role}
+                          {roleLabel(u.role)}
                         </span>
                       </td >
 
@@ -1799,7 +1799,7 @@ export default function RegisteredUsersPage() {
                   <div className="flex items-center gap-2">
                     <h4 className="text-xs font-black text-slate-900 truncate">{selectedUserGeoModal.user.name}</h4>
                     <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[9.5px] font-black uppercase ${getRoleBadgeStyle(selectedUserGeoModal.user.role)}`}>
-                      {selectedUserGeoModal.user.role}
+                      {roleLabel(selectedUserGeoModal.user.role)}
                     </span>
                   </div>
                   <p className="text-[11px] font-semibold text-slate-500 truncate">
@@ -1889,7 +1889,7 @@ export default function RegisteredUsersPage() {
                 <div className="flex items-center gap-2">
                   <h4 className="text-xs font-black text-slate-900 truncate">{resetPasswordTarget.name}</h4>
                   <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[9.5px] font-black uppercase ${getRoleBadgeStyle(resetPasswordTarget.role)}`}>
-                    {resetPasswordTarget.role}
+                    {roleLabel(resetPasswordTarget.role)}
                   </span>
                 </div>
                 <p className="text-[11px] font-semibold text-slate-500 truncate">
@@ -2145,9 +2145,9 @@ export default function RegisteredUsersPage() {
                     <option value="COMMISSIONER">Commissioner</option>
                     <option value="ULB_OFFICER">ULB Officer</option>
                     <option value="CITY_ADMIN">City Admin</option>
-                    <option value="QC">Quality Controller (QC)</option>
-                    <option value="ACTION_OFFICER">Action Officer</option>
-                    <option value="SUPERVISOR">Supervisor</option>
+                    <option value="QC">Sanitary Inspector (SI)</option>
+                    <option value="ACTION_OFFICER">IEC Member</option>
+                    <option value="SUPERVISOR">Daroga</option>
                     <option value="EMPLOYEE">Employee</option>
                   </select>
                 </div>
@@ -2726,7 +2726,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
       setStatusMsg({
         type: "error",
         text:
-          "Supervisor and QC users must be assigned to exactly one zone."
+          "Daroga and SI users must be assigned to exactly one zone."
       });
 
       return;
@@ -2885,9 +2885,9 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                     <option value="COMMISSIONER">Commissioner</option>
                     <option value="ULB_OFFICER">ULB Officer</option>
                     <option value="CITY_ADMIN">City Admin</option>
-                    <option value="QC">Quality Controller (QC)</option>
-                    <option value="ACTION_OFFICER">Action Officer</option>
-                    <option value="SUPERVISOR">Supervisor</option>
+                    <option value="QC">Sanitary Inspector (SI)</option>
+                    <option value="ACTION_OFFICER">IEC Member</option>
+                    <option value="SUPERVISOR">Daroga</option>
                     <option value="EMPLOYEE">Employee</option>
                   </select>
                 </div>
