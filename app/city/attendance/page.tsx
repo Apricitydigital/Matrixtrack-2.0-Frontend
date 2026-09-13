@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import ExcelJS from "exceljs";
 import {
   Activity,
   AlertCircle,
@@ -58,6 +59,8 @@ import {
   type AttendanceRecord,
   type AttendanceUploadCalendarResponse,
   type AttendanceUploadResponse,
+  type RegisteredEmployee,
+  type RegisteredEmployeesResponse,
 } from "@lib/attendanceApi";
 
 const numberFormatter = new Intl.NumberFormat("en-IN");
@@ -210,8 +213,8 @@ function SearchableSelect({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(option)}
                 className={`flex items-center w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${isSelected(option.value)
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
               >
                 {isMultiSelect && (
@@ -1541,6 +1544,8 @@ function AttendanceDashboard() {
   const [employeeDrilldownData, setEmployeeDrilldownData] = useState<AttendanceDashboardResponse | null>(null);
   const [employeeDrilldownPage, setEmployeeDrilldownPage] = useState(1);
   const [employeeDrilldownLoading, setEmployeeDrilldownLoading] = useState(false);
+  const [registeredEmpData, setRegisteredEmpData] = useState<RegisteredEmployeesResponse | null>(null);
+  const [registeredEmpLoading, setRegisteredEmpLoading] = useState(false);
 
   const today = new Date();
   const todayKey = toLocalDateKey(today);
@@ -1799,6 +1804,44 @@ function AttendanceDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeDrilldown, employeeDrilldownPage, appliedFilters, selectedCityId, hmsSuperAdmin, employeeGroup]);
 
+  // Fetch registered employees when Health Workers tab is active
+  useEffect(() => {
+    if (employeeGroup !== "HEALTH_WORKERS") {
+      setRegisteredEmpData(null);
+      return;
+    }
+    if (hmsSuperAdmin && !selectedCityId) {
+      setRegisteredEmpData(null);
+      return;
+    }
+
+    let cancelled = false;
+    setRegisteredEmpLoading(true);
+
+    const from = appliedFilters.from || undefined;
+    const to = appliedFilters.to || undefined;
+
+    AttendanceApi.registeredEmployees({
+      cityId: attendanceCityId,
+      from,
+      to,
+    })
+      .then((result) => {
+        if (!cancelled) setRegisteredEmpData(result);
+      })
+      .catch(() => {
+        if (!cancelled) setRegisteredEmpData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRegisteredEmpLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeGroup, appliedFilters, selectedCityId, hmsSuperAdmin]);
+
   const handleCityChange = (cityId: string) => {
     setSelectedCityId(cityId);
     setData(null);
@@ -1816,6 +1859,7 @@ function AttendanceDashboard() {
     setWorkDurationData(null);
     setEmployeeDrilldown(null);
     setEmployeeDrilldownData(null);
+    setRegisteredEmpData(null);
     setDesignationPage(1);
     setTopEmployeesPage(1);
     setNotice("");
@@ -1838,6 +1882,117 @@ function AttendanceDashboard() {
     setKpiDrilldownPage(1);
     setKpiDrilldownData(null);
     setKpiDrilldown(config);
+  };
+
+  const handleDownloadRegisteredHealthWorkersExcel = async (
+    filterType: "ALL" | "MATCHED" | "PRESENT" | "UNMATCHED"
+  ) => {
+    if (!registeredEmpData || !registeredEmpData.employees.length) return;
+
+    let list = registeredEmpData.employees;
+    let title = "Registered Health Workers";
+    let filenamePrefix = "Health_Workers_All";
+
+    if (filterType === "UNMATCHED") {
+      list = list.filter((e) => !e.isMatched);
+      title = "No Attendance Data Found - Health Workers";
+      filenamePrefix = "Health_Workers_No_Data_Found";
+    } else if (filterType === "MATCHED") {
+      list = list.filter((e) => e.isMatched);
+      title = "Attendance Found - Health Workers";
+      filenamePrefix = "Health_Workers_Attendance_Found";
+    } else if (filterType === "PRESENT") {
+      list = list.filter((e) => e.isMatched && e.presentDays > 0);
+      title = "Present Health Workers";
+      filenamePrefix = "Health_Workers_Present";
+    }
+
+    if (!list.length) return;
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(title.slice(0, 31));
+
+    worksheet.columns = [
+      { header: "S.No.", key: "sno", width: 8 },
+      { header: "User ID", key: "userId", width: 25 },
+      { header: "Employee Name", key: "name", width: 28 },
+      { header: "Registered Aadhaar", key: "rawAadhaar", width: 20 },
+      { header: "Aadhaar Suffix (Last 8)", key: "aadhaarSuffix", width: 22 },
+      { header: "Attendance ID (Matched)", key: "attendanceId", width: 24 },
+      { header: "Attendance Status", key: "status", width: 18 },
+      { header: "Present Days", key: "presentDays", width: 14 },
+      { header: "Absent Days", key: "absentDays", width: 14 },
+      { header: "Attendance Rate (%)", key: "attendanceRate", width: 18 },
+      { header: "Resolution / Reason", key: "reason", width: 55 },
+      { header: "Assigned Zones", key: "zones", width: 25 },
+      { header: "Assigned Wards", key: "wards", width: 30 },
+    ];
+
+    // Header styling
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    const headerBg =
+      filterType === "UNMATCHED"
+        ? "FFE11D48"
+        : filterType === "PRESENT"
+          ? "FF2563EB"
+          : filterType === "MATCHED"
+            ? "FF059669"
+            : "FF0D9488";
+
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: headerBg } };
+    headerRow.alignment = { vertical: "middle", horizontal: "left" };
+
+    list.forEach((e, idx) => {
+      const hasAadhaar = Boolean(e.aadhaarSuffix);
+      let reason = "";
+      if (!e.isMatched) {
+        reason = hasAadhaar
+          ? `Aadhaar suffix (${e.aadhaarSuffix}) not present in attendance report CSV`
+          : "Aadhaar card number missing or invalid on user profile";
+      } else {
+        reason = `Matched to Attendance ID ${e.attendanceId || e.aadhaarSuffix}`;
+      }
+
+      worksheet.addRow({
+        sno: idx + 1,
+        userId: e.userId,
+        name: e.name,
+        rawAadhaar: e.rawAadhaar || "Not Provided",
+        aadhaarSuffix: e.aadhaarSuffix || "N/A",
+        attendanceId: e.attendanceId || "Not Matched",
+        status: e.status || (e.isMatched ? "P" : "No Record"),
+        presentDays: e.presentDays,
+        absentDays: e.absentDays,
+        attendanceRate: `${e.attendanceRate.toFixed(1)}%`,
+        reason,
+        zones: e.zones.join(", ") || "-",
+        wards: e.wards.join(", ") || "-",
+      });
+    });
+
+    // Auto fit column width
+    worksheet.columns.forEach((column) => {
+      let maxLen = 0;
+      column.eachCell({ includeEmpty: true }, (cell) => {
+        const val = cell.value ? cell.value.toString() : "";
+        maxLen = Math.max(maxLen, val.length);
+      });
+      column.width = Math.min(Math.max(maxLen + 4, 12), 60);
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const dateStr = appliedFilters.from || todayKey;
+    const fileName = `${filenamePrefix}_${dateStr}_(${list.length}_employees).xlsx`;
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const summary = data?.summary;
@@ -2178,6 +2333,475 @@ function AttendanceDashboard() {
     void handleCopySummary();
   };
 
+  function EmployeeMatchedSection({
+    employees,
+    openEmployeeDrilldown,
+  }: {
+    employees: AttendanceEmployeeSummary[];
+    openEmployeeDrilldown: (employee: AttendanceEmployeeSummary) => void;
+  }) {
+    const [matchFilter, setMatchFilter] = useState<"MATCHED" | "ALL" | "UNMATCHED">("MATCHED");
+    const [selectedZone, setSelectedZone] = useState<string>("ALL");
+    const [selectedWard, setSelectedWard] = useState<string>("ALL");
+    const [sortBy, setSortBy] = useState<"ZONE_ASC" | "ZONE_DESC" | "WARD_ASC" | "WARD_DESC" | "RATE_DESC" | "NAME_ASC">("ZONE_ASC");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    const extractGeoNumber = (val: string) => {
+      const match = val.match(/\d+/);
+      return match ? parseInt(match[0], 10) : 999;
+    };
+
+    const availableZones = useMemo(() => {
+      const set = new Set<string>();
+      employees.forEach((e) => {
+        e.zones?.forEach((z) => set.add(z));
+      });
+      return Array.from(set).sort((a, b) => extractGeoNumber(a) - extractGeoNumber(b));
+    }, [employees]);
+
+    const availableWards = useMemo(() => {
+      const set = new Set<string>();
+      employees.forEach((e) => {
+        e.wards?.forEach((w) => set.add(w));
+      });
+      return Array.from(set).sort((a, b) => extractGeoNumber(a) - extractGeoNumber(b));
+    }, [employees]);
+
+    const matchedEmployeesCount = useMemo(() => {
+      return employees.filter(
+        (e) => (e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0)
+      ).length;
+    }, [employees]);
+
+    const filteredEmployees = useMemo(() => {
+      return employees.filter((e) => {
+        const isMatched = Boolean((e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0));
+
+        if (matchFilter === "MATCHED" && !isMatched) return false;
+        if (matchFilter === "UNMATCHED" && isMatched) return false;
+
+        if (selectedZone !== "ALL") {
+          if (!e.zones || !e.zones.includes(selectedZone)) return false;
+        }
+
+        if (selectedWard !== "ALL") {
+          if (!e.wards || !e.wards.includes(selectedWard)) return false;
+        }
+
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase().trim();
+          const matchesName = e.employeeName.toLowerCase().includes(q);
+          const matchesId = e.attendanceId.toLowerCase().includes(q);
+          const matchesDesig = (e.designation || "").toLowerCase().includes(q);
+          const matchesZone = (e.zones || []).some((z) => z.toLowerCase().includes(q));
+          const matchesWard = (e.wards || []).some((w) => w.toLowerCase().includes(q));
+          if (!matchesName && !matchesId && !matchesDesig && !matchesZone && !matchesWard) return false;
+        }
+
+        return true;
+      }).sort((a, b) => {
+        const aZone = a.zones?.[0] || "—";
+        const bZone = b.zones?.[0] || "—";
+        const aWard = a.wards?.[0] || "—";
+        const bWard = b.wards?.[0] || "—";
+
+        if (sortBy === "ZONE_ASC") {
+          const numA = extractGeoNumber(aZone);
+          const numB = extractGeoNumber(bZone);
+          if (numA !== numB) return numA - numB;
+          return aZone.localeCompare(bZone);
+        }
+        if (sortBy === "ZONE_DESC") {
+          const numA = extractGeoNumber(aZone);
+          const numB = extractGeoNumber(bZone);
+          if (numA !== numB) return numB - numA;
+          return bZone.localeCompare(aZone);
+        }
+        if (sortBy === "WARD_ASC") {
+          const numA = extractGeoNumber(aWard);
+          const numB = extractGeoNumber(bWard);
+          if (numA !== numB) return numA - numB;
+          return aWard.localeCompare(bWard);
+        }
+        if (sortBy === "WARD_DESC") {
+          const numA = extractGeoNumber(aWard);
+          const numB = extractGeoNumber(bWard);
+          if (numA !== numB) return numB - numA;
+          return bWard.localeCompare(aWard);
+        }
+        if (sortBy === "RATE_DESC") {
+          return b.attendanceRate - a.attendanceRate;
+        }
+        return a.employeeName.localeCompare(b.employeeName);
+      });
+    }, [employees, matchFilter, selectedZone, selectedWard, sortBy, searchQuery]);
+
+    useEffect(() => {
+      setPage(1);
+    }, [matchFilter, selectedZone, selectedWard, sortBy, searchQuery, pageSize]);
+
+    const totalPages = Math.ceil(filteredEmployees.length / pageSize) || 1;
+    const paginatedEmployees = useMemo(() => {
+      const start = (page - 1) * pageSize;
+      return filteredEmployees.slice(start, start + pageSize);
+    }, [filteredEmployees, page, pageSize]);
+
+    const avgMatchedRate = useMemo(() => {
+      const matched = employees.filter(
+        (e) => (e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0)
+      );
+      if (!matched.length) return "0.0";
+      const sum = matched.reduce((acc, curr) => acc + curr.attendanceRate, 0);
+      return (sum / matched.length).toFixed(1);
+    }, [employees]);
+
+    return (
+      <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_14px_42px_rgba(15,23,42,0.055)]">
+        {/* Header Banner */}
+        <div className="flex flex-col gap-4 border-b border-slate-100 bg-gradient-to-r from-emerald-900/5 via-blue-50/40 to-indigo-50/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/80 shadow-sm">
+              <UserCheck size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black tracking-tight text-slate-950">Employee Match with Employee Base</h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[10px] font-black uppercase text-emerald-800 ring-1 ring-emerald-200">
+                  <CheckCircle2 size={11} /> {matchedEmployeesCount} Matched
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                Matched against registered employee profiles via Aadhaar (last 8 digits) with Zone & Ward location sorting
+              </p>
+            </div>
+          </div>
+
+          {/* Quick KPI Stat Badges */}
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-3 py-1.5 shadow-sm">
+              <div className="flex flex-col text-right leading-tight">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Total Matched</span>
+                <span className="text-sm font-black text-emerald-950">{matchedEmployeesCount} / {employees.length}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-blue-200/80 bg-blue-50/80 px-3 py-1.5 shadow-sm">
+              <div className="flex flex-col text-right leading-tight">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700">Matched Attendance</span>
+                <span className="text-sm font-black text-blue-950">{avgMatchedRate}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Toolbar: Filters & Sorting */}
+        <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Match Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+              {(
+                [
+                  { id: "MATCHED", label: "Matched Only", count: matchedEmployeesCount },
+                  { id: "ALL", label: "All Employees", count: employees.length },
+                  { id: "UNMATCHED", label: "Unmatched", count: employees.length - matchedEmployeesCount },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMatchFilter(tab.id)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${matchFilter === tab.id
+                    ? "bg-slate-900 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    }`}
+                >
+                  {tab.label}
+                  <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${matchFilter === tab.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                    }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative min-w-[210px] max-w-xs">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, ID, zone, ward..."
+                className="h-8 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-xs font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Zone, Ward & Sorting Dropdowns */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Zone Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Zone:</span>
+              <select
+                value={selectedZone}
+                onChange={(e) => setSelectedZone(e.target.value)}
+                className="h-8 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 shadow-sm"
+              >
+                <option value="ALL">All Zones ({availableZones.length})</option>
+                {availableZones.map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Ward Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Ward:</span>
+              <select
+                value={selectedWard}
+                onChange={(e) => setSelectedWard(e.target.value)}
+                className="h-8 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 shadow-sm"
+              >
+                <option value="ALL">All Wards ({availableWards.length})</option>
+                {availableWards.map((ward) => (
+                  <option key={ward} value={ward}>
+                    {ward}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort By Dropdown */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="h-8 rounded-xl border border-blue-200 bg-blue-50/80 px-2.5 text-xs font-black text-blue-900 outline-none focus:border-blue-400 shadow-sm"
+              >
+                <option value="ZONE_ASC">Zone (Ascending 1 → 20)</option>
+                <option value="ZONE_DESC">Zone (Descending 20 → 1)</option>
+                <option value="WARD_ASC">Ward (Ascending 1 → 85)</option>
+                <option value="WARD_DESC">Ward (Descending 85 → 1)</option>
+                <option value="RATE_DESC">Attendance Rate (High to Low)</option>
+                <option value="NAME_ASC">Employee Name (A → Z)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Matched Employee Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1280px] border-collapse">
+            <thead>
+              <tr className="bg-slate-50/95 text-left backdrop-blur">
+                {[
+                  "Employee Name",
+                  "Attendance ID (Aadhaar)",
+                  "Match Status",
+                  "Designation",
+                  "Zone",
+                  "Ward",
+                  "Present / Total",
+                  "Absent",
+                  "Attendance Rate",
+                  "Completed Punches",
+                  "Avg Work Time",
+                ].map((heading) => (
+                  <th
+                    key={heading}
+                    className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400"
+                  >
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {paginatedEmployees.map((employee) => {
+                const isMatched = Boolean(
+                  (employee.matrixTrackUserId && employee.matrixTrackUserId.trim() !== "") ||
+                  (employee.zones && employee.zones.length > 0) ||
+                  (employee.wards && employee.wards.length > 0)
+                );
+
+                return (
+                  <tr
+                    key={employee.attendanceId}
+                    className="group transition-all duration-200 odd:bg-white even:bg-slate-50/25 hover:bg-emerald-50/40"
+                  >
+                    {/* Name */}
+                    <td className="px-4 py-3.5">
+                      <button
+                        type="button"
+                        onClick={() => openEmployeeDrilldown(employee)}
+                        className="flex items-center gap-2.5 text-left"
+                        title={`View ${employee.employeeName}'s details`}
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 text-[11px] font-black text-emerald-800 ring-1 ring-emerald-200/70">
+                          {employee.employeeName.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="max-w-[190px] truncate text-xs font-bold text-slate-900 group-hover:text-emerald-700 group-hover:underline">
+                            {employee.employeeName}
+                          </p>
+                          <p className="mt-0.5 max-w-[190px] truncate text-[10px] font-medium text-slate-400">
+                            {employee.officeLocation || "—"}
+                          </p>
+                        </div>
+                      </button>
+                    </td>
+
+                    {/* Attendance ID / Aadhaar */}
+                    <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-700">
+                      <span className="inline-block rounded-md bg-slate-100 px-2 py-0.5 ring-1 ring-slate-200/80">
+                        {employee.attendanceId}
+                      </span>
+                    </td>
+
+                    {/* Match Status */}
+                    <td className="px-4 py-3.5">
+                      {isMatched ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-200">
+                          <CheckCircle2 size={11} /> Matched (Aadhaar)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-400 ring-1 ring-slate-200">
+                          Unmatched
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Designation */}
+                    <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{employee.designation || "—"}</td>
+
+                    {/* Zone */}
+                    <td className="px-4 py-3.5">
+                      {employee.zones && employee.zones.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {employee.zones.map((z) => (
+                            <span key={z} className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 ring-1 ring-indigo-100">
+                              {z}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-300">—</span>
+                      )}
+                    </td>
+
+                    {/* Ward */}
+                    <td className="px-4 py-3.5">
+                      {employee.wards && employee.wards.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {employee.wards.map((w) => (
+                            <span key={w} className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-100">
+                              {w}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-300">—</span>
+                      )}
+                    </td>
+
+                    {/* Present/Total */}
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">
+                        {employee.presentDays}/{employee.totalDays}
+                      </span>
+                    </td>
+
+                    {/* Absent */}
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">
+                        {employee.absentDays}
+                      </span>
+                    </td>
+
+                    {/* Attendance Rate */}
+                    <td className="px-4 py-3.5 text-xs font-black text-slate-800">{employee.attendanceRate.toFixed(1)}%</td>
+
+                    {/* Punches */}
+                    <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{employee.completedPunches}</td>
+
+                    {/* Avg Work Time */}
+                    <td className="px-4 py-3.5 text-xs font-semibold text-slate-500">{minutesToDuration(employee.avgWorkMinutes)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {!paginatedEmployees.length && (
+            <div className="flex min-h-[200px] flex-col items-center justify-center px-6 text-center">
+              <Search size={22} className="mb-2 text-slate-300" />
+              <p className="text-sm font-bold text-slate-600">No matched employees found for these criteria</p>
+              <p className="mt-1 text-xs text-slate-400">Try selecting "All Employees" or choosing a different Zone/Ward.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[11px] font-semibold text-slate-500">
+            Showing {paginatedEmployees.length > 0 ? (page - 1) * pageSize + 1 : 0} to{" "}
+            {Math.min(page * pageSize, filteredEmployees.length)} of {filteredEmployees.length} employees
+          </p>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 mr-2">
+              <span className="text-[10px] font-extrabold uppercase text-slate-400">Page Size:</span>
+              {[10, 20, 50, 100].map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setPageSize(size)}
+                  className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${pageSize === size ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200"
+                    }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={14} /> Previous
+            </button>
+            <span className="text-xs font-bold text-slate-600">
+              {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading && !data) {
     return (
       <div className="flex min-h-[68vh] items-center justify-center">
@@ -2263,8 +2887,8 @@ function AttendanceDashboard() {
             <button
               onClick={() => setEmployeeGroup("ALL")}
               className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${employeeGroup === "ALL"
-                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                 }`}
             >
               <Sparkles size={12} className={employeeGroup === "ALL" ? "text-blue-500" : "text-slate-400"} />
@@ -2273,8 +2897,8 @@ function AttendanceDashboard() {
             <button
               onClick={() => setEmployeeGroup("HEALTH_WORKERS")}
               className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${employeeGroup === "HEALTH_WORKERS"
-                  ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80"
-                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                ? "bg-white text-blue-700 shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/80"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                 }`}
             >
               <Building2 size={12} className={employeeGroup === "HEALTH_WORKERS" ? "text-blue-500" : "text-slate-400"} />
@@ -2584,34 +3208,122 @@ function AttendanceDashboard() {
         </section>
       ) : (
         <>
+          {/* Health Worker registered employees stats banner */}
+          {employeeGroup === "HEALTH_WORKERS" && (
+            <section className="rounded-2xl border border-teal-200/80 bg-gradient-to-r from-teal-50 via-emerald-50/60 to-white p-4 shadow-sm">
+              {registeredEmpLoading ? (
+                <div className="flex items-center gap-2 text-xs font-semibold text-teal-700">
+                  <RefreshCw size={14} className="animate-spin" /> Loading registered employee data...
+                </div>
+              ) : registeredEmpData ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-teal-100 text-teal-700 ring-1 ring-teal-200">
+                      <UsersRound size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-slate-900">Registered Health Workers (Employee Roster)</p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+                        Matched via Aadhaar last 8 digits against attendance ID · {registeredEmpData.totalWithAadhaar} of {registeredEmpData.totalRegistered} have Aadhaar on file
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadRegisteredHealthWorkersExcel("ALL")}
+                      title="Click to download Excel list of all registered employees"
+                      className="group rounded-xl bg-teal-100 px-3 py-1.5 text-center ring-1 ring-teal-200 hover:bg-teal-200 hover:scale-105 transition-all shadow-sm cursor-pointer"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-teal-700">Registered</p>
+                        <ArrowDownToLine size={10} className="text-teal-700 opacity-60 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <p className="text-base font-black text-teal-900">{numberFormatter.format(registeredEmpData.totalRegistered)}</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadRegisteredHealthWorkersExcel("MATCHED")}
+                      title="Click to download Excel list of employees with attendance data found"
+                      className="group rounded-xl bg-emerald-100 px-3 py-1.5 text-center ring-1 ring-emerald-200 hover:bg-emerald-200 hover:scale-105 transition-all shadow-sm cursor-pointer"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">Attendance Found</p>
+                        <ArrowDownToLine size={10} className="text-emerald-700 opacity-60 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <p className="text-base font-black text-emerald-900">{numberFormatter.format(registeredEmpData.totalMatched)}</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadRegisteredHealthWorkersExcel("PRESENT")}
+                      title="Click to download Excel list of employees with present days"
+                      className="group rounded-xl bg-blue-100 px-3 py-1.5 text-center ring-1 ring-blue-200 hover:bg-blue-200 hover:scale-105 transition-all shadow-sm cursor-pointer"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-blue-700">Had Present Days</p>
+                        <ArrowDownToLine size={10} className="text-blue-700 opacity-60 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <p className="text-base font-black text-blue-900">{numberFormatter.format(registeredEmpData.totalPresent)}</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadRegisteredHealthWorkersExcel("UNMATCHED")}
+                      title="Click to download Excel list of employees with no attendance data found"
+                      className="group relative rounded-xl bg-rose-100 px-3 py-1.5 text-center ring-2 ring-rose-300 hover:bg-rose-200 hover:scale-105 transition-all shadow-sm cursor-pointer"
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-rose-700">No Data Found</p>
+                        <ArrowDownToLine size={11} className="text-rose-700" />
+                      </div>
+                      <p className="text-base font-black text-rose-900">{numberFormatter.format(registeredEmpData.totalUnmatched)}</p>
+                      <span className="text-[8px] font-black uppercase tracking-tight text-rose-700 block -mt-0.5 underline">
+                        Download Excel
+                      </span>
+                    </button>
+
+                    <div className="rounded-xl bg-slate-100 px-3 py-1.5 text-center ring-1 ring-slate-200">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Match Rate</p>
+                      <p className="text-base font-black text-slate-900">
+                        {registeredEmpData.totalRegistered > 0
+                          ? ((registeredEmpData.totalMatched / registeredEmpData.totalRegistered) * 100).toFixed(1)
+                          : "0.0"}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          )}
+
           <section className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
             <KpiCard
-              label="Total employees"
-              value={numberFormatter.format(summary.uniqueEmployees)}
-              // detail={
-              //   isMultiDayRange
-              //     ? `Avg ${formatAverageValue(avgTotalRecords)} records/day (${averageFormula(summary.totalRecords, rangeDayCount)})`
-              //     : `${numberFormatter.format(summary.totalRecords)} attendance records`
-              // }
+              label={employeeGroup === "HEALTH_WORKERS" && registeredEmpData ? "Registered Employees" : "Total employees"}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? numberFormatter.format(registeredEmpData.totalRegistered)
+                  : numberFormatter.format(summary.uniqueEmployees)
+              }
               icon={<UsersRound size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "ALL"}
               onClick={() => openKpiDrilldown({
                 key: "ALL",
                 title: "Total employees",
-                subtitle: "Underlying employee attendance records for the current dashboard filters.",
-                value: numberFormatter.format(summary.uniqueEmployees),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? `${registeredEmpData.totalRegistered} registered employees · ${registeredEmpData.totalMatched} matched with attendance data.`
+                  : "Underlying employee attendance records for the current dashboard filters.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? numberFormatter.format(registeredEmpData.totalRegistered)
+                  : numberFormatter.format(summary.uniqueEmployees),
                 tone: "blue",
               })}
             />
             <KpiCard
               label="Present"
               value={isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
-              // detail={
-              //   isMultiDayRange
-              //     ? `Avg/day (${averageFormula(summary.present, rangeDayCount)})`
-              //     : `${summary.attendanceRate.toFixed(1)}% attendance`
-              // }
               icon={<UserCheck size={18} />}
               tone="emerald"
               active={kpiDrilldown?.key === "PRESENT"}
@@ -2627,11 +3339,6 @@ function AttendanceDashboard() {
             <KpiCard
               label="Absent"
               value={isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
-              // detail={
-              //   isMultiDayRange
-              //     ? `Avg/day (${averageFormula(summary.absent, rangeDayCount)})`
-              //     : `${summary.totalRecords ? ((summary.absent / summary.totalRecords) * 100).toFixed(1) : "0.0"}% of records`
-              // }
               icon={<UserRoundX size={18} />}
               tone="rose"
               active={kpiDrilldown?.key === "ABSENT"}
@@ -2646,15 +3353,20 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Attendance rate"
-              value={`${summary.attendanceRate.toFixed(1)}%`}
-              // detail="Present ÷ total records"
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && registeredEmpData.totalRegistered > 0
+                  ? `${((summary.present / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
+                  : `${summary.attendanceRate.toFixed(1)}%`
+              }
               icon={<Activity size={18} />}
               tone="violet"
               active={kpiDrilldown?.key === "RATE"}
               onClick={() => openKpiDrilldown({
                 key: "RATE",
                 title: "Attendance rate · Present records",
-                subtitle: "Present employee records used to calculate the attendance rate for the current selection.",
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? `Present ÷ total registered (${summary.present} present of ${registeredEmpData.totalRegistered} registered).`
+                  : "Present employee records used to calculate the attendance rate for the current selection.",
                 value: `${summary.attendanceRate.toFixed(1)}%`,
                 tone: "violet",
                 query: { status: "P" },
@@ -2663,11 +3375,6 @@ function AttendanceDashboard() {
             <KpiCard
               label="Punch In"
               value={isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount)}
-              // detail={
-              //   isMultiDayRange
-              //     ? `Avg/day (${averageFormula(punchInCount, rangeDayCount)})`
-              //     : `${summary.totalRecords ? ((punchInCount / summary.totalRecords) * 100).toFixed(1) : "0.0"}% with Punch In`
-              // }
               icon={<Clock3 size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "PUNCH_IN"}
@@ -2683,11 +3390,6 @@ function AttendanceDashboard() {
             <KpiCard
               label="Punch Out"
               value={isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(summary.checkedOut)}
-              // detail={
-              //   isMultiDayRange
-              //     ? `Avg/day (${averageFormula(summary.checkedOut, rangeDayCount)})`
-              //     : "Completed Punch In / Punch Out cycle"
-              // }
               icon={<CheckCircle2 size={18} />}
               tone="teal"
               active={kpiDrilldown?.key === "PUNCH_OUT"}
@@ -2703,11 +3405,6 @@ function AttendanceDashboard() {
             <KpiCard
               label="Not punched out"
               value={isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
-              // detail={
-              //   isMultiDayRange
-              //     ? `Avg/day (${averageFormula(summary.openCheckIns, rangeDayCount)})`
-              //     : "Punch In recorded · Punch Out pending"
-              // }
               icon={<TimerReset size={18} />}
               tone="amber"
               active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
@@ -3273,8 +3970,8 @@ function AttendanceDashboard() {
                           setPage(1);
                         }}
                         className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${employeePageSize === size
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                           }`}
                       >
                         {size}
@@ -3359,6 +4056,35 @@ function AttendanceDashboard() {
               </div>
             </div>
 
+          </section>
+
+          <section>
+            {employeeGroup === "HEALTH_WORKERS" && registeredEmpData ? (
+              <EmployeeMatchedSection
+                employees={registeredEmpData.employees.map((re) => ({
+                  attendanceId: re.attendanceId || re.aadhaarSuffix || "No Aadhaar",
+                  employeeName: re.name,
+                  designation: null,
+                  officeLocation: null,
+                  matrixTrackUserId: re.isMatched ? re.userId : null,
+                  zones: re.zones,
+                  wards: re.wards,
+                  totalDays: re.totalDays,
+                  presentDays: re.presentDays,
+                  absentDays: re.absentDays,
+                  attendanceRate: re.attendanceRate,
+                  completedPunches: 0,
+                  avgWorkMinutes: null,
+                  lastAttendanceDate: "",
+                }))}
+                openEmployeeDrilldown={openEmployeeDrilldown}
+              />
+            ) : (
+              <EmployeeMatchedSection
+                employees={data.allEmployees || data.employees}
+                openEmployeeDrilldown={openEmployeeDrilldown}
+              />
+            )}
           </section>
 
           <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-[0_12px_38px_rgba(15,23,42,0.06)] sm:p-6">

@@ -49,6 +49,7 @@ type UserRecord = {
   id: string;
   name: string;
   email?: string | null;
+  aadhaar?: string | null;
   phone?: string;
   password?: string | null;
   plainPassword?: string | null;
@@ -307,7 +308,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose, on
                 <div className="sm:col-span-2">
                   <DrilldownChipSection
                     title="Assigned Toilets"
-                  onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("TOILET") : undefined}
+                    onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("TOILET") : undefined}
                     icon={<Droplet size={15} className="text-sky-600" />}
                     colorClass="border-sky-100 bg-sky-50/40"
                     items={(data?.assignments.toilets || []).map((t) => ({
@@ -761,6 +762,7 @@ export default function RegisteredUsersPage() {
         const matchesSearch =
           !q ||
           String(u.name || "").toLowerCase().includes(q) ||
+          String(u.aadhaar || "").toLowerCase().includes(q) ||
           String(u.email || "").toLowerCase().includes(q) ||
           String(u.phone || "").toLowerCase().includes(q) ||
           String(uCityName || "").toLowerCase().includes(q) ||
@@ -870,6 +872,7 @@ export default function RegisteredUsersPage() {
       const matchesSearch =
         !q ||
         String(u.name || "").toLowerCase().includes(q) ||
+        String(u.aadhaar || "").toLowerCase().includes(q) ||
         String(u.email || "").toLowerCase().includes(q) ||
         String(u.phone || "").toLowerCase().includes(q);
 
@@ -1423,7 +1426,7 @@ export default function RegisteredUsersPage() {
 
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75">
-                {["SR. NO.", "USER NAME", "USER EMAIL", "MOBILE NUMBER", "USER ROLE", "STATE & CITY", "ZONE & WARD", "ASSIGNED MODULES", "CREATED ON", "ACTION"].map((h) => (
+                {["SR. NO.", "USER NAME", "AADHAAR CARD / EMAIL", "MOBILE NUMBER", "USER ROLE", "STATE & CITY", "ZONE & WARD", "ASSIGNED MODULES", "CREATED ON", "ACTION"].map((h) => (
                   <th key={h} className="px-3 py-3.5 text-left text-[11px] font-extrabold uppercase tracking-[0.05em] text-slate-500 first:pl-5 last:pr-5">
                     {h}
                   </th>
@@ -1504,18 +1507,22 @@ export default function RegisteredUsersPage() {
                         </button>
                       </td>
 
-                      {/* User Email */}
+                      {/* Aadhaar Card Number / User Email */}
                       <td className="px-3 py-3 align-middle">
-                        {(!u.email || u.email.trim() === '' || u.email.includes('@internal.')) ? (
-                          <span className="truncate text-xs font-semibold text-slate-400 block">
-                            N/A
+                        {u.aadhaar && u.aadhaar.trim() !== '' ? (
+                          <span className="truncate text-xs font-bold text-slate-900 block tracking-wide font-mono bg-slate-100/80 px-2 py-0.5 rounded border border-slate-200/80 w-fit">
+                            {u.aadhaar}
                           </span>
-                        ) : (
+                        ) : u.email && u.email.trim() !== '' && !u.email.includes('@internal.') ? (
                           <span className="truncate text-xs font-semibold text-slate-600 block">
                             {u.email}
                           </span>
+                        ) : (
+                          <span className="truncate text-xs font-semibold text-slate-400 block">
+                            N/A
+                          </span>
                         )}
-                      </td >
+                      </td>
 
                       {/* Mobile Number */}
                       < td className="px-3 py-3 align-middle" >
