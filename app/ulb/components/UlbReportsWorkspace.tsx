@@ -10142,7 +10142,7 @@ function ReportJourneySection({
             icon: Clock3,
             title: 'Submitted',
             time: formatDate(item?.createdAt),
-            description: 'Supervisor submitted report',
+            description: 'Daroga submitted report',
         },
     ];
 
