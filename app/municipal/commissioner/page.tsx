@@ -645,7 +645,6 @@ function effectiveStatus(
       'PENDING_QC',
       'SUBMITTED',
       'IN_PROGRESS',
-      'DRAFT',
     ].includes(status)
   ) {
     return 'PENDING';
@@ -891,7 +890,14 @@ function inspectionStats(
   let qcApproved = 0;
   let qcRejected = 0;
 
-  records.forEach(
+  const applicableRecords =
+    records.filter(
+      (item) =>
+        effectiveStatus(item) !==
+        'DRAFT'
+    );
+
+  applicableRecords.forEach(
     (item) => {
       const status =
         effectiveStatus(item);
@@ -934,7 +940,7 @@ function inspectionStats(
   );
 
   const total =
-    records.length;
+    applicableRecords.length;
 
   const performance =
     total > 0
@@ -3644,10 +3650,74 @@ export default function CommissionerDashboard() {
   ========================================================= */
 
   const days =
-    dateRangeDays(
+    useMemo(() => {
+      if (
+        appliedFrom &&
+        appliedTo
+      ) {
+        return dateRangeDays(
+          appliedFrom,
+          appliedTo
+        );
+      }
+
+      const timestamps =
+        filteredInspectionRecords
+          .map((item) => {
+            const value =
+              recordDate(item);
+
+            if (!value) {
+              return null;
+            }
+
+            const timestamp =
+              new Date(
+                value
+              ).getTime();
+
+            return Number.isFinite(
+              timestamp
+            )
+              ? timestamp
+              : null;
+          })
+          .filter(
+            (
+              value
+            ): value is number =>
+              value !== null
+          );
+
+      if (!timestamps.length) {
+        return 1;
+      }
+
+      const first =
+        Math.min(
+          ...timestamps
+        );
+
+      const last =
+        Math.max(
+          ...timestamps
+        );
+
+      return Math.max(
+        1,
+        Math.floor(
+          (
+            last -
+            first
+          ) /
+          86400000
+        ) + 1
+      );
+    }, [
       appliedFrom,
-      appliedTo
-    );
+      appliedTo,
+      filteredInspectionRecords,
+    ]);
 
   const inspection =
     useMemo(
@@ -4166,14 +4236,23 @@ export default function CommissionerDashboard() {
           )
           .sort(
             (a, b) =>
-              (
-                b.metricValue ||
-                0
-              ) -
-              (
-                a.metricValue ||
-                0
-              )
+              negativeMetric
+                ? (
+                    a.metricValue ||
+                    0
+                  ) -
+                  (
+                    b.metricValue ||
+                    0
+                  )
+                : (
+                    b.metricValue ||
+                    0
+                  ) -
+                  (
+                    a.metricValue ||
+                    0
+                  )
           ),
       [
         zoneRows,
@@ -4201,14 +4280,23 @@ export default function CommissionerDashboard() {
           )
           .sort(
             (a, b) =>
-              (
-                b.metricValue ||
-                0
-              ) -
-              (
-                a.metricValue ||
-                0
-              )
+              negativeMetric
+                ? (
+                    a.metricValue ||
+                    0
+                  ) -
+                  (
+                    b.metricValue ||
+                    0
+                  )
+                : (
+                    b.metricValue ||
+                    0
+                  ) -
+                  (
+                    a.metricValue ||
+                    0
+                  )
           ),
       [
         wardPerformanceRows,
