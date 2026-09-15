@@ -54,6 +54,7 @@ import { useAuth } from '@hooks/useAuth';
 
 import {
   ModuleRecordsApi,
+  TaskforceApi,
 } from '@lib/apiClient';
 
 import {
@@ -2297,6 +2298,12 @@ export default function CommissionerDashboard() {
     >([]);
 
   const [
+    taskforceCases,
+    setTaskforceCases,
+  ] =
+    useState<any[]>([]);
+
+  const [
     loading,
     setLoading,
   ] =
@@ -2546,12 +2553,18 @@ export default function CommissionerDashboard() {
             }
           );
 
+        const taskforcePromise =
+          TaskforceApi.listCases(
+            cityId
+          );
+
         const results =
           await Promise.allSettled(
             [
               modulePromise,
               attendancePromise,
               wardPromise,
+              taskforcePromise,
             ]
           );
 
@@ -2563,6 +2576,9 @@ export default function CommissionerDashboard() {
 
         const wardResult =
           results[2];
+
+        const taskforceResult =
+          results[3];
 
         if (
           moduleResult.status ===
@@ -2609,6 +2625,21 @@ export default function CommissionerDashboard() {
           );
           setLoadError(
             true
+          );
+        }
+
+        if (
+          taskforceResult.status ===
+          'fulfilled'
+        ) {
+          setTaskforceCases(
+            taskforceResult.value
+              .cases ||
+              []
+          );
+        } else {
+          setTaskforceCases(
+            []
           );
         }
 
@@ -3824,6 +3855,51 @@ export default function CommissionerDashboard() {
       1,
       days
     );
+
+  const taskforceStats =
+    useMemo(() => {
+      const total =
+        taskforceCases.length;
+
+      const open =
+        taskforceCases.filter(
+          (item) =>
+            String(
+              item?.status ||
+                ''
+            ).toUpperCase() ===
+              'OPEN'
+        ).length;
+
+      const inProgress =
+        taskforceCases.filter(
+          (item) =>
+            String(
+              item?.status ||
+                ''
+            ).toUpperCase() ===
+              'IN_PROGRESS'
+        ).length;
+
+      const completed =
+        taskforceCases.filter(
+          (item) =>
+            String(
+              item?.status ||
+                ''
+            ).toUpperCase() ===
+              'COMPLETED'
+        ).length;
+
+      return {
+        total,
+        open,
+        inProgress,
+        completed,
+      };
+    }, [
+      taskforceCases,
+    ]);
 
 
   /* =========================================================
@@ -6949,6 +7025,67 @@ export default function CommissionerDashboard() {
               );
             }
           )}
+        </section>
+
+        {/* TASKFORCE / CTU-GVP */}
+        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                <Target
+                  size={18}
+                  className="text-orange-600"
+                />
+                CTU / GVP ? Taskforce
+              </div>
+
+              <div className="mt-1 text-[10px] font-bold text-slate-400">
+                Live city-wide operational cases, tracked separately from inspection performance filters.
+              </div>
+            </div>
+
+            <div className="rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[10px] font-black text-orange-700">
+              TASKFORCE
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                Total Cases
+              </div>
+              <div className="mt-2 text-2xl font-black text-slate-950">
+                {taskforceStats.total.toLocaleString('en-IN')}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-amber-600">
+                Open
+              </div>
+              <div className="mt-2 text-2xl font-black text-amber-800">
+                {taskforceStats.open.toLocaleString('en-IN')}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-blue-600">
+                In Progress
+              </div>
+              <div className="mt-2 text-2xl font-black text-blue-800">
+                {taskforceStats.inProgress.toLocaleString('en-IN')}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-600">
+                Completed
+              </div>
+              <div className="mt-2 text-2xl font-black text-emerald-800">
+                {taskforceStats.completed.toLocaleString('en-IN')}
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* TREND + ZONE */}
