@@ -222,7 +222,7 @@ export default function TermsAndConditionsPage() {
                 <main className="lg:col-span-8 xl:col-span-9 space-y-8 print-full-width">
 
                     {/* SECTION 1 */}
-                    {matchesSearch('Purpose MatrixTrack 2.0 Workforce Employee Attendance Field Inspections Sweeping Toilet Litter Bin Taskforce Quality Control Action Required Action Taken Ward Zone Performance Ward Ranking Administrative') && (
+                    {matchesSearch('Purpose MatrixTrack 2.0 Workforce Employee Attendance Field Inspections Sweeping Toilet Litter Bin Taskforce Sanitary Inspector Action Required Action Taken Ward Zone Performance Ward Ranking Administrative') && (
                         <article id="sec-1" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-black text-sm">
@@ -268,7 +268,7 @@ export default function TermsAndConditionsPage() {
                     )}
 
                     {/* SECTION 2 */}
-                    {matchesSearch('Authorized Users Commissioners City Administrators ULB Officers Action Officers QC Supervisors Employees') && (
+                    {matchesSearch('Authorized Users Commissioners City Administrators ULB Officers IEC Members QC Darogas Employees') && (
                         <article id="sec-2" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-sm">
@@ -518,7 +518,7 @@ export default function TermsAndConditionsPage() {
                     )}
 
                     {/* SECTION 11 */}
-                    {matchesSearch('Quality Control Approved Rejected Review Standards Statuses') && (
+                    {matchesSearch('Sanitary Inspector Approved Rejected Review Standards Statuses') && (
                         <article id="sec-11" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 font-black text-sm">
@@ -547,7 +547,7 @@ export default function TermsAndConditionsPage() {
                     )}
 
                     {/* SECTION 12 */}
-                    {matchesSearch('Action Required Action Taken ULB Officers Action Officers Corrective Activity') && (
+                    {matchesSearch('Action Required Action Taken ULB Officers IEC Members Corrective Activity') && (
                         <article id="sec-12" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 font-black text-sm">

@@ -168,10 +168,10 @@ const VIEW_CONFIG: Record<
 > = {
     APPROVED: {
         title:
-            'QC Approved Reports',
+            'SI Approved Reports',
 
         description:
-            'Review QC-approved reports. If action is still required, send the report to the mapped Action Officer with a clear instruction.',
+            'Review SI-approved reports. If action is still required, send the report to the mapped IEC Member with a clear instruction.',
 
         status:
             'APPROVED',
@@ -182,10 +182,10 @@ const VIEW_CONFIG: Record<
 
     REJECTED: {
         title:
-            'QC Rejected Reports',
+            'SI Rejected Reports',
 
         description:
-            'Review QC-rejected reports and escalate only the cases that require municipal action.',
+            'Review SI-rejected reports and escalate only the cases that require municipal action.',
 
         status:
             'REJECTED',
@@ -199,7 +199,7 @@ const VIEW_CONFIG: Record<
             'Action Required',
 
         description:
-            'Track reports already sent to Action Officers. The original ULB instruction remains visible while action is pending.',
+            'Track reports already sent to IEC Members. The original ULB instruction remains visible while action is pending.',
 
         status:
             'ACTION_REQUIRED',
@@ -213,7 +213,7 @@ const VIEW_CONFIG: Record<
             'Action Taken History',
 
         description:
-            'Review Action Taken reports with the original ULB instruction, Action Officer response and submitted evidence.',
+            'Review Action Taken reports with the original ULB instruction, IEC Member response and submitted evidence.',
 
         status:
             'ACTION_TAKEN',
@@ -1165,7 +1165,7 @@ function isWithinRange(
    employee, supervisor, QC reviewer, action officer) purely
    from the fields the records API actually returns. Where an
    identity isn't returned by the backend for a module (e.g.
-   Action Officer names on Sweeping/Litter Bin), the identity
+   IEC Member names on Sweeping/Litter Bin), the identity
    function returns null and that record is simply excluded
    from that specific leaderboard rather than being faked.
 ========================================================= */
@@ -3027,7 +3027,7 @@ export default function UlbOperationsWorkspace({
 
             if (approvalRate !== null) {
                 sentences.push(
-                    `Out of ${stats.approved + stats.rejected} QC-reviewed reports, ${approvalRate}% were QC Approved${approvalRate < 70 ? ', which is below the healthy threshold and needs review' : ''}.`
+                    `Out of ${stats.approved + stats.rejected} SI-reviewed reports, ${approvalRate}% were SI Approved${approvalRate < 70 ? ', which is below the healthy threshold and needs review' : ''}.`
                 );
             }
 
@@ -3051,7 +3051,7 @@ export default function UlbOperationsWorkspace({
 
             if (!sentences.length) {
                 sentences.push(
-                    'All reviewed reports are QC Approved and no report is currently Action Required.'
+                    'All reviewed reports are SI Approved and no report is currently Action Required.'
                 );
             }
 
@@ -3112,9 +3112,9 @@ export default function UlbOperationsWorkspace({
         lines.push('');
         lines.push('INSPECTION & PERFORMANCE');
         lines.push(`Total Inspections: ${dashboardNumberFormatter.format(stats.grandTotal)}${isMultiDayRange ? ` (avg ${formatAverageValue(stats.grandTotal / rangeDayCount)}/day)` : ''}`);
-        lines.push(`QC Approved: ${dashboardNumberFormatter.format(stats.approved)}${approvalRate !== null ? ` — ${approvalRate}% Approval %` : ''}`);
-        lines.push(`QC Rejected: ${dashboardNumberFormatter.format(stats.rejected)}`);
-        lines.push(`QC Pending: ${dashboardNumberFormatter.format(stats.pending)}`);
+        lines.push(`SI Approved: ${dashboardNumberFormatter.format(stats.approved)}${approvalRate !== null ? ` — ${approvalRate}% Approval %` : ''}`);
+        lines.push(`SI Rejected: ${dashboardNumberFormatter.format(stats.rejected)}`);
+        lines.push(`SI Pending: ${dashboardNumberFormatter.format(stats.pending)}`);
         lines.push(`Action Required: ${dashboardNumberFormatter.format(stats.actionRequired)}`);
         lines.push(`Action Taken: ${dashboardNumberFormatter.format(stats.actionTaken)}${correctiveTotal > 0 ? ` — ${closureRate}% Action` : ''}`);
 
@@ -3451,7 +3451,7 @@ export default function UlbOperationsWorkspace({
 
             setError(
                 err?.message ||
-                'Unable to send this report to the Action Officer.'
+                'Unable to send this report to the IEC Member.'
             );
 
         } finally {
@@ -3739,7 +3739,7 @@ export default function UlbOperationsWorkspace({
 
 
                                             <ExecutiveKpi
-                                                label="QC Pending"
+                                                label="SI Pending"
 
                                                 value={
                                                     stats.pending
@@ -3766,7 +3766,7 @@ export default function UlbOperationsWorkspace({
 
 
                                             <ExecutiveKpi
-                                                label="QC Approved"
+                                                label="SI Approved"
 
                                                 value={
                                                     stats.approved
@@ -3793,7 +3793,7 @@ export default function UlbOperationsWorkspace({
 
 
                                             <ExecutiveKpi
-                                                label="QC Rejected"
+                                                label="SI Rejected"
 
                                                 value={
                                                     stats.rejected
@@ -4261,7 +4261,7 @@ export default function UlbOperationsWorkspace({
                         PERFORMANCE BREAKDOWN
 
                         Wraps the Zone/Ward leaderboards and the
-                        Supervisor/QC Reviewer/Action Officer
+                        Daroga/SI Reviewer/IEC Member
                         leaderboards into one titled section, so all
                         five performance rankings read as one domain.
                     ========================================= */}
@@ -4272,7 +4272,7 @@ export default function UlbOperationsWorkspace({
                                                 icon={Trophy}
                                                 eyebrow="Performance leaderboards"
                                                 title="Performance Breakdown"
-                                                description="Zone, ward, supervisor, QC reviewer and Action Officer performance across all sanitation modules."
+                                                description="Zone, ward, supervisor, QC reviewer and IEC Member performance across all sanitation modules."
                                             />
 
                                             <div className="space-y-5 p-5">
@@ -4319,7 +4319,7 @@ export default function UlbOperationsWorkspace({
                                                     <PeopleLeaderboardCard
                                                         icon={ShieldCheck}
                                                         tone="teal"
-                                                        title="QC Reviewer Performance"
+                                                        title="SI Reviewer Performance"
                                                         rows={qcLeaderboard}
                                                         rateType="approval"
                                                         emptyMessage="No QC reviewer identity is available yet."
@@ -4329,10 +4329,10 @@ export default function UlbOperationsWorkspace({
                                                     <PeopleLeaderboardCard
                                                         icon={Award}
                                                         tone="amber"
-                                                        title="Action Officer Performance"
+                                                        title="IEC Member Performance"
                                                         rows={actionOfficerLeaderboard}
                                                         rateType="closure"
-                                                        emptyMessage="No Action Officer identity is available yet."
+                                                        emptyMessage="No IEC Member identity is available yet."
                                                         note="Named officers are shown for Toilets, Litter Bins and Sweeping. Litter Bin records assigned before this data was joined may still fall back to a short officer ID."
                                                     />
 
@@ -4356,7 +4356,7 @@ export default function UlbOperationsWorkspace({
 
                                                 title="Oldest Action Pending Reports"
 
-                                                description="Reports already sent to Action Officers and still awaiting a response."
+                                                description="Reports already sent to IEC Members and still awaiting a response."
 
                                                 action={
 
@@ -11139,7 +11139,7 @@ function ActionRequiredModal({
 
 
                         <h3 className="mt-1 text-lg font-black text-slate-900">
-                            Send to Action Officer
+                            Send to IEC Member
                         </h3>
 
 
@@ -11210,7 +11210,7 @@ function ActionRequiredModal({
                             )
                         }
 
-                        placeholder="Write a clear instruction for the Action Officer..."
+                        placeholder="Write a clear instruction for the IEC Member..."
 
                         rows={5}
 

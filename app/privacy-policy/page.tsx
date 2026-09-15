@@ -217,7 +217,7 @@ export default function PrivacyPolicyPage() {
                 <main className="lg:col-span-8 xl:col-span-9 space-y-8 print-full-width">
 
                     {/* SECTION 1 */}
-                    {matchesSearch('Scope Commissioners City Administrators ULB Officers Action Officers Quality Control Supervisors Employees') && (
+                    {matchesSearch('Scope Commissioners City Administrators ULB Officers IEC Members Sanitary Inspector Darogas Employees') && (
                         <article id="sec-1" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-sm">
@@ -254,7 +254,7 @@ export default function PrivacyPolicyPage() {
                     )}
 
                     {/* SECTION 2 */}
-                    {matchesSearch('Information We May Collect Personal Employee Name ID Supervisor Designation Department Agency Organization Email Mobile City Zone Ward Area Beat Shift') && (
+                    {matchesSearch('Information We May Collect Personal Employee Name ID Daroga Designation Department Agency Organization Email Mobile City Zone Ward Area Beat Shift') && (
                         <article id="sec-2" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black text-sm">
