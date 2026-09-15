@@ -110,7 +110,7 @@ export default function QCDashboard() {
             const res = await EmployeesApi.list("LITTERBINS");
             setEmployees(res.employees || []);
         } catch (err) {
-            alert("Failed to load supervisors");
+            alert("Failed to load Darogas");
         } finally {
             setEmployeesLoading(false);
         }
@@ -218,20 +218,20 @@ export default function QCDashboard() {
         const inZone = scope.zoneIds.includes(record.zoneId);
         const inWard = scope.wardIds.includes(record.wardId);
 
-        if (!inZone) return { allowed: false, reason: "Bin outside your QC Zone scope" };
-        if (!inWard) return { allowed: false, reason: "Bin outside your QC Ward scope" };
+        if (!inZone) return { allowed: false, reason: "Bin outside your SI Zone scope" };
+        if (!inWard) return { allowed: false, reason: "Bin outside your SI Ward scope" };
 
         return { allowed: true, reason: "" };
     }
 
-    if (!stats && loading && records.length === 0) return <div className="p-8 text-center muted">Loading QC Dashboard...</div>;
+    if (!stats && loading && records.length === 0) return <div className="p-8 text-center muted">Loading SI Dashboard...</div>;
 
     return (
         <div className="content">
             <header className="flex justify-between items-start mb-8">
                 <div>
                     <p className="eyebrow">Module · Litter Bins</p>
-                    <h1>QC Dashboard</h1>
+                    <h1>SI Dashboard</h1>
                     <div className="muted text-sm flex flex-col gap-1 mt-2">
                         <div className="flex gap-2">
                             <span className="font-semibold text-base-content w-16">Zones:</span>
@@ -247,7 +247,7 @@ export default function QCDashboard() {
                     <button className="btn btn-sm btn-outline" onClick={openEmployeesModal}>
                         Employees
                     </button>
-                    <div className="badge badge-warning">QC Access</div>
+                    <div className="badge badge-warning">SI Access</div>
                 </div>
             </header>
 
@@ -338,7 +338,7 @@ export default function QCDashboard() {
                                                     <div className="flex flex-col gap-1">
                                                         {r.assignedEmployees.map((emp: any) => (
                                                             <span key={emp.id} className={`text-xs px-2 py-0.5 rounded font-semibold border ${emp.role === 'SUPERVISOR' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                                                                👤 {emp.name} ({emp.role ? emp.role.replace('_', ' ') : 'Staff'})
+                                                                👤 {emp.name} ({emp.role === 'SUPERVISOR' ? 'DAROGA' : (emp.role ? emp.role.replace('_', ' ') : 'Staff')})
                                                             </span>
                                                         ))}
                                                     </div>
@@ -454,7 +454,7 @@ export default function QCDashboard() {
                         </p>
 
                         {supervisorsLoading ? (
-                            <div className="py-4 text-center">Loading supervisors...</div>
+                            <div className="py-4 text-center">Loading Darogas...</div>
                         ) : (
                             <div className="form-control w-full">
                                 <label className="label">
@@ -465,7 +465,7 @@ export default function QCDashboard() {
                                     value={selectedEmployeeId}
                                     onChange={(e) => setSelectedEmployeeId(e.target.value)}
                                 >
-                                    <option value="" disabled>Choose an supervisor...</option>
+                                    <option value="" disabled>Choose a Daroga...</option>
                                     {eligibleEmployees.map(e => (
                                         <option key={e.id} value={e.id}>
                                             {e.name} ({e.email})
@@ -474,7 +474,7 @@ export default function QCDashboard() {
                                 </select>
                                 <label className="label">
                                     <span className="label-text-alt text-warning">
-                                        Only showing supervisors with LITTERBINS access.
+                                        Only showing Darogas with LITTERBINS access.
                                     </span>
                                 </label>
                             </div>
@@ -505,9 +505,9 @@ export default function QCDashboard() {
                         </div>
 
                         {supervisorsLoading ? (
-                            <div className="py-6 text-center">Loading supervisors...</div>
+                            <div className="py-6 text-center">Loading Darogas...</div>
                         ) : supervisors.length === 0 ? (
-                            <div className="muted text-sm">No supervisors found for this module.</div>
+                            <div className="muted text-sm">No Darogas found for this module.</div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="table table-sm">

@@ -47,11 +47,11 @@ export default function InspectionDetailPage() {
         let comment = '';
         if (status === 'ACTION_REQUIRED' || status === 'REJECTED') {
             const promptMsg = status === 'ACTION_REQUIRED'
-                ? "Enter instructions for Action Officer:"
+                ? "Enter instructions for IEC Member:"
                 : "Enter reason for rejection:";
             const val = prompt(promptMsg);
             if (val === null) return;
-            comment = val || (status === 'REJECTED' ? 'Rejected by QC' : '');
+            comment = val || (status === 'REJECTED' ? 'Rejected by SI' : '');
         }
 
         try {

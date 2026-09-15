@@ -274,7 +274,7 @@ export default function UserPerformanceModal({
                <div className="min-w-0">
                  <div className="flex items-center gap-2 mb-1">
                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase text-white ${isEmployee ? 'bg-amber-500' : 'bg-rose-500'}`}>
-                     {isEmployee ? "Employee Profile" : "Supervisor Performance"}
+                     {isEmployee ? "Employee Profile" : "Daroga Performance"}
                    </span>
                    <span className="px-2 py-0.5 rounded-full border border-white/20 text-[9px] font-bold text-white/70">
                      {isEmployee ? (attendance ? `${attendance.present} Present Days` : "Attendance") : `${metrics.total || 0} inspections`}
@@ -604,7 +604,7 @@ export default function UserPerformanceModal({
                   <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-xs font-black text-slate-800 uppercase">Assigned Beat Inspection History</h3>
-                      <span className="text-[10px] font-bold text-slate-400">Inspections conducted by beat supervisor</span>
+                      <span className="text-[10px] font-bold text-slate-400">Inspections conducted by beat daroga</span>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

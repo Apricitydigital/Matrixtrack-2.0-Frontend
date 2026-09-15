@@ -267,7 +267,7 @@ dark:text-blue-400
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-gray-800 dark:text-white">Geo-Fencing Configuration</h2>
-                        <p className="text-sm text-gray-500 dark:text-slate-400 dark:text-slate-400 dark:text-slate-400">Define allowed punch-in zones for supervisors</p>
+                        <p className="text-sm text-gray-500 dark:text-slate-400 dark:text-slate-400 dark:text-slate-400">Define allowed punch-in zones for darogas</p>
                     </div>
                 </div>
 

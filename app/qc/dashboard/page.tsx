@@ -54,8 +54,8 @@ const actionTrackingData = [
         count: 15,
         ward: "Ward 2",
         status: "Assigned",
-        assignedTo: "Beat Supervisor",
-        teamRole: "Supervisor",
+        assignedTo: "Beat Daroga",
+        teamRole: "Daroga",
         reportedAt: "5h ago",
         isEscalated: true
     },
@@ -248,7 +248,7 @@ export default function QCDashboard() {
                 <div className="page dashboard-page">
                     <header className="section-header">
                         <div>
-                            <h1 className="dashboard-title">QC Command Center</h1>
+                            <h1 className="dashboard-title">SI Command Center</h1>
                             <p className="muted">City cleanliness & sanitation performance overview</p>
                         </div>
                         <div className="section-actions">
@@ -519,7 +519,7 @@ export default function QCDashboard() {
                                 </div>
 
                                 <div className="card-promo">
-                                    <h4>Weekly QC Tip</h4>
+                                    <h4>Weekly SI Tip</h4>
                                     <p>Focus on Ward 4 this week. Litter bin overflow has increased by 12% in the last 48 hours.</p>
                                     <button className="btn btn-primary btn-sm w-full">View Details</button>
                                 </div>

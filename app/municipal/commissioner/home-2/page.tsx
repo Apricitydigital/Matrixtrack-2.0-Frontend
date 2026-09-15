@@ -76,7 +76,7 @@ const stateLegend: Array<{
     },
     {
       state: 'APPROVED',
-      label: 'QC approved',
+      label: 'SI approved',
       color: '#10b981',
     },
     {
@@ -267,7 +267,7 @@ export default function CommissionerHome2Page() {
     },
     {
       id: 'APPROVED',
-      label: 'QC Approved',
+      label: 'SI Approved',
       value: summary?.approved || 0,
       helper: `${completion}% approved coverage`,
       icon: CheckCircle2,
@@ -361,7 +361,7 @@ export default function CommissionerHome2Page() {
 
               <div className="rounded-xl bg-white/[0.05] px-4 py-3">
                 <div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-                  QC Completion
+                  SI Completion
                 </div>
 
                 <div className="mt-1 text-2xl font-black">
@@ -459,7 +459,7 @@ export default function CommissionerHome2Page() {
 
               <p className="mt-1 text-[11px] font-semibold text-slate-500">
                 Refine the live map by administrative
-                area, supervisor and operational date.
+                area, daroga and operational date.
               </p>
             </div>
 
@@ -528,7 +528,7 @@ export default function CommissionerHome2Page() {
               onChange={setSupervisorId}
             >
               <option value="">
-                All supervisors
+                All darogas
               </option>
 
               {data?.filters.supervisors.map(

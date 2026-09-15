@@ -148,9 +148,9 @@ export default function TaskforceActionOfficerPage() {
               <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', background: '#e2e8f0', padding: '4px 8px', borderRadius: 4, color: '#475569' }}>CTU / GVP</span>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase' }}>Module</span>
             </div>
-            <h1 style={{ fontSize: 28, fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Action Officer Dashboard</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>IEC Member Dashboard</h1>
             <p style={{ marginTop: 8, color: '#64748b', fontSize: 15, lineHeight: 1.6 }}>
-              Review action-required reports and send them back to QC.
+              Review action-required reports and send them back to SI.
             </p>
           </header>
 
@@ -162,7 +162,7 @@ export default function TaskforceActionOfficerPage() {
 
           <div className="stats-compact-grid" style={{ marginBottom: 32 }}>
             <StatCard label="PENDING ACTIONS" value={pendingCount} sub="Needs Attention" color="#f59e0b" />
-            <StatCard label="RETURNED TO QC" value={returnedCount} sub="Processed" color="#10b981" />
+            <StatCard label="RETURNED TO SI" value={returnedCount} sub="Processed" color="#10b981" />
             <StatCard label="TOTAL IN SCOPE" value={totalInScope} sub="Active Queue" color="#6366f1" />
           </div>
 
@@ -276,7 +276,7 @@ export default function TaskforceActionOfficerPage() {
                     onClick={handleSubmit}
                     style={{ opacity: submitLoading ? 0.7 : 1 }}
                   >
-                    {submitLoading ? "Submitting..." : "Submit to QC"}
+                    {submitLoading ? "Submitting..." : "Submit to SI"}
                   </button>
                 </div>
               </div>

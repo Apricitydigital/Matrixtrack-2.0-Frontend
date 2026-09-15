@@ -84,13 +84,13 @@ export default function GroupedBeatTable({ beats, onRefresh, onView, onEdit, onA
                         <div className="group-name"><h4>{group.title}</h4><p>{group.subtitle} • {group.beats.length} beats</p></div>
                         <div className="group-progress"><strong>{configured}/{group.beats.length}</strong><span>Configured</span></div>
                         {!isReadOnly && <div className="group-actions" onClick={(event) => event.stopPropagation()}>
-                            <button onClick={() => onAssignGroup(group, "SUPERVISOR")}><Users size={15} /> Assign Supervisor to all</button>
+                            <button onClick={() => onAssignGroup(group, "SUPERVISOR")}><Users size={15} /> Assign Daroga to all</button>
                             <button onClick={() => onAssignGroup(group, "EMPLOYEE")}><UserPlus size={15} /> Assign Employee to all</button>
                         </div>}
                     </div>
 
                     {isOpen && <div className="beat-group-children">
-                        <div className="child-header"><span>Beat</span><span>Supervisor</span><span>Employee</span><span>Points</span><span>Status</span><span>Actions</span></div>
+                        <div className="child-header"><span>Beat</span><span>Daroga</span><span>Employee</span><span>Points</span><span>Status</span><span>Actions</span></div>
                         {group.beats.map((beat) => {
                             const supervisors = getSupervisors(beat);
                             const employees = getEmployees(beat);
@@ -98,7 +98,7 @@ export default function GroupedBeatTable({ beats, onRefresh, onView, onEdit, onA
                             const ready = supervisors.length > 0 && employees.length > 0 && pointCount === 5;
                             return <div className="child-row" key={beat.id}>
                                 <button className="beat-name" onClick={() => onView(beat)}><span>{beat.beatName}</span><small>{new Date(beat.createdAt).toLocaleDateString()}</small></button>
-                                <button className="assignment-cell" disabled={isReadOnly} onClick={() => onAssign(beat)}>{supervisors[0]?.name || "+ Assign Supervisor"}</button>
+                                <button className="assignment-cell" disabled={isReadOnly} onClick={() => onAssign(beat)}>{supervisors[0]?.name || "+ Assign Daroga"}</button>
                                 <button className="assignment-cell employee" disabled={isReadOnly} onClick={() => onAssignEmployees(beat)}>{employees[0]?.name || "+ Assign Employee"}</button>
                                 <button className="points-cell" onClick={() => onEditPoints(beat)}><MapPin size={14} /> {pointCount}/5 <em>Edit</em></button>
                                 <span className={ready ? "status-ready" : "status-pending"}>{ready ? "Configured" : "Needs Setup"}</span>

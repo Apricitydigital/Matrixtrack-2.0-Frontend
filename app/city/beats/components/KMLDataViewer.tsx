@@ -782,7 +782,7 @@ export default function KMLDataViewer({
                             />
 
                             <InfoCard
-                                label="Supervisor"
+                                label="Daroga"
                                 value={
                                     supervisorName ||
                                     "Not assigned"

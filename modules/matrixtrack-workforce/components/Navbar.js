@@ -141,9 +141,9 @@ function Navbar({ toggleSidebar }) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([
     { id: 1, title: "Attendance synced", message: "Daily attendance data was synced successfully.", time: "Just now", type: "success", read: false, path: "/attendance" },
-    { id: 2, title: "Pending confirmations", message: "3 supervisors still need to confirm today's attendance.", time: "15m ago", type: "warning", read: false, path: "/supervisors" },
+    { id: 2, title: "Pending confirmations", message: "3 darogas still need to confirm today's attendance.", time: "15m ago", type: "warning", read: false, path: "/supervisors" },
     { id: 3, title: "New report available", message: "Short attendance report for this range is ready.", time: "1h ago", type: "info", read: false, path: "/short-attendance" },
-    { id: 4, title: "New supervisor added", message: "Supervisor Priya has been assigned to Ward 12.", time: "2h ago", type: "info", read: false, path: "/assignSupervisorWard" },
+    { id: 4, title: "New daroga added", message: "Daroga Priya has been assigned to Ward 12.", time: "2h ago", type: "info", read: false, path: "/assignSupervisorWard" },
   ]);
 
   const inputRef = useRef(null);

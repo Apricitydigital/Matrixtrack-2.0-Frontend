@@ -954,7 +954,7 @@ export default function CompliancePerformanceAnalytics() {
             <thead>
               <tr>
                 <th>Rank</th>
-                <th>Team / Supervisor</th>
+                <th>Team / Daroga</th>
                 <th>City</th>
                 <th>Total</th>
                 <th>Approved</th>
@@ -1843,7 +1843,7 @@ export default function CompliancePerformanceAnalytics() {
               <thead>
                 <tr>
                   <th>Rank</th>
-                  <th>Team / Supervisor</th>
+                  <th>Team / Daroga</th>
                   <th>Total</th>
                   <th>Approved</th>
                   <th>Rejected</th>
@@ -1982,7 +1982,7 @@ export default function CompliancePerformanceAnalytics() {
                         }}
                       />
 
-                      No supervisor /
+                      No daroga /
                       team activity found
                       in this period.
                     </td>

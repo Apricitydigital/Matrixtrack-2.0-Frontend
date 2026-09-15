@@ -81,7 +81,7 @@ export function StatusBadge({ status }: { status: string }) {
         color: s.text,
       }}
     >
-      {status?.replace(/_/g, " ")}
+      {status?.replace(/_/g, " ").replace(/\bQC\b/, "SI")}
       <style jsx>{`
         .status-badge {
           padding: 4px 10px;

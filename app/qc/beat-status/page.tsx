@@ -355,7 +355,7 @@ export default function QCBeatStatusPage() {
                     {/* Search */}
                     <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 14px", display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
                         <Search size={15} color="#94a3b8" />
-                        <input placeholder="Search beats, points, supervisors, zones, wards..." value={search} onChange={e => setSearch(e.target.value)}
+                        <input placeholder="Search beats, points, darogas, zones, wards..." value={search} onChange={e => setSearch(e.target.value)}
                             style={{ flex: 1, border: "none", outline: "none", fontSize: 13, fontFamily: "inherit" }} />
                         {search && <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={14} color="#94a3b8" /></button>}
                         <span style={{ fontSize: 12, color: "#94a3b8" }}>{filtered.length} beats showing</span>
@@ -371,7 +371,7 @@ export default function QCBeatStatusPage() {
                     {!loading && view === "list" && (
                         <>
                             <div style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1.5fr 1fr auto", gap: 12, padding: "8px 18px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>
-                                <span>Beat</span><span>Supervisor</span><span>Employees</span><span>Progress</span><span>Status</span>
+                                <span>Beat</span><span>Daroga</span><span>Employees</span><span>Progress</span><span>Status</span>
                             </div>
                             {filtered.length === 0 && (
                                 <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
@@ -411,7 +411,7 @@ export default function QCBeatStatusPage() {
                                                                 <StatusBadge status={beat.beatCompletionStatus} />
                                                                 <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
                                                                     <div><b>Zone/Ward:</b> {beat.zoneName} · {beat.wardName}</div>
-                                                                    <div><b>Supervisor:</b> {beat.supervisorsSummary[0]?.name || "—"}</div>
+                                                                    <div><b>Daroga:</b> {beat.supervisorsSummary[0]?.name || "—"}</div>
                                                                     <div><b>Progress:</b> {beat.assessedPointsCount}/{beat.totalPoints} points reported</div>
                                                                 </div>
                                                             </div>

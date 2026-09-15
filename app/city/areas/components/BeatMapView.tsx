@@ -265,7 +265,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         if (beat.assignedToId === selectedSupervisorId && beat.assignedToName) {
             return { id: beat.assignedToId, name: beat.assignedToName, count: 0 };
         }
-        return { id: selectedSupervisorId, name: "Selected Supervisor", count: 0 };
+        return { id: selectedSupervisorId, name: "Selected Daroga", count: 0 };
     }, [selectedSupervisorId, availableSupervisors, beat]);
 
     const explodedGeoJSON = React.useMemo(() => {
@@ -412,7 +412,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                         }}>
                             <User size={16} color={selectedSupervisorId ? "#2563eb" : "#64748b"} />
                             <span style={{ fontSize: "0.75rem", fontWeight: 700, color: selectedSupervisorId ? "#1e40af" : "#475569", whiteSpace: "nowrap" }}>
-                                Supervisor:
+                                Daroga:
                             </span>
                             <select
                                 value={selectedSupervisorId || ""}
@@ -423,7 +423,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                     fontWeight: 700, fontSize: "0.75rem", cursor: "pointer", outline: "none"
                                 }}
                             >
-                                <option value="">All Supervisors ({availableSupervisors.reduce((acc, s) => acc + s.count, 0)})</option>
+                                <option value="">All Darogas ({availableSupervisors.reduce((acc, s) => acc + s.count, 0)})</option>
                                 {availableSupervisors.map(sup => (
                                     <option key={sup.id} value={sup.id}>
                                         {sup.name} ({sup.count} beat{sup.count === 1 ? '' : 's'})
@@ -442,7 +442,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                     }}
                                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"}
                                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                                    title="Clear Supervisor Filter"
+                                    title="Clear Daroga Filter"
                                 >
                                     <X size={13} strokeWidth={2.5} />
                                 </button>
@@ -521,7 +521,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                     marginBottom: "12px"
                                 }}
                             >
-                                {selectedSegmentIds.length > 0 ? `${assignmentMode === "EMPLOYEE" ? "Deploy" : "Assign"} ${selectedSegmentIds.length} Segments` : (assignmentMode === "EMPLOYEE" ? "Deploy Employees" : "Assign Supervisor")}
+                                {selectedSegmentIds.length > 0 ? `${assignmentMode === "EMPLOYEE" ? "Deploy" : "Assign"} ${selectedSegmentIds.length} Segments` : (assignmentMode === "EMPLOYEE" ? "Deploy Employees" : "Assign Daroga")}
                             </button>
 
                             {onEdit && (
@@ -652,7 +652,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                     }}
                                     onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.15)"}
                                     onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-                                    title="Clear Supervisor Filter"
+                                    title="Clear Daroga Filter"
                                 >
                                     <X size={14} strokeWidth={2.5} />
                                 </button>
@@ -775,7 +775,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
 
                                     if (layer && typeof layer.bindPopup === "function") {
                                         const popupRoleColor = assignmentMode === "EMPLOYEE" ? "#db2777" : "#6366f1";
-                                        const popupRoleLabel = assignmentMode === "EMPLOYEE" ? "Employee" : "Supervisor";
+                                        const popupRoleLabel = assignmentMode === "EMPLOYEE" ? "Employee" : "Daroga";
                                         const avatarBg = assignmentMode === "EMPLOYEE" ? "linear-gradient(135deg, #ec4899 0%, #be185d 100%)" : "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)";
 
                                         layer.bindPopup(`
@@ -878,7 +878,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                     </div>
                                     <div style={{ marginTop: "16px", display: "grid", gap: "12px" }}>
                                         <div style={{ background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: "16px", padding: "14px" }}>
-                                            <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Supervisor</div>
+                                            <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", fontWeight: 800, marginBottom: "8px" }}>Daroga</div>
                                             <div style={{ fontWeight: 700, color: "#1e293b" }}>{supervisorName}</div>
                                         </div>
                                         <div style={{ background: "#fdf2f8", border: "1px solid #fbcfe8", borderRadius: "16px", padding: "14px" }}>
@@ -891,7 +891,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                             onClick={() => setShowAssignModal(true)}
                                             style={{ marginTop: "16px", width: "100%", padding: "12px 14px", borderRadius: "14px", border: "none", backgroundColor: "#0f172a", color: "white", fontWeight: 700, cursor: "pointer" }}
                                         >
-                                            {assignmentMode === "EMPLOYEE" ? "Assign Beat Segment" : "Assign Supervisor Segment"}
+                                            {assignmentMode === "EMPLOYEE" ? "Assign Beat Segment" : "Assign Daroga Segment"}
                                         </button>
                                     )}
                                 </div>

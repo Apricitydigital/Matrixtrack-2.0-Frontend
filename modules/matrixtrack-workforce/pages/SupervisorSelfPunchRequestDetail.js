@@ -32,7 +32,7 @@ const formatDateTime = (value) => {
 const normalizeLog = (entry) => ({
   ...entry,
   actorName: entry.supervisor_name || "System",
-  actorRole: entry.performed_by_id ? "Supervisor" : "System",
+  actorRole: entry.performed_by_id ? "Daroga" : "System",
   note: entry.comments || "-",
   timestamp: entry.created_at,
 });

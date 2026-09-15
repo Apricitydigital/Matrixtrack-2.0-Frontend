@@ -153,7 +153,7 @@ justify-center
 text-gray-500
 dark:text-slate-400
 ">
-          No attendance data available for the selected supervisor.
+          No attendance data available for the selected daroga.
         </div>
       )}
 

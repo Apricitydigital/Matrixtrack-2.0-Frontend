@@ -157,7 +157,7 @@ function TopSupervisors({
 
     if (!response.ok) {
       throw new Error(
-        "Unable to load top supervisors."
+        "Unable to load top darogas."
       );
     }
 
@@ -247,7 +247,7 @@ useEffect(() => {
       <div className="bg-white rounded-xl shadow-lg border border-slate-100 border-l-[4px] border-l-blue-500 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
           <h3 className="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white">
-            Top Performing Supervisors
+            Top Performing Darogas
           </h3>
           {periodSelector}
         </div>
@@ -263,7 +263,7 @@ useEffect(() => {
       <div className="bg-white rounded-xl shadow-lg border border-slate-100 border-l-[4px] border-l-blue-500 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
           <h3 className="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white">
-            Top Performing Supervisors
+            Top Performing Darogas
           </h3>
           {periodSelector}
         </div>
@@ -290,12 +290,12 @@ useEffect(() => {
       <div className="bg-white rounded-xl shadow-lg border border-slate-100 border-l-[4px] border-l-blue-500 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
           <h3 className="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white">
-            Top Performing Supervisors
+            Top Performing Darogas
           </h3>
           {periodSelector}
         </div>
         <div className="h-48 flex items-center justify-center text-sm font-medium text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-          No supervisor data available for this selection.
+          No daroga data available for this selection.
         </div>
       </div>
     );
@@ -365,7 +365,7 @@ whitespace-nowrap
     {/* TITLE */}
     <div>
       <h3 className="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white">
-        Top Performing Supervisors
+        Top Performing Darogas
       </h3>
 
       <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
@@ -398,7 +398,7 @@ whitespace-nowrap
         whitespace-nowrap
       "
     >
-      {supervisors.length} supervisor
+      {supervisors.length} daroga
       {supervisors.length !== 1
         ? "s"
         : ""}

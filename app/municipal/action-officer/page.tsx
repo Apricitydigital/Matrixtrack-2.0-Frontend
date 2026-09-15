@@ -4,7 +4,7 @@ export default function ActionOfficerPage() {
   return (
     <RoleGuard roles={["ACTION_OFFICER", "HMS_SUPER_ADMIN"]}>
       <div className="card">
-        <h2>Action Officer Tasks</h2>
+        <h2>IEC Member Tasks</h2>
         <p>Assigned tasks with status update actions only.</p>
         <ul>
           <li>View assigned tasks (API: GET /municipal/tasks?assignedTo=me)</li>

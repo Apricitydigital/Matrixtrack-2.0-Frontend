@@ -399,7 +399,7 @@ dark:shadow-none
              <div className="lg:col-span-2 space-y-4">
                 <h3 className="text-xl font-black text-slate-900 dark:text-white dark:text-white flex items-center gap-2">
                   <MessageSquare size={22} className="text-indigo-600" />
-                  Supervisor Feedbacks ({feedbackResponses.length})
+                  Daroga Feedbacks ({feedbackResponses.length})
                 </h3>
                 <div className="space-y-6 text-slate-800 dark:text-slate-100">
                    {/* Grouping feedback by user and session (approx same time) */}
@@ -608,7 +608,7 @@ space-y-8
               <input required type="text" value={announceForm.title} onChange={(e) => setAnnounceForm({ ...announceForm, title: e.target.value })} placeholder="Title" className="w-full bg-slate-50 dark:bg-slate-800 dark:bg-slate-800 border-0 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none font-bold" />
               <textarea required rows="4" value={announceForm.content} onChange={(e) => setAnnounceForm({ ...announceForm, content: e.target.value })} placeholder="Message content..." className="w-full bg-slate-50 dark:bg-slate-800 dark:bg-slate-800 border-0 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-medium"></textarea>
               <select value={announceForm.target_role} onChange={(e) => setAnnounceForm({ ...announceForm, target_role: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-800 dark:bg-slate-800 border-0 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
-                <option value="supervisor">Supervisor</option>
+                <option value="supervisor">Daroga</option>
                 <option value="all">Everyone</option>
               </select>
               <button disabled={submitting} type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black hover:scale-[1.02] transition-all shadow-lg shadow-indigo-100 mt-2">
@@ -628,14 +628,14 @@ space-y-8
                 <Star size={32} className="fill-current" />
              </div>
              <h2 className="text-3xl font-black text-slate-900 dark:text-white dark:text-white mb-2">{editingFeedbackId ? "Edit Question" : "Live App Question"}</h2>
-             <p className="text-slate-500 dark:text-slate-400 dark:text-slate-400 font-bold mb-8">What should common supervisors see in the feedback prompt today?</p>
+             <p className="text-slate-500 dark:text-slate-400 dark:text-slate-400 font-bold mb-8">What should common darogas see in the feedback prompt today?</p>
              <form onSubmit={handleFeedbackSubmit} className="space-y-6">
                 <textarea 
                   required 
                   rows="3" 
                   value={feedbackForm.question} 
                   onChange={(e) => setFeedbackForm({ ...feedbackForm, question: e.target.value })} 
-                  placeholder="Enter the question for supervisors..." 
+                  placeholder="Enter the question for darogas..."
                   className="w-full bg-slate-50 dark:bg-slate-800 dark:bg-slate-800 border-0 rounded-3xl px-6 py-5 text-xl font-bold text-slate-900 dark:text-white dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
                 ></textarea>
                 <div className="flex items-center gap-3 py-2">

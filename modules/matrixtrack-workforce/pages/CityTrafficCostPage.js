@@ -63,7 +63,7 @@ const sourceMeta = {
   group_attendance: {
     label: "Group Attendance",
     short: "Group",
-    description: "Supervisor group photo attendance traffic",
+    description: "Daroga group photo attendance traffic",
     badge: "bg-sky-50 text-sky-700 border-sky-200",
   },
   individual_attendance: {

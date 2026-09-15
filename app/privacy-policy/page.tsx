@@ -217,7 +217,7 @@ export default function PrivacyPolicyPage() {
                 <main className="lg:col-span-8 xl:col-span-9 space-y-8 print-full-width">
 
                     {/* SECTION 1 */}
-                    {matchesSearch('Scope Commissioners City Administrators ULB Officers Action Officers Quality Control Supervisors Employees') && (
+                    {matchesSearch('Scope Commissioners City Administrators ULB Officers IEC Members Sanitary Inspector Darogas Employees') && (
                         <article id="sec-1" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-sm">
@@ -235,9 +235,9 @@ export default function PrivacyPolicyPage() {
                                     'Commissioners',
                                     'City Administrators',
                                     'ULB Officers',
-                                    'Action Officers',
-                                    'Quality Control',
-                                    'Supervisors',
+                                    'IEC Members',
+                                    'Sanitary Inspectors',
+                                    'Darogas',
                                     'Employees'
                                 ].map((role) => (
                                     <li key={role} className="flex items-center gap-2 bg-slate-900/60 border border-slate-700/50 p-2.5 rounded-xl">
@@ -254,7 +254,7 @@ export default function PrivacyPolicyPage() {
                     )}
 
                     {/* SECTION 2 */}
-                    {matchesSearch('Information We May Collect Personal Employee Name ID Supervisor Designation Department Agency Organization Email Mobile City Zone Ward Area Beat Shift') && (
+                    {matchesSearch('Information We May Collect Personal Employee Name ID Daroga Designation Department Agency Organization Email Mobile City Zone Ward Area Beat Shift') && (
                         <article id="sec-2" className="policy-card bg-slate-800/40 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black text-sm">
@@ -278,7 +278,7 @@ export default function PrivacyPolicyPage() {
                                         'Name',
                                         'Employee/User ID',
                                         'Employee code',
-                                        'Supervisor details',
+                                        'Daroga details',
                                         'Designation',
                                         'Department',
                                         'Agency',
@@ -381,7 +381,7 @@ export default function PrivacyPolicyPage() {
                                     'Employee ID',
                                     'Assigned shift',
                                     'Work location',
-                                    'Supervisor or ward assignment',
+                                    'Daroga or ward assignment',
                                     'Attendance history',
                                     'Uploaded attendance records',
                                     'Related attendance analytics'
@@ -505,14 +505,14 @@ export default function PrivacyPolicyPage() {
                                     'Litter Bins',
                                     'Sweeping records',
                                     'Taskforce records',
-                                    'QC status',
+                                    'SI status',
                                     'Approved records',
                                     'Rejected records',
                                     'Action Required records',
                                     'Action Taken records',
-                                    'Supervisor remarks',
+                                    'Daroga remarks',
                                     'ULB Officer remarks',
-                                    'QC remarks',
+                                    'SI remarks',
                                     'Operational scores and KPIs'
                                 ].map((item) => (
                                     <div key={item} className="bg-slate-900/60 border border-slate-700/40 px-3 py-2 rounded-lg text-slate-200">
@@ -547,7 +547,7 @@ export default function PrivacyPolicyPage() {
                                     'Rejected reports',
                                     'Action Required cases',
                                     'Action Taken cases',
-                                    'Supervisor performance',
+                                    'Daroga performance',
                                     'Employee performance',
                                     'Zone performance',
                                     'Ward performance',
@@ -662,11 +662,11 @@ export default function PrivacyPolicyPage() {
                                     'Manage zones, wards, areas and beats',
                                     'Conduct and monitor inspections',
                                     'Maintain photo evidence',
-                                    'Operate QC workflows',
+                                    'Operate SI workflows',
                                     'Manage Action Required and Action Taken workflows',
                                     'Generate dashboards',
                                     'Generate operational analytics',
-                                    'Measure employee and supervisor performance',
+                                    'Measure employee and daroga performance',
                                     'Generate ward and zone rankings',
                                     'Detect suspected fraud or misuse',
                                     'Protect Platform security',
@@ -731,10 +731,10 @@ export default function PrivacyPolicyPage() {
                                     'ULBs',
                                     'Authorized government departments',
                                     'Authorized administrators',
-                                    'Supervisors',
-                                    'QC personnel',
+                                    'Darogas',
+                                    'SI personnel',
                                     'ULB Officers',
-                                    'Action Officers',
+                                    'IEC Members',
                                     'Authorized technology/service providers',
                                     'Cloud infrastructure providers',
                                     'Storage providers',
@@ -851,7 +851,7 @@ export default function PrivacyPolicyPage() {
                                     'Attendance records',
                                     'Inspection records',
                                     'Government or organizational record keeping',
-                                    'QC workflows',
+                                    'SI workflows',
                                     'Action Required / Action Taken workflows',
                                     'Audit requirements',
                                     'Security investigations',

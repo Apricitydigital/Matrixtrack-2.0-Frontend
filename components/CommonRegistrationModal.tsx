@@ -77,17 +77,17 @@ export default function CommonRegistrationModal({
       { key: "TASKFORCE", name: "CTU / GVP Feeder Points" }
     ],
     taskforceRoles: [
-      { key: "SUPERVISOR", label: "Supervisor" },
+      { key: "SUPERVISOR", label: "Daroga" },
       { key: "EMPLOYEE", label: "Field Employee" },
-      { key: "QC", label: "Quality Controller" },
+      { key: "QC", label: "Sanitary Inspector" },
       { key: "ULB_OFFICER", label: "ULB Officer" },
-      { key: "ACTION_OFFICER", label: "Action Officer" },
+      { key: "ACTION_OFFICER", label: "IEC Member" },
       { key: "COMMISSIONER", label: "Commissioner" },
       { key: "CITY_ADMIN", label: "City Admin" }
     ],
     swachhRoles: [
       { key: "accessor", label: "Assessor / Evaluator" },
-      { key: "qc", label: "Quality Controller" },
+      { key: "qc", label: "Sanitary Inspector" },
       { key: "admin", label: "System Admin" }
     ],
     swachhAccessorTypes: [
@@ -151,16 +151,16 @@ export default function CommonRegistrationModal({
 
   const registrationRoleLabel =
     registrationRole === "QC"
-      ? "Quality Controller"
+      ? "Sanitary Inspector"
       : registrationRole === "ULB_OFFICER"
         ? "ULB Officer"
         : registrationRole === "ACTION_OFFICER"
-          ? "Action Officer"
+          ? "IEC Member"
           : registrationRole === "CITY_ADMIN"
             ? "City Admin"
             : registrationRole === "COMMISSIONER"
               ? "Commissioner"
-              : "Supervisor";
+              : "Daroga";
 
   useEffect(() => {
     if (isOpen) {
@@ -1110,7 +1110,7 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
                     .map((r) => {
                       let labelText = r.label;
                       if (r.key === "QC" || String(r.label).toLowerCase().includes("qc inspector")) {
-                        labelText = "Quality Controller";
+                        labelText = "Sanitary Inspector";
                       }
                       return (
                         <option key={r.key} value={r.key}>

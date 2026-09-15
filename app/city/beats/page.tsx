@@ -490,7 +490,7 @@ export default function BeatsPage() {
                       b.wardName ||
                       "-",
 
-                    Supervisor:
+                    Daroga:
                       b
                         .supervisorsSummary?.[0]
                         ?.name ||
@@ -694,7 +694,7 @@ export default function BeatsPage() {
 
               {
                 label:
-                  "Beats with Supervisors",
+                  "Beats with Darogas",
                 count:
                   stats.withQC,
                 icon:

@@ -1719,15 +1719,15 @@ export default function WardRankingWorkspace() {
             },
             {
               key: 'supervisor',
-              label: 'Supervisor',
+              label: 'Daroga',
             },
             {
               key: 'qc',
-              label: 'QC',
+              label: 'SI',
             },
             {
               key: 'actionOfficer',
-              label: 'AO',
+              label: 'IEC',
             },
           ];
 
@@ -2453,9 +2453,9 @@ export default function WardRankingWorkspace() {
                       'Beat',
                       'Toilet',
                       'Litter Bin',
-                      'Supervisor',
-                      'QC',
-                      'AO',
+                      'Daroga',
+                      'SI',
+                      'IEC',
                       'Trend',
                     ].map(
                       (heading) => (
@@ -2768,17 +2768,17 @@ export default function WardRankingWorkspace() {
                             ?.litterBin,
                         ],
                         [
-                          'Supervisor',
+                          'Daroga',
                           item.components
                             ?.supervisor,
                         ],
                         [
-                          'QC',
+                          'SI',
                           item.components
                             ?.qc,
                         ],
                         [
-                          'AO',
+                          'IEC',
                           item.components
                             ?.actionOfficer,
                         ],

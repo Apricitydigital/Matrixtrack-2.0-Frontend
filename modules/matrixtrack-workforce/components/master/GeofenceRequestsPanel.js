@@ -145,7 +145,7 @@ dark:text-orange-400
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-gray-800 dark:text-white">Geofence Requests</h2>
-                            <p className="text-sm text-gray-500 dark:text-slate-400">Supervisors requesting geo-fence configuration</p>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">Darogas requesting geo-fence configuration</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -291,7 +291,7 @@ dark:text-slate-500
 ">
                     <MapPin size={48} className="opacity-20 mb-4" />
                     <p className="font-bold text-gray-500">No {filter !== "all" ? filter : ""} requests</p>
-                    <p className="text-sm mt-1">When supervisors request geo-fence setup, they'll appear here.</p>
+                    <p className="text-sm mt-1">When darogas request geo-fence setup, they'll appear here.</p>
                 </div>
             ) : (
                 <div className="space-y-4">

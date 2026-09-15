@@ -261,8 +261,8 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
                             <StatCard label="TOTAL TOILETS" value={totalToiletsCount} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatus === ''} />
                             <StatCard label="SUBMITTED REPORTS" value={activeStats?.submitted || 0} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
                             <StatCard label="PENDING REPORTS" value={pendingVal > 0 ? pendingVal : 0} sub="Pending Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
-                            <StatCard label="APPROVED REPORTS" value={activeStats?.approved || 0} sub="Approved by QC" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatus === 'APPROVED'} />
-                            <StatCard label="REJECTED REPORTS" value={activeStats?.rejected || 0} sub="Rejected by QC" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatus === 'REJECTED'} />
+                            <StatCard label="APPROVED REPORTS" value={activeStats?.approved || 0} sub="Approved by SI" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatus === 'APPROVED'} />
+                            <StatCard label="REJECTED REPORTS" value={activeStats?.rejected || 0} sub="Rejected by SI" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatus === 'REJECTED'} />
                             <StatCard label="ACTION REQUIRED" value={activeStats?.actionRequired || 0} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatus === 'ACTION_REQUIRED'} />
                             <StatCard label="ACTION TAKEN REPORTS" value={activeStats?.actionTaken || 0} sub="Action Completed" color="#06b6d4" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={selectedStatus === 'ACTION_TAKEN'} />
                         </div>
@@ -289,7 +289,7 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                             <input
                                 type="text"
-                                placeholder="Search toilet name, ID, ward, supervisor..."
+                                placeholder="Search toilet name, ID, ward, daroga..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="filter-select"
@@ -310,7 +310,7 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
 
                             {/* Supervisor Dropdown */}
                             <select value={selectedSupervisor} onChange={e => setSelectedSupervisor(e.target.value)} className="filter-select">
-                                <option value="">All Supervisors</option>
+                                <option value="">All Darogas</option>
                                 {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
 
@@ -400,7 +400,7 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
                                                 {/* Submitted By */}
                                                 <td style={{ padding: '12px 14px' }}>
                                                     <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>{submitterName}</div>
-                                                    <div style={{ fontSize: 11, color: '#64748b' }}>Supervisor</div>
+                                                    <div style={{ fontSize: 11, color: '#64748b' }}>Daroga</div>
                                                 </td>
 
                                                 {/* Status */}

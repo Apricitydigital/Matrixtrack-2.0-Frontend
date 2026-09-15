@@ -109,7 +109,7 @@ function buildWardPagesInDoc(
     doc.text('PUNE MUNICIPAL CORPORATION  ·  SWACHH RANKING EVALUATION', PW / 2, cy + 9, { align: 'center' });
     doc.setFontSize(13);
     doc.setTextColor(...WHITE);
-    doc.text('SELF ASSESSMENT — QC REVIEW REPORT', PW / 2, cy + 18, { align: 'center' });
+    doc.text('SELF ASSESSMENT — SI REVIEW REPORT', PW / 2, cy + 18, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(180, 200, 255);
@@ -151,7 +151,7 @@ function buildWardPagesInDoc(
     const cardW = CW / 3, cardH = 16;
     [
         { label: 'Self Assessment Score', value: totalSelf, color: BLUE },
-        { label: 'QC Score', value: totalQc !== null ? totalQc : '—', color: PURP },
+        { label: 'SI Score', value: totalQc !== null ? totalQc : '—', color: PURP },
         { label: 'Final Score', value: finalScore !== null ? finalScore : '—', color: GREEN },
         { label: 'Total Max Marks', value: totalMax, color: NAVY },
         { label: 'Total Questions', value: questions.length, color: MUTED },
@@ -171,7 +171,7 @@ function buildWardPagesInDoc(
     cy += 2 * (cardH + 2) + 4;
 
     // Status counts bar
-    cy = sectionHeading('QC Question Status', cy + 4);
+    cy = sectionHeading('SI Question Status', cy + 4);
     const barH = 20;
     doc.setFillColor(...LGREY); doc.rect(ML, cy, CW, barH, 'F');
     doc.setDrawColor(...MGREY); doc.rect(ML, cy, CW, barH, 'S');
@@ -200,7 +200,7 @@ function buildWardPagesInDoc(
 
     autoTable(doc, {
         startY: cy + 1,
-        head: [['Indicator', 'Self Score', 'QC Score', 'Final Score', 'Max Marks', '%']],
+        head: [['Indicator', 'Self Score', 'SI Score', 'Final Score', 'Max Marks', '%']],
         body: indRows,
         styles: { fontSize: 8, cellPadding: 3, textColor: TEXT },
         headStyles: { fillColor: BLUE, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
@@ -226,11 +226,11 @@ function buildWardPagesInDoc(
         doc.setFillColor(...LGREY); doc.setDrawColor(...MGREY); doc.rect(ML, sy, CW, 10, 'FD');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...NAVY); doc.text(g.indicator, ML + 3, sy + 6.5);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MUTED);
-        doc.text(`Self: ${sG}  |  QC: ${cG !== null ? cG : '—'}  |  Max: ${mG}  |  ${pG}${pG !== '—' ? '%' : ''}`, ML + CW - 3, sy + 6.5, { align: 'right' });
+        doc.text(`Self: ${sG}  |  SI: ${cG !== null ? cG : '—'}  |  Max: ${mG}  |  ${pG}${pG !== '—' ? '%' : ''}`, ML + CW - 3, sy + 6.5, { align: 'right' });
 
         autoTable(doc, {
             startY: sy + 10,
-            head: [['#', 'Question', 'Max', 'Self', 'QC', 'Final', 'Status']],
+            head: [['#', 'Question', 'Max', 'Self', 'SI', 'Final', 'Status']],
             body: g.questions.map((q, qi) => {
                 const ans = answers[q.id], self = ans?.score ?? 0;
                 const qc = qcDone ? (typeof ans?.qcScore === 'number' ? ans.qcScore : self) : null;
@@ -260,7 +260,7 @@ function buildWardPagesInDoc(
         startY: cy + 2,
         body: [
             ['Self Assessment Score', String(totalSelf), `${totalMax > 0 ? ((totalSelf / totalMax) * 100).toFixed(1) : 0}%`],
-            ['QC Score', totalQc !== null ? String(totalQc) : '—', totalQc !== null && totalMax > 0 ? `${((totalQc / totalMax) * 100).toFixed(1)}%` : '—'],
+            ['SI Score', totalQc !== null ? String(totalQc) : '—', totalQc !== null && totalMax > 0 ? `${((totalQc / totalMax) * 100).toFixed(1)}%` : '—'],
             ['Final Score', finalScore !== null ? String(finalScore) : '—', pctFinal !== null ? `${pctFinal}%` : '—'],
             ['Total Max Marks', String(totalMax), '—'],
             ['Total Questions', String(questions.length), '—'],
@@ -474,7 +474,7 @@ const ScoreCell = ({ assessment }: { assessment: SelfAssessment }) => {
             </div>
             <div>
                 <div style={{ fontSize: '0.65rem', fontWeight: 600, color: C.textMute, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
-                    QC Score
+                    SI Score
                 </div>
                 {hasQc ? (
                     <div style={{
@@ -493,7 +493,7 @@ const ScoreCell = ({ assessment }: { assessment: SelfAssessment }) => {
                         fontSize: '0.72rem', fontWeight: 500,
                         border: `1px solid ${C.border}`,
                     }}>
-                        Pending QC
+                        Pending SI
                     </div>
                 )}
             </div>
@@ -664,7 +664,7 @@ const SelfAssessmentQCReview = () => {
                 qcUserName: currentUser.name,
             }, { headers: authHeaders() });
             if (finalize) {
-                alert('QC Review complete! Assessment approved.');
+                alert('SI Review complete! Assessment approved.');
                 setViewDetail(null);
                 fetchData();
             } else {
@@ -702,7 +702,7 @@ const SelfAssessmentQCReview = () => {
             const doc = new jsPDF({ unit: 'mm', format: 'a4' });
             details.forEach((d, i) => buildWardPagesInDoc(doc, d, pmcB64, swachhB64, i));
             addPdfFooters(doc);
-            doc.save(`QC_Bulk_Report_${details.length}_Wards_${new Date().toISOString().slice(0, 10)}.pdf`);
+            doc.save(`SI_Bulk_Report_${details.length}_Wards_${new Date().toISOString().slice(0, 10)}.pdf`);
         } catch (err: any) {
             alert('Bulk download failed: ' + (err?.message || 'Unknown error'));
         } finally {
@@ -766,7 +766,7 @@ const SelfAssessmentQCReview = () => {
 
         autoTable(doc, {
             startY: BANNER_H + 4,
-            head: [['#', 'Participant / Ward', 'Category', 'Mobile', 'Submitted', 'Status', 'QC Remarks']],
+            head: [['#', 'Participant / Ward', 'Category', 'Mobile', 'Submitted', 'Status', 'SI Remarks']],
             body: rows,
             styles: { fontSize: 8, cellPadding: 3, textColor: TEXT_C },
             headStyles: { fillColor: NAVY_C, textColor: WHITE_C, fontStyle: 'bold' },
@@ -806,7 +806,7 @@ const SelfAssessmentQCReview = () => {
             Mobile: a.participant.mobileNumber,
             Submitted: new Date(a.submittedAt).toLocaleDateString(),
             Status: STATUS_META[a.status]?.label || a.status,
-            QC_Remarks: a.qcRemarks || '',
+            SI_Remarks: a.qcRemarks || '',
         }));
         const ws = XLSX.utils.json_to_sheet(data);
 
@@ -838,7 +838,7 @@ const SelfAssessmentQCReview = () => {
         buildWardPagesInDoc(doc, detail, pmcB64, swachhB64, 0);
         addPdfFooters(doc);
         const safeName = getParticipantName(detail.selfAssessment.participant.details).replace(/\s+/g, '_');
-        doc.save(`QC_Report_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`);
+        doc.save(`SI_Report_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`);
     };
 
     // ── Derived data ───────────────────────────────────────────────────────────
@@ -1015,13 +1015,13 @@ const SelfAssessmentQCReview = () => {
 
                 {/* Workflow Steps */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 0, borderTop: `1px solid ${C.border}` }}>
-                    {['Not Started', 'Submitted', 'Pending QC Review', 'Approved / Rejected'].map((step, i, arr) => (
+                    {['Not Started', 'Submitted', 'Pending SI Review', 'Approved / Rejected'].map((step, i, arr) => (
                         <React.Fragment key={step}>
                             <div style={{
                                 padding: '8px 16px',
                                 fontSize: '0.72rem', fontWeight: 600,
-                                color: step === 'Pending QC Review' ? C.blue : C.textMute,
-                                borderBottom: step === 'Pending QC Review' ? `2px solid ${C.blue}` : '2px solid transparent',
+                                color: step === 'Pending SI Review' ? C.blue : C.textMute,
+                                borderBottom: step === 'Pending SI Review' ? `2px solid ${C.blue}` : '2px solid transparent',
                                 whiteSpace: 'nowrap',
                             }}>
                                 <span style={{ marginRight: 6, opacity: 0.5 }}>{i + 1}.</span>{step}
@@ -1066,7 +1066,7 @@ const SelfAssessmentQCReview = () => {
                         accent: C.danger,
                     },
                     ...(avgScore !== null ? [{
-                        label: 'Average QC Score',
+                        label: 'Average SI Score',
                         value: avgScore,
                         sub: `Highest: ${topScore} pts`,
                         icon: <TrendingUp size={18} />,
@@ -1833,7 +1833,7 @@ const SelfAssessmentQCReview = () => {
                                                         borderRadius: 4, padding: '2px 8px',
                                                         fontSize: '0.7rem', fontWeight: 600,
                                                     }}>
-                                                        <Shield size={10} /> QC Complete
+                                                        <Shield size={10} /> SI Complete
                                                     </span>
                                                 )}
                                             </div>
@@ -1877,7 +1877,7 @@ const SelfAssessmentQCReview = () => {
                                     }}>
                                         {[
                                             { label: 'Self Assessment Score', value: totalSubmitted, sub: `/ ${maxScore}`, pct: pctSubmitted, color: C.blue },
-                                            { label: 'QC Score', value: qcTot, sub: `/ ${maxScore}`, pct: pctQc, color: '#7C3AED' },
+                                            { label: 'SI Score', value: qcTot, sub: `/ ${maxScore}`, pct: pctQc, color: '#7C3AED' },
                                             { label: 'Total Marks', value: maxScore, sub: `${viewDetail.questions.length} questions`, pct: null, color: C.textMute },
                                             { label: 'Questions Reviewed', value: `${reviewedN}/${viewDetail.questions.length}`, sub: `${pctReviewed}% complete`, pct: pctReviewed, color: C.success },
                                         ].map((kpi, i, arr) => (
@@ -1909,7 +1909,7 @@ const SelfAssessmentQCReview = () => {
                                             {/* QC complete banner */}
                                             {viewDetail.selfAssessment.qcReviewComplete && (() => {
                                                 const reviewerName = viewDetail.selfAssessment.qcReviewedBy ||
-                                                    Object.values(answers).find((a: any) => a?.qcReviewedByName)?.qcReviewedByName || 'QC Member';
+                                                    Object.values(answers).find((a: any) => a?.qcReviewedByName)?.qcReviewedByName || 'SI Member';
                                                 return (
                                                     <div style={{
                                                         marginBottom: 16, background: C.successBg,
@@ -1919,8 +1919,8 @@ const SelfAssessmentQCReview = () => {
                                                     }}>
                                                         <Shield size={15} color={C.success} style={{ flexShrink: 0 }} />
                                                         <div style={{ fontSize: '0.82rem', color: '#166534' }}>
-                                                            <strong>QC Review Complete</strong>
-                                                            {' · QC Score: '}<strong>{viewDetail.selfAssessment.qcTotalScore}</strong>
+                                                            <strong>SI Review Complete</strong>
+                                                            {' · SI Score: '}<strong>{viewDetail.selfAssessment.qcTotalScore}</strong>
                                                             {' · Reviewed by '}<strong>{reviewerName}</strong>
                                                             {viewDetail.selfAssessment.qcReviewedAt
                                                                 ? ' on ' + new Date(viewDetail.selfAssessment.qcReviewedAt).toLocaleDateString('en-IN')
@@ -1938,7 +1938,7 @@ const SelfAssessmentQCReview = () => {
                                                     borderRadius: 8, padding: '10px 14px',
                                                 }}>
                                                     <div style={{ fontSize: '0.65rem', fontWeight: 700, color: C.danger, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>
-                                                        QC Remarks
+                                                        SI Remarks
                                                     </div>
                                                     <div style={{ color: '#7F1D1D', fontSize: '0.845rem' }}>
                                                         {viewDetail.selfAssessment.qcRemarks}
@@ -2092,7 +2092,7 @@ const SelfAssessmentQCReview = () => {
                                                                                                 <div style={{ flexShrink: 0, textAlign: 'right', minWidth: 80 }}>
                                                                                                     {rev.qcStatus !== 'pending' ? (
                                                                                                         <>
-                                                                                                            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: C.textMute, textTransform: 'uppercase', letterSpacing: '0.05em' }}>QC Score</div>
+                                                                                                            <div style={{ fontSize: '0.6rem', fontWeight: 700, color: C.textMute, textTransform: 'uppercase', letterSpacing: '0.05em' }}>SI Score</div>
                                                                                                             <div style={{ fontSize: '1.05rem', fontWeight: 700, color: cs.accentColor }}>
                                                                                                                 {rev.qcScore}
                                                                                                                 <span style={{ fontSize: '0.7rem', fontWeight: 400, color: C.textMute }}> / {q.marks}</span>
@@ -2323,7 +2323,7 @@ const SelfAssessmentQCReview = () => {
                                                     </div>
                                                 </div>
                                                 <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
-                                                    <div style={{ fontSize: '0.65rem', color: C.textMute, fontWeight: 600, marginBottom: 2 }}>QC Score</div>
+                                                    <div style={{ fontSize: '0.65rem', color: C.textMute, fontWeight: 600, marginBottom: 2 }}>SI Score</div>
                                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                                                         <span style={{ fontSize: '1.4rem', fontWeight: 700, color: C.navy }}>{qcTot}</span>
                                                         <span style={{ fontSize: '0.78rem', color: C.textMute }}>/ {maxScore}</span>

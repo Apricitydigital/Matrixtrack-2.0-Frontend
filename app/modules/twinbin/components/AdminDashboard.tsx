@@ -478,7 +478,7 @@ return true;
                             )}
                         </div>
                         <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontWeight: 500 }}>
-                            Monitor daily litter bin inspections, bin requests, and supervisor deployments.
+                            Monitor daily litter bin inspections, bin requests, and daroga deployments.
                         </p>
                     </div>
 
@@ -489,7 +489,7 @@ return true;
                             { id: 'SUBMITTED_REPORTS', label: 'Inspection Reports' },
                             { id: 'REGISTERED', label: 'Registered Litterbins' },
                             { id: 'APPROVALS', label: 'Approval & Verification' },
-                            { id: 'ASSIGNMENTS', label: 'Supervisor Assignments' },
+                            { id: 'ASSIGNMENTS', label: 'Daroga Assignments' },
                         ].map(t => (
                             <button
                                 key={t.id}
@@ -604,7 +604,7 @@ return true;
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">
                                 <StatCard label="TOTAL REGISTERED LITTERBINS" value={registeredBins.length || combinedBins.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={statusFilter === 'ALL'} />
                                 <StatCard label="SUBMITTED REPORTS" value={totalSubmitted} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
-                                <StatCard label="PENDING REVIEW REPORTS" value={pendingCount} sub="Awaiting QC Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
+                                <StatCard label="PENDING REVIEW REPORTS" value={pendingCount} sub="Awaiting SI Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
                                 <StatCard label="APPROVED REPORTS" value={approvedCount} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={statusFilter === 'APPROVED'} />
                                 <StatCard label="REJECTED REPORTS" value={rejectedCount} sub="Non-Compliant" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={statusFilter === 'REJECTED'} />
                                 <StatCard label="ACTION REQUIRED REPORTS" value={actionReqCount} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={statusFilter === 'ACTION_REQUIRED'} />
@@ -646,7 +646,7 @@ return true;
                                 </select>
                                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="filter-select">
                                     <option value="ALL">All Status</option>
-                                    <option value="PENDING_QC">Pending QC</option>
+                                    <option value="PENDING_QC">Pending SI</option>
                                     <option value="APPROVED">Approved</option>
                                     <option value="REJECTED">Rejected</option>
                                     <option value="ACTION_REQUIRED">Action Required</option>
@@ -1024,7 +1024,7 @@ function ReportTableRow({ record, onView }: any) {
                         || (typeof record.createdBy === 'string' && !record.createdBy.includes('-') ? record.createdBy : null)
                         || 'Minakshi'}
                 </div>
-                <div style={{ fontSize: 10, color: '#94a3b8' }}>Supervisor</div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>Daroga</div>
             </td>
             <td style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{

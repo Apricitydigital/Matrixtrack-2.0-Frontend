@@ -148,13 +148,13 @@ const features = [
   { icon: icons.face, title: "Face Recognition", desc: "AI-powered facial verification ensures employees are physically present. Real-time anti-spoof protection built-in.", color: "#6366f1" },
   { icon: icons.geo,  title: "Geofencing",       desc: "GPS-based virtual boundaries ensure attendance from authorized locations only. Auto-detect proximity for seamless check-in.", color: "#0ea5e9" },
   { icon: icons.report, title: "Smart Reports",  desc: "Download detailed Excel & PDF reports. Visual analytics with real-time dashboards and downloadable data.", color: "#8b5cf6" },
-  { icon: icons.leave, title: "Leave Management", desc: "Comprehensive leave module supporting CL, SL, LOP, Comp-off. Supervisors can mark & unmark leave seamlessly.", color: "#10b981" },
-  { icon: icons.shield, title: "Supervisor Integrity", desc: "Role-based access control with audit trails. Every action validated against supervisor assignments.", color: "#f59e0b" },
+  { icon: icons.leave, title: "Leave Management", desc: "Comprehensive leave module supporting CL, SL, LOP, Comp-off. Darogas can mark & unmark leave seamlessly.", color: "#10b981" },
+  { icon: icons.shield, title: "Daroga Integrity", desc: "Role-based access control with audit trails. Every action validated against daroga assignments.", color: "#f59e0b" },
   { icon: icons.dash, title: "Live Dashboard",   desc: "Real-time stats — present, absent, on-leave counts. Auto-syncing every 30 seconds with visual cards.", color: "#ec4899" },
 ];
 
 const howItWorks = [
-  { step: "01", title: "Supervisor Logs In", desc: "Secure role-based authentication with assigned permissions for each module." },
+  { step: "01", title: "Daroga Logs In", desc: "Secure role-based authentication with assigned permissions for each module." },
   { step: "02", title: "Select Kothi / Ward", desc: "Browse assigned locations. Geofence validation ensures you're on-site." },
   { step: "03", title: "Capture & Verify",    desc: "Take a photo — our AI matches it against enrolled faces in milliseconds." },
   { step: "04", title: "Attendance Recorded",  desc: "Punch-in/out timestamps, GPS coordinates, and face-match scores saved instantly." },
@@ -169,7 +169,7 @@ const stats = [
 
 const capabilities = [
   "Ward / Kothi assignment",       "Group attendance capture",
-  "Face gallery management",       "Supervisor role-based access",
+  "Face gallery management",       "Daroga role-based access",
   "Leave type management (CL, SL, LOP …)", "Excel & PDF report downloads",
   "Geofence request workflow",      "Real-time auto-sync (30s polling)",
   "Short attendance reports",       "Multi-zone / multi-city support",

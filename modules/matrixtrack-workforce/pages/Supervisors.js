@@ -152,7 +152,7 @@ function Supervisors() {
   const isSupervisor = user?.role === "supervisor";
 
   useEffect(() => {
-    if (logPageView) logPageView("Supervisors Management", "/supervisors");
+    if (logPageView) logPageView("Darogas Management", "/supervisors");
   }, [logPageView]);
   const [supervisors, setSupervisors] = useState([]);
   const aadharFileRef = useRef(null);
@@ -451,7 +451,7 @@ function Supervisors() {
             const sup = scopedSupervisors.find(s => String(s.user_id) === id);
             return {
               id,
-              name: sup?.name || `Supervisor #${id}`,
+              name: sup?.name || `Daroga #${id}`,
               emp_code: sup?.emp_code || "",
               wards: [...new Set(supIdToWards.get(id) || [])],
             };
@@ -472,7 +472,7 @@ function Supervisors() {
       .filter(([, depts]) => depts.length > 1)
       .map(([id, depts]) => {
         const sup = scopedSupervisors.find(s => String(s.user_id) === id);
-        return { id, name: sup?.name || `Supervisor #${id}`, depts };
+        return { id, name: sup?.name || `Daroga #${id}`, depts };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -491,7 +491,7 @@ function Supervisors() {
       setSupervisors(response.data);
     } catch (error) {
       console.error("Error fetching user's data", error);
-      alert("Failed to fetch supervisors. Please try again.");
+      alert("Failed to fetch darogas. Please try again.");
     }
   };
 
@@ -1043,7 +1043,7 @@ function Supervisors() {
 
         fetchSupervisor();
         resetLabel();
-        Swal.fire({ icon: "success", title: "Success", text: "Supervisor updated successfully.", timer: 2000, showConfirmButton: false });
+        Swal.fire({ icon: "success", title: "Success", text: "Daroga updated successfully.", timer: 2000, showConfirmButton: false });
       } else if (isEditing && changePassword) {
         await axios.put(`${apiUrl}/auth/update`, { passChange: true, user_id: formData.user_id, name: formData.name, emp_code: formData.emp_code, email: formData.email, phone: formData.phone, role: formData.role, password: formData.password }, requestConfig);
         
@@ -1062,12 +1062,12 @@ function Supervisors() {
 
         fetchSupervisor();
         resetLabel();
-        Swal.fire({ icon: "success", title: "Password Updated", html: `<p>Supervisor updated.</p><p><strong>New password:</strong> ${formData.password}</p>`, showConfirmButton: true });
+        Swal.fire({ icon: "success", title: "Password Updated", html: `<p>Daroga updated.</p><p><strong>New password:</strong> ${formData.password}</p>`, showConfirmButton: true });
       } else {
         // New registration
         Swal.fire({
           title: 'Creating Account...',
-          text: 'Please wait while we set up the supervisor profile.',
+          text: 'Please wait while we set up the daroga profile.',
           allowOutsideClick: false,
           didOpen: () => { Swal.showLoading(); }
         });
@@ -1119,13 +1119,13 @@ function Supervisors() {
         Swal.fire({ 
           icon: "success", 
           title: "Registration Complete", 
-          text: "Supervisor account and media saved successfully.",
+          text: "Daroga account and media saved successfully.",
           confirmButtonColor: '#4f46e5'
         });
       }
     } catch (error) {
       console.error("Error saving supervisor", error);
-      Swal.fire({ icon: "error", title: "Failed", text: error?.response?.data?.error || "Unable to save supervisor." });
+      Swal.fire({ icon: "error", title: "Failed", text: error?.response?.data?.error || "Unable to save daroga." });
     }
   };
 
@@ -1146,7 +1146,7 @@ function Supervisors() {
       await axios.delete(`${apiUrl}/supervisor/${id}`, buildRequestConfig());
       setSupervisors(supervisors.filter((sup) => sup.user_id !== id));
       fetchSupervisor();
-      Swal.fire("Deleted!", "The Supervisor has been removed.", "success");
+      Swal.fire("Deleted!", "The Daroga has been removed.", "success");
     } catch (error) {
       console.error("Error deleting supervisor", error);
       Swal.fire("Error!", "Something went wrong.", "error");
@@ -1186,7 +1186,7 @@ text-slate-800 dark:text-slate-100
 dark:text-white
 ">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-          Supervisor Management
+          Daroga Management
         </div>
 
         <div className="flex items-center gap-3">
@@ -1257,7 +1257,7 @@ dark:shadow-none
               onClick={() => setActiveTab("management")}
               className={`px-5 py-2 rounded-lg text-sm font-bold transition-all duration-200 flex items-center gap-2 ${activeTab === "management" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300"}`}
             >
-              {isSupervisor ? "Supervisors" : "Register New"}
+              {isSupervisor ? "Darogas" : "Register New"}
             </button>
             <button
               onClick={() => setActiveTab("distribution")}
@@ -1312,7 +1312,7 @@ items-center
 gap-2
 ">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" /></svg>
-                  {isEditing ? "Modify Supervisor Profile" : "Register New Supervisor"}
+                  {isEditing ? "Modify Daroga Profile" : "Register New Daroga"}
                 </h2>
               </div>
               <form onSubmit={handleSubmit} className="p-6">
@@ -1383,7 +1383,7 @@ gap-2
                       <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         <div className="flex items-center gap-3 mb-6 border-b border-slate-100 dark:border-slate-800 pb-3">
                           <User size={20} className="text-indigo-600" />
-                          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Supervisor Identity</h3>
+                          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Daroga Identity</h3>
                         </div>
 
                         {formErrors.general && (
@@ -1423,7 +1423,7 @@ gap-2
                           <div>
                             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">System Role <span className="text-red-500">*</span></label>
                             <select name="role" value={formData.role} onChange={handleInputChange} className="w-full p-2.5 border border-slate-300 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 dark:text-white">
-                              <option value="supervisor">SUPERVISOR</option>
+                              <option value="supervisor">DAROGA</option>
                               <option value="admin">ADMIN</option>
                             </select>
                           </div>
@@ -1733,7 +1733,7 @@ text-sm
                   </svg>
                 </div>
                 <div className="text-sm font-semibold text-slate-600 dark:text-slate-500 dark:text-slate-400 bg-slate-100 px-3 py-1.5 rounded-md shadow-sm border border-slate-200 flex items-center gap-2">
-                  Total Supervisors: {supervisorCityCount}
+                  Total Darogas: {supervisorCityCount}
                 </div>
               </div>
 
@@ -1817,7 +1817,7 @@ border-slate-200
 dark:border-slate-700
 ">
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider w-12">S.No</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supervisor Identity</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daroga Identity</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Phone No</th>
@@ -1844,7 +1844,7 @@ dark:hover:bg-slate-800/60
                             </td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-sm font-semibold ${sup.role === 'admin' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700 dark:text-slate-300'}`}>
-                                {sup.role === 'admin' ? 'ADMIN' : 'SUPERVISOR'}
+                                {sup.role === 'admin' ? 'ADMIN' : 'DAROGA'}
                               </span>
                             </td>
                             <td className="px-4 py-3"><div className="text-sm font-medium text-slate-800 dark:text-slate-100">{sup.email || "N/A"}</div></td>
@@ -1852,7 +1852,7 @@ dark:hover:bg-slate-800/60
                           </tr>
                         ))
                       ) : (
-                        <tr><td colSpan="5" className="p-3 text-center text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 font-bold italic">No supervisors matched your search.</td></tr>
+                        <tr><td colSpan="5" className="p-3 text-center text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 font-bold italic">No darogas matched your search.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1948,7 +1948,7 @@ dark:shadow-none">
                   </svg>
                 </div>
                 <div className="text-sm font-semibold text-slate-600 dark:text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-md shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-2">
-                  Total Supervisors: {distributionTabSupervisors.length}
+                  Total Darogas: {distributionTabSupervisors.length}
                 </div>
               </div>
 
@@ -2027,7 +2027,7 @@ border-slate-200
 dark:border-slate-700
 ">
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-12">S.No</th>
-                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supervisor Identity</th>
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daroga Identity</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Role</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
                         <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Phone No</th>
@@ -2061,7 +2061,7 @@ dark:hover:bg-slate-800/60
                             </td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-sm font-semibold ${sup.role === 'admin' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700 dark:text-slate-300'}`}>
-                                {sup.role === 'admin' ? 'ADMIN' : 'SUPERVISOR'}
+                                {sup.role === 'admin' ? 'ADMIN' : 'DAROGA'}
                               </span>
                             </td>
                             <td className="px-4 py-3"><div className="text-sm font-medium text-slate-800 dark:text-slate-100">{sup.email || "N/A"}</div></td>
@@ -2096,7 +2096,7 @@ dark:hover:bg-slate-800/60
                                    onClick={() => window.open(`${apiUrl}/supervisor-photo/${sup.user_id}/view`, "_blank")} 
                                    className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded border border-indigo-100 hover:bg-indigo-100 transition-all text-[10px] font-black uppercase tracking-tighter w-fit"
                                  >
-                                   <ImageIcon size={10} /> Supervisor Face
+                                   <ImageIcon size={10} /> Daroga Face
                                  </button>
                                  <button 
                                    onClick={() => window.open(`${apiUrl}/supervisor-aadhar/${sup.user_id}/view`, "_blank")} 
@@ -2137,7 +2137,7 @@ dark:hover:bg-slate-800/60
                           </tr>
                         ))
                       ) : (
-                        <tr><td colSpan="6" className="p-3 text-center text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 font-bold italic">No supervisors matched your search.</td></tr>
+                        <tr><td colSpan="6" className="p-3 text-center text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 font-bold italic">No darogas matched your search.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -2276,14 +2276,14 @@ dark:border-slate-700
   <div>
     <h3 className="text-lg font-bold text-white flex items-center gap-2">
       <MapPin size={18} />
-      City-wise Supervisor List
+      City-wise Daroga List
     </h3>
 
     <p className="text-indigo-200 dark:text-slate-400 text-xs mt-0.5">
       {selectedCityId && selectedCityId !== "ALL"
         ? "Filtered by your city scope"
         : "All assigned cities"}{" "}
-      · {new Set(cityWiseSupervisors.map(r => String(r.user_id))).size} supervisor
+      · {new Set(cityWiseSupervisors.map(r => String(r.user_id))).size} daroga
       {cityWiseSupervisors.length !== 1 ? "s" : ""}
     </p>
   </div>
@@ -2292,7 +2292,7 @@ dark:border-slate-700
     <div className="relative">
       <input
         type="text"
-        placeholder="Search supervisors, zones, kothis..."
+        placeholder="Search darogas, zones, kothis..."
         value={cityWiseSearch}
         onChange={(e) => setCityWiseSearch(e.target.value)}
         className="
@@ -2395,7 +2395,7 @@ active:scale-95
             ) : groupedCityWise.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-slate-500 dark:text-slate-400">
                 <MapPin size={36} className="mb-3 text-slate-300" />
-                <p className="text-sm font-semibold">No supervisor assignments found.</p>
+                <p className="text-sm font-semibold">No daroga assignments found.</p>
                 <p className="text-xs mt-1">Try adjusting your search or city filter.</p>
               </div>
             ) : (
@@ -2463,8 +2463,8 @@ ${
                             <p className="font-bold text-slate-800 dark:text-slate-100">{cityName}</p>
                             <p className="text-xs text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 mt-0.5">
                               {isFiltered
-                                ? `${rows.length} of ${unfilteredCount} supervisor${unfilteredCount !== 1 ? "s" : ""} (filtered)`
-                                : `${rows.length} supervisor${rows.length !== 1 ? "s" : ""}`
+                                ? `${rows.length} of ${unfilteredCount} daroga${unfilteredCount !== 1 ? "s" : ""} (filtered)`
+                                : `${rows.length} daroga${rows.length !== 1 ? "s" : ""}`
                               }
                               &nbsp;·&nbsp;
                               {totalEmp} employee{totalEmp !== 1 ? "s" : ""}
@@ -2599,7 +2599,7 @@ min-w-[130px]"
                             )}
 
                             <span className="ml-auto text-xs text-slate-500 dark:text-slate-400 font-medium">
-                              Showing {rows.length} of {unfilteredCount} supervisors
+                              Showing {rows.length} of {unfilteredCount} darogas
                             </span>
                           </div>
 
@@ -2607,7 +2607,7 @@ min-w-[130px]"
                           {rows.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-10 text-slate-500 dark:text-slate-400">
                               <Users size={28} className="mb-2 text-slate-300" />
-                              <p className="text-sm font-semibold">No supervisors match the selected filters.</p>
+                              <p className="text-sm font-semibold">No darogas match the selected filters.</p>
                               <button
                                 type="button"
                                 onClick={() => setCityFilters(prev => ({ ...prev, [cityName]: { zone: "", ward: "", kothi: "" } }))}
@@ -2629,7 +2629,7 @@ border-slate-200
 dark:border-slate-700
 ">
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider w-10">#</th>
-                                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Supervisor</th>
+                                    <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Daroga</th>
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Contact</th>
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Zones</th>
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kothis / Wards</th>
@@ -2780,7 +2780,7 @@ items-center
 gap-1
 ">
                     <Users size={13} />
-                    {new Set(cityWiseSupervisors.map(r => String(r.user_id))).size} Supervisors
+                    {new Set(cityWiseSupervisors.map(r => String(r.user_id))).size} Darogas
                   </span>
                   <span className="
 text-indigo-200

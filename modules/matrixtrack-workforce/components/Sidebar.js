@@ -40,13 +40,13 @@ export const NAV_ITEMS = [
   },
   {
     to: "/supervisors",
-    label: "Supervisors Management",
+    label: "Darogas Management",
     icon: UserCheck,
     permission: { module: "supervisors", action: "view" },
   },
   {
     to: "/assignSupervisorWard",
-    label: "Assign Supervisor Kothi",
+    label: "Assign Daroga Kothi",
     icon: UserCheck,
     permission: { module: "assign-supervisor-ward", action: "view" },
   },
@@ -70,7 +70,7 @@ export const NAV_ITEMS = [
   },
   {
     to: "/supervisor-audit",
-    label: "Supervisor Attendance Audit",
+    label: "Daroga Attendance Audit",
     icon: UserCheck,
     permission: { module: "supervisor-audit", action: "view" },
   },

@@ -361,7 +361,7 @@ export default function RegistrationRequestsPage() {
                   >
                     <option value="">Select organizational role</option>
                     {ROLE_OPTIONS.map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                      <option key={r} value={r}>{roleLabel(r)}</option>
                     ))}
                   </select>
                 </div>

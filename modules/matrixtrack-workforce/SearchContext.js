@@ -29,7 +29,7 @@ const SCREEN_REGISTRY = [
   },
   {
     key: "supervisors",
-    label: "Supervisors",
+    label: "Darogas",
     route: "/supervisors",
     icon: "supervisor",
     fields: ["name", "emp_code", "email", "phone", "role"],
@@ -39,15 +39,15 @@ const SCREEN_REGISTRY = [
 const STATIC_PAGES = [
   { label: "Dashboard",               route: "/dashboard",           description: "Overview and stats" },
   { label: "Employees",               route: "/employees",           description: "Manage all employees" },
-  { label: "Supervisors",             route: "/supervisors",         description: "Manage supervisors" },
+  { label: "Darogas",                 route: "/supervisors",         description: "Manage darogas" },
   { label: "Attendance Reports",      route: "/attendance",          description: "View attendance records" },
   { label: "Short Attendance Report", route: "/short-attendance",    description: "Short attendance summary" },
   { label: "Geo Fencing",             route: "/geofencing",          description: "Manage geo fencing zones" },
   { label: "Settings",                route: "/settings",            description: "Application settings" },
   { label: "Master",                  route: "/master",              description: "Master data management" },
   { label: "Announcements",           route: "/announcements",       description: "View announcements" },
-  { label: "Assign Supervisor Ward",  route: "/assignSupervisorWard",description: "Assign supervisors to wards" },
-  { label: "Supervisor Audit",        route: "/supervisor-audit",    description: "Audit supervisor attendance" },
+  { label: "Assign Daroga Ward",      route: "/assignSupervisorWard",description: "Assign darogas to wards" },
+  { label: "Daroga Audit",            route: "/supervisor-audit",    description: "Audit daroga attendance" },
 ];
 
 export function SearchProvider({ children }) {

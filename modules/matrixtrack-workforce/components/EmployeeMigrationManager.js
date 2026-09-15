@@ -195,7 +195,7 @@ function EmployeeMigrationManager() {
     }
 
     if (transferMode === "supervisor_selection" && !selectedSupervisorId) {
-      Swal.fire("Required", "Select supervisor.", "warning");
+      Swal.fire("Required", "Select daroga.", "warning");
       return;
     }
 
@@ -329,7 +329,7 @@ space-y-3
                     setSupervisorSearch("");
                   }}
                 />
-                By Supervisor
+                By Daroga
               </label>
             </div>
 
@@ -484,7 +484,7 @@ transition-colors
                       checked={supervisorTransferMode === "employees_only"}
                       onChange={() => setSupervisorTransferMode("employees_only")}
                     />
-                    Transfer without supervisor (employees only)
+                    Transfer without daroga (employees only)
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -493,7 +493,7 @@ transition-colors
                       checked={supervisorTransferMode === "with_supervisor"}
                       onChange={() => setSupervisorTransferMode("with_supervisor")}
                     />
-                    Transfer with supervisor (employees + supervisor)
+                    Transfer with daroga (employees + daroga)
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -502,14 +502,14 @@ transition-colors
                       checked={supervisorTransferMode === "supervisor_only"}
                       onChange={() => setSupervisorTransferMode("supervisor_only")}
                     />
-                    Supervisor only transfer
+                    Daroga only transfer
                   </label>
                 </div>
                 <input
                   type="text"
                   value={supervisorSearch}
                   onChange={(e) => setSupervisorSearch(e.target.value)}
-                  placeholder="Search supervisor by name / code..."
+                  placeholder="Search daroga by name / code..."
                   className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
                 />
                 <div className="max-h-44 overflow-auto border border-slate-200 rounded-md">
@@ -530,7 +530,7 @@ transition-colors
                     );
                   })}
                   {filteredSupervisors.length === 0 && (
-                    <div className="px-3 py-2 text-sm text-slate-500">No supervisor found.</div>
+                    <div className="px-3 py-2 text-sm text-slate-500">No daroga found.</div>
                   )}
                 </div>
 

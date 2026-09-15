@@ -237,7 +237,7 @@ const Register = () => {
                                     style={{ paddingLeft: '3rem' }}
                                 >
                                     <option value="accessor">Accessor</option>
-                                    <option value="qc">QC</option>
+                                    <option value="qc">SI</option>
                                     <option value="admin">Admin</option>
                                 </select>
                             </div>

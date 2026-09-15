@@ -87,7 +87,7 @@ const RBAC_ROLES = [
   },
   {
     key: 'QC',
-    label: 'Quality Controller (QC)',
+    label: 'Sanitary Inspector (SI)',
     desc: 'Field quality scorecard audits & Swachh assessment reviews',
     color: '#9333ea',
     bg: '#faf5ff',
@@ -96,7 +96,7 @@ const RBAC_ROLES = [
   },
   {
     key: 'ACTION_OFFICER',
-    label: 'Action Officer',
+    label: 'IEC Member',
     desc: 'Taskforce ticket resolution & spot transformation authority',
     color: '#ea580c',
     bg: '#fff7ed',
@@ -105,7 +105,7 @@ const RBAC_ROLES = [
   },
   {
     key: 'SUPERVISOR',
-    label: 'Field Supervisor',
+    label: 'Field Daroga',
     desc: 'Workforce facial recognition attendance & worker tracking',
     color: '#0891b2',
     bg: '#ecfeff',
@@ -272,9 +272,9 @@ export default function SuperAdminAccessManagementPage() {
         { id: '3', name: 'Indore City Admin', email: 'cityadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'WRITE' },
         { id: '4', name: 'Zone 01 Admin', email: 'zoneadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
         { id: '5', name: 'Ward 15 Admin', email: 'wardadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
-        { id: '6', name: 'Quality Controller (QC)', email: 'qc@indore.local', role: 'QC', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'READ', mrfAccess: 'READ' },
-        { id: '7', name: 'Mahendra (Action Officer)', email: 'mahendra@gmail.com', role: 'ACTION_OFFICER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'READ', workforceAccess: 'RESTRICTED', mrfAccess: 'RESTRICTED' },
-        { id: '8', name: 'Field Supervisor', email: 'supervisor.vaani@gmail.com', role: 'SUPERVISOR', createdAt: new Date().toISOString(), taskforceAccess: 'READ', swachhAccess: 'RESTRICTED', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
+        { id: '6', name: 'Sanitary Inspector (SI)', email: 'qc@indore.local', role: 'QC', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'READ', mrfAccess: 'READ' },
+        { id: '7', name: 'Mahendra (IEC Member)', email: 'mahendra@gmail.com', role: 'ACTION_OFFICER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'READ', workforceAccess: 'RESTRICTED', mrfAccess: 'RESTRICTED' },
+        { id: '8', name: 'Field Daroga', email: 'supervisor.vaani@gmail.com', role: 'SUPERVISOR', createdAt: new Date().toISOString(), taskforceAccess: 'READ', swachhAccess: 'RESTRICTED', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
       ];
 
       // Merge stored overrides!

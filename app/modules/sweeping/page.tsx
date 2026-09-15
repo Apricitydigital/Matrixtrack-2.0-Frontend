@@ -299,7 +299,7 @@ export default function SweepingModulePage() {
                                     )}
                                 </div>
                                 <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontWeight: 500 }}>
-                                    Manage street beats, daily inspection reports, and quality control assignments.
+                                    Manage street beats, daily inspection reports, and sanitary inspector assignments.
                                 </p>
                             </div>
 
@@ -439,7 +439,7 @@ export default function SweepingModulePage() {
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">
                                         <StatCard label="TOTAL REGISTERED BEATS" value={beats.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatus === ''} />
                                         <StatCard label="SUBMITTED REPORTS" value={stats.total || 0} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
-                                        <StatCard label="PENDING REPORTS" value={stats.pending || 0} sub="Awaiting QC Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
+                                        <StatCard label="PENDING REPORTS" value={stats.pending || 0} sub="Awaiting SI Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
                                         <StatCard label="APPROVED REPORTS" value={stats.approved || 0} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatus === 'APPROVED'} />
                                         <StatCard label="REJECTED REPORTS" value={stats.actionRequired || 0} sub="Non-Compliant" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatus === 'REJECTED'} />
                                         <StatCard label="ACTION REQUIRED REPORTS" value={stats.actionRequired || 0} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatus === 'ACTION_REQUIRED'} />
@@ -524,7 +524,7 @@ export default function SweepingModulePage() {
                                             {/* Search Input */}
                                             <input
                                                 type="text"
-                                                placeholder="🔍 Search by beat, supervisor..."
+                                                placeholder="🔍 Search by beat, daroga..."
                                                 value={searchQuery}
                                                 onChange={e => setSearchQuery(e.target.value)}
                                                 className="filter-select"
@@ -558,7 +558,7 @@ export default function SweepingModulePage() {
                                             {/* Status Dropdown */}
                                             <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)} className="filter-select">
                                                 <option value="">All Status</option>
-                                                <option value="PENDING_QC">Pending QC</option>
+                                                <option value="PENDING_QC">Pending SI</option>
                                                 <option value="APPROVED">Approved</option>
                                                 <option value="REJECTED">Rejected</option>
                                                 <option value="ACTION_REQUIRED">Action Required</option>
@@ -681,7 +681,7 @@ function StatCard({ label, value, sub, color, onClick }: any) {
 function ReportTableRow({ record, onView }: any) {
     const st = (record.status || 'SUBMITTED').toUpperCase();
     const statusConfig: Record<string, { bg: string; color: string; label: string }> = {
-        PENDING_QC: { bg: '#eff6ff', color: '#2563eb', label: 'PENDING QC' },
+        PENDING_QC: { bg: '#eff6ff', color: '#2563eb', label: 'PENDING SI' },
         SUBMITTED: { bg: '#eff6ff', color: '#2563eb', label: 'SUBMITTED' },
         APPROVED: { bg: '#ecfdf5', color: '#059669', label: 'APPROVED' },
         REJECTED: { bg: '#fef2f2', color: '#dc2626', label: 'REJECTED' },

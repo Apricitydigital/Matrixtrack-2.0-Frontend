@@ -558,7 +558,7 @@ export default function CreateCityPage() {
                       />
                     </div>
                     <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                      Assessor evaluations, Ward Ranking scoring system, and QC inspection portal.
+                      Assessor evaluations, Ward Ranking scoring system, and SI inspection portal.
                     </p>
                   </div>
 

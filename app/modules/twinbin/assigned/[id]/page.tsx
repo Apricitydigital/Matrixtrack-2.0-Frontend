@@ -162,7 +162,7 @@ export default function AssignedBinDetailPage() {
         questionnaire,
         proximityToken
       });
-      setStatusMsg("Report submitted, awaiting QC review.");
+      setStatusMsg("Report submitted, awaiting SI review.");
       setReportStatus(res.report?.status || "SUBMITTED");
     } catch (err) {
       setSubmitError(err instanceof ApiError ? err.message : "Failed to submit report");

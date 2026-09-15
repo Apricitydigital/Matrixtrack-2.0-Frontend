@@ -102,7 +102,7 @@ export default function GlobalAdminDashboard() {
       list.push({ type: 'warning', msg: `${actionRequiredCount} global taskforce reports require immediate action in the field.` });
     }
     if (swachhStats?.underReview > 0) {
-      list.push({ type: 'info', msg: `${swachhStats.underReview} Swachh Ward assessments are pending QC review.` });
+      list.push({ type: 'info', msg: `${swachhStats.underReview} Swachh Ward assessments are pending SI review.` });
     }
     if (rejectedCount > 5) {
       list.push({ type: 'error', msg: `High rejection rate detected (${rejectedCount} recent taskforce rejections).` });
@@ -133,7 +133,7 @@ export default function GlobalAdminDashboard() {
     csvContent += "Swachh Ward Ranking KPIs\n";
     csvContent += `Total Participants,${swachhStats?.totalParticipants || 0}\n`;
     csvContent += `Assessments Completed,${swachhStats?.totalAssessments || 0}\n`;
-    csvContent += `QC Approved,${swachhStats?.qcApproved || 0}\n\n`;
+    csvContent += `SI Approved,${swachhStats?.qcApproved || 0}\n\n`;
 
     // Section 2: Users
     csvContent += "--- Platform Users ---\n";
@@ -247,9 +247,9 @@ export default function GlobalAdminDashboard() {
           </h2>
           <div className="grid grid-cols-2 gap-4">
             <KpiBlock label="Total Participants" value={swachhStats?.totalParticipants || 0} color="violet" />
-            <KpiBlock label="QC Pending" value={swachhStats?.underReview || 0} color="amber" highlight />
+            <KpiBlock label="SI Pending" value={swachhStats?.underReview || 0} color="amber" highlight />
             <KpiBlock label="Completed Assessments" value={swachhStats?.totalAssessments || 0} color="emerald" />
-            <KpiBlock label="QC Approved" value={swachhStats?.qcApproved || 0} color="blue" />
+            <KpiBlock label="SI Approved" value={swachhStats?.qcApproved || 0} color="blue" />
           </div>
         </div>
       </div>

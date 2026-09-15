@@ -14,7 +14,7 @@ const TABLE_HEADERS = [
   "Zone Name",
   "Ward Name",
   "Kothi Name",
-  "Supervisor Names",
+  "Daroga Names",
   "Registered",
   "Punched In",
   "Not Punched",
@@ -1137,7 +1137,7 @@ const ShortAttendanceReport = () => {
             <FileText size={22} className="text-indigo-600" /> Short Attendance Report
           </div>
           <p className="text-slate-500 text-sm font-medium">
-            Quick snapshot of ward-level attendance with supervisor coverage and current-day presence.
+            Quick snapshot of ward-level attendance with daroga coverage and current-day presence.
           </p>
         </div>
         <button
@@ -1639,7 +1639,7 @@ dark:border-slate-700
 
 text-slate-700 dark:text-slate-200
 dark:text-slate-200
-">Supervisor</th>
+">Daroga</th>
                 <th className="text-center p-3 border-b">Registered</th>
                 <th className="text-center p-3 border-b">Punched In</th>
                 <th className="text-center p-3 border-b">On Leave</th>

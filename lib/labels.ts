@@ -4,13 +4,13 @@ export const ROLE_LABELS: Record<Role | string, string> = {
   SUPER_ADMIN: "Super Admin",
   DIVISION_ADMIN: "Division Admin",
   EMPLOYEE: "Employee",
-  SUPERVISOR: "Supervisor",
+  SUPERVISOR: "Daroga",
   COMMISSIONER: "ULB Official",
-  QC: "Quality Controller",
+  QC: "Sanitary Inspector",
   ULB_OFFICER: "ULB Officer",
   CITY_ADMIN: "City Admin",
   CITY_ADMINISTRATOR: "City Admin",
-  ACTION_OFFICER: "Action Officer",
+  ACTION_OFFICER: "IEC Member",
   ADMIN: "Admin",
   ADMINISTRATOR: "Admin"
 };

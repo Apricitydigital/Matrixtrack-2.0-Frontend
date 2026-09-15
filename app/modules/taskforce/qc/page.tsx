@@ -15,7 +15,7 @@ export default function TaskforceQcHomePage() {
     return (
       <div className="card">
         <h3>Unauthorized for this module</h3>
-        <p className="muted">Action Officer access is not allowed on QC workspaces.</p>
+        <p className="muted">IEC Member access is not allowed on SI workspaces.</p>
       </div>
     );
   }

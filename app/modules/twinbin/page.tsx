@@ -20,7 +20,7 @@ export default function TwinbinPage() {
         {isActionOfficer ? (
           <div className="card">
             <h3>Unauthorized for this module</h3>
-            <p className="muted">Action Officer access is not allowed on Employee or QC workspaces.</p>
+            <p className="muted">IEC Member access is not allowed on Employee or SI workspaces.</p>
           </div>
         ) : (isAdmin || isQC || roles.includes("HMS_SUPER_ADMIN")) ? (
           <AdminDashboard />

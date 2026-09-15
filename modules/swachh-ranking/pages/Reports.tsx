@@ -194,7 +194,7 @@ const Reports = () => {
                 qcUserName: user.name
             }, { headers: { Authorization: `Bearer ${token}` } });
             if (finalize) {
-                alert('QC Review finalized! Assessment sent to Administrator.');
+                alert('SI Review finalized! Assessment sent to Administrator.');
                 setSelectedReport(null);
                 fetchReports();
             } else {
@@ -668,7 +668,7 @@ const Reports = () => {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem', color: 'var(--swachh-green)' }}>
                                         <CheckCircle2 size={16} />
                                         <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase' }}>
-                                            {selectedReport.qcReviewComplete ? 'QC Score' : 'Self Score'}
+                                            {selectedReport.qcReviewComplete ? 'SI Score' : 'Self Score'}
                                         </span>
                                     </div>
                                     <div style={{ fontWeight: 900, color: 'var(--text-primary)', fontSize: '1.4rem', lineHeight: 1.1 }}>
@@ -793,7 +793,7 @@ const Reports = () => {
                                                 {/* Header row: label + status badge */}
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                                                     <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                                                        QC Review
+                                                        SI Review
                                                     </span>
                                                     <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', padding: '0.2rem 0.7rem', borderRadius: '99px', background: sc.bg, color: sc.color }}>
                                                         {rev?.qcStatus || 'Pending'}
@@ -807,7 +807,7 @@ const Reports = () => {
                                                     </span>
                                                     {(user.role === 'qc' || user.role === 'admin') && (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>QC Score:</span>
+                                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>SI Score:</span>
                                                             <input
                                                                 type="number"
                                                                 min={0}
@@ -902,14 +902,14 @@ const Reports = () => {
                                 <div style={{ display: 'flex', gap: '1rem', padding: '0.875rem 1.1rem', background: '#f8fafc', borderRadius: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <BarChart2 size={18} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                                     <div>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>QC Total Score</div>
+                                        <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>SI Total Score</div>
                                         <div style={{ fontWeight: 900, fontSize: '1.2rem' }}>
                                             {computeQcTotal()}
                                             <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-muted)' }}> / {selectedReport.maxScore}</span>
                                         </div>
                                     </div>
                                     <div style={{ marginLeft: '1rem' }}>
-                                        <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>QC %</div>
+                                        <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)' }}>SI %</div>
                                         <div style={{ fontWeight: 800 }}>{selectedReport.maxScore > 0 ? Math.round((computeQcTotal() / selectedReport.maxScore) * 100) : 0}%</div>
                                     </div>
                                     <div style={{ marginLeft: '1rem' }}>

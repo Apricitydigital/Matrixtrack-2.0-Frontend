@@ -115,10 +115,10 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
         );
     }, [search, users]);
 
-    const modalTitle = targetRole === "SUPERVISOR" ? "Assign Supervisor" : "Deploy Employees";
+    const modalTitle = targetRole === "SUPERVISOR" ? "Assign Daroga" : "Deploy Employees";
     const wholeBeatLabel = targetRole === "SUPERVISOR" ? "Assign Entire Beat" : "Deploy Full Beat";
     const wholeBeatHelp = targetRole === "SUPERVISOR"
-        ? "Assign the complete beat to one supervisor, or switch below to split sub-beats across multiple supervisors."
+        ? "Assign the complete beat to one daroga, or switch below to split sub-beats across multiple darogas."
         : "Assign all visible sub-beats to one employee in one shot.";
 
     return (
@@ -167,7 +167,7 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
                                         />
                                         <div>
                                             <div style={{ fontWeight: 700, color: !isWholeBeat ? "#1e3a8a" : "#334155" }}>Select Specific Sub-Beats ({selectedSegmentIds.length})</div>
-                                            <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{targetRole === "SUPERVISOR" ? "Split one large beat across multiple supervisors." : "Deploy one or many selected paths to employees."}</div>
+                                            <div style={{ fontSize: "0.75rem", color: "#64748b" }}>{targetRole === "SUPERVISOR" ? "Split one large beat across multiple darogas." : "Deploy one or many selected paths to employees."}</div>
                                         </div>
                                     </div>
 
@@ -242,14 +242,14 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
 
                     <div style={{ marginTop: "32px", paddingBottom: "32px" }}>
                         <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "12px" }}>
-                            Step 2: Assign to {targetRole === "SUPERVISOR" ? "Supervisor" : "Employee"}
+                            Step 2: Assign to {targetRole === "SUPERVISOR" ? "Daroga" : "Employee"}
                         </div>
 
                         <div style={{ position: "relative", marginBottom: "16px" }}>
                             <Search size={16} style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
                             <input
                                 type="text"
-                                placeholder={targetRole === "SUPERVISOR" ? "Search supervisor..." : "Search employee..."}
+                                placeholder={targetRole === "SUPERVISOR" ? "Search daroga..." : "Search employee..."}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 style={{ width: "100%", padding: "12px 12px 12px 42px", borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "0.875rem" }}
@@ -280,7 +280,7 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
 
                             {!fetching && filteredUsers.length === 0 && (
                                 <div style={{ padding: "24px", borderRadius: "14px", border: "1px dashed #cbd5e1", textAlign: "center", color: "#64748b" }}>
-                                    No {targetRole === "SUPERVISOR" ? "supervisor" : "employee"} found for this scope.
+                                    No {targetRole === "SUPERVISOR" ? "daroga" : "employee"} found for this scope.
                                 </div>
                             )}
 
@@ -309,7 +309,7 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
                                 ) : (
                                     <>
                                         <UserX size={16} />
-                                        <span>Unassign {targetRole === "SUPERVISOR" ? "Supervisor" : "Employee"} (Clear Selection)</span>
+                                        <span>Unassign {targetRole === "SUPERVISOR" ? "Daroga" : "Employee"} (Clear Selection)</span>
                                     </>
                                 )}
                             </button>

@@ -15,7 +15,7 @@ export default function LitterbinsEmployeePage() {
     return (
       <div className="card">
         <h3>Unauthorized for this module</h3>
-        <p className="muted">Action Officer access is not allowed on Employee workspaces.</p>
+        <p className="muted">IEC Member access is not allowed on Employee workspaces.</p>
       </div>
     );
   }
