@@ -1974,10 +1974,12 @@ function AttendanceDashboard() {
     // Auto fit column width
     worksheet.columns.forEach((column) => {
       let maxLen = 0;
-      column.eachCell({ includeEmpty: true }, (cell) => {
+
+      column.eachCell?.({ includeEmpty: true }, (cell) => {
         const val = cell.value ? cell.value.toString() : "";
         maxLen = Math.max(maxLen, val.length);
       });
+
       column.width = Math.min(Math.max(maxLen + 4, 12), 60);
     });
 

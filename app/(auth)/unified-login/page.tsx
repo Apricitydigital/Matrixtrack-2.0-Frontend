@@ -40,9 +40,9 @@ const PORTAL_ROLE_OPTIONS: Record<
   Array<{ value: string; label: string }>
 > = {
   TASKFORCE_20: [
-    { value: "SUPERVISOR", label: "Supervisor" },
-    { value: "QC", label: "Quality Controller" },
-    { value: "ACTION_OFFICER", label: "Action Officer" },
+    { value: "SUPERVISOR", label: "Daroga" },
+    { value: "QC", label: "Sanitary Inspector" },
+    { value: "ACTION_OFFICER", label: "IEC Member" },
   ],
 
   PROCESSING_PLANT: [
@@ -56,7 +56,7 @@ const PORTAL_ROLE_OPTIONS: Record<
 
   WARD_RANKING: [
     { value: "ACCESSOR", label: "Assessor / Evaluator" },
-    { value: "QC", label: "Quality Controller" },
+    { value: "QC", label: "Sanitary Inspector" },
     { value: "ADMIN", label: "Admin" },
   ],
 };
@@ -478,11 +478,37 @@ export default function LoginPage() {
   ) => {
     saveUnifiedSession(response);
 
+    const redirectTo =
+      resolveUnifiedRedirect(response);
+
+    /*
+     * ULB login briefing trigger.
+     *
+     * We store this only for a successful fresh ULB login.
+     * The ULB dashboard consumes and removes the flag,
+     * therefore normal page refresh/navigation will NOT
+     * keep reopening the briefing.
+     */
+    try {
+      if (redirectTo === "/ulb/dashboard") {
+        window.sessionStorage.setItem(
+          "matrixtrack:ulb-operations-brief",
+          "1",
+        );
+      } else {
+        window.sessionStorage.removeItem(
+          "matrixtrack:ulb-operations-brief",
+        );
+      }
+    } catch {
+      /*
+       * sessionStorage should never block login.
+       */
+    }
+
     // Full reload lets AuthProvider read the newly saved
     // cookie and unified session before guards execute.
-    window.location.assign(
-      resolveUnifiedRedirect(response),
-    );
+    window.location.assign(redirectTo);
   };
 
   const resetOtpStep = () => {

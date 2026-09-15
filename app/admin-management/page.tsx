@@ -87,7 +87,7 @@ const RBAC_ROLES = [
   },
   {
     key: 'QC',
-    label: 'Quality Controller (QC)',
+    label: 'Sanitary Inspector',
     desc: 'Field quality scorecard audits & Swachh assessment reviews',
     color: '#9333ea',
     bg: '#faf5ff',
@@ -96,7 +96,7 @@ const RBAC_ROLES = [
   },
   {
     key: 'ACTION_OFFICER',
-    label: 'Action Officer',
+    label: 'IEC Member',
     desc: 'Taskforce ticket resolution & spot transformation authority',
     color: '#ea580c',
     bg: '#fff7ed',
@@ -131,13 +131,13 @@ export default function SuperAdminAccessManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL');
   const [viewMode, setViewMode] = useState<'GRID' | 'TABLE'>('GRID');
-  
+
   // Modals State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isRbacGuideOpen, setIsRbacGuideOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
-  
+
   // Save Feedback & Tracking
   const [savedUserId, setSavedUserId] = useState<string | null>(null);
   const [dirtyUserIds, setDirtyUserIds] = useState<Set<string>>(new Set());
@@ -272,8 +272,8 @@ export default function SuperAdminAccessManagementPage() {
         { id: '3', name: 'Indore City Admin', email: 'cityadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'WRITE' },
         { id: '4', name: 'Zone 01 Admin', email: 'zoneadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
         { id: '5', name: 'Ward 15 Admin', email: 'wardadmin@matrixtrack.in', role: 'CITY_ADMIN', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
-        { id: '6', name: 'Quality Controller (QC)', email: 'qc@indore.local', role: 'QC', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'READ', mrfAccess: 'READ' },
-        { id: '7', name: 'Mahendra (Action Officer)', email: 'mahendra@gmail.com', role: 'ACTION_OFFICER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'READ', workforceAccess: 'RESTRICTED', mrfAccess: 'RESTRICTED' },
+        { id: '6', name: 'Sanitary Inspector', email: 'qc@indore.local', role: 'QC', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'WRITE', workforceAccess: 'READ', mrfAccess: 'READ' },
+        { id: '7', name: 'Mahendra (IEC Member)', email: 'mahendra@gmail.com', role: 'ACTION_OFFICER', createdAt: new Date().toISOString(), taskforceAccess: 'WRITE', swachhAccess: 'READ', workforceAccess: 'RESTRICTED', mrfAccess: 'RESTRICTED' },
         { id: '8', name: 'Field Supervisor', email: 'supervisor.vaani@gmail.com', role: 'SUPERVISOR', createdAt: new Date().toISOString(), taskforceAccess: 'READ', swachhAccess: 'RESTRICTED', workforceAccess: 'WRITE', mrfAccess: 'RESTRICTED' },
       ];
 
@@ -361,10 +361,10 @@ export default function SuperAdminAccessManagementPage() {
         const origUser = originalUsersMap[userId];
         if (userNow && origUser) {
           const isDirty = (userNow.taskforceAccess !== origUser.taskforceAccess) ||
-                          (userNow.swachhAccess !== origUser.swachhAccess) ||
-                          (userNow.workforceAccess !== origUser.workforceAccess) ||
-                          (userNow.mrfAccess !== origUser.mrfAccess) ||
-                          (userNow.role !== origUser.role);
+            (userNow.swachhAccess !== origUser.swachhAccess) ||
+            (userNow.workforceAccess !== origUser.workforceAccess) ||
+            (userNow.mrfAccess !== origUser.mrfAccess) ||
+            (userNow.role !== origUser.role);
           setDirtyUserIds(prev => {
             const next = new Set(prev);
             if (isDirty) next.add(userId);
@@ -538,7 +538,7 @@ export default function SuperAdminAccessManagementPage() {
   return (
     <Protected>
       <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '32px 40px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-        
+
         {/* Top Navigation */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
@@ -809,7 +809,7 @@ export default function SuperAdminAccessManagementPage() {
 
                         {/* 3 Workspaces Interactive Access Cards */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-                          
+
                           {/* Taskforce 20 */}
                           <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 14, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: 12.5, fontWeight: 800, color: '#334155' }}>Taskforce 20</span>
@@ -1042,7 +1042,7 @@ export default function SuperAdminAccessManagementPage() {
         {isCreateModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <div onClick={() => setIsCreateModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
-            
+
             <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 600, background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1167,7 +1167,7 @@ export default function SuperAdminAccessManagementPage() {
         {isEditModalOpen && editingUser && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <div onClick={() => setIsEditModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
-            
+
             <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 600, background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1277,7 +1277,7 @@ export default function SuperAdminAccessManagementPage() {
         {isRbacGuideOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <div onClick={() => setIsRbacGuideOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
-            
+
             <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 820, maxHeight: '90vh', overflowY: 'auto', background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

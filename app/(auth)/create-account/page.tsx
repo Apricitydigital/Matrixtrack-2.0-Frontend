@@ -105,10 +105,10 @@ const ROLE_OPTIONS: Array<{
     value: UnifiedRegistrationRole;
     label: string;
 }> = [
-        { value: "SUPERVISOR", label: "Supervisor" },
+        { value: "SUPERVISOR", label: "Daroga" },
         { value: "EMPLOYEE", label: "Employee / Road Sweeper" },
-        { value: "QC", label: "Quality Control" },
-        { value: "ACTION_OFFICER", label: "Action Officer" },
+        { value: "QC", label: "Sanitary Inspector" },
+        { value: "ACTION_OFFICER", label: "IEC Member" },
     ];
 
 export default function CreateAccountPage() {
@@ -803,7 +803,8 @@ export default function CreateAccountPage() {
                 </div>
             </section>
 
-            <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
         * {
           box-sizing: border-box;
         }
