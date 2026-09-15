@@ -90,7 +90,7 @@ import {
     WardRankingApi,
     type WardRankingSummaryResponse,
 } from '@lib/wardRankingApi';
-
+import { createPortal } from 'react-dom';
 
 /* =========================================================
    TYPES
@@ -1618,6 +1618,21 @@ export default function UlbOperationsWorkspace({
         setError,
     ] = useState('');
 
+    /* ===========================
+   LOGIN OPERATIONS BRIEF
+=========================== */
+
+    const [
+        showOperationsBrief,
+        setShowOperationsBrief,
+    ] = useState(false);
+
+
+    const [
+        operationsBriefRequested,
+        setOperationsBriefRequested,
+    ] = useState(false);
+
 
     /* ===========================
        FILTERS
@@ -1882,6 +1897,75 @@ export default function UlbOperationsWorkspace({
     useEffect(() => {
         loadRecords();
     }, []);
+
+    /*
+ * Show the executive operations brief only after
+ * a fresh ULB login.
+ *
+ * The flag is removed immediately after reading it,
+ * therefore refreshes and normal dashboard navigation
+ * will not reopen the popup.
+ */
+    useEffect(() => {
+        if (view !== 'DASHBOARD') {
+            return;
+        }
+
+        try {
+            const shouldShow =
+                window.sessionStorage.getItem(
+                    'matrixtrack:ulb-operations-brief'
+                ) === '1';
+
+            if (!shouldShow) {
+                return;
+            }
+
+            window.sessionStorage.removeItem(
+                'matrixtrack:ulb-operations-brief'
+            );
+
+            setOperationsBriefRequested(true);
+
+        } catch {
+            /*
+             * Storage failure should never affect
+             * normal dashboard operation.
+             */
+        }
+    }, [view]);
+
+    /*
+ * Wait for the dashboard's existing data sources
+ * before opening the brief. This avoids displaying
+ * temporary zeros while APIs are still loading.
+ */
+    useEffect(() => {
+        if (
+            !operationsBriefRequested ||
+            view !== 'DASHBOARD'
+        ) {
+            return;
+        }
+
+        if (
+            loading ||
+            attendanceLoading ||
+            wardSummaryLoading
+        ) {
+            return;
+        }
+
+        setShowOperationsBrief(true);
+        setOperationsBriefRequested(false);
+
+    }, [
+        operationsBriefRequested,
+        view,
+        loading,
+        attendanceLoading,
+        wardSummaryLoading,
+    ]);
 
 
     /* =========================================================
@@ -4218,14 +4302,19 @@ export default function UlbOperationsWorkspace({
 
                                                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
-                                                    <PeopleLeaderboardCard
-                                                        icon={UsersRound}
-                                                        tone="indigo"
-                                                        title="Supervisor Performance"
-                                                        rows={supervisorLeaderboard}
-                                                        rateType="approval"
-                                                        emptyMessage="No records are attributed to a named supervisor yet."
-                                                    />
+                                                    <div
+                                                        id="supervisor-performance"
+                                                        className="scroll-mt-6"
+                                                    >
+                                                        <PeopleLeaderboardCard
+                                                            icon={UsersRound}
+                                                            tone="indigo"
+                                                            title="Supervisor Performance"
+                                                            rows={supervisorLeaderboard}
+                                                            rateType="approval"
+                                                            emptyMessage="No records are attributed to a named supervisor yet."
+                                                        />
+                                                    </div>
 
                                                     <PeopleLeaderboardCard
                                                         icon={ShieldCheck}
@@ -4605,6 +4694,113 @@ export default function UlbOperationsWorkspace({
                             ) : null
                         }
 
+                        {/* =================================================
+        ULB LOGIN OPERATIONS BRIEF
+================================================= */}
+
+                        <UlbOperationsBriefModal
+                            open={showOperationsBrief}
+
+                            onClose={() =>
+                                setShowOperationsBrief(false)
+                            }
+
+                            stats={stats}
+
+                            approvalRate={approvalRate}
+
+                            closureRate={closureRate}
+
+                            oldestPendingDays={oldestPendingDays}
+
+                            attendance={
+                                attendance?.hasData &&
+                                    attendance.summary
+                                    ? attendance.summary
+                                    : null
+                            }
+
+                            wardSummary={wardSummary}
+
+                            attentionZone={attentionZone}
+
+                            wardLeaderboard={wardLeaderboard}
+
+                            supervisorLeaderboard={
+                                supervisorLeaderboard
+                            }
+
+                            modulePerformanceRows={
+                                modulePerformanceRows
+                            }
+
+                            rangeDayCount={rangeDayCount}
+
+                            isMultiDayRange={isMultiDayRange}
+
+                            periodLabel={dashboardPeriodLabel(
+                                appliedDashFromDate,
+                                appliedDashToDate
+                            )}
+
+                            onOpenInspection={() => {
+                                setShowOperationsBrief(false);
+
+                                router.push(
+                                    '/ulb/inspection-performance'
+                                );
+                            }}
+
+                            onOpenAttendance={() => {
+                                setShowOperationsBrief(false);
+
+                                router.push(
+                                    `/ulb/attendance?group=HEALTH_WORKERS${appliedDashFromDate
+                                        ? `&from=${appliedDashFromDate}`
+                                        : ''
+                                    }${appliedDashToDate
+                                        ? `&to=${appliedDashToDate}`
+                                        : ''
+                                    }`
+                                );
+                            }}
+
+                            onOpenWardRanking={() => {
+                                setShowOperationsBrief(false);
+
+                                router.push(
+                                    '/ulb/ward-ranking?status=RED'
+                                );
+                            }}
+
+                            onOpenActionQueue={() => {
+                                setShowOperationsBrief(false);
+
+                                router.push(
+                                    '/ulb/reports/action-required'
+                                );
+                            }}
+
+                            onOpenSupervisorPerformance={() => {
+                                setShowOperationsBrief(false);
+
+                                window.setTimeout(() => {
+                                    document
+                                        .getElementById(
+                                            'supervisor-performance'
+                                        )
+                                        ?.scrollIntoView({
+                                            behavior: 'smooth',
+                                            block: 'start',
+                                        });
+                                }, 100);
+                            }}
+
+                            onOpenDashboard={() =>
+                                setShowOperationsBrief(false)
+                            }
+                        />
+
 
                         {/* =================================================
                 VIEW DETAILS
@@ -4704,6 +4900,2864 @@ export default function UlbOperationsWorkspace({
     );
 }
 
+/* =========================================================
+   ULB OPERATIONS BRIEF MODAL
+========================================================= */
+
+function UlbOperationsBriefModal({
+    open,
+    onClose,
+
+    stats,
+    approvalRate,
+    closureRate,
+    oldestPendingDays,
+
+    attendance,
+    wardSummary,
+
+    attentionZone,
+    wardLeaderboard,
+    supervisorLeaderboard,
+    modulePerformanceRows,
+
+    rangeDayCount,
+    isMultiDayRange,
+    periodLabel,
+
+    onOpenInspection,
+    onOpenAttendance,
+    onOpenWardRanking,
+    onOpenActionQueue,
+    onOpenSupervisorPerformance,
+    onOpenDashboard,
+
+}: {
+    open: boolean;
+
+    onClose: () => void;
+
+    stats: {
+        approved: number;
+        rejected: number;
+        pending: number;
+        actionRequired: number;
+        actionTaken: number;
+        grandTotal: number;
+    };
+
+    approvalRate: number | null;
+
+    closureRate: number;
+
+    oldestPendingDays:
+    number | null;
+
+    attendance: {
+        uniqueEmployees: number;
+        present: number;
+        absent: number;
+        attendanceRate: number;
+        avgWorkMinutes: number | null;
+    } | null;
+
+    wardSummary:
+    WardRankingSummaryResponse | null;
+
+    attentionZone:
+    LeaderboardRow | null;
+
+    wardLeaderboard:
+    LeaderboardRow[];
+
+    supervisorLeaderboard:
+    LeaderboardRow[];
+
+    modulePerformanceRows:
+    LeaderboardRow[];
+
+    rangeDayCount: number;
+
+    isMultiDayRange: boolean;
+
+    periodLabel: string;
+
+    onOpenInspection: () => void;
+
+    onOpenAttendance: () => void;
+
+    onOpenWardRanking: () => void;
+
+    onOpenActionQueue: () => void;
+
+    onOpenSupervisorPerformance: () => void;
+
+    onOpenDashboard: () => void;
+}) {
+
+    /* =========================================
+       MODAL BEHAVIOUR
+    ========================================= */
+
+    useEffect(() => {
+
+        if (!open) {
+            return;
+        }
+
+
+        const previousOverflow =
+            document.body.style.overflow;
+
+
+        document.body.style.overflow =
+            'hidden';
+
+
+        const handleEscape = (
+            event: KeyboardEvent
+        ) => {
+
+            if (
+                event.key ===
+                'Escape'
+            ) {
+                onClose();
+            }
+
+        };
+
+
+        window.addEventListener(
+            'keydown',
+            handleEscape
+        );
+
+
+        return () => {
+
+            document.body.style.overflow =
+                previousOverflow;
+
+
+            window.removeEventListener(
+                'keydown',
+                handleEscape
+            );
+
+        };
+
+    }, [
+        open,
+        onClose,
+    ]);
+
+
+    if (
+        !open ||
+        typeof document === 'undefined'
+    ) {
+        return null;
+    }
+
+
+    /* =========================================
+       DERIVED REAL DATA
+    ========================================= */
+
+    const now =
+        new Date();
+
+
+    const attendanceRate =
+        attendance
+            ? Number(
+                attendance
+                    .attendanceRate || 0
+            )
+            : null;
+
+
+    const averagePresent =
+        attendance
+            ? (
+                isMultiDayRange
+                    ? attendance.present /
+                    Math.max(
+                        rangeDayCount,
+                        1
+                    )
+                    : attendance.present
+            )
+            : 0;
+
+
+    const averageAbsent =
+        attendance
+            ? (
+                isMultiDayRange
+                    ? attendance.absent /
+                    Math.max(
+                        rangeDayCount,
+                        1
+                    )
+                    : attendance.absent
+            )
+            : 0;
+
+
+    const rankedWards =
+        wardSummary
+            ? (
+                wardSummary.green +
+                wardSummary.amber +
+                wardSummary.red
+            )
+            : 0;
+
+
+    const rankingPending =
+        wardSummary
+            ? Math.max(
+                0,
+                wardSummary.totalWards -
+                rankedWards
+            )
+            : 0;
+
+    console.log(
+        '[ULB OPERATIONS BRIEF] Ward summary:',
+        {
+            totalWards:
+                wardSummary?.totalWards,
+
+            green:
+                wardSummary?.green,
+
+            amber:
+                wardSummary?.amber,
+
+            red:
+                wardSummary?.red,
+
+            rankedWards,
+
+            rankingPending,
+        }
+    );
+    const lowestWard =
+        [...wardLeaderboard]
+            .map(
+                (
+                    row
+                ) => ({
+                    ...row,
+
+                    rate:
+                        approvalRateOf(
+                            row
+                        ),
+                })
+            )
+            .filter(
+                (
+                    row
+                ) =>
+                    row.rate !==
+                    null
+            )
+            .sort(
+                (
+                    a,
+                    b
+                ) =>
+                    Number(a.rate) -
+                    Number(b.rate)
+            )[0] || null;
+
+
+    const lowestSupervisor =
+        [...supervisorLeaderboard]
+            .map(
+                (
+                    row
+                ) => ({
+                    ...row,
+
+                    rate:
+                        approvalRateOf(
+                            row
+                        ),
+                })
+            )
+            .filter(
+                (
+                    row
+                ) =>
+                    row.rate !==
+                    null
+            )
+            .sort(
+                (
+                    a,
+                    b
+                ) =>
+                    Number(a.rate) -
+                    Number(b.rate)
+            )[0] || null;
+
+
+    const hasAttention =
+        stats.actionRequired > 0 ||
+        (
+            approvalRate !== null &&
+            approvalRate < 70
+        ) ||
+        (
+            attendanceRate !== null &&
+            attendanceRate < 70
+        ) ||
+        (
+            wardSummary !== null &&
+            wardSummary.red > 0
+        );
+
+
+    const operationalStatus =
+        hasAttention
+            ? 'Management Attention Required'
+            : 'Operations Stable';
+
+
+    const statusTone =
+        hasAttention
+            ? 'amber'
+            : 'emerald';
+
+
+    /* =========================================
+       MODULE HEALTH
+    ========================================= */
+
+    const moduleByLabel = (
+        label: string
+    ) =>
+        modulePerformanceRows.find(
+            (
+                row
+            ) =>
+                row.label
+                    .toLowerCase()
+                    .includes(
+                        label.toLowerCase()
+                    )
+        ) || null;
+
+
+    const sweepingModule =
+        moduleByLabel(
+            'Sweeping'
+        );
+
+
+    const litterModule =
+        moduleByLabel(
+            'Litter'
+        );
+
+
+    const toiletModule =
+        modulePerformanceRows.find(
+            (
+                row
+            ) =>
+                row.label
+                    .toLowerCase()
+                    .includes(
+                        'toilet'
+                    )
+        ) || null;
+
+
+    /* =========================================
+       EXECUTIVE SENTENCE
+    ========================================= */
+
+    const summaryParts:
+        string[] = [];
+
+
+    if (
+        wardSummary &&
+        wardSummary.red > 0
+    ) {
+
+        summaryParts.push(
+            `${wardSummary.red} ranked ward${wardSummary.red === 1
+                ? ''
+                : 's'
+            } are below the current performance threshold`
+        );
+
+    }
+
+
+    if (
+        stats.actionRequired >
+        0
+    ) {
+
+        summaryParts.push(
+            `${stats.actionRequired} corrective action${stats.actionRequired ===
+                1
+                ? ''
+                : 's'
+            } remain pending`
+        );
+
+    }
+
+
+    if (
+        attendanceRate !==
+        null
+    ) {
+
+        summaryParts.push(
+            `health-worker attendance is ${attendanceRate.toFixed(
+                1
+            )}%`
+        );
+
+    }
+
+
+    const executiveSentence =
+        summaryParts.length
+            ? `${hasAttention
+                ? 'Current operations require management attention.'
+                : 'Current operations remain stable.'
+            } ${summaryParts.join(
+                ', '
+            )}.`
+            : 'Operational information is available for the selected reporting period.';
+
+
+    /* =========================================
+       HELPERS
+    ========================================= */
+
+    function moduleState(
+        row:
+            LeaderboardRow | null
+    ) {
+
+        if (!row) {
+
+            return {
+                label:
+                    'Limited Data',
+
+                className:
+                    'bg-slate-100 text-slate-500',
+
+                dot:
+                    'bg-slate-400',
+            };
+
+        }
+
+
+        if (
+            row.actionRequired >
+            0
+        ) {
+
+            return {
+                label:
+                    'Action Required',
+
+                className:
+                    'bg-rose-50 text-rose-600',
+
+                dot:
+                    'bg-rose-500',
+            };
+
+        }
+
+
+        const rate =
+            approvalRateOf(
+                row
+            );
+
+
+        if (
+            rate !== null &&
+            rate < 70
+        ) {
+
+            return {
+                label:
+                    'Needs Attention',
+
+                className:
+                    'bg-amber-50 text-amber-700',
+
+                dot:
+                    'bg-amber-500',
+            };
+
+        }
+
+
+        if (
+            rate !== null
+        ) {
+
+            return {
+                label:
+                    'Stable',
+
+                className:
+                    'bg-emerald-50 text-emerald-700',
+
+                dot:
+                    'bg-emerald-500',
+            };
+
+        }
+
+
+        return {
+            label:
+                'Limited Data',
+
+            className:
+                'bg-slate-100 text-slate-500',
+
+            dot:
+                'bg-slate-400',
+        };
+
+    }
+
+
+    /* =========================================
+       RENDER
+    ========================================= */
+
+    return createPortal(
+
+        <div
+            className="
+            fixed inset-0
+            z-[9999]
+            flex items-center
+            justify-center
+            bg-[#071225]/75
+            px-4 py-5
+            backdrop-blur-md
+        "
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ulb-operations-brief-title"
+        >
+
+            {/* =================================
+                BACKDROP
+            ================================= */}
+
+            <button
+                type="button"
+                aria-label="Close operations brief"
+                onClick={onClose}
+                className="
+                    absolute inset-0
+                    cursor-default
+                "
+            />
+
+
+            {/* =================================
+                MODAL
+            ================================= */}
+
+            <div
+                className="
+                    relative z-10
+                    flex
+               max-h-[90vh]
+                    w-full
+                    max-w-[1240px]
+                    flex-col
+                    overflow-hidden
+                    rounded-[28px]
+                    border
+                    border-white/20
+                    bg-[#f7f9fe]
+                    shadow-[0_40px_120px_rgba(2,8,23,0.55)]
+                "
+            >
+
+                {/* =================================
+                    PREMIUM HEADER
+                ================================= */}
+
+                <div
+                    className="
+                        relative
+                        overflow-hidden
+                        bg-gradient-to-r
+                        from-[#07142f]
+                        via-[#10275d]
+                        to-[#203b99]
+                      px-7 pt-5 pb-7
+                        text-white
+                    "
+                >
+
+                    <div
+                        className="
+                            pointer-events-none
+                            absolute
+                            -right-16
+                            -top-28
+                            h-72 w-72
+                            rounded-full
+                            bg-blue-400/20
+                            blur-3xl
+                        "
+                    />
+
+
+                    <div
+                        className="
+                            pointer-events-none
+                            absolute
+                            bottom-[-80px]
+                            left-[35%]
+                            h-48 w-96
+                            rounded-full
+                            bg-indigo-300/10
+                            blur-3xl
+                        "
+                    />
+
+
+                    <div
+                        className="
+                            relative
+                            flex
+                            items-start
+                            justify-between
+                            gap-6
+                        "
+                    >
+
+                        <div
+                            className="
+                                flex
+                                min-w-0
+                                items-start
+                                gap-4
+                            "
+                        >
+
+                            <div
+                                className="
+                                    flex
+                                    h-12 w-12
+                                    shrink-0
+                                    items-center
+                                    justify-center
+                                    rounded-[16px]
+                                    border
+                                    border-blue-300/30
+                                    bg-gradient-to-br
+                                    from-blue-500
+                                    to-indigo-600
+                                    shadow-lg
+                                    shadow-blue-950/30
+                                "
+                            >
+                                <ShieldCheck
+                                    size={23}
+                                    strokeWidth={2.3}
+                                />
+                            </div>
+
+
+                            <div
+                                className="
+                                    min-w-0
+                                "
+                            >
+
+                                <div
+                                    className="
+                                        mb-1
+                                        flex
+                                        items-center
+                                        gap-2
+                                        text-[10px]
+                                        font-black
+                                        uppercase
+                                        tracking-[0.22em]
+                                        text-blue-300
+                                    "
+                                >
+                                    <Sparkles
+                                        size={12}
+                                    />
+
+                                    MatrixTrack 2.0
+                                </div>
+
+
+                                <h2
+                                    id="ulb-operations-brief-title"
+                                    className="
+                                        text-[24px]
+                                        font-black
+                                        tracking-tight
+                                        text-white
+                                    "
+                                >
+                                    Ujjain Operations Brief
+                                </h2>
+
+
+                                <div
+                                    className="
+                                 mt-2
+                                        flex
+                                        flex-wrap
+                                        items-center
+                                        gap-2
+                                        text-xs
+                                        font-semibold
+                                        text-blue-100/75
+                                    "
+                                >
+
+                                    <span>
+                                        {now.toLocaleDateString(
+                                            'en-IN',
+                                            {
+                                                weekday:
+                                                    'long',
+
+                                                day:
+                                                    '2-digit',
+
+                                                month:
+                                                    'long',
+
+                                                year:
+                                                    'numeric',
+                                            }
+                                        )}
+                                    </span>
+
+
+                                    <span>
+                                        •
+                                    </span>
+
+
+                                    <span>
+                                        {periodLabel}
+                                    </span>
+
+
+                                    <span>
+                                        •
+                                    </span>
+
+
+                                    <span>
+                                        Live operational overview
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            className="
+                                flex
+                                shrink-0
+                                items-center
+                                gap-2
+                            "
+                        >
+
+                            <div
+                                className="
+                                    hidden
+                                    items-center
+                                    gap-2
+                                    rounded-full
+                                    border
+                                    border-emerald-300/40
+                                    bg-emerald-400/10
+                                    px-3.5 py-2
+                                    text-[10px]
+                                    font-black
+                                    uppercase
+                                    tracking-wide
+                                    text-emerald-300
+                                    sm:inline-flex
+                                "
+                            >
+
+                                <span
+                                    className="
+                                        h-2 w-2
+                                        rounded-full
+                                        bg-emerald-400
+                                        shadow-[0_0_12px_rgba(52,211,153,0.9)]
+                                    "
+                                />
+
+                                Live
+
+                            </div>
+
+
+                            <div
+                                className={`
+                                    hidden
+                                    rounded-full
+                                    border
+                                    px-3.5 py-2
+                                    text-[10px]
+                                    font-black
+                                    uppercase
+                                    tracking-wide
+                                    md:inline-flex
+
+                                    ${statusTone ===
+                                        'amber'
+
+                                        ? `
+                                                border-amber-300/40
+                                                bg-amber-400/15
+                                                text-amber-200
+                                            `
+
+                                        : `
+                                                border-emerald-300/40
+                                                bg-emerald-400/15
+                                                text-emerald-200
+                                            `
+                                    }
+                                `}
+                            >
+
+                                {
+                                    operationalStatus
+                                }
+
+                            </div>
+
+
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                aria-label="Close operations brief"
+                                className="
+                                    flex
+                                    h-9 w-9
+                                    items-center
+                                    justify-center
+                                    rounded-full
+                                    border
+                                    border-white/10
+                                    bg-white/5
+                                    text-blue-100
+                                    transition
+                                    hover:bg-white/15
+                                    hover:text-white
+                                "
+                            >
+                                <X
+                                    size={18}
+                                />
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {/* =================================
+                    SCROLLABLE CONTENT
+                ================================= */}
+
+                <div
+                    className="
+                        flex-1
+                        overflow-y-auto
+                        bg-gradient-to-b
+                        from-[#f4f7ff]
+                        via-[#f8faff]
+                        to-white
+                        p-5
+                    "
+                >
+
+                    {/* =================================
+                        EXECUTIVE GREETING
+                    ================================= */}
+
+                    <div
+                        className="
+                            rounded-[20px]
+                            border
+                            border-blue-100
+                            bg-gradient-to-r
+                            from-blue-50
+                            via-white
+                            to-indigo-50
+                            px-5 py-4
+                            shadow-sm
+                        "
+                    >
+
+                        <div
+                            className="
+                                flex
+                                items-start
+                                gap-4
+                            "
+                        >
+
+                            <div
+                                className="
+                                    flex
+                                    h-11 w-11
+                                    shrink-0
+                                    items-center
+                                    justify-center
+                                    rounded-[14px]
+                                    bg-white
+                                    text-blue-600
+                                    shadow-sm
+                                "
+                            >
+                                <Activity
+                                    size={21}
+                                />
+                            </div>
+
+
+                            <div>
+
+                                <h3
+                                    className="
+                                        text-[17px]
+                                        font-black
+                                        text-slate-900
+                                    "
+                                >
+                                    Good Afternoon, ULB Officer!
+                                </h3>
+
+
+                                <p
+                                    className="
+                                        mt-1
+                                        max-w-[950px]
+                                        text-[13px]
+                                        font-medium
+                                        leading-5
+                                        text-slate-600
+                                    "
+                                >
+                                    {
+                                        executiveSentence
+                                    }
+                                </p>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    {/* =================================
+                        KPI STRIP
+                    ================================= */}
+
+                    <div
+                        className="
+                            mt-4
+                            grid
+                            grid-cols-1
+                            gap-3
+                            sm:grid-cols-2
+                            xl:grid-cols-5
+                        "
+                    >
+
+                        <BriefKpiCard
+                            icon={
+                                UsersRound
+                            }
+
+                            label="Workforce Attendance"
+
+                            value={
+                                attendanceRate !==
+                                    null
+                                    ? `${attendanceRate.toFixed(
+                                        1
+                                    )}%`
+                                    : '—'
+                            }
+
+                            note={
+                                attendance
+                                    ? `${formatAverageValue(
+                                        averagePresent
+                                    )} present · ${formatAverageValue(
+                                        averageAbsent
+                                    )} absent`
+                                    : 'No attendance data'
+                            }
+
+                            tone={
+                                attendanceRate !==
+                                    null &&
+                                    attendanceRate <
+                                    70
+                                    ? 'rose'
+                                    : 'emerald'
+                            }
+                        />
+
+
+                        <BriefKpiCard
+                            icon={
+                                ClipboardCheck
+                            }
+
+                            label="Total Inspections"
+
+                            value={
+                                dashboardNumberFormatter.format(
+                                    stats.grandTotal
+                                )
+                            }
+
+                            note={`${dashboardNumberFormatter.format(
+                                stats.pending
+                            )} QC pending`}
+
+                            tone="blue"
+                        />
+
+
+                        <BriefKpiCard
+                            icon={
+                                ShieldCheck
+                            }
+
+                            label="QC Approval Rate"
+
+                            value={
+                                approvalRate !==
+                                    null
+                                    ? `${approvalRate}%`
+                                    : '—'
+                            }
+
+                            note={`${dashboardNumberFormatter.format(
+                                stats.approved
+                            )} approved · ${dashboardNumberFormatter.format(
+                                stats.rejected
+                            )} rejected`}
+
+                            tone={
+                                approvalRate !==
+                                    null &&
+                                    approvalRate <
+                                    70
+                                    ? 'amber'
+                                    : 'emerald'
+                            }
+                        />
+
+
+                        <BriefKpiCard
+                            icon={
+                                MapPin
+                            }
+
+                            label="Wards Below Average"
+
+                            value={
+                                wardSummary
+                                    ? `${wardSummary.red} / ${wardSummary.totalWards}`
+                                    : '—'
+                            }
+
+                            note={
+                                wardSummary
+                                    ? `${rankingPending} awaiting ranking data`
+                                    : 'Ranking data unavailable'
+                            }
+
+                            tone={
+                                wardSummary &&
+                                    wardSummary.red >
+                                    0
+                                    ? 'rose'
+                                    : 'blue'
+                            }
+                        />
+
+
+                        <BriefKpiCard
+                            icon={
+                                AlertTriangle
+                            }
+
+                            label="Action Required"
+
+                            value={
+                                dashboardNumberFormatter.format(
+                                    stats.actionRequired
+                                )
+                            }
+
+                            note={
+                                stats.actionRequired >
+                                    0
+                                    ? `${oldestPendingDays ??
+                                    0
+                                    } day${oldestPendingDays ===
+                                        1
+                                        ? ''
+                                        : 's'
+                                    } oldest pending`
+                                    : `${stats.actionTaken} action taken`
+                            }
+
+                            tone={
+                                stats.actionRequired >
+                                    0
+                                    ? 'rose'
+                                    : 'emerald'
+                            }
+                        />
+
+                    </div>
+
+
+                    {/* =================================
+                        MAIN GRID
+                    ================================= */}
+
+                    <div
+                        className="
+                            mt-4
+                            grid
+                            grid-cols-1
+                            gap-4
+                            xl:grid-cols-[1.65fr_0.85fr]
+                        "
+                    >
+
+                        {/* =============================
+                            MANAGEMENT ATTENTION
+                        ============================= */}
+
+                        <section
+                            className="
+                                overflow-hidden
+                                rounded-[22px]
+                                border
+                                border-slate-200
+                                bg-white
+                                shadow-sm
+                            "
+                        >
+
+                            <div
+                                className="
+                                    flex
+                                    items-center
+                                    justify-between
+                                    gap-4
+                                    border-b
+                                    border-slate-100
+                                    px-5 py-4
+                                "
+                            >
+
+                                <div>
+
+                                    <div
+                                        className="
+                                            flex
+                                            items-center
+                                            gap-2
+                                        "
+                                    >
+
+                                        <div
+                                            className="
+                                                flex
+                                                h-8 w-8
+                                                items-center
+                                                justify-center
+                                                rounded-[10px]
+                                                bg-rose-50
+                                                text-rose-600
+                                            "
+                                        >
+                                            <AlertTriangle
+                                                size={17}
+                                            />
+                                        </div>
+
+
+                                        <h3
+                                            className="
+                                                text-base
+                                                font-black
+                                                text-slate-900
+                                            "
+                                        >
+                                            Requires Management Attention
+                                        </h3>
+
+                                    </div>
+
+
+                                    <p
+                                        className="
+                                            mt-1
+                                            pl-10
+                                            text-[11px]
+                                            font-medium
+                                            text-slate-400
+                                        "
+                                    >
+                                        Prioritized using currently available operational data.
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                className="
+                                    divide-y
+                                    divide-slate-100
+                                "
+                            >
+
+                                {/* WARD */}
+
+                                <BriefAttentionRow
+                                    number={1}
+
+                                    tone="rose"
+
+                                    icon={
+                                        MapPin
+                                    }
+
+                                    title={
+                                        lowestWard
+                                            ? lowestWard.label
+                                            : attentionZone
+                                                ? attentionZone.label
+                                                : 'Ward Performance'
+                                    }
+
+                                    subtitle={
+                                        lowestWard &&
+                                            lowestWard.rate !==
+                                            null
+                                            ? `${lowestWard.rate}% QC approval in current reporting period`
+                                            : wardSummary
+                                                ? `${wardSummary.red} ranked ward${wardSummary.red ===
+                                                    1
+                                                    ? ''
+                                                    : 's'
+                                                } below average`
+                                                : 'Ward ranking data is limited'
+                                    }
+
+                                    meta={
+                                        wardSummary
+                                            ? `${rankedWards} of ${wardSummary.totalWards} wards currently ranked`
+                                            : undefined
+                                    }
+
+                                    actionLabel="View Wards"
+
+                                    onAction={
+                                        onOpenWardRanking
+                                    }
+                                />
+
+
+                                {/* ACTIONS */}
+
+                                <BriefAttentionRow
+                                    number={2}
+
+                                    tone={
+                                        stats.actionRequired >
+                                            0
+                                            ? 'amber'
+                                            : 'emerald'
+                                    }
+
+                                    icon={
+                                        FileCheck2
+                                    }
+
+                                    title={`${stats.actionRequired} Corrective Action${stats.actionRequired ===
+                                        1
+                                        ? ''
+                                        : 's'
+                                        } Pending`}
+
+                                    subtitle={
+                                        stats.actionRequired >
+                                            0
+                                            ? 'Reports already escalated for corrective action are awaiting closure.'
+                                            : 'There are currently no unresolved corrective actions.'
+                                    }
+
+                                    meta={
+                                        stats.actionRequired >
+                                            0
+                                            ? `${stats.actionTaken} completed · oldest pending ${oldestPendingDays ??
+                                            0
+                                            } day${oldestPendingDays ===
+                                                1
+                                                ? ''
+                                                : 's'
+                                            }`
+                                            : `${stats.actionTaken} corrective actions completed`
+                                    }
+
+                                    actionLabel="Review Actions"
+
+                                    onAction={
+                                        onOpenActionQueue
+                                    }
+                                />
+
+
+                                {/* ATTENDANCE */}
+
+                                <BriefAttentionRow
+                                    number={3}
+
+                                    tone={
+                                        attendanceRate !==
+                                            null &&
+                                            attendanceRate <
+                                            70
+                                            ? 'amber'
+                                            : 'emerald'
+                                    }
+
+                                    icon={
+                                        UsersRound
+                                    }
+
+                                    title="Health Worker Attendance"
+
+                                    subtitle={
+                                        attendanceRate !==
+                                            null
+                                            ? `${attendanceRate.toFixed(
+                                                1
+                                            )}% attendance for the selected period`
+                                            : 'Attendance data is not available for this period'
+                                    }
+
+                                    meta={
+                                        attendance
+                                            ? `${formatAverageValue(
+                                                averagePresent
+                                            )} avg. present · ${formatAverageValue(
+                                                averageAbsent
+                                            )} avg. absent`
+                                            : undefined
+                                    }
+
+                                    actionLabel="Open Attendance"
+
+                                    onAction={
+                                        onOpenAttendance
+                                    }
+                                />
+
+
+                                {/* SUPERVISOR */}
+
+                                <BriefAttentionRow
+                                    number={4}
+
+                                    tone={
+                                        lowestSupervisor &&
+                                            lowestSupervisor.rate !==
+                                            null &&
+                                            lowestSupervisor.rate <
+                                            70
+                                            ? 'amber'
+                                            : 'blue'
+                                    }
+
+                                    icon={
+                                        UserCheck
+                                    }
+
+                                    title="Supervisor Performance"
+
+                                    subtitle={
+                                        lowestSupervisor
+                                            ? `${lowestSupervisor.label}${lowestSupervisor.rate !==
+                                                null
+                                                ? ` · ${lowestSupervisor.rate}% inspection approval`
+                                                : ''
+                                            }`
+                                            : 'No measurable supervisor inspection performance is currently available'
+                                    }
+
+                                    meta={
+                                        lowestSupervisor
+                                            ? `${lowestSupervisor.total} report${lowestSupervisor.total ===
+                                                1
+                                                ? ''
+                                                : 's'
+                                            } in selected period`
+                                            : undefined
+                                    }
+
+                                    actionLabel="View Performance"
+
+                                    onAction={
+                                        onOpenSupervisorPerformance
+                                    }
+                                />
+
+                            </div>
+
+                        </section>
+
+
+                        {/* =============================
+                            RIGHT COLUMN
+                        ============================= */}
+
+                        <div
+                            className="
+                                space-y-4
+                            "
+                        >
+
+                            {/* OPERATIONAL PULSE */}
+
+                            <section
+                                className="
+                                    rounded-[22px]
+                                    border
+                                    border-slate-200
+                                    bg-white
+                                    p-5
+                                    shadow-sm
+                                "
+                            >
+
+                                <div
+                                    className="
+                                        flex
+                                        items-center
+                                        gap-2
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            flex
+                                            h-8 w-8
+                                            items-center
+                                            justify-center
+                                            rounded-[10px]
+                                            bg-blue-50
+                                            text-blue-600
+                                        "
+                                    >
+                                        <BarChart3
+                                            size={17}
+                                        />
+                                    </div>
+
+
+                                    <h3
+                                        className="
+                                            text-base
+                                            font-black
+                                            text-slate-900
+                                        "
+                                    >
+                                        Operational Pulse
+                                    </h3>
+
+                                </div>
+
+
+                                <div
+                                    className="
+                                        mt-5
+                                        space-y-5
+                                    "
+                                >
+
+                                    <BriefPulseRow
+                                        label="Workforce Attendance"
+
+                                        value={
+                                            attendanceRate
+                                        }
+
+                                        text={
+                                            attendanceRate !==
+                                                null
+                                                ? `${attendanceRate.toFixed(
+                                                    1
+                                                )}%`
+                                                : '—'
+                                        }
+
+                                        tone={
+                                            attendanceRate !==
+                                                null &&
+                                                attendanceRate <
+                                                70
+                                                ? 'rose'
+                                                : 'emerald'
+                                        }
+                                    />
+
+
+                                    <BriefPulseRow
+                                        label="Inspection Quality"
+
+                                        value={
+                                            approvalRate
+                                        }
+
+                                        text={
+                                            approvalRate !==
+                                                null
+                                                ? `${approvalRate}%`
+                                                : '—'
+                                        }
+
+                                        tone={
+                                            approvalRate !==
+                                                null &&
+                                                approvalRate <
+                                                70
+                                                ? 'amber'
+                                                : 'emerald'
+                                        }
+                                    />
+
+
+                                    <BriefPulseRow
+                                        label="Corrective Action Closure"
+
+                                        value={
+                                            stats.actionRequired +
+                                                stats.actionTaken >
+                                                0
+                                                ? closureRate
+                                                : null
+                                        }
+
+                                        text={
+                                            stats.actionRequired +
+                                                stats.actionTaken >
+                                                0
+                                                ? `${closureRate}%`
+                                                : '—'
+                                        }
+
+                                        tone={
+                                            stats.actionRequired >
+                                                0 &&
+                                                closureRate <
+                                                70
+                                                ? 'rose'
+                                                : 'emerald'
+                                        }
+                                    />
+
+                                </div>
+
+                            </section>
+
+
+                            {/* MODULE HEALTH */}
+
+                            <section
+                                className="
+                                    rounded-[22px]
+                                    border
+                                    border-slate-200
+                                    bg-white
+                                    p-5
+                                    shadow-sm
+                                "
+                            >
+
+                                <div
+                                    className="
+                                        flex
+                                        items-center
+                                        gap-2
+                                    "
+                                >
+
+                                    <div
+                                        className="
+                                            flex
+                                            h-8 w-8
+                                            items-center
+                                            justify-center
+                                            rounded-[10px]
+                                            bg-indigo-50
+                                            text-indigo-600
+                                        "
+                                    >
+                                        <Layers3
+                                            size={17}
+                                        />
+                                    </div>
+
+
+                                    <h3
+                                        className="
+                                            text-base
+                                            font-black
+                                            text-slate-900
+                                        "
+                                    >
+                                        Module Health
+                                    </h3>
+
+                                </div>
+
+
+                                <div
+                                    className="
+                                        mt-4
+                                        grid
+                                        grid-cols-1
+                                        gap-2.5
+                                        sm:grid-cols-3
+                                        xl:grid-cols-1
+                                    "
+                                >
+
+                                    <BriefModuleCard
+                                        title="Sweeping"
+
+                                        row={
+                                            sweepingModule
+                                        }
+
+                                        state={
+                                            moduleState(
+                                                sweepingModule
+                                            )
+                                        }
+                                    />
+
+
+                                    <BriefModuleCard
+                                        title="Litter Bins"
+
+                                        row={
+                                            litterModule
+                                        }
+
+                                        state={
+                                            moduleState(
+                                                litterModule
+                                            )
+                                        }
+                                    />
+
+
+                                    <BriefModuleCard
+                                        title="Toilets"
+
+                                        row={
+                                            toiletModule
+                                        }
+
+                                        state={
+                                            moduleState(
+                                                toiletModule
+                                            )
+                                        }
+                                    />
+
+                                </div>
+
+                            </section>
+
+                        </div>
+
+                    </div>
+
+
+                    {/* =================================
+                        MATRIXTRACK INTELLIGENCE
+                    ================================= */}
+
+                    <section
+                        className="
+                            mt-4
+                            rounded-[22px]
+                            border
+                            border-blue-100
+                            bg-gradient-to-r
+                            from-[#edf4ff]
+                            via-white
+                            to-[#f2f0ff]
+                            p-5
+                            shadow-sm
+                        "
+                    >
+
+                        <div
+                            className="
+                                flex
+                                items-center
+                                gap-3
+                            "
+                        >
+
+                            <div
+                                className="
+                                    flex
+                                    h-9 w-9
+                                    items-center
+                                    justify-center
+                                    rounded-[12px]
+                                    bg-blue-600
+                                    text-white
+                                    shadow-md
+                                    shadow-blue-600/20
+                                "
+                            >
+                                <Sparkles
+                                    size={18}
+                                />
+                            </div>
+
+
+                            <div>
+
+                                <h3
+                                    className="
+                                        text-base
+                                        font-black
+                                        text-slate-900
+                                    "
+                                >
+                                    MatrixTrack Intelligence
+                                </h3>
+
+
+                                <p
+                                    className="
+                                        text-[11px]
+                                        font-medium
+                                        text-slate-500
+                                    "
+                                >
+                                    Decision-oriented insights generated from currently available operational data.
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            className="
+                                mt-4
+                                grid
+                                grid-cols-1
+                                gap-3
+                                lg:grid-cols-3
+                            "
+                        >
+
+                            <BriefInsightCard
+                                icon={
+                                    Target
+                                }
+
+                                tone="rose"
+
+                                title="Priority Insight"
+
+                                text={
+                                    attentionZone
+                                        ? `${attentionZone.label} currently requires the closest management review among zones with measurable inspection performance.${lowestWard
+                                            ? ` ${lowestWard.label} is the lowest measurable ward in the selected period.`
+                                            : ''
+                                        }`
+                                        : 'Zone-level performance information is currently limited for the selected reporting period.'
+                                }
+                            />
+
+
+                            <BriefInsightCard
+                                icon={
+                                    UsersRound
+                                }
+
+                                tone="blue"
+
+                                title="Workforce Insight"
+
+                                text={
+                                    attendanceRate !==
+                                        null
+                                        ? `Health-worker attendance is ${attendanceRate.toFixed(
+                                            1
+                                        )}% for this period, with an average of ${formatAverageValue(
+                                            averagePresent
+                                        )} workers present and ${formatAverageValue(
+                                            averageAbsent
+                                        )} absent.`
+                                        : 'Attendance information is currently unavailable for this reporting period.'
+                                }
+                            />
+
+
+                            <BriefInsightCard
+                                icon={
+                                    FileCheck2
+                                }
+
+                                tone="amber"
+
+                                title="Action Insight"
+
+                                text={
+                                    stats.actionRequired >
+                                        0
+                                        ? `${stats.actionRequired} report${stats.actionRequired ===
+                                            1
+                                            ? ''
+                                            : 's'
+                                        } currently require corrective action. ${stats.actionTaken
+                                        } action${stats.actionTaken ===
+                                            1
+                                            ? ''
+                                            : 's'
+                                        } have been completed.`
+                                        : 'There are currently no unresolved Action Required reports in this selection.'
+                                }
+                            />
+
+                        </div>
+
+                    </section>
+
+
+                    {/* DATA CONTEXT */}
+
+                    {
+                        wardSummary &&
+                            rankingPending >
+                            0
+                            ? (
+
+                                <div
+                                    className="
+                                        mt-3
+                                        flex
+                                        items-start
+                                        gap-2
+                                        rounded-[14px]
+                                        border
+                                        border-slate-200
+                                        bg-white
+                                        px-4 py-3
+                                        text-[11px]
+                                        font-medium
+                                        text-slate-500
+                                    "
+                                >
+
+                                    <CircleAlert
+                                        size={15}
+                                        className="
+                                            mt-0.5
+                                            shrink-0
+                                            text-slate-400
+                                        "
+                                    />
+
+
+                                    <span>
+                                        Ward ranking interpretation is based on currently available data.{' '}
+                                        <strong
+                                            className="
+                                                text-slate-700
+                                            "
+                                        >
+                                            {rankedWards}
+                                        </strong>{' '}
+                                        of{' '}
+                                        <strong
+                                            className="
+                                                text-slate-700
+                                            "
+                                        >
+                                            {wardSummary.totalWards}
+                                        </strong>{' '}
+                                        wards have sufficient ranking data for this period;{' '}
+                                        <strong
+                                            className="
+                                                text-slate-700
+                                            "
+                                        >
+                                            {rankingPending}
+                                        </strong>{' '}
+                                        are awaiting data.
+                                    </span>
+
+                                </div>
+
+                            )
+                            : null
+                    }
+
+                </div>
+
+
+                {/* =================================
+                    FOOTER
+                ================================= */}
+
+                <div
+                    className="
+                        flex
+                        flex-wrap
+                        items-center
+                        justify-between
+                        gap-3
+                        border-t
+                        border-slate-200
+                        bg-white
+                        px-6 py-4
+                    "
+                >
+
+                    <div
+                        className="
+                            flex
+                            items-center
+                            gap-2
+                            text-[10px]
+                            font-semibold
+                            text-slate-400
+                        "
+                    >
+
+                        <RefreshCw
+                            size={13}
+                        />
+
+                        Last refreshed{' '}
+
+                        {now.toLocaleTimeString(
+                            'en-IN',
+                            {
+                                hour:
+                                    '2-digit',
+
+                                minute:
+                                    '2-digit',
+
+                                second:
+                                    '2-digit',
+
+                                hour12:
+                                    true,
+                            }
+                        )}
+
+                        <span>
+                            •
+                        </span>
+
+                        Live from MatrixTrack 2.0
+
+                    </div>
+
+
+                    <div
+                        className="
+                            flex
+                            items-center
+                            gap-2
+                        "
+                    >
+
+                        <button
+                            type="button"
+                            onClick={
+                                onOpenDashboard
+                            }
+                            className="
+                                inline-flex
+                                h-11
+                                items-center
+                                justify-center
+                                rounded-[13px]
+                                border
+                                border-slate-200
+                                bg-white
+                                px-5
+                                text-sm
+                                font-black
+                                text-slate-700
+                                transition
+                                hover:bg-slate-50
+                            "
+                        >
+                            Open Dashboard
+                        </button>
+
+
+                        <button
+                            type="button"
+                            onClick={
+                                onOpenInspection
+                            }
+                            className="
+                                inline-flex
+                                h-11
+                                items-center
+                                gap-2
+                                rounded-[13px]
+                                bg-gradient-to-r
+                                from-blue-700
+                                to-indigo-700
+                                px-5
+                                text-sm
+                                font-black
+                                text-white
+                                shadow-lg
+                                shadow-blue-900/20
+                                transition
+                                hover:-translate-y-0.5
+                                hover:shadow-xl
+                            "
+                        >
+
+                            Review Priority Issues
+
+                            <ArrowRight
+                                size={16}
+                            />
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>,
+
+        document.body
+    );
+}
+
+/* =========================================================
+   OPERATIONS BRIEF UI HELPERS
+========================================================= */
+
+type BriefTone =
+    | 'blue'
+    | 'emerald'
+    | 'amber'
+    | 'rose';
+
+
+function BriefKpiCard({
+    icon: Icon,
+    label,
+    value,
+    note,
+    tone,
+}: {
+    icon: any;
+    label: string;
+    value: string;
+    note: string;
+    tone: BriefTone;
+}) {
+
+    const tones: Record<
+        BriefTone,
+        {
+            icon: string;
+            line: string;
+        }
+    > = {
+        blue: {
+            icon:
+                'bg-blue-50 text-blue-600',
+
+            line:
+                'bg-blue-500',
+        },
+
+        emerald: {
+            icon:
+                'bg-emerald-50 text-emerald-600',
+
+            line:
+                'bg-emerald-500',
+        },
+
+        amber: {
+            icon:
+                'bg-amber-50 text-amber-600',
+
+            line:
+                'bg-amber-500',
+        },
+
+        rose: {
+            icon:
+                'bg-rose-50 text-rose-600',
+
+            line:
+                'bg-rose-500',
+        },
+    };
+
+
+    const style =
+        tones[tone];
+
+
+    return (
+
+        <div
+            className="
+                relative
+                overflow-hidden
+                rounded-[18px]
+                border
+                border-slate-200
+                bg-white
+                p-4
+                shadow-sm
+            "
+        >
+
+            <div
+                className={`
+                    absolute
+                    inset-x-0
+                    top-0
+                    h-[3px]
+
+                    ${style.line}
+                `}
+            />
+
+
+            <div
+                className="
+                    flex
+                    items-start
+                    gap-3
+                "
+            >
+
+                <div
+                    className={`
+                        flex
+                        h-9 w-9
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-[12px]
+
+                        ${style.icon}
+                    `}
+                >
+                    <Icon
+                        size={18}
+                    />
+                </div>
+
+
+                <div
+                    className="
+                        min-w-0
+                    "
+                >
+
+                    <div
+                        className="
+                            truncate
+                            text-[9px]
+                            font-black
+                            uppercase
+                            tracking-[0.12em]
+                            text-slate-400
+                        "
+                    >
+                        {label}
+                    </div>
+
+
+                    <div
+                        className="
+                            mt-1
+                            text-[23px]
+                            font-black
+                            leading-none
+                            tracking-tight
+                            text-slate-900
+                        "
+                    >
+                        {value}
+                    </div>
+
+
+                    <div
+                        className="
+                            mt-2
+                            truncate
+                            text-[10px]
+                            font-semibold
+                            text-slate-500
+                        "
+                    >
+                        {note}
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    );
+}
+
+
+function BriefAttentionRow({
+    number,
+    tone,
+    icon: Icon,
+    title,
+    subtitle,
+    meta,
+    actionLabel,
+    onAction,
+}: {
+    number: number;
+    tone: BriefTone;
+    icon: any;
+    title: string;
+    subtitle: string;
+    meta?: string;
+    actionLabel: string;
+    onAction: () => void;
+}) {
+
+    const tones: Record<
+        BriefTone,
+        {
+            number: string;
+            icon: string;
+            button: string;
+        }
+    > = {
+
+        blue: {
+            number:
+                'bg-blue-500',
+
+            icon:
+                'bg-blue-50 text-blue-600',
+
+            button:
+                'border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100',
+        },
+
+        emerald: {
+            number:
+                'bg-emerald-500',
+
+            icon:
+                'bg-emerald-50 text-emerald-600',
+
+            button:
+                'border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+        },
+
+        amber: {
+            number:
+                'bg-amber-500',
+
+            icon:
+                'bg-amber-50 text-amber-600',
+
+            button:
+                'border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100',
+        },
+
+        rose: {
+            number:
+                'bg-rose-500',
+
+            icon:
+                'bg-rose-50 text-rose-600',
+
+            button:
+                'border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100',
+        },
+
+    };
+
+
+    const style =
+        tones[tone];
+
+
+    return (
+
+        <div
+            className="
+                grid
+                grid-cols-[32px_1fr]
+                gap-3
+                px-5 py-4
+                lg:grid-cols-[32px_42px_1fr_auto]
+                lg:items-center
+            "
+        >
+
+            <div
+                className={`
+                    flex
+                    h-6 w-6
+                    items-center
+                    justify-center
+                    rounded-full
+                    text-[10px]
+                    font-black
+                    text-white
+
+                    ${style.number}
+                `}
+            >
+                {number}
+            </div>
+
+
+            <div
+                className={`
+                    hidden
+                    h-10 w-10
+                    items-center
+                    justify-center
+                    rounded-[12px]
+                    lg:flex
+
+                    ${style.icon}
+                `}
+            >
+                <Icon
+                    size={18}
+                />
+            </div>
+
+
+            <div
+                className="
+                    min-w-0
+                "
+            >
+
+                <div
+                    className="
+                        text-[13px]
+                        font-black
+                        text-slate-900
+                    "
+                >
+                    {title}
+                </div>
+
+
+                <div
+                    className="
+                        mt-0.5
+                        text-[11px]
+                        font-medium
+                        text-slate-500
+                    "
+                >
+                    {subtitle}
+                </div>
+
+
+                {
+                    meta
+                        ? (
+
+                            <div
+                                className="
+                                    mt-1
+                                    text-[10px]
+                                    font-bold
+                                    text-slate-400
+                                "
+                            >
+                                {meta}
+                            </div>
+
+                        )
+                        : null
+                }
+
+            </div>
+
+
+            <button
+                type="button"
+                onClick={
+                    onAction
+                }
+                className={`
+                    col-start-2
+                    mt-2
+                    inline-flex
+                    h-9
+                    items-center
+                    justify-center
+                    gap-1.5
+                    rounded-[11px]
+                    border
+                    px-3
+                    text-[10px]
+                    font-black
+                    transition
+                    lg:col-start-auto
+                    lg:mt-0
+
+                    ${style.button}
+                `}
+            >
+
+                {actionLabel}
+
+                <ArrowRight
+                    size={12}
+                />
+
+            </button>
+
+        </div>
+    );
+}
+
+
+function BriefPulseRow({
+    label,
+    value,
+    text,
+    tone,
+}: {
+    label: string;
+    value: number | null;
+    text: string;
+    tone: BriefTone;
+}) {
+
+    const barClass: Record<
+        BriefTone,
+        string
+    > = {
+        blue:
+            'bg-blue-500',
+
+        emerald:
+            'bg-emerald-500',
+
+        amber:
+            'bg-amber-500',
+
+        rose:
+            'bg-rose-500',
+    };
+
+
+    const width =
+        value === null
+            ? 0
+            : Math.max(
+                0,
+                Math.min(
+                    100,
+                    value
+                )
+            );
+
+
+    return (
+
+        <div>
+
+            <div
+                className="
+                    mb-2
+                    flex
+                    items-center
+                    justify-between
+                    gap-3
+                "
+            >
+
+                <span
+                    className="
+                        text-[11px]
+                        font-bold
+                        text-slate-600
+                    "
+                >
+                    {label}
+                </span>
+
+
+                <span
+                    className="
+                        text-[11px]
+                        font-black
+                        text-slate-900
+                    "
+                >
+                    {text}
+                </span>
+
+            </div>
+
+
+            <div
+                className="
+                    h-2
+                    overflow-hidden
+                    rounded-full
+                    bg-slate-100
+                "
+            >
+
+                <div
+                    className={`
+                        h-full
+                        rounded-full
+                        transition-all
+                        duration-500
+
+                        ${barClass[tone]}
+                    `}
+                    style={{
+                        width:
+                            `${width}%`,
+                    }}
+                />
+
+            </div>
+
+        </div>
+    );
+}
+
+
+function BriefModuleCard({
+    title,
+    row,
+    state,
+}: {
+    title: string;
+
+    row:
+    LeaderboardRow | null;
+
+    state: {
+        label: string;
+        className: string;
+        dot: string;
+    };
+}) {
+
+    return (
+
+        <div
+            className="
+                rounded-[15px]
+                border
+                border-slate-100
+                bg-slate-50/70
+                p-3
+            "
+        >
+
+            <div
+                className="
+                    flex
+                    items-center
+                    justify-between
+                    gap-2
+                "
+            >
+
+                <div
+                    className="
+                        text-[11px]
+                        font-black
+                        text-slate-800
+                    "
+                >
+                    {title}
+                </div>
+
+
+                <span
+                    className={`
+                        inline-flex
+                        items-center
+                        gap-1.5
+                        rounded-full
+                        px-2 py-1
+                        text-[8px]
+                        font-black
+                        uppercase
+                        tracking-wide
+
+                        ${state.className}
+                    `}
+                >
+
+                    <span
+                        className={`
+                            h-1.5 w-1.5
+                            rounded-full
+
+                            ${state.dot}
+                        `}
+                    />
+
+                    {state.label}
+
+                </span>
+
+            </div>
+
+
+            {
+                row
+                    ? (
+
+                        <div
+                            className="
+                                mt-2
+                                flex
+                                flex-wrap
+                                gap-x-3
+                                gap-y-1
+                                text-[9px]
+                                font-semibold
+                                text-slate-500
+                            "
+                        >
+
+                            <span>
+                                {row.total} reports
+                            </span>
+
+
+                            <span>
+                                {row.approved} approved
+                            </span>
+
+
+                            <span>
+                                {row.rejected} rejected
+                            </span>
+
+
+                            <span>
+                                {row.actionRequired} action required
+                            </span>
+
+                        </div>
+
+                    )
+                    : (
+
+                        <div
+                            className="
+                                mt-2
+                                text-[9px]
+                                font-semibold
+                                text-slate-400
+                            "
+                        >
+                            No measurable data for this period.
+                        </div>
+
+                    )
+            }
+
+        </div>
+    );
+}
+
+
+function BriefInsightCard({
+    icon: Icon,
+    tone,
+    title,
+    text,
+}: {
+    icon: any;
+    tone: BriefTone;
+    title: string;
+    text: string;
+}) {
+
+    const tones: Record<
+        BriefTone,
+        string
+    > = {
+        blue:
+            'bg-blue-50 text-blue-600',
+
+        emerald:
+            'bg-emerald-50 text-emerald-600',
+
+        amber:
+            'bg-amber-50 text-amber-600',
+
+        rose:
+            'bg-rose-50 text-rose-600',
+    };
+
+
+    return (
+
+        <div
+            className="
+                rounded-[16px]
+                border
+                border-white
+                bg-white/80
+                p-4
+                shadow-sm
+                backdrop-blur-sm
+            "
+        >
+
+            <div
+                className="
+                    flex
+                    items-start
+                    gap-3
+                "
+            >
+
+                <div
+                    className={`
+                        flex
+                        h-8 w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-[10px]
+
+                        ${tones[tone]}
+                    `}
+                >
+                    <Icon
+                        size={16}
+                    />
+                </div>
+
+
+                <div>
+
+                    <div
+                        className="
+                            text-[11px]
+                            font-black
+                            text-slate-800
+                        "
+                    >
+                        {title}
+                    </div>
+
+
+                    <p
+                        className="
+                            mt-1
+                            text-[10px]
+                            font-medium
+                            leading-[1.55]
+                            text-slate-500
+                        "
+                    >
+                        {text}
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+    );
+}
 
 /* =========================================================
    SCORE RING

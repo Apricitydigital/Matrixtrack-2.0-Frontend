@@ -803,7 +803,8 @@ export default function CreateAccountPage() {
                 </div>
             </section>
 
-            <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
         * {
           box-sizing: border-box;
         }

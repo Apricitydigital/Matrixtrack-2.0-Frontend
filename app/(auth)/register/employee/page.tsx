@@ -25,7 +25,7 @@ export default function EmployeeRegisterPage() {
     const [loadingGeo, setLoadingGeo] = useState(false);
 
     useEffect(() => {
-        PublicGeoApi.cities().then((res) => setCities(res.cities || [])).catch(() => {});
+        PublicGeoApi.cities().then((res) => setCities(res.cities || [])).catch(() => { });
     }, []);
 
     const update = (key: keyof typeof form, value: string) => setForm((f) => ({ ...f, [key]: value }));

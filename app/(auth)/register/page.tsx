@@ -142,7 +142,7 @@ export default function RegisterPage() {
                         Join the movement for smarter, cleaner cities.
                     </h2>
                     <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 16, lineHeight: 1.6, maxWidth: 360 }}>
-                        Submit your daroga application to become part of the HMS network. Your request will be reviewed by city administrators.
+                        Submit your Daroga application to become part of the HMS network. Your request will be reviewed by city administrators.
                     </p>
                 </div>
 
@@ -259,7 +259,8 @@ export default function RegisterPage() {
                 </div>
             </div>
 
-            <style dangerouslySetInnerHTML={{ __html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
         .premium-label {
             display: flex;
             align-items: center;
