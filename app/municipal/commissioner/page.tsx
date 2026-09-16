@@ -32,6 +32,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Timer,
   Trash2,
   TrendingDown,
   TrendingUp,
@@ -64,6 +65,8 @@ import UniversalReportModal from '@components/UniversalReportModal';
 import { useAuth } from '@hooks/useAuth';
 
 import {
+  CityUserApi,
+  GeoApi,
   ModuleRecordsApi,
 } from '@lib/apiClient';
 
@@ -99,6 +102,7 @@ type RoleKey =
   | 'ALL'
   | 'SUPERVISOR'
   | 'QC'
+  | 'ULB_OFFICER'
   | 'ACTION_OFFICER'
   | 'EMPLOYEE';
 
@@ -114,6 +118,14 @@ type MetricKey =
 type DashboardRecord = any & {
   dashboardModule: InspectionModuleKey;
   dashboardModuleLabel: string;
+};
+
+type CityUserSummary = {
+  id: string;
+  name: string;
+  role: string;
+  zoneIds?: string[];
+  wardIds?: string[];
 };
 
 type InspectionStats = {
@@ -304,6 +316,10 @@ const ROLES: Array<{
   {
     key: 'QC',
     label: 'Sanitary Inspector',
+  },
+  {
+    key: 'ULB_OFFICER',
+    label: 'ULB Officer',
   },
   {
     key: 'ACTION_OFFICER',
@@ -3029,6 +3045,67 @@ export default function CommissionerDashboard() {
   ] =
     useState(false);
 
+  /*
+   * The full registered-user roster (same source as the Registered
+   * Users Directory) so every registered SI/IEC/Daroga/Employee/ULB
+   * Officer shows up here even with zero activity in the selected
+   * date range - building rows only from inspection records/
+   * attendance entries silently dropped anyone with no matching
+   * record.
+   */
+  const [
+    cityUsers,
+    setCityUsers,
+  ] =
+    useState<CityUserSummary[]>([]);
+
+  const [
+    geoNameById,
+    setGeoNameById,
+  ] =
+    useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const [usersResult, zonesResult, wardsResult] = await Promise.allSettled([
+        CityUserApi.list(),
+        GeoApi.list('ZONE'),
+        GeoApi.list('WARD'),
+      ]);
+
+      if (cancelled) return;
+
+      if (usersResult.status === 'fulfilled') {
+        setCityUsers(usersResult.value.users || []);
+      }
+
+      const nameMap = new Map<string, string>();
+      if (zonesResult.status === 'fulfilled') {
+        (zonesResult.value.nodes || []).forEach((node: any) => nameMap.set(node.id, node.name));
+      }
+      if (wardsResult.status === 'fulfilled') {
+        (wardsResult.value.nodes || []).forEach((node: any) => nameMap.set(node.id, node.name));
+      }
+      setGeoNameById(nameMap);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const cityUsersByRole = useMemo(() => {
+    const map = new Map<string, CityUserSummary[]>();
+    cityUsers.forEach((entry) => {
+      const list = map.get(entry.role) || [];
+      list.push(entry);
+      map.set(entry.role, list);
+    });
+    return map;
+  }, [cityUsers]);
+
   /* =========================
      DATE
   ========================= */
@@ -4706,33 +4783,6 @@ export default function CommissionerDashboard() {
       return beats.size;
     }, [records]);
 
-  const cityDarogaCount =
-    useMemo(() => {
-      const darogas =
-        new Set<string>();
-
-      records.forEach(
-        (item) => {
-          const id =
-            getDarogaId(item);
-
-          const name =
-            getDarogaName(item);
-
-          const key =
-            id
-              ? String(id)
-              : name;
-
-          if (key) {
-            darogas.add(key);
-          }
-        }
-      );
-
-      return darogas.size;
-    }, [records]);
-
   /* =========================================================
      MODULE PERFORMANCE
   ========================================================= */
@@ -5232,6 +5282,15 @@ export default function CommissionerDashboard() {
      ROLE PERFORMANCE
   ========================================================= */
 
+  /*
+   * Rows come from the full registered-user roster (same source as
+   * the Registered Users Directory) rather than being derived only
+   * from inspection records - matching by roster ID/name means a
+   * registered SI/IEC/Daroga with zero activity in the selected date
+   * range still gets a row (0 records / 0% performance) instead of
+   * being silently dropped, which used to make this widget's counts
+   * disagree with the Registered Users Directory.
+   */
   const buildRoleRows =
     useCallback(
       (
@@ -5240,175 +5299,62 @@ export default function CommissionerDashboard() {
           | 'QC'
           | 'ACTION_OFFICER'
       ) => {
-        const map =
-          new Map<
-            string,
-            {
-              id?: string | null;
-              records: DashboardRecord[];
-            }
-          >();
+        const roster = cityUsersByRole.get(role) || [];
 
-        filteredInspectionRecords.forEach(
-          (item) => {
-            let name =
-              '';
+        return roster
+          .map((person) => {
+            const matchedRecords = filteredInspectionRecords.filter((item) => {
+              let name = '';
+              let id: string | null = null;
 
-            let id:
-              | string
-              | null =
-              null;
+              if (role === 'SUPERVISOR') {
+                name = getDarogaName(item);
+                id = getDarogaId(item);
+              } else if (role === 'QC') {
+                name = getSiName(item);
+                id = getSiId(item);
+              } else if (role === 'ACTION_OFFICER') {
+                name = getIecName(item);
+                id = getIecId(item);
+              }
 
-            if (
-              role ===
-              'SUPERVISOR'
-            ) {
-              name =
-                getDarogaName(
-                  item
-                );
+              if (id) return String(id) === String(person.id);
+              return Boolean(name) && normalize(name) === normalize(person.name);
+            });
 
-              id =
-                getDarogaId(
-                  item
-                );
-            }
+            const stats = inspectionStats(matchedRecords);
 
-            if (
-              role ===
-              'QC'
-            ) {
-              name =
-                getSiName(
-                  item
-                );
+            const attendanceEmployee =
+              attendance?.employees?.find(
+                (employee) =>
+                  employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(person.id)
+              ) || null;
 
-              id =
-                getSiId(
-                  item
-                );
-            }
+            return {
+              key: `${role}-${person.id}`,
+              id: person.id,
+              label: person.name,
 
-            if (
-              role ===
-              'ACTION_OFFICER'
-            ) {
-              name =
-                getIecName(
-                  item
-                );
+              total: stats.total,
+              approved: stats.approved,
+              rejected: stats.rejected,
+              actionRequired: stats.actionRequired,
+              actionTaken: stats.actionTaken,
+              pending: stats.pending,
 
-              id =
-                getIecId(
-                  item
-                );
-            }
+              performance: stats.performance || 0,
 
-            if (!name) {
-              return;
-            }
+              records: matchedRecords,
 
-            const current =
-              map.get(
-                name
-              ) || {
-                id,
-                records:
-                  [],
-              };
+              attendance: attendanceEmployee?.attendanceRate ?? null,
 
-            current.records.push(
-              item
-            );
-
-            if (
-              !current.id &&
-              id
-            ) {
-              current.id =
-                id;
-            }
-
-            map.set(
-              name,
-              current
-            );
-          }
-        );
-
-        return Array.from(
-          map.entries()
-        )
-          .map(
-            ([
-              label,
-              data,
-            ]) => {
-              const stats =
-                inspectionStats(
-                  data.records
-                );
-
-              const attendanceEmployee =
-                data.id
-                  ? attendance?.employees?.find(
-                      (
-                        employee
-                      ) =>
-                        employee.matrixTrackUserId &&
-                        String(
-                          employee.matrixTrackUserId
-                        ) ===
-                          String(
-                            data.id
-                          )
-                    ) ||
-                    null
-                  : null;
-
-              return {
-                key:
-                  `${role}-${label}`,
-                id:
-                  data.id,
-                label,
-
-                total:
-                  stats.total,
-                approved:
-                  stats.approved,
-                rejected:
-                  stats.rejected,
-                actionRequired:
-                  stats.actionRequired,
-                actionTaken:
-                  stats.actionTaken,
-                pending:
-                  stats.pending,
-
-                performance:
-                  stats.performance ||
-                  0,
-
-                records:
-                  data.records,
-
-                attendance:
-                  attendanceEmployee
-                    ?.attendanceRate ??
-                  null,
-
-                attendanceEmployee,
-              } satisfies RolePerformanceRow;
-            }
-          )
-          .sort(
-            (a, b) =>
-              b.performance -
-              a.performance
-          );
+              attendanceEmployee,
+            } satisfies RolePerformanceRow;
+          })
+          .sort((a, b) => b.performance - a.performance);
       },
       [
+        cityUsersByRole,
         filteredInspectionRecords,
         attendance,
       ]
@@ -5441,56 +5387,150 @@ export default function CommissionerDashboard() {
       [buildRoleRows]
     );
 
-  const employeeRows =
+  /*
+   * ULB Officer records carry no reviewer/actor field (unlike Daroga's
+   * supervisorId, SI's reviewedByQcId, IEC's actionTakenById), so a
+   * ULB Officer's rows are matched by their assigned Zone/Ward scope
+   * (the same scope the backend enforces when they mark a report
+   * Action Required) rather than by a per-record person field.
+   */
+  const ulbOfficerRows =
     useMemo(
       () =>
-        filteredAttendanceEmployees
-          .map(
-            (
-              employee
-            ) => ({
-              key:
-                `EMPLOYEE-${employee.attendanceId}`,
-              id:
-                employee.matrixTrackUserId,
-              label:
-                employee.employeeName,
+        (cityUsersByRole.get('ULB_OFFICER') || [])
+          .map((officer) => {
+            const zoneNames = (officer.zoneIds || [])
+              .map((id) => geoNameById.get(id))
+              .filter((name): name is string => Boolean(name));
+            const wardNames = (officer.wardIds || [])
+              .map((id) => geoNameById.get(id))
+              .filter((name): name is string => Boolean(name));
 
-              total:
-                employee.totalDays,
-              approved:
-                employee.presentDays,
-              rejected:
-                employee.absentDays,
-              actionRequired:
-                0,
-              actionTaken:
-                0,
-              pending:
-                0,
+            const zoneSet = new Set(zoneNames.map(normalize));
+            const wardSet = new Set(wardNames.map(normalize));
 
-              performance:
-                employee.attendanceRate,
+            const matchedRecords =
+              zoneSet.size || wardSet.size
+                ? filteredInspectionRecords.filter((item) => {
+                    const zone = normalize(getRecordZone(item));
+                    const ward = normalize(getRecordWard(item));
+                    return (zone && zoneSet.has(zone)) || (ward && wardSet.has(ward));
+                  })
+                : [];
 
-              records:
-                [],
+            const stats = inspectionStats(matchedRecords);
 
-              attendance:
-                employee.attendanceRate,
+            const attendanceEmployee =
+              attendance?.employees?.find(
+                (employee) =>
+                  employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(officer.id)
+              ) || null;
 
-              attendanceEmployee:
-                employee,
-            })
-          )
-          .sort(
-            (a, b) =>
-              b.performance -
-              a.performance
-          ),
-      [
-        filteredAttendanceEmployees,
-      ]
+            return {
+              key: `ULB_OFFICER-${officer.id}`,
+              id: officer.id,
+              label: officer.name,
+
+              total: stats.total,
+              approved: stats.approved,
+              rejected: stats.rejected,
+              actionRequired: stats.actionRequired,
+              actionTaken: stats.actionTaken,
+              pending: stats.pending,
+
+              performance: stats.performance || 0,
+
+              records: matchedRecords,
+
+              attendance: attendanceEmployee?.attendanceRate ?? null,
+              attendanceEmployee,
+            } satisfies RolePerformanceRow;
+          })
+          .sort((a, b) => b.performance - a.performance),
+      [cityUsersByRole, geoNameById, filteredInspectionRecords, attendance]
     );
+
+  /*
+   * Built from the full registered EMPLOYEE roster rather than only
+   * from filteredAttendanceEmployees, so a registered employee with no
+   * attendance rows in the selected date range still gets a row
+   * instead of being dropped from the count.
+   */
+  const employeeRows =
+    useMemo(() => {
+      /*
+       * Mirrors the early-return gating filteredAttendanceEmployees
+       * used to provide, so this tab still empties out under the same
+       * global module/status filter combinations as before.
+       */
+      if (moduleFilter !== 'ALL' && moduleFilter !== 'ATTENDANCE') {
+        return [];
+      }
+
+      if (statusFilter !== 'ALL' && !['PRESENT', 'ABSENT'].includes(statusFilter)) {
+        return [];
+      }
+
+      const roster = cityUsersByRole.get('EMPLOYEE') || [];
+
+      return roster
+        .map((person) => {
+          const attendanceEmployee =
+            attendance?.employees?.find(
+              (employee) =>
+                employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(person.id)
+            ) || null;
+
+          return {
+            key: `EMPLOYEE-${person.id}`,
+            id: person.id,
+            label: person.name,
+
+            total: attendanceEmployee?.totalDays ?? 0,
+            approved: attendanceEmployee?.presentDays ?? 0,
+            rejected: attendanceEmployee?.absentDays ?? 0,
+            actionRequired: 0,
+            actionTaken: 0,
+            pending: 0,
+
+            performance: attendanceEmployee?.attendanceRate ?? 0,
+
+            records: [],
+
+            attendance: attendanceEmployee?.attendanceRate ?? null,
+
+            attendanceEmployee,
+
+            _zones: attendanceEmployee?.zones || [],
+            _wards: attendanceEmployee?.wards || [],
+          };
+        })
+        .filter((row) => {
+          if (zoneFilter !== 'ALL' && !row._zones.includes(zoneFilter)) return false;
+          if (wardFilter !== 'ALL' && !row._wards.includes(wardFilter)) return false;
+          if (personFilter !== 'ALL' && row.label !== personFilter) return false;
+          if (statusFilter === 'PRESENT' && row.approved <= 0) return false;
+          if (statusFilter === 'ABSENT' && row.rejected <= 0) return false;
+
+          if (searchValue) {
+            const haystack = normalize([row.label, ...row._zones, ...row._wards].join(' '));
+            if (!haystack.includes(searchValue)) return false;
+          }
+
+          return true;
+        })
+        .map(({ _zones, _wards, ...row }) => row)
+        .sort((a, b) => b.performance - a.performance);
+    }, [
+      cityUsersByRole,
+      attendance,
+      moduleFilter,
+      statusFilter,
+      zoneFilter,
+      wardFilter,
+      personFilter,
+      searchValue,
+    ]);
 
   const [
     performanceRole,
@@ -5512,6 +5552,9 @@ export default function CommissionerDashboard() {
       : performanceRole ===
         'QC'
       ? siRows
+      : performanceRole ===
+        'ULB_OFFICER'
+      ? ulbOfficerRows
       : performanceRole ===
         'ACTION_OFFICER'
       ? iecRows
@@ -7978,21 +8021,37 @@ export default function CommissionerDashboard() {
               </div>
             </button>
 
-            <div className="min-h-[76px] rounded-xl border border-indigo-100 bg-indigo-50/45 px-3 py-2.5">
+            <button
+              type="button"
+              onClick={() =>
+                openInspectionMetric(
+                  'Pending Action',
+                  records.filter(
+                    (item) =>
+                      effectiveStatus(item) ===
+                      'ACTION_REQUIRED'
+                  ),
+                  citySnapshotStats.actionRequired.toLocaleString(
+                    'en-IN'
+                  )
+                )
+              }
+              className="group min-h-[76px] rounded-xl border border-cyan-100 bg-cyan-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md"
+            >
               <div className="flex h-full items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100/80 text-indigo-600">
-                    <UsersRound size={16} />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-100/80 text-cyan-600">
+                    <Timer size={16} />
                   </div>
                   <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    Total Darogas
+                    Pending Action
                   </div>
                 </div>
                 <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {cityDarogaCount}
+                  {citySnapshotStats.actionRequired}
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </section>
 

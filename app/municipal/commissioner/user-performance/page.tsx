@@ -23,7 +23,7 @@ import { RoleGuard } from '@components/Guards';
 import UniversalReportModal from '@components/UniversalReportModal';
 
 import { useAuth } from '@hooks/useAuth';
-import { ModuleRecordsApi } from '@lib/apiClient';
+import { CityUserApi, GeoApi, ModuleRecordsApi } from '@lib/apiClient';
 
 import {
   AttendanceApi,
@@ -38,11 +38,19 @@ import {
 
 type InspectionModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING';
 
-type UserRoleKey = 'SUPERVISOR' | 'QC' | 'ACTION_OFFICER' | 'EMPLOYEE';
+type UserRoleKey = 'SUPERVISOR' | 'QC' | 'ULB_OFFICER' | 'ACTION_OFFICER' | 'EMPLOYEE';
 
 type DashboardRecord = any & {
   dashboardModule: InspectionModuleKey;
   dashboardModuleLabel: string;
+};
+
+type CityUserSummary = {
+  id: string;
+  name: string;
+  role: string;
+  zoneIds?: string[];
+  wardIds?: string[];
 };
 
 type UserPerformanceRow = {
@@ -73,10 +81,17 @@ type UserPerformanceRow = {
    CONFIG
 ========================================================= */
 
+/*
+ * Labels + ordering mirror the canonical role list on the Registered
+ * Users Directory (app/portal-home/registered-users/page.tsx), minus
+ * the admin-only roles (HMS Super Admin, City Admin, Commissioner)
+ * that never act on inspection records and would always show empty.
+ */
 const ROLES: Array<{ key: UserRoleKey; label: string }> = [
-  { key: 'SUPERVISOR', label: 'Daroga' },
-  { key: 'QC', label: 'Sanitary Inspector' },
+  { key: 'ULB_OFFICER', label: 'ULB Officer' },
+  { key: 'QC', label: 'Sanitary Inspector (SI)' },
   { key: 'ACTION_OFFICER', label: 'IEC Member' },
+  { key: 'SUPERVISOR', label: 'Daroga' },
   { key: 'EMPLOYEE', label: 'Employee' },
 ];
 
@@ -576,6 +591,57 @@ export default function UserPerformancePage() {
   const [activeRow, setActiveRow] = useState<UserPerformanceRow | null>(null);
   const [proofRecord, setProofRecord] = useState<DashboardRecord | null>(null);
 
+  /*
+   * The full registered-user roster (same source as the Registered
+   * Users Directory) so every registered SI/IEC/Daroga/Employee shows
+   * up here even with zero activity in the selected date range -
+   * building rows only from inspection records/attendance entries (the
+   * old approach) silently dropped anyone with no matching record.
+   */
+  const [cityUsers, setCityUsers] = useState<CityUserSummary[]>([]);
+  const [geoNameById, setGeoNameById] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const [usersResult, zonesResult, wardsResult] = await Promise.allSettled([
+        CityUserApi.list(),
+        GeoApi.list('ZONE'),
+        GeoApi.list('WARD'),
+      ]);
+
+      if (cancelled) return;
+
+      if (usersResult.status === 'fulfilled') {
+        setCityUsers(usersResult.value.users || []);
+      }
+
+      const nameMap = new Map<string, string>();
+      if (zonesResult.status === 'fulfilled') {
+        (zonesResult.value.nodes || []).forEach((node: any) => nameMap.set(node.id, node.name));
+      }
+      if (wardsResult.status === 'fulfilled') {
+        (wardsResult.value.nodes || []).forEach((node: any) => nameMap.set(node.id, node.name));
+      }
+      setGeoNameById(nameMap);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const cityUsersByRole = useMemo(() => {
+    const map = new Map<string, CityUserSummary[]>();
+    cityUsers.forEach((entry) => {
+      const list = map.get(entry.role) || [];
+      list.push(entry);
+      map.set(entry.role, list);
+    });
+    return map;
+  }, [cityUsers]);
+
   const loadData = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
@@ -640,34 +706,29 @@ export default function UserPerformancePage() {
 
   const buildInspectionRows = useCallback(
     (role: 'SUPERVISOR' | 'QC' | 'ACTION_OFFICER'): UserPerformanceRow[] => {
-      const map = new Map<string, { id: string | null; records: DashboardRecord[] }>();
+      const roster = cityUsersByRole.get(role) || [];
 
-      filteredRecords.forEach((item) => {
-        const name = personForRole(item, role);
-        if (!name) return;
+      return roster.map((person) => {
+        const matchedRecords = filteredRecords.filter((item) => {
+          const id = personIdForRole(item, role);
+          if (id) return String(id) === String(person.id);
+          const name = personForRole(item, role);
+          return Boolean(name) && normalize(name) === normalize(person.name);
+        });
 
-        const id = personIdForRole(item, role);
-        const current = map.get(name) || { id, records: [] as DashboardRecord[] };
-        current.records.push(item);
-        if (!current.id && id) current.id = id;
-        map.set(name, current);
-      });
+        const stats = inspectionStats(matchedRecords);
 
-      return Array.from(map.entries()).map(([label, data]) => {
-        const stats = inspectionStats(data.records);
-
-        const attendanceEmployee = data.id
-          ? attendance?.employees?.find(
-              (employee) =>
-                employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(data.id)
-            ) || null
-          : null;
+        const attendanceEmployee =
+          attendance?.employees?.find(
+            (employee) =>
+              employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(person.id)
+          ) || null;
 
         const zones = new Set<string>();
         const wards = new Set<string>();
         const modules = new Set<string>();
 
-        data.records.forEach((item) => {
+        matchedRecords.forEach((item) => {
           const zone = getRecordZone(item);
           const ward = getRecordWard(item);
           if (zone) zones.add(zone);
@@ -676,9 +737,9 @@ export default function UserPerformancePage() {
         });
 
         return {
-          key: `${role}-${label}`,
-          id: data.id,
-          label,
+          key: `${role}-${person.id}`,
+          id: person.id,
+          label: person.name,
           total: stats.total,
           approved: stats.approved,
           rejected: stats.rejected,
@@ -686,7 +747,7 @@ export default function UserPerformancePage() {
           actionTaken: stats.actionTaken,
           pending: stats.pending,
           performance: stats.performance,
-          records: data.records,
+          records: matchedRecords,
           attendance: attendanceEmployee?.attendanceRate ?? null,
           attendanceEmployee,
           zones: Array.from(zones),
@@ -695,40 +756,114 @@ export default function UserPerformancePage() {
         };
       });
     },
-    [filteredRecords, attendance]
+    [cityUsersByRole, filteredRecords, attendance]
   );
 
   const employeeRows = useMemo<UserPerformanceRow[]>(() => {
-    const employees = attendance?.employees || [];
+    const roster = cityUsersByRole.get('EMPLOYEE') || [];
 
-    return employees.map((employee) => ({
-      key: `EMPLOYEE-${employee.attendanceId}`,
-      id: employee.matrixTrackUserId,
-      label: employee.employeeName,
-      total: employee.totalDays,
-      approved: employee.presentDays,
-      rejected: employee.absentDays,
-      actionRequired: 0,
-      actionTaken: 0,
-      pending: 0,
-      performance: employee.attendanceRate,
-      records: [],
-      attendance: employee.attendanceRate,
-      attendanceEmployee: employee,
-      zones: employee.zones || [],
-      wards: employee.wards || [],
-      modules: [],
-    }));
-  }, [attendance]);
+    return roster.map((person) => {
+      const attendanceEmployee =
+        attendance?.employees?.find(
+          (employee) =>
+            employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(person.id)
+        ) || null;
+
+      return {
+        key: `EMPLOYEE-${person.id}`,
+        id: person.id,
+        label: person.name,
+        total: attendanceEmployee?.totalDays ?? 0,
+        approved: attendanceEmployee?.presentDays ?? 0,
+        rejected: attendanceEmployee?.absentDays ?? 0,
+        actionRequired: 0,
+        actionTaken: 0,
+        pending: 0,
+        performance: attendanceEmployee?.attendanceRate ?? null,
+        records: [],
+        attendance: attendanceEmployee?.attendanceRate ?? null,
+        attendanceEmployee,
+        zones: attendanceEmployee?.zones || [],
+        wards: attendanceEmployee?.wards || [],
+        modules: [],
+      };
+    });
+  }, [cityUsersByRole, attendance]);
+
+  /*
+   * ULB Officer records carry no reviewer/actor field (unlike Daroga's
+   * supervisorId, SI's reviewedByQcId, IEC's actionTakenById), so a
+   * ULB Officer's rows are matched by their assigned Zone/Ward scope
+   * (the same scope the backend enforces when they mark a report
+   * Action Required) rather than by a per-record person field.
+   */
+  const buildUlbOfficerRows = useCallback((): UserPerformanceRow[] => {
+    const roster = cityUsersByRole.get('ULB_OFFICER') || [];
+
+    return roster.map((officer) => {
+      const zoneNames = (officer.zoneIds || [])
+        .map((id) => geoNameById.get(id))
+        .filter((name): name is string => Boolean(name));
+      const wardNames = (officer.wardIds || [])
+        .map((id) => geoNameById.get(id))
+        .filter((name): name is string => Boolean(name));
+
+      const zoneSet = new Set(zoneNames.map(normalize));
+      const wardSet = new Set(wardNames.map(normalize));
+
+      const matchedRecords =
+        zoneSet.size || wardSet.size
+          ? filteredRecords.filter((item) => {
+              const zone = normalize(getRecordZone(item));
+              const ward = normalize(getRecordWard(item));
+              return (zone && zoneSet.has(zone)) || (ward && wardSet.has(ward));
+            })
+          : [];
+
+      const stats = inspectionStats(matchedRecords);
+
+      const attendanceEmployee =
+        attendance?.employees?.find(
+          (employee) =>
+            employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(officer.id)
+        ) || null;
+
+      const modules = new Set<string>();
+      matchedRecords.forEach((item) => {
+        if (item.dashboardModuleLabel) modules.add(item.dashboardModuleLabel);
+      });
+
+      return {
+        key: `ULB_OFFICER-${officer.id}`,
+        id: officer.id,
+        label: officer.name,
+        total: stats.total,
+        approved: stats.approved,
+        rejected: stats.rejected,
+        actionRequired: stats.actionRequired,
+        actionTaken: stats.actionTaken,
+        pending: stats.pending,
+        performance: stats.performance,
+        records: matchedRecords,
+        attendance: attendanceEmployee?.attendanceRate ?? null,
+        attendanceEmployee,
+        zones: zoneNames,
+        wards: wardNames,
+        modules: Array.from(modules),
+      };
+    });
+  }, [cityUsersByRole, geoNameById, filteredRecords, attendance]);
 
   const activeRoleRows = useMemo(() => {
     const rows =
       roleFilter === 'EMPLOYEE'
         ? employeeRows
+        : roleFilter === 'ULB_OFFICER'
+        ? buildUlbOfficerRows()
         : buildInspectionRows(roleFilter as 'SUPERVISOR' | 'QC' | 'ACTION_OFFICER');
 
     return [...rows].sort((a, b) => (b.performance ?? -1) - (a.performance ?? -1));
-  }, [roleFilter, employeeRows, buildInspectionRows]);
+  }, [roleFilter, employeeRows, buildUlbOfficerRows, buildInspectionRows]);
 
   const filteredRows = useMemo(() => {
     const query = normalize(search);
