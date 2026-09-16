@@ -74,7 +74,7 @@ export default function PortalHomePage() {
 
   useEffect(() => {
     if (isCommissioner && !isSuperAdmin) {
-      router.replace('/municipal/commissioner/home-2');
+      router.replace('/municipal/commissioner');
     }
   }, [isCommissioner, isSuperAdmin, router]);
 

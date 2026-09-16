@@ -31,6 +31,10 @@ const STANDALONE_PATHS = [
   "/ulb/map-view-dashboard",
 ];
 
+const HIDE_TOPBAR_PATHS = [
+  "/municipal/commissioner",
+];
+
 export function AppShell({
   children,
 }: {
@@ -43,6 +47,13 @@ export function AppShell({
 
   const isStandalonePage =
     STANDALONE_PATHS.some(
+      (path) =>
+        pathname === path ||
+        pathname.startsWith(`${path}/`),
+    );
+
+  const hideTopbar =
+    HIDE_TOPBAR_PATHS.some(
       (path) =>
         pathname === path ||
         pathname.startsWith(`${path}/`),
@@ -117,9 +128,11 @@ export function AppShell({
           </span>
         </div>
 
-        <div className="shrink-0">
-          <Topbar />
-        </div>
+        {!hideTopbar && (
+          <div className="shrink-0">
+            <Topbar />
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
