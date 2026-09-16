@@ -292,6 +292,11 @@ export default function Sidebar() {
           href: "/municipal/commissioner/ward-ranking",
           icon: <Award size={18} />,
         },
+        {
+          label: "User Performance",
+          href: "/municipal/commissioner/user-performance",
+          icon: <Users size={18} />,
+        },
       );
     } else if (isCityAdmin) {
       links.push({

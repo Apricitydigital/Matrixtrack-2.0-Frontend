@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -11,16 +12,27 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  Brush,
   CalendarDays,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Clock3,
+  ClipboardList,
+  Droplets,
   Eye,
+  FileText,
   Filter,
+  Layers3,
+  MapPin,
   RefreshCw,
   Search,
+  Settings2,
   ShieldCheck,
-  Target,
+  Sparkles,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Trophy,
@@ -36,7 +48,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   ResponsiveContainer,
   Scatter,
@@ -54,7 +65,6 @@ import { useAuth } from '@hooks/useAuth';
 
 import {
   ModuleRecordsApi,
-  TaskforceApi,
 } from '@lib/apiClient';
 
 import {
@@ -113,9 +123,6 @@ type InspectionStats = {
   actionRequired: number;
   actionTaken: number;
   pending: number;
-
-  qcApproved: number;
-  qcRejected: number;
 
   performance: number | null;
   approvalRate: number | null;
@@ -227,6 +234,61 @@ const DASHBOARD_MODULES: Array<{
   },
 ];
 
+const MODULE_VISUALS: Record<
+  string,
+  {
+    icon: React.ReactNode;
+    color: string;
+    soft: string;
+  }
+> = {
+  TOILET: {
+    icon: (
+      <Droplets
+        size={14}
+      />
+    ),
+    color: '#7c3aed',
+    soft: '#f5f3ff',
+  },
+  LITTERBINS: {
+    icon: (
+      <Trash2
+        size={14}
+      />
+    ),
+    color: '#16a34a',
+    soft: '#f0fdf4',
+  },
+  SWEEPING: {
+    icon: (
+      <Brush
+        size={14}
+      />
+    ),
+    color: '#4f46e5',
+    soft: '#eef2ff',
+  },
+  ATTENDANCE: {
+    icon: (
+      <UsersRound
+        size={14}
+      />
+    ),
+    color: '#0ea5e9',
+    soft: '#f0f9ff',
+  },
+  WARD_RANKING: {
+    icon: (
+      <Trophy
+        size={14}
+      />
+    ),
+    color: '#9333ea',
+    soft: '#faf5ff',
+  },
+};
+
 const ROLES: Array<{
   key: RoleKey;
   label: string;
@@ -328,23 +390,6 @@ function percentText(
   return `${round1(value)}%`;
 }
 
-function averageText(
-  value: number
-) {
-  if (!Number.isFinite(value)) {
-    return '0';
-  }
-
-  if (value >= 100) {
-    return Math.round(value)
-      .toLocaleString('en-IN');
-  }
-
-  return Number.isInteger(value)
-    ? String(value)
-    : value.toFixed(1);
-}
-
 function averageApplicable(
   values: Array<number | null | undefined>
 ): number | null {
@@ -410,39 +455,6 @@ function defaultRange() {
     from: toDateInput(start),
     to: toDateInput(today),
   };
-}
-
-function dateRangeDays(
-  from: string,
-  to: string
-) {
-  if (!from || !to) {
-    return 1;
-  }
-
-  const start =
-    new Date(
-      `${from}T00:00:00`
-    );
-
-  const end =
-    new Date(
-      `${to}T00:00:00`
-    );
-
-  const diff =
-    Math.floor(
-      (
-        end.getTime() -
-        start.getTime()
-      ) /
-      86400000
-    ) + 1;
-
-  return Math.max(
-    1,
-    diff
-  );
 }
 
 function formatDate(
@@ -539,19 +551,6 @@ function positiveColor(
     score * 0.55;
 
   return `hsl(239 84% ${lightness}%)`;
-}
-
-function negativeColor(
-  value: number
-) {
-  const score =
-    clamp(value);
-
-  const lightness =
-    97 -
-    score * 0.52;
-
-  return `hsl(347 78% ${lightness}%)`;
 }
 
 function heatTextClass(
@@ -652,39 +651,6 @@ function effectiveStatus(
   }
 
   return status || 'PENDING';
-}
-
-function qcDecision(
-  item: any
-) {
-  const explicit =
-    String(
-      item?.qcDecision ||
-      ''
-    ).toUpperCase();
-
-  if (
-    explicit ===
-      'APPROVED' ||
-    explicit ===
-      'REJECTED'
-  ) {
-    return explicit;
-  }
-
-  const status =
-    effectiveStatus(item);
-
-  if (
-    status ===
-      'APPROVED' ||
-    status ===
-      'REJECTED'
-  ) {
-    return status;
-  }
-
-  return '';
 }
 
 function getRecordZone(
@@ -888,9 +854,6 @@ function inspectionStats(
   let actionTaken = 0;
   let pending = 0;
 
-  let qcApproved = 0;
-  let qcRejected = 0;
-
   const applicableRecords =
     records.filter(
       (item) =>
@@ -924,19 +887,6 @@ function inspectionStats(
       } else {
         pending += 1;
       }
-
-      const decision =
-        qcDecision(item);
-
-      if (
-        decision === 'APPROVED'
-      ) {
-        qcApproved += 1;
-      } else if (
-        decision === 'REJECTED'
-      ) {
-        qcRejected += 1;
-      }
     }
   );
 
@@ -954,14 +904,20 @@ function inspectionStats(
         ) * 100
       : null;
 
+  /*
+   * Matches the ULB officer dashboard's own "Approval Rate":
+   * decided = current-status approved + rejected (not the
+   * QC's original decision), so a report that was QC-approved
+   * but later needed corrective action no longer counts here.
+   */
   const decided =
-    qcApproved +
-    qcRejected;
+    approved +
+    rejected;
 
   const approvalRate =
     decided > 0
       ? (
-          qcApproved /
+          approved /
           decided
         ) * 100
       : null;
@@ -969,7 +925,7 @@ function inspectionStats(
   const rejectionRate =
     decided > 0
       ? (
-          qcRejected /
+          rejected /
           decided
         ) * 100
       : null;
@@ -993,9 +949,6 @@ function inspectionStats(
     actionRequired,
     actionTaken,
     pending,
-
-    qcApproved,
-    qcRejected,
 
     performance,
     approvalRate,
@@ -1122,77 +1075,319 @@ async function loadAllModuleRecords(
 
 
 /* =========================================================
-   KPI CARD
+   MONTH-OVER-MONTH TREND
 ========================================================= */
 
-function KpiCard({
-  label,
-  value,
-  gradient,
+function monthBoundaries(
+  offsetMonths: number
+) {
+  const now =
+    new Date();
+
+  const first =
+    new Date(
+      now.getFullYear(),
+      now.getMonth() +
+        offsetMonths,
+      1
+    );
+
+  const last =
+    offsetMonths === 0
+      ? now
+      : new Date(
+          now.getFullYear(),
+          now.getMonth() +
+            offsetMonths +
+            1,
+          0
+        );
+
+  return {
+    from: toDateInput(first),
+    to: toDateInput(last),
+  };
+}
+
+type PeriodMetrics = {
+  overallPerformance: number | null;
+  inspectionPerformance: number | null;
+  attendanceRate: number | null;
+  approvalRate: number | null;
+  rejectionRate: number | null;
+  actionClosure: number | null;
+  wardRankingAverage: number | null;
+};
+
+async function computePeriodMetrics(
+  cityId: string | undefined,
+  from: string,
+  to: string
+): Promise<PeriodMetrics> {
+  const moduleRows =
+    await Promise.all(
+      INSPECTION_MODULES.map(
+        (module) =>
+          loadAllModuleRecords(
+            module.key,
+            from,
+            to
+          )
+      )
+    );
+
+  const inspection =
+    inspectionStats(
+      moduleRows.flat()
+    );
+
+  const [
+    attendanceResult,
+    wardResult,
+  ] =
+    await Promise.allSettled([
+      /*
+       * employeeGroup: 'HEALTH_WORKERS' matches the ULB officer
+       * dashboard's own Attendance query - without it this counts
+       * every employee type and no longer agrees with that screen.
+       */
+      AttendanceApi.dashboard({
+        cityId,
+        from,
+        to,
+        employeeGroup:
+          'HEALTH_WORKERS',
+        page: 1,
+        pageSize: 1,
+      }),
+      WardRankingApi.summary({
+        from,
+        to,
+      }),
+    ]);
+
+  const attendanceRate =
+    attendanceResult.status ===
+      'fulfilled' &&
+    attendanceResult.value
+      .hasData
+      ? attendanceResult.value
+          .summary
+          ?.attendanceRate ??
+        null
+      : null;
+
+  /*
+   * averageScore comes straight from /ward-ranking/summary -
+   * the same endpoint and field the ULB officer dashboard reads
+   * for its "City Average Score", so the two stay in sync.
+   */
+  const wardRankingAverage =
+    wardResult.status ===
+    'fulfilled'
+      ? wardResult.value
+          .averageScore ??
+        null
+      : null;
+
+  const overallPerformance =
+    averageApplicable([
+      inspection.performance,
+      attendanceRate,
+      wardRankingAverage,
+    ]);
+
+  return {
+    overallPerformance,
+    inspectionPerformance:
+      inspection.performance,
+    attendanceRate,
+    approvalRate:
+      inspection.approvalRate,
+    rejectionRate:
+      inspection.rejectionRate,
+    actionClosure:
+      inspection.actionClosure,
+    wardRankingAverage,
+  };
+}
+
+type MonthTrend = {
+  deltaPct: number | null;
+  direction: 'up' | 'down' | 'flat';
+};
+
+function buildMonthTrends(
+  current: PeriodMetrics,
+  previous: PeriodMetrics
+): Record<string, MonthTrend> {
+  const result: Record<
+    string,
+    MonthTrend
+  > = {};
+
+  (
+    Object.keys(
+      current
+    ) as Array<
+      keyof PeriodMetrics
+    >
+  ).forEach((key) => {
+    const curr = current[key];
+    const prev = previous[key];
+
+    if (
+      curr === null ||
+      prev === null ||
+      prev === 0
+    ) {
+      result[key] = {
+        deltaPct: null,
+        direction: 'flat',
+      };
+
+      return;
+    }
+
+    const deltaPct =
+      ((curr - prev) /
+        Math.abs(prev)) *
+      100;
+
+    result[key] = {
+      deltaPct,
+      direction:
+        deltaPct >= 0
+          ? 'up'
+          : 'down',
+    };
+  });
+
+  return result;
+}
+
+
+/* =========================================================
+   KPI ICON BADGE (small overlay circle on the main icon)
+========================================================= */
+
+function IconBadge({
   icon,
-  tooltip,
+  bg,
+}: {
+  icon: React.ReactNode;
+  bg: string;
+}) {
+  return (
+    <span
+      className={`absolute -bottom-1 -right-1 flex h-[16px] w-[16px] items-center justify-center rounded-full ring-2 ring-white ${bg}`}
+    >
+      {icon}
+    </span>
+  );
+}
+
+
+/* =========================================================
+   CIRCULAR PROGRESS
+   (Top / Worst Performance rings - presentation only, the
+   value/name/onClick it renders come straight from the
+   existing rankedZones/rankedWards rows)
+========================================================= */
+
+function CircularProgress({
+  value,
+  label,
+  name,
+  variant = 'success',
+  accent,
+  track,
   onClick,
 }: {
+  value: number | null | undefined;
   label: string;
-  value: string;
-  gradient: string;
-  icon: React.ReactNode;
-  tooltip: Array<{
-    label: string;
-    value: string;
-  }>;
-  onClick: () => void;
+  name: string;
+  variant?: 'success' | 'danger';
+  accent?: string;
+  track?: string;
+  onClick?: () => void;
 }) {
+  const progress =
+    clamp(
+      typeof value ===
+        'number' &&
+        Number.isFinite(
+          value
+        )
+        ? value
+        : 0
+    );
+
+  const isDanger =
+    variant === 'danger';
+
+  const progressColor =
+    accent ??
+    (isDanger
+      ? '#F43F5E'
+      : '#10B981');
+
+  const trackColor =
+    track ??
+    (isDanger
+      ? '#FECDD3'
+      : '#D1FAE5');
+
+  const percentColor =
+    accent ??
+    (isDanger
+      ? '#9F1239'
+      : '#064E3B');
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative min-h-[138px] overflow-hidden rounded-[24px] border border-white/70 bg-white p-4 text-left shadow-[0_12px_36px_-22px_rgba(15,23,42,.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_55px_-26px_rgba(79,70,229,.38)]"
+      disabled={!onClick}
+      className="group flex flex-col items-center gap-1 text-center transition disabled:cursor-default"
     >
       <div
-        className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${gradient}`}
-      />
-
-      <div
-        className={`pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-gradient-to-br ${gradient} opacity-[0.10] blur-2xl transition duration-300 group-hover:opacity-[0.20]`}
-      />
-
-      <div className="relative flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-            {label}
-          </div>
-
-          <div className="mt-3 text-[30px] font-black tracking-tight text-slate-950">
-            {value}
-          </div>
-        </div>
+        className="relative flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-full transition-transform duration-300 group-enabled:group-hover:scale-[1.03] sm:h-[76px] sm:w-[76px] xl:h-[88px] xl:w-[88px]"
+        style={{
+          background: `conic-gradient(${progressColor} ${
+            progress * 3.6
+          }deg, ${trackColor} 0deg)`,
+        }}
+      >
+        <div className="absolute inset-[6px] rounded-full bg-white shadow-[inset_0_2px_6px_rgba(15,23,42,.06)] sm:inset-[8px] xl:inset-[9px]" />
 
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-lg transition duration-300 group-hover:scale-110`}
+          className="relative text-[14px] font-black leading-none sm:text-[16px] xl:text-[19px]"
+          style={{
+            color: percentColor,
+          }}
         >
-          {icon}
+          {percentText(value)}
         </div>
       </div>
 
-      <div className="absolute inset-x-3 bottom-3 z-20 hidden rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur-xl group-hover:block">
-        <div className="space-y-1.5">
-          {tooltip.map(
-            (row) => (
-              <div
-                key={`${row.label}-${row.value}`}
-                className="flex items-center justify-between gap-4 text-[11px]"
-              >
-                <span className="font-semibold text-slate-500">
-                  {row.label}
-                </span>
+      <div className="min-w-0 max-w-[110px]">
+        <div
+          className="truncate text-[11px] font-extrabold leading-tight sm:text-[12px] xl:text-[13px]"
+          style={{
+            color: '#0F1B4C',
+          }}
+        >
+          {name || '—'}
+        </div>
 
-                <span className="font-black text-slate-950">
-                  {row.value}
-                </span>
-              </div>
-            )
-          )}
+        <div
+          className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.05em] sm:text-[10px]"
+          style={{
+            color: '#647DB7',
+          }}
+        >
+          {label}
         </div>
       </div>
     </button>
@@ -1201,56 +1396,266 @@ function KpiCard({
 
 
 /* =========================================================
-   STATUS AVERAGE CARD
+   KPI CARD
 ========================================================= */
 
-function StatusAverageCard({
+function KpiCard({
   label,
-  count,
-  days,
-  gradient,
+  value,
+  lastMonthValue,
+  cardTint,
+  iconGradient,
+  icon,
+  tooltip,
+  trend,
   onClick,
 }: {
   label: string;
-  count: number;
-  days: number;
-  gradient: string;
+  value: string;
+  lastMonthValue?: string;
+  cardTint: string;
+  iconGradient: string;
+  icon: React.ReactNode;
+  tooltip: Array<{
+    label: string;
+    value: string;
+  }>;
+  trend?: MonthTrend;
   onClick: () => void;
 }) {
-  const average =
-    count / Math.max(
-      1,
-      days
-    );
+  const isDown = trend?.direction === 'down';
+
+  /*
+   * Visual-only mapping.
+   * This does not touch KPI calculations, click handlers, filters,
+   * month trends, drilldowns, or any API/data logic.
+   */
+  const visual = (() => {
+    switch (label) {
+      case 'Overall Performance':
+        return {
+          cornerIcon: <Activity size={15} strokeWidth={2.8} />,
+          accentText: 'text-violet-400',
+        };
+
+      case 'Inspection Performance':
+        return {
+          cornerIcon: <Eye size={15} strokeWidth={2.8} />,
+          accentText: 'text-blue-400',
+        };
+
+      case 'Attendance':
+        return {
+          cornerIcon: <UserRoundCheck size={15} strokeWidth={2.8} />,
+          accentText: 'text-emerald-400',
+        };
+
+      case 'Approval Rate':
+        return {
+          cornerIcon: <ShieldCheck size={15} strokeWidth={2.8} />,
+          accentText: 'text-teal-400',
+        };
+
+      case 'Rejection Rate':
+        return {
+          cornerIcon: <XCircle size={15} strokeWidth={2.8} />,
+          accentText: 'text-rose-400',
+        };
+
+      case 'Action Closure':
+        return {
+          cornerIcon: <CheckCircle2 size={15} strokeWidth={2.8} />,
+          accentText: 'text-orange-400',
+        };
+
+      case 'Ward Ranking':
+        return {
+          cornerIcon: <Trophy size={15} strokeWidth={2.8} />,
+          accentText: 'text-violet-400',
+        };
+
+      default:
+        return {
+          cornerIcon: <Activity size={15} strokeWidth={2.8} />,
+          accentText: 'text-indigo-400',
+        };
+    }
+  })();
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white px-4 py-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+      style={{ perspective: '1200px' }}
+      className="group block h-full w-full text-left"
     >
-      <div
-        className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r ${gradient}`}
-      />
+      <div className="relative h-full min-h-[258px] w-full transition-transform duration-500 ease-out [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+        {/* FRONT */}
+        <div
+          className={`absolute inset-0 flex h-full w-full flex-col overflow-hidden rounded-[18px] border border-white/80 ${cardTint} shadow-[0_12px_30px_-20px_rgba(15,23,42,.32)] transition-shadow duration-300 group-hover:shadow-[0_20px_46px_-20px_rgba(15,23,42,.32)]`}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+          }}
+        >
+          {/* =====================================================
+              TOP VISUAL AREA
+              Large main icon + small corner icon + skyline effect
+          ====================================================== */}
+          <div className="relative h-[88px] shrink-0 overflow-hidden px-4 pt-2.5">
+            {/* soft theme glow */}
+            <div
+              className={`pointer-events-none absolute -left-5 -top-5 h-24 w-24 rounded-full bg-gradient-to-br ${iconGradient} opacity-[0.12] blur-2xl`}
+            />
+            <div
+              className={`pointer-events-none absolute right-3 top-6 h-16 w-16 rounded-full bg-gradient-to-br ${iconGradient} opacity-[0.08] blur-2xl`}
+            />
 
-      <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-        {label}
-      </div>
+            {/* subtle city / building silhouette */}
+            <div
+              className={`pointer-events-none absolute inset-x-0 bottom-0 h-[52px] opacity-[0.16] ${visual.accentText}`}
+              aria-hidden="true"
+            >
+              <div className="absolute bottom-0 left-[1%] h-8 w-5 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[7%] h-12 w-7 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[15%] h-7 w-4 rounded-t-[2px] bg-current" />
+              <div className="absolute bottom-0 left-[21%] h-14 w-8 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[31%] h-10 w-6 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[39%] h-[62px] w-8 rounded-t-[4px] bg-current" />
+              <div className="absolute bottom-0 left-[50%] h-9 w-5 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[57%] h-12 w-7 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[67%] h-7 w-5 rounded-t-[2px] bg-current" />
+              <div className="absolute bottom-0 left-[74%] h-14 w-8 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[85%] h-10 w-6 rounded-t-[3px] bg-current" />
+              <div className="absolute bottom-0 left-[93%] h-8 w-5 rounded-t-[3px] bg-current" />
 
-      <div className="mt-2 text-2xl font-black text-slate-950">
-        {averageText(
-          average
-        )}
-      </div>
+              {/* tiny windows / city depth */}
+              <div className="absolute bottom-3 left-[9%] h-1 w-1 rounded-full bg-white/70" />
+              <div className="absolute bottom-7 left-[24%] h-1 w-1 rounded-full bg-white/70" />
+              <div className="absolute bottom-8 left-[42%] h-1 w-1 rounded-full bg-white/70" />
+              <div className="absolute bottom-5 left-[60%] h-1 w-1 rounded-full bg-white/70" />
+              <div className="absolute bottom-8 left-[77%] h-1 w-1 rounded-full bg-white/70" />
+            </div>
 
-      <div className="mt-1 text-[10px] font-bold text-slate-400">
-        Average / Day
-      </div>
+            {/* large primary icon */}
+            <div
+              className={`absolute bottom-1 left-1/2 z-10 flex h-[52px] w-[52px] -translate-x-1/2 items-center justify-center rounded-[15px] bg-gradient-to-br ${iconGradient} text-white shadow-[0_10px_18px_-9px_rgba(15,23,42,.45)] ring-[3px] ring-white/45 [&>svg]:h-[26px] [&>svg]:w-[26px]`}
+            >
+              {icon}
+            </div>
 
-      <div className="absolute right-3 top-3 hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-900 shadow-xl group-hover:block">
-        {count.toLocaleString(
-          'en-IN'
-        )}
+            {/* small top-right secondary icon */}
+            <div
+              className={`absolute right-3 top-3 z-20 flex h-[28px] w-[28px] items-center justify-center rounded-[9px] bg-gradient-to-br ${iconGradient} text-white shadow-[0_6px_14px_-7px_rgba(15,23,42,.45)] ring-2 ring-white/70 [&>svg]:h-[13px] [&>svg]:w-[13px]`}
+            >
+              {visual.cornerIcon}
+            </div>
+          </div>
+
+          {/* METRIC */}
+          <div className="relative z-10 px-4 pt-1">
+            <div className="text-[26px] font-black leading-none tracking-[-0.035em] text-[#10224a]">
+              {value}
+            </div>
+
+            <div className="mt-1.5 line-clamp-2 min-h-[32px] text-[12px] font-bold leading-[1.25] text-[#31518f]">
+              {label}
+            </div>
+          </div>
+
+          {/* TREND + LAST MONTH */}
+          <div className="mt-auto px-4 pb-2.5 pt-2">
+            <div className="border-t border-slate-200/65 pt-2">
+              {trend && trend.deltaPct !== null ? (
+                <div className="flex min-h-[30px] items-start gap-1.5">
+                  <span
+                    className={
+                      isDown
+                        ? 'mt-[1px] text-rose-500'
+                        : 'mt-[1px] text-emerald-500'
+                    }
+                  >
+                    {isDown ? (
+                      <TrendingDown size={16} strokeWidth={2.8} />
+                    ) : (
+                      <TrendingUp size={16} strokeWidth={2.8} />
+                    )}
+                  </span>
+
+                  <div>
+                    <div
+                      className={`text-[13px] font-black leading-none ${
+                        isDown
+                          ? 'text-rose-500'
+                          : 'text-emerald-600'
+                      }`}
+                    >
+                      {Math.abs(trend.deltaPct).toFixed(0)}%
+                    </div>
+
+                    <div className="mt-1 text-[9px] font-semibold leading-none text-[#49679d]">
+                      vs last month
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex min-h-[30px] items-center text-[10px] font-semibold text-slate-400">
+                  No prior data
+                </div>
+              )}
+
+              <div className="mt-1.5 rounded-[9px] border border-white/70 bg-white/55 px-2.5 py-1.5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,.75)] backdrop-blur-sm">
+                <div className="text-[9px] font-semibold leading-none text-[#49679d]">
+                  Last Month
+                </div>
+
+                <div className="mt-1 text-[13px] font-black leading-none text-[#172d5d]">
+                  {lastMonthValue ?? '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* BACK - existing drill/tooltip behaviour preserved */}
+        <div
+          className={`absolute inset-0 flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-gradient-to-br ${iconGradient} p-3.5 text-white shadow-[0_14px_34px_-18px_rgba(15,23,42,.45)]`}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            transform: 'rotateY(180deg)',
+          }}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 text-[9.5px] font-black uppercase leading-[1.35] tracking-[0.1em] text-white/75">
+              {label}
+            </div>
+
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] bg-white/15 ring-1 ring-white/20 [&>svg]:h-[12px] [&>svg]:w-[12px]">
+              {visual.cornerIcon}
+            </div>
+          </div>
+
+          <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
+            {tooltip.map((row) => (
+              <div
+                key={`${row.label}-${row.value}`}
+                className="flex w-full min-w-0 items-center justify-between gap-1.5 rounded-[9px] bg-white/10 px-2 py-1 text-[9px] ring-1 ring-white/5"
+              >
+                <span className="min-w-0 flex-1 truncate font-semibold leading-tight text-white/75">
+                  {row.label}
+                </span>
+                <span className="shrink-0 whitespace-nowrap text-[10px] font-black leading-tight text-white">
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-1.5 shrink-0 truncate border-t border-white/10 pt-1.5 text-[8px] font-semibold text-white/60">
+            Breakdown for the current filter
+          </div>
+        </div>
       </div>
     </button>
   );
@@ -2247,6 +2652,286 @@ function WardProof({
 }
 
 
+const WARD_COMPONENT_FIELDS: Array<{
+  key: keyof WardRankingRow['components'];
+  label: string;
+}> = [
+  {
+    key: 'workforce',
+    label: 'Attendance',
+  },
+  {
+    key: 'beat',
+    label: 'Sweeping',
+  },
+  {
+    key: 'toilet',
+    label: 'Cleanliness of Toilets',
+  },
+  {
+    key: 'litterBin',
+    label: 'Litter Bins',
+  },
+  {
+    key: 'supervisor',
+    label: 'Daroga',
+  },
+  {
+    key: 'qc',
+    label: 'Sanitary Inspector',
+  },
+  {
+    key: 'actionOfficer',
+    label: 'IEC Member',
+  },
+];
+
+function wardCalculationText(
+  ward: WardRankingRow
+): string {
+  const parts =
+    WARD_COMPONENT_FIELDS.filter(
+      (field) =>
+        ward.components?.[
+          field.key
+        ]?.applicable
+    ).map(
+      (field) =>
+        `${field.label} ${percentText(
+          ward.components?.[
+            field.key
+          ]?.percentage
+        )}`
+    );
+
+  if (!parts.length) {
+    return 'No component data available';
+  }
+
+  return `Average of ${parts.join(', ')} = ${percentText(ward.finalScore)}`;
+}
+
+/*
+ * Continuously scrolls through every ward (rAF-driven, no
+ * step delay) and freezes the instant the pointer enters the
+ * strip, revealing the component-level calculation behind
+ * whichever ward is centered at that moment (same components/
+ * labels as WardProof). Resumes from where it left off on
+ * pointer-leave.
+ */
+function WardPerformanceScroller({
+  wards,
+}: {
+  wards: WardRankingRow[];
+}) {
+  const ITEM_HEIGHT = 92;
+  const PIXELS_PER_SECOND = 46;
+
+  const [offset, setOffset] =
+    useState(0);
+
+  const [paused, setPaused] =
+    useState(false);
+
+  const pausedRef =
+    useRef(paused);
+
+  const rafRef =
+    useRef<number | null>(
+      null
+    );
+
+  const lastTimeRef =
+    useRef<number | null>(
+      null
+    );
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  useEffect(() => {
+    if (wards.length <= 1) {
+      return;
+    }
+
+    const totalHeight =
+      wards.length *
+      ITEM_HEIGHT;
+
+    const tick = (
+      time: number
+    ) => {
+      if (
+        lastTimeRef.current ===
+        null
+      ) {
+        lastTimeRef.current =
+          time;
+      }
+
+      const delta =
+        time -
+        lastTimeRef.current;
+
+      lastTimeRef.current =
+        time;
+
+      if (!pausedRef.current) {
+        setOffset(
+          (previous) =>
+            (previous +
+              (PIXELS_PER_SECOND *
+                delta) /
+                1000) %
+            totalHeight
+        );
+      }
+
+      rafRef.current =
+        requestAnimationFrame(
+          tick
+        );
+    };
+
+    rafRef.current =
+      requestAnimationFrame(
+        tick
+      );
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(
+          rafRef.current
+        );
+      }
+
+      lastTimeRef.current =
+        null;
+    };
+  }, [wards.length]);
+
+  if (!wards.length) {
+    return (
+      <div className="flex h-[340px] items-center justify-center text-xs font-bold text-slate-400">
+        No ward data available
+      </div>
+    );
+  }
+
+  const activeIndex =
+    Math.floor(
+      offset / ITEM_HEIGHT
+    ) % wards.length;
+
+  const activeWard =
+    wards[activeIndex] ||
+    wards[0];
+
+  const loopedWards = [
+    ...wards,
+    ...wards,
+  ];
+
+  return (
+    <div
+      className="relative h-[340px] overflow-hidden rounded-2xl border border-slate-100"
+      onMouseEnter={() =>
+        setPaused(true)
+      }
+      onMouseLeave={() =>
+        setPaused(false)
+      }
+    >
+      <div
+        style={{
+          transform: `translateY(-${offset}px)`,
+        }}
+      >
+        {loopedWards.map(
+          (ward, position) => (
+            <div
+              key={`${ward.wardId}-${position}`}
+              style={{
+                height:
+                  ITEM_HEIGHT,
+              }}
+              className="flex items-center gap-4 px-4"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-black text-indigo-700">
+                {String(
+                  (position %
+                    wards.length) +
+                    1
+                ).padStart(
+                  2,
+                  '0'
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-black text-slate-950">
+                  {ward.wardName ||
+                    ward.wardId}
+                </div>
+
+                <div className="truncate text-[10px] font-bold text-slate-400">
+                  {ward.zoneName ||
+                    'Unassigned Zone'}
+                </div>
+
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${clamp(
+                        ward.finalScore
+                      )}%`,
+                      background:
+                        positiveColor(
+                          ward.finalScore
+                        ),
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="w-16 shrink-0 text-right text-lg font-black text-indigo-700">
+                {percentText(
+                  ward.finalScore
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+
+      {paused && (
+        <div className="absolute inset-x-3 bottom-3 rounded-xl border border-indigo-100 bg-white/95 p-3 text-[11px] shadow-xl backdrop-blur">
+          <div className="font-black text-slate-950">
+            {activeWard.wardName ||
+              activeWard.wardId}
+          </div>
+
+          <div className="mt-1 font-bold text-indigo-700">
+            Overall Performance:{' '}
+            {percentText(
+              activeWard.finalScore
+            )}
+          </div>
+
+          <div className="mt-1.5 font-semibold leading-snug text-slate-500">
+            {wardCalculationText(
+              activeWard
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 /* =========================================================
    MAIN
 ========================================================= */
@@ -2297,11 +2982,34 @@ export default function CommissionerDashboard() {
       WardRankingRow[]
     >([]);
 
+  /*
+   * City-wide average score from /ward-ranking/summary - the same
+   * endpoint/field the ULB officer dashboard shows as its "City
+   * Average Score", used here whenever no zone/ward filter narrows
+   * the view so the two dashboards agree.
+   */
   const [
-    taskforceCases,
-    setTaskforceCases,
+    wardSummaryAverage,
+    setWardSummaryAverage,
   ] =
-    useState<any[]>([]);
+    useState<number | null>(
+      null
+    );
+
+  /*
+   * Registered Health Worker headcount from the ULB Attendance
+   * Analytics dashboard's "Registered Employees" tile
+   * (AttendanceApi.registeredEmployees), used for the Attendance
+   * card's Total Employee count whenever no zone/ward/role filter
+   * narrows the view.
+   */
+  const [
+    registeredEmployeesTotal,
+    setRegisteredEmployeesTotal,
+  ] =
+    useState<number | null>(
+      null
+    );
 
   const [
     loading,
@@ -2535,6 +3243,8 @@ export default function CommissionerDashboard() {
               to:
                 appliedTo ||
                 undefined,
+              employeeGroup:
+                'HEALTH_WORKERS',
               page: 1,
               pageSize:
                 5000,
@@ -2553,9 +3263,29 @@ export default function CommissionerDashboard() {
             }
           );
 
-        const taskforcePromise =
-          TaskforceApi.listCases(
-            cityId
+        const wardSummaryPromise =
+          WardRankingApi.summary(
+            {
+              from:
+                appliedFrom ||
+                undefined,
+              to:
+                appliedTo ||
+                undefined,
+            }
+          );
+
+        const registeredEmployeesPromise =
+          AttendanceApi.registeredEmployees(
+            {
+              cityId,
+              from:
+                appliedFrom ||
+                undefined,
+              to:
+                appliedTo ||
+                undefined,
+            }
           );
 
         const results =
@@ -2564,7 +3294,8 @@ export default function CommissionerDashboard() {
               modulePromise,
               attendancePromise,
               wardPromise,
-              taskforcePromise,
+              wardSummaryPromise,
+              registeredEmployeesPromise,
             ]
           );
 
@@ -2577,8 +3308,11 @@ export default function CommissionerDashboard() {
         const wardResult =
           results[2];
 
-        const taskforceResult =
+        const wardSummaryResult =
           results[3];
+
+        const registeredEmployeesResult =
+          results[4];
 
         if (
           moduleResult.status ===
@@ -2629,17 +3363,33 @@ export default function CommissionerDashboard() {
         }
 
         if (
-          taskforceResult.status ===
+          wardSummaryResult.status ===
           'fulfilled'
         ) {
-          setTaskforceCases(
-            taskforceResult.value
-              .cases ||
-              []
+          setWardSummaryAverage(
+            wardSummaryResult.value
+              .averageScore ??
+              null
           );
         } else {
-          setTaskforceCases(
-            []
+          setWardSummaryAverage(
+            null
+          );
+        }
+
+        if (
+          registeredEmployeesResult.status ===
+          'fulfilled'
+        ) {
+          setRegisteredEmployeesTotal(
+            registeredEmployeesResult
+              .value
+              .totalRegistered ??
+              null
+          );
+        } else {
+          setRegisteredEmployeesTotal(
+            null
           );
         }
 
@@ -2661,6 +3411,72 @@ export default function CommissionerDashboard() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+
+  /* =========================================================
+     MONTH-OVER-MONTH TREND (always this month vs last month,
+     independent of the selected date filter)
+  ========================================================= */
+
+  const [monthTrends, setMonthTrends] =
+    useState<
+      Record<string, MonthTrend>
+    >({});
+
+  // Full previous-month values are kept separately from the trend percentage
+  // so each KPI card can show the exact "Last Month" value.
+  const [lastMonthMetrics, setLastMonthMetrics] =
+    useState<PeriodMetrics | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        const thisMonthRange =
+          monthBoundaries(0);
+
+        const lastMonthRange =
+          monthBoundaries(-1);
+
+        const [
+          thisMonth,
+          lastMonth,
+        ] =
+          await Promise.all([
+            computePeriodMetrics(
+              cityId,
+              thisMonthRange.from,
+              thisMonthRange.to
+            ),
+            computePeriodMetrics(
+              cityId,
+              lastMonthRange.from,
+              lastMonthRange.to
+            ),
+          ]);
+
+        if (!active) return;
+
+        setMonthTrends(
+          buildMonthTrends(
+            thisMonth,
+            lastMonth
+          )
+        );
+        setLastMonthMetrics(lastMonth);
+      } catch {
+        if (active) {
+          setMonthTrends({});
+          setLastMonthMetrics(null);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [cityId]);
 
 
   /* =========================================================
@@ -2694,6 +3510,8 @@ export default function CommissionerDashboard() {
               to:
                 appliedTo ||
                 undefined,
+              employeeGroup:
+                'HEALTH_WORKERS',
               employeeId:
                 proofAttendance!
                   .attendanceId,
@@ -3680,75 +4498,6 @@ export default function CommissionerDashboard() {
      PRIMARY STATS
   ========================================================= */
 
-  const days =
-    useMemo(() => {
-      if (
-        appliedFrom &&
-        appliedTo
-      ) {
-        return dateRangeDays(
-          appliedFrom,
-          appliedTo
-        );
-      }
-
-      const timestamps =
-        filteredInspectionRecords
-          .map((item) => {
-            const value =
-              recordDate(item);
-
-            if (!value) {
-              return null;
-            }
-
-            const timestamp =
-              new Date(
-                value
-              ).getTime();
-
-            return Number.isFinite(
-              timestamp
-            )
-              ? timestamp
-              : null;
-          })
-          .filter(
-            (
-              value
-            ): value is number =>
-              value !== null
-          );
-
-      if (!timestamps.length) {
-        return 1;
-      }
-
-      const first =
-        Math.min(
-          ...timestamps
-        );
-
-      const last =
-        Math.max(
-          ...timestamps
-        );
-
-      return Math.max(
-        1,
-        Math.floor(
-          (
-            last -
-            first
-          ) /
-          86400000
-        ) + 1
-      );
-    }, [
-      appliedFrom,
-      appliedTo,
-      filteredInspectionRecords,
-    ]);
 
   const inspection =
     useMemo(
@@ -3818,19 +4567,55 @@ export default function CommissionerDashboard() {
       filteredAttendanceEmployees,
     ]);
 
+  /*
+   * With no zone/ward/role narrowing, "Total Employee" uses the
+   * registered Health Worker headcount from the ULB Attendance
+   * Analytics dashboard's Registered Employees tile - the same
+   * number that screen shows. A filter narrows the view further
+   * than that endpoint supports, so it falls back to the filtered
+   * employee count from the attendance records themselves.
+   */
+  const attendanceEmployeeTotal =
+    zoneFilter === 'ALL' &&
+    wardFilter === 'ALL' &&
+    roleFilter === 'ALL' &&
+    registeredEmployeesTotal !==
+      null
+      ? registeredEmployeesTotal
+      : attendanceStats.employees;
+
   const wardRankingAverage =
-    useMemo(
-      () =>
-        averageApplicable(
-          filteredWardRows.map(
-            (row) =>
-              Number(
-                row.finalScore
-              )
-          )
-        ),
-      [filteredWardRows]
-    );
+    useMemo(() => {
+      /*
+       * With no zone/ward narrowing the city-wide average from
+       * /ward-ranking/summary is used directly - the exact number
+       * the ULB officer dashboard shows as "City Average Score".
+       * A zone/ward filter has no equivalent on that screen, so it
+       * falls back to averaging the filtered rows client-side.
+       */
+      if (
+        zoneFilter === 'ALL' &&
+        wardFilter === 'ALL' &&
+        wardSummaryAverage !==
+          null
+      ) {
+        return wardSummaryAverage;
+      }
+
+      return averageApplicable(
+        filteredWardRows.map(
+          (row) =>
+            Number(
+              row.finalScore
+            )
+        )
+      );
+    }, [
+      filteredWardRows,
+      zoneFilter,
+      wardFilter,
+      wardSummaryAverage,
+    ]);
 
   const overallPerformance =
     useMemo(
@@ -3849,58 +4634,104 @@ export default function CommissionerDashboard() {
       ]
     );
 
-  const averageReportsPerDay =
-    inspection.total /
-    Math.max(
-      1,
-      days
+  /* =========================================================
+     CITY SNAPSHOT
+     Whole-city totals for the applied date range - deliberately
+     unfiltered by the dashboard's zone/ward/role filters, since
+     this is meant to read as "overall city totals" at a glance.
+  ========================================================= */
+
+  const citySnapshotStats =
+    useMemo(
+      () =>
+        inspectionStats(
+          records
+        ),
+      [records]
     );
 
-  const taskforceStats =
+  const cityZoneCount =
     useMemo(() => {
-      const total =
-        taskforceCases.length;
+      const zones =
+        new Set<string>();
 
-      const open =
-        taskforceCases.filter(
-          (item) =>
+      wardRows.forEach(
+        (row) => {
+          const zone =
             String(
-              item?.status ||
+              row.zoneName ||
                 ''
-            ).toUpperCase() ===
-              'OPEN'
-        ).length;
+            ).trim();
 
-      const inProgress =
-        taskforceCases.filter(
-          (item) =>
+          if (zone) {
+            zones.add(zone);
+          }
+        }
+      );
+
+      return zones.size;
+    }, [wardRows]);
+
+  const cityWardCount =
+    wardRows.length;
+
+  const cityBeatCount =
+    useMemo(() => {
+      const beats =
+        new Set<string>();
+
+      records.forEach(
+        (item) => {
+          if (
+            item.dashboardModule !==
+            'SWEEPING'
+          ) {
+            return;
+          }
+
+          const beat =
             String(
-              item?.status ||
+              item?.beatName ||
+                item?.beat
+                  ?.beatName ||
                 ''
-            ).toUpperCase() ===
-              'IN_PROGRESS'
-        ).length;
+            ).trim();
 
-      const completed =
-        taskforceCases.filter(
-          (item) =>
-            String(
-              item?.status ||
-                ''
-            ).toUpperCase() ===
-              'COMPLETED'
-        ).length;
+          if (beat) {
+            beats.add(beat);
+          }
+        }
+      );
 
-      return {
-        total,
-        open,
-        inProgress,
-        completed,
-      };
-    }, [
-      taskforceCases,
-    ]);
+      return beats.size;
+    }, [records]);
 
+  const cityDarogaCount =
+    useMemo(() => {
+      const darogas =
+        new Set<string>();
+
+      records.forEach(
+        (item) => {
+          const id =
+            getDarogaId(item);
+
+          const name =
+            getDarogaName(item);
+
+          const key =
+            id
+              ? String(id)
+              : name;
+
+          if (key) {
+            darogas.add(key);
+          }
+        }
+      );
+
+      return darogas.size;
+    }, [records]);
 
   /* =========================================================
      MODULE PERFORMANCE
@@ -4279,14 +5110,6 @@ export default function CommissionerDashboard() {
 
     return row.performance;
   }
-
-  const metricLabel =
-    METRICS.find(
-      (item) =>
-        item.key ===
-        metricFilter
-    )?.label ||
-    'Overall Performance';
 
   const negativeMetric =
     metricFilter ===
@@ -4694,6 +5517,43 @@ export default function CommissionerDashboard() {
       ? iecRows
       : employeeRows;
 
+  const roleRowsPageSize =
+    7;
+
+  const [
+    roleRowsPage,
+    setRoleRowsPage,
+  ] =
+    useState(1);
+
+  useEffect(() => {
+    setRoleRowsPage(1);
+  }, [
+    performanceRole,
+  ]);
+
+  const roleRowsPageCount =
+    Math.max(
+      1,
+      Math.ceil(
+        activeRoleRows.length /
+          roleRowsPageSize
+      )
+    );
+
+  const roleRowsStart =
+    (
+      roleRowsPage - 1
+    ) *
+    roleRowsPageSize;
+
+  const pagedRoleRows =
+    activeRoleRows.slice(
+      roleRowsStart,
+      roleRowsStart +
+        roleRowsPageSize
+    );
+
 
   /* =========================================================
      ATTENDANCE × INSPECTION
@@ -5067,6 +5927,22 @@ export default function CommissionerDashboard() {
      ZONE × MODULE
   ========================================================= */
 
+  const [
+    zoneModuleView,
+    setZoneModuleView,
+  ] =
+    useState<DashboardModuleKey>(
+      'ALL'
+    );
+
+  const [
+    selectedMapZone,
+    setSelectedMapZone,
+  ] =
+    useState<
+      string | null
+    >(null);
+
   const zoneModuleMatrix =
     useMemo(() => {
       return zoneOptions
@@ -5224,10 +6100,129 @@ export default function CommissionerDashboard() {
       inspectionContextRecords,
     ]);
 
+  const visibleZoneModuleCards =
+    zoneModuleView === 'ALL'
+      ? moduleCards
+      : moduleCards.filter(
+          (module) =>
+            module.key ===
+            zoneModuleView
+        );
+
+  const activeMapZone =
+    selectedMapZone &&
+    zoneModuleMatrix.some(
+      (row) =>
+        row.zone ===
+        selectedMapZone
+    )
+      ? selectedMapZone
+      : zoneModuleMatrix[0]
+          ?.zone ??
+        null;
+
+  const activeMapZoneCells =
+    zoneModuleMatrix.find(
+      (row) =>
+        row.zone ===
+        activeMapZone
+    )?.cells ?? [];
+
+  const activeMapZoneOverall =
+    zoneRows.find(
+      (row) =>
+        row.label ===
+        activeMapZone
+    ) ?? null;
+
+  const zoneModuleDateLabel =
+    (() => {
+      if (
+        !appliedFrom &&
+        !appliedTo
+      ) {
+        return 'All Time';
+      }
+
+      if (
+        appliedFrom &&
+        appliedTo
+      ) {
+        const fromDate =
+          new Date(
+            `${appliedFrom}T00:00:00`
+          );
+
+        const toDate =
+          new Date(
+            `${appliedTo}T00:00:00`
+          );
+
+        const sameMonth =
+          fromDate.getFullYear() ===
+            toDate.getFullYear() &&
+          fromDate.getMonth() ===
+            toDate.getMonth();
+
+        if (sameMonth) {
+          return toDate.toLocaleDateString(
+            'en-IN',
+            {
+              month:
+                'long',
+              year:
+                'numeric',
+            }
+          );
+        }
+
+        return `${fromDate.toLocaleDateString(
+          'en-IN',
+          {
+            day: '2-digit',
+            month: 'short',
+          }
+        )} - ${toDate.toLocaleDateString(
+          'en-IN',
+          {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          }
+        )}`;
+      }
+
+      return (
+        appliedFrom ||
+        appliedTo ||
+        ''
+      );
+    })();
+
 
   /* =========================================================
      DRILL HELPERS
   ========================================================= */
+
+  function openZoneModuleCell(
+    zoneLabel: string,
+    cell: (typeof zoneModuleMatrix)[number]['cells'][number]
+  ) {
+    setDrilldown({
+      title:
+        `${zoneLabel} · ${cell.label}`,
+      value:
+        percentText(
+          cell.value
+        ),
+      inspectionRecords:
+        cell.records,
+      attendanceEmployees:
+        cell.employees,
+      wardRows:
+        cell.wards,
+    });
+  }
 
   function breakdownForGeo(
     row: GeoPerformanceRow
@@ -5439,9 +6434,9 @@ export default function CommissionerDashboard() {
       breakdown: [
         {
           label:
-            'Employee',
+            'Total Employee',
           value:
-            attendanceStats.employees.toLocaleString(
+            attendanceEmployeeTotal.toLocaleString(
               'en-IN'
             ),
         },
@@ -5740,77 +6735,58 @@ export default function CommissionerDashboard() {
     >
       <div className="min-h-full bg-[#f6f8fc] pb-12">
         {/* HEADER */}
-        <section className="relative overflow-hidden rounded-[28px] border border-indigo-950/10 bg-gradient-to-br from-[#111827] via-[#1e1b4b] to-[#312e81] px-5 py-5 text-white shadow-[0_25px_80px_-35px_rgba(49,46,129,.85)] sm:px-7">
-          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-violet-400/20 blur-3xl" />
+        <section style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', color: 'white', borderRadius: '24px', padding: '26px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 12px 40px -10px rgba(15,23,42,0.6)', position: 'relative', overflow: 'hidden', marginBottom: '24px', flexWrap: 'wrap', gap: '24px' }}>
+          <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', height: '100%', background: 'radial-gradient(ellipse at top, rgba(59, 130, 246, 0.2), transparent 70%)', pointerEvents: 'none' }} />
 
-          <div className="pointer-events-none absolute -bottom-24 left-1/4 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1, minWidth: '280px' }}>
+            <div style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ShieldCheck size={14} color="#60a5fa" /> MATRIXTRACK 2.0 • COMMISSIONER OVERSIGHT
+            </div>
 
-          <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
-            <div>
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-200">
-                <ShieldCheck
-                  size={15}
-                />
+            <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.02em' }}>
+              {new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 17 ? 'Good Afternoon' : 'Good Evening'}, {user?.name || 'Commissioner'}
+            </h1>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', padding: '3px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <MapPin size={12} color="#38bdf8" /> {cityName}
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#818cf8', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.25)', padding: '3px 10px', borderRadius: '12px' }}>
                 Commissioner
-              </div>
-
-              <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
-                Commissioner Dashboard
-              </h1>
-
-              <div className="mt-2 text-sm font-bold text-indigo-100/80">
-                {cityName}
-              </div>
+              </span>
             </div>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowFilters(
-                    (
-                      value
-                    ) =>
-                      !value
-                  )
-                }
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-xs font-black text-white backdrop-blur-xl transition hover:bg-white/15"
-              >
-                <Filter
-                  size={15}
-                />
-                Filters
-              </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowFilters((value) => !value)}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', borderRadius: '12px', padding: '9px 14px', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            >
+              <Filter size={14} />
+              Filters
+              {showFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
 
-              <button
-                type="button"
-                onClick={() =>
-                  loadDashboard(
-                    true
-                  )
-                }
-                disabled={
-                  refreshing
-                }
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white px-4 py-2.5 text-xs font-black text-slate-950 shadow-lg transition hover:bg-indigo-50 disabled:opacity-60"
-              >
-                <RefreshCw
-                  size={15}
-                  className={
-                    refreshing
-                      ? 'animate-spin'
-                      : ''
-                  }
-                />
-                Refresh
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => loadDashboard(true)}
+              disabled={refreshing}
+              style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px', cursor: refreshing ? 'default' : 'pointer', boxShadow: '0 4px 14px rgba(37,99,235,0.4)', opacity: refreshing ? 0.6 : 1 }}
+            >
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
         </section>
 
         {/* FILTERS */}
-        {showFilters && (
-          <section className="sticky top-0 z-40 mt-4 rounded-[24px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_14px_40px_-25px_rgba(15,23,42,.35)] backdrop-blur-xl">
+        <div
+          className={`grid transition-all duration-300 ease-in-out ${
+            showFilters ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+          }`}
+        >
+          <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_14px_40px_-25px_rgba(15,23,42,.35)] backdrop-blur-xl">
             <div className="flex flex-wrap gap-2">
               {[
                 [
@@ -5863,7 +6839,7 @@ export default function CommissionerDashboard() {
               )}
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-8">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
               <label>
                 <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
                   From
@@ -6122,92 +7098,9 @@ export default function CommissionerDashboard() {
                   )}
                 </select>
               </label>
-
-              <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                  Status
-                </span>
-
-                <select
-                  value={
-                    statusFilter
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setStatusFilter(
-                      event
-                        .target
-                        .value
-                    )
-                  }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
-                >
-                  {statusOptions.map(
-                    (
-                      status
-                    ) => (
-                      <option
-                        key={
-                          status
-                        }
-                        value={
-                          status
-                        }
-                      >
-                        {status.replace(
-                          /_/g,
-                          ' '
-                        )}
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr_auto_auto]">
-              <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                  Metric
-                </span>
-
-                <select
-                  value={
-                    metricFilter
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setMetricFilter(
-                      event
-                        .target
-                        .value as MetricKey
-                    )
-                  }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
-                >
-                  {METRICS.map(
-                    (
-                      item
-                    ) => (
-                      <option
-                        key={
-                          item.key
-                        }
-                        value={
-                          item.key
-                        }
-                      >
-                        {
-                          item.label
-                        }
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
               <label>
                 <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
                   Search
@@ -6258,7 +7151,7 @@ export default function CommissionerDashboard() {
               </button>
             </div>
           </section>
-        )}
+        </div>
 
         {loadError && (
           <div className="mt-4 flex items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
@@ -6282,7 +7175,7 @@ export default function CommissionerDashboard() {
         )}
 
         {/* KPI */}
-        <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+        <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
           <KpiCard
             label="Overall Performance"
             value={
@@ -6292,11 +7185,22 @@ export default function CommissionerDashboard() {
                     overallPerformance
                   )
             }
-            gradient="from-indigo-500 via-violet-500 to-purple-600"
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.overallPerformance)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-violet-50 via-purple-50 to-white"
+            iconGradient="from-violet-500 to-purple-600"
             icon={
-              <Activity
-                size={18}
-              />
+              <div className="relative flex items-center justify-center">
+                <BarChart3 size={26} strokeWidth={2.2} />
+                <TrendingUp
+                  size={13}
+                  strokeWidth={3}
+                  className="absolute -right-1.5 -top-1.5"
+                />
+              </div>
             }
             tooltip={[
               {
@@ -6324,6 +7228,7 @@ export default function CommissionerDashboard() {
                   ),
               },
             ]}
+            trend={monthTrends.overallPerformance}
             onClick={
               openOverall
             }
@@ -6338,26 +7243,86 @@ export default function CommissionerDashboard() {
                     inspection.performance
                   )
             }
-            gradient="from-blue-500 via-indigo-500 to-violet-600"
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.inspectionPerformance)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-blue-50 via-sky-50 to-white"
+            iconGradient="from-blue-500 to-indigo-500"
             icon={
-              <Target
-                size={18}
-              />
+              <div className="relative flex items-center justify-center">
+                <ClipboardList size={24} strokeWidth={2.2} />
+                <IconBadge
+                  bg="bg-blue-700"
+                  icon={
+                    <Search
+                      size={9}
+                      strokeWidth={3}
+                    />
+                  }
+                />
+              </div>
             }
             tooltip={[
               {
                 label:
-                  'Records',
+                  'Total Inspection',
                 value:
                   inspection.total.toLocaleString(
                     'en-IN'
                   ),
               },
               {
+                /*
+                 * SI Approved counts every report the SI ever
+                 * approved, including ones later flagged for
+                 * corrective action - so Total Inspection =
+                 * SI Approved + SI Rejected + SI Pending holds.
+                 */
                 label:
-                  'Approved',
+                  'SI Approved',
                 value:
-                  inspection.approved.toLocaleString(
+                  (
+                    inspection.approved +
+                    inspection.actionRequired +
+                    inspection.actionTaken
+                  ).toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'SI Rejected',
+                value:
+                  inspection.rejected.toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'SI Pending',
+                value:
+                  inspection.pending.toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'Action Required',
+                value:
+                  (
+                    inspection.actionRequired +
+                    inspection.actionTaken
+                  ).toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'Pending Action',
+                value:
+                  inspection.actionRequired.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -6370,6 +7335,7 @@ export default function CommissionerDashboard() {
                   ),
               },
             ]}
+            trend={monthTrends.inspectionPerformance}
             onClick={() =>
               openInspectionMetric(
                 'Inspection Performance',
@@ -6390,18 +7356,33 @@ export default function CommissionerDashboard() {
                     attendanceStats.rate
                   )
             }
-            gradient="from-emerald-400 via-teal-500 to-cyan-600"
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.attendanceRate)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-emerald-50 via-teal-50 to-white"
+            iconGradient="from-emerald-400 to-teal-500"
             icon={
-              <UserRoundCheck
-                size={18}
-              />
+              <div className="relative flex items-center justify-center">
+                <UsersRound size={24} strokeWidth={2.2} />
+                <IconBadge
+                  bg="bg-emerald-600"
+                  icon={
+                    <Check
+                      size={10}
+                      strokeWidth={3.2}
+                    />
+                  }
+                />
+              </div>
             }
             tooltip={[
               {
                 label:
-                  'Employee',
+                  'Total Employee',
                 value:
-                  attendanceStats.employees.toLocaleString(
+                  attendanceEmployeeTotal.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -6422,6 +7403,7 @@ export default function CommissionerDashboard() {
                   ),
               },
             ]}
+            trend={monthTrends.attendanceRate}
             onClick={
               openAttendance
             }
@@ -6436,30 +7418,58 @@ export default function CommissionerDashboard() {
                     inspection.approvalRate
                   )
             }
-            gradient="from-emerald-400 via-emerald-500 to-teal-600"
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.approvalRate)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-teal-50 via-emerald-50 to-white"
+            iconGradient="from-teal-400 to-emerald-600"
             icon={
-              <CheckCircle2
-                size={18}
-              />
+              <div className="relative flex items-center justify-center">
+                <FileText size={24} strokeWidth={2.2} />
+                <IconBadge
+                  bg="bg-emerald-600"
+                  icon={
+                    <Check
+                      size={10}
+                      strokeWidth={3.2}
+                    />
+                  }
+                />
+              </div>
             }
             tooltip={[
               {
                 label:
-                  'Approved',
+                  'Total',
                 value:
-                  inspection.qcApproved.toLocaleString(
+                  inspection.total.toLocaleString(
                     'en-IN'
                   ),
               },
               {
                 label:
-                  'Rejected',
+                  'SI Approved',
                 value:
-                  inspection.qcRejected.toLocaleString(
+                  (
+                    inspection.approved +
+                    inspection.actionRequired +
+                    inspection.actionTaken
+                  ).toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'SI Rejected',
+                value:
+                  inspection.rejected.toLocaleString(
                     'en-IN'
                   ),
               },
             ]}
+            trend={monthTrends.approvalRate}
             onClick={() =>
               openInspectionMetric(
                 'Approval Rate',
@@ -6467,7 +7477,7 @@ export default function CommissionerDashboard() {
                   (
                     item
                   ) =>
-                    qcDecision(
+                    effectiveStatus(
                       item
                     ) ===
                     'APPROVED'
@@ -6488,30 +7498,58 @@ export default function CommissionerDashboard() {
                     inspection.rejectionRate
                   )
             }
-            gradient="from-rose-400 via-rose-500 to-red-700"
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.rejectionRate)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-rose-50 via-red-50 to-white"
+            iconGradient="from-rose-500 to-red-600"
             icon={
-              <XCircle
-                size={18}
-              />
+              <div className="relative flex items-center justify-center">
+                <FileText size={24} strokeWidth={2.2} />
+                <IconBadge
+                  bg="bg-rose-600"
+                  icon={
+                    <X
+                      size={10}
+                      strokeWidth={3.2}
+                    />
+                  }
+                />
+              </div>
             }
             tooltip={[
               {
                 label:
-                  'Rejected',
+                  'Total',
                 value:
-                  inspection.qcRejected.toLocaleString(
+                  inspection.total.toLocaleString(
                     'en-IN'
                   ),
               },
               {
                 label:
-                  'Approved',
+                  'SI Approved',
                 value:
-                  inspection.qcApproved.toLocaleString(
+                  (
+                    inspection.approved +
+                    inspection.actionRequired +
+                    inspection.actionTaken
+                  ).toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'SI Rejected',
+                value:
+                  inspection.rejected.toLocaleString(
                     'en-IN'
                   ),
               },
             ]}
+            trend={monthTrends.rejectionRate}
             onClick={() =>
               openInspectionMetric(
                 'Rejection Rate',
@@ -6519,7 +7557,7 @@ export default function CommissionerDashboard() {
                   (
                     item
                   ) =>
-                    qcDecision(
+                    effectiveStatus(
                       item
                     ) ===
                     'REJECTED'
@@ -6540,16 +7578,42 @@ export default function CommissionerDashboard() {
                     inspection.actionClosure
                   )
             }
-            gradient="from-amber-400 via-orange-500 to-rose-500"
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.actionClosure)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-orange-50 via-amber-50 to-white"
+            iconGradient="from-orange-400 to-amber-500"
             icon={
-              <CheckCircle2
-                size={18}
-              />
+              <div className="relative flex items-center justify-center">
+                <Settings2 size={24} strokeWidth={2.2} />
+                <IconBadge
+                  bg="bg-orange-600"
+                  icon={
+                    <Check
+                      size={10}
+                      strokeWidth={3.2}
+                    />
+                  }
+                />
+              </div>
             }
             tooltip={[
               {
                 label:
                   'Action Required',
+                value:
+                  (
+                    inspection.actionRequired +
+                    inspection.actionTaken
+                  ).toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'Action Pending',
                 value:
                   inspection.actionRequired.toLocaleString(
                     'en-IN'
@@ -6564,6 +7628,7 @@ export default function CommissionerDashboard() {
                   ),
               },
             ]}
+            trend={monthTrends.actionClosure}
             onClick={() =>
               openInspectionMetric(
                 'Action Closure',
@@ -6596,10 +7661,17 @@ export default function CommissionerDashboard() {
                     wardRankingAverage
                   )
             }
-            gradient="from-violet-400 via-purple-500 to-fuchsia-600"
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.wardRankingAverage)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-violet-50 via-fuchsia-50 to-white"
+            iconGradient="from-violet-500 to-fuchsia-600"
             icon={
               <Trophy
-                size={18}
+                size={26}
+                strokeWidth={2.2}
               />
             }
             tooltip={[
@@ -6612,333 +7684,641 @@ export default function CommissionerDashboard() {
                   ),
               },
             ]}
+            trend={monthTrends.wardRankingAverage}
             onClick={
               openWardRanking
             }
           />
-
-          <KpiCard
-            label="Average Reports / Day"
-            value={
-              loading
-                ? '—'
-                : averageText(
-                    averageReportsPerDay
-                  )
-            }
-            gradient="from-sky-400 via-blue-500 to-indigo-600"
-            icon={
-              <BarChart3
-                size={18}
-              />
-            }
-            tooltip={[
-              {
-                label:
-                  'Records',
-                value:
-                  inspection.total.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Days',
-                value:
-                  String(
-                    days
-                  ),
-              },
-            ]}
-            onClick={() =>
-              openInspectionMetric(
-                'Average Reports / Day',
-                filteredInspectionRecords,
-                averageText(
-                  averageReportsPerDay
-                )
-              )
-            }
-          />
         </section>
 
-        {/* STATUS AVERAGES */}
-        <section className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
-          <StatusAverageCard
-            label="Approved"
-            count={
-              inspection.approved
-            }
-            days={days}
-            gradient="from-emerald-400 to-teal-600"
-            onClick={() =>
-              openInspectionMetric(
-                'Approved',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    effectiveStatus(
-                      item
-                    ) ===
-                    'APPROVED'
-                ),
-                averageText(
-                  inspection.approved /
-                    days
-                )
-              )
-            }
-          />
+        {/* CITY SNAPSHOT */}
+        <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+              City Snapshot
+            </h2>
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+              Overall city totals and today&apos;s report status across all inspection modules
+            </p>
+          </div>
 
-          <StatusAverageCard
-            label="Rejected"
-            count={
-              inspection.rejected
-            }
-            days={days}
-            gradient="from-rose-400 to-red-700"
-            onClick={() =>
-              openInspectionMetric(
-                'Rejected',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    effectiveStatus(
-                      item
-                    ) ===
-                    'REJECTED'
-                ),
-                averageText(
-                  inspection.rejected /
-                    days
-                )
-              )
-            }
-          />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="min-h-[76px] rounded-xl border border-blue-100 bg-blue-50/55 px-3 py-2.5">
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100/80 text-blue-600">
+                    <MapPin size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    Total Zones
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {cityZoneCount}
+                </div>
+              </div>
+            </div>
 
-          <StatusAverageCard
-            label="Action Required"
-            count={
-              inspection.actionRequired
-            }
-            days={days}
-            gradient="from-amber-400 to-orange-600"
-            onClick={() =>
-              openInspectionMetric(
-                'Action Required',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    effectiveStatus(
-                      item
-                    ) ===
-                    'ACTION_REQUIRED'
-                ),
-                averageText(
-                  inspection.actionRequired /
-                    days
-                )
-              )
-            }
-          />
+            <div className="min-h-[76px] rounded-xl border border-violet-100 bg-violet-50/45 px-3 py-2.5">
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100/80 text-violet-600">
+                    <Layers3 size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    Total Wards
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {cityWardCount}
+                </div>
+              </div>
+            </div>
 
-          <StatusAverageCard
-            label="Action Taken"
-            count={
-              inspection.actionTaken
-            }
-            days={days}
-            gradient="from-blue-400 to-indigo-600"
-            onClick={() =>
-              openInspectionMetric(
-                'Action Taken',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    effectiveStatus(
-                      item
-                    ) ===
-                    'ACTION_TAKEN'
-                ),
-                averageText(
-                  inspection.actionTaken /
-                    days
-                )
-              )
-            }
-          />
+            <div className="min-h-[76px] rounded-xl border border-cyan-100 bg-cyan-50/45 px-3 py-2.5">
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-100/80 text-cyan-600">
+                    <Activity size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    Total Beats
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {cityBeatCount}
+                </div>
+              </div>
+            </div>
 
-          <StatusAverageCard
-            label="Pending"
-            count={
-              inspection.pending
-            }
-            days={days}
-            gradient="from-slate-300 to-slate-600"
-            onClick={() =>
-              openInspectionMetric(
-                'Pending',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    effectiveStatus(
-                      item
-                    ) ===
-                    'PENDING'
-                ),
-                averageText(
-                  inspection.pending /
-                    days
+            <button
+              type="button"
+              onClick={() =>
+                openInspectionMetric(
+                  'Total Inspection',
+                  records,
+                  citySnapshotStats.total.toLocaleString(
+                    'en-IN'
+                  )
                 )
-              )
-            }
-          />
+              }
+              className="group min-h-[76px] rounded-xl border border-sky-100 bg-sky-50/50 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
+            >
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100/80 text-sky-700">
+                    <ClipboardList size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    Total Inspection
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {citySnapshotStats.total}
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                openInspectionMetric(
+                  'SI Pending',
+                  records.filter(
+                    (
+                      item
+                    ) =>
+                      effectiveStatus(
+                        item
+                      ) ===
+                      'PENDING'
+                  ),
+                  citySnapshotStats.pending.toLocaleString(
+                    'en-IN'
+                  )
+                )
+              }
+              className="group min-h-[76px] rounded-xl border border-amber-100 bg-amber-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md"
+            >
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100/80 text-amber-600">
+                    <Clock3 size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    SI Pending
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {citySnapshotStats.pending}
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                openInspectionMetric(
+                  'SI Approved',
+                  records.filter(
+                    (
+                      item
+                    ) =>
+                      [
+                        'APPROVED',
+                        'ACTION_REQUIRED',
+                        'ACTION_TAKEN',
+                      ].includes(
+                        effectiveStatus(
+                          item
+                        )
+                      )
+                  ),
+                  (
+                    citySnapshotStats.approved +
+                    citySnapshotStats.actionRequired +
+                    citySnapshotStats.actionTaken
+                  ).toLocaleString(
+                    'en-IN'
+                  )
+                )
+              }
+              className="group min-h-[76px] rounded-xl border border-emerald-100 bg-emerald-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
+            >
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100/80 text-emerald-600">
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    SI Approved
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {citySnapshotStats.approved +
+                    citySnapshotStats.actionRequired +
+                    citySnapshotStats.actionTaken}
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                openInspectionMetric(
+                  'SI Rejected',
+                  records.filter(
+                    (
+                      item
+                    ) =>
+                      effectiveStatus(
+                        item
+                      ) ===
+                      'REJECTED'
+                  ),
+                  citySnapshotStats.rejected.toLocaleString(
+                    'en-IN'
+                  )
+                )
+              }
+              className="group min-h-[76px] rounded-xl border border-rose-100 bg-rose-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-md"
+            >
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100/80 text-rose-600">
+                    <XCircle size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    SI Rejected
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {citySnapshotStats.rejected}
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                openInspectionMetric(
+                  'Action Required',
+                  records.filter(
+                    (
+                      item
+                    ) =>
+                      [
+                        'ACTION_REQUIRED',
+                        'ACTION_TAKEN',
+                      ].includes(
+                        effectiveStatus(
+                          item
+                        )
+                      )
+                  ),
+                  (
+                    citySnapshotStats.actionRequired +
+                    citySnapshotStats.actionTaken
+                  ).toLocaleString(
+                    'en-IN'
+                  )
+                )
+              }
+              className="group min-h-[76px] rounded-xl border border-orange-100 bg-orange-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
+            >
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-100/80 text-orange-600">
+                    <AlertTriangle size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    Action Required
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {citySnapshotStats.actionRequired +
+                    citySnapshotStats.actionTaken}
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                openInspectionMetric(
+                  'Action Taken',
+                  records.filter(
+                    (
+                      item
+                    ) =>
+                      effectiveStatus(
+                        item
+                      ) ===
+                      'ACTION_TAKEN'
+                  ),
+                  citySnapshotStats.actionTaken.toLocaleString(
+                    'en-IN'
+                  )
+                )
+              }
+              className="group min-h-[76px] rounded-xl border border-teal-100 bg-teal-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md"
+            >
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-100/80 text-teal-600">
+                    <ShieldCheck size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    Action Taken
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {citySnapshotStats.actionTaken}
+                </div>
+              </div>
+            </button>
+
+            <div className="min-h-[76px] rounded-xl border border-indigo-100 bg-indigo-50/45 px-3 py-2.5">
+              <div className="flex h-full items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100/80 text-indigo-600">
+                    <UsersRound size={16} />
+                  </div>
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                    Total Darogas
+                  </div>
+                </div>
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
+                  {cityDarogaCount}
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* TOP / WORST */}
-        <section className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <div className="relative overflow-hidden rounded-[26px] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/50 to-teal-50 p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-950">
-              <TrendingUp
-                size={18}
-                className="text-emerald-600"
-              />
-              Top Performance
+        <section className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-2">
+          {/* TOP PERFORMANCE */}
+          <div
+            className="relative overflow-hidden rounded-[22px] border p-4 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
+            style={{
+              background:
+                'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 50%, #F0FDFA 100%)',
+              borderColor:
+                '#D1FAE5',
+              minHeight: 196,
+            }}
+          >
+            {/* decorative skyline */}
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-12 opacity-[0.12]"
+              aria-hidden="true"
+            >
+              <div className="absolute bottom-0 left-[2%] h-10 w-6 rounded-t-[3px] bg-emerald-600" />
+              <div className="absolute bottom-0 left-[10%] h-16 w-8 rounded-t-[3px] bg-emerald-600" />
+              <div className="absolute bottom-0 left-[20%] h-8 w-5 rounded-t-[2px] bg-emerald-600" />
+              <div className="absolute bottom-0 left-[28%] h-20 w-9 rounded-t-[4px] bg-emerald-600" />
+              <div className="absolute bottom-0 right-[28%] h-14 w-7 rounded-t-[3px] bg-emerald-600" />
+              <div className="absolute bottom-0 right-[18%] h-9 w-5 rounded-t-[2px] bg-emerald-600" />
+              <div className="absolute bottom-0 right-[8%] h-[70px] w-8 rounded-t-[4px] bg-emerald-600" />
+              <div className="absolute bottom-0 right-[1%] h-12 w-6 rounded-t-[3px] bg-emerald-600" />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {[topZone, topWard].map(
-                (
-                  row,
-                  index
-                ) =>
-                  row ? (
-                    <button
-                      key={`${row.label}-${index}`}
-                      type="button"
-                      onClick={() =>
+            {/* HEADER */}
+            <div className="relative flex items-center gap-2">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background:
+                    '#10B981',
+                  boxShadow:
+                    '0 8px 20px rgba(16,185,129,0.20)',
+                }}
+              >
+                <TrendingUp
+                  size={15}
+                  strokeWidth={2.5}
+                  color="#fff"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <div
+                  className="text-[14px] font-extrabold leading-tight"
+                  style={{
+                    color:
+                      '#0F1B4C',
+                  }}
+                >
+                  Top Performance
+                </div>
+
+                <div
+                  className="mt-0.5 text-[10px] font-medium"
+                  style={{
+                    color:
+                      '#31518F',
+                  }}
+                >
+                  Best performing zone and ward
+                </div>
+              </div>
+            </div>
+
+            {/* MAIN PERFORMANCE AREA */}
+            <div className="relative mt-3 grid grid-cols-2 items-center justify-items-center gap-1.5 xl:grid-cols-[1fr_1fr_0.8fr]">
+              <CircularProgress
+                value={
+                  topZone?.metricValue
+                }
+                name={
+                  topZone?.label ??
+                  '—'
+                }
+                label="ZONE"
+                variant="success"
+                onClick={
+                  topZone
+                    ? () =>
                         openGeo(
-                          row
+                          topZone
                         )
-                      }
-                      className="group rounded-2xl border border-white bg-white/90 p-4 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg"
-                    >
-                      <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                        {index ===
-                        0
-                          ? 'Zone'
-                          : 'Ward'}
-                      </div>
+                    : undefined
+                }
+              />
 
-                      <div className="mt-1 truncate text-sm font-black text-slate-950">
-                        {
-                          row.label
-                        }
-                      </div>
+              <CircularProgress
+                value={
+                  topWard?.metricValue
+                }
+                name={
+                  topWard?.label ??
+                  '—'
+                }
+                label="WARD"
+                variant="success"
+                onClick={
+                  topWard
+                    ? () =>
+                        openGeo(
+                          topWard
+                        )
+                    : undefined
+                }
+              />
 
-                      <div className="mt-3 flex items-end justify-between">
-                        <div className="text-3xl font-black tracking-tight text-emerald-700">
-                          {percentText(
-                            row.metricValue
-                          )}
-                        </div>
+              <div className="relative hidden items-center justify-center xl:flex">
+                <Trophy
+                  size={60}
+                  strokeWidth={1.5}
+                  color="#F59E0B"
+                  className="relative z-10"
+                />
 
-                        <ChevronRight
-                          size={18}
-                          className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-emerald-600"
-                        />
-                      </div>
+                <Sparkles
+                  size={13}
+                  className="absolute -right-1 top-1 z-10 text-[#34D399]"
+                />
 
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-700 transition-all duration-700"
-                          style={{
-                            width:
-                              `${clamp(
-                                row.metricValue ||
-                                  0
-                              )}%`,
-                          }}
-                        />
-                      </div>
-                    </button>
-                  ) : null
-              )}
+                <Sparkles
+                  size={9}
+                  className="absolute bottom-1 left-0 z-10 text-[#34D399]"
+                />
+              </div>
+            </div>
+
+            {/* FOOTER */}
+            <div
+              className="relative mt-3 flex min-h-[42px] items-center gap-2 rounded-[13px] px-3"
+              style={{
+                background:
+                  'rgba(16,185,129,0.10)',
+                border:
+                  '1px solid rgba(16,185,129,0.08)',
+              }}
+            >
+              <div
+                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background:
+                    '#10B981',
+                }}
+              >
+                <Check
+                  size={14}
+                  color="#fff"
+                  strokeWidth={3}
+                />
+              </div>
+
+              <div
+                className="text-[11px] font-semibold leading-tight"
+                style={{
+                  color:
+                    '#065F46',
+                }}
+              >
+                On the Basis of Approval Rate and Action Closure
+              </div>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[26px] border border-rose-100 bg-gradient-to-br from-white via-rose-50/50 to-orange-50 p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-950">
-              <TrendingDown
-                size={18}
-                className="text-rose-600"
-              />
-              Worst Performance
+          {/* WORST PERFORMANCE */}
+          <div
+            className="relative overflow-hidden rounded-[22px] border p-4 shadow-[0_8px_30px_rgba(15,23,42,0.06)]"
+            style={{
+              background:
+                'linear-gradient(135deg, #FFF7F7 0%, #FFF1F2 50%, #FFF7F7 100%)',
+              borderColor:
+                '#FECDD3',
+              minHeight: 196,
+            }}
+          >
+            {/* decorative declining bars */}
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 flex h-12 items-end justify-between px-5 opacity-[0.2]"
+              aria-hidden="true"
+            >
+              <div className="h-[85%] w-6 rounded-t-[4px] bg-rose-500" />
+              <div className="h-[65%] w-6 rounded-t-[4px] bg-rose-500" />
+              <div className="h-[48%] w-6 rounded-t-[4px] bg-rose-500" />
+              <div className="h-[30%] w-6 rounded-t-[4px] bg-rose-500" />
+              <div className="h-[16%] w-6 rounded-t-[4px] bg-rose-500" />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {[worstZone, worstWard].map(
-                (
-                  row,
-                  index
-                ) =>
-                  row ? (
-                    <button
-                      key={`${row.label}-${index}`}
-                      type="button"
-                      onClick={() =>
+            {/* HEADER */}
+            <div className="relative flex items-center gap-2">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background:
+                    '#F43F5E',
+                  boxShadow:
+                    '0 8px 20px rgba(244,63,94,0.20)',
+                }}
+              >
+                <TrendingDown
+                  size={15}
+                  strokeWidth={2.5}
+                  color="#fff"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <div
+                  className="text-[14px] font-extrabold leading-tight"
+                  style={{
+                    color:
+                      '#0F1B4C',
+                  }}
+                >
+                  Worst Performance
+                </div>
+
+                <div
+                  className="mt-0.5 text-[10px] font-medium"
+                  style={{
+                    color:
+                      '#31518F',
+                  }}
+                >
+                  Lowest performing zone and ward
+                </div>
+              </div>
+            </div>
+
+            {/* MAIN PERFORMANCE AREA */}
+            <div className="relative mt-3 grid grid-cols-2 items-center justify-items-center gap-1.5 xl:grid-cols-[1fr_1fr_0.8fr]">
+              <CircularProgress
+                value={
+                  worstZone?.metricValue
+                }
+                name={
+                  worstZone?.label ??
+                  '—'
+                }
+                label="ZONE"
+                variant="danger"
+                onClick={
+                  worstZone
+                    ? () =>
                         openGeo(
-                          row
+                          worstZone
                         )
-                      }
-                      className="group rounded-2xl border border-white bg-white/90 p-4 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg"
-                    >
-                      <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                        {index ===
-                        0
-                          ? 'Zone'
-                          : 'Ward'}
-                      </div>
+                    : undefined
+                }
+              />
 
-                      <div className="mt-1 truncate text-sm font-black text-slate-950">
-                        {
-                          row.label
-                        }
-                      </div>
+              <CircularProgress
+                value={
+                  worstWard?.metricValue
+                }
+                name={
+                  worstWard?.label ??
+                  '—'
+                }
+                label="WARD"
+                variant="danger"
+                onClick={
+                  worstWard
+                    ? () =>
+                        openGeo(
+                          worstWard
+                        )
+                    : undefined
+                }
+              />
 
-                      <div className="mt-3 flex items-end justify-between">
-                        <div className="text-3xl font-black tracking-tight text-rose-700">
-                          {percentText(
-                            row.metricValue
-                          )}
-                        </div>
+              <div className="relative hidden flex-col items-center justify-center gap-0.5 xl:flex">
+                <BarChart3
+                  size={42}
+                  strokeWidth={1.5}
+                  color="#F43F5E"
+                  className="relative z-10 opacity-80"
+                />
 
-                        <ChevronRight
-                          size={18}
-                          className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-rose-600"
-                        />
-                      </div>
+                <TrendingDown
+                  size={24}
+                  strokeWidth={2}
+                  color="#F43F5E"
+                  className="relative z-10 -mt-1.5"
+                />
+              </div>
+            </div>
 
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-rose-100">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-rose-300 via-rose-500 to-red-800 transition-all duration-700"
-                          style={{
-                            width:
-                              `${clamp(
-                                row.metricValue ||
-                                  0
-                              )}%`,
-                          }}
-                        />
-                      </div>
-                    </button>
-                  ) : null
-              )}
+            {/* FOOTER */}
+            <div
+              className="relative mt-3 flex min-h-[42px] items-center gap-2 rounded-[13px] px-3"
+              style={{
+                background:
+                  'rgba(244,63,94,0.10)',
+                border:
+                  '1px solid rgba(244,63,94,0.08)',
+              }}
+            >
+              <div
+                className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background:
+                    '#F43F5E',
+                }}
+              >
+                <AlertTriangle
+                  size={14}
+                  color="#fff"
+                  strokeWidth={2.5}
+                />
+              </div>
+
+              <div
+                className="text-[11px] font-semibold leading-tight"
+                style={{
+                  color:
+                    '#9F1239',
+                }}
+              >
+                On the Basis of Approval Rate and Action Closure
+              </div>
             </div>
           </div>
         </section>
@@ -6958,6 +8338,58 @@ export default function CommissionerDashboard() {
                   'from-emerald-400 via-teal-500 to-cyan-600',
                   'from-violet-400 via-purple-500 to-fuchsia-600',
                 ];
+
+              /*
+               * Full calculation shown on hover - derived from the
+               * same raw records/employees/wards already carried on
+               * this module card, using the existing performance
+               * formulas (no new calculation logic introduced).
+               */
+              const calculation =
+                (() => {
+                  if (
+                    module.key ===
+                    'ATTENDANCE'
+                  ) {
+                    const totalDays =
+                      module.employees.reduce(
+                        (
+                          sum,
+                          employee
+                        ) =>
+                          sum +
+                          employee.totalDays,
+                        0
+                      );
+
+                    const present =
+                      module.employees.reduce(
+                        (
+                          sum,
+                          employee
+                        ) =>
+                          sum +
+                          employee.presentDays,
+                        0
+                      );
+
+                    return `${present.toLocaleString('en-IN')} Present / ${totalDays.toLocaleString('en-IN')} Total Days = ${percentText(module.performance)}`;
+                  }
+
+                  if (
+                    module.key ===
+                    'WARD_RANKING'
+                  ) {
+                    return `Average of ${module.wards.length.toLocaleString('en-IN')} Ward${module.wards.length === 1 ? '' : 's'} = ${percentText(module.performance)}`;
+                  }
+
+                  const stats =
+                    inspectionStats(
+                      module.records
+                    );
+
+                  return `(${stats.approved.toLocaleString('en-IN')} Approved + ${stats.actionTaken.toLocaleString('en-IN')} Action Taken) / ${stats.total.toLocaleString('en-IN')} Total = ${percentText(module.performance)}`;
+                })();
 
               return (
                 <button
@@ -7016,76 +8448,13 @@ export default function CommissionerDashboard() {
                     />
                   </div>
 
-                  <div className="absolute right-3 top-10 hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black shadow-xl group-hover:block">
-                    {module.count.toLocaleString(
-                      'en-IN'
-                    )}
+                  <div className="pointer-events-none absolute inset-x-3 top-10 z-10 hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold leading-snug text-slate-700 shadow-xl group-hover:block">
+                    {calculation}
                   </div>
                 </button>
               );
             }
           )}
-        </section>
-
-        {/* TASKFORCE / CTU-GVP */}
-        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-black text-slate-950">
-                <Target
-                  size={18}
-                  className="text-orange-600"
-                />
-                CTU / GVP ? Taskforce
-              </div>
-
-              <div className="mt-1 text-[10px] font-bold text-slate-400">
-                Live city-wide operational cases, tracked separately from inspection performance filters.
-              </div>
-            </div>
-
-            <div className="rounded-full border border-orange-100 bg-orange-50 px-3 py-1 text-[10px] font-black text-orange-700">
-              TASKFORCE
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                Total Cases
-              </div>
-              <div className="mt-2 text-2xl font-black text-slate-950">
-                {taskforceStats.total.toLocaleString('en-IN')}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-amber-600">
-                Open
-              </div>
-              <div className="mt-2 text-2xl font-black text-amber-800">
-                {taskforceStats.open.toLocaleString('en-IN')}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-blue-600">
-                In Progress
-              </div>
-              <div className="mt-2 text-2xl font-black text-blue-800">
-                {taskforceStats.inProgress.toLocaleString('en-IN')}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-600">
-                Completed
-              </div>
-              <div className="mt-2 text-2xl font-black text-emerald-800">
-                {taskforceStats.completed.toLocaleString('en-IN')}
-              </div>
-            </div>
-          </div>
         </section>
 
         {/* TREND + ZONE */}
@@ -7343,329 +8712,22 @@ export default function CommissionerDashboard() {
                   size={18}
                   className="text-violet-600"
                 />
-                Zone Performance
+                Ward Performance
               </div>
 
               <div className="text-[10px] font-black text-slate-400">
-                {metricLabel}
+                {
+                  wardRows.length
+                }{' '}
+                Wards
               </div>
             </div>
 
-            <div className="h-[340px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <BarChart
-                  data={
-                    rankedZones
-                  }
-                  layout="vertical"
-                  margin={{
-                    left: 8,
-                    right: 24,
-                    top: 4,
-                    bottom: 4,
-                  }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="4 5"
-                    stroke="#e2e8f0"
-                    horizontal={
-                      false
-                    }
-                  />
-
-                  <XAxis
-                    type="number"
-                    domain={[
-                      0,
-                      100,
-                    ]}
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                    tick={{
-                      fontSize:
-                        10,
-                      fill:
-                        '#94a3b8',
-                    }}
-                  />
-
-                  <YAxis
-                    type="category"
-                    dataKey="label"
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                    width={78}
-                    tick={{
-                      fontSize:
-                        10,
-                      fill:
-                        '#475569',
-                      fontWeight:
-                        700,
-                    }}
-                  />
-
-                  <Tooltip
-                    formatter={(
-                      value: any
-                    ) => [
-                      percentText(
-                        Number(
-                          value
-                        )
-                      ),
-                      metricLabel,
-                    ]}
-                    contentStyle={{
-                      borderRadius:
-                        14,
-                      border:
-                        '1px solid #e2e8f0',
-                      fontSize:
-                        11,
-                    }}
-                  />
-
-                  <Bar
-                    dataKey="metricValue"
-                    radius={[
-                      0,
-                      10,
-                      10,
-                      0,
-                    ]}
-                    barSize={22}
-                    cursor="pointer"
-                    isAnimationActive
-                    animationDuration={
-                      700
-                    }
-                    onClick={(
-                      data: any
-                    ) => {
-                      const row =
-                        data?.payload ||
-                        data;
-
-                      if (row) {
-                        openGeo(
-                          row
-                        );
-                      }
-                    }}
-                  >
-                    {rankedZones.map(
-                      (
-                        row
-                      ) => (
-                        <Cell
-                          key={
-                            row.label
-                          }
-                          fill={
-                            negativeMetric
-                              ? negativeColor(
-                                  row.metricValue ||
-                                    0
-                                )
-                              : positiveColor(
-                                  row.metricValue ||
-                                    0
-                                )
-                          }
-                        />
-                      )
-                    )}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </section>
-
-        {/* ZONE × MODULE */}
-        <section className="mt-4 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4 text-sm font-black text-slate-950">
-            Zone · Module
-          </div>
-
-          <div className="overflow-x-auto p-5">
-            <div className="min-w-[980px]">
-              <div className="grid grid-cols-[150px_repeat(5,minmax(145px,1fr))] gap-2">
-                <div />
-
-                {moduleCards.map(
-                  (
-                    module
-                  ) => (
-                    <div
-                      key={
-                        module.key
-                      }
-                      className="px-2 py-2 text-center text-[10px] font-black uppercase tracking-[0.08em] text-slate-400"
-                    >
-                      {
-                        module.label
-                      }
-                    </div>
-                  )
-                )}
-
-                {zoneModuleMatrix.flatMap(
-                  (
-                    row
-                  ) => [
-                    <div
-                      key={`${row.zone}-label`}
-                      className="flex items-center rounded-xl bg-slate-50 px-3 text-xs font-black text-slate-700"
-                    >
-                      {
-                        row.zone
-                      }
-                    </div>,
-
-                    ...row.cells.map(
-                      (
-                        cell
-                      ) => {
-                        const value =
-                          cell.value ||
-                          0;
-
-                        return (
-                          <button
-                            key={`${row.zone}-${cell.key}`}
-                            type="button"
-                            onClick={() =>
-                              setDrilldown(
-                                {
-                                  title:
-                                    `${row.zone} · ${cell.label}`,
-                                  value:
-                                    percentText(
-                                      cell.value
-                                    ),
-                                  inspectionRecords:
-                                    cell.records,
-                                  attendanceEmployees:
-                                    cell.employees,
-                                  wardRows:
-                                    cell.wards,
-                                }
-                              )
-                            }
-                            className={`group relative min-h-[66px] overflow-hidden rounded-xl border border-white/60 p-3 text-center transition duration-300 hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-lg ${heatTextClass(
-                              value
-                            )}`}
-                            style={{
-                              background:
-                                positiveColor(
-                                  value
-                                ),
-                            }}
-                          >
-                            <div className="text-lg font-black">
-                              {percentText(
-                                cell.value
-                              )}
-                            </div>
-
-                            <div className="absolute inset-x-2 bottom-1 hidden rounded-lg bg-white/95 px-2 py-1 text-[9px] font-black text-slate-900 shadow-lg group-hover:block">
-                              {cell.records.length +
-                                cell.employees.length +
-                                cell.wards.length}
-                            </div>
-                          </button>
-                        );
-                      }
-                    ),
-                  ]
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* WARD HEATMAP */}
-        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-black text-slate-950">
-              <Trophy
-                size={18}
-                className="text-indigo-600"
-              />
-              Ward Performance
-            </div>
-
-            <div className="text-[10px] font-black text-slate-400">
-              {metricLabel}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-9">
-            {rankedWards.map(
-              (row) => {
-                const value =
-                  row.metricValue ||
-                  0;
-
-                return (
-                  <button
-                    key={
-                      row.label
-                    }
-                    type="button"
-                    onClick={() =>
-                      openGeo(
-                        row
-                      )
-                    }
-                    className={`group relative min-h-[78px] overflow-hidden rounded-2xl border border-white/50 p-3 text-left transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-xl ${heatTextClass(
-                      value
-                    )}`}
-                    style={{
-                      background:
-                        negativeMetric
-                          ? negativeColor(
-                              value
-                            )
-                          : positiveColor(
-                              value
-                            ),
-                    }}
-                  >
-                    <div className="truncate text-[10px] font-black">
-                      {
-                        row.label
-                      }
-                    </div>
-
-                    <div className="mt-2 text-xl font-black">
-                      {percentText(
-                        row.metricValue
-                      )}
-                    </div>
-
-                    <div className="absolute inset-x-2 bottom-1 hidden rounded-lg bg-white/95 px-2 py-1 text-center text-[9px] font-black text-slate-950 shadow-lg group-hover:block">
-                      {row.records.length +
-                        row.employees.length +
-                        row.wards.length}
-                    </div>
-                  </button>
-                );
+            <WardPerformanceScroller
+              wards={
+                wardRows
               }
-            )}
+            />
           </div>
         </section>
 
@@ -7903,7 +8965,7 @@ export default function CommissionerDashboard() {
                 size={18}
                 className="text-violet-600"
               />
-              Performance
+              User Performance
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -7943,78 +9005,135 @@ export default function CommissionerDashboard() {
           </div>
 
           <div className="mt-5 space-y-2">
-            {activeRoleRows
-              .slice(
-                0,
-                15
+            {pagedRoleRows.map(
+              (
+                row,
+                index
+              ) => (
+                <button
+                  key={
+                    row.key
+                  }
+                  type="button"
+                  onClick={() =>
+                    openRoleRow(
+                      row
+                    )
+                  }
+                  className="group grid w-full grid-cols-[32px_minmax(120px,220px)_1fr_70px] items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-left transition hover:border-indigo-100 hover:bg-indigo-50/50"
+                >
+                  <div className="text-center text-[10px] font-black text-slate-400">
+                    {roleRowsStart +
+                      index +
+                      1}
+                  </div>
+
+                  <div className="truncate text-xs font-black text-slate-800">
+                    {
+                      row.label
+                    }
+                  </div>
+
+                  <div className="relative h-2 rounded-full bg-slate-100">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full transition-all duration-700"
+                      style={{
+                        width:
+                          `${clamp(
+                            row.performance
+                          )}%`,
+                        background:
+                          `linear-gradient(90deg,#c7d2fe,${positiveColor(
+                            row.performance
+                          )})`,
+                      }}
+                    />
+
+                    <span
+                      className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-white shadow-md transition-all duration-700"
+                      style={{
+                        left:
+                          `calc(${clamp(
+                            row.performance
+                          )}% - 8px)`,
+                        background:
+                          positiveColor(
+                            row.performance
+                          ),
+                      }}
+                    />
+                  </div>
+
+                  <div className="text-right text-xs font-black text-slate-950">
+                    {percentText(
+                      row.performance
+                    )}
+                  </div>
+                </button>
               )
-              .map(
-                (
-                  row,
-                  index
-                ) => (
-                  <button
-                    key={
-                      row.key
-                    }
-                    type="button"
-                    onClick={() =>
-                      openRoleRow(
-                        row
-                      )
-                    }
-                    className="group grid w-full grid-cols-[32px_minmax(120px,220px)_1fr_70px] items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-left transition hover:border-indigo-100 hover:bg-indigo-50/50"
-                  >
-                    <div className="text-center text-[10px] font-black text-slate-400">
-                      {index +
-                        1}
-                    </div>
-
-                    <div className="truncate text-xs font-black text-slate-800">
-                      {
-                        row.label
-                      }
-                    </div>
-
-                    <div className="relative h-2 rounded-full bg-slate-100">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-700"
-                        style={{
-                          width:
-                            `${clamp(
-                              row.performance
-                            )}%`,
-                          background:
-                            `linear-gradient(90deg,#c7d2fe,${positiveColor(
-                              row.performance
-                            )})`,
-                        }}
-                      />
-
-                      <span
-                        className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-white shadow-md transition-all duration-700"
-                        style={{
-                          left:
-                            `calc(${clamp(
-                              row.performance
-                            )}% - 8px)`,
-                          background:
-                            positiveColor(
-                              row.performance
-                            ),
-                        }}
-                      />
-                    </div>
-
-                    <div className="text-right text-xs font-black text-slate-950">
-                      {percentText(
-                        row.performance
-                      )}
-                    </div>
-                  </button>
-                )
-              )}
+            )}
           </div>
+
+          {roleRowsPageCount >
+            1 && (
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                disabled={
+                  roleRowsPage <=
+                  1
+                }
+                onClick={() =>
+                  setRoleRowsPage(
+                    (
+                      current
+                    ) =>
+                      Math.max(
+                        1,
+                        current -
+                          1
+                      )
+                  )
+                }
+                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
+              >
+                Previous
+              </button>
+
+              <div className="text-xs font-black text-slate-500">
+                {
+                  roleRowsPage
+                }{' '}
+                /{' '}
+                {
+                  roleRowsPageCount
+                }
+              </div>
+
+              <button
+                type="button"
+                disabled={
+                  roleRowsPage >=
+                  roleRowsPageCount
+                }
+                onClick={() =>
+                  setRoleRowsPage(
+                    (
+                      current
+                    ) =>
+                      Math.min(
+                        roleRowsPageCount,
+                        current +
+                          1
+                      )
+                  )
+                }
+                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </section>
 
         {/* ATTENDANCE × INSPECTION */}
@@ -8353,6 +9472,849 @@ export default function CommissionerDashboard() {
               </div>
             </section>
           )}
+
+        {/* ZONE × MODULE */}
+        <section className="mt-4 overflow-hidden rounded-[22px] border border-[#dfe7f5] bg-[#fbfdff] shadow-[0_10px_34px_-22px_rgba(30,64,175,.28)]">
+          {/* HEADER */}
+          <div className="flex flex-col gap-3 border-b border-[#e8edf7] bg-white/95 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-[0_6px_16px_-8px_rgba(37,99,235,.65)]">
+                <BarChart3
+                  size={17}
+                  strokeWidth={2.5}
+                />
+              </span>
+
+              <div className="min-w-0">
+                <div className="truncate text-[14px] font-black leading-tight text-[#11265b]">
+                  Zone · Module Performance
+                </div>
+
+                <div className="mt-0.5 text-[9px] font-semibold text-[#8190b5]">
+                  Module-wise performance across all zones
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-0.5 text-[8px] font-black uppercase tracking-[0.08em] text-[#7b8db7]">
+                View By:
+              </span>
+
+              {DASHBOARD_MODULES.map(
+                (
+                  item
+                ) => (
+                  <button
+                    key={
+                      item.key
+                    }
+                    type="button"
+                    onClick={() =>
+                      setZoneModuleView(
+                        item.key
+                      )
+                    }
+                    className={`rounded-[7px] border px-2 py-1.5 text-[8px] font-black transition ${
+                      zoneModuleView ===
+                        item.key
+                        ? 'border-blue-500 bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-sm'
+                        : 'border-[#e3e9f4] bg-white text-[#53678f] hover:border-blue-200 hover:bg-blue-50'
+                    }`}
+                  >
+                    {item.key ===
+                    'ALL'
+                      ? 'All Modules'
+                      : item.label}
+                  </button>
+                )
+              )}
+
+              <span className="ml-1 flex items-center gap-1.5 rounded-[8px] border border-[#dfe6f2] bg-white px-2.5 py-1.5 text-[8.5px] font-black text-[#53678f] shadow-sm">
+                <CalendarDays
+                  size={11}
+                  className="text-[#8292b5]"
+                />
+                {
+                  zoneModuleDateLabel
+                }
+                <ChevronDown
+                  size={10}
+                  className="text-[#9aa8c5]"
+                />
+              </span>
+            </div>
+          </div>
+
+          {/* MATRIX */}
+          <div className="overflow-x-auto px-4 pb-3 pt-2">
+            <div
+              className="grid min-w-[900px] gap-x-2 gap-y-1.5"
+              style={{
+                gridTemplateColumns: `155px repeat(${visibleZoneModuleCards.length}, minmax(118px, 1fr))`,
+              }}
+            >
+              {/* COLUMN HEADERS */}
+              <div className="flex items-center gap-1.5 px-2 py-2 text-[9px] font-black text-[#24365f]">
+                <MapPin
+                  size={12}
+                  className="text-blue-500"
+                />
+                Zone
+              </div>
+
+              {visibleZoneModuleCards.map(
+                (
+                  module
+                ) => {
+                  const visual =
+                    MODULE_VISUALS[
+                      module.key
+                    ];
+
+                  return (
+                    <div
+                      key={
+                        module.key
+                      }
+                      className="flex items-center justify-center gap-1.5 px-1 py-2 text-center"
+                    >
+                      {visual && (
+                        <span
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px]"
+                          style={{
+                            background:
+                              visual.soft,
+                            color:
+                              visual.color,
+                          }}
+                        >
+                          {
+                            visual.icon
+                          }
+                        </span>
+                      )}
+
+                      <span className="max-w-[96px] text-[8px] font-black leading-[1.15] text-[#293b66]">
+                        {
+                          module.label
+                        }
+                      </span>
+                    </div>
+                  );
+                }
+              )}
+
+              {/* DATA ROWS */}
+              {zoneModuleMatrix.flatMap(
+                (
+                  row,
+                  rowIndex
+                ) => [
+                  <button
+                    key={`${row.zone}-label`}
+                    type="button"
+                    onClick={() =>
+                      setSelectedMapZone(
+                        row.zone
+                      )
+                    }
+                    className={`group flex min-h-[30px] items-center justify-between gap-2 rounded-[8px] px-2.5 py-1.5 text-left text-[9px] font-black transition ${
+                      activeMapZone ===
+                      row.zone
+                        ? 'bg-[#eef3ff] text-[#243fa8] ring-1 ring-[#c7d2fe]'
+                        : 'bg-[#f7f9fd] text-[#34486f] hover:bg-[#f1f5fb]'
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          rowIndex % 4 ===
+                          0
+                            ? 'bg-indigo-500'
+                            : rowIndex % 4 ===
+                              1
+                            ? 'bg-sky-500'
+                            : rowIndex % 4 ===
+                              2
+                            ? 'bg-cyan-500'
+                            : 'bg-blue-400'
+                        }`}
+                      />
+                      <span className="truncate">
+                        {
+                          row.zone
+                        }
+                      </span>
+                    </span>
+
+                    <ChevronRight
+                      size={11}
+                      className="shrink-0 text-[#9aa7c2] transition group-hover:translate-x-0.5"
+                    />
+                  </button>,
+
+                  ...row.cells
+                    .filter(
+                      (
+                        cell
+                      ) =>
+                        visibleZoneModuleCards.some(
+                          (
+                            module
+                          ) =>
+                            module.key ===
+                            cell.key
+                        )
+                    )
+                    .map(
+                      (
+                        cell
+                      ) => {
+                        const value =
+                          cell.value;
+
+                        const barBackground =
+                          value ===
+                          null
+                            ? '#f1f4fa'
+                            : value >= 90
+                            ? 'linear-gradient(90deg,#4338ca 0%,#1d4ed8 100%)'
+                            : value >= 50
+                            ? 'linear-gradient(90deg,#818cf8 0%,#4f46e5 100%)'
+                            : value > 0
+                            ? 'linear-gradient(90deg,#c7d2fe 0%,#818cf8 100%)'
+                            : '#e7ecf5';
+
+                        return (
+                          <button
+                            key={`${row.zone}-${cell.key}`}
+                            type="button"
+                            onClick={() =>
+                              openZoneModuleCell(
+                                row.zone,
+                                cell
+                              )
+                            }
+                            className="group relative flex min-h-[30px] items-center rounded-[8px] border border-[#edf1f8] bg-[#f7f9fd] px-1.5 py-1 transition hover:border-indigo-200 hover:bg-white hover:shadow-sm"
+                          >
+                            {value ===
+                            null ? (
+                              <span className="mx-auto text-[10px] font-black text-[#b1bad0]">
+                                —
+                              </span>
+                            ) : (
+                              <div className="relative h-[18px] w-full overflow-hidden rounded-[6px] bg-[#e9edf7]">
+                                <div
+                                  className="absolute inset-y-0 left-0 rounded-[6px] transition-all duration-700"
+                                  style={{
+                                    width:
+                                      `${Math.max(
+                                        value > 0
+                                          ? 4
+                                          : 0,
+                                        clamp(
+                                          value
+                                        )
+                                      )}%`,
+                                    background:
+                                      barBackground,
+                                  }}
+                                />
+
+                                <div
+                                  className={`absolute inset-0 flex items-center justify-end px-2 text-[8.5px] font-black ${
+                                    value >=
+                                    46
+                                      ? 'text-white'
+                                      : 'text-[#1e3264]'
+                                  }`}
+                                >
+                                  {percentText(
+                                    value
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      }
+                    ),
+                ]
+              )}
+            </div>
+          </div>
+
+          {/* LEGEND */}
+          <div className="flex flex-col gap-2 border-t border-[#eef2f8] bg-white/80 px-4 py-2.5 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[8px] font-bold text-[#6f7fa4]">
+              <span className="font-black text-[#40537e]">
+                Performance Scale:
+              </span>
+
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-[#3730a3]" />
+                90 - 100%
+                <span className="font-semibold text-[#9ba7c0]">
+                  Excellent
+                </span>
+              </span>
+
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-[#818cf8]" />
+                50 - 89%
+                <span className="font-semibold text-[#9ba7c0]">
+                  Good
+                </span>
+              </span>
+
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-[#c7d2fe]" />
+                1 - 49%
+                <span className="font-semibold text-[#9ba7c0]">
+                  Needs Attention
+                </span>
+              </span>
+
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-[#dbe2ef]" />
+                0%
+                <span className="font-semibold text-[#9ba7c0]">
+                  No Data
+                </span>
+              </span>
+
+              <span className="flex items-center gap-1">
+                <span className="text-[11px] font-black text-[#c0c8d8]">
+                  —
+                </span>
+                Not Applicable
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1 text-[8px] font-bold text-[#8a98b6]">
+              Click on a zone to view detailed performance
+              <ChevronRight
+                size={10}
+              />
+            </div>
+          </div>
+
+          {/* ZONE MAP + DETAIL */}
+          <div className="grid grid-cols-1 gap-3 border-t border-[#edf1f7] bg-[#fbfdff] p-3 xl:grid-cols-[0.9fr_1.12fr]">
+            {/* VISUAL ZONE MAP */}
+            <div className="overflow-hidden rounded-[16px] border border-[#e1e8f3] bg-white shadow-[0_7px_22px_-18px_rgba(37,99,235,.32)]">
+              <div className="flex items-center justify-between gap-3 border-b border-[#eef2f7] px-3.5 py-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-sm">
+                    <MapPin
+                      size={13}
+                    />
+                  </span>
+
+                  <div>
+                    <div className="text-[11px] font-black text-[#1b2f5e]">
+                      Zone Performance Map
+                    </div>
+
+                    <div className="mt-0.5 text-[7.5px] font-semibold text-[#9aa7c1]">
+                      Visual representation of zone performance
+                    </div>
+                  </div>
+                </div>
+
+                <select
+                  value={
+                    metricFilter
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setMetricFilter(
+                      event
+                        .target
+                        .value as MetricKey
+                    )
+                  }
+                  className="h-7 rounded-[7px] border border-[#e1e7f1] bg-white px-2 text-[8px] font-black text-[#53678f] outline-none transition focus:border-indigo-300"
+                >
+                  {METRICS.map(
+                    (
+                      metric
+                    ) => (
+                      <option
+                        key={
+                          metric.key
+                        }
+                        value={
+                          metric.key
+                        }
+                      >
+                        {
+                          metric.label
+                        }
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              <div className="relative min-h-[250px] bg-[radial-gradient(circle_at_30%_35%,rgba(219,234,254,.65),transparent_32%),linear-gradient(180deg,#fbfdff_0%,#f7faff_100%)] px-3 py-2">
+                <svg
+                  viewBox="0 0 410 300"
+                  className="mx-auto h-[238px] w-full max-w-[430px]"
+                  role="img"
+                  aria-label="Visual representation of zone performance"
+                >
+                  {zoneModuleMatrix
+                    .slice(
+                      0,
+                      6
+                    )
+                    .map(
+                      (
+                        row,
+                        index
+                      ) => {
+                        const zoneRow =
+                          zoneRows.find(
+                            (
+                              item
+                            ) =>
+                              item.label ===
+                              row.zone
+                          );
+
+                        const value =
+                          zoneRow
+                            ? geoMetric(
+                                zoneRow
+                              )
+                            : null;
+
+                        const paths =
+                          [
+                            'M150 27 L214 17 L242 66 L215 113 L159 105 L130 60 Z',
+                            'M79 88 L130 60 L159 105 L143 160 L83 177 L49 132 Z',
+                            'M159 105 L215 113 L232 166 L192 211 L143 160 Z',
+                            'M242 66 L307 53 L345 91 L326 145 L232 166 L215 113 Z',
+                            'M232 166 L326 145 L351 203 L306 247 L226 232 L192 211 Z',
+                            'M143 160 L192 211 L226 232 L191 282 L122 262 L94 209 Z',
+                          ];
+
+                        const labels =
+                          [
+                            {
+                              x: 185,
+                              y: 68,
+                            },
+                            {
+                              x: 101,
+                              y: 128,
+                            },
+                            {
+                              x: 185,
+                              y: 160,
+                            },
+                            {
+                              x: 286,
+                              y: 111,
+                            },
+                            {
+                              x: 285,
+                              y: 205,
+                            },
+                            {
+                              x: 159,
+                              y: 238,
+                            },
+                          ];
+
+                        const selected =
+                          activeMapZone ===
+                          row.zone;
+
+                        const label =
+                          labels[
+                            index
+                          ];
+
+                        return (
+                          <g
+                            key={
+                              row.zone
+                            }
+                            onClick={() =>
+                              setSelectedMapZone(
+                                row.zone
+                              )
+                            }
+                            className="cursor-pointer"
+                          >
+                            <path
+                              d={
+                                paths[
+                                  index
+                                ]
+                              }
+                              fill={
+                                value ===
+                                null
+                                  ? '#e9eef7'
+                                  : positiveColor(
+                                      value
+                                    )
+                              }
+                              stroke={
+                                selected
+                                  ? '#1d4ed8'
+                                  : '#ffffff'
+                              }
+                              strokeWidth={
+                                selected
+                                  ? 5
+                                  : 3
+                              }
+                              style={{
+                                filter:
+                                  selected
+                                    ? 'drop-shadow(0 5px 8px rgba(37,99,235,.28))'
+                                    : 'drop-shadow(0 2px 3px rgba(30,64,175,.08))',
+                                transition:
+                                  'all .25s ease',
+                              }}
+                            />
+
+                            <circle
+                              cx={
+                                label.x
+                              }
+                              cy={
+                                label.y -
+                                13
+                              }
+                              r="4.5"
+                              fill={
+                                selected
+                                  ? '#ffffff'
+                                  : value !==
+                                      null &&
+                                    value >=
+                                      66
+                                  ? '#ffffff'
+                                  : '#4f46e5'
+                              }
+                              stroke="#4f46e5"
+                              strokeWidth="1.5"
+                            />
+
+                            <text
+                              x={
+                                label.x
+                              }
+                              y={
+                                label.y +
+                                1
+                              }
+                              textAnchor="middle"
+                              fontSize="9"
+                              fontWeight="800"
+                              fill={
+                                value !==
+                                  null &&
+                                value >=
+                                  66
+                                  ? '#ffffff'
+                                  : '#18305f'
+                              }
+                            >
+                              {row.zone.length >
+                              12
+                                ? `${row.zone.slice(
+                                    0,
+                                    11
+                                  )}…`
+                                : row.zone}
+                            </text>
+
+                            <text
+                              x={
+                                label.x
+                              }
+                              y={
+                                label.y +
+                                15
+                              }
+                              textAnchor="middle"
+                              fontSize="11"
+                              fontWeight="900"
+                              fill={
+                                value !==
+                                  null &&
+                                value >=
+                                  66
+                                  ? '#ffffff'
+                                  : '#132a58'
+                              }
+                            >
+                              {percentText(
+                                value
+                              )}
+                            </text>
+                          </g>
+                        );
+                      }
+                    )}
+                </svg>
+
+                {zoneModuleMatrix.length >
+                  6 && (
+                  <div className="absolute bottom-2 left-3 right-3 flex flex-wrap justify-center gap-1">
+                    {zoneModuleMatrix
+                      .slice(
+                        6
+                      )
+                      .map(
+                        (
+                          row
+                        ) => {
+                          const zoneRow =
+                            zoneRows.find(
+                              (
+                                item
+                              ) =>
+                                item.label ===
+                                row.zone
+                            );
+
+                          const value =
+                            zoneRow
+                              ? geoMetric(
+                                  zoneRow
+                                )
+                              : null;
+
+                          return (
+                            <button
+                              key={
+                                row.zone
+                              }
+                              type="button"
+                              onClick={() =>
+                                setSelectedMapZone(
+                                  row.zone
+                                )
+                              }
+                              className={`rounded-full border px-2 py-1 text-[7px] font-black ${
+                                activeMapZone ===
+                                row.zone
+                                  ? 'border-indigo-400 bg-indigo-600 text-white'
+                                  : 'border-slate-200 bg-white text-slate-600'
+                              }`}
+                            >
+                              {
+                                row.zone
+                              }{' '}
+                              ·{' '}
+                              {percentText(
+                                value
+                              )}
+                            </button>
+                          );
+                        }
+                      )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ACTIVE ZONE DETAIL */}
+            <div className="overflow-hidden rounded-[16px] border border-[#e1e8f3] bg-white shadow-[0_7px_22px_-18px_rgba(37,99,235,.32)]">
+              <div className="flex items-center justify-between gap-3 border-b border-[#edf1f7] px-3.5 py-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-[0_6px_16px_-8px_rgba(37,99,235,.7)]">
+                    <MapPin
+                      size={14}
+                    />
+                  </span>
+
+                  <div className="min-w-0">
+                    <div className="truncate text-[12px] font-black text-[#152a59]">
+                      {activeMapZone ||
+                        'Select Zone'}
+                    </div>
+
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[8px] font-semibold text-[#8c99b6]">
+                      Overall Performance
+                      <span className="text-[10px] font-black text-[#243d75]">
+                        {percentText(
+                          activeMapZoneOverall?.performance
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    !activeMapZoneOverall
+                  }
+                  onClick={() =>
+                    activeMapZoneOverall &&
+                    openGeo(
+                      activeMapZoneOverall
+                    )
+                  }
+                  className="flex shrink-0 items-center gap-1 rounded-[7px] border border-blue-200 bg-blue-50 px-2 py-1.5 text-[8px] font-black text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  View Zone Details
+                  <ChevronRight
+                    size={10}
+                  />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 p-2.5 sm:grid-cols-3 xl:grid-cols-5">
+                {activeMapZoneCells.map(
+                  (
+                    cell
+                  ) => {
+                    const visual =
+                      MODULE_VISUALS[
+                        cell.key
+                      ];
+
+                    const value =
+                      cell.value;
+
+                    const progress =
+                      value ===
+                      null
+                        ? 0
+                        : clamp(
+                            value
+                          );
+
+                    const itemCount =
+                      cell.records.length +
+                      cell.employees.length +
+                      cell.wards.length;
+
+                    const itemLabel =
+                      cell.key ===
+                      'ATTENDANCE'
+                        ? 'Employees'
+                        : cell.key ===
+                          'WARD_RANKING'
+                        ? 'Wards'
+                        : 'Records';
+
+                    const accent =
+                      visual?.color ||
+                      '#4f46e5';
+
+                    return (
+                      <button
+                        key={
+                          cell.key
+                        }
+                        type="button"
+                        onClick={() =>
+                          activeMapZone &&
+                          openZoneModuleCell(
+                            activeMapZone,
+                            cell
+                          )
+                        }
+                        className="group relative min-h-[152px] overflow-hidden rounded-[12px] border border-[#edf1f7] bg-gradient-to-b from-white to-[#fbfcff] px-2 py-2.5 text-center transition duration-300 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-[0_10px_20px_-16px_rgba(79,70,229,.45)]"
+                      >
+                        <div className="flex min-h-[32px] items-center justify-center gap-1.5">
+                          {visual && (
+                            <span
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px]"
+                              style={{
+                                color:
+                                  visual.color,
+                                background:
+                                  visual.soft,
+                              }}
+                            >
+                              {
+                                visual.icon
+                              }
+                            </span>
+                          )}
+
+                          <span className="text-left text-[7.5px] font-black leading-[1.1] text-[#34496f]">
+                            {
+                              cell.label
+                            }
+                          </span>
+                        </div>
+
+                        <div
+                          className="relative mx-auto mt-2 flex h-[58px] w-[58px] items-center justify-center rounded-full"
+                          style={{
+                            background:
+                              value ===
+                              null
+                                ? '#edf1f6'
+                                : `conic-gradient(${accent} ${
+                                    progress *
+                                    3.6
+                                  }deg, #e9edf4 0deg)`,
+                          }}
+                        >
+                          <div className="absolute inset-[6px] rounded-full bg-white shadow-[inset_0_1px_5px_rgba(15,23,42,.05)]" />
+
+                          <div
+                            className="relative text-[11px] font-black"
+                            style={{
+                              color:
+                                value ===
+                                null
+                                  ? '#a6b0c5'
+                                  : '#1d3263',
+                            }}
+                          >
+                            {percentText(
+                              value
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-1.5 text-[7.5px] font-bold text-[#98a4bd]">
+                          {value ===
+                          null
+                            ? 'No data'
+                            : 'Current filter'}
+                        </div>
+
+                        <div
+                          className="mx-auto mt-2 rounded-[6px] px-2 py-1 text-[7.5px] font-black"
+                          style={{
+                            background:
+                              visual?.soft ||
+                              '#f3f4f6',
+                            color:
+                              visual?.color ||
+                              '#4f46e5',
+                          }}
+                        >
+                          {itemLabel}{' '}
+                          {itemCount.toLocaleString(
+                            'en-IN'
+                          )}
+                        </div>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* WARD RANKING */}
         {(
