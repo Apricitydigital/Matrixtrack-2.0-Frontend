@@ -250,7 +250,7 @@ function PortalHomeLayoutContent({
   const [
     systemManagementOpen,
     setSystemManagementOpen,
-  ] = useState(true);
+  ] = useState(isSystemManagementActive);
 
 
   /* =========================================================
@@ -1910,7 +1910,7 @@ function PortalHomeLayoutContent({
           LEFT SIDEBAR (DRAWER ON MOBILE, FIXED ON LG)
       ===================================================== */}
       <aside
-        className={`fixed left-0 top-0 bottom-0 bg-white border-r border-slate-200 flex flex-col justify-between h-screen overflow-y-auto scrollbar-hide z-50 transition-all duration-300 ease-out ${sidebarCollapsed ? 'lg:w-[76px] lg:p-3 p-5 w-72' : 'w-72 p-5'
+        className={`fixed left-0 top-0 bottom-0 bg-white border-r border-slate-200 flex flex-col h-screen z-50 transition-all duration-300 ease-out ${sidebarCollapsed ? 'lg:w-[76px] lg:p-3 p-5 w-72' : 'w-72 p-5'
           } ${mobileMenuOpen
             ? 'translate-x-0 shadow-2xl'
             : '-translate-x-full lg:translate-x-0'
@@ -1919,7 +1919,7 @@ function PortalHomeLayoutContent({
         <div className="flex flex-col gap-6 flex-1 min-h-0">
 
           {/* LOGO & CLOSE / TOGGLE BUTTON */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between shrink-0">
             <Link
               href={isUlbUser ? "/ulb/dashboard" : "/portal-home"}
               onClick={() => setMobileMenuOpen(false)}
@@ -1962,7 +1962,7 @@ function PortalHomeLayoutContent({
           </div>
 
 
-          <nav className="flex flex-col gap-2 flex-1">
+          <nav className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto scrollbar-hide -mr-2 pr-2">
 
 
             {/* =================================================
@@ -3302,7 +3302,7 @@ function PortalHomeLayoutContent({
             DISPLAY & SESSION CONTROLS
         ===================================================== */}
 
-        <div className="flex flex-col gap-2.5 border-t border-slate-200 pt-4 mt-6">
+        <div className="shrink-0 flex flex-col gap-2 border-t border-slate-200 pt-3 mt-3">
 
           {/* Expand Button: ONLY visible on desktop when sidebar is collapsed */}
           {sidebarCollapsed && (
@@ -3316,26 +3316,28 @@ function PortalHomeLayoutContent({
             </button>
           )}
 
-          <button
-            onClick={toggleDarkMode}
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 font-bold text-sm rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''}`}
-            title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
-            {isDarkMode ? <Sun size={16} className="shrink-0 text-amber-500" /> : <Moon size={16} className="shrink-0 text-slate-600" />}
-            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
-              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            </span>
-          </button>
+          <div className={`flex items-center gap-2 ${sidebarCollapsed ? 'lg:flex-col' : ''}`}>
+            <button
+              onClick={toggleDarkMode}
+              className={`flex items-center justify-center gap-2 flex-1 h-10 px-3 font-bold text-xs rounded-xl transition-all shadow-sm bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200 ${sidebarCollapsed ? 'lg:w-full lg:px-0' : ''}`}
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Sun size={15} className="shrink-0 text-amber-500" /> : <Moon size={15} className="shrink-0 text-slate-600" />}
+              <span className={`truncate ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              </span>
+            </button>
 
-          <button
-            onClick={handleLogout}
-            className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-rose-50 border border-rose-200 text-rose-600 font-extrabold text-sm rounded-xl hover:bg-rose-100 transition-all shadow-sm cursor-pointer ${sidebarCollapsed ? 'lg:px-0 lg:justify-center' : ''
-              }`}
-            title="Sign out of portal"
-          >
-            <LogOut size={16} className="shrink-0" />
-            <span className={sidebarCollapsed ? 'lg:hidden' : ''}>Logout</span>
-          </button>
+            <button
+              onClick={handleLogout}
+              className={`flex items-center justify-center gap-2 flex-1 h-10 px-3 bg-rose-50 border border-rose-200 text-rose-600 font-extrabold text-xs rounded-xl hover:bg-rose-100 transition-all shadow-sm cursor-pointer ${sidebarCollapsed ? 'lg:w-full lg:px-0' : ''
+                }`}
+              title="Sign out of portal"
+            >
+              <LogOut size={15} className="shrink-0" />
+              <span className={`truncate ${sidebarCollapsed ? 'lg:hidden' : ''}`}>Logout</span>
+            </button>
+          </div>
 
         </div>
 
