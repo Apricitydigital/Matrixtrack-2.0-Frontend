@@ -3325,30 +3325,46 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Present"
-              value={isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalPresent / avgDivisor) : numberFormatter.format(registeredEmpData.totalPresent))
+                  : (isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present))
+              }
               icon={<UserCheck size={18} />}
               tone="emerald"
               active={kpiDrilldown?.key === "PRESENT"}
               onClick={() => openKpiDrilldown({
                 key: "PRESENT",
                 title: "Present employees",
-                subtitle: "Employees marked present within the current date range and active filters.",
-                value: numberFormatter.format(summary.present),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? `${registeredEmpData.totalPresent} registered health workers marked present.`
+                  : "Employees marked present within the current date range and active filters.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? numberFormatter.format(registeredEmpData.totalPresent)
+                  : numberFormatter.format(summary.present),
                 tone: "emerald",
                 query: { status: "P" },
               })}
             />
             <KpiCard
               label="Absent"
-              value={isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalAbsent / avgDivisor) : numberFormatter.format(registeredEmpData.totalAbsent))
+                  : (isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent))
+              }
               icon={<UserRoundX size={18} />}
               tone="rose"
               active={kpiDrilldown?.key === "ABSENT"}
               onClick={() => openKpiDrilldown({
                 key: "ABSENT",
                 title: "Absent employees",
-                subtitle: "Employees marked absent within the current date range and active filters.",
-                value: numberFormatter.format(summary.absent),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? `${registeredEmpData.totalAbsent} registered health workers marked absent.`
+                  : "Employees marked absent within the current date range and active filters.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? numberFormatter.format(registeredEmpData.totalAbsent)
+                  : numberFormatter.format(summary.absent),
                 tone: "rose",
                 query: { status: "A" },
               })}
@@ -3357,7 +3373,7 @@ function AttendanceDashboard() {
               label="Attendance rate"
               value={
                 employeeGroup === "HEALTH_WORKERS" && registeredEmpData && registeredEmpData.totalRegistered > 0
-                  ? `${((summary.present / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
+                  ? `${((registeredEmpData.totalPresent / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
                   : `${summary.attendanceRate.toFixed(1)}%`
               }
               icon={<Activity size={18} />}
@@ -3367,9 +3383,11 @@ function AttendanceDashboard() {
                 key: "RATE",
                 title: "Attendance rate · Present records",
                 subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
-                  ? `Present ÷ total registered (${summary.present} present of ${registeredEmpData.totalRegistered} registered).`
+                  ? `Present ÷ total registered (${registeredEmpData.totalPresent} present of ${registeredEmpData.totalRegistered} registered).`
                   : "Present employee records used to calculate the attendance rate for the current selection.",
-                value: `${summary.attendanceRate.toFixed(1)}%`,
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && registeredEmpData.totalRegistered > 0
+                  ? `${((registeredEmpData.totalPresent / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
+                  : `${summary.attendanceRate.toFixed(1)}%`,
                 tone: "violet",
                 query: { status: "P" },
               })}
