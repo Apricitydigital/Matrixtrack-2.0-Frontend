@@ -3397,15 +3397,23 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Punch In"
-              value={isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalPresent / avgDivisor) : numberFormatter.format(registeredEmpData.totalPresent))
+                  : (isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount))
+              }
               icon={<Clock3 size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "PUNCH_IN"}
               onClick={() => openKpiDrilldown({
                 key: "PUNCH_IN",
                 title: "Punch In records",
-                subtitle: "Employees with a recorded Punch In within the current selection.",
-                value: numberFormatter.format(punchInCount),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? `${registeredEmpData.totalPresent} registered health workers recorded a punch in.`
+                  : "Employees with a recorded Punch In within the current selection.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? numberFormatter.format(registeredEmpData.totalPresent)
+                  : numberFormatter.format(punchInCount),
                 tone: "blue",
                 query: { checkoutState: "HAS_CHECKIN" },
               })}
@@ -3427,15 +3435,23 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Not punched out"
-              value={isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? (isMultiDayRange ? formatAverageValue(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut) / avgDivisor) : numberFormatter.format(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut)))
+                  : (isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns))
+              }
               icon={<TimerReset size={18} />}
               tone="amber"
               active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
               onClick={() => openKpiDrilldown({
                 key: "OPEN_PUNCH_IN",
                 title: "Not punched out records",
-                subtitle: "Employees with Punch In recorded but no Punch Out yet.",
-                value: numberFormatter.format(summary.openCheckIns),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? `${Math.max(0, registeredEmpData.totalPresent - summary.checkedOut)} registered health workers with Punch In recorded but Punch Out pending.`
+                  : "Employees with Punch In recorded but no Punch Out yet.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                  ? numberFormatter.format(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut))
+                  : numberFormatter.format(summary.openCheckIns),
                 tone: "amber",
                 query: { checkoutState: "OPEN_CHECKIN" },
               })}
