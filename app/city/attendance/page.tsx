@@ -1486,6 +1486,9 @@ function AttendanceDashboard() {
       .map((role) => String(role).toUpperCase())
   );
   const isUlbOfficer = attendanceRoles.has("ULB_OFFICER");
+  const isCityAdmin =
+    hmsSuperAdmin ||
+    attendanceRoles.has("CITY_ADMIN");
   const canUploadAttendance =
     hmsSuperAdmin ||
     attendanceRoles.has("CITY_ADMIN") ||
@@ -3210,8 +3213,8 @@ function AttendanceDashboard() {
         </section>
       ) : (
         <>
-          {/* Health Worker registered employees stats banner */}
-          {employeeGroup === "HEALTH_WORKERS" && (
+          {/* Health Worker registered employees stats banner - visible to City Admin & Super Admin */}
+          {employeeGroup === "HEALTH_WORKERS" && isCityAdmin && (
             <section className="rounded-2xl border border-teal-200/80 bg-gradient-to-r from-teal-50 via-emerald-50/60 to-white p-4 shadow-sm">
               {registeredEmpLoading ? (
                 <div className="flex items-center gap-2 text-xs font-semibold text-teal-700">
