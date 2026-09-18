@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -34,9 +35,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -55,7 +53,6 @@ import {
   type WardRankingQuery,
   type WardRankingComponent,
   type WardRankingRow,
-  type WardRankingSummaryResponse,
   type WardComponentScore,
 } from '@lib/wardRankingApi';
 
@@ -151,7 +148,11 @@ const PERIOD_OPTIONS: Array<{
     },
     {
       key: 'CUSTOM',
-      label: 'Custom',
+      label: 'Date Range',
+    },
+    {
+      key: 'ALL',
+      label: 'All',
     },
   ];
 
@@ -270,7 +271,11 @@ function resolvePeriodRange(
   type: WardRankingPeriodType,
   anchorDate: string,
   customFrom: string,
-  customTo: string
+  customTo: string,
+  allDateBounds?: {
+    from: string;
+    to: string;
+  } | null
 ) {
   const safeAnchor =
     anchorDate ||
@@ -327,6 +332,20 @@ function resolvePeriodRange(
         toLocalISO(start),
 
       to:
+        safeAnchor,
+    };
+  }
+
+  if (
+    type === 'ALL'
+  ) {
+    return {
+      from:
+        allDateBounds?.from ||
+        safeAnchor,
+
+      to:
+        allDateBounds?.to ||
         safeAnchor,
     };
   }
@@ -824,6 +843,46 @@ const STATUS_FILTER_VALUES: StatusFilter[] = [
   'RED',
 ];
 
+const RANKING_CACHE_TTL_MS =
+  5 * 60 * 1000;
+
+type RankingCacheEntry = {
+  expiresAt: number;
+  rows: WardRankingRow[];
+};
+
+const rankingQueryCache =
+  new Map<
+    string,
+    RankingCacheEntry
+  >();
+
+function rankingCacheKey(
+  query: WardRankingQuery
+) {
+  return JSON.stringify({
+    from:
+      query.from ||
+      '',
+    to:
+      query.to ||
+      '',
+    zoneId:
+      query.zoneId ||
+      '',
+    wardId:
+      query.wardId ||
+      '',
+    module:
+      query.module ||
+      '',
+    allDates:
+      Boolean(
+        query.allDates
+      ),
+  });
+}
+
 export default function WardRankingWorkspace() {
   const searchParams = useSearchParams();
 
@@ -857,6 +916,33 @@ export default function WardRankingWorkspace() {
   ] =
     useState(
       todayString()
+    );
+
+  const [
+    customFromDraft,
+    setCustomFromDraft,
+  ] =
+    useState(
+      todayString()
+    );
+
+  const [
+    customToDraft,
+    setCustomToDraft,
+  ] =
+    useState(
+      todayString()
+    );
+
+  const [
+    allDateBounds,
+    setAllDateBounds,
+  ] =
+    useState<{
+      from: string;
+      to: string;
+    } | null>(
+      null
     );
 
   const [
@@ -930,14 +1016,6 @@ export default function WardRankingWorkspace() {
     useState<WardRankingRow[]>([]);
 
   const [
-    summary,
-    setSummary,
-  ] =
-    useState<WardRankingSummaryResponse | null>(
-      null
-    );
-
-  const [
     loading,
     setLoading,
   ] =
@@ -987,6 +1065,11 @@ export default function WardRankingWorkspace() {
       null
     );
 
+  const requestSequenceRef =
+    useRef(0);
+
+  const initialLoadCompleteRef =
+    useRef(false);
 
 
   const dateRange =
@@ -996,7 +1079,8 @@ export default function WardRankingWorkspace() {
           periodType,
           anchorDate,
           customFrom,
-          customTo
+          customTo,
+          allDateBounds
         ),
 
       [
@@ -1004,6 +1088,7 @@ export default function WardRankingWorkspace() {
         anchorDate,
         customFrom,
         customTo,
+        allDateBounds,
       ]
     );
 
@@ -1076,6 +1161,12 @@ export default function WardRankingWorkspace() {
             'ALL'
             ? undefined
             : moduleFilter,
+
+        allDates:
+          periodType ===
+            'ALL'
+            ? true
+            : undefined,
       }),
 
       [
@@ -1084,6 +1175,7 @@ export default function WardRankingWorkspace() {
         selectedZoneId,
         selectedWardId,
         moduleFilter,
+        periodType,
       ]
     );
 
@@ -1155,64 +1247,153 @@ export default function WardRankingWorkspace() {
     );
 
 
+  const loadDateBounds =
+    useCallback(
+      async () => {
+        try {
+          const response =
+            await WardRankingApi
+              .dateBounds();
+
+          setAllDateBounds({
+            from:
+              response.from,
+            to:
+              response.to,
+          });
+        } catch (
+        boundsError
+        ) {
+          console.warn(
+            '[WardRanking] Unable to load date bounds',
+            boundsError
+          );
+        }
+      },
+      []
+    );
+
+
   const loadRanking =
     useCallback(
       async (
         manualRefresh = false
       ) => {
+        const requestId =
+          ++requestSequenceRef.current;
+
+        const cacheKey =
+          rankingCacheKey(
+            rankingQuery
+          );
+
+        const cached =
+          manualRefresh
+            ? undefined
+            : rankingQueryCache.get(
+              cacheKey
+            );
+
+        if (
+          cached &&
+          cached.expiresAt >
+          Date.now()
+        ) {
+          setRows(
+            cached.rows
+          );
+
+          setError('');
+          setLoading(false);
+          setRefreshing(false);
+
+          initialLoadCompleteRef
+            .current = true;
+
+          return;
+        }
+
+        const isInitialLoad =
+          !initialLoadCompleteRef
+            .current;
+
         try {
           if (
-            manualRefresh
+            isInitialLoad
           ) {
-            setRefreshing(
+            setLoading(
               true
             );
           } else {
-            setLoading(
+            setRefreshing(
               true
             );
           }
 
           setError('');
 
-          const [
-            rankingResponse,
-            summaryResponse,
-          ] =
-            await Promise.all([
-              WardRankingApi.list(
-                rankingQuery
-              ),
+          const rankingResponse =
+            await WardRankingApi.list(
+              rankingQuery
+            );
 
-              WardRankingApi.summary(
-                rankingQuery
-              ),
-            ]);
+          if (
+            requestId !==
+            requestSequenceRef.current
+          ) {
+            return;
+          }
 
-          setRows(
+          const mergedRows =
             mergeRankingRows(
               rankingResponse
-            )
+            );
+
+          setRows(
+            mergedRows
           );
 
-          setSummary(
-            summaryResponse
+          rankingQueryCache.set(
+            cacheKey,
+            {
+              expiresAt:
+                Date.now() +
+                RANKING_CACHE_TTL_MS,
+
+              rows:
+                mergedRows,
+            }
           );
+
+          initialLoadCompleteRef
+            .current = true;
         } catch (
         err: any
         ) {
+          if (
+            requestId !==
+            requestSequenceRef.current
+          ) {
+            return;
+          }
+
           setError(
             err?.message ||
             'Unable to load Ward Ranking.'
           );
         } finally {
-          setLoading(
-            false
-          );
+          if (
+            requestId ===
+            requestSequenceRef.current
+          ) {
+            setLoading(
+              false
+            );
 
-          setRefreshing(
-            false
-          );
+            setRefreshing(
+              false
+            );
+          }
         }
       },
 
@@ -1225,19 +1406,36 @@ export default function WardRankingWorkspace() {
   useEffect(
     () => {
       void loadGeo();
+      void loadDateBounds();
     },
     [
       loadGeo,
+      loadDateBounds,
     ]
   );
 
 
+  const rankingReady =
+    periodType !==
+      'ALL' ||
+    Boolean(
+      allDateBounds
+    );
+
+
   useEffect(
     () => {
+      if (
+        !rankingReady
+      ) {
+        return;
+      }
+
       void loadRanking();
     },
     [
       loadRanking,
+      rankingReady,
     ]
   );
 
@@ -1524,91 +1722,6 @@ export default function WardRankingWorkspace() {
 
 
 
-  const performanceDistributionData =
-    useMemo(
-      () => [
-        {
-          name: 'Green',
-          value: counts.green,
-          color: CHART_COLORS.emerald,
-        },
-        {
-          name: 'Amber',
-          value: counts.amber,
-          color: CHART_COLORS.amber,
-        },
-        {
-          name: 'Red',
-          value: counts.red,
-          color: CHART_COLORS.rose,
-        },
-        {
-          name: 'No Data',
-          value: counts.noData,
-          color: CHART_COLORS.slate,
-        },
-      ],
-      [
-        counts.green,
-        counts.amber,
-        counts.red,
-        counts.noData,
-      ]
-    );
-
-
-  const topWardChartData =
-    useMemo(
-      () =>
-        rankableRows
-          .slice()
-          .sort(
-            (
-              first,
-              second
-            ) => {
-              const firstRank =
-                first.cityRank ??
-                Number.MAX_SAFE_INTEGER;
-
-              const secondRank =
-                second.cityRank ??
-                Number.MAX_SAFE_INTEGER;
-
-              return (
-                firstRank -
-                secondRank
-              );
-            }
-          )
-          .slice(
-            0,
-            10
-          )
-          .map(
-            (
-              item
-            ) => ({
-              ward:
-                item.wardName ||
-                'Ward',
-
-              score:
-                Number(
-                  item.finalScore ||
-                  0
-                ),
-
-              rank:
-                item.cityRank,
-            })
-          ),
-      [
-        rankableRows,
-      ]
-    );
-
-
   const trendComparisonData =
     useMemo(
       () =>
@@ -1693,110 +1806,6 @@ export default function WardRankingWorkspace() {
     );
 
 
-  const componentAverageData =
-    useMemo(
-      () => {
-        const definitions: Array<{
-          key:
-          keyof WardRankingRow['components'];
-          label: string;
-        }> = [
-            {
-              key: 'workforce',
-              label: 'Workforce',
-            },
-            {
-              key: 'beat',
-              label: 'Beat',
-            },
-            {
-              key: 'toilet',
-              label: 'Toilet',
-            },
-            {
-              key: 'litterBin',
-              label: 'Litter Bin',
-            },
-            {
-              key: 'supervisor',
-              label: 'Daroga',
-            },
-            {
-              key: 'qc',
-              label: 'SI',
-            },
-            {
-              key: 'actionOfficer',
-              label: 'IEC',
-            },
-          ];
-
-        return definitions.map(
-          (
-            definition
-          ) => {
-            const applicable =
-              rankableRows
-                .map(
-                  (
-                    item
-                  ) =>
-                    item.components?.[
-                    definition.key
-                    ]
-                )
-                .filter(
-                  (
-                    component
-                  ): component is WardComponentScore =>
-                    Boolean(
-                      component &&
-                      component.applicable
-                    )
-                );
-
-            const average =
-              applicable.length
-                ? applicable.reduce(
-                  (
-                    total,
-                    component
-                  ) =>
-                    total +
-                    Number(
-                      component.percentage ||
-                      0
-                    ),
-                  0
-                ) /
-                applicable.length
-                : null;
-
-            return {
-              component:
-                definition.label,
-
-              average:
-                average ===
-                  null
-                  ? null
-                  : Number(
-                    average.toFixed(
-                      2
-                    )
-                  ),
-
-              applicable:
-                applicable.length,
-            };
-          }
-        );
-      },
-      [
-        rankableRows,
-      ]
-    );
-
   const displayedFrom =
     filteredRows.length
       ? (
@@ -1867,6 +1876,90 @@ export default function WardRankingWorkspace() {
     };
 
 
+  const handlePeriodChange = (
+    nextPeriod:
+      WardRankingPeriodType
+  ) => {
+    if (
+      nextPeriod ===
+      'CUSTOM'
+    ) {
+      const draftFrom =
+        periodType ===
+          'ALL'
+          ? anchorDate
+          : dateRange.from;
+
+      const draftTo =
+        periodType ===
+          'ALL'
+          ? anchorDate
+          : dateRange.to;
+
+      setCustomFrom(
+        draftFrom
+      );
+
+      setCustomTo(
+        draftTo
+      );
+
+      setCustomFromDraft(
+        draftFrom
+      );
+
+      setCustomToDraft(
+        draftTo
+      );
+    }
+
+    setPeriodType(
+      nextPeriod
+    );
+  };
+
+
+  const applyCustomDateRange =
+    () => {
+      let from =
+        customFromDraft ||
+        anchorDate;
+
+      let to =
+        customToDraft ||
+        anchorDate;
+
+      if (
+        from > to
+      ) {
+        const swap =
+          from;
+
+        from =
+          to;
+
+        to =
+          swap;
+      }
+
+      setCustomFrom(
+        from
+      );
+
+      setCustomTo(
+        to
+      );
+
+      setCustomFromDraft(
+        from
+      );
+
+      setCustomToDraft(
+        to
+      );
+    };
+
+
   const resetFilters =
     () => {
       const today =
@@ -1885,6 +1978,14 @@ export default function WardRankingWorkspace() {
       );
 
       setCustomTo(
+        today
+      );
+
+      setCustomFromDraft(
+        today
+      );
+
+      setCustomToDraft(
         today
       );
 
@@ -1912,14 +2013,23 @@ export default function WardRankingWorkspace() {
     loading
   ) {
     return (
-      <div className="flex min-h-[440px] items-center justify-center rounded-2xl border border-slate-200 bg-white">
-        <div className="flex items-center gap-3 text-sm font-bold text-slate-500">
-          <Loader2
-            size={20}
-            className="animate-spin text-blue-600"
-          />
+      <div className="flex min-h-[440px] items-center justify-center rounded-[22px] border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col items-center text-center">
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+            <div className="absolute inset-2 animate-ping rounded-xl bg-blue-100/60" />
+            <Loader2
+              size={28}
+              className="relative animate-spin"
+            />
+          </div>
 
-          Loading Ward Ranking...
+          <div className="mt-4 text-sm font-black text-slate-800">
+            Loading Ward Ranking
+          </div>
+
+          <div className="mt-1 text-[11px] font-semibold text-slate-400">
+            Preparing ward performance and exceptions...
+          </div>
         </div>
       </div>
     );
@@ -1927,7 +2037,8 @@ export default function WardRankingWorkspace() {
 
 
   if (
-    error
+    error &&
+    !rows.length
   ) {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
@@ -1969,7 +2080,33 @@ export default function WardRankingWorkspace() {
 
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="relative space-y-5 pb-8">
+
+      {(refreshing || (periodType === 'ALL' && !allDateBounds)) && (
+        <>
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-[80] h-1 animate-pulse bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-500" />
+
+          <div className="fixed right-6 top-24 z-[70] flex items-center gap-3 rounded-2xl border border-blue-100 bg-white/95 px-4 py-3 shadow-xl shadow-blue-100/60 backdrop-blur">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-200">
+            <Loader2
+              size={18}
+              className="animate-spin"
+            />
+          </div>
+
+          <div>
+            <div className="text-[11px] font-black text-slate-900">
+              Updating Ward Ranking
+            </div>
+            <div className="mt-0.5 text-[9px] font-bold text-slate-400">
+              {periodType === 'ALL' && !allDateBounds
+                ? 'Preparing available history range...'
+                : 'Latest dashboard data is loading...'}
+            </div>
+          </div>
+        </div>
+        </>
+      )}
 
       {/* =====================================================
           FILTERS
@@ -1991,7 +2128,7 @@ export default function WardRankingWorkspace() {
                     <button
                       type="button"
                       key={option.key}
-                      onClick={() => setPeriodType(option.key)}
+                      onClick={() => handlePeriodChange(option.key)}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${active
                         ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
                         : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
@@ -2003,7 +2140,8 @@ export default function WardRankingWorkspace() {
                 })}
               </div>
 
-              {periodType !== 'CUSTOM' && (
+              {periodType !== 'CUSTOM' &&
+                periodType !== 'ALL' && (
                 <input
                   type="date"
                   value={anchorDate}
@@ -2099,33 +2237,85 @@ export default function WardRankingWorkspace() {
               ))}
             </select>
 
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
-            >
-              Reset
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {refreshing && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-black text-blue-700 ring-1 ring-blue-100">
+                  <Loader2
+                    size={12}
+                    className="animate-spin"
+                  />
+                  Updating
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 transition hover:border-rose-200 hover:text-rose-600"
+              >
+                Reset
+              </button>
+            </div>
           </div>
 
           {periodType === 'CUSTOM' && (
+            <div className="flex flex-wrap items-end gap-3 border-t border-slate-200 pt-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  From
+                </span>
+                <input
+                  type="date"
+                  value={customFromDraft}
+                  max={customToDraft || todayString()}
+                  onChange={(event) => setCustomFromDraft(event.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 outline-none focus:border-blue-400"
+                />
+              </label>
+
+              <span className="pb-2 text-xs font-semibold text-slate-400">
+                to
+              </span>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  To
+                </span>
+                <input
+                  type="date"
+                  value={customToDraft}
+                  min={customFromDraft || undefined}
+                  max={todayString()}
+                  onChange={(event) => setCustomToDraft(event.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 outline-none focus:border-blue-400"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={applyCustomDateRange}
+                disabled={
+                  customFromDraft === customFrom &&
+                  customToDraft === customTo
+                }
+                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              >
+                Apply
+              </button>
+            </div>
+          )}
+
+          {periodType === 'ALL' && (
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
-              <input
-                type="date"
-                value={customFrom}
-                max={customTo || todayString()}
-                onChange={(event) => setCustomFrom(event.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 outline-none focus:border-blue-400"
-              />
-              <span className="text-xs font-semibold text-slate-400">to</span>
-              <input
-                type="date"
-                value={customTo}
-                min={customFrom || undefined}
-                max={todayString()}
-                onChange={(event) => setCustomTo(event.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 outline-none focus:border-blue-400"
-              />
+              <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-[10px] font-black text-blue-700 ring-1 ring-blue-100">
+                All available Ward Ranking history
+              </span>
+
+              {allDateBounds && (
+                <span className="text-[10px] font-bold text-slate-400">
+                  {allDateBounds.from} to {allDateBounds.to}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -2164,6 +2354,32 @@ export default function WardRankingWorkspace() {
         </div>
 
       </section>
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2 text-xs font-bold text-rose-700">
+            <XCircle
+              size={15}
+              className="shrink-0"
+            />
+            <span className="truncate">
+              {error}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              void loadRanking(
+                true
+              );
+            }}
+            className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-[10px] font-black text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
 
       {/* =====================================================
