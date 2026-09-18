@@ -44,21 +44,32 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-  ZAxis,
-} from 'recharts';
+import dynamic from 'next/dynamic';
 
 import { RoleGuard } from '@components/Guards';
+
+/*
+ * recharts (and its d3 sub-dependencies) is only needed once these
+ * below-the-fold charts actually render, so it's kept out of this
+ * route's initial JS chunk. Each chart is a self-contained recharts
+ * tree, which next/dynamic requires - splitting individual recharts
+ * primitives (Bar, XAxis, ...) would break recharts' children-based
+ * composition.
+ */
+const ComparisonBarChart = dynamic(
+  () => import('@components/commissioner/ComparisonBarChart'),
+  { ssr: false }
+);
+
+const ModuleStatusBarChart = dynamic(
+  () => import('@components/commissioner/ModuleStatusBarChart'),
+  { ssr: false }
+);
+
+const AttendanceInspectionScatterChart = dynamic(
+  () => import('@components/commissioner/AttendanceInspectionScatterChart'),
+  { ssr: false }
+);
 import UniversalReportModal from '@components/UniversalReportModal';
 
 import { useAuth } from '@hooks/useAuth';
@@ -3551,112 +3562,11 @@ function CityPerformancePulse({
               </div>
 
               <div className="h-[190px]">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-                  <BarChart
-                    data={
-                      comparisonData
-                    }
-                    margin={{
-                      top: 10,
-                      right: 4,
-                      bottom: 0,
-                      left: -22,
-                    }}
-                    barGap={4}
-                  >
-                    <CartesianGrid
-                      vertical={false}
-                      stroke="#e8edf5"
-                      strokeDasharray="3 5"
-                    />
-
-                    <XAxis
-                      dataKey="metric"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{
-                        fontSize: 9,
-                        fill: '#64748b',
-                        fontWeight: 700,
-                      }}
-                    />
-
-                    <YAxis
-                      domain={[0, 100]}
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{
-                        fontSize: 9,
-                        fill: '#94a3b8',
-                      }}
-                      tickFormatter={(
-                        value
-                      ) =>
-                        `${value}%`
-                      }
-                    />
-
-                    <Tooltip
-                      formatter={(
-                        value: any,
-                        name: any
-                      ) => [
-                        percentText(
-                          Number(
-                            value
-                          )
-                        ),
-                        name ===
-                        'current'
-                          ? 'Current Period'
-                          : 'Last Month',
-                      ]}
-                      contentStyle={{
-                        borderRadius: 14,
-                        border:
-                          '1px solid #e2e8f0',
-                        boxShadow:
-                          '0 12px 30px rgba(15,23,42,.10)',
-                        fontSize: 10,
-                      }}
-                    />
-
-                    <Bar
-                      dataKey="lastMonth"
-                      fill="#cbd5e1"
-                      radius={[
-                        6,
-                        6,
-                        0,
-                        0,
-                      ]}
-                      barSize={15}
-                      isAnimationActive
-                      animationDuration={
-                        650
-                      }
-                    />
-
-                    <Bar
-                      dataKey="current"
-                      fill="#4f46e5"
-                      radius={[
-                        6,
-                        6,
-                        0,
-                        0,
-                      ]}
-                      barSize={15}
-                      isAnimationActive
-                      animationDuration={
-                        800
-                      }
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <ComparisonBarChart
+                  data={
+                    comparisonData
+                  }
+                />
               </div>
             </div>
           </div>
@@ -4124,6 +4034,26 @@ export default function CommissionerDashboard() {
     setSearch,
   ] =
     useState('');
+
+  /*
+   * The input itself stays bound to `search` for instant typing
+   * feedback; `debouncedSearch` (used below for searchValue) trails
+   * it by 250ms so the dozen-plus useMemo chains keyed on searchValue
+   * don't fully recompute on every keystroke.
+   */
+  const [
+    debouncedSearch,
+    setDebouncedSearch,
+  ] =
+    useState('');
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
 
   const [
     showFilters,
@@ -4859,7 +4789,7 @@ export default function CommissionerDashboard() {
   ========================================================= */
 
   const searchValue =
-    normalize(search);
+    normalize(debouncedSearch);
 
   const selectedAttendanceEmployee =
     useMemo(
@@ -6500,6 +6430,25 @@ export default function CommissionerDashboard() {
   ========================================================= */
 
   /*
+   * Single-pass lookup for attendance-by-user, shared by every role
+   * row builder below - avoids re-scanning attendance.employees with
+   * .find() for every person in every roster (was O(roster x employees)
+   * per role).
+   */
+  const attendanceEmployeeByUserId =
+    useMemo(() => {
+      const map = new Map<string, AttendanceEmployeeSummary>();
+
+      attendance?.employees?.forEach((employee) => {
+        if (employee.matrixTrackUserId) {
+          map.set(String(employee.matrixTrackUserId), employee);
+        }
+      });
+
+      return map;
+    }, [attendance]);
+
+  /*
    * Rows come from the full registered-user roster (same source as
    * the Registered Users Directory) rather than being derived only
    * from inspection records - matching by roster ID/name means a
@@ -6518,34 +6467,53 @@ export default function CommissionerDashboard() {
       ) => {
         const roster = cityUsersByRole.get(role) || [];
 
+        /*
+         * Bucket every inspection record once (O(records)) instead of
+         * re-filtering the full record set for every person in the
+         * roster (was O(roster x records)). A record either matches by
+         * id or by normalized name, same as the original per-record
+         * check, so records land in exactly one of the two maps.
+         */
+        const byId = new Map<string, DashboardRecord[]>();
+        const byName = new Map<string, DashboardRecord[]>();
+
+        filteredInspectionRecords.forEach((item) => {
+          let name = '';
+          let id: string | null = null;
+
+          if (role === 'SUPERVISOR') {
+            name = getDarogaName(item);
+            id = getDarogaId(item);
+          } else if (role === 'QC') {
+            name = getSiName(item);
+            id = getSiId(item);
+          } else if (role === 'ACTION_OFFICER') {
+            name = getIecName(item);
+            id = getIecId(item);
+          }
+
+          if (id) {
+            const key = String(id);
+            if (!byId.has(key)) byId.set(key, []);
+            byId.get(key)!.push(item);
+          } else if (name) {
+            const key = normalize(name);
+            if (!byName.has(key)) byName.set(key, []);
+            byName.get(key)!.push(item);
+          }
+        });
+
         return roster
           .map((person) => {
-            const matchedRecords = filteredInspectionRecords.filter((item) => {
-              let name = '';
-              let id: string | null = null;
-
-              if (role === 'SUPERVISOR') {
-                name = getDarogaName(item);
-                id = getDarogaId(item);
-              } else if (role === 'QC') {
-                name = getSiName(item);
-                id = getSiId(item);
-              } else if (role === 'ACTION_OFFICER') {
-                name = getIecName(item);
-                id = getIecId(item);
-              }
-
-              if (id) return String(id) === String(person.id);
-              return Boolean(name) && normalize(name) === normalize(person.name);
-            });
+            const matchedRecords =
+              byId.get(String(person.id)) ||
+              byName.get(normalize(person.name)) ||
+              [];
 
             const stats = inspectionStats(matchedRecords);
 
             const attendanceEmployee =
-              attendance?.employees?.find(
-                (employee) =>
-                  employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(person.id)
-              ) || null;
+              attendanceEmployeeByUserId.get(String(person.id)) || null;
 
             return {
               key: `${role}-${person.id}`,
@@ -6573,7 +6541,7 @@ export default function CommissionerDashboard() {
       [
         cityUsersByRole,
         filteredInspectionRecords,
-        attendance,
+        attendanceEmployeeByUserId,
       ]
     );
 
@@ -6611,6 +6579,39 @@ export default function CommissionerDashboard() {
    * (the same scope the backend enforces when they mark a report
    * Action Required) rather than by a per-record person field.
    */
+  /*
+   * Bucket every inspection record once by normalized zone/ward
+   * (O(records)) instead of re-filtering the full record set for every
+   * ULB officer (was O(officers x records)).
+   */
+  const recordsByNormalizedZone =
+    useMemo(() => {
+      const map = new Map<string, DashboardRecord[]>();
+
+      filteredInspectionRecords.forEach((item) => {
+        const zone = normalize(getRecordZone(item));
+        if (!zone) return;
+        if (!map.has(zone)) map.set(zone, []);
+        map.get(zone)!.push(item);
+      });
+
+      return map;
+    }, [filteredInspectionRecords]);
+
+  const recordsByNormalizedWard =
+    useMemo(() => {
+      const map = new Map<string, DashboardRecord[]>();
+
+      filteredInspectionRecords.forEach((item) => {
+        const ward = normalize(getRecordWard(item));
+        if (!ward) return;
+        if (!map.has(ward)) map.set(ward, []);
+        map.get(ward)!.push(item);
+      });
+
+      return map;
+    }, [filteredInspectionRecords]);
+
   const ulbOfficerRows =
     useMemo(
       () =>
@@ -6626,22 +6627,22 @@ export default function CommissionerDashboard() {
             const zoneSet = new Set(zoneNames.map(normalize));
             const wardSet = new Set(wardNames.map(normalize));
 
-            const matchedRecords =
-              zoneSet.size || wardSet.size
-                ? filteredInspectionRecords.filter((item) => {
-                    const zone = normalize(getRecordZone(item));
-                    const ward = normalize(getRecordWard(item));
-                    return (zone && zoneSet.has(zone)) || (ward && wardSet.has(ward));
-                  })
-                : [];
+            const matchedRecordsSet = new Set<DashboardRecord>();
+
+            zoneSet.forEach((zone) => {
+              recordsByNormalizedZone.get(zone)?.forEach((item) => matchedRecordsSet.add(item));
+            });
+
+            wardSet.forEach((ward) => {
+              recordsByNormalizedWard.get(ward)?.forEach((item) => matchedRecordsSet.add(item));
+            });
+
+            const matchedRecords = Array.from(matchedRecordsSet);
 
             const stats = inspectionStats(matchedRecords);
 
             const attendanceEmployee =
-              attendance?.employees?.find(
-                (employee) =>
-                  employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(officer.id)
-              ) || null;
+              attendanceEmployeeByUserId.get(String(officer.id)) || null;
 
             return {
               key: `ULB_OFFICER-${officer.id}`,
@@ -6664,7 +6665,13 @@ export default function CommissionerDashboard() {
             } satisfies RolePerformanceRow;
           })
           .sort((a, b) => b.performance - a.performance),
-      [cityUsersByRole, geoNameById, filteredInspectionRecords, attendance]
+      [
+        cityUsersByRole,
+        geoNameById,
+        recordsByNormalizedZone,
+        recordsByNormalizedWard,
+        attendanceEmployeeByUserId,
+      ]
     );
 
   /*
@@ -7016,6 +7023,54 @@ export default function CommissionerDashboard() {
   ] =
     useState(true);
 
+  /*
+   * Bucket each dataset once by zone (O(records + employees + wards))
+   * instead of re-filtering the full dataset for every zone x module
+   * cell (was O(zones x modules x records)).
+   */
+  const inspectionRecordsByZoneAndModule =
+    useMemo(() => {
+      const map = new Map<string, DashboardRecord[]>();
+
+      inspectionContextRecords.forEach((item) => {
+        const zone = getRecordZone(item);
+        if (!zone || !item.dashboardModule) return;
+
+        const key = `${zone}__${item.dashboardModule}`;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(item);
+      });
+
+      return map;
+    }, [inspectionContextRecords]);
+
+  const attendanceEmployeesByZone =
+    useMemo(() => {
+      const map = new Map<string, AttendanceEmployeeSummary[]>();
+
+      attendanceContextEmployees.forEach((employee) => {
+        employee.zones?.forEach((zone) => {
+          if (!map.has(zone)) map.set(zone, []);
+          map.get(zone)!.push(employee);
+        });
+      });
+
+      return map;
+    }, [attendanceContextEmployees]);
+
+  const wardContextRowsByZone =
+    useMemo(() => {
+      const map = new Map<string, WardRankingRow[]>();
+
+      wardContextRows.forEach((ward) => {
+        if (!ward.zoneName) return;
+        if (!map.has(ward.zoneName)) map.set(ward.zoneName, []);
+        map.get(ward.zoneName)!.push(ward);
+      });
+
+      return map;
+    }, [wardContextRows]);
+
   const zoneModuleMatrix =
     useMemo(() => {
       return zoneOptions
@@ -7036,15 +7091,9 @@ export default function CommissionerDashboard() {
                     'ATTENDANCE'
                   ) {
                     const employees =
-                      attendanceContextEmployees.filter(
-                        (
-                          employee
-                        ) =>
-                          employee.zones
-                            ?.includes(
-                              zone
-                            )
-                      );
+                      attendanceEmployeesByZone.get(
+                        zone
+                      ) || [];
 
                     const total =
                       employees.reduce(
@@ -7095,13 +7144,9 @@ export default function CommissionerDashboard() {
                     'WARD_RANKING'
                   ) {
                     const wards =
-                      wardContextRows.filter(
-                        (
-                          ward
-                        ) =>
-                          ward.zoneName ===
-                          zone
-                      );
+                      wardContextRowsByZone.get(
+                        zone
+                      ) || [];
 
                     return {
                       key:
@@ -7126,17 +7171,9 @@ export default function CommissionerDashboard() {
                   }
 
                   const recordsForCell =
-                    inspectionContextRecords.filter(
-                      (
-                        item
-                      ) =>
-                        item.dashboardModule ===
-                          module.key &&
-                        getRecordZone(
-                          item
-                        ) ===
-                          zone
-                    );
+                    inspectionRecordsByZoneAndModule.get(
+                      `${zone}__${module.key}`
+                    ) || [];
 
                   return {
                     key:
@@ -7168,9 +7205,9 @@ export default function CommissionerDashboard() {
       zoneOptions,
       zoneFilter,
       moduleCards,
-      attendanceContextEmployees,
-      wardContextRows,
-      inspectionContextRecords,
+      attendanceEmployeesByZone,
+      wardContextRowsByZone,
+      inspectionRecordsByZoneAndModule,
     ]);
 
   const visibleZoneModuleCards =
@@ -9696,218 +9733,11 @@ export default function CommissionerDashboard() {
           </div>
 
           <div className="h-[300px]">
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-              <BarChart
-                data={
-                  moduleStatusRows
-                }
-                layout="vertical"
-                margin={{
-                  left: 32,
-                  right: 14,
-                  top: 4,
-                  bottom: 4,
-                }}
-              >
-                <defs>
-                  <linearGradient
-                    id="approvedGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#34d399"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#047857"
-                    />
-                  </linearGradient>
-
-                  <linearGradient
-                    id="rejectedGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#fb7185"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#be123c"
-                    />
-                  </linearGradient>
-
-                  <linearGradient
-                    id="actionRequiredGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#fbbf24"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#d97706"
-                    />
-                  </linearGradient>
-
-                  <linearGradient
-                    id="actionTakenGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#60a5fa"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#4338ca"
-                    />
-                  </linearGradient>
-                </defs>
-
-                <XAxis
-                  type="number"
-                  domain={[
-                    0,
-                    100,
-                  ]}
-                  axisLine={
-                    false
-                  }
-                  tickLine={
-                    false
-                  }
-                  tick={{
-                    fontSize:
-                      10,
-                    fill:
-                      '#94a3b8',
-                  }}
-                />
-
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={145}
-                  axisLine={
-                    false
-                  }
-                  tickLine={
-                    false
-                  }
-                  tick={{
-                    fontSize:
-                      10,
-                    fill:
-                      '#475569',
-                    fontWeight:
-                      700,
-                  }}
-                />
-
-                <Tooltip
-                  formatter={(
-                    value: any
-                  ) =>
-                    percentText(
-                      Number(
-                        value
-                      )
-                    )
-                  }
-                  contentStyle={{
-                    borderRadius:
-                      14,
-                    border:
-                      '1px solid #e2e8f0',
-                    fontSize:
-                      11,
-                  }}
-                />
-
-                <Legend
-                  wrapperStyle={{
-                    fontSize:
-                      10,
-                    fontWeight:
-                      800,
-                  }}
-                />
-
-                <Bar
-                  dataKey="Approved"
-                  stackId="status"
-                  fill="url(#approvedGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    650
-                  }
-                />
-
-                <Bar
-                  dataKey="Rejected"
-                  stackId="status"
-                  fill="url(#rejectedGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    700
-                  }
-                />
-
-                <Bar
-                  dataKey="Action Required"
-                  stackId="status"
-                  fill="url(#actionRequiredGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    750
-                  }
-                />
-
-                <Bar
-                  dataKey="Action Taken"
-                  stackId="status"
-                  fill="url(#actionTakenGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    800
-                  }
-                />
-
-                <Bar
-                  dataKey="Pending"
-                  stackId="status"
-                  fill="#cbd5e1"
-                  radius={[
-                    0,
-                    10,
-                    10,
-                    0,
-                  ]}
-                  isAnimationActive
-                  animationDuration={
-                    850
-                  }
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <ModuleStatusBarChart
+              data={
+                moduleStatusRows
+              }
+            />
           </div>
         </section>
 
@@ -10103,209 +9933,53 @@ export default function CommissionerDashboard() {
             </div>
 
             <div className="h-[390px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <ScatterChart
-                  margin={{
-                    top: 20,
-                    right: 25,
-                    bottom: 20,
-                    left: 5,
-                  }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="4 5"
-                    stroke="#e2e8f0"
-                  />
-
-                  <XAxis
-                    type="number"
-                    dataKey="attendance"
-                    name="Attendance"
-                    domain={[
-                      0,
-                      100,
-                    ]}
-                    tick={{
-                      fontSize:
-                        10,
-                      fill:
-                        '#64748b',
-                    }}
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                  />
-
-                  <YAxis
-                    type="number"
-                    dataKey="inspection"
-                    name="Inspection Performance"
-                    domain={[
-                      0,
-                      100,
-                    ]}
-                    tick={{
-                      fontSize:
-                        10,
-                      fill:
-                        '#64748b',
-                    }}
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                  />
-
-                  <ZAxis
-                    type="number"
-                    dataKey="reports"
-                    range={[
-                      70,
-                      440,
-                    ]}
-                  />
-
-                  <Tooltip
-                    cursor={{
-                      strokeDasharray:
-                        '4 4',
-                    }}
-                    content={({
-                      active,
-                      payload,
-                    }: any) => {
-                      if (
-                        !active ||
-                        !payload?.length
-                      ) {
-                        return null;
-                      }
-
-                      const row =
-                        payload[0]
-                          .payload;
-
-                      return (
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 text-[11px] shadow-xl">
-                          <div className="font-black text-slate-950">
-                            {
-                              row.name
-                            }
-                          </div>
-
-                          <div className="mt-2 flex justify-between gap-5">
-                            <span className="font-semibold text-slate-500">
-                              Attendance
-                            </span>
-
-                            <span className="font-black text-slate-950">
-                              {percentText(
-                                row.attendance
-                              )}
-                            </span>
-                          </div>
-
-                          <div className="mt-1 flex justify-between gap-5">
-                            <span className="font-semibold text-slate-500">
-                              Inspection Performance
-                            </span>
-
-                            <span className="font-black text-slate-950">
-                              {percentText(
-                                row.inspection
-                              )}
-                            </span>
-                          </div>
-
-                          <div className="mt-1 flex justify-between gap-5">
-                            <span className="font-semibold text-slate-500">
-                              Records
-                            </span>
-
-                            <span className="font-black text-slate-950">
-                              {
-                                row.reports
-                              }
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-
-                  <Scatter
-                    data={
-                      attendanceInspectionPoints
-                    }
-                    fill="#4f46e5"
-                    cursor="pointer"
-                    isAnimationActive
-                    animationDuration={
-                      800
-                    }
-                    onClick={(
-                      data: any
-                    ) => {
-                      const row =
-                        data?.payload ||
-                        data;
-
-                      if (!row) {
-                        return;
-                      }
-
-                      setDrilldown({
-                        title:
-                          row.name,
+              <AttendanceInspectionScatterChart
+                data={
+                  attendanceInspectionPoints
+                }
+                onPointClick={(row) => {
+                  setDrilldown({
+                    title:
+                      row.name,
+                    value:
+                      percentText(
+                        row.inspection
+                      ),
+                    breakdown: [
+                      {
+                        label:
+                          'Attendance',
+                        value:
+                          percentText(
+                            row.attendance
+                          ),
+                      },
+                      {
+                        label:
+                          'Inspection Performance',
                         value:
                           percentText(
                             row.inspection
                           ),
-                        breakdown: [
-                          {
-                            label:
-                              'Attendance',
-                            value:
-                              percentText(
-                                row.attendance
-                              ),
-                          },
-                          {
-                            label:
-                              'Inspection Performance',
-                            value:
-                              percentText(
-                                row.inspection
-                              ),
-                          },
-                          {
-                            label:
-                              'Records',
-                            value:
-                              String(
-                                row.reports
-                              ),
-                          },
-                        ],
-                        inspectionRecords:
-                          row.records,
-                        attendanceEmployees:
-                          [
-                            row.employee,
-                          ],
-                      });
-                    }}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
+                      },
+                      {
+                        label:
+                          'Records',
+                        value:
+                          String(
+                            row.reports
+                          ),
+                      },
+                    ],
+                    inspectionRecords:
+                      row.records,
+                    attendanceEmployees:
+                      [
+                        row.employee,
+                      ],
+                  });
+                }}
+              />
             </div>
           </section>
         )}
