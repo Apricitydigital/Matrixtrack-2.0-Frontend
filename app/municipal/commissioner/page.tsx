@@ -10693,7 +10693,7 @@ export default function CommissionerDashboard() {
                             <path
                               d={row.layout.path}
                               fill={`url(#zone-map-gradient-${index})`}
-                              stroke="#ffffff"
+                              stroke={selected ? '#0f172a' : '#ffffff'}
                               strokeWidth={selected ? 5.5 : 4.5}
                               strokeLinejoin="round"
                               style={{
@@ -10701,7 +10701,7 @@ export default function CommissionerDashboard() {
                                   ? 'url(#zoneSelectedShadow)'
                                   : 'url(#zoneSoftShadow)',
                                 transition:
-                                  'filter .22s ease, opacity .22s ease',
+                                  'filter .22s ease, opacity .22s ease, stroke .22s ease',
                               }}
                             />
 
