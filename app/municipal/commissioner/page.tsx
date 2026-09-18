@@ -17,6 +17,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
   Clock3,
@@ -43,28 +44,38 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip,
-  XAxis,
-  YAxis,
-  ZAxis,
-} from 'recharts';
+import dynamic from 'next/dynamic';
 
 import { RoleGuard } from '@components/Guards';
+
+/*
+ * recharts (and its d3 sub-dependencies) is only needed once these
+ * below-the-fold charts actually render, so it's kept out of this
+ * route's initial JS chunk. Each chart is a self-contained recharts
+ * tree, which next/dynamic requires - splitting individual recharts
+ * primitives (Bar, XAxis, ...) would break recharts' children-based
+ * composition.
+ */
+const ComparisonBarChart = dynamic(
+  () => import('@components/commissioner/ComparisonBarChart'),
+  { ssr: false }
+);
+
+const ModuleStatusBarChart = dynamic(
+  () => import('@components/commissioner/ModuleStatusBarChart'),
+  { ssr: false }
+);
+
+const AttendanceInspectionScatterChart = dynamic(
+  () => import('@components/commissioner/AttendanceInspectionScatterChart'),
+  { ssr: false }
+);
 import UniversalReportModal from '@components/UniversalReportModal';
 
 import { useAuth } from '@hooks/useAuth';
 
 import {
+  AreaBeatApi,
   CityUserApi,
   GeoApi,
   ModuleRecordsApi,
@@ -301,6 +312,52 @@ const MODULE_VISUALS: Record<
   },
 };
 
+/*
+ * Per-module gradient stops for the Zone x Module matrix bars, so each
+ * column reads in its own module color (matching MODULE_VISUALS above
+ * it) instead of every column sharing one flat indigo scale.
+ */
+const ZONE_MODULE_BAR_TONES: Record<
+  string,
+  {
+    light: string;
+    medium: string;
+    full: string;
+    deep: string;
+  }
+> = {
+  TOILET: {
+    light: '#ede9fe',
+    medium: '#c4b5fd',
+    full: '#8b5cf6',
+    deep: '#6d28d9',
+  },
+  LITTERBINS: {
+    light: '#dcfce7',
+    medium: '#86efac',
+    full: '#22c55e',
+    deep: '#15803d',
+  },
+  SWEEPING: {
+    light: '#e0e7ff',
+    medium: '#a5b4fc',
+    full: '#6366f1',
+    deep: '#4338ca',
+  },
+  ATTENDANCE: {
+    light: '#e0f2fe',
+    medium: '#7dd3fc',
+    full: '#0ea5e9',
+    deep: '#0369a1',
+  },
+  WARD_RANKING: {
+    light: '#f3e8ff',
+    medium: '#d8b4fe',
+    full: '#a855f7',
+    deep: '#7e22ce',
+  },
+};
+
 const ROLES: Array<{
   key: RoleKey;
   label: string;
@@ -364,6 +421,59 @@ const METRICS: Array<{
     label: 'Ward Ranking',
   },
 ];
+
+
+/* =========================================================
+   ZONE PERFORMANCE MAP VISUAL LAYOUT
+   Presentation only. The values and click behaviour still come
+   from the existing zoneRows / geoMetric logic.
+========================================================= */
+
+const ZONE_MAP_LAYOUT: Record<
+  number,
+  {
+    path: string;
+    labelX: number;
+    labelY: number;
+  }
+> = {
+  1: {
+    path:
+      'M 350 40 C 386 28 420 35 445 50 C 468 63 483 58 500 70 C 512 89 503 110 484 125 C 466 141 454 158 430 170 C 411 178 392 170 375 164 C 358 159 344 158 330 160 C 332 147 339 137 345 125 C 359 101 360 70 350 40 Z',
+    labelX: 411,
+    labelY: 103,
+  },
+  2: {
+    path:
+      'M 500 70 C 535 72 560 91 575 112 C 592 136 610 151 610 182 C 610 208 595 225 580 242 C 566 259 571 279 550 290 C 533 301 515 287 500 274 C 482 259 468 245 452 232 C 438 220 430 202 430 180 C 430 176 430 173 430 170 C 454 158 466 141 484 125 C 503 110 512 89 500 70 Z',
+    labelX: 526,
+    labelY: 175,
+  },
+  3: {
+    path:
+      'M 365 178 C 382 173 402 171 430 170 C 430 173 430 176 430 180 C 430 202 438 220 452 232 C 468 245 482 259 500 274 C 515 287 533 301 550 290 C 532 312 505 319 480 318 C 458 317 442 330 420 330 C 395 332 375 316 360 306 C 350 295 355 280 365 266 C 378 246 390 228 380 214 C 376 198 370 185 365 178 Z',
+    labelX: 430,
+    labelY: 265,
+  },
+  4: {
+    path:
+      'M 190 247 C 205 274 228 290 255 301 C 278 312 295 326 320 322 C 345 318 362 301 375 282 C 388 262 388 236 380 214 C 376 198 370 185 365 178 C 350 190 330 198 310 210 C 289 225 275 242 252 244 C 230 245 210 260 190 247 Z',
+    labelX: 286,
+    labelY: 267,
+  },
+  5: {
+    path:
+      'M 180 90 C 195 62 220 48 250 45 C 280 42 310 46 350 40 C 360 70 359 101 345 125 C 339 137 332 147 330 160 C 302 157 282 148 262 134 C 238 118 218 120 198 108 C 190 103 184 96 180 90 Z',
+    labelX: 257,
+    labelY: 91,
+  },
+  6: {
+    path:
+      'M 180 90 C 171 112 151 121 142 142 C 132 165 140 188 158 201 C 176 215 170 235 190 247 C 210 260 230 245 252 244 C 275 242 289 225 310 210 C 330 198 350 190 365 178 C 354 170 343 164 330 160 C 302 157 282 148 262 134 C 238 118 218 120 198 108 C 190 103 184 96 180 90 Z',
+    labelX: 213,
+    labelY: 180,
+  },
+};
 
 
 /* =========================================================
@@ -567,6 +677,19 @@ function positiveColor(
     score * 0.55;
 
   return `hsl(239 84% ${lightness}%)`;
+}
+
+function attendanceHeatColor(
+  value: number
+) {
+  const score =
+    clamp(value);
+
+  const lightness =
+    95 -
+    score * 0.5;
+
+  return `hsl(346 77% ${lightness}%)`;
 }
 
 function heatTextClass(
@@ -1231,6 +1354,18 @@ async function computePeriodMetrics(
 type MonthTrend = {
   deltaPct: number | null;
   direction: 'up' | 'down' | 'flat';
+};
+
+type SmartInsightTone =
+  | 'positive'
+  | 'warning'
+  | 'neutral';
+
+type SmartInsight = {
+  id: string;
+  tone: SmartInsightTone;
+  icon: React.ReactNode;
+  text: string;
 };
 
 function buildMonthTrends(
@@ -2741,16 +2876,54 @@ function WardPerformanceScroller({
   wards: WardRankingRow[];
 }) {
   const ITEM_HEIGHT = 92;
+  const VISIBLE_ROWS = 6;
   const PIXELS_PER_SECOND = 46;
 
-  const [offset, setOffset] =
-    useState(0);
+  const sortedWards =
+    useMemo(
+      () =>
+        [...wards].sort(
+          (a, b) =>
+            String(
+              a.wardName ||
+                ''
+            ).localeCompare(
+              String(
+                b.wardName ||
+                  ''
+              ),
+              undefined,
+              {
+                numeric: true,
+                sensitivity:
+                  'base',
+              }
+            )
+        ),
+      [wards]
+    );
 
-  const [paused, setPaused] =
-    useState(false);
+  const [hoveredWard, setHoveredWard] =
+    useState<WardRankingRow | null>(
+      null
+    );
+
+  const [
+    containerHovered,
+    setContainerHovered,
+  ] = useState(false);
+
+  const paused =
+    containerHovered ||
+    hoveredWard !== null;
 
   const pausedRef =
     useRef(paused);
+
+  const scrollRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
 
   const rafRef =
     useRef<number | null>(
@@ -2767,12 +2940,12 @@ function WardPerformanceScroller({
   }, [paused]);
 
   useEffect(() => {
-    if (wards.length <= 1) {
+    if (sortedWards.length <= 1) {
       return;
     }
 
     const totalHeight =
-      wards.length *
+      sortedWards.length *
       ITEM_HEIGHT;
 
     const tick = (
@@ -2793,15 +2966,29 @@ function WardPerformanceScroller({
       lastTimeRef.current =
         time;
 
-      if (!pausedRef.current) {
-        setOffset(
-          (previous) =>
-            (previous +
-              (PIXELS_PER_SECOND *
-                delta) /
-                1000) %
-            totalHeight
-        );
+      const node =
+        scrollRef.current;
+
+      if (
+        node &&
+        !pausedRef.current
+      ) {
+        let next =
+          node.scrollTop +
+          (PIXELS_PER_SECOND *
+            delta) /
+            1000;
+
+        if (
+          next >=
+          totalHeight
+        ) {
+          next -=
+            totalHeight;
+        }
+
+        node.scrollTop =
+          next;
       }
 
       rafRef.current =
@@ -2825,43 +3012,73 @@ function WardPerformanceScroller({
       lastTimeRef.current =
         null;
     };
-  }, [wards.length]);
+  }, [sortedWards.length]);
 
-  if (!wards.length) {
+  if (!sortedWards.length) {
     return (
-      <div className="flex h-[340px] items-center justify-center text-xs font-bold text-slate-400">
+      <div
+        className="flex items-center justify-center text-xs font-bold text-slate-400"
+        style={{
+          height:
+            VISIBLE_ROWS *
+            ITEM_HEIGHT,
+        }}
+      >
         No ward data available
       </div>
     );
   }
 
-  const activeIndex =
-    Math.floor(
-      offset / ITEM_HEIGHT
-    ) % wards.length;
-
-  const activeWard =
-    wards[activeIndex] ||
-    wards[0];
-
   const loopedWards = [
-    ...wards,
-    ...wards,
+    ...sortedWards,
+    ...sortedWards,
   ];
 
   return (
     <div
-      className="relative h-[340px] overflow-hidden rounded-2xl border border-slate-100"
+      className="relative overflow-hidden rounded-2xl border border-slate-100"
+      style={{
+        height:
+          VISIBLE_ROWS *
+          ITEM_HEIGHT,
+      }}
       onMouseEnter={() =>
-        setPaused(true)
+        setContainerHovered(
+          true
+        )
       }
       onMouseLeave={() =>
-        setPaused(false)
+        setContainerHovered(
+          false
+        )
       }
     >
       <div
+        ref={scrollRef}
+        className="h-full overflow-y-auto"
         style={{
-          transform: `translateY(-${offset}px)`,
+          scrollbarWidth:
+            'thin',
+          scrollbarColor:
+            '#c7d2fe #f1f5f9',
+        }}
+        onScroll={(
+          event
+        ) => {
+          const node =
+            event.currentTarget;
+
+          const totalHeight =
+            sortedWards.length *
+            ITEM_HEIGHT;
+
+          if (
+            node.scrollTop >=
+            totalHeight
+          ) {
+            node.scrollTop -=
+              totalHeight;
+          }
         }}
       >
         {loopedWards.map(
@@ -2872,12 +3089,26 @@ function WardPerformanceScroller({
                 height:
                   ITEM_HEIGHT,
               }}
-              className="flex items-center gap-4 px-4"
+              className="flex cursor-pointer items-center gap-4 px-4 transition hover:bg-indigo-50/50"
+              onMouseEnter={() =>
+                setHoveredWard(
+                  ward
+                )
+              }
+              onMouseLeave={() =>
+                setHoveredWard(
+                  (current) =>
+                    current ===
+                    ward
+                      ? null
+                      : current
+                )
+              }
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[11px] font-black text-indigo-700">
                 {String(
                   (position %
-                    wards.length) +
+                    sortedWards.length) +
                     1
                 ).padStart(
                   2,
@@ -2922,26 +3153,568 @@ function WardPerformanceScroller({
         )}
       </div>
 
-      {paused && (
+      {hoveredWard && (
         <div className="absolute inset-x-3 bottom-3 rounded-xl border border-indigo-100 bg-white/95 p-3 text-[11px] shadow-xl backdrop-blur">
           <div className="font-black text-slate-950">
-            {activeWard.wardName ||
-              activeWard.wardId}
+            {hoveredWard.wardName ||
+              hoveredWard.wardId}
           </div>
 
           <div className="mt-1 font-bold text-indigo-700">
             Overall Performance:{' '}
             {percentText(
-              activeWard.finalScore
+              hoveredWard.finalScore
             )}
           </div>
 
           <div className="mt-1.5 font-semibold leading-snug text-slate-500">
             {wardCalculationText(
-              activeWard
+              hoveredWard
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   CITY PERFORMANCE PULSE
+   Commissioner-level summary built only from metrics already
+   loaded by this dashboard. No additional API requests are made.
+========================================================= */
+
+function timeAgoLabel(
+  date: Date | null
+) {
+  if (!date) {
+    return 'Not updated yet';
+  }
+
+  const diffSeconds =
+    Math.max(
+      0,
+      Math.floor(
+        (Date.now() -
+          date.getTime()) /
+          1000
+      )
+    );
+
+  if (diffSeconds < 5) {
+    return 'Updated just now';
+  }
+
+  if (diffSeconds < 60) {
+    return `Updated ${diffSeconds}s ago`;
+  }
+
+  const diffMinutes =
+    Math.floor(
+      diffSeconds / 60
+    );
+
+  if (diffMinutes < 60) {
+    return `Updated ${diffMinutes}m ago`;
+  }
+
+  const diffHours =
+    Math.floor(
+      diffMinutes / 60
+    );
+
+  return `Updated ${diffHours}h ago`;
+}
+
+function CityPerformancePulse({
+  loading,
+  periodLabel,
+  overallPerformance,
+  inspectionPerformance,
+  attendanceRate,
+  wardRankingAverage,
+  lastMonthMetrics,
+  monthTrends,
+  insights,
+  lastUpdatedAt,
+  onOverall,
+  onInspection,
+  onAttendance,
+  onWardRanking,
+}: {
+  loading: boolean;
+  periodLabel: string;
+  overallPerformance: number | null;
+  inspectionPerformance: number | null;
+  attendanceRate: number | null;
+  wardRankingAverage: number | null;
+  lastMonthMetrics: PeriodMetrics | null;
+  monthTrends: Record<string, MonthTrend>;
+  insights: SmartInsight[];
+  lastUpdatedAt: Date | null;
+  onOverall: () => void;
+  onInspection: () => void;
+  onAttendance: () => void;
+  onWardRanking: () => void;
+}) {
+  const comparisonData = [
+    {
+      metric: 'Overall',
+      current:
+        overallPerformance,
+      lastMonth:
+        lastMonthMetrics
+          ?.overallPerformance ??
+        null,
+    },
+    {
+      metric: 'Inspection',
+      current:
+        inspectionPerformance,
+      lastMonth:
+        lastMonthMetrics
+          ?.inspectionPerformance ??
+        null,
+    },
+    {
+      metric: 'Attendance',
+      current:
+        attendanceRate,
+      lastMonth:
+        lastMonthMetrics
+          ?.attendanceRate ??
+        null,
+    },
+    {
+      metric: 'Ward Ranking',
+      current:
+        wardRankingAverage,
+      lastMonth:
+        lastMonthMetrics
+          ?.wardRankingAverage ??
+        null,
+    },
+  ];
+
+  const metricCards = [
+    {
+      key: 'inspectionPerformance',
+      label: 'Inspection',
+      value:
+        inspectionPerformance,
+      previous:
+        lastMonthMetrics
+          ?.inspectionPerformance ??
+        null,
+      trend:
+        monthTrends.inspectionPerformance,
+      icon: (
+        <ClipboardList
+          size={15}
+        />
+      ),
+      onClick:
+        onInspection,
+    },
+    {
+      key: 'attendanceRate',
+      label: 'Attendance',
+      value:
+        attendanceRate,
+      previous:
+        lastMonthMetrics
+          ?.attendanceRate ??
+        null,
+      trend:
+        monthTrends.attendanceRate,
+      icon: (
+        <UserRoundCheck
+          size={15}
+        />
+      ),
+      onClick:
+        onAttendance,
+    },
+    {
+      key: 'wardRankingAverage',
+      label: 'Ward Ranking',
+      value:
+        wardRankingAverage,
+      previous:
+        lastMonthMetrics
+          ?.wardRankingAverage ??
+        null,
+      trend:
+        monthTrends.wardRankingAverage,
+      icon: (
+        <Trophy
+          size={15}
+        />
+      ),
+      onClick:
+        onWardRanking,
+    },
+  ];
+
+  const attentionInsights =
+    [
+      ...insights.filter(
+        (item) =>
+          item.tone ===
+          'warning'
+      ),
+      ...insights.filter(
+        (item) =>
+          item.tone !==
+          'warning'
+      ),
+    ].slice(0, 3);
+
+  const overallTrend =
+    monthTrends.overallPerformance;
+
+  const overallDown =
+    overallTrend?.direction ===
+    'down';
+
+  const overallFlat =
+    !overallTrend ||
+    overallTrend.deltaPct ===
+      null ||
+    overallTrend.direction ===
+      'flat';
+
+  function trendLabel(
+    trend: MonthTrend | undefined
+  ) {
+    if (
+      !trend ||
+      trend.deltaPct === null
+    ) {
+      return 'No prior data';
+    }
+
+    return `${Math.abs(
+      trend.deltaPct
+    ).toFixed(1)}%`;
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[22px] border border-indigo-100 bg-[linear-gradient(135deg,#ffffff_0%,#f8faff_48%,#f5f3ff_100%)] p-4 shadow-[0_18px_46px_-30px_rgba(79,70,229,.45)] sm:p-5">
+      <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-violet-200/35 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-20 h-52 w-52 rounded-full bg-blue-200/30 blur-3xl" />
+
+      <div className="relative flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-indigo-700">
+              <Activity
+                size={11}
+              />
+              City Performance Pulse
+            </span>
+
+            <span className="hidden text-[10px] font-bold text-slate-400 sm:inline">
+              {periodLabel}
+            </span>
+          </div>
+
+          <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
+            City-level performance compared with last month
+          </p>
+        </div>
+
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          </span>
+          {timeAgoLabel(
+            lastUpdatedAt
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="relative mt-4 h-[300px] animate-pulse rounded-2xl bg-slate-100" />
+      ) : (
+        <>
+          <div className="relative mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[0.8fr_1.45fr]">
+            <button
+              type="button"
+              onClick={onOverall}
+              className="group relative overflow-hidden rounded-2xl bg-[linear-gradient(145deg,#312e81_0%,#4f46e5_45%,#7c3aed_100%)] p-4 text-left text-white shadow-[0_18px_35px_-18px_rgba(79,70,229,.75)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-18px_rgba(79,70,229,.8)]"
+            >
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.12]"
+                style={{
+                  backgroundImage:
+                    'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+                  backgroundSize:
+                    '17px 17px',
+                }}
+              />
+
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[9px] font-black uppercase tracking-[0.14em] text-indigo-100/80">
+                    Overall Performance
+                  </div>
+
+                  <div className="mt-2 text-[38px] font-black leading-none tracking-[-0.045em]">
+                    {percentText(
+                      overallPerformance
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 backdrop-blur">
+                  <BarChart3
+                    size={20}
+                  />
+                </div>
+              </div>
+
+              <div className="relative mt-3 flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black ${
+                    overallFlat
+                      ? 'border-white/15 bg-white/10 text-white/75'
+                      : overallDown
+                      ? 'border-rose-300/20 bg-rose-400/15 text-rose-100'
+                      : 'border-emerald-300/20 bg-emerald-400/15 text-emerald-100'
+                  }`}
+                >
+                  {overallFlat ? (
+                    <Activity
+                      size={11}
+                    />
+                  ) : overallDown ? (
+                    <TrendingDown
+                      size={11}
+                    />
+                  ) : (
+                    <TrendingUp
+                      size={11}
+                    />
+                  )}
+
+                  {trendLabel(
+                    overallTrend
+                  )}
+                </span>
+
+                <span className="text-[10px] font-semibold text-white/65">
+                  vs last month
+                </span>
+              </div>
+
+              <div className="relative mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-sm">
+                  <div className="text-[8px] font-black uppercase tracking-[0.1em] text-white/55">
+                    Last Month
+                  </div>
+                  <div className="mt-1 text-sm font-black text-white">
+                    {percentText(
+                      lastMonthMetrics
+                        ?.overallPerformance
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-sm">
+                  <div className="text-[8px] font-black uppercase tracking-[0.1em] text-white/55">
+                    Components
+                  </div>
+                  <div className="mt-1 text-sm font-black text-white">
+                    3 Signals
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative mt-3 text-[9px] font-semibold text-white/55">
+                Inspection + Attendance + Ward Ranking
+              </div>
+            </button>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-3 shadow-sm backdrop-blur-sm">
+              <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                <div>
+                  <div className="text-[11px] font-black text-slate-800">
+                    Performance Comparison
+                  </div>
+                  <div className="text-[9px] font-semibold text-slate-400">
+                    Current period vs last month
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-[9px] font-bold text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-indigo-600" />
+                    Current
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-slate-300" />
+                    Last Month
+                  </span>
+                </div>
+              </div>
+
+              <div className="h-[190px]">
+                <ComparisonBarChart
+                  data={
+                    comparisonData
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="relative mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {metricCards.map(
+              (metric) => {
+                const down =
+                  metric.trend
+                    ?.direction ===
+                  'down';
+
+                const hasTrend =
+                  metric.trend &&
+                  metric.trend
+                    .deltaPct !==
+                    null;
+
+                return (
+                  <button
+                    key={
+                      metric.key
+                    }
+                    type="button"
+                    onClick={
+                      metric.onClick
+                    }
+                    className="group rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-slate-600">
+                        <span className="text-indigo-600">
+                          {
+                            metric.icon
+                          }
+                        </span>
+                        {
+                          metric.label
+                        }
+                      </span>
+
+                      {hasTrend && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 text-[9px] font-black ${
+                            down
+                              ? 'text-rose-500'
+                              : 'text-emerald-600'
+                          }`}
+                        >
+                          {down ? (
+                            <TrendingDown
+                              size={10}
+                            />
+                          ) : (
+                            <TrendingUp
+                              size={10}
+                            />
+                          )}
+                          {trendLabel(
+                            metric.trend
+                          )}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-1.5 flex items-end justify-between gap-2">
+                      <div className="text-xl font-black leading-none text-slate-950">
+                        {percentText(
+                          metric.value
+                        )}
+                      </div>
+
+                      <div className="text-right text-[8px] font-bold text-slate-400">
+                        <div>
+                          Last month
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-black text-slate-500">
+                          {percentText(
+                            metric.previous
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              }
+            )}
+          </div>
+
+          <div className="relative mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-2.5">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">
+                <AlertTriangle
+                  size={11}
+                  className="text-amber-500"
+                />
+                Attention Signals
+              </div>
+
+              <div className="text-[8px] font-bold text-slate-400">
+                Auto-generated from current dashboard data
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+              {attentionInsights.map(
+                (item) => (
+                  <div
+                    key={
+                      item.id
+                    }
+                    className={`flex min-h-[48px] items-start gap-2 rounded-lg border px-2.5 py-2 ${
+                      item.tone ===
+                      'warning'
+                        ? 'border-rose-100 bg-rose-50/80'
+                        : item.tone ===
+                          'positive'
+                        ? 'border-emerald-100 bg-emerald-50/80'
+                        : 'border-indigo-100 bg-indigo-50/70'
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
+                        item.tone ===
+                        'warning'
+                          ? 'bg-rose-100 text-rose-600'
+                          : item.tone ===
+                            'positive'
+                          ? 'bg-emerald-100 text-emerald-600'
+                          : 'bg-indigo-100 text-indigo-600'
+                      } [&>svg]:h-[12px] [&>svg]:w-[12px]`}
+                    >
+                      {
+                        item.icon
+                      }
+                    </span>
+
+                    <p className="text-[9px] font-bold leading-[1.35] text-slate-600">
+                      {
+                        item.text
+                      }
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -3045,6 +3818,14 @@ export default function CommissionerDashboard() {
   ] =
     useState(false);
 
+  const [
+    lastUpdatedAt,
+    setLastUpdatedAt,
+  ] =
+    useState<Date | null>(
+      null
+    );
+
   /*
    * The full registered-user roster (same source as the Registered
    * Users Directory) so every registered SI/IEC/Daroga/Employee/ULB
@@ -3065,14 +3846,53 @@ export default function CommissionerDashboard() {
   ] =
     useState<Map<string, string>>(new Map());
 
+  /*
+   * Registered totals for the City Snapshot cards - the actual
+   * zone/ward/beat registry, independent of the applied date range,
+   * so "Total Zones/Wards/Beats" reads as the whole city's real
+   * footprint rather than only whatever happened to have activity
+   * in the selected window.
+   */
+  const [
+    registeredZoneCount,
+    setRegisteredZoneCount,
+  ] =
+    useState(0);
+
+  /*
+   * The zone registry's own names, so a zone with zero current-period
+   * activity (no records/employees/ward-ranking rows yet) still shows
+   * up as its own row in Zone Options-based views (Zone x Module
+   * matrix, Zone Performance Map) instead of only existing in the
+   * City Snapshot's registry-based zone count.
+   */
+  const [
+    registeredZoneNames,
+    setRegisteredZoneNames,
+  ] =
+    useState<string[]>([]);
+
+  const [
+    registeredWardCount,
+    setRegisteredWardCount,
+  ] =
+    useState(0);
+
+  const [
+    registeredBeatCount,
+    setRegisteredBeatCount,
+  ] =
+    useState(0);
+
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const [usersResult, zonesResult, wardsResult] = await Promise.allSettled([
+      const [usersResult, zonesResult, wardsResult, beatsResult] = await Promise.allSettled([
         CityUserApi.list(),
         GeoApi.list('ZONE'),
         GeoApi.list('WARD'),
+        AreaBeatApi.list(),
       ]);
 
       if (cancelled) return;
@@ -3083,12 +3903,27 @@ export default function CommissionerDashboard() {
 
       const nameMap = new Map<string, string>();
       if (zonesResult.status === 'fulfilled') {
-        (zonesResult.value.nodes || []).forEach((node: any) => nameMap.set(node.id, node.name));
+        const nodes = zonesResult.value.nodes || [];
+        nodes.forEach((node: any) => nameMap.set(node.id, node.name));
+        setRegisteredZoneCount(nodes.length);
+        setRegisteredZoneNames(
+          naturalSort(
+            nodes
+              .map((node: any) => String(node.name || '').trim())
+              .filter(Boolean)
+          )
+        );
       }
       if (wardsResult.status === 'fulfilled') {
-        (wardsResult.value.nodes || []).forEach((node: any) => nameMap.set(node.id, node.name));
+        const nodes = wardsResult.value.nodes || [];
+        nodes.forEach((node: any) => nameMap.set(node.id, node.name));
+        setRegisteredWardCount(nodes.length);
       }
       setGeoNameById(nameMap);
+
+      if (beatsResult.status === 'fulfilled') {
+        setRegisteredBeatCount((beatsResult.value.beats || []).length);
+      }
     })();
 
     return () => {
@@ -3199,6 +4034,26 @@ export default function CommissionerDashboard() {
     setSearch,
   ] =
     useState('');
+
+  /*
+   * The input itself stays bound to `search` for instant typing
+   * feedback; `debouncedSearch` (used below for searchValue) trails
+   * it by 250ms so the dozen-plus useMemo chains keyed on searchValue
+   * don't fully recompute on every keystroke.
+   */
+  const [
+    debouncedSearch,
+    setDebouncedSearch,
+  ] =
+    useState('');
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
 
   const [
     showFilters,
@@ -3477,6 +4332,10 @@ export default function CommissionerDashboard() {
         setRefreshing(
           false
         );
+
+        setLastUpdatedAt(
+          new Date()
+        );
       },
       [
         appliedFrom,
@@ -3681,12 +4540,20 @@ export default function CommissionerDashboard() {
         }
       );
 
+      const ulb =
+        new Set<string>(
+          (cityUsersByRole.get('ULB_OFFICER') || []).map(
+            (officer) => String(officer.id)
+          )
+        );
+
       return {
         daroga,
         si,
         iec,
+        ulb,
       };
-    }, [records]);
+    }, [records, cityUsersByRole]);
 
 
   /* =========================================================
@@ -3741,6 +4608,14 @@ export default function CommissionerDashboard() {
         }
       );
 
+      registeredZoneNames.forEach(
+        (name) => {
+          values.add(
+            name
+          );
+        }
+      );
+
       return naturalSort(
         Array.from(
           values
@@ -3750,6 +4625,7 @@ export default function CommissionerDashboard() {
       records,
       attendance,
       wardRows,
+      registeredZoneNames,
     ]);
 
   const wardOptions =
@@ -3843,110 +4719,6 @@ export default function CommissionerDashboard() {
       zoneFilter,
     ]);
 
-  const personOptions =
-    useMemo(() => {
-      const values =
-        new Set<string>();
-
-      if (
-        roleFilter ===
-          'ALL' ||
-        roleFilter ===
-          'SUPERVISOR'
-      ) {
-        records.forEach(
-          (item) => {
-            const name =
-              getDarogaName(
-                item
-              );
-
-            if (name) {
-              values.add(
-                name
-              );
-            }
-          }
-        );
-      }
-
-      if (
-        roleFilter ===
-          'ALL' ||
-        roleFilter ===
-          'QC'
-      ) {
-        records.forEach(
-          (item) => {
-            const name =
-              getSiName(
-                item
-              );
-
-            if (name) {
-              values.add(
-                name
-              );
-            }
-          }
-        );
-      }
-
-      if (
-        roleFilter ===
-          'ALL' ||
-        roleFilter ===
-          'ACTION_OFFICER'
-      ) {
-        records.forEach(
-          (item) => {
-            const name =
-              getIecName(
-                item
-              );
-
-            if (name) {
-              values.add(
-                name
-              );
-            }
-          }
-        );
-      }
-
-      if (
-        roleFilter ===
-          'ALL' ||
-        roleFilter ===
-          'EMPLOYEE'
-      ) {
-        attendance?.employees
-          ?.forEach(
-            (
-              employee
-            ) => {
-              if (
-                employee.employeeName
-              ) {
-                values.add(
-                  employee.employeeName
-                );
-              }
-            }
-          );
-      }
-
-      return naturalSort(
-        Array.from(
-          values
-        )
-      );
-    }, [
-      records,
-      attendance,
-      roleFilter,
-    ]);
-
   const statusOptions =
     useMemo(() => {
       if (
@@ -4017,7 +4789,7 @@ export default function CommissionerDashboard() {
   ========================================================= */
 
   const searchValue =
-    normalize(search);
+    normalize(debouncedSearch);
 
   const selectedAttendanceEmployee =
     useMemo(
@@ -4034,6 +4806,31 @@ export default function CommissionerDashboard() {
         personFilter,
       ]
     );
+
+  /*
+   * ULB Officer records carry no reviewer/actor field (see ulbOfficerRows
+   * below), so the Role filter matches a ULB Officer by whether the
+   * record's zone/ward falls under any registered ULB Officer's
+   * assigned scope, rather than by a per-record person field.
+   */
+  const ulbOfficerScope = useMemo(() => {
+    const zones = new Set<string>();
+    const wards = new Set<string>();
+
+    (cityUsersByRole.get('ULB_OFFICER') || []).forEach((officer) => {
+      (officer.zoneIds || []).forEach((id) => {
+        const name = geoNameById.get(id);
+        if (name) zones.add(normalize(name));
+      });
+
+      (officer.wardIds || []).forEach((id) => {
+        const name = geoNameById.get(id);
+        if (name) wards.add(normalize(name));
+      });
+    });
+
+    return { zones, wards };
+  }, [cityUsersByRole, geoNameById]);
 
   function recordMatchesRole(
     item: DashboardRecord
@@ -4100,6 +4897,32 @@ export default function CommissionerDashboard() {
           selectedAttendanceEmployee
             .matrixTrackUserId
         )
+      );
+    }
+
+    if (
+      roleFilter ===
+      'ULB_OFFICER'
+    ) {
+      const zone =
+        normalize(
+          getRecordZone(item)
+        );
+
+      const ward =
+        normalize(
+          getRecordWard(item)
+        );
+
+      return (
+        (Boolean(zone) &&
+          ulbOfficerScope.zones.has(
+            zone
+          )) ||
+        (Boolean(ward) &&
+          ulbOfficerScope.wards.has(
+            ward
+          ))
       );
     }
 
@@ -4241,6 +5064,7 @@ export default function CommissionerDashboard() {
       statusFilter,
       searchValue,
       selectedAttendanceEmployee,
+      ulbOfficerScope,
     ]);
 
   const filteredInspectionRecords =
@@ -4345,6 +5169,22 @@ export default function CommissionerDashboard() {
             if (
               !employee.matrixTrackUserId ||
               !roleUserIds.iec.has(
+                String(
+                  employee.matrixTrackUserId
+                )
+              )
+            ) {
+              return false;
+            }
+          }
+
+          if (
+            roleFilter ===
+            'ULB_OFFICER'
+          ) {
+            if (
+              !employee.matrixTrackUserId ||
+              !roleUserIds.ulb.has(
                 String(
                   employee.matrixTrackUserId
                 )
@@ -4728,60 +5568,13 @@ export default function CommissionerDashboard() {
     );
 
   const cityZoneCount =
-    useMemo(() => {
-      const zones =
-        new Set<string>();
-
-      wardRows.forEach(
-        (row) => {
-          const zone =
-            String(
-              row.zoneName ||
-                ''
-            ).trim();
-
-          if (zone) {
-            zones.add(zone);
-          }
-        }
-      );
-
-      return zones.size;
-    }, [wardRows]);
+    registeredZoneCount;
 
   const cityWardCount =
-    wardRows.length;
+    registeredWardCount;
 
   const cityBeatCount =
-    useMemo(() => {
-      const beats =
-        new Set<string>();
-
-      records.forEach(
-        (item) => {
-          if (
-            item.dashboardModule !==
-            'SWEEPING'
-          ) {
-            return;
-          }
-
-          const beat =
-            String(
-              item?.beatName ||
-                item?.beat
-                  ?.beatName ||
-                ''
-            ).trim();
-
-          if (beat) {
-            beats.add(beat);
-          }
-        }
-      );
-
-      return beats.size;
-    }, [records]);
+    registeredBeatCount;
 
   /* =========================================================
      MODULE PERFORMANCE
@@ -5113,6 +5906,360 @@ export default function CommissionerDashboard() {
       [buildGeoRows]
     );
 
+  /* =========================================================
+     SMART BRIEF - AUTO-GENERATED INSIGHTS
+     Rule-based highlights derived from the already-computed stats
+     below, surfaced as short human-readable statements instead of
+     making the commissioner read a chart to find the same story.
+  ========================================================= */
+
+  const smartInsights =
+    useMemo<SmartInsight[]>(() => {
+      const items: SmartInsight[] =
+        [];
+
+      const overallTrend =
+        monthTrends.overallPerformance;
+
+      if (
+        overallPerformance !==
+        null
+      ) {
+        if (
+          overallTrend &&
+          overallTrend.deltaPct !==
+            null &&
+          Math.abs(
+            overallTrend.deltaPct
+          ) >= 1
+        ) {
+          const up =
+            overallTrend.direction ===
+            'up';
+
+          items.push({
+            id: 'overall-trend',
+            tone: up
+              ? 'positive'
+              : 'warning',
+            icon: up ? (
+              <TrendingUp
+                size={18}
+              />
+            ) : (
+              <TrendingDown
+                size={18}
+              />
+            ),
+            text: `City's overall performance is ${percentText(
+              overallPerformance
+            )}, ${
+              up ? 'up' : 'down'
+            } ${Math.abs(
+              overallTrend.deltaPct
+            ).toFixed(
+              0
+            )}% from last month.`,
+          });
+        } else {
+          items.push({
+            id: 'overall-flat',
+            tone: 'neutral',
+            icon: (
+              <Activity
+                size={18}
+              />
+            ),
+            text: `City's overall performance is holding steady at ${percentText(
+              overallPerformance
+            )} this period.`,
+          });
+        }
+      }
+
+      const scoredZones =
+        zoneRows.filter(
+          (row) =>
+            row.performance !==
+              null &&
+            row.records.length >
+              0
+        );
+
+      if (scoredZones.length >= 2) {
+        const best = [
+          ...scoredZones,
+        ].sort(
+          (a, b) =>
+            (b.performance ??
+              0) -
+            (a.performance ??
+              0)
+        )[0];
+
+        const worst = [
+          ...scoredZones,
+        ].sort(
+          (a, b) =>
+            (a.performance ??
+              0) -
+            (b.performance ??
+              0)
+        )[0];
+
+        if (
+          best &&
+          best.label !==
+            worst?.label
+        ) {
+          items.push({
+            id: 'best-zone',
+            tone: 'positive',
+            icon: (
+              <Trophy
+                size={18}
+              />
+            ),
+            text: `${
+              best.label
+            } is the top-performing zone this period at ${percentText(
+              best.performance
+            )}.`,
+          });
+        }
+
+        if (worst) {
+          items.push({
+            id: 'worst-zone',
+            tone: 'warning',
+            icon: (
+              <AlertTriangle
+                size={18}
+              />
+            ),
+            text: `${
+              worst.label
+            } needs attention - lowest zone performance at ${percentText(
+              worst.performance
+            )}.`,
+          });
+        }
+      }
+
+      const redWards =
+        wardRows.filter(
+          (row) =>
+            row.performanceBand ===
+            'RED'
+        );
+
+      if (redWards.length > 0) {
+        items.push({
+          id: 'red-wards',
+          tone: 'warning',
+          icon: (
+            <MapPin
+              size={18}
+            />
+          ),
+          text: `${
+            redWards.length
+          } ward${
+            redWards.length === 1
+              ? ''
+              : 's'
+          } ${
+            redWards.length === 1
+              ? 'is'
+              : 'are'
+          } in the Red band and need urgent action.`,
+        });
+      }
+
+      if (
+        citySnapshotStats.actionRequired >
+        0
+      ) {
+        items.push({
+          id: 'action-required',
+          tone: 'warning',
+          icon: (
+            <AlertTriangle
+              size={18}
+            />
+          ),
+          text: `${
+            citySnapshotStats.actionRequired
+          } report${
+            citySnapshotStats.actionRequired ===
+            1
+              ? ''
+              : 's'
+          } ${
+            citySnapshotStats.actionRequired ===
+            1
+              ? 'is'
+              : 'are'
+          } awaiting Action Officer response.`,
+        });
+      }
+
+      if (
+        citySnapshotStats.pending >
+        0
+      ) {
+        items.push({
+          id: 'pending-qc',
+          tone: 'neutral',
+          icon: (
+            <Clock3
+              size={18}
+            />
+          ),
+          text: `${
+            citySnapshotStats.pending
+          } report${
+            citySnapshotStats.pending ===
+            1
+              ? ''
+              : 's'
+          } currently pending SI/QC review.`,
+        });
+      }
+
+      const scoredModules =
+        moduleCards.filter(
+          (item) =>
+            item.performance !==
+              null &&
+            INSPECTION_MODULES.some(
+              (module) =>
+                module.key ===
+                item.key
+            )
+        );
+
+      if (scoredModules.length >= 2) {
+        const bestModule = [
+          ...scoredModules,
+        ].sort(
+          (a, b) =>
+            (b.performance ??
+              0) -
+            (a.performance ??
+              0)
+        )[0];
+
+        const worstModule = [
+          ...scoredModules,
+        ].sort(
+          (a, b) =>
+            (a.performance ??
+              0) -
+            (b.performance ??
+              0)
+        )[0];
+
+        if (
+          bestModule &&
+          bestModule.key !==
+            worstModule?.key
+        ) {
+          items.push({
+            id: 'best-module',
+            tone: 'positive',
+            icon: (
+              <CheckCircle2
+                size={18}
+              />
+            ),
+            text: `${
+              bestModule.label
+            } inspections are leading this period at ${percentText(
+              bestModule.performance
+            )} performance.`,
+          });
+
+          items.push({
+            id: 'worst-module',
+            tone: 'warning',
+            icon: (
+              <XCircle
+                size={18}
+              />
+            ),
+            text: `${
+              worstModule.label
+            } inspections are the weakest module at ${percentText(
+              worstModule.performance
+            )} performance.`,
+          });
+        }
+      }
+
+      const attendanceTrend =
+        monthTrends.attendanceRate;
+
+      if (
+        attendanceStats.rate !==
+          null &&
+        attendanceTrend &&
+        attendanceTrend.deltaPct !==
+          null &&
+        Math.abs(
+          attendanceTrend.deltaPct
+        ) >= 1
+      ) {
+        const up =
+          attendanceTrend.direction ===
+          'up';
+
+        items.push({
+          id: 'attendance-trend',
+          tone: up
+            ? 'positive'
+            : 'warning',
+          icon: (
+            <UserRoundCheck
+              size={18}
+            />
+          ),
+          text: `Field staff attendance is ${percentText(
+            attendanceStats.rate
+          )}, ${
+            up ? 'up' : 'down'
+          } ${Math.abs(
+            attendanceTrend.deltaPct
+          ).toFixed(
+            0
+          )}% vs last month.`,
+        });
+      }
+
+      if (!items.length) {
+        items.push({
+          id: 'no-data',
+          tone: 'neutral',
+          icon: (
+            <Sparkles
+              size={18}
+            />
+          ),
+          text: 'Not enough data yet this period to generate insights.',
+        });
+      }
+
+      return items;
+    }, [
+      overallPerformance,
+      monthTrends,
+      zoneRows,
+      wardRows,
+      citySnapshotStats,
+      moduleCards,
+      attendanceStats,
+    ]);
+
   function geoMetric(
     row: GeoPerformanceRow
   ): number | null {
@@ -5283,6 +6430,25 @@ export default function CommissionerDashboard() {
   ========================================================= */
 
   /*
+   * Single-pass lookup for attendance-by-user, shared by every role
+   * row builder below - avoids re-scanning attendance.employees with
+   * .find() for every person in every roster (was O(roster x employees)
+   * per role).
+   */
+  const attendanceEmployeeByUserId =
+    useMemo(() => {
+      const map = new Map<string, AttendanceEmployeeSummary>();
+
+      attendance?.employees?.forEach((employee) => {
+        if (employee.matrixTrackUserId) {
+          map.set(String(employee.matrixTrackUserId), employee);
+        }
+      });
+
+      return map;
+    }, [attendance]);
+
+  /*
    * Rows come from the full registered-user roster (same source as
    * the Registered Users Directory) rather than being derived only
    * from inspection records - matching by roster ID/name means a
@@ -5301,34 +6467,53 @@ export default function CommissionerDashboard() {
       ) => {
         const roster = cityUsersByRole.get(role) || [];
 
+        /*
+         * Bucket every inspection record once (O(records)) instead of
+         * re-filtering the full record set for every person in the
+         * roster (was O(roster x records)). A record either matches by
+         * id or by normalized name, same as the original per-record
+         * check, so records land in exactly one of the two maps.
+         */
+        const byId = new Map<string, DashboardRecord[]>();
+        const byName = new Map<string, DashboardRecord[]>();
+
+        filteredInspectionRecords.forEach((item) => {
+          let name = '';
+          let id: string | null = null;
+
+          if (role === 'SUPERVISOR') {
+            name = getDarogaName(item);
+            id = getDarogaId(item);
+          } else if (role === 'QC') {
+            name = getSiName(item);
+            id = getSiId(item);
+          } else if (role === 'ACTION_OFFICER') {
+            name = getIecName(item);
+            id = getIecId(item);
+          }
+
+          if (id) {
+            const key = String(id);
+            if (!byId.has(key)) byId.set(key, []);
+            byId.get(key)!.push(item);
+          } else if (name) {
+            const key = normalize(name);
+            if (!byName.has(key)) byName.set(key, []);
+            byName.get(key)!.push(item);
+          }
+        });
+
         return roster
           .map((person) => {
-            const matchedRecords = filteredInspectionRecords.filter((item) => {
-              let name = '';
-              let id: string | null = null;
-
-              if (role === 'SUPERVISOR') {
-                name = getDarogaName(item);
-                id = getDarogaId(item);
-              } else if (role === 'QC') {
-                name = getSiName(item);
-                id = getSiId(item);
-              } else if (role === 'ACTION_OFFICER') {
-                name = getIecName(item);
-                id = getIecId(item);
-              }
-
-              if (id) return String(id) === String(person.id);
-              return Boolean(name) && normalize(name) === normalize(person.name);
-            });
+            const matchedRecords =
+              byId.get(String(person.id)) ||
+              byName.get(normalize(person.name)) ||
+              [];
 
             const stats = inspectionStats(matchedRecords);
 
             const attendanceEmployee =
-              attendance?.employees?.find(
-                (employee) =>
-                  employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(person.id)
-              ) || null;
+              attendanceEmployeeByUserId.get(String(person.id)) || null;
 
             return {
               key: `${role}-${person.id}`,
@@ -5356,7 +6541,7 @@ export default function CommissionerDashboard() {
       [
         cityUsersByRole,
         filteredInspectionRecords,
-        attendance,
+        attendanceEmployeeByUserId,
       ]
     );
 
@@ -5394,6 +6579,39 @@ export default function CommissionerDashboard() {
    * (the same scope the backend enforces when they mark a report
    * Action Required) rather than by a per-record person field.
    */
+  /*
+   * Bucket every inspection record once by normalized zone/ward
+   * (O(records)) instead of re-filtering the full record set for every
+   * ULB officer (was O(officers x records)).
+   */
+  const recordsByNormalizedZone =
+    useMemo(() => {
+      const map = new Map<string, DashboardRecord[]>();
+
+      filteredInspectionRecords.forEach((item) => {
+        const zone = normalize(getRecordZone(item));
+        if (!zone) return;
+        if (!map.has(zone)) map.set(zone, []);
+        map.get(zone)!.push(item);
+      });
+
+      return map;
+    }, [filteredInspectionRecords]);
+
+  const recordsByNormalizedWard =
+    useMemo(() => {
+      const map = new Map<string, DashboardRecord[]>();
+
+      filteredInspectionRecords.forEach((item) => {
+        const ward = normalize(getRecordWard(item));
+        if (!ward) return;
+        if (!map.has(ward)) map.set(ward, []);
+        map.get(ward)!.push(item);
+      });
+
+      return map;
+    }, [filteredInspectionRecords]);
+
   const ulbOfficerRows =
     useMemo(
       () =>
@@ -5409,22 +6627,22 @@ export default function CommissionerDashboard() {
             const zoneSet = new Set(zoneNames.map(normalize));
             const wardSet = new Set(wardNames.map(normalize));
 
-            const matchedRecords =
-              zoneSet.size || wardSet.size
-                ? filteredInspectionRecords.filter((item) => {
-                    const zone = normalize(getRecordZone(item));
-                    const ward = normalize(getRecordWard(item));
-                    return (zone && zoneSet.has(zone)) || (ward && wardSet.has(ward));
-                  })
-                : [];
+            const matchedRecordsSet = new Set<DashboardRecord>();
+
+            zoneSet.forEach((zone) => {
+              recordsByNormalizedZone.get(zone)?.forEach((item) => matchedRecordsSet.add(item));
+            });
+
+            wardSet.forEach((ward) => {
+              recordsByNormalizedWard.get(ward)?.forEach((item) => matchedRecordsSet.add(item));
+            });
+
+            const matchedRecords = Array.from(matchedRecordsSet);
 
             const stats = inspectionStats(matchedRecords);
 
             const attendanceEmployee =
-              attendance?.employees?.find(
-                (employee) =>
-                  employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(officer.id)
-              ) || null;
+              attendanceEmployeeByUserId.get(String(officer.id)) || null;
 
             return {
               key: `ULB_OFFICER-${officer.id}`,
@@ -5447,7 +6665,13 @@ export default function CommissionerDashboard() {
             } satisfies RolePerformanceRow;
           })
           .sort((a, b) => b.performance - a.performance),
-      [cityUsersByRole, geoNameById, filteredInspectionRecords, attendance]
+      [
+        cityUsersByRole,
+        geoNameById,
+        recordsByNormalizedZone,
+        recordsByNormalizedWard,
+        attendanceEmployeeByUserId,
+      ]
     );
 
   /*
@@ -5697,199 +6921,6 @@ export default function CommissionerDashboard() {
 
 
   /* =========================================================
-     DAILY TREND
-  ========================================================= */
-
-  const trendRows =
-    useMemo(() => {
-      const map =
-        new Map<
-          string,
-          {
-            date: string;
-            inspectionRecords: DashboardRecord[];
-            attendancePresent: number;
-            attendanceTotal: number;
-            wardScores: number[];
-          }
-        >();
-
-      function row(
-        date: string
-      ) {
-        if (!map.has(date)) {
-          map.set(date, {
-            date,
-            inspectionRecords:
-              [],
-            attendancePresent:
-              0,
-            attendanceTotal:
-              0,
-            wardScores:
-              [],
-          });
-        }
-
-        return map.get(
-          date
-        )!;
-      }
-
-      filteredInspectionRecords.forEach(
-        (item) => {
-          const raw =
-            recordDate(item);
-
-          if (!raw) {
-            return;
-          }
-
-          const date =
-            new Date(raw)
-              .toISOString()
-              .slice(
-                0,
-                10
-              );
-
-          row(
-            date
-          ).inspectionRecords.push(
-            item
-          );
-        }
-      );
-
-      if (
-        zoneFilter ===
-          'ALL' &&
-        wardFilter ===
-          'ALL' &&
-        personFilter ===
-          'ALL'
-      ) {
-        attendance?.dailyTrend
-          ?.forEach(
-            (item) => {
-              const date =
-                item.date.slice(
-                  0,
-                  10
-                );
-
-              const target =
-                row(date);
-
-              target.attendancePresent =
-                item.present;
-
-              target.attendanceTotal =
-                item.total;
-            }
-          );
-      }
-
-      filteredWardRows.forEach(
-        (ward) => {
-          if (
-            !ward.scoreDate
-          ) {
-            return;
-          }
-
-          const date =
-            String(
-              ward.scoreDate
-            ).slice(
-              0,
-              10
-            );
-
-          row(
-            date
-          ).wardScores.push(
-            Number(
-              ward.finalScore
-            )
-          );
-        }
-      );
-
-      return Array.from(
-        map.values()
-      )
-        .sort(
-          (a, b) =>
-            a.date.localeCompare(
-              b.date
-            )
-        )
-        .map(
-          (item) => {
-            const inspection =
-              inspectionStats(
-                item.inspectionRecords
-              ).performance;
-
-            const attendanceRate =
-              item.attendanceTotal >
-              0
-                ? (
-                    item.attendancePresent /
-                    item.attendanceTotal
-                  ) *
-                  100
-                : null;
-
-            const wardRanking =
-              averageApplicable(
-                item.wardScores
-              );
-
-            return {
-              date:
-                item.date,
-              label:
-                new Date(
-                  `${item.date}T00:00:00`
-                ).toLocaleDateString(
-                  'en-IN',
-                  {
-                    day:
-                      '2-digit',
-                    month:
-                      'short',
-                  }
-                ),
-              inspection,
-              attendance:
-                attendanceRate,
-              wardRanking,
-              overall:
-                averageApplicable(
-                  [
-                    inspection,
-                    attendanceRate,
-                    wardRanking,
-                  ]
-                ),
-              records:
-                item.inspectionRecords,
-            };
-          }
-        );
-    }, [
-      filteredInspectionRecords,
-      filteredWardRows,
-      attendance,
-      zoneFilter,
-      wardFilter,
-      personFilter,
-    ]);
-
-
-  /* =========================================================
      STATUS BAR DATA
   ========================================================= */
 
@@ -5986,6 +7017,60 @@ export default function CommissionerDashboard() {
       string | null
     >(null);
 
+  const [
+    isZoneMapOpen,
+    setIsZoneMapOpen,
+  ] =
+    useState(true);
+
+  /*
+   * Bucket each dataset once by zone (O(records + employees + wards))
+   * instead of re-filtering the full dataset for every zone x module
+   * cell (was O(zones x modules x records)).
+   */
+  const inspectionRecordsByZoneAndModule =
+    useMemo(() => {
+      const map = new Map<string, DashboardRecord[]>();
+
+      inspectionContextRecords.forEach((item) => {
+        const zone = getRecordZone(item);
+        if (!zone || !item.dashboardModule) return;
+
+        const key = `${zone}__${item.dashboardModule}`;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(item);
+      });
+
+      return map;
+    }, [inspectionContextRecords]);
+
+  const attendanceEmployeesByZone =
+    useMemo(() => {
+      const map = new Map<string, AttendanceEmployeeSummary[]>();
+
+      attendanceContextEmployees.forEach((employee) => {
+        employee.zones?.forEach((zone) => {
+          if (!map.has(zone)) map.set(zone, []);
+          map.get(zone)!.push(employee);
+        });
+      });
+
+      return map;
+    }, [attendanceContextEmployees]);
+
+  const wardContextRowsByZone =
+    useMemo(() => {
+      const map = new Map<string, WardRankingRow[]>();
+
+      wardContextRows.forEach((ward) => {
+        if (!ward.zoneName) return;
+        if (!map.has(ward.zoneName)) map.set(ward.zoneName, []);
+        map.get(ward.zoneName)!.push(ward);
+      });
+
+      return map;
+    }, [wardContextRows]);
+
   const zoneModuleMatrix =
     useMemo(() => {
       return zoneOptions
@@ -6006,15 +7091,9 @@ export default function CommissionerDashboard() {
                     'ATTENDANCE'
                   ) {
                     const employees =
-                      attendanceContextEmployees.filter(
-                        (
-                          employee
-                        ) =>
-                          employee.zones
-                            ?.includes(
-                              zone
-                            )
-                      );
+                      attendanceEmployeesByZone.get(
+                        zone
+                      ) || [];
 
                     const total =
                       employees.reduce(
@@ -6065,13 +7144,9 @@ export default function CommissionerDashboard() {
                     'WARD_RANKING'
                   ) {
                     const wards =
-                      wardContextRows.filter(
-                        (
-                          ward
-                        ) =>
-                          ward.zoneName ===
-                          zone
-                      );
+                      wardContextRowsByZone.get(
+                        zone
+                      ) || [];
 
                     return {
                       key:
@@ -6096,17 +7171,9 @@ export default function CommissionerDashboard() {
                   }
 
                   const recordsForCell =
-                    inspectionContextRecords.filter(
-                      (
-                        item
-                      ) =>
-                        item.dashboardModule ===
-                          module.key &&
-                        getRecordZone(
-                          item
-                        ) ===
-                          zone
-                    );
+                    inspectionRecordsByZoneAndModule.get(
+                      `${zone}__${module.key}`
+                    ) || [];
 
                   return {
                     key:
@@ -6138,9 +7205,9 @@ export default function CommissionerDashboard() {
       zoneOptions,
       zoneFilter,
       moduleCards,
-      attendanceContextEmployees,
-      wardContextRows,
-      inspectionContextRecords,
+      attendanceEmployeesByZone,
+      wardContextRowsByZone,
+      inspectionRecordsByZoneAndModule,
     ]);
 
   const visibleZoneModuleCards =
@@ -6241,6 +7308,101 @@ export default function CommissionerDashboard() {
         ''
       );
     })();
+
+
+  const zoneMapVisualRows = (() => {
+    const rows = zoneModuleMatrix
+      .slice(0, 6)
+      .map((row, index) => {
+        const zoneRow = zoneRows.find(
+          (item) => item.label === row.zone
+        );
+
+        const value = zoneRow
+          ? geoMetric(zoneRow)
+          : null;
+
+        const match = row.zone.match(/(\d+)/);
+        const zoneNumber = match
+          ? Number(match[1])
+          : index + 1;
+
+        const layout =
+          ZONE_MAP_LAYOUT[zoneNumber] ||
+          ZONE_MAP_LAYOUT[(index % 6) + 1];
+
+        return {
+          ...row,
+          value,
+          zoneNumber,
+          layout,
+        };
+      });
+
+    const values = rows
+      .map((row) => row.value)
+      .filter(
+        (value): value is number =>
+          typeof value === 'number' &&
+          Number.isFinite(value)
+      );
+
+    const minValue = values.length
+      ? Math.min(...values)
+      : 0;
+
+    const maxValue = values.length
+      ? Math.max(...values)
+      : 100;
+
+    return rows.map((row) => {
+      const hasValue =
+        typeof row.value === 'number' &&
+        Number.isFinite(row.value);
+
+      const relative = !hasValue
+        ? 0
+        : maxValue > minValue
+        ? clamp(
+            (row.value! - minValue) /
+              (maxValue - minValue),
+            0,
+            1
+          )
+        : clamp(row.value! / 100, 0, 1);
+
+      const intensity =
+        !hasValue || row.value === 0
+          ? 0
+          : 0.16 +
+            0.84 * Math.pow(relative, 1.8);
+
+      const startLightness =
+        96 - intensity * 38;
+
+      const endLightness =
+        92 - intensity * 46;
+
+      const darkZone =
+        intensity >= 0.86;
+
+      return {
+        ...row,
+        gradientStart: hasValue
+          ? `hsl(238 88% ${startLightness}%)`
+          : '#f4f6fb',
+        gradientEnd: hasValue
+          ? `hsl(234 90% ${endLightness}%)`
+          : '#e8ecf6',
+        textColor: darkZone
+          ? '#ffffff'
+          : '#10235e',
+        dotColor: darkZone
+          ? '#ffffff'
+          : '#5b55f6',
+      };
+    });
+  })();
 
 
   /* =========================================================
@@ -6783,7 +7945,7 @@ export default function CommissionerDashboard() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1, minWidth: '280px' }}>
             <div style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldCheck size={14} color="#60a5fa" /> MATRIXTRACK 2.0 • COMMISSIONER OVERSIGHT
+              <ShieldCheck size={14} color="#60a5fa" /> MATRIXTRACK 2.0
             </div>
 
             <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.02em' }}>
@@ -6882,7 +8044,7 @@ export default function CommissionerDashboard() {
               )}
             </div>
 
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
               <label>
                 <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
                   From
@@ -7090,51 +8252,6 @@ export default function CommissionerDashboard() {
                       >
                         {
                           item.label
-                        }
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-
-              <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                  Person
-                </span>
-
-                <select
-                  value={
-                    personFilter
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setPersonFilter(
-                      event
-                        .target
-                        .value
-                    )
-                  }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
-                >
-                  <option value="ALL">
-                    All
-                  </option>
-
-                  {personOptions.map(
-                    (
-                      person
-                    ) => (
-                      <option
-                        key={
-                          person
-                        }
-                        value={
-                          person
-                        }
-                      >
-                        {
-                          person
                         }
                       </option>
                     )
@@ -8527,241 +9644,56 @@ export default function CommissionerDashboard() {
               Overall Performance
             </div>
 
-            <div className="h-[340px]">
-              {loading ? (
-                <div className="h-full animate-pulse rounded-2xl bg-slate-100" />
-              ) : (
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-                  <AreaChart
-                    data={
-                      trendRows
-                    }
-                    margin={{
-                      top: 10,
-                      right: 12,
-                      left: -18,
-                      bottom: 0,
-                    }}
-                    onClick={(
-                      state: any
-                    ) => {
-                      const row =
-                        state
-                          ?.activePayload?.[0]
-                          ?.payload;
-
-                      if (!row) {
-                        return;
-                      }
-
-                      setDrilldown({
-                        title:
-                          formatDate(
-                            row.date
-                          ),
-                        value:
-                          percentText(
-                            row.overall
-                          ),
-                        inspectionRecords:
-                          row.records,
-                      });
-                    }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="overallArea"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="#4f46e5"
-                          stopOpacity={
-                            0.42
-                          }
-                        />
-
-                        <stop
-                          offset="100%"
-                          stopColor="#8b5cf6"
-                          stopOpacity={
-                            0
-                          }
-                        />
-                      </linearGradient>
-
-                      <linearGradient
-                        id="inspectionArea"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="0%"
-                          stopColor="#2563eb"
-                          stopOpacity={
-                            0.18
-                          }
-                        />
-
-                        <stop
-                          offset="100%"
-                          stopColor="#2563eb"
-                          stopOpacity={
-                            0
-                          }
-                        />
-                      </linearGradient>
-                    </defs>
-
-                    <CartesianGrid
-                      strokeDasharray="4 5"
-                      stroke="#e2e8f0"
-                      vertical={
-                        false
-                      }
-                    />
-
-                    <XAxis
-                      dataKey="label"
-                      axisLine={
-                        false
-                      }
-                      tickLine={
-                        false
-                      }
-                      minTickGap={
-                        25
-                      }
-                      tick={{
-                        fontSize:
-                          10,
-                        fill:
-                          '#64748b',
-                      }}
-                    />
-
-                    <YAxis
-                      domain={[
-                        0,
-                        100,
-                      ]}
-                      axisLine={
-                        false
-                      }
-                      tickLine={
-                        false
-                      }
-                      tick={{
-                        fontSize:
-                          10,
-                        fill:
-                          '#94a3b8',
-                      }}
-                    />
-
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius:
-                          16,
-                        border:
-                          '1px solid #e2e8f0',
-                        boxShadow:
-                          '0 18px 45px rgba(15,23,42,.16)',
-                        fontSize:
-                          11,
-                        fontWeight:
-                          700,
-                      }}
-                    />
-
-                    <Legend
-                      wrapperStyle={{
-                        fontSize:
-                          10,
-                        fontWeight:
-                          800,
-                      }}
-                    />
-
-                    <Area
-                      type="monotone"
-                      dataKey="overall"
-                      name="Overall Performance"
-                      stroke="#4f46e5"
-                      strokeWidth={
-                        3
-                      }
-                      fill="url(#overallArea)"
-                      connectNulls
-                      isAnimationActive
-                      animationDuration={
-                        750
-                      }
-                    />
-
-                    <Area
-                      type="monotone"
-                      dataKey="inspection"
-                      name="Inspection Performance"
-                      stroke="#2563eb"
-                      strokeWidth={
-                        2
-                      }
-                      fill="url(#inspectionArea)"
-                      connectNulls
-                      isAnimationActive
-                      animationDuration={
-                        800
-                      }
-                    />
-
-                    <Area
-                      type="monotone"
-                      dataKey="attendance"
-                      name="Attendance"
-                      stroke="#059669"
-                      strokeWidth={
-                        2
-                      }
-                      fillOpacity={
-                        0
-                      }
-                      connectNulls
-                      isAnimationActive
-                      animationDuration={
-                        850
-                      }
-                    />
-
-                    <Area
-                      type="monotone"
-                      dataKey="wardRanking"
-                      name="Ward Ranking"
-                      stroke="#9333ea"
-                      strokeWidth={
-                        2
-                      }
-                      fillOpacity={
-                        0
-                      }
-                      connectNulls
-                      isAnimationActive
-                      animationDuration={
-                        900
-                      }
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
+            <CityPerformancePulse
+              loading={
+                loading
+              }
+              periodLabel={
+                zoneModuleDateLabel
+              }
+              overallPerformance={
+                overallPerformance
+              }
+              inspectionPerformance={
+                inspection.performance
+              }
+              attendanceRate={
+                attendanceStats.rate
+              }
+              wardRankingAverage={
+                wardRankingAverage
+              }
+              lastMonthMetrics={
+                lastMonthMetrics
+              }
+              monthTrends={
+                monthTrends
+              }
+              insights={
+                smartInsights
+              }
+              lastUpdatedAt={
+                lastUpdatedAt
+              }
+              onOverall={
+                openOverall
+              }
+              onInspection={() =>
+                openInspectionMetric(
+                  'Inspection Performance',
+                  filteredInspectionRecords,
+                  percentText(
+                    inspection.performance
+                  )
+                )
+              }
+              onAttendance={
+                openAttendance
+              }
+              onWardRanking={
+                openWardRanking
+              }
+            />
           </div>
 
           <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -8801,218 +9733,11 @@ export default function CommissionerDashboard() {
           </div>
 
           <div className="h-[300px]">
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-              <BarChart
-                data={
-                  moduleStatusRows
-                }
-                layout="vertical"
-                margin={{
-                  left: 32,
-                  right: 14,
-                  top: 4,
-                  bottom: 4,
-                }}
-              >
-                <defs>
-                  <linearGradient
-                    id="approvedGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#34d399"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#047857"
-                    />
-                  </linearGradient>
-
-                  <linearGradient
-                    id="rejectedGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#fb7185"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#be123c"
-                    />
-                  </linearGradient>
-
-                  <linearGradient
-                    id="actionRequiredGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#fbbf24"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#d97706"
-                    />
-                  </linearGradient>
-
-                  <linearGradient
-                    id="actionTakenGradient"
-                    x1="0"
-                    y1="0"
-                    x2="1"
-                    y2="0"
-                  >
-                    <stop
-                      offset="0%"
-                      stopColor="#60a5fa"
-                    />
-                    <stop
-                      offset="100%"
-                      stopColor="#4338ca"
-                    />
-                  </linearGradient>
-                </defs>
-
-                <XAxis
-                  type="number"
-                  domain={[
-                    0,
-                    100,
-                  ]}
-                  axisLine={
-                    false
-                  }
-                  tickLine={
-                    false
-                  }
-                  tick={{
-                    fontSize:
-                      10,
-                    fill:
-                      '#94a3b8',
-                  }}
-                />
-
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={145}
-                  axisLine={
-                    false
-                  }
-                  tickLine={
-                    false
-                  }
-                  tick={{
-                    fontSize:
-                      10,
-                    fill:
-                      '#475569',
-                    fontWeight:
-                      700,
-                  }}
-                />
-
-                <Tooltip
-                  formatter={(
-                    value: any
-                  ) =>
-                    percentText(
-                      Number(
-                        value
-                      )
-                    )
-                  }
-                  contentStyle={{
-                    borderRadius:
-                      14,
-                    border:
-                      '1px solid #e2e8f0',
-                    fontSize:
-                      11,
-                  }}
-                />
-
-                <Legend
-                  wrapperStyle={{
-                    fontSize:
-                      10,
-                    fontWeight:
-                      800,
-                  }}
-                />
-
-                <Bar
-                  dataKey="Approved"
-                  stackId="status"
-                  fill="url(#approvedGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    650
-                  }
-                />
-
-                <Bar
-                  dataKey="Rejected"
-                  stackId="status"
-                  fill="url(#rejectedGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    700
-                  }
-                />
-
-                <Bar
-                  dataKey="Action Required"
-                  stackId="status"
-                  fill="url(#actionRequiredGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    750
-                  }
-                />
-
-                <Bar
-                  dataKey="Action Taken"
-                  stackId="status"
-                  fill="url(#actionTakenGradient)"
-                  isAnimationActive
-                  animationDuration={
-                    800
-                  }
-                />
-
-                <Bar
-                  dataKey="Pending"
-                  stackId="status"
-                  fill="#cbd5e1"
-                  radius={[
-                    0,
-                    10,
-                    10,
-                    0,
-                  ]}
-                  isAnimationActive
-                  animationDuration={
-                    850
-                  }
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <ModuleStatusBarChart
+              data={
+                moduleStatusRows
+              }
+            />
           </div>
         </section>
 
@@ -9208,209 +9933,53 @@ export default function CommissionerDashboard() {
             </div>
 
             <div className="h-[390px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <ScatterChart
-                  margin={{
-                    top: 20,
-                    right: 25,
-                    bottom: 20,
-                    left: 5,
-                  }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="4 5"
-                    stroke="#e2e8f0"
-                  />
-
-                  <XAxis
-                    type="number"
-                    dataKey="attendance"
-                    name="Attendance"
-                    domain={[
-                      0,
-                      100,
-                    ]}
-                    tick={{
-                      fontSize:
-                        10,
-                      fill:
-                        '#64748b',
-                    }}
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                  />
-
-                  <YAxis
-                    type="number"
-                    dataKey="inspection"
-                    name="Inspection Performance"
-                    domain={[
-                      0,
-                      100,
-                    ]}
-                    tick={{
-                      fontSize:
-                        10,
-                      fill:
-                        '#64748b',
-                    }}
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                  />
-
-                  <ZAxis
-                    type="number"
-                    dataKey="reports"
-                    range={[
-                      70,
-                      440,
-                    ]}
-                  />
-
-                  <Tooltip
-                    cursor={{
-                      strokeDasharray:
-                        '4 4',
-                    }}
-                    content={({
-                      active,
-                      payload,
-                    }: any) => {
-                      if (
-                        !active ||
-                        !payload?.length
-                      ) {
-                        return null;
-                      }
-
-                      const row =
-                        payload[0]
-                          .payload;
-
-                      return (
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 text-[11px] shadow-xl">
-                          <div className="font-black text-slate-950">
-                            {
-                              row.name
-                            }
-                          </div>
-
-                          <div className="mt-2 flex justify-between gap-5">
-                            <span className="font-semibold text-slate-500">
-                              Attendance
-                            </span>
-
-                            <span className="font-black text-slate-950">
-                              {percentText(
-                                row.attendance
-                              )}
-                            </span>
-                          </div>
-
-                          <div className="mt-1 flex justify-between gap-5">
-                            <span className="font-semibold text-slate-500">
-                              Inspection Performance
-                            </span>
-
-                            <span className="font-black text-slate-950">
-                              {percentText(
-                                row.inspection
-                              )}
-                            </span>
-                          </div>
-
-                          <div className="mt-1 flex justify-between gap-5">
-                            <span className="font-semibold text-slate-500">
-                              Records
-                            </span>
-
-                            <span className="font-black text-slate-950">
-                              {
-                                row.reports
-                              }
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-
-                  <Scatter
-                    data={
-                      attendanceInspectionPoints
-                    }
-                    fill="#4f46e5"
-                    cursor="pointer"
-                    isAnimationActive
-                    animationDuration={
-                      800
-                    }
-                    onClick={(
-                      data: any
-                    ) => {
-                      const row =
-                        data?.payload ||
-                        data;
-
-                      if (!row) {
-                        return;
-                      }
-
-                      setDrilldown({
-                        title:
-                          row.name,
+              <AttendanceInspectionScatterChart
+                data={
+                  attendanceInspectionPoints
+                }
+                onPointClick={(row) => {
+                  setDrilldown({
+                    title:
+                      row.name,
+                    value:
+                      percentText(
+                        row.inspection
+                      ),
+                    breakdown: [
+                      {
+                        label:
+                          'Attendance',
+                        value:
+                          percentText(
+                            row.attendance
+                          ),
+                      },
+                      {
+                        label:
+                          'Inspection Performance',
                         value:
                           percentText(
                             row.inspection
                           ),
-                        breakdown: [
-                          {
-                            label:
-                              'Attendance',
-                            value:
-                              percentText(
-                                row.attendance
-                              ),
-                          },
-                          {
-                            label:
-                              'Inspection Performance',
-                            value:
-                              percentText(
-                                row.inspection
-                              ),
-                          },
-                          {
-                            label:
-                              'Records',
-                            value:
-                              String(
-                                row.reports
-                              ),
-                          },
-                        ],
-                        inspectionRecords:
-                          row.records,
-                        attendanceEmployees:
-                          [
-                            row.employee,
-                          ],
-                      });
-                    }}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
+                      },
+                      {
+                        label:
+                          'Records',
+                        value:
+                          String(
+                            row.reports
+                          ),
+                      },
+                    ],
+                    inspectionRecords:
+                      row.records,
+                    attendanceEmployees:
+                      [
+                        row.employee,
+                      ],
+                  });
+                }}
+              />
             </div>
           </section>
         )}
@@ -9435,7 +10004,7 @@ export default function CommissionerDashboard() {
               <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-950">
                 <CalendarDays
                   size={18}
-                  className="text-emerald-600"
+                  className="text-rose-600"
                 />
                 Attendance
               </div>
@@ -9494,7 +10063,7 @@ export default function CommissionerDashboard() {
                         )}`}
                         style={{
                           background:
-                            positiveColor(
+                            attendanceHeatColor(
                               value
                             ),
                         }}
@@ -9733,16 +10302,22 @@ export default function CommissionerDashboard() {
                         const value =
                           cell.value;
 
+                        const tone =
+                          ZONE_MODULE_BAR_TONES[
+                            cell.key
+                          ] ||
+                          ZONE_MODULE_BAR_TONES.SWEEPING;
+
                         const barBackground =
                           value ===
                           null
                             ? '#f1f4fa'
                             : value >= 90
-                            ? 'linear-gradient(90deg,#4338ca 0%,#1d4ed8 100%)'
+                            ? `linear-gradient(90deg,${tone.full} 0%,${tone.deep} 100%)`
                             : value >= 50
-                            ? 'linear-gradient(90deg,#818cf8 0%,#4f46e5 100%)'
+                            ? `linear-gradient(90deg,${tone.medium} 0%,${tone.full} 100%)`
                             : value > 0
-                            ? 'linear-gradient(90deg,#c7d2fe 0%,#818cf8 100%)'
+                            ? `linear-gradient(90deg,${tone.light} 0%,${tone.medium} 100%)`
                             : '#e7ecf5';
 
                         return (
@@ -9860,336 +10435,378 @@ export default function CommissionerDashboard() {
           </div>
 
           {/* ZONE MAP + DETAIL */}
-          <div className="grid grid-cols-1 gap-3 border-t border-[#edf1f7] bg-[#fbfdff] p-3 xl:grid-cols-[0.9fr_1.12fr]">
+          <div className="grid grid-cols-1 gap-3 border-t border-[#edf1f7] bg-[#fbfdff] p-3 xl:grid-cols-[1.22fr_1fr]">
             {/* VISUAL ZONE MAP */}
-            <div className="overflow-hidden rounded-[16px] border border-[#e1e8f3] bg-white shadow-[0_7px_22px_-18px_rgba(37,99,235,.32)]">
-              <div className="flex items-center justify-between gap-3 border-b border-[#eef2f7] px-3.5 py-2.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-sm">
-                    <MapPin
-                      size={13}
-                    />
+            <div className="overflow-hidden rounded-[18px] border border-[#dfe7f3] bg-white shadow-[0_14px_35px_-24px_rgba(37,99,235,.38)]">
+              <div className="flex items-center justify-between gap-3 border-b border-[#eef2f7] px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-[0_8px_18px_-9px_rgba(79,70,229,.75)]">
+                    <MapPin size={14} />
                   </span>
 
-                  <div>
-                    <div className="text-[11px] font-black text-[#1b2f5e]">
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-black text-[#152a59]">
                       Zone Performance Map
                     </div>
 
-                    <div className="mt-0.5 text-[7.5px] font-semibold text-[#9aa7c1]">
-                      Visual representation of zone performance
+                    <div className="mt-0.5 truncate text-[8px] font-semibold text-[#8f9bb4]">
+                      Interactive performance view - illustrative zone layout
                     </div>
                   </div>
                 </div>
 
-                <select
-                  value={
-                    metricFilter
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setMetricFilter(
-                      event
-                        .target
-                        .value as MetricKey
-                    )
-                  }
-                  className="h-7 rounded-[7px] border border-[#e1e7f1] bg-white px-2 text-[8px] font-black text-[#53678f] outline-none transition focus:border-indigo-300"
-                >
-                  {METRICS.map(
-                    (
-                      metric
-                    ) => (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <select
+                    value={metricFilter}
+                    onChange={(event) =>
+                      setMetricFilter(
+                        event.target.value as MetricKey
+                      )
+                    }
+                    className="h-8 max-w-[158px] rounded-[9px] border border-[#dfe6f1] bg-white px-2.5 text-[8px] font-black text-[#53678f] outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                  >
+                    {METRICS.map((metric) => (
                       <option
-                        key={
-                          metric.key
-                        }
-                        value={
-                          metric.key
-                        }
+                        key={metric.key}
+                        value={metric.key}
                       >
-                        {
-                          metric.label
-                        }
+                        {metric.label}
                       </option>
-                    )
-                  )}
-                </select>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setIsZoneMapOpen(
+                        (prev) => !prev
+                      )
+                    }
+                    aria-expanded={isZoneMapOpen}
+                    aria-label={
+                      isZoneMapOpen
+                        ? 'Collapse zone performance map'
+                        : 'Expand zone performance map'
+                    }
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-[#dfe6f1] bg-white text-[#53678f] transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                  >
+                    {isZoneMapOpen ? (
+                      <ChevronUp size={13} />
+                    ) : (
+                      <ChevronDown size={13} />
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="relative min-h-[250px] bg-[radial-gradient(circle_at_30%_35%,rgba(219,234,254,.65),transparent_32%),linear-gradient(180deg,#fbfdff_0%,#f7faff_100%)] px-3 py-2">
-                <svg
-                  viewBox="0 0 410 300"
-                  className="mx-auto h-[238px] w-full max-w-[430px]"
-                  role="img"
-                  aria-label="Visual representation of zone performance"
-                >
-                  {zoneModuleMatrix
-                    .slice(
-                      0,
-                      6
-                    )
-                    .map(
-                      (
-                        row,
-                        index
-                      ) => {
-                        const zoneRow =
-                          zoneRows.find(
-                            (
-                              item
-                            ) =>
-                              item.label ===
-                              row.zone
-                          );
+              {isZoneMapOpen && (
+                <div className="relative min-h-[330px] overflow-hidden bg-[#f8fbff]">
+                  <svg
+                    viewBox="0 0 760 360"
+                    className="h-[330px] w-full"
+                    preserveAspectRatio="xMidYMid meet"
+                    role="img"
+                    aria-label="Illustrative interactive zone performance map"
+                  >
+                    <defs>
+                      <linearGradient
+                        id="zoneMapBackground"
+                        x1="0"
+                        y1="0"
+                        x2="1"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="#fbfdff"
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="#f2f7fd"
+                        />
+                      </linearGradient>
 
-                        const value =
-                          zoneRow
-                            ? geoMetric(
-                                zoneRow
-                              )
-                            : null;
+                      <pattern
+                        id="zoneStreetPattern"
+                        width="58"
+                        height="58"
+                        patternUnits="userSpaceOnUse"
+                        patternTransform="rotate(7)"
+                      >
+                        <path
+                          d="M 0 10 H 58 M 0 34 H 58 M 10 0 V 58 M 39 0 V 58"
+                          fill="none"
+                          stroke="#dfe8f3"
+                          strokeWidth="1"
+                          opacity="0.58"
+                        />
+                      </pattern>
 
-                        const paths =
-                          [
-                            'M150 27 L214 17 L242 66 L215 113 L159 105 L130 60 Z',
-                            'M79 88 L130 60 L159 105 L143 160 L83 177 L49 132 Z',
-                            'M159 105 L215 113 L232 166 L192 211 L143 160 Z',
-                            'M242 66 L307 53 L345 91 L326 145 L232 166 L215 113 Z',
-                            'M232 166 L326 145 L351 203 L306 247 L226 232 L192 211 Z',
-                            'M143 160 L192 211 L226 232 L191 282 L122 262 L94 209 Z',
-                          ];
+                      <filter
+                        id="zoneSoftShadow"
+                        x="-30%"
+                        y="-30%"
+                        width="160%"
+                        height="160%"
+                      >
+                        <feDropShadow
+                          dx="0"
+                          dy="6"
+                          stdDeviation="6"
+                          floodColor="#294a91"
+                          floodOpacity="0.10"
+                        />
+                      </filter>
 
-                        const labels =
-                          [
-                            {
-                              x: 185,
-                              y: 68,
-                            },
-                            {
-                              x: 101,
-                              y: 128,
-                            },
-                            {
-                              x: 185,
-                              y: 160,
-                            },
-                            {
-                              x: 286,
-                              y: 111,
-                            },
-                            {
-                              x: 285,
-                              y: 205,
-                            },
-                            {
-                              x: 159,
-                              y: 238,
-                            },
-                          ];
+                      <filter
+                        id="zoneSelectedShadow"
+                        x="-35%"
+                        y="-35%"
+                        width="170%"
+                        height="170%"
+                      >
+                        <feDropShadow
+                          dx="0"
+                          dy="8"
+                          stdDeviation="9"
+                          floodColor="#312e81"
+                          floodOpacity="0.30"
+                        />
+                      </filter>
 
+                      {zoneMapVisualRows.map(
+                        (row, index) => (
+                          <linearGradient
+                            key={`gradient-${row.zone}`}
+                            id={`zone-map-gradient-${index}`}
+                            x1="0%"
+                            y1="0%"
+                            x2="100%"
+                            y2="100%"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor={row.gradientStart}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor={row.gradientEnd}
+                            />
+                          </linearGradient>
+                        )
+                      )}
+                    </defs>
+
+                    <rect
+                      width="760"
+                      height="360"
+                      fill="url(#zoneMapBackground)"
+                    />
+
+                    <rect
+                      width="760"
+                      height="360"
+                      fill="url(#zoneStreetPattern)"
+                      opacity="0.82"
+                    />
+
+                    {/* broad pale roads */}
+                    <g
+                      fill="none"
+                      strokeLinecap="round"
+                      pointerEvents="none"
+                    >
+                      <path
+                        d="M -35 300 C 115 240 210 250 355 210 C 480 176 590 135 790 84"
+                        stroke="#e1e9f3"
+                        strokeWidth="7"
+                        opacity="0.68"
+                      />
+                      <path
+                        d="M -30 85 C 105 115 220 95 335 125 C 480 163 590 220 790 280"
+                        stroke="#e5edf6"
+                        strokeWidth="5"
+                        opacity="0.66"
+                      />
+                      <path
+                        d="M 86 -20 C 145 78 191 142 230 238 C 247 280 266 322 300 380"
+                        stroke="#e6edf6"
+                        strokeWidth="5"
+                        opacity="0.65"
+                      />
+                      <path
+                        d="M 485 -30 C 470 45 487 101 521 150 C 557 203 594 256 620 390"
+                        stroke="#e3ebf4"
+                        strokeWidth="4"
+                        opacity="0.58"
+                      />
+                    </g>
+
+                    {/* pale river on the right, matching the reference style */}
+                    <path
+                      d="M 650 -35 C 603 28 622 92 671 126 C 715 157 704 207 677 238 C 645 276 659 323 728 392"
+                      fill="none"
+                      stroke="#d8ecfb"
+                      strokeWidth="34"
+                      strokeLinecap="round"
+                      opacity="0.72"
+                      pointerEvents="none"
+                    />
+                    <path
+                      d="M 650 -35 C 603 28 622 92 671 126 C 715 157 704 207 677 238 C 645 276 659 323 728 392"
+                      fill="none"
+                      stroke="#cce5f8"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      opacity="0.8"
+                      pointerEvents="none"
+                    />
+
+                    {/* soft halo behind the full zone cluster */}
+                    <ellipse
+                      cx="380"
+                      cy="190"
+                      rx="250"
+                      ry="150"
+                      fill="#7484ff"
+                      opacity="0.055"
+                      pointerEvents="none"
+                    />
+
+                    {zoneMapVisualRows.map(
+                      (row, index) => {
                         const selected =
-                          activeMapZone ===
-                          row.zone;
-
-                        const label =
-                          labels[
-                            index
-                          ];
+                          activeMapZone === row.zone;
 
                         return (
                           <g
-                            key={
-                              row.zone
-                            }
+                            key={row.zone}
                             onClick={() =>
-                              setSelectedMapZone(
-                                row.zone
-                              )
+                              setSelectedMapZone(row.zone)
                             }
                             className="cursor-pointer"
+                            role="button"
+                            aria-label={`${row.zone} ${percentText(
+                              row.value
+                            )}`}
                           >
                             <path
-                              d={
-                                paths[
-                                  index
-                                ]
-                              }
-                              fill={
-                                value ===
-                                null
-                                  ? '#e9eef7'
-                                  : positiveColor(
-                                      value
-                                    )
-                              }
-                              stroke={
-                                selected
-                                  ? '#1d4ed8'
-                                  : '#ffffff'
-                              }
-                              strokeWidth={
-                                selected
-                                  ? 5
-                                  : 3
-                              }
+                              d={row.layout.path}
+                              fill={`url(#zone-map-gradient-${index})`}
+                              stroke={selected ? '#0f172a' : '#ffffff'}
+                              strokeWidth={selected ? 5.5 : 4.5}
+                              strokeLinejoin="round"
                               style={{
-                                filter:
-                                  selected
-                                    ? 'drop-shadow(0 5px 8px rgba(37,99,235,.28))'
-                                    : 'drop-shadow(0 2px 3px rgba(30,64,175,.08))',
+                                filter: selected
+                                  ? 'url(#zoneSelectedShadow)'
+                                  : 'url(#zoneSoftShadow)',
                                 transition:
-                                  'all .25s ease',
+                                  'filter .22s ease, opacity .22s ease, stroke .22s ease',
                               }}
                             />
 
                             <circle
-                              cx={
-                                label.x
-                              }
-                              cy={
-                                label.y -
-                                13
-                              }
-                              r="4.5"
-                              fill={
-                                selected
-                                  ? '#ffffff'
-                                  : value !==
-                                      null &&
-                                    value >=
-                                      66
+                              cx={row.layout.labelX}
+                              cy={row.layout.labelY - 25}
+                              r="8"
+                              fill="#ffffff"
+                              opacity={selected ? 0.95 : 0.72}
+                            />
+
+                            <circle
+                              cx={row.layout.labelX}
+                              cy={row.layout.labelY - 25}
+                              r="5"
+                              fill={row.dotColor}
+                              stroke={
+                                row.dotColor === '#ffffff'
                                   ? '#ffffff'
                                   : '#4f46e5'
                               }
-                              stroke="#4f46e5"
-                              strokeWidth="1.5"
+                              strokeWidth="1.2"
                             />
 
                             <text
-                              x={
-                                label.x
-                              }
-                              y={
-                                label.y +
-                                1
-                              }
+                              x={row.layout.labelX}
+                              y={row.layout.labelY}
                               textAnchor="middle"
-                              fontSize="9"
+                              fontSize="13"
                               fontWeight="800"
-                              fill={
-                                value !==
-                                  null &&
-                                value >=
-                                  66
-                                  ? '#ffffff'
-                                  : '#18305f'
-                              }
+                              fill={row.textColor}
+                              style={{
+                                pointerEvents: 'none',
+                              }}
                             >
-                              {row.zone.length >
-                              12
-                                ? `${row.zone.slice(
-                                    0,
-                                    11
-                                  )}…`
+                              {row.zone.length > 14
+                                ? `${row.zone.slice(0, 13)}...`
                                 : row.zone}
                             </text>
 
                             <text
-                              x={
-                                label.x
-                              }
-                              y={
-                                label.y +
-                                15
-                              }
+                              x={row.layout.labelX}
+                              y={row.layout.labelY + 23}
                               textAnchor="middle"
-                              fontSize="11"
+                              fontSize="17"
                               fontWeight="900"
-                              fill={
-                                value !==
-                                  null &&
-                                value >=
-                                  66
-                                  ? '#ffffff'
-                                  : '#132a58'
-                              }
+                              fill={row.textColor}
+                              style={{
+                                pointerEvents: 'none',
+                                letterSpacing: '-0.02em',
+                              }}
                             >
-                              {percentText(
-                                value
-                              )}
+                              {percentText(row.value)}
                             </text>
                           </g>
                         );
                       }
                     )}
-                </svg>
+                  </svg>
 
-                {zoneModuleMatrix.length >
-                  6 && (
-                  <div className="absolute bottom-2 left-3 right-3 flex flex-wrap justify-center gap-1">
-                    {zoneModuleMatrix
-                      .slice(
-                        6
-                      )
-                      .map(
-                        (
-                          row
-                        ) => {
+                  {zoneModuleMatrix.length > 6 && (
+                    <div className="absolute bottom-3 left-3 right-3 flex flex-wrap justify-center gap-1.5">
+                      {zoneModuleMatrix
+                        .slice(6)
+                        .map((row) => {
                           const zoneRow =
                             zoneRows.find(
-                              (
-                                item
-                              ) =>
-                                item.label ===
-                                row.zone
+                              (item) =>
+                                item.label === row.zone
                             );
 
-                          const value =
-                            zoneRow
-                              ? geoMetric(
-                                  zoneRow
-                                )
-                              : null;
+                          const value = zoneRow
+                            ? geoMetric(zoneRow)
+                            : null;
 
                           return (
                             <button
-                              key={
-                                row.zone
-                              }
+                              key={row.zone}
                               type="button"
                               onClick={() =>
-                                setSelectedMapZone(
-                                  row.zone
-                                )
+                                setSelectedMapZone(row.zone)
                               }
-                              className={`rounded-full border px-2 py-1 text-[7px] font-black ${
-                                activeMapZone ===
-                                row.zone
-                                  ? 'border-indigo-400 bg-indigo-600 text-white'
-                                  : 'border-slate-200 bg-white text-slate-600'
+                              className={`rounded-full border px-2.5 py-1 text-[8px] font-black shadow-sm transition ${
+                                activeMapZone === row.zone
+                                  ? 'border-indigo-500 bg-indigo-600 text-white'
+                                  : 'border-white/90 bg-white/90 text-slate-600 hover:border-indigo-200 hover:text-indigo-700'
                               }`}
                             >
-                              {
-                                row.zone
-                              }{' '}
-                              ·{' '}
-                              {percentText(
-                                value
-                              )}
+                              {row.zone} - {percentText(value)}
                             </button>
                           );
-                        }
-                      )}
+                        })}
+                    </div>
+                  )}
+
+                  <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-full border border-white/80 bg-white/78 px-2.5 py-1 text-[7px] font-bold text-[#8c99b4] shadow-sm backdrop-blur sm:block">
+                    Click a zone for details
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* ACTIVE ZONE DETAIL */}
-            <div className="overflow-hidden rounded-[16px] border border-[#e1e8f3] bg-white shadow-[0_7px_22px_-18px_rgba(37,99,235,.32)]">
-              <div className="flex items-center justify-between gap-3 border-b border-[#edf1f7] px-3.5 py-2.5">
+            <div className="flex h-full flex-col overflow-hidden rounded-[16px] border border-[#e1e8f3] bg-white shadow-[0_7px_22px_-18px_rgba(37,99,235,.32)]">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#edf1f7] px-3.5 py-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-[0_6px_16px_-8px_rgba(37,99,235,.7)]">
                     <MapPin
@@ -10234,7 +10851,7 @@ export default function CommissionerDashboard() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-1.5 p-2.5 sm:grid-cols-3 xl:grid-cols-5">
+              <div className="grid flex-1 content-center grid-cols-2 gap-1.5 p-2.5 sm:grid-cols-3 xl:grid-cols-5">
                 {activeMapZoneCells.map(
                   (
                     cell

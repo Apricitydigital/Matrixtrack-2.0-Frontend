@@ -526,13 +526,15 @@ export default function Sidebar() {
       <div className="border-t border-slate-100 p-4 space-y-2">
         {!loading && user && (
           <>
-            <Link
-              href="/portal-home/profile"
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary no-underline"
-            >
-              <UserIcon size={16} />
-              My Profile
-            </Link>
+            {!isCommissioner && (
+              <Link
+                href="/portal-home/profile"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:border-primary/40 hover:bg-primary/5 hover:text-primary no-underline"
+              >
+                <UserIcon size={16} />
+                My Profile
+              </Link>
+            )}
 
             <button
               type="button"

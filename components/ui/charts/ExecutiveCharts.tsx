@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 // 1. Reusable Area Line Trend Chart (SVG Smooth Curve with Soft Glow & Gradient)
 export function LineTrendChart({
@@ -96,11 +96,19 @@ export function BarComparisonChart({
 }) {
   const globalMax = Math.max(...items.map(i => i.max || i.value), 1);
 
+  const [animated, setAnimated] = useState(false);
+  useEffect(() => {
+    setAnimated(false);
+    const raf = requestAnimationFrame(() => setAnimated(true));
+    return () => cancelAnimationFrame(raf);
+  }, [items]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%' }}>
       {items.map((item, idx) => {
         const percentage = Math.round((item.value / (item.max || globalMax)) * 100);
         const activeColor = item.color || barColor;
+        const targetWidth = Math.max(percentage, item.value > 0 ? 8 : 0);
         return (
           <div key={idx}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
@@ -112,10 +120,10 @@ export function BarComparisonChart({
             <div style={{ height: 8, background: '#f1f5f9', borderRadius: 6, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
               <div style={{
                 height: '100%',
-                width: `${Math.max(percentage, item.value > 0 ? 8 : 0)}%`,
+                width: `${animated ? targetWidth : 0}%`,
                 background: `linear-gradient(90deg, ${activeColor}, ${activeColor}dd)`,
                 borderRadius: 6,
-                transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
+                transition: `width 0.85s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 90}ms`
               }} />
             </div>
           </div>
@@ -139,6 +147,13 @@ export function DonutDistributionChart({
   const radius = (size - strokeWidth) / 2;
   const circ = 2 * Math.PI * radius;
 
+  const [animated, setAnimated] = useState(false);
+  useEffect(() => {
+    setAnimated(false);
+    const raf = requestAnimationFrame(() => setAnimated(true));
+    return () => cancelAnimationFrame(raf);
+  }, [segments]);
+
   let currentOffset = 0;
 
   return (
@@ -150,7 +165,8 @@ export function DonutDistributionChart({
           ) : (
             segments.map((seg, i) => {
               const segLength = (seg.value / total) * circ;
-              const strokeDasharray = `${segLength} ${circ - segLength}`;
+              const animatedLength = animated ? segLength : 0;
+              const strokeDasharray = `${animatedLength} ${circ - animatedLength}`;
               const rotationOffset = (currentOffset / total) * 360;
               currentOffset += seg.value;
 
@@ -168,14 +184,27 @@ export function DonutDistributionChart({
                   style={{
                     transformOrigin: 'center',
                     transform: `rotate(${rotationOffset}deg)`,
-                    transition: 'all 0.6s ease'
+                    transition: `stroke-dasharray 0.9s cubic-bezier(0.16, 1, 0.3, 1) ${i * 110}ms, transform 0.6s ease`
                   }}
                 />
               );
             })
           )}
         </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            opacity: animated ? 1 : 0,
+            transform: animated ? 'scale(1)' : 'scale(0.85)',
+            transition: 'opacity 0.5s ease 0.3s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s',
+          }}
+        >
           <span style={{ fontSize: 38, fontWeight: 900, color: '#0f172a', lineHeight: 1, letterSpacing: '-1px' }}>{total}</span>
           <span style={{ fontSize: 12, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginTop: 4, letterSpacing: '1px' }}>TOTAL</span>
         </div>
@@ -184,7 +213,20 @@ export function DonutDistributionChart({
       {/* Legend */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, justifyContent: 'center' }}>
         {segments.map((seg, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              fontSize: 14,
+              fontWeight: 700,
+              color: '#1e293b',
+              opacity: animated ? 1 : 0,
+              transform: animated ? 'translateX(0)' : 'translateX(-8px)',
+              transition: `opacity 0.45s ease ${idx * 110 + 150}ms, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 110 + 150}ms`,
+            }}
+          >
             <div style={{ width: 14, height: 14, borderRadius: '50%', background: seg.color, boxShadow: `0 0 0 3px ${seg.color}25` }} />
             <span>{seg.label}:</span>
             <strong style={{ color: '#0f172a', fontStyle: 'normal', fontWeight: 900, fontSize: 16, marginLeft: 'auto' }}>{seg.value}</strong>
