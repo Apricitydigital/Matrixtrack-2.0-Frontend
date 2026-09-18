@@ -1,29 +1,38 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 import {
   Activity,
   ArrowLeft,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Droplet,
   Filter,
   MapPin,
   RefreshCw,
+  Route,
   Search,
   ShieldCheck,
+  Table2,
+  Trash2,
   Trophy,
   Users,
   UsersRound,
   X,
+  XCircle,
 } from 'lucide-react';
 
 import { RoleGuard } from '@components/Guards';
 import UniversalReportModal from '@components/UniversalReportModal';
+import { BarComparisonChart, DonutDistributionChart } from '@components/ui/charts/ExecutiveCharts';
 
 import { useAuth } from '@hooks/useAuth';
-import { CityUserApi, GeoApi, ModuleRecordsApi } from '@lib/apiClient';
+import { CityUserApi, GeoApi, ModuleRecordsApi, type UserWorkSummaryResponse } from '@lib/apiClient';
 
 import {
   AttendanceApi,
@@ -116,6 +125,40 @@ function toDateInput(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+const WEEKDAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+function calendarMonthsInRange(fromStr: string, toStr: string, maxMonths = 6) {
+  if (!fromStr || !toStr) return [];
+
+  const from = new Date(`${fromStr}T00:00:00`);
+  const to = new Date(`${toStr}T00:00:00`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return [];
+
+  const months: { year: number; month: number }[] = [];
+  const cursor = new Date(to.getFullYear(), to.getMonth(), 1);
+  const floor = new Date(from.getFullYear(), from.getMonth(), 1);
+
+  while (cursor >= floor && months.length < maxMonths) {
+    months.unshift({ year: cursor.getFullYear(), month: cursor.getMonth() });
+    cursor.setMonth(cursor.getMonth() - 1);
+  }
+
+  return months;
+}
+
+function daysInCalendarMonth(year: number, month: number) {
+  const firstDay = new Date(year, month, 1);
+  const totalDays = new Date(year, month + 1, 0).getDate();
+  const leadingBlanks = firstDay.getDay();
+
+  const cells: Array<{ dateStr: string; day: number } | null> = [];
+  for (let i = 0; i < leadingBlanks; i += 1) cells.push(null);
+  for (let day = 1; day <= totalDays; day += 1) {
+    cells.push({ dateStr: toDateInput(new Date(year, month, day)), day });
+  }
+  return cells;
 }
 
 function defaultRange() {
@@ -242,6 +285,18 @@ function getRecordTitle(item: DashboardRecord) {
     return item?.beatName || item?.beat?.beatName || item?.areaName || 'Sweeping';
   }
   return item?.locationName || item?.bin?.locationName || item?.areaName || item?.bin?.areaName || 'Litter Bins';
+}
+
+function getRecordAssetId(item: any) {
+  return (
+    item?.toiletId ||
+    item?.toilet?.id ||
+    item?.binId ||
+    item?.bin?.id ||
+    item?.beatId ||
+    item?.beat?.id ||
+    null
+  );
 }
 
 function getDarogaName(item: any) {
@@ -398,41 +453,354 @@ async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: strin
    RECORD DETAIL DRAWER
 ========================================================= */
 
+const STATUS_COLORS: Record<string, string> = {
+  Approved: '#10b981',
+  'SI Approved': '#10b981',
+  Rejected: '#f43f5e',
+  'SI Rejected': '#f43f5e',
+  'Action Required': '#f59e0b',
+  'Action Taken': '#6366f1',
+  Pending: '#94a3b8',
+  Present: '#10b981',
+  Absent: '#f43f5e',
+};
+
+const MODULE_BAR_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+function StatTile({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon: React.ReactNode;
+  tone: 'blue' | 'emerald' | 'rose' | 'amber' | 'violet' | 'sky' | 'slate';
+}) {
+  const toneClass: Record<typeof tone, string> = {
+    blue: 'border-blue-100 bg-blue-50 text-blue-600',
+    emerald: 'border-emerald-100 bg-emerald-50 text-emerald-600',
+    rose: 'border-rose-100 bg-rose-50 text-rose-600',
+    amber: 'border-amber-100 bg-amber-50 text-amber-600',
+    violet: 'border-violet-100 bg-violet-50 text-violet-600',
+    sky: 'border-sky-100 bg-sky-50 text-sky-600',
+    slate: 'border-slate-200 bg-slate-50 text-slate-600',
+  };
+
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${toneClass[tone]}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.08em] opacity-80">{label}</span>
+        {icon}
+      </div>
+      <div className="mt-1 text-lg font-black text-slate-950">{value}</div>
+    </div>
+  );
+}
+
 function UserDetailDrawer({
   row,
   roleLabel,
+  roleKey,
+  fromDate,
+  toDate,
+  allRecords,
   onClose,
   onOpenRecord,
 }: {
   row: UserPerformanceRow;
   roleLabel: string;
+  roleKey: UserRoleKey;
+  fromDate: string;
+  toDate: string;
+  allRecords: DashboardRecord[];
   onClose: () => void;
   onOpenRecord: (record: DashboardRecord) => void;
 }) {
+  const [tab, setTab] = useState<'charts' | 'calendar' | 'table'>('charts');
+  const [workSummary, setWorkSummary] = useState<UserWorkSummaryResponse | null>(null);
+  const [workSummaryLoading, setWorkSummaryLoading] = useState(false);
+  const [hoverDate, setHoverDate] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; openUpward: boolean } | null>(null);
+  const [tableFilterDate, setTableFilterDate] = useState<string | null>(null);
+  const [tableFilterModule, setTableFilterModule] = useState<InspectionModuleKey | null>(null);
+  const closeTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const TOOLTIP_WIDTH = 176;
+  const TOOLTIP_HEIGHT_ESTIMATE = 130;
+  const VIEWPORT_MARGIN = 12;
+
+  function clearCloseTimer() {
+    if (closeTooltipTimer.current) {
+      clearTimeout(closeTooltipTimer.current);
+      closeTooltipTimer.current = null;
+    }
+  }
+
+  function openTooltip(dateStr: string, target: HTMLElement) {
+    clearCloseTimer();
+    const rect = target.getBoundingClientRect();
+
+    let left = rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2;
+    left = Math.min(Math.max(left, VIEWPORT_MARGIN), window.innerWidth - TOOLTIP_WIDTH - VIEWPORT_MARGIN);
+
+    const openUpward = rect.bottom + TOOLTIP_HEIGHT_ESTIMATE + VIEWPORT_MARGIN > window.innerHeight;
+    const top = openUpward ? rect.top - VIEWPORT_MARGIN : rect.bottom + VIEWPORT_MARGIN;
+
+    setTooltipPos({ top, left, openUpward });
+    setHoverDate(dateStr);
+  }
+
+  function scheduleCloseTooltip() {
+    clearCloseTimer();
+    closeTooltipTimer.current = setTimeout(() => {
+      setHoverDate(null);
+      setTooltipPos(null);
+    }, 150);
+  }
+
+  function toggleTooltip(dateStr: string, target: HTMLElement) {
+    if (hoverDate === dateStr) {
+      clearCloseTimer();
+      setHoverDate(null);
+      setTooltipPos(null);
+    } else {
+      openTooltip(dateStr, target);
+    }
+  }
+
+  useEffect(() => () => clearCloseTimer(), []);
+
+  useEffect(() => {
+    if (tab !== 'calendar') {
+      clearCloseTimer();
+      setHoverDate(null);
+      setTooltipPos(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setWorkSummary(null);
+    setTableFilterDate(null);
+    setTableFilterModule(null);
+    setHoverDate(null);
+    setTab('charts');
+
+    if (!row.id) return;
+
+    setWorkSummaryLoading(true);
+    CityUserApi.workSummary(row.id)
+      .then((result) => {
+        if (!cancelled) setWorkSummary(result);
+      })
+      .catch(() => {
+        if (!cancelled) setWorkSummary(null);
+      })
+      .finally(() => {
+        if (!cancelled) setWorkSummaryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [row.id]);
+
+  const isEmployee = roleKey === 'EMPLOYEE';
+  const approvedLabel = 'SI Approved';
+  const rejectedLabel = 'SI Rejected';
+  const pendingLabel = 'SI Pending';
+
+  const beatsCount = workSummary?.assignments.beats.length ?? null;
+  const toiletsCount = workSummary?.assignments.toilets.length ?? null;
+  const litterBinsCount = workSummary?.assignments.litterBins.length ?? null;
+  const assetsTotal = (beatsCount ?? 0) + (toiletsCount ?? 0) + (litterBinsCount ?? 0);
+  const coveragePct = assetsTotal > 0 ? clamp((row.total / assetsTotal) * 100) : null;
+
+  /*
+   * Employees aren't reviewers - their inspection-record trail only
+   * exists if their name/id can be traced to an asset they clean
+   * (a toilet or litter bin assigned to them via work-summary). Once
+   * matched, "approved" = found clean, "rejected" = found unclean, so
+   * the same STAT CARDS / charts / calendar / table used for reviewer
+   * roles can display something meaningful for a field employee too.
+   */
+  const employeeAssetRecords = useMemo(() => {
+    if (!isEmployee || !workSummary) return [];
+
+    const assetIds = new Set<string>();
+    const assetNames = new Set<string>();
+
+    [...workSummary.assignments.toilets, ...workSummary.assignments.litterBins].forEach((asset) => {
+      if (asset.id) assetIds.add(String(asset.id));
+      if (asset.name) assetNames.add(normalize(asset.name));
+    });
+
+    if (!assetIds.size && !assetNames.size) return [];
+
+    return allRecords.filter((record) => {
+      if (record.dashboardModule !== 'TOILET' && record.dashboardModule !== 'LITTERBINS') return false;
+      const assetId = getRecordAssetId(record);
+      if (assetId && assetIds.has(String(assetId))) return true;
+      const assetName = normalize(getRecordTitle(record));
+      return Boolean(assetName) && assetNames.has(assetName);
+    });
+  }, [isEmployee, workSummary, allRecords]);
+
+  const employeeAssetStats = useMemo(() => inspectionStats(employeeAssetRecords), [employeeAssetRecords]);
+
+  const coveredAssetsCount = useMemo(() => {
+    if (roleKey !== 'SUPERVISOR') return 0;
+    const keys = new Set<string>();
+    row.records.forEach((record) => {
+      const key = getRecordAssetId(record) || normalize(getRecordTitle(record));
+      if (key) keys.add(String(key));
+    });
+    return keys.size;
+  }, [roleKey, row.records]);
+
+  const calendarSourceRecords = isEmployee ? employeeAssetRecords : row.records;
+
   const recentRecords = useMemo(
     () =>
-      [...row.records]
-        .sort((a, b) => new Date(recordDate(b) || 0).getTime() - new Date(recordDate(a) || 0).getTime())
-        .slice(0, 25),
-    [row.records]
+      [...calendarSourceRecords].sort(
+        (a, b) => new Date(recordDate(b) || 0).getTime() - new Date(recordDate(a) || 0).getTime()
+      ),
+    [calendarSourceRecords]
   );
 
-  const breakdown =
-    row.attendanceEmployee && !row.records.length
-      ? [
-          { label: 'Total Days', value: row.total.toLocaleString('en-IN') },
-          { label: 'Present Days', value: row.approved.toLocaleString('en-IN') },
-          { label: 'Absent Days', value: row.rejected.toLocaleString('en-IN') },
-          { label: 'Attendance', value: percentText(row.attendance) },
-        ]
-      : [
-          { label: 'Records', value: row.total.toLocaleString('en-IN') },
-          { label: 'Approved', value: row.approved.toLocaleString('en-IN') },
-          { label: 'Rejected', value: row.rejected.toLocaleString('en-IN') },
-          { label: 'Action Required', value: row.actionRequired.toLocaleString('en-IN') },
-          { label: 'Action Taken', value: row.actionTaken.toLocaleString('en-IN') },
-          { label: 'Attendance', value: percentText(row.attendance) },
-        ];
+  /* -------- Submission Calendar -------- */
+
+  const recordsByDate = useMemo(() => {
+    const map = new Map<string, Record<InspectionModuleKey, number> & { total: number }>();
+
+    calendarSourceRecords.forEach((record) => {
+      const raw = recordDate(record);
+      if (!raw) return;
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return;
+
+      const key = toDateInput(parsed);
+      const entry = map.get(key) || { TOILET: 0, LITTERBINS: 0, SWEEPING: 0, total: 0 };
+      const moduleKey = record.dashboardModule as InspectionModuleKey;
+      if (moduleKey === 'TOILET' || moduleKey === 'LITTERBINS' || moduleKey === 'SWEEPING') {
+        entry[moduleKey] += 1;
+      }
+      entry.total += 1;
+      map.set(key, entry);
+    });
+
+    return map;
+  }, [calendarSourceRecords]);
+
+  const calendarRange = useMemo(() => {
+    if (fromDate && toDate) return { from: fromDate, to: toDate };
+
+    const knownDates = Array.from(recordsByDate.keys()).sort();
+    if (knownDates.length > 0) {
+      return { from: knownDates[0], to: knownDates[knownDates.length - 1] };
+    }
+
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(start.getDate() - 29);
+    return { from: toDateInput(start), to: toDateInput(today) };
+  }, [fromDate, toDate, recordsByDate]);
+
+  const calendarMonths = useMemo(
+    () => calendarMonthsInRange(calendarRange.from, calendarRange.to),
+    [calendarRange]
+  );
+
+  const todayStr = useMemo(() => toDateInput(new Date()), []);
+
+  function goToDateTable(dateStr: string, moduleKey: InspectionModuleKey | null) {
+    setTableFilterDate(dateStr);
+    setTableFilterModule(moduleKey);
+    clearCloseTimer();
+    setHoverDate(null);
+    setTooltipPos(null);
+    setTab('table');
+  }
+
+  const filteredTableRecords = useMemo(() => {
+    if (!tableFilterDate) return recentRecords;
+    return recentRecords.filter((record) => {
+      const raw = recordDate(record);
+      if (!raw) return false;
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return false;
+      if (toDateInput(parsed) !== tableFilterDate) return false;
+      if (tableFilterModule && record.dashboardModule !== tableFilterModule) return false;
+      return true;
+    });
+  }, [recentRecords, tableFilterDate, tableFilterModule]);
+
+  const donutTitle =
+    roleKey === 'SUPERVISOR'
+      ? 'Asset Coverage'
+      : roleKey === 'ULB_OFFICER'
+      ? 'Action Cycle · Raised vs Resolved'
+      : roleKey === 'ACTION_OFFICER'
+      ? 'Action Cycle · Pending vs Resolved'
+      : isEmployee
+      ? 'Attendance'
+      : 'Status Distribution';
+
+  const donutSegments = useMemo(() => {
+    if (isEmployee) {
+      return [
+        { label: 'Present', value: row.approved, color: STATUS_COLORS.Present },
+        { label: 'Absent', value: row.rejected, color: STATUS_COLORS.Absent },
+      ];
+    }
+
+    if (roleKey === 'ULB_OFFICER' || roleKey === 'ACTION_OFFICER') {
+      return [
+        { label: 'Action Required', value: row.actionRequired, color: STATUS_COLORS['Action Required'] },
+        { label: 'Action Taken', value: row.actionTaken, color: STATUS_COLORS['Action Taken'] },
+      ];
+    }
+
+    if (roleKey === 'SUPERVISOR') {
+      const covered = Math.min(coveredAssetsCount, assetsTotal || coveredAssetsCount);
+      const notCovered = Math.max(assetsTotal - coveredAssetsCount, 0);
+      return [
+        { label: 'Assets Covered', value: covered, color: STATUS_COLORS.Approved },
+        { label: 'Assets Not Covered', value: notCovered, color: STATUS_COLORS.Pending },
+      ];
+    }
+
+    return [
+      { label: approvedLabel, value: row.approved, color: STATUS_COLORS[approvedLabel] },
+      { label: rejectedLabel, value: row.rejected, color: STATUS_COLORS[rejectedLabel] },
+      { label: pendingLabel, value: row.pending, color: STATUS_COLORS.Pending },
+    ];
+  }, [isEmployee, roleKey, row, approvedLabel, rejectedLabel, pendingLabel, coveredAssetsCount, assetsTotal]);
+
+  const assetCleanlinessSegments = useMemo(
+    () => [
+      { label: 'Approved (Clean)', value: employeeAssetStats.approved, color: STATUS_COLORS.Approved },
+      { label: 'Rejected (Unclean)', value: employeeAssetStats.rejected, color: STATUS_COLORS.Rejected },
+      { label: 'Pending Review', value: employeeAssetStats.pending, color: STATUS_COLORS.Pending },
+    ],
+    [employeeAssetStats]
+  );
+
+  const moduleBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    calendarSourceRecords.forEach((record) => {
+      const label = record.dashboardModuleLabel || 'Other';
+      counts.set(label, (counts.get(label) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, value], index) => ({
+      label,
+      value,
+      color: MODULE_BAR_COLORS[index % MODULE_BAR_COLORS.length],
+    }));
+  }, [calendarSourceRecords]);
 
   return (
     <div className="fixed inset-0 z-[80]">
@@ -443,7 +811,7 @@ function UserDetailDrawer({
         className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
       />
 
-      <aside className="absolute bottom-0 right-0 top-0 flex w-full max-w-[720px] flex-col border-l border-slate-200 bg-[#f8fafc] shadow-[-30px_0_80px_-30px_rgba(15,23,42,.42)]">
+      <aside className="absolute bottom-0 right-0 top-0 flex w-full max-w-[760px] flex-col overflow-y-auto border-l border-slate-200 bg-[#f8fafc] shadow-[-30px_0_80px_-30px_rgba(15,23,42,.42)]">
         <div className="border-b border-slate-200 bg-white px-6 py-5">
           <div className="flex items-start justify-between gap-5">
             <div>
@@ -487,70 +855,427 @@ function UserDetailDrawer({
             </div>
           )}
 
+          {/* STAT CARDS */}
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {breakdown.map((item) => (
-              <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                  {item.label}
+            {roleKey === 'SUPERVISOR' && (
+              <>
+                <StatTile label="Reports Submitted" value={row.total.toLocaleString('en-IN')} icon={<Activity size={13} />} tone="slate" />
+                <StatTile
+                  label="Assigned Beats"
+                  value={workSummaryLoading ? '…' : (beatsCount ?? 0).toLocaleString('en-IN')}
+                  icon={<Route size={13} />}
+                  tone="violet"
+                />
+                <StatTile
+                  label="Assigned Toilets"
+                  value={workSummaryLoading ? '…' : (toiletsCount ?? 0).toLocaleString('en-IN')}
+                  icon={<Droplet size={13} />}
+                  tone="sky"
+                />
+                <StatTile
+                  label="Assigned Litter Bins"
+                  value={workSummaryLoading ? '…' : (litterBinsCount ?? 0).toLocaleString('en-IN')}
+                  icon={<Trash2 size={13} />}
+                  tone="emerald"
+                />
+                <StatTile
+                  label="Coverage"
+                  value={workSummaryLoading ? '…' : percentText(coveragePct)}
+                  icon={<ShieldCheck size={13} />}
+                  tone="amber"
+                />
+                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
+              </>
+            )}
+
+            {roleKey === 'QC' && (
+              <>
+                <StatTile label="Total Reports" value={row.total.toLocaleString('en-IN')} icon={<Activity size={13} />} tone="slate" />
+                <StatTile label={approvedLabel} value={row.approved.toLocaleString('en-IN')} icon={<CheckCircle2 size={13} />} tone="emerald" />
+                <StatTile label={rejectedLabel} value={row.rejected.toLocaleString('en-IN')} icon={<XCircle size={13} />} tone="rose" />
+                <StatTile label={pendingLabel} value={row.pending.toLocaleString('en-IN')} icon={<ShieldCheck size={13} />} tone="amber" />
+                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
+              </>
+            )}
+
+            {(roleKey === 'ULB_OFFICER' || roleKey === 'ACTION_OFFICER') && (
+              <>
+                <StatTile
+                  label={roleKey === 'ULB_OFFICER' ? 'Total In Jurisdiction' : 'Total Action Items'}
+                  value={row.total.toLocaleString('en-IN')}
+                  icon={<Activity size={13} />}
+                  tone="slate"
+                />
+                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
+
+                <div className="col-span-2 mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 sm:col-span-3">
+                  Action Cycle
                 </div>
-                <div className="mt-1 text-sm font-black text-slate-950">{item.value}</div>
-              </div>
-            ))}
+                <StatTile
+                  label={roleKey === 'ULB_OFFICER' ? 'Action Required (Raised)' : 'Pending Action'}
+                  value={row.actionRequired.toLocaleString('en-IN')}
+                  icon={<ShieldCheck size={13} />}
+                  tone="amber"
+                />
+                <StatTile
+                  label="Action Taken (Resolved)"
+                  value={row.actionTaken.toLocaleString('en-IN')}
+                  icon={<CheckCircle2 size={13} />}
+                  tone="violet"
+                />
+                <StatTile
+                  label={roleKey === 'ULB_OFFICER' ? 'Flag Rate' : 'Resolution Rate'}
+                  value={percentText(row.performance)}
+                  icon={<Activity size={13} />}
+                  tone="emerald"
+                />
+              </>
+            )}
+
+            {roleKey === 'EMPLOYEE' && (
+              <>
+                <StatTile label="Total Days" value={row.total.toLocaleString('en-IN')} icon={<Activity size={13} />} tone="slate" />
+                <StatTile label="Present Days" value={row.approved.toLocaleString('en-IN')} icon={<CheckCircle2 size={13} />} tone="emerald" />
+                <StatTile label="Absent Days" value={row.rejected.toLocaleString('en-IN')} icon={<XCircle size={13} />} tone="rose" />
+                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
+                <StatTile
+                  label="Assigned Toilets"
+                  value={workSummaryLoading ? '…' : (toiletsCount ?? 0).toLocaleString('en-IN')}
+                  icon={<Droplet size={13} />}
+                  tone="sky"
+                />
+                <StatTile
+                  label="Assigned Litter Bins"
+                  value={workSummaryLoading ? '…' : (litterBinsCount ?? 0).toLocaleString('en-IN')}
+                  icon={<Trash2 size={13} />}
+                  tone="emerald"
+                />
+
+                {employeeAssetRecords.length > 0 && (
+                  <>
+                    <div className="col-span-2 mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 sm:col-span-3">
+                      Asset Inspection Results
+                    </div>
+                    <StatTile
+                      label="Approved (Clean)"
+                      value={employeeAssetStats.approved.toLocaleString('en-IN')}
+                      icon={<CheckCircle2 size={13} />}
+                      tone="emerald"
+                    />
+                    <StatTile
+                      label="Rejected (Unclean)"
+                      value={employeeAssetStats.rejected.toLocaleString('en-IN')}
+                      icon={<XCircle size={13} />}
+                      tone="rose"
+                    />
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {recentRecords.length > 0 ? (
-            <>
-              <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-                Recent Records ({recentRecords.length} of {row.records.length})
+        {/* TABS */}
+        <div className="grid grid-cols-3 gap-2 border-b border-slate-200 bg-white px-6 py-3">
+          <button
+            type="button"
+            onClick={() => setTab('charts')}
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[10px] font-black transition sm:text-[11px] ${
+              tab === 'charts'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
+                : 'border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <BarChart3 size={13} />
+            Charts &amp; Breakdown
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTab('calendar')}
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[10px] font-black transition sm:text-[11px] ${
+              tab === 'calendar'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
+                : 'border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <CalendarDays size={13} />
+            Calendar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTab('table')}
+            className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[10px] font-black transition sm:text-[11px] ${
+              tab === 'table'
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
+                : 'border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+            }`}
+          >
+            <Table2 size={13} />
+            Data Table
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          {tab === 'charts' && (
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  {donutTitle}
+                </div>
+                {donutSegments.every((segment) => segment.value === 0) ? (
+                  <div className="flex h-32 items-center justify-center text-xs font-bold text-slate-400">
+                    No records in the selected range.
+                  </div>
+                ) : (
+                  <DonutDistributionChart segments={donutSegments} size={190} strokeWidth={20} />
+                )}
               </div>
 
-              <div className="space-y-2">
-                {recentRecords.map((record, index) => {
-                  const status = effectiveStatus(record);
+              {!isEmployee && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    Module Breakdown
+                  </div>
+                  {moduleBreakdown.length > 0 ? (
+                    <BarComparisonChart items={moduleBreakdown} />
+                  ) : (
+                    <div className="flex h-20 items-center justify-center text-xs font-bold text-slate-400">
+                      No module activity in the selected range.
+                    </div>
+                  )}
+                </div>
+              )}
 
-                  const statusStyle =
-                    status === 'APPROVED' || status === 'ACTION_TAKEN'
-                      ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                      : status === 'REJECTED'
-                      ? 'border-rose-100 bg-rose-50 text-rose-700'
-                      : status === 'ACTION_REQUIRED'
-                      ? 'border-amber-100 bg-amber-50 text-amber-700'
-                      : 'border-slate-200 bg-slate-50 text-slate-500';
+              {isEmployee && employeeAssetRecords.length > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    Asset Cleanliness · Toilets &amp; Litter Bins
+                  </div>
+                  <DonutDistributionChart segments={assetCleanlinessSegments} size={190} strokeWidth={20} />
+                </div>
+              )}
+            </div>
+          )}
 
-                  return (
-                    <button
-                      key={record.id || `${record.dashboardModule}-${index}`}
-                      type="button"
-                      onClick={() => onOpenRecord(record)}
-                      className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left transition hover:border-indigo-200 hover:bg-indigo-50/40"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-black text-slate-800">
-                          {getRecordTitle(record)}
-                        </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[9px] font-bold uppercase text-slate-400">
-                          <span>{record.dashboardModuleLabel}</span>
-                          <span>·</span>
-                          <span>{formatDate(recordDate(record))}</span>
-                        </div>
+          {tab === 'calendar' && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Report submitted
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <i className="h-2.5 w-2.5 rounded-sm border border-rose-200 bg-rose-100" /> No report
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <i className="h-2.5 w-2.5 rounded-sm border border-slate-200 bg-slate-50" /> Outside range
+                  </span>
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                  Hover a green date for the module breakdown
+                </span>
+              </div>
+
+              {calendarMonths.length === 0 ? (
+                <div className="flex h-32 items-center justify-center rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-400">
+                  No date range available to build a calendar.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {calendarMonths.map(({ year, month }) => (
+                    <div key={`${year}-${month}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="mb-3 text-[11px] font-black uppercase tracking-[0.08em] text-slate-700">
+                        {new Date(year, month, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                       </div>
 
-                      <span
-                        className={`shrink-0 rounded-md border px-2 py-1 text-[9px] font-black uppercase ${statusStyle}`}
-                      >
-                        {status.replace(/_/g, ' ')}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <div className="flex h-full items-center justify-center text-xs font-bold text-slate-400">
-              No inspection records in the selected range.
+                      <div className="grid grid-cols-7 gap-1 text-center text-[8px] font-black uppercase text-slate-400">
+                        {WEEKDAY_LABELS.map((weekday) => (
+                          <div key={weekday} className="py-1">
+                            {weekday}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-7 gap-1">
+                        {daysInCalendarMonth(year, month).map((cell, index) => {
+                          if (!cell) return <div key={`blank-${index}`} />;
+
+                          const inRange = cell.dateStr >= calendarRange.from && cell.dateStr <= calendarRange.to;
+                          const isFuture = cell.dateStr > todayStr;
+                          const entry = recordsByDate.get(cell.dateStr);
+                          const hasReports = Boolean(entry && entry.total > 0);
+                          const active = inRange && !isFuture;
+
+                          const cellStyle = !active
+                            ? 'border-slate-100 bg-slate-50 text-slate-300'
+                            : hasReports
+                            ? 'border-emerald-500 bg-emerald-500 text-white cursor-pointer'
+                            : 'border-rose-200 bg-rose-100 text-rose-500';
+
+                          return (
+                            <div key={cell.dateStr} className="relative">
+                              <button
+                                type="button"
+                                disabled={!active || !hasReports}
+                                onMouseEnter={(event) => active && hasReports && openTooltip(cell.dateStr, event.currentTarget)}
+                                onMouseLeave={scheduleCloseTooltip}
+                                onClick={(event) => active && hasReports && toggleTooltip(cell.dateStr, event.currentTarget)}
+                                className={`flex h-8 w-full items-center justify-center rounded-md border text-[9px] font-black transition ${cellStyle}`}
+                              >
+                                {cell.day}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {hoverDate && tooltipPos && recordsByDate.get(hoverDate) && (
+                <div
+                  onMouseEnter={clearCloseTimer}
+                  onMouseLeave={scheduleCloseTooltip}
+                  style={{
+                    position: 'fixed',
+                    top: tooltipPos.top,
+                    left: tooltipPos.left,
+                    width: TOOLTIP_WIDTH,
+                    transform: tooltipPos.openUpward ? 'translateY(-100%)' : 'none',
+                  }}
+                  className="z-[100] rounded-xl border border-slate-200 bg-white p-2.5 text-left shadow-2xl"
+                >
+                  <div className="mb-1.5 text-[9px] font-black uppercase tracking-wide text-slate-400">
+                    {formatDate(hoverDate)}
+                  </div>
+                  <div className="space-y-1">
+                    {(() => {
+                      const entry = recordsByDate.get(hoverDate)!;
+                      return (
+                        [
+                          ['TOILET', 'Toilet', entry.TOILET],
+                          ['LITTERBINS', 'Litter Bin', entry.LITTERBINS],
+                          ['SWEEPING', 'Beat (Sweeping)', entry.SWEEPING],
+                        ] as Array<[InspectionModuleKey, string, number]>
+                      ).map(([moduleKey, label, count]) => (
+                        <button
+                          key={moduleKey}
+                          type="button"
+                          disabled={count === 0}
+                          onClick={() => goToDateTable(hoverDate, moduleKey)}
+                          className={`flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-bold transition ${
+                            count > 0
+                              ? 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700'
+                              : 'cursor-not-allowed text-slate-300'
+                          }`}
+                        >
+                          <span>{label}</span>
+                          <span className="font-black">{count}</span>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
             </div>
+          )}
+
+          {tab === 'table' && (
+            <>
+              {tableFilterDate && (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3.5 py-2.5">
+                  <span className="text-[10px] font-bold text-indigo-700">
+                    Showing reports for <strong>{formatDate(tableFilterDate)}</strong>
+                    {tableFilterModule
+                      ? ` · ${INSPECTION_MODULES.find((module) => module.key === tableFilterModule)?.label || tableFilterModule}`
+                      : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTableFilterDate(null);
+                      setTableFilterModule(null);
+                    }}
+                    className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black text-indigo-600 transition hover:bg-indigo-100"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              )}
+
+              {filteredTableRecords.length > 0 ? (
+                <>
+                  <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    {tableFilterDate ? 'Filtered Records' : 'All Records'} ({filteredTableRecords.length})
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50">
+                        <tr className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                          <th className="p-3">Report</th>
+                          <th className="p-3">Module</th>
+                          <th className="p-3">Date</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredTableRecords.map((record, index) => {
+                          const status = effectiveStatus(record);
+
+                          const statusStyle =
+                            status === 'APPROVED' || status === 'ACTION_TAKEN'
+                              ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                              : status === 'REJECTED'
+                              ? 'border-rose-100 bg-rose-50 text-rose-700'
+                              : status === 'ACTION_REQUIRED'
+                              ? 'border-amber-100 bg-amber-50 text-amber-700'
+                              : 'border-slate-200 bg-slate-50 text-slate-500';
+
+                          return (
+                            <tr key={record.id || `${record.dashboardModule}-${index}`} className="transition hover:bg-slate-50">
+                              <td className="max-w-[220px] truncate p-3 font-black text-slate-800">
+                                {getRecordTitle(record)}
+                              </td>
+                              <td className="p-3 text-[10px] font-bold uppercase text-slate-500">
+                                {record.dashboardModuleLabel}
+                              </td>
+                              <td className="p-3 text-[10px] font-bold text-slate-500">
+                                {formatDate(recordDate(record))}
+                              </td>
+                              <td className="p-3">
+                                <span className={`rounded-md border px-2 py-1 text-[9px] font-black uppercase ${statusStyle}`}>
+                                  {status.replace(/_/g, ' ')}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenRecord(record)}
+                                  className="rounded-lg border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-[9px] font-black text-indigo-600 transition hover:bg-indigo-100"
+                                >
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-32 items-center justify-center text-xs font-bold text-slate-400">
+                  {tableFilterDate
+                    ? 'No reports for this date / module.'
+                    : 'No inspection records in the selected range.'}
+                </div>
+              )}
+            </>
           )}
         </div>
       </aside>
@@ -704,8 +1429,15 @@ export default function UserPerformancePage() {
     return records.filter((record) => record.dashboardModule === moduleFilter);
   }, [records, moduleFilter, moduleFilterApplicable]);
 
+  /*
+   * SI (QC) performance is judged on how many of their assigned reports
+   * are still pending review, NOT on approval outcome - a high pending
+   * count means the SI is behind on their own queue, so performance
+   * drops as pending grows (unrelated to how ULB/IEC action cycles play
+   * out downstream).
+   */
   const buildInspectionRows = useCallback(
-    (role: 'SUPERVISOR' | 'QC' | 'ACTION_OFFICER'): UserPerformanceRow[] => {
+    (role: 'SUPERVISOR' | 'QC'): UserPerformanceRow[] => {
       const roster = cityUsersByRole.get(role) || [];
 
       return roster.map((person) => {
@@ -736,6 +1468,13 @@ export default function UserPerformancePage() {
           if (item.dashboardModuleLabel) modules.add(item.dashboardModuleLabel);
         });
 
+        const performance =
+          role === 'QC'
+            ? stats.total > 0
+              ? ((stats.total - stats.pending) / stats.total) * 100
+              : null
+            : stats.performance;
+
         return {
           key: `${role}-${person.id}`,
           id: person.id,
@@ -746,7 +1485,7 @@ export default function UserPerformancePage() {
           actionRequired: stats.actionRequired,
           actionTaken: stats.actionTaken,
           pending: stats.pending,
-          performance: stats.performance,
+          performance,
           records: matchedRecords,
           attendance: attendanceEmployee?.attendanceRate ?? null,
           attendanceEmployee,
@@ -796,6 +1535,10 @@ export default function UserPerformancePage() {
    * ULB Officer's rows are matched by their assigned Zone/Ward scope
    * (the same scope the backend enforces when they mark a report
    * Action Required) rather than by a per-record person field.
+   *
+   * Performance is judged on how many reports in their jurisdiction
+   * they've flagged into the Action Required cycle - the action cycle
+   * itself (Required -> Taken) is what the drawer's stat card surfaces.
    */
   const buildUlbOfficerRows = useCallback((): UserPerformanceRow[] => {
     const roster = cityUsersByRole.get('ULB_OFFICER') || [];
@@ -843,7 +1586,7 @@ export default function UserPerformancePage() {
         actionRequired: stats.actionRequired,
         actionTaken: stats.actionTaken,
         pending: stats.pending,
-        performance: stats.performance,
+        performance: stats.total > 0 ? (stats.actionRequired / stats.total) * 100 : null,
         records: matchedRecords,
         attendance: attendanceEmployee?.attendanceRate ?? null,
         attendanceEmployee,
@@ -854,16 +1597,111 @@ export default function UserPerformancePage() {
     });
   }, [cityUsersByRole, geoNameById, filteredRecords, attendance]);
 
+  /*
+   * IEC (Action Officer) records are matched two ways: records they've
+   * already resolved (actionTakenBy = them) PLUS records still sitting
+   * in Action Required within their own zone/ward scope - those are the
+   * items still "pending action" on their side. Performance is the
+   * resolution rate of that action cycle (Taken / (Required + Taken)),
+   * so a growing pending pile drags performance down.
+   */
+  const buildActionOfficerRows = useCallback((): UserPerformanceRow[] => {
+    const roster = cityUsersByRole.get('ACTION_OFFICER') || [];
+
+    return roster.map((officer) => {
+      const zoneNames = (officer.zoneIds || [])
+        .map((id) => geoNameById.get(id))
+        .filter((name): name is string => Boolean(name));
+      const wardNames = (officer.wardIds || [])
+        .map((id) => geoNameById.get(id))
+        .filter((name): name is string => Boolean(name));
+
+      const zoneSet = new Set(zoneNames.map(normalize));
+      const wardSet = new Set(wardNames.map(normalize));
+
+      const matchedRecords = filteredRecords.filter((item) => {
+        const iecId = getIecId(item);
+        const iecName = getIecName(item);
+        const resolvedByOfficer = iecId
+          ? String(iecId) === String(officer.id)
+          : Boolean(iecName) && normalize(iecName) === normalize(officer.name);
+        if (resolvedByOfficer) return true;
+
+        if (effectiveStatus(item) !== 'ACTION_REQUIRED') return false;
+        if (!(zoneSet.size || wardSet.size)) return false;
+        const zone = normalize(getRecordZone(item));
+        const ward = normalize(getRecordWard(item));
+        return (zone && zoneSet.has(zone)) || (ward && wardSet.has(ward));
+      });
+
+      const stats = inspectionStats(matchedRecords);
+
+      const attendanceEmployee =
+        attendance?.employees?.find(
+          (employee) =>
+            employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(officer.id)
+        ) || null;
+
+      const modules = new Set<string>();
+      matchedRecords.forEach((item) => {
+        if (item.dashboardModuleLabel) modules.add(item.dashboardModuleLabel);
+      });
+
+      const actionable = stats.actionRequired + stats.actionTaken;
+
+      return {
+        key: `ACTION_OFFICER-${officer.id}`,
+        id: officer.id,
+        label: officer.name,
+        total: stats.total,
+        approved: stats.approved,
+        rejected: stats.rejected,
+        actionRequired: stats.actionRequired,
+        actionTaken: stats.actionTaken,
+        pending: stats.pending,
+        performance: actionable > 0 ? (stats.actionTaken / actionable) * 100 : null,
+        records: matchedRecords,
+        attendance: attendanceEmployee?.attendanceRate ?? null,
+        attendanceEmployee,
+        zones: zoneNames,
+        wards: wardNames,
+        modules: Array.from(modules),
+      };
+    });
+  }, [cityUsersByRole, geoNameById, filteredRecords, attendance]);
+
+  /*
+   * Daroga performance is judged on submission volume against the rest
+   * of the currently-viewed roster (count of reports submitted matters
+   * more than SI approval outcome), so the base approve/actionTaken
+   * score from buildInspectionRows is replaced with a relative score
+   * once every Daroga's total is known. The drawer additionally shows
+   * assets-assigned vs. reports-submitted coverage using work-summary
+   * data fetched per user.
+   */
   const activeRoleRows = useMemo(() => {
-    const rows =
-      roleFilter === 'EMPLOYEE'
-        ? employeeRows
-        : roleFilter === 'ULB_OFFICER'
-        ? buildUlbOfficerRows()
-        : buildInspectionRows(roleFilter as 'SUPERVISOR' | 'QC' | 'ACTION_OFFICER');
+    let rows: UserPerformanceRow[];
+
+    if (roleFilter === 'EMPLOYEE') {
+      rows = employeeRows;
+    } else if (roleFilter === 'ULB_OFFICER') {
+      rows = buildUlbOfficerRows();
+    } else if (roleFilter === 'ACTION_OFFICER') {
+      rows = buildActionOfficerRows();
+    } else {
+      rows = buildInspectionRows(roleFilter as 'SUPERVISOR' | 'QC');
+    }
+
+    if (roleFilter === 'SUPERVISOR') {
+      const maxTotal = Math.max(0, ...rows.map((row) => row.total));
+      rows = rows.map((row) => ({
+        ...row,
+        performance: maxTotal > 0 ? (row.total / maxTotal) * 100 : null,
+      }));
+    }
 
     return [...rows].sort((a, b) => (b.performance ?? -1) - (a.performance ?? -1));
-  }, [roleFilter, employeeRows, buildUlbOfficerRows, buildInspectionRows]);
+  }, [roleFilter, employeeRows, buildUlbOfficerRows, buildActionOfficerRows, buildInspectionRows]);
 
   const filteredRows = useMemo(() => {
     const query = normalize(search);
@@ -1420,6 +2258,10 @@ export default function UserPerformancePage() {
           <UserDetailDrawer
             row={activeRow}
             roleLabel={roleLabel}
+            roleKey={roleFilter}
+            fromDate={appliedFrom}
+            toDate={appliedTo}
+            allRecords={filteredRecords}
             onClose={() => setActiveRow(null)}
             onOpenRecord={setProofRecord}
           />
