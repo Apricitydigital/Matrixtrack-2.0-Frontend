@@ -281,6 +281,7 @@ function scoreText(
 }
 
 
+
 function statusClass(
   status: string
 ) {
@@ -2930,13 +2931,13 @@ export default function WardDrilldownDrawer({
                     </div>
                   </div>
                   {(
+                    selectedComponent === 'WORKFORCE' ||
                     selectedComponent === 'BEAT' ||
                     selectedComponent === 'TOILET' ||
                     selectedComponent === 'LITTERBIN' ||
                     selectedComponent === 'SUPERVISOR' ||
                     selectedComponent === 'QC' ||
-                    selectedComponent ===
-                    'ACTION_OFFICER'
+                    selectedComponent === 'ACTION_OFFICER'
                   ) && (
                       <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
 
@@ -3022,6 +3023,7 @@ export default function WardDrilldownDrawer({
                 </div>
 
 
+
                 {selectedScore?.metrics &&
                   detailView === 'OVERVIEW' && (
 
@@ -3102,11 +3104,18 @@ export default function WardDrilldownDrawer({
 
                               <div className="mt-0.5 text-lg font-black text-violet-700">
                                 {Number(
+                                  workforceMetrics.manpowerScheduled || 0
+                                ) > 0
+                                  ? `${Number(
                                   workforceMetrics
-                                    .deploymentCompliancePercent ||
-                                  0
-                                ).toFixed(1)}
-                                %
+                                    .manpowerScheduled || 0
+                                ) > 0
+                                  ? `${Number(
+                                    workforceMetrics
+                                      .deploymentCompliancePercent || 0
+                                  ).toFixed(1)}%`
+                                  : 'N/A'}`
+                                  : 'N/A'}
                               </div>
 
                               <div className="text-[7px] font-semibold text-slate-400">
@@ -3136,10 +3145,13 @@ export default function WardDrilldownDrawer({
                                   <div className="mt-1 text-xl font-black text-slate-900">
                                     {Number(
                                       workforceMetrics
-                                        .supervisorAvailabilityPercent ||
-                                      0
-                                    ).toFixed(1)}
-                                    %
+                                        .supervisorsScheduled || 0
+                                    ) > 0
+                                      ? `${Number(
+                                        workforceMetrics
+                                          .supervisorAvailabilityPercent || 0
+                                      ).toFixed(1)}%`
+                                      : 'N/A'}
                                   </div>
                                 </div>
 
@@ -3223,10 +3235,13 @@ export default function WardDrilldownDrawer({
                                   <div className="mt-1 text-xl font-black text-slate-900">
                                     {Number(
                                       workforceMetrics
-                                        .mannedBeatPercent ||
-                                      0
-                                    ).toFixed(1)}
-                                    %
+                                        .beatDeploymentOpportunities || 0
+                                    ) > 0
+                                      ? `${Number(
+                                        workforceMetrics
+                                          .mannedBeatPercent || 0
+                                      ).toFixed(1)}%`
+                                      : 'N/A'}
                                   </div>
                                 </div>
 
@@ -4621,34 +4636,42 @@ export default function WardDrilldownDrawer({
 
                         </div>
 
+                        {Number(
+                          workforceMetrics
+                            .manpowerScheduled || 0
+                        ) > 0 ? (
 
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
 
-                          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
-                            {Number(
-                              workforceMetrics
-                                .correctlyDeployed ||
-                              0
-                            )}
-                            {' of '}
-                            {Number(
-                              workforceMetrics
-                                .manpowerScheduled ||
-                              0
-                            )}
-                          </span>
+                            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                              {Number(
+                                workforceMetrics
+                                  .correctlyDeployed || 0
+                              )}
+                              {' of '}
+                              {Number(
+                                workforceMetrics
+                                  .manpowerScheduled || 0
+                              )}
+                            </span>
 
+                            <span className="text-xs font-black text-blue-700">
+                              {Number(
+                                workforceMetrics
+                                  .deploymentCompliancePercent || 0
+                              ).toFixed(1)}
+                              %
+                            </span>
 
-                          <span className="text-xs font-black text-blue-700">
-                            {Number(
-                              workforceMetrics
-                                .deploymentCompliancePercent ||
-                              0
-                            ).toFixed(1)}
-                            %
-                          </span>
+                          </div>
 
-                        </div>
+                        ) : (
+
+                          <div className="mt-2 text-[10px] font-bold text-slate-400">
+                            No employee attendance obligation — this factor is N/A
+                          </div>
+
+                        )}
 
                       </div>
 
@@ -4860,15 +4883,9 @@ export default function WardDrilldownDrawer({
 
 
                       <div className="text-xl font-black text-blue-700">
-                        {Number(
-                          selectedScore.score ||
-                          0
-                        ).toFixed(1)}
-                        {' / '}
-                        {Number(
-                          selectedScore.maxScore ||
-                          20
-                        ).toFixed(1)}
+                        {scoreText(
+                          selectedScore
+                        )}
                       </div>
 
                     </div>
@@ -5281,7 +5298,11 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[8px] font-bold text-slate-400">
-                            Coverage score
+                            Maximum{' '}
+                            {Number(
+                              selectedScore.components?.inspectionCoverage?.maxScore || 0
+                            ).toFixed(1)}
+                            {' '}marks
                           </div>
 
                         </div>
@@ -5370,7 +5391,13 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[8px] font-bold text-slate-400">
-                            SI score
+                            Maximum{' '}
+                            {Number(
+                              selectedScore.components
+                                ?.compliance
+                                ?.maxScore || 0
+                            ).toFixed(1)}
+                            {' '}marks
                           </div>
 
                         </div>
@@ -5468,7 +5495,13 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[8px] font-bold text-slate-400">
-                            Quality score
+                            Maximum{' '}
+                            {Number(
+                              selectedScore.components
+                                ?.quality
+                                ?.maxScore || 0
+                            ).toFixed(1)}
+                            {' '}marks
                           </div>
 
                         </div>
@@ -6325,11 +6358,19 @@ export default function WardDrilldownDrawer({
                     <div className="border-b border-slate-100 bg-blue-50/50 px-4 py-3">
 
                       <div className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-600">
-                        IEC Member Workflow Guide
+                        IEC Member Scoring Guide
                       </div>
 
                       <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                        Current IEC Member workflow from Action Required to Action Taken.
+                        Action Taken ÷ Action Required determines the current IEC Member Ward Ranking score.
+                      </div>
+
+                      <div className="mt-2 inline-flex rounded-lg border border-blue-100 bg-white px-2.5 py-1 text-[9px] font-black text-blue-700">
+                        IEC Member maximum score:{' '}
+                        {Number(
+                          selectedScore.maxScore || 10
+                        ).toFixed(1)}
+                        {' '}marks
                       </div>
 
                     </div>
@@ -6442,7 +6483,7 @@ export default function WardDrilldownDrawer({
                           selectedScore.metrics
                             .tasksAssigned || 0
                         ) > 0
-                          ? (
+                          ? `${(
                             Number(
                               selectedScore.metrics
                                 .tasksCompleted || 0
@@ -6452,10 +6493,8 @@ export default function WardDrilldownDrawer({
                                 .tasksAssigned || 0
                             ) *
                             100
-                          ).toFixed(1)
-                          : '0.0'}
-
-                        %
+                          ).toFixed(1)}%`
+                          : 'N/A'}
 
                       </div>
 

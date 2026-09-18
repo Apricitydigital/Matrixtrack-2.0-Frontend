@@ -1486,6 +1486,9 @@ function AttendanceDashboard() {
       .map((role) => String(role).toUpperCase())
   );
   const isUlbOfficer = attendanceRoles.has("ULB_OFFICER");
+  const isCityAdmin =
+    hmsSuperAdmin ||
+    attendanceRoles.has("CITY_ADMIN");
   const canUploadAttendance =
     hmsSuperAdmin ||
     attendanceRoles.has("CITY_ADMIN") ||
@@ -3210,8 +3213,8 @@ function AttendanceDashboard() {
         </section>
       ) : (
         <>
-          {/* Health Worker registered employees stats banner */}
-          {employeeGroup === "HEALTH_WORKERS" && (
+          {/* Health Worker registered employees stats banner - visible to City Admin & Super Admin */}
+          {employeeGroup === "HEALTH_WORKERS" && isCityAdmin && (
             <section className="rounded-2xl border border-teal-200/80 bg-gradient-to-r from-teal-50 via-emerald-50/60 to-white p-4 shadow-sm">
               {registeredEmpLoading ? (
                 <div className="flex items-center gap-2 text-xs font-semibold text-teal-700">
@@ -3302,9 +3305,9 @@ function AttendanceDashboard() {
 
           <section className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
             <KpiCard
-              label={employeeGroup === "HEALTH_WORKERS" && registeredEmpData ? "Registered Employees" : "Total employees"}
+              label={employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin ? "Registered Employees" : "Total employees"}
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
                   ? numberFormatter.format(registeredEmpData.totalRegistered)
                   : numberFormatter.format(summary.uniqueEmployees)
               }
@@ -3314,10 +3317,10 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "ALL",
                 title: "Total employees",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
                   ? `${registeredEmpData.totalRegistered} registered employees · ${registeredEmpData.totalMatched} matched with attendance data.`
                   : "Underlying employee attendance records for the current dashboard filters.",
-                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
                   ? numberFormatter.format(registeredEmpData.totalRegistered)
                   : numberFormatter.format(summary.uniqueEmployees),
                 tone: "blue",
@@ -3325,30 +3328,46 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Present"
-              value={isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalPresent / avgDivisor) : numberFormatter.format(registeredEmpData.totalPresent))
+                  : (isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present))
+              }
               icon={<UserCheck size={18} />}
               tone="emerald"
               active={kpiDrilldown?.key === "PRESENT"}
               onClick={() => openKpiDrilldown({
                 key: "PRESENT",
                 title: "Present employees",
-                subtitle: "Employees marked present within the current date range and active filters.",
-                value: numberFormatter.format(summary.present),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? `${registeredEmpData.totalPresent} registered health workers marked present.`
+                  : "Employees marked present within the current date range and active filters.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? numberFormatter.format(registeredEmpData.totalPresent)
+                  : numberFormatter.format(summary.present),
                 tone: "emerald",
                 query: { status: "P" },
               })}
             />
             <KpiCard
               label="Absent"
-              value={isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalAbsent / avgDivisor) : numberFormatter.format(registeredEmpData.totalAbsent))
+                  : (isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent))
+              }
               icon={<UserRoundX size={18} />}
               tone="rose"
               active={kpiDrilldown?.key === "ABSENT"}
               onClick={() => openKpiDrilldown({
                 key: "ABSENT",
                 title: "Absent employees",
-                subtitle: "Employees marked absent within the current date range and active filters.",
-                value: numberFormatter.format(summary.absent),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? `${registeredEmpData.totalAbsent} registered health workers marked absent.`
+                  : "Employees marked absent within the current date range and active filters.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? numberFormatter.format(registeredEmpData.totalAbsent)
+                  : numberFormatter.format(summary.absent),
                 tone: "rose",
                 query: { status: "A" },
               })}
@@ -3356,8 +3375,8 @@ function AttendanceDashboard() {
             <KpiCard
               label="Attendance rate"
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && registeredEmpData.totalRegistered > 0
-                  ? `${((summary.present / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin && registeredEmpData.totalRegistered > 0
+                  ? `${((registeredEmpData.totalPresent / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
                   : `${summary.attendanceRate.toFixed(1)}%`
               }
               icon={<Activity size={18} />}
@@ -3366,25 +3385,35 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "RATE",
                 title: "Attendance rate · Present records",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData
-                  ? `Present ÷ total registered (${summary.present} present of ${registeredEmpData.totalRegistered} registered).`
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? `Present ÷ total registered (${registeredEmpData.totalPresent} present of ${registeredEmpData.totalRegistered} registered).`
                   : "Present employee records used to calculate the attendance rate for the current selection.",
-                value: `${summary.attendanceRate.toFixed(1)}%`,
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin && registeredEmpData.totalRegistered > 0
+                  ? `${((registeredEmpData.totalPresent / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
+                  : `${summary.attendanceRate.toFixed(1)}%`,
                 tone: "violet",
                 query: { status: "P" },
               })}
             />
             <KpiCard
               label="Punch In"
-              value={isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalPresent / avgDivisor) : numberFormatter.format(registeredEmpData.totalPresent))
+                  : (isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount))
+              }
               icon={<Clock3 size={18} />}
               tone="blue"
               active={kpiDrilldown?.key === "PUNCH_IN"}
               onClick={() => openKpiDrilldown({
                 key: "PUNCH_IN",
                 title: "Punch In records",
-                subtitle: "Employees with a recorded Punch In within the current selection.",
-                value: numberFormatter.format(punchInCount),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? `${registeredEmpData.totalPresent} registered health workers recorded a punch in.`
+                  : "Employees with a recorded Punch In within the current selection.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? numberFormatter.format(registeredEmpData.totalPresent)
+                  : numberFormatter.format(punchInCount),
                 tone: "blue",
                 query: { checkoutState: "HAS_CHECKIN" },
               })}
@@ -3406,15 +3435,23 @@ function AttendanceDashboard() {
             />
             <KpiCard
               label="Not punched out"
-              value={isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
+              value={
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? (isMultiDayRange ? formatAverageValue(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut) / avgDivisor) : numberFormatter.format(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut)))
+                  : (isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns))
+              }
               icon={<TimerReset size={18} />}
               tone="amber"
               active={kpiDrilldown?.key === "OPEN_PUNCH_IN"}
               onClick={() => openKpiDrilldown({
                 key: "OPEN_PUNCH_IN",
                 title: "Not punched out records",
-                subtitle: "Employees with Punch In recorded but no Punch Out yet.",
-                value: numberFormatter.format(summary.openCheckIns),
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? `${Math.max(0, registeredEmpData.totalPresent - summary.checkedOut)} registered health workers with Punch In recorded but Punch Out pending.`
+                  : "Employees with Punch In recorded but no Punch Out yet.",
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                  ? numberFormatter.format(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut))
+                  : numberFormatter.format(summary.openCheckIns),
                 tone: "amber",
                 query: { checkoutState: "OPEN_CHECKIN" },
               })}
@@ -3672,9 +3709,22 @@ function AttendanceDashboard() {
                             <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
                               {employee.designation || "Employee"} · {employee.attendanceId}
                             </p>
-                            <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames((employee as any).zone || employee.zones)} · Ward: ${formatScopeNames((employee as any).ward || employee.wards)}`}>
-                              Zone: {formatScopeNames((employee as any).zone || employee.zones)} · Ward: {formatScopeNames((employee as any).ward || employee.wards)}
-                            </p>
+                            {(() => {
+                              const zoneStr = formatScopeNames((employee as any).zone || employee.zones);
+                              const wardStr = formatScopeNames((employee as any).ward || employee.wards);
+                              const locFallback = (employee as any).officeLocation;
+                              const hasScope = zoneStr !== "—" || wardStr !== "—";
+                              const displayText = hasScope
+                                ? `Zone: ${zoneStr} · Ward: ${wardStr}`
+                                : locFallback
+                                  ? `Location: ${locFallback}`
+                                  : "Zone: — · Ward: —";
+                              return (
+                                <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={displayText}>
+                                  {displayText}
+                                </p>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -3922,142 +3972,6 @@ function AttendanceDashboard() {
                 </div>
               )}
             </ChartCard>
-          </section>
-
-          <section>
-            <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_14px_42px_rgba(15,23,42,0.055)]">
-              <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-white via-blue-50/35 to-violet-50/35 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100"><UsersRound size={18} /></div>
-                  <div>
-                    <h2 className="text-base font-black tracking-tight text-slate-950">Employee attendance records</h2>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      {numberFormatter.format(data.employeePagination.total)} unique employees match the current filters · tap a name for their full history
-                    </p>
-                  </div>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-[11px] font-black text-blue-700 shadow-sm ring-1 ring-blue-100">
-                  <CalendarDays size={13} /> {visibleRangeLabel}
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="relative max-w-sm sm:flex-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={draftFilters.search}
-                    onChange={(e) => setDraftFilters((current) => ({ ...current, search: e.target.value }))}
-                    onKeyDown={(e) => e.key === "Enter" && applyFilters()}
-                    placeholder="Search employee by name or attendance ID"
-                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-[4.5rem] text-xs font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={applyFilters}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-blue-700"
-                  >
-                    Search
-                  </button>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Show</span>
-                  <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                    {[10, 20, 50, 100].map((size) => (
-                      <button
-                        key={size}
-                        type="button"
-                        onClick={() => {
-                          setEmployeePageSize(size);
-                          setPage(1);
-                        }}
-                        className={`rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${employeePageSize === size
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                          }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1270px] border-collapse">
-                  <thead className="sticky top-0 z-10">
-                    <tr className="bg-slate-50/95 text-left backdrop-blur">
-                      {['Employee', 'Attendance ID', 'Designation', 'Zone', 'Ward', 'Present', 'Absent', 'Attendance rate', 'Completed punches', 'Avg work time'].map((heading) => (
-                        <th key={heading} className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{heading}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.employees.map((employee: AttendanceEmployeeSummary) => (
-                      <tr key={employee.attendanceId} className="group border-b border-slate-100 transition-all duration-200 odd:bg-white even:bg-slate-50/25 hover:bg-blue-50/55 last:border-b-0">
-                        <td className="px-4 py-3.5">
-                          <button
-                            type="button"
-                            onClick={() => openEmployeeDrilldown(employee)}
-                            className="flex items-center gap-2.5 text-left"
-                            title={`View ${employee.employeeName}'s attendance for ${visibleRangeLabel}`}
-                          >
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 text-[11px] font-black text-blue-700 ring-1 ring-blue-100">
-                              {employee.employeeName.slice(0, 1).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="max-w-[190px] truncate text-xs font-bold text-blue-700 underline-offset-2 group-hover:underline" title={employee.employeeName}>{employee.employeeName}</p>
-                              <p className="mt-0.5 max-w-[190px] truncate text-[10px] font-medium text-slate-400" title={employee.officeLocation || ""}>{employee.officeLocation || "—"}</p>
-                            </div>
-                          </button>
-                        </td>
-                        <td className="px-4 py-3.5 font-mono text-[11px] font-bold text-slate-600">{employee.attendanceId}</td>
-                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{employee.designation || "—"}</td>
-                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(employee.zones)}</td>
-                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{formatScopeNames(employee.wards)}</td>
-                        <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100">{employee.presentDays}/{employee.totalDays}</span></td>
-                        <td className="px-4 py-3.5"><span className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700 ring-1 ring-rose-100">{employee.absentDays}</span></td>
-                        <td className="px-4 py-3.5 text-xs font-bold text-slate-700">{employee.attendanceRate.toFixed(1)}%</td>
-                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-600">{employee.completedPunches}</td>
-                        <td className="px-4 py-3.5 text-xs font-semibold text-slate-500">{minutesToDuration(employee.avgWorkMinutes)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!data.employees.length && (
-                  <div className="flex min-h-[220px] flex-col items-center justify-center px-6 text-center">
-                    <Search size={24} className="mb-3 text-slate-300" />
-                    <p className="text-sm font-bold text-slate-600">No employees match these filters</p>
-                    <button onClick={resetFilters} className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-700">Clear filters</button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[11px] font-semibold text-slate-500">
-                  Page {data.employeePagination.page} of {Math.max(data.employeePagination.totalPages, 1)}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page <= 1}
-                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronLeft size={14} /> Previous
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.min(data.employeePagination.totalPages, current + 1))}
-                    disabled={page >= data.employeePagination.totalPages}
-                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
           </section>
 
           <section>
