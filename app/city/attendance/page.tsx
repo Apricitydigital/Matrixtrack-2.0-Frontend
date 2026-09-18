@@ -3709,9 +3709,22 @@ function AttendanceDashboard() {
                             <p className="mt-0.5 truncate text-[9.5px] font-semibold text-slate-400" title={employee.designation || employee.attendanceId}>
                               {employee.designation || "Employee"} · {employee.attendanceId}
                             </p>
-                            <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={`Zone: ${formatScopeNames((employee as any).zone || employee.zones)} · Ward: ${formatScopeNames((employee as any).ward || employee.wards)}`}>
-                              Zone: {formatScopeNames((employee as any).zone || employee.zones)} · Ward: {formatScopeNames((employee as any).ward || employee.wards)}
-                            </p>
+                            {(() => {
+                              const zoneStr = formatScopeNames((employee as any).zone || employee.zones);
+                              const wardStr = formatScopeNames((employee as any).ward || employee.wards);
+                              const locFallback = (employee as any).officeLocation;
+                              const hasScope = zoneStr !== "—" || wardStr !== "—";
+                              const displayText = hasScope
+                                ? `Zone: ${zoneStr} · Ward: ${wardStr}`
+                                : locFallback
+                                  ? `Location: ${locFallback}`
+                                  : "Zone: — · Ward: —";
+                              return (
+                                <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400" title={displayText}>
+                                  {displayText}
+                                </p>
+                              );
+                            })()}
                           </div>
                         </div>
 
