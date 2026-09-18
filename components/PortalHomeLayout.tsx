@@ -3274,21 +3274,6 @@ function PortalHomeLayoutContent({
                       <span>Audit Logs</span>
                     </Link>
                   )}
-
-                  <Link
-                    href="/portal-home/profile"
-                    title="My Profile"
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname === '/portal-home/profile' || pathname === '/profile'
-                      ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
-                      : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
-                      }`}
-                  >
-                    <UserCheck
-                      size={15}
-                      className={`shrink-0 ${pathname === '/portal-home/profile' || pathname === '/profile' ? 'text-white' : 'text-blue-500'}`}
-                    />
-                    <span>My Profile</span>
-                  </Link>
                 </div>
               )}
             </div>
