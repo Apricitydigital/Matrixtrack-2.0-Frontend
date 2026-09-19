@@ -171,6 +171,8 @@ export type AttendanceDashboardQuery = {
   designation?: string;
   officeLocation?: string;
   divisionUnit?: string;
+  zoneId?: string;
+  wardId?: string;
   checkoutState?: string;
   workDurationBucket?: string;
   search?: string;

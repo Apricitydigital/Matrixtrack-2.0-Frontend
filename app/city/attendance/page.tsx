@@ -48,7 +48,7 @@ import {
 } from "recharts";
 import { RoleGuard } from "@components/Guards";
 import { useAuth } from "@hooks/useAuth";
-import { ApiError } from "@lib/apiClient";
+import { ApiError, GeoApi } from "@lib/apiClient";
 import { isHmsSuperAdmin } from "@utils/rbac";
 import {
   AttendanceApi,
@@ -90,6 +90,8 @@ type FilterState = {
   to: string;
   status: string;
   designation: string;
+  zoneId: string;
+  wardId: string;
   checkoutState: string;
   search: string;
 };
@@ -99,9 +101,13 @@ const emptyFilters: FilterState = {
   to: "",
   status: "ALL",
   designation: "",
+  zoneId: "",
+  wardId: "",
   checkoutState: "ALL",
   search: "",
 };
+
+type GeoNode = { id: string; name: string; level: string; parentId: string | null };
 
 type SearchableOption = { value: string; label: string };
 
@@ -1549,6 +1555,8 @@ function AttendanceDashboard() {
   const [employeeDrilldownLoading, setEmployeeDrilldownLoading] = useState(false);
   const [registeredEmpData, setRegisteredEmpData] = useState<RegisteredEmployeesResponse | null>(null);
   const [registeredEmpLoading, setRegisteredEmpLoading] = useState(false);
+  const [zones, setZones] = useState<GeoNode[]>([]);
+  const [wards, setWards] = useState<GeoNode[]>([]);
 
   const today = new Date();
   const todayKey = toLocalDateKey(today);
@@ -1564,12 +1572,50 @@ function AttendanceDashboard() {
     to: filters.to || undefined,
     status: filters.status === "ALL" ? undefined : filters.status,
     designation: filters.designation || undefined,
+    zoneId: filters.zoneId || undefined,
+    wardId: filters.wardId || undefined,
     checkoutState: filters.checkoutState === "ALL" ? undefined : filters.checkoutState,
     search: filters.search.trim() || undefined,
     employeeGroup: employeeGroup === "ALL" ? undefined : employeeGroup,
     page: requestedPage,
     pageSize: employeePageSize,
   });
+
+  useEffect(() => {
+    if (hmsSuperAdmin && !selectedCityId) {
+      setZones([]);
+      setWards([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const [zoneResult, wardResult] = await Promise.all([
+          GeoApi.list("ZONE", attendanceCityId),
+          GeoApi.list("WARD", attendanceCityId),
+        ]);
+        if (cancelled) return;
+        setZones(zoneResult.nodes || []);
+        setWards(wardResult.nodes || []);
+      } catch {
+        if (!cancelled) {
+          setZones([]);
+          setWards([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hmsSuperAdmin, selectedCityId, attendanceCityId]);
+
+  const wardsForSelectedZone = useMemo(() => {
+    if (!draftFilters.zoneId) return wards;
+    return wards.filter((ward) => ward.parentId === draftFilters.zoneId);
+  }, [wards, draftFilters.zoneId]);
 
   useEffect(() => {
     if (!hmsSuperAdmin) return;
@@ -3093,7 +3139,7 @@ function AttendanceDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
           <label className="space-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">From</span>
             <input
@@ -3156,6 +3202,32 @@ function AttendanceDashboard() {
               />
             </label>
           )}
+          <label className="space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Zone</span>
+            <SearchableSelect
+              value={draftFilters.zoneId}
+              onChange={(zoneId) => {
+                const zoneWardIds = new Set(wards.filter((ward) => ward.parentId === zoneId).map((ward) => ward.id));
+                const wardId = zoneId && draftFilters.wardId && !zoneWardIds.has(draftFilters.wardId) ? "" : draftFilters.wardId;
+                updateFilter({ zoneId, wardId });
+              }}
+              options={[
+                { value: "", label: "All zones" },
+                ...zones.map((zone) => ({ value: zone.id, label: zone.name })),
+              ]}
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ward</span>
+            <SearchableSelect
+              value={draftFilters.wardId}
+              onChange={(wardId) => updateFilter({ wardId })}
+              options={[
+                { value: "", label: "All wards" },
+                ...wardsForSelectedZone.map((ward) => ({ value: ward.id, label: ward.name })),
+              ]}
+            />
+          </label>
           <label className={`space-y-1.5 ${employeeGroup === "HEALTH_WORKERS" ? "md:col-span-2 xl:col-span-2 2xl:col-span-2" : ""}`}>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Employee search</span>
             <div className="relative">

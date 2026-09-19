@@ -568,7 +568,13 @@ export const ModuleApi = {
 };
 
 export const GeoApi = {
-  list: (level?: string) => apiFetch<{ nodes: any[] }>(level ? `/city/geo?level=${level}` : "/city/geo"),
+  list: (level?: string, cityId?: string) => {
+    const params = new URLSearchParams();
+    if (level) params.set("level", level);
+    if (cityId) params.set("cityId", cityId);
+    const qs = params.toString();
+    return apiFetch<{ nodes: any[] }>(qs ? `/city/geo?${qs}` : "/city/geo");
+  },
   create: (body: any) => apiFetch<{ node: any }>("/city/geo", { method: "POST", body: JSON.stringify(body) }),
   update: (id: string, body: any) =>
     apiFetch<{ node: any }>(`/city/geo/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
