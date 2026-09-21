@@ -2406,8 +2406,8 @@ export default function WardRankingWorkspace() {
       >
 
         <ChartCard
-          title="Ward Performance Trend"
-          subtitle="Current score vs 7-day and 30-day averages."
+          title="Ward Score Comparison"
+          subtitle="Current ward scores with 7-day and 30-day averages when available."
         // badge="Trend"
         >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -2565,7 +2565,7 @@ export default function WardRankingWorkspace() {
             </div>
           ) : (
             <ChartEmptyState
-              message="No ward trend data available."
+              message="No ward comparison data available."
             />
           )}
         </ChartCard>

@@ -194,6 +194,100 @@ export default function UniversalReportModal({
     const isFinalized = status === 'APPROVED' || status === 'REJECTED' || status === 'ACTION_TAKEN';
     const isPending = !isActionRequired && !isFinalized;
 
+    /*
+     * AI VISUAL REVIEW
+     *
+     * IMPORTANT:
+     * This data is READ ONLY.
+     * It must never change QC / ULB / AO status automatically.
+     */
+    const aiResult =
+        record.autoQcResult ||
+        record.payload?.autoQcResult ||
+        record.qcAiResult ||
+        record.payload?.qcAiResult ||
+        null;
+
+    const rawAiChecks = Array.isArray(aiResult?.checks)
+        ? aiResult.checks
+        : Array.isArray(aiResult?.pointFindings)
+            ? aiResult.pointFindings
+            : [];
+
+    const getAiQuestionLabel = (check: any, index: number) => {
+        const rawCode = String(
+            check?.questionCode ||
+            check?.code ||
+            check?.pointCode ||
+            check?.question ||
+            ""
+        ).trim();
+
+        /*
+         * Display-only simplification:
+         * PT01 / CT01 / U01 / L1 / S1 -> Q1
+         *
+         * Original backend code remains unchanged.
+         */
+        const numberMatch = rawCode.match(/(\d+)$/);
+
+        if (numberMatch) {
+            const questionNumber = Number(numberMatch[1]);
+
+            if (Number.isFinite(questionNumber) && questionNumber > 0) {
+                return `Q${questionNumber}`;
+            }
+        }
+
+        return `Q${index + 1}`;
+    };
+
+    const aiChecks = rawAiChecks.map((check: any, index: number) => ({
+        ...check,
+        displayQuestion: getAiQuestionLabel(check, index),
+        displayResult: String(
+            check?.result ||
+            check?.status ||
+            check?.decision ||
+            "NOT_VERIFIABLE"
+        ).toUpperCase(),
+        displayReason:
+            check?.reason ||
+            check?.visualFinding ||
+            check?.finding ||
+            check?.summary ||
+            ""
+    }));
+
+    const aiInsights = Array.isArray(aiResult?.additionalInsights)
+        ? aiResult.additionalInsights
+        : [];
+
+    const aiDecision = String(
+        aiResult?.decision ||
+        aiResult?.result ||
+        ""
+    ).toUpperCase();
+
+    const rawAiConfidence = Number(aiResult?.confidence);
+
+    const aiConfidence = Number.isFinite(rawAiConfidence)
+        ? (
+            rawAiConfidence <= 1
+                ? Math.round(rawAiConfidence * 100)
+                : Math.round(rawAiConfidence)
+        )
+        : null;
+
+    const hasAiReview =
+        Boolean(aiResult) &&
+        (
+            Boolean(aiDecision) ||
+            aiChecks.length > 0 ||
+            aiInsights.length > 0
+        );
+
+
 
 
     // Gather ALL evidence photos from record fields & Q&A responses
@@ -446,6 +540,397 @@ export default function UniversalReportModal({
                                                 <img src={url} alt={`Evidence ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            )}
+
+
+                            {/* AI VISUAL REVIEW - READ ONLY */}
+                            {hasAiReview && (
+                                <div
+                                    style={{
+                                        borderRadius: '14px',
+                                        border: '1px solid #c7d2fe',
+                                        background: 'linear-gradient(135deg, #f8faff 0%, #eef2ff 100%)',
+                                        overflow: 'hidden',
+                                        boxShadow: '0 4px 14px rgba(79,70,229,0.06)'
+                                    }}
+                                >
+                                    {/* AI Header */}
+                                    <div
+                                        style={{
+                                            padding: '13px 14px',
+                                            borderBottom: '1px solid #dbeafe',
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            justifyContent: 'space-between',
+                                            gap: 12
+                                        }}
+                                    >
+                                        <div>
+                                            <div
+                                                style={{
+                                                    fontSize: '11px',
+                                                    fontWeight: 800,
+                                                    color: '#4338ca',
+                                                    letterSpacing: '0.08em',
+                                                    textTransform: 'uppercase'
+                                                }}
+                                            >
+                                                AI Visual Review
+                                            </div>
+
+                                            <div
+                                                style={{
+                                                    marginTop: 3,
+                                                    fontSize: '11px',
+                                                    color: '#64748b',
+                                                    lineHeight: 1.45
+                                                }}
+                                            >
+                                                AI-generated assistance only. Final review and status remain controlled by the authorized officer.
+                                            </div>
+                                        </div>
+
+                                        {aiDecision && (
+                                            <div
+                                                style={{
+                                                    flexShrink: 0,
+                                                    padding: '5px 9px',
+                                                    borderRadius: '999px',
+                                                    fontSize: '10px',
+                                                    fontWeight: 800,
+                                                    background:
+                                                        aiDecision === 'APPROVED'
+                                                            ? '#dcfce7'
+                                                            : aiDecision === 'REJECTED'
+                                                                ? '#fee2e2'
+                                                                : '#e0e7ff',
+                                                    color:
+                                                        aiDecision === 'APPROVED'
+                                                            ? '#166534'
+                                                            : aiDecision === 'REJECTED'
+                                                                ? '#991b1b'
+                                                                : '#4338ca'
+                                                }}
+                                            >
+                                                AI: {aiDecision.replace(/_/g, ' ')}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            padding: '12px 14px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 12
+                                        }}
+                                    >
+                                        {/* Confidence */}
+                                        {aiConfidence !== null && (
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    gap: 10,
+                                                    padding: '8px 10px',
+                                                    borderRadius: '9px',
+                                                    background: 'rgba(255,255,255,0.72)',
+                                                    border: '1px solid #e2e8f0'
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: 650,
+                                                        color: '#475569'
+                                                    }}
+                                                >
+                                                    AI Confidence
+                                                </span>
+
+                                                <span
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        fontWeight: 800,
+                                                        color: '#312e81'
+                                                    }}
+                                                >
+                                                    {Math.max(0, Math.min(100, aiConfidence))}%
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Question Verification */}
+                                        {aiChecks.length > 0 && (
+                                            <div>
+                                                <div
+                                                    style={{
+                                                        fontSize: '10px',
+                                                        fontWeight: 800,
+                                                        color: '#64748b',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.06em',
+                                                        marginBottom: 7
+                                                    }}
+                                                >
+                                                    Question Verification
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: 6
+                                                    }}
+                                                >
+                                                    {aiChecks.map((check: any, index: number) => {
+                                                        const result = check.displayResult;
+
+                                                        const resultBackground =
+                                                            result === 'MATCH' || result === 'ACCEPTABLE'
+                                                                ? '#dcfce7'
+                                                                : result === 'MISMATCH' || result === 'ISSUE'
+                                                                    ? '#fee2e2'
+                                                                    : '#fef3c7';
+
+                                                        const resultColor =
+                                                            result === 'MATCH' || result === 'ACCEPTABLE'
+                                                                ? '#166534'
+                                                                : result === 'MISMATCH' || result === 'ISSUE'
+                                                                    ? '#991b1b'
+                                                                    : '#92400e';
+
+                                                        return (
+                                                            <div
+                                                                key={index}
+                                                                style={{
+                                                                    background: '#ffffff',
+                                                                    border: '1px solid #e2e8f0',
+                                                                    borderRadius: '10px',
+                                                                    padding: '9px 10px'
+                                                                }}
+                                                            >
+                                                                <div
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'space-between',
+                                                                        gap: 10
+                                                                    }}
+                                                                >
+                                                                    <span
+                                                                        style={{
+                                                                            minWidth: 30,
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 800,
+                                                                            color: '#1e293b'
+                                                                        }}
+                                                                    >
+                                                                        {check.displayQuestion}
+                                                                    </span>
+
+                                                                    <span
+                                                                        style={{
+                                                                            padding: '3px 7px',
+                                                                            borderRadius: '999px',
+                                                                            fontSize: '9px',
+                                                                            fontWeight: 800,
+                                                                            background: resultBackground,
+                                                                            color: resultColor
+                                                                        }}
+                                                                    >
+                                                                        {result.replace(/_/g, ' ')}
+                                                                    </span>
+                                                                </div>
+
+                                                                {check.displayReason && (
+                                                                    <div
+                                                                        style={{
+                                                                            marginTop: 5,
+                                                                            fontSize: '10.5px',
+                                                                            lineHeight: 1.45,
+                                                                            color: '#64748b'
+                                                                        }}
+                                                                    >
+                                                                        {check.displayReason}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Additional Visual Insights */}
+                                        {aiInsights.length > 0 && (
+                                            <div>
+                                                <div
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        gap: 10,
+                                                        marginBottom: 7
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            fontSize: '10px',
+                                                            fontWeight: 800,
+                                                            color: '#64748b',
+                                                            textTransform: 'uppercase',
+                                                            letterSpacing: '0.06em'
+                                                        }}
+                                                    >
+                                                        Additional Visual Observations
+                                                    </div>
+
+                                                    <span
+                                                        style={{
+                                                            fontSize: '9px',
+                                                            fontWeight: 750,
+                                                            color: '#6366f1'
+                                                        }}
+                                                    >
+                                                        Advisory only
+                                                    </span>
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        gap: 7
+                                                    }}
+                                                >
+                                                    {aiInsights.map((insight: any, index: number) => {
+                                                        const severity = String(
+                                                            insight?.severity || 'INFO'
+                                                        ).toUpperCase();
+
+                                                        const severityBackground =
+                                                            severity === 'HIGH'
+                                                                ? '#fee2e2'
+                                                                : severity === 'MEDIUM'
+                                                                    ? '#ffedd5'
+                                                                    : severity === 'LOW'
+                                                                        ? '#fef3c7'
+                                                                        : '#e0f2fe';
+
+                                                        const severityColor =
+                                                            severity === 'HIGH'
+                                                                ? '#991b1b'
+                                                                : severity === 'MEDIUM'
+                                                                    ? '#9a3412'
+                                                                    : severity === 'LOW'
+                                                                        ? '#92400e'
+                                                                        : '#075985';
+
+                                                        return (
+                                                            <div
+                                                                key={index}
+                                                                style={{
+                                                                    background: '#ffffff',
+                                                                    border: insight?.actionRelevant
+                                                                        ? '1px solid #fdba74'
+                                                                        : '1px solid #e2e8f0',
+                                                                    borderRadius: '10px',
+                                                                    padding: '10px'
+                                                                }}
+                                                            >
+                                                                <div
+                                                                    style={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 6,
+                                                                        flexWrap: 'wrap',
+                                                                        marginBottom: 5
+                                                                    }}
+                                                                >
+                                                                    <span
+                                                                        style={{
+                                                                            fontSize: '10px',
+                                                                            fontWeight: 800,
+                                                                            color: '#334155',
+                                                                            textTransform: 'capitalize'
+                                                                        }}
+                                                                    >
+                                                                        {String(
+                                                                            insight?.category ||
+                                                                            'Visual Observation'
+                                                                        )
+                                                                            .replace(/_/g, ' ')
+                                                                            .toLowerCase()
+                                                                            .replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                                                                    </span>
+
+                                                                    <span
+                                                                        style={{
+                                                                            padding: '2px 6px',
+                                                                            borderRadius: '999px',
+                                                                            fontSize: '8px',
+                                                                            fontWeight: 800,
+                                                                            background: severityBackground,
+                                                                            color: severityColor
+                                                                        }}
+                                                                    >
+                                                                        {severity}
+                                                                    </span>
+
+                                                                    {insight?.actionRelevant && (
+                                                                        <span
+                                                                            style={{
+                                                                                padding: '2px 6px',
+                                                                                borderRadius: '999px',
+                                                                                fontSize: '8px',
+                                                                                fontWeight: 800,
+                                                                                background: '#fff7ed',
+                                                                                color: '#c2410c',
+                                                                                border: '1px solid #fed7aa'
+                                                                            }}
+                                                                        >
+                                                                            ACTION RELEVANT
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                {insight?.finding && (
+                                                                    <div
+                                                                        style={{
+                                                                            fontSize: '11px',
+                                                                            color: '#334155',
+                                                                            lineHeight: 1.45
+                                                                        }}
+                                                                    >
+                                                                        {insight.finding}
+                                                                    </div>
+                                                                )}
+
+                                                                {insight?.findingHi &&
+                                                                    insight.findingHi !== insight.finding && (
+                                                                        <div
+                                                                            style={{
+                                                                                marginTop: 4,
+                                                                                paddingTop: 4,
+                                                                                borderTop: '1px dashed #e2e8f0',
+                                                                                fontSize: '10.5px',
+                                                                                color: '#64748b',
+                                                                                lineHeight: 1.5
+                                                                            }}
+                                                                        >
+                                                                            {insight.findingHi}
+                                                                        </div>
+                                                                    )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
