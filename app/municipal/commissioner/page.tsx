@@ -147,6 +147,12 @@ type InspectionStats = {
   actionTaken: number;
   pending: number;
 
+  // Records counted once each toward `performance` - decision===APPROVED
+  // or status===ACTION_TAKEN, unioned rather than summed since approved
+  // (a permanent verdict) and actionTaken (a current status) can both be
+  // true for the same escalated-then-closed record.
+  goodOutcome: number;
+
   performance: number | null;
   approvalRate: number | null;
   rejectionRate: number | null;
@@ -738,13 +744,11 @@ function recordDate(
 function effectiveStatus(
   item: any
 ) {
-  if (
-    item?.workspaceStatus
-  ) {
-    return String(
-      item.workspaceStatus
+  const workspaceStatus =
+    String(
+      item?.workspaceStatus ||
+      ''
     ).toUpperCase();
-  }
 
   const actionStatus =
     String(
@@ -752,26 +756,7 @@ function effectiveStatus(
       ''
     ).toUpperCase();
 
-  if (
-    actionStatus ===
-      'ACTION_REQUIRED' ||
-    actionStatus ===
-      'ACTION_TAKEN'
-  ) {
-    return actionStatus;
-  }
-
-  if (
-    item?.actionOfficerRespondedAt &&
-    String(
-      item?.status || ''
-    ).toUpperCase() ===
-      'ACTION_REQUIRED'
-  ) {
-    return 'ACTION_TAKEN';
-  }
-
-  const status =
+  const rawStatus =
     String(
       item?.status ||
       item?.reviewStatus ||
@@ -779,17 +764,95 @@ function effectiveStatus(
       ''
     ).toUpperCase();
 
+  if (workspaceStatus === 'ACTION_TAKEN') return 'ACTION_TAKEN';
+  if (workspaceStatus === 'ACTION_REQUIRED') return 'ACTION_REQUIRED';
+  if (workspaceStatus === 'APPROVED') return 'APPROVED';
+  if (workspaceStatus === 'REJECTED') return 'REJECTED';
+  if (workspaceStatus === 'DRAFT') return 'DRAFT';
   if (
     [
-      'PENDING_QC',
       'SUBMITTED',
-      'IN_PROGRESS',
-    ].includes(status)
+      'PENDING',
+      'PENDING_QC',
+    ].includes(workspaceStatus)
   ) {
     return 'PENDING';
   }
 
-  return status || 'PENDING';
+  if (actionStatus === 'ACTION_TAKEN') return 'ACTION_TAKEN';
+  if (actionStatus === 'ACTION_REQUIRED') return 'ACTION_REQUIRED';
+
+  if (
+    item?.actionOfficerRespondedAt ||
+    item?.actionTakenBy ||
+    item?.actionTakenById ||
+    rawStatus === 'ACTION_TAKEN'
+  ) {
+    return 'ACTION_TAKEN';
+  }
+
+  if (rawStatus === 'ACTION_REQUIRED') return 'ACTION_REQUIRED';
+  if (rawStatus === 'APPROVED') return 'APPROVED';
+  if (rawStatus === 'REJECTED') return 'REJECTED';
+  if (
+    [
+      'SUBMITTED',
+      'PENDING',
+      'PENDING_QC',
+      'IN_PROGRESS',
+    ].includes(rawStatus)
+  ) {
+    return 'PENDING';
+  }
+
+  return rawStatus || 'PENDING';
+}
+
+/*
+ * The permanent QC verdict for a record. Unlike effectiveStatus, this
+ * stays APPROVED/REJECTED even after the record moves on to
+ * ACTION_REQUIRED / ACTION_TAKEN, so Approved/Rejected stats below
+ * still count every record that ever received that verdict - matching
+ * InspectionPerformanceWorkspace's getQcDecision.
+ */
+function getQcDecision(
+  item: any
+): 'APPROVED' | 'REJECTED' | null {
+  const decision =
+    String(
+      item?.qcDecision || ''
+    ).toUpperCase();
+
+  if (
+    decision === 'APPROVED' ||
+    decision === 'REJECTED'
+  ) {
+    return decision;
+  }
+
+  const status =
+    effectiveStatus(item);
+
+  if (
+    status === 'APPROVED' ||
+    status === 'REJECTED'
+  ) {
+    return status;
+  }
+
+  // Legacy records escalated to Action Required / Action Taken before
+  // the permanent qcDecision field existed have no recoverable original
+  // verdict. Default them to Approved (the far more common precursor to
+  // escalation) so Approved + Rejected + Pending still reconciles with
+  // Total.
+  if (
+    status === 'ACTION_REQUIRED' ||
+    status === 'ACTION_TAKEN'
+  ) {
+    return 'APPROVED';
+  }
+
+  return null;
 }
 
 function getRecordZone(
@@ -993,6 +1056,12 @@ function inspectionStats(
   let actionTaken = 0;
   let pending = 0;
 
+  // Records whose current status/QC decision resolve to a "good
+  // outcome" - counted once per record even though approved (a
+  // permanent verdict) and actionTaken (a current status) can both be
+  // true for the same escalated-then-closed record.
+  let goodOutcome = 0;
+
   const applicableRecords =
     records.filter(
       (item) =>
@@ -1004,27 +1073,47 @@ function inspectionStats(
     (item) => {
       const status =
         effectiveStatus(item);
+      const decision =
+        getQcDecision(item);
 
+      // Approved / Rejected are supersets: a record keeps its
+      // original QC verdict even after it moves on to Action
+      // Required or Action Taken, so it still counts here -
+      // matching InspectionPerformanceWorkspace's getQcDecision.
       if (
-        status === 'APPROVED'
+        decision === 'APPROVED'
       ) {
         approved += 1;
       } else if (
-        status === 'REJECTED'
+        decision === 'REJECTED'
       ) {
         rejected += 1;
+      }
+
+      if (
+        status === 'PENDING'
+      ) {
+        pending += 1;
       } else if (
         status ===
         'ACTION_REQUIRED'
       ) {
+        // Action Required is a superset that also includes
+        // records whose action has already been taken.
         actionRequired += 1;
       } else if (
         status ===
         'ACTION_TAKEN'
       ) {
+        actionRequired += 1;
         actionTaken += 1;
-      } else {
-        pending += 1;
+      }
+
+      if (
+        decision === 'APPROVED' ||
+        status === 'ACTION_TAKEN'
+      ) {
+        goodOutcome += 1;
       }
     }
   );
@@ -1035,20 +1124,15 @@ function inspectionStats(
   const performance =
     total > 0
       ? (
-          (
-            approved +
-            actionTaken
-          ) /
+          goodOutcome /
           total
         ) * 100
       : null;
 
-  /*
-   * Matches the ULB officer dashboard's own "Approval Rate":
-   * decided = current-status approved + rejected (not the
-   * QC's original decision), so a report that was QC-approved
-   * but later needed corrective action no longer counts here.
-   */
+  // decided uses the permanent QC verdict (getQcDecision), so a report
+  // that was QC-approved but later needed corrective action still
+  // counts under its original verdict here - matching
+  // InspectionPerformanceWorkspace's SI Approved / SI Rejected stats.
   const decided =
     approved +
     rejected;
@@ -1069,15 +1153,13 @@ function inspectionStats(
         ) * 100
       : null;
 
-  const corrective =
-    actionRequired +
-    actionTaken;
-
+  // actionRequired is already the superset (Action Required + Action
+  // Taken), so it alone is the corrective denominator.
   const actionClosure =
-    corrective > 0
+    actionRequired > 0
       ? (
           actionTaken /
-          corrective
+          actionRequired
         ) * 100
       : null;
 
@@ -1088,6 +1170,8 @@ function inspectionStats(
     actionRequired,
     actionTaken,
     pending,
+
+    goodOutcome,
 
     performance,
     approvalRate,
@@ -6076,8 +6160,12 @@ export default function CommissionerDashboard() {
         });
       }
 
+      const pendingActionCount =
+        citySnapshotStats.actionRequired -
+        citySnapshotStats.actionTaken;
+
       if (
-        citySnapshotStats.actionRequired >
+        pendingActionCount >
         0
       ) {
         items.push({
@@ -6089,14 +6177,14 @@ export default function CommissionerDashboard() {
             />
           ),
           text: `${
-            citySnapshotStats.actionRequired
+            pendingActionCount
           } report${
-            citySnapshotStats.actionRequired ===
+            pendingActionCount ===
             1
               ? ''
               : 's'
           } ${
-            citySnapshotStats.actionRequired ===
+            pendingActionCount ===
             1
               ? 'is'
               : 'are'
@@ -6926,6 +7014,15 @@ export default function CommissionerDashboard() {
 
   const moduleStatusRows =
     useMemo(() => {
+      /*
+       * This feeds a stacked bar chart (stackId="status" in
+       * ModuleStatusBarChart), so the five segments below must be
+       * mutually exclusive and sum to 100% - unlike inspectionStats(),
+       * whose Approved/Rejected/Action Required are deliberately
+       * overlapping supersets. Bucket directly off effectiveStatus
+       * (which is always exactly one value per record) instead of
+       * reusing inspectionStats() here.
+       */
       return INSPECTION_MODULES.map(
         (module) => {
           const rows =
@@ -6935,16 +7032,37 @@ export default function CommissionerDashboard() {
                 module.key
             );
 
-          const stats =
-            inspectionStats(
-              rows
+          const applicableRows =
+            rows.filter(
+              (item) =>
+                effectiveStatus(item) !==
+                'DRAFT'
             );
 
           const total =
             Math.max(
               1,
-              stats.total
+              applicableRows.length
             );
+
+          let approvedCount = 0;
+          let rejectedCount = 0;
+          let actionRequiredCount = 0;
+          let actionTakenCount = 0;
+          let pendingCount = 0;
+
+          applicableRows.forEach(
+            (item) => {
+              const status =
+                effectiveStatus(item);
+
+              if (status === 'APPROVED') approvedCount += 1;
+              else if (status === 'REJECTED') rejectedCount += 1;
+              else if (status === 'ACTION_REQUIRED') actionRequiredCount += 1;
+              else if (status === 'ACTION_TAKEN') actionTakenCount += 1;
+              else pendingCount += 1;
+            }
+          );
 
           return {
             key:
@@ -6954,35 +7072,35 @@ export default function CommissionerDashboard() {
 
             Approved:
               (
-                stats.approved /
+                approvedCount /
                 total
               ) *
               100,
 
             Rejected:
               (
-                stats.rejected /
+                rejectedCount /
                 total
               ) *
               100,
 
             'Action Required':
               (
-                stats.actionRequired /
+                actionRequiredCount /
                 total
               ) *
               100,
 
             'Action Taken':
               (
-                stats.actionTaken /
+                actionTakenCount /
                 total
               ) *
               100,
 
             Pending:
               (
-                stats.pending /
+                pendingCount /
                 total
               ) *
               100,
@@ -8435,19 +8553,16 @@ export default function CommissionerDashboard() {
               },
               {
                 /*
-                 * SI Approved counts every report the SI ever
-                 * approved, including ones later flagged for
-                 * corrective action - so Total Inspection =
-                 * SI Approved + SI Rejected + SI Pending holds.
+                 * SI Approved (inspection.approved) already counts
+                 * every report the SI ever approved, including ones
+                 * later flagged for corrective action - so Total
+                 * Inspection = SI Approved + SI Rejected + SI Pending
+                 * holds.
                  */
                 label:
                   'SI Approved',
                 value:
-                  (
-                    inspection.approved +
-                    inspection.actionRequired +
-                    inspection.actionTaken
-                  ).toLocaleString(
+                  inspection.approved.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8468,13 +8583,15 @@ export default function CommissionerDashboard() {
                   ),
               },
               {
+                /*
+                 * Action Required (inspection.actionRequired) is
+                 * already a superset that also includes records
+                 * whose action has since been taken.
+                 */
                 label:
                   'Action Required',
                 value:
-                  (
-                    inspection.actionRequired +
-                    inspection.actionTaken
-                  ).toLocaleString(
+                  inspection.actionRequired.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8482,7 +8599,10 @@ export default function CommissionerDashboard() {
                 label:
                   'Pending Action',
                 value:
-                  inspection.actionRequired.toLocaleString(
+                  (
+                    inspection.actionRequired -
+                    inspection.actionTaken
+                  ).toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8612,11 +8732,7 @@ export default function CommissionerDashboard() {
                 label:
                   'SI Approved',
                 value:
-                  (
-                    inspection.approved +
-                    inspection.actionRequired +
-                    inspection.actionTaken
-                  ).toLocaleString(
+                  inspection.approved.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8637,7 +8753,7 @@ export default function CommissionerDashboard() {
                   (
                     item
                   ) =>
-                    effectiveStatus(
+                    getQcDecision(
                       item
                     ) ===
                     'APPROVED'
@@ -8692,11 +8808,7 @@ export default function CommissionerDashboard() {
                 label:
                   'SI Approved',
                 value:
-                  (
-                    inspection.approved +
-                    inspection.actionRequired +
-                    inspection.actionTaken
-                  ).toLocaleString(
+                  inspection.approved.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8717,7 +8829,7 @@ export default function CommissionerDashboard() {
                   (
                     item
                   ) =>
-                    effectiveStatus(
+                    getQcDecision(
                       item
                     ) ===
                     'REJECTED'
@@ -8764,10 +8876,7 @@ export default function CommissionerDashboard() {
                 label:
                   'Action Required',
                 value:
-                  (
-                    inspection.actionRequired +
-                    inspection.actionTaken
-                  ).toLocaleString(
+                  inspection.actionRequired.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8775,7 +8884,10 @@ export default function CommissionerDashboard() {
                 label:
                   'Action Pending',
                 value:
-                  inspection.actionRequired.toLocaleString(
+                  (
+                    inspection.actionRequired -
+                    inspection.actionTaken
+                  ).toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8984,21 +9096,12 @@ export default function CommissionerDashboard() {
                     (
                       item
                     ) =>
-                      [
-                        'APPROVED',
-                        'ACTION_REQUIRED',
-                        'ACTION_TAKEN',
-                      ].includes(
-                        effectiveStatus(
-                          item
-                        )
-                      )
+                      getQcDecision(
+                        item
+                      ) ===
+                      'APPROVED'
                   ),
-                  (
-                    citySnapshotStats.approved +
-                    citySnapshotStats.actionRequired +
-                    citySnapshotStats.actionTaken
-                  ).toLocaleString(
+                  citySnapshotStats.approved.toLocaleString(
                     'en-IN'
                   )
                 )
@@ -9015,9 +9118,7 @@ export default function CommissionerDashboard() {
                   </div>
                 </div>
                 <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.approved +
-                    citySnapshotStats.actionRequired +
-                    citySnapshotStats.actionTaken}
+                  {citySnapshotStats.approved}
                 </div>
               </div>
             </button>
@@ -9031,7 +9132,7 @@ export default function CommissionerDashboard() {
                     (
                       item
                     ) =>
-                      effectiveStatus(
+                      getQcDecision(
                         item
                       ) ===
                       'REJECTED'
@@ -9076,10 +9177,7 @@ export default function CommissionerDashboard() {
                         )
                       )
                   ),
-                  (
-                    citySnapshotStats.actionRequired +
-                    citySnapshotStats.actionTaken
-                  ).toLocaleString(
+                  citySnapshotStats.actionRequired.toLocaleString(
                     'en-IN'
                   )
                 )
@@ -9096,8 +9194,7 @@ export default function CommissionerDashboard() {
                   </div>
                 </div>
                 <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.actionRequired +
-                    citySnapshotStats.actionTaken}
+                  {citySnapshotStats.actionRequired}
                 </div>
               </div>
             </button>
@@ -9148,7 +9245,10 @@ export default function CommissionerDashboard() {
                       effectiveStatus(item) ===
                       'ACTION_REQUIRED'
                   ),
-                  citySnapshotStats.actionRequired.toLocaleString(
+                  (
+                    citySnapshotStats.actionRequired -
+                    citySnapshotStats.actionTaken
+                  ).toLocaleString(
                     'en-IN'
                   )
                 )
@@ -9165,7 +9265,8 @@ export default function CommissionerDashboard() {
                   </div>
                 </div>
                 <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.actionRequired}
+                  {citySnapshotStats.actionRequired -
+                    citySnapshotStats.actionTaken}
                 </div>
               </div>
             </button>
@@ -9564,7 +9665,7 @@ export default function CommissionerDashboard() {
                       module.records
                     );
 
-                  return `(${stats.approved.toLocaleString('en-IN')} Approved + ${stats.actionTaken.toLocaleString('en-IN')} Action Taken) / ${stats.total.toLocaleString('en-IN')} Total = ${percentText(module.performance)}`;
+                  return `${stats.goodOutcome.toLocaleString('en-IN')} Approved or Action Taken / ${stats.total.toLocaleString('en-IN')} Total = ${percentText(module.performance)}`;
                 })();
 
               return (

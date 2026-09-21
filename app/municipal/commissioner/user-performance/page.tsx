@@ -97,11 +97,9 @@ type UserPerformanceRow = {
  * that never act on inspection records and would always show empty.
  */
 const ROLES: Array<{ key: UserRoleKey; label: string }> = [
-  { key: 'ULB_OFFICER', label: 'ULB Officer' },
   { key: 'QC', label: 'Sanitary Inspector (SI)' },
   { key: 'ACTION_OFFICER', label: 'IEC Member' },
   { key: 'SUPERVISOR', label: 'Daroga' },
-  { key: 'EMPLOYEE', label: 'Employee' },
 ];
 
 const INSPECTION_MODULES: Array<{ key: InspectionModuleKey; label: string }> = [
@@ -884,7 +882,6 @@ function UserDetailDrawer({
                   icon={<ShieldCheck size={13} />}
                   tone="amber"
                 />
-                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
               </>
             )}
 
@@ -894,7 +891,6 @@ function UserDetailDrawer({
                 <StatTile label={approvedLabel} value={row.approved.toLocaleString('en-IN')} icon={<CheckCircle2 size={13} />} tone="emerald" />
                 <StatTile label={rejectedLabel} value={row.rejected.toLocaleString('en-IN')} icon={<XCircle size={13} />} tone="rose" />
                 <StatTile label={pendingLabel} value={row.pending.toLocaleString('en-IN')} icon={<ShieldCheck size={13} />} tone="amber" />
-                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
               </>
             )}
 
@@ -906,7 +902,6 @@ function UserDetailDrawer({
                   icon={<Activity size={13} />}
                   tone="slate"
                 />
-                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
 
                 <div className="col-span-2 mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 sm:col-span-3">
                   Action Cycle
@@ -937,7 +932,6 @@ function UserDetailDrawer({
                 <StatTile label="Total Days" value={row.total.toLocaleString('en-IN')} icon={<Activity size={13} />} tone="slate" />
                 <StatTile label="Present Days" value={row.approved.toLocaleString('en-IN')} icon={<CheckCircle2 size={13} />} tone="emerald" />
                 <StatTile label="Absent Days" value={row.rejected.toLocaleString('en-IN')} icon={<XCircle size={13} />} tone="rose" />
-                <StatTile label="Attendance" value={percentText(row.attendance)} icon={<Activity size={13} />} tone="blue" />
                 <StatTile
                   label="Assigned Toilets"
                   value={workSummaryLoading ? '…' : (toiletsCount ?? 0).toLocaleString('en-IN')}
