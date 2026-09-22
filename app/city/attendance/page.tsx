@@ -1494,7 +1494,9 @@ function AttendanceDashboard() {
   const isUlbOfficer = attendanceRoles.has("ULB_OFFICER");
   const isCityAdmin =
     hmsSuperAdmin ||
-    attendanceRoles.has("CITY_ADMIN");
+    attendanceRoles.has("CITY_ADMIN") ||
+    attendanceRoles.has("COMMISSIONER") ||
+    attendanceRoles.has("ULB_OFFICER");
   const canUploadAttendance =
     hmsSuperAdmin ||
     attendanceRoles.has("CITY_ADMIN") ||
