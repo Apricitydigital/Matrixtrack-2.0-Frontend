@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   ChartNoAxesCombined,
   Award,
+  Factory,
 } from "lucide-react";
 import { UserProfileModal } from "./UserProfileModal";
 
@@ -198,6 +199,11 @@ export default function Sidebar() {
   const isQC =
     user?.roles.includes("QC" as Role) ?? false;
 
+  const hasProcessingPlantModule =
+    (user?.modules || []).some(
+      (module) => (module.key || "").toUpperCase() === "PROCESSING_PLANT"
+    );
+
   const moduleLinks = useMemo(() => {
     const canonicalModules = canonicalizeModules(
       user?.modules || []
@@ -292,6 +298,15 @@ export default function Sidebar() {
           href: "/municipal/commissioner/ward-ranking",
           icon: <Award size={18} />,
         },
+        ...(hasProcessingPlantModule
+          ? [
+              {
+                label: "Plant & Processing",
+                href: "/municipal/commissioner/processing-plant",
+                icon: <Factory size={18} />,
+              },
+            ]
+          : []),
         {
           label: "User Performance",
           href: "/municipal/commissioner/user-performance",

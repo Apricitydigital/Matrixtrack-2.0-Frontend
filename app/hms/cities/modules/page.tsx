@@ -10,7 +10,7 @@ import { moduleLabel } from "@lib/labels";
 
 type City = { id: string; name: string; modules: { moduleId: string; enabled: boolean; name: string }[] };
 
-const AVAILABLE_MODULES = ["TASKFORCE", "TOILET", "MODULE3", "MODULE4", "MODULE5", "MODULE6", "MODULE7", "MODULE8"] as const;
+const AVAILABLE_MODULES = ["TASKFORCE", "TOILET", "PROCESSING_PLANT", "MODULE4", "MODULE5", "MODULE6", "MODULE7", "MODULE8"] as const;
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (

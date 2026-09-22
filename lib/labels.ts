@@ -25,7 +25,8 @@ export const MODULE_LABELS: Record<string, string> = {
   TASKFORCE: "CTU/GVP Transformation",
   LITTERBINS: "Litter Bins",
   SWEEPING: "Sweeping",
-  TOILET: "Cleanliness of Toilet"
+  TOILET: "Cleanliness of Toilet",
+  PROCESSING_PLANT: "Plant & Processing"
 };
 
 export function moduleLabel(key: string, fallback?: string) {

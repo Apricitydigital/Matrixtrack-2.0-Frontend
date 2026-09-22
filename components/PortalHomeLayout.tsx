@@ -46,7 +46,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Moon,
-  Sun
+  Sun,
+  Factory,
 } from 'lucide-react';
 
 import { moduleEntryPath } from '@utils/modules';
@@ -444,6 +445,15 @@ function PortalHomeLayoutContent({
         ].includes(r)
     );
 
+  const isCommissioner =
+    normalizedAllRoles.includes('COMMISSIONER');
+
+  const hasProcessingPlantModule =
+    (user?.modules || []).some(
+      (module: any) => (module?.key || '').toUpperCase() === 'PROCESSING_PLANT'
+    );
+
+
   const isSwachhAdmin =
     isSuperAdmin ||
     normalizedAllRoles.some(
@@ -633,6 +643,9 @@ function PortalHomeLayoutContent({
     pageTitle = 'Map View Dashboard';
   }
 
+  if (pathname.startsWith('/city/processing-plant')) {
+    pageTitle = 'Plant & Processing';
+  }
 
 
 
@@ -2645,6 +2658,29 @@ function PortalHomeLayoutContent({
                     Map View Dashboard
                   </span>
                 </Link>
+
+                {isCommissioner && hasProcessingPlantModule && (
+                  <Link
+                    href="/city/processing-plant"
+                    title="Plant & Processing"
+                    className={`flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${pathname.startsWith('/city/processing-plant')
+                      ? 'bg-emerald-600 text-white font-extrabold shadow-md shadow-emerald-500/20'
+                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                      } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                  >
+                    <Factory
+                      size={18}
+                      className={`shrink-0 ${pathname.startsWith('/city/processing-plant')
+                        ? 'text-white'
+                        : 'text-slate-500'
+                        }`}
+                    />
+
+                    <span className={`text-left leading-snug ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                      Plant & Processing
+                    </span>
+                  </Link>
+                )}
 
                 <Link
                   href="/city/attendance"
