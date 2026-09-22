@@ -160,7 +160,7 @@ function safeNumber(value: unknown) {
 function scoreBand(score: number) {
     if (score >= 85) {
         return {
-            label: 'Strong',
+            label: 'Good Performance',
             short: 'GREEN',
             text: 'text-emerald-700',
             softText: 'text-emerald-600',
@@ -173,7 +173,7 @@ function scoreBand(score: number) {
 
     if (score >= 70) {
         return {
-            label: 'Watch',
+            label: 'Attention Required',
             short: 'AMBER',
             text: 'text-amber-700',
             softText: 'text-amber-600',
@@ -185,7 +185,7 @@ function scoreBand(score: number) {
     }
 
     return {
-        label: 'Critical',
+        label: 'Immediate Action Required',
         short: 'RED',
         text: 'text-rose-700',
         softText: 'text-rose-600',
@@ -649,11 +649,24 @@ export default function WardExecutiveOverview({
         ? scoreBand(analytics.cityAverage)
         : null;
 
-    const leaderboard = leaderboardMode === 'TOP'
-        ? analytics.ranked.slice(0, 5)
-        : analytics.attention.length
-            ? analytics.attention.slice(0, 5)
-            : [...analytics.ranked].reverse().slice(0, 5);
+    const immediateActionWards =
+        analytics.ranked
+            .filter(
+                (row) =>
+                    String(
+                        row.performanceBand || '',
+                    ).toUpperCase() === 'RED',
+            )
+            .sort(
+                (a, b) =>
+                    safeNumber(a.finalScore) -
+                    safeNumber(b.finalScore),
+            );
+
+    const leaderboard =
+        leaderboardMode === 'TOP'
+            ? analytics.ranked.slice(0, 5)
+            : immediateActionWards;
 
     const fieldComponents = analytics.components.filter(
         (component) => component.group === 'MODULE',
@@ -664,7 +677,11 @@ export default function WardExecutiveOverview({
     );
 
     const componentChartData = analytics.components
-        .filter((component) => component.average !== null)
+        .filter(
+            (component) =>
+                component.average !== null &&
+                component.applicableCount > 0,
+        )
         .sort(
             (a, b) => safeNumber(b.average) - safeNumber(a.average),
         )
@@ -699,7 +716,7 @@ export default function WardExecutiveOverview({
                 />
 
                 <ExecutiveKpi
-                    label="Ranked Performance"
+                    label="Average Ranked Ward Score"
                     value={
                         analytics.ranked.length
                             ? analytics.cityAverage.toFixed(2)
@@ -730,9 +747,9 @@ export default function WardExecutiveOverview({
                 />
 
                 <ExecutiveKpi
-                    label="Attention Wards"
+                    label="Immediate Action Wards"
                     value={analytics.red}
-                    sub={`${analytics.amber} watch · ${analytics.green} strong`}
+                    sub={`${analytics.amber} attention required · ${analytics.green} good`}
                     tone="rose"
                     icon={<CircleAlert size={17} />}
                     decorativeIcon={<Target size={64} />}
@@ -794,7 +811,7 @@ export default function WardExecutiveOverview({
 
                         <div className="relative">
                             <div className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-200">
-                                Ranked Ward Average
+                                Average Ranked Ward Score
                             </div>
 
                             <div className="mt-5 flex items-center gap-5">
@@ -959,7 +976,11 @@ export default function WardExecutiveOverview({
                                 }
                             />
                             <FocusRow
-                                label="Lowest Zone"
+                                label={
+                                    analytics.zones.length > 1
+                                        ? 'Lowest Performing Zone'
+                                        : 'Currently Ranked Zone'
+                                }
                                 value={analytics.worstZone?.name || '—'}
                                 metric={
                                     analytics.worstZone
@@ -980,7 +1001,7 @@ export default function WardExecutiveOverview({
                                 tone="amber"
                             />
                             <FocusRow
-                                label="Highest Exception Volume"
+                                label="Highest Exception Impact"
                                 value={topExceptionArea?.name || '—'}
                                 metric={topExceptionArea ? String(topExceptionArea.value) : '—'}
                                 tone="slate"
@@ -992,7 +1013,7 @@ export default function WardExecutiveOverview({
 
 
             {/* =====================================================
-                3. ATTENTION REQUIRED / TOP PERFORMERS
+                3. IMMEDIATE ACTION / TOP RANKED
             ===================================================== */}
             <section
                 id="ward-attention"
@@ -1001,10 +1022,10 @@ export default function WardExecutiveOverview({
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <SectionHeading
                         eyebrow="Action View"
-                        title={leaderboardMode === 'ATTENTION' ? 'Attention Required' : 'Top Performing Wards'}
+                        title={leaderboardMode === 'ATTENTION' ? 'Immediate Action Required' : 'Top Ranked Wards'}
                         subtitle={
                             leaderboardMode === 'ATTENTION'
-                                ? 'Lowest-scoring ranked wards surfaced first for rapid review.'
+                                ? 'All ranked wards below 70, lowest score first.'
                                 : 'Highest-scoring ranked wards in the current selection.'
                         }
                     />
@@ -1018,7 +1039,7 @@ export default function WardExecutiveOverview({
                                 : 'text-slate-500 hover:text-slate-800'
                                 }`}
                         >
-                            Needs Attention
+                            Immediate Action
                         </button>
                         <button
                             type="button"
@@ -1028,7 +1049,7 @@ export default function WardExecutiveOverview({
                                 : 'text-slate-500 hover:text-slate-800'
                                 }`}
                         >
-                            Top Performing
+                            Top Ranked
                         </button>
                     </div>
                 </div>
@@ -1163,7 +1184,11 @@ export default function WardExecutiveOverview({
                     <SectionHeading
                         eyebrow="Location View"
                         title="Zone Performance"
-                        subtitle="Ranked ward average by zone."
+                        subtitle={
+                            analytics.zones.length > 1
+                                ? 'Average ranked ward score by zone.'
+                                : 'Current zone represented by ranked ward data.'
+                        }
                         badge={`${analytics.zones.length} zone${analytics.zones.length === 1 ? '' : 's'}`}
                     />
 
@@ -1250,7 +1275,7 @@ export default function WardExecutiveOverview({
 
                             <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5">
                                 <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                                    Exception Volume by Area
+                                    Exception Impact by Area
                                 </div>
 
                                 {analytics.exceptionAreas.length ? (
