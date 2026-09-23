@@ -668,6 +668,137 @@ export default function WardExecutiveOverview({
             ? analytics.ranked.slice(0, 5)
             : immediateActionWards;
 
+    /*
+     * Commissioner exception drill-down.
+     *
+     * HIGH is selected by default because the executive KPI
+     * represents unresolved critical/high-severity issues.
+     */
+    const [
+        exceptionSeverityFilter,
+        setExceptionSeverityFilter,
+    ] = useState<
+        'HIGH' |
+        'MEDIUM' |
+        'LOW' |
+        'ALL'
+    >('HIGH');
+
+    const [
+        exceptionAreaFilter,
+        setExceptionAreaFilter,
+    ] = useState<string>('ALL');
+
+    /*
+     * First apply severity.
+     *
+     * Area filtering is applied afterwards so the area chart
+     * can still show the distribution for the selected severity.
+     */
+    const severityFilteredExceptions =
+        analytics.exceptions.filter(
+            (exception: any) => {
+                if (
+                    exceptionSeverityFilter ===
+                    'ALL'
+                ) {
+                    return true;
+                }
+
+                return String(
+                    exception.severity ||
+                    'LOW'
+                ).toUpperCase() ===
+                    exceptionSeverityFilter;
+            },
+        );
+
+    const exceptionAreaOptions =
+        Array.from(
+            new Set(
+                analytics.exceptions.map(
+                    (exception: any) =>
+                        exceptionAreaName(
+                            exception.module,
+                        ),
+                ),
+            ),
+        ).sort();
+
+    /*
+     * Commissioner-friendly area distribution.
+     * Count issues, do not display internal weighted impact.
+     */
+    const exceptionCountByArea =
+        Array.from(
+            severityFilteredExceptions.reduce(
+                (
+                    map: Map<string, number>,
+                    exception: any,
+                ) => {
+                    const area =
+                        exceptionAreaName(
+                            exception.module,
+                        );
+
+                    map.set(
+                        area,
+                        (
+                            map.get(area) ||
+                            0
+                        ) + 1,
+                    );
+
+                    return map;
+                },
+                new Map<string, number>(),
+            ),
+        )
+            .map(
+                ([name, value]) => ({
+                    name,
+                    value,
+                }),
+            )
+            .sort(
+                (a, b) =>
+                    b.value -
+                    a.value,
+            );
+
+    const filteredExceptions =
+        severityFilteredExceptions.filter(
+            (exception: any) => {
+                if (
+                    exceptionAreaFilter ===
+                    'ALL'
+                ) {
+                    return true;
+                }
+
+                return (
+                    exceptionAreaName(
+                        exception.module,
+                    ) ===
+                    exceptionAreaFilter
+                );
+            },
+        );
+
+    const selectedSeverityLabel =
+        exceptionSeverityFilter === 'HIGH'
+            ? 'High Priority'
+            : exceptionSeverityFilter === 'MEDIUM'
+                ? 'Medium Priority'
+                : exceptionSeverityFilter === 'LOW'
+                    ? 'Low Priority'
+                    : 'All';
+
+    const selectedAreaLabel =
+        exceptionAreaFilter === 'ALL'
+            ? 'All Areas'
+            : exceptionAreaFilter;
+
     const fieldComponents = analytics.components.filter(
         (component) => component.group === 'MODULE',
     );
@@ -763,9 +894,9 @@ export default function WardExecutiveOverview({
                 />
 
                 <ExecutiveKpi
-                    label="Priority Exceptions"
-                    value={analytics.exceptions.length}
-                    sub={`${analytics.highExceptions} high · ${analytics.mediumExceptions} medium`}
+                    label="Unresolved Critical Issues"
+                    value={analytics.highExceptions}
+                    sub={`${analytics.highExceptions} high-severity of ${analytics.exceptions.length} total exceptions`}
                     tone={
                         analytics.highExceptions > 0
                             ? 'rose'
@@ -775,11 +906,24 @@ export default function WardExecutiveOverview({
                     }
                     icon={<AlertTriangle size={17} />}
                     decorativeIcon={<AlertTriangle size={64} />}
-                    onClick={() =>
+
+                    onClick={() => {
+                        setExceptionSeverityFilter(
+                            'HIGH'
+                        );
+
+                        setExceptionAreaFilter(
+                            'ALL'
+                        );
                         document
-                            .getElementById('ward-issues')
-                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    }
+                            .getElementById(
+                                'ward-issues'
+                            )
+                            ?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'start',
+                            });
+                    }}
                 />
             </section>
 
@@ -790,9 +934,7 @@ export default function WardExecutiveOverview({
             <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-col gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-blue-50/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <div>
-                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-blue-600">
-                            Executive Performance
-                        </div>
+
                         <h2 className="mt-1 text-[18px] font-black tracking-[-0.03em] text-slate-950">
                             City Ward Performance
                         </h2>
@@ -1179,7 +1321,7 @@ export default function WardExecutiveOverview({
             {/* =====================================================
                 5. ZONE + ISSUE INTELLIGENCE
             ===================================================== */}
-            <section className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
+            <section id="critical-issues-section" className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
                 <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <SectionHeading
                         eyebrow="Location View"
@@ -1248,41 +1390,202 @@ export default function WardExecutiveOverview({
                 >
                     <SectionHeading
                         eyebrow="Exception Intelligence"
-                        title="Issues Requiring Attention"
+                        title="Critical Issues Requiring Intervention"
                         subtitle="Highest-impact exceptions across the current ward selection."
-                        badge={`${analytics.exceptions.length} issue${analytics.exceptions.length === 1 ? '' : 's'}`}
+                        badge={`${analytics.exceptions.length} TOTAL EXCEPTIONS`}
                     />
 
                     <div className="mt-5 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
                         <div>
-                            <div className="grid grid-cols-3 gap-2">
-                                <SeverityStat
-                                    label="High"
-                                    value={analytics.highExceptions}
-                                    tone="rose"
-                                />
-                                <SeverityStat
-                                    label="Medium"
-                                    value={analytics.mediumExceptions}
-                                    tone="amber"
-                                />
-                                <SeverityStat
-                                    label="Low"
-                                    value={analytics.lowExceptions}
-                                    tone="blue"
-                                />
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setExceptionSeverityFilter(
+                                            'HIGH'
+                                        )
+                                    }
+                                    className={`rounded-2xl transition ${
+                                        exceptionSeverityFilter ===
+                                        'HIGH'
+                                            ? 'ring-2 ring-rose-200'
+                                            : ''
+                                    }`}
+                                >
+                                    <SeverityStat
+                                        label="High"
+                                        value={
+                                            analytics.highExceptions
+                                        }
+                                        tone="rose"
+                                    />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setExceptionSeverityFilter(
+                                            'MEDIUM'
+                                        )
+                                    }
+                                    className={`rounded-2xl transition ${
+                                        exceptionSeverityFilter ===
+                                        'MEDIUM'
+                                            ? 'ring-2 ring-amber-200'
+                                            : ''
+                                    }`}
+                                >
+                                    <SeverityStat
+                                        label="Medium"
+                                        value={
+                                            analytics.mediumExceptions
+                                        }
+                                        tone="amber"
+                                    />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setExceptionSeverityFilter(
+                                            'LOW'
+                                        )
+                                    }
+                                    className={`rounded-2xl transition ${
+                                        exceptionSeverityFilter ===
+                                        'LOW'
+                                            ? 'ring-2 ring-blue-200'
+                                            : ''
+                                    }`}
+                                >
+                                    <SeverityStat
+                                        label="Low"
+                                        value={
+                                            analytics.lowExceptions
+                                        }
+                                        tone="blue"
+                                    />
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setExceptionSeverityFilter(
+                                            'ALL'
+                                        )
+                                    }
+                                    className={`rounded-2xl transition ${
+                                        exceptionSeverityFilter ===
+                                        'ALL'
+                                            ? 'ring-2 ring-slate-300'
+                                            : ''
+                                    }`}
+                                >
+                                    <div className="flex h-full min-h-[84px] flex-col items-center justify-center rounded-2xl bg-slate-50 px-3 py-3 ring-1 ring-slate-200">
+                                        <div className="text-[22px] font-black text-slate-800">
+                                            {
+                                                analytics
+                                                    .exceptions
+                                                    .length
+                                            }
+                                        </div>
+
+                                        <div className="mt-1 text-[8px] font-black uppercase tracking-[0.08em] text-slate-500">
+                                            All
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[9px] font-bold text-slate-500">
+                                <span className="font-black text-slate-900">
+                                    {
+                                        filteredExceptions.length
+                                    } issues
+                                </span>
+
+                                <span>•</span>
+
+                                <span>
+                                    {
+                                        selectedSeverityLabel
+                                    }
+                                </span>
+
+                                <span>•</span>
+
+                                <span>
+                                    {
+                                        selectedAreaLabel
+                                    }
+                                </span>
+
+                                <span className="text-slate-300">
+                                    / {
+                                        analytics.exceptions.length
+                                    } total
+                                </span>
                             </div>
 
                             <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-3.5">
                                 <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                                    Exception Impact by Area
+                                    Issues by Area
                                 </div>
 
-                                {analytics.exceptionAreas.length ? (
-                                    <div className="mt-2 h-[235px] w-full">
+                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setExceptionAreaFilter(
+                                                'ALL'
+                                            )
+                                        }
+                                        className={`rounded-lg border px-2.5 py-1.5 text-[8px] font-black transition ${
+                                            exceptionAreaFilter ===
+                                            'ALL'
+                                                ? 'border-slate-300 bg-slate-800 text-white'
+                                                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        All Areas
+                                    </button>
+
+                                    {
+                                        exceptionAreaOptions.map(
+                                            (area) => (
+                                                <button
+                                                    key={
+                                                        area
+                                                    }
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setExceptionAreaFilter(
+                                                            area
+                                                        )
+                                                    }
+                                                    className={`rounded-lg border px-2.5 py-1.5 text-[8px] font-black transition ${
+                                                        exceptionAreaFilter ===
+                                                        area
+                                                            ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {
+                                                        area
+                                                    }
+                                                </button>
+                                            ),
+                                        )
+                                    }
+                                </div>
+
+
+
+                                {exceptionCountByArea.length ? (
+                                    <div className="mt-3 h-[180px] w-full">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart
-                                                data={analytics.exceptionAreas.slice(0, 5)}
+                                                data={exceptionCountByArea.slice(0, 5)}
                                                 layout="vertical"
                                                 margin={{ top: 4, right: 18, left: 20, bottom: 4 }}
                                             >
@@ -1316,8 +1619,7 @@ export default function WardExecutiveOverview({
                                                         'Impact',
                                                     ]}
                                                 />
-                                                <Bar
-                                                    dataKey="value"
+                                                <Bar dataKey="value" name="Issues"
                                                     fill="#f43f5e"
                                                     radius={[0, 8, 8, 0]}
                                                     barSize={17}
@@ -1327,14 +1629,14 @@ export default function WardExecutiveOverview({
                                     </div>
                                 ) : (
                                     <div className="flex h-[235px] items-center justify-center text-[10px] font-bold text-slate-400">
-                                        No exception data available.
+                                        No issues available for the selected severity.
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className="space-y-2.5">
-                            {analytics.exceptions.slice(0, 5).map((exception: any, index) => (
+                        <div className="max-h-[420px] space-y-2.5 overflow-y-auto pr-1">
+                            {filteredExceptions.map((exception: any, index) => (
                                 <ExceptionCard
                                     key={`${exception.ward?.wardId}-${exception.title}-${index}`}
                                     exception={exception}
@@ -1342,13 +1644,13 @@ export default function WardExecutiveOverview({
                                 />
                             ))}
 
-                            {!analytics.exceptions.length && (
+                            {!filteredExceptions.length && (
                                 <div className="flex min-h-[330px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/30 text-center">
                                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                                         <CheckCircle2 size={20} />
                                     </div>
                                     <div className="mt-3 text-[11px] font-black text-slate-700">
-                                        No priority exceptions
+                                        No issues match the selected severity and area
                                     </div>
                                 </div>
                             )}

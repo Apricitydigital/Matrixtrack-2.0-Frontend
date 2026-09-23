@@ -172,6 +172,9 @@ export default function UniversalReportModal({
 
     const titleLower = (moduleTitle || '').toLowerCase();
     const isSweepingModule = titleLower.includes('sweeping') || titleLower.includes('beat');
+
+
+
     const isLitterbinModule = titleLower.includes('litter') || titleLower.includes('twinbin') || titleLower.includes('bin');
     const isToiletModule = titleLower.includes('toilet');
 
@@ -429,17 +432,1198 @@ export default function UniversalReportModal({
         reviewerRoleText = 'Sanitary Inspector';
     }
 
-    if (!reviewerName && (status === 'APPROVED' || status === 'REJECTED' || status === 'ACTION_TAKEN')) {
-        if (user?.name) {
-            reviewerName = user.name;
-            reviewerRoleText = isCityAdminUser ? 'City Admin' : isQcUser ? 'Sanitary Inspector' : '';
-        } else {
-            reviewerName = 'Reviewing Officer';
-        }
+    if (
+        !reviewerName &&
+        (
+            status === 'APPROVED' ||
+            status === 'REJECTED' ||
+            status === 'ACTION_TAKEN'
+        )
+    ) {
+        /*
+         * Reviewer identity must come only from the
+         * inspection workflow data.
+         *
+         * Never use the currently logged-in viewer.
+         */
+        reviewerName = null;
+        reviewerRoleText = '';
     }
 
     const reviewedAtRaw = record.reviewedAt || record.approvedAt || record.updatedAt || null;
     const formattedReviewedAt = reviewedAtRaw ? new Date(reviewedAtRaw).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+
+
+    /* =========================================================
+       COMMISSIONER AUDIT VIEW
+       Read-only executive inspection lifecycle.
+       Existing QC / Admin / AO action logic below is untouched.
+    ========================================================= */
+
+    const isCommissionerUser =
+        allRoles.includes('COMMISSIONER');
+
+    const safeText = (
+        ...values: any[]
+    ): string | null => {
+        for (const value of values) {
+            if (
+                value === null ||
+                value === undefined
+            ) {
+                continue;
+            }
+
+            if (typeof value === 'string') {
+                const cleaned =
+                    value.trim();
+
+                if (
+                    cleaned &&
+                    cleaned !== '-' &&
+                    cleaned.toLowerCase() !== 'null' &&
+                    cleaned.toLowerCase() !== 'undefined'
+                ) {
+                    return cleaned;
+                }
+            }
+
+            if (
+                typeof value === 'number' &&
+                Number.isFinite(value)
+            ) {
+                return String(value);
+            }
+        }
+
+        return null;
+    };
+
+    const looksLikeUuid = (
+        value: any
+    ) =>
+        typeof value === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            value.trim()
+        );
+
+    const formatAuditDateTime = (
+        value: any
+    ) => {
+        if (!value) {
+            return null;
+        }
+
+        const parsed =
+            new Date(value);
+
+        if (
+            Number.isNaN(
+                parsed.getTime()
+            )
+        ) {
+            return null;
+        }
+
+        return parsed.toLocaleString(
+            'en-IN',
+            {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }
+        );
+    };
+
+    const sweepingEvidencePoints = (() => {
+        if (!isSweepingModule) {
+            return [];
+        }
+
+        const payloadPoints =
+            Array.isArray(
+                record.payload?.points
+            )
+                ? record.payload.points
+                : [];
+
+        const directPoints =
+            Array.isArray(
+                record.beatPoints
+            )
+                ? record.beatPoints
+                : [];
+
+        const configuredPoints =
+            Array.isArray(
+                record.beat?.points
+            )
+                ? record.beat.points
+                : Array.isArray(
+                    record.segment?.beat?.points
+                )
+                    ? record.segment.beat.points
+                    : [];
+
+        const maxLength =
+            Math.max(
+                payloadPoints.length,
+                directPoints.length,
+                configuredPoints.length
+            );
+
+        const points: any[] = [];
+
+        for (
+            let index = 0;
+            index < maxLength;
+            index += 1
+        ) {
+            const submitted =
+                payloadPoints[index] || {};
+
+            const direct =
+                directPoints[index] || {};
+
+            const configured =
+                configuredPoints[index] || {};
+
+            const pointName =
+                safeText(
+                    submitted.pointName,
+                    direct.pointName,
+                    configured.pointName,
+                    configured.name,
+                    configured.label
+                ) ||
+                `Point ${index + 1}`;
+
+            const pointCode =
+                safeText(
+                    submitted.pointCode,
+                    direct.pointCode,
+                    configured.pointCode,
+                    configured.code
+                ) ||
+                `P${index + 1}`;
+
+            const pointType =
+                safeText(
+                    submitted.pointType,
+                    direct.pointType,
+                    configured.pointType,
+                    configured.type
+                );
+
+            const submittedTime =
+                formatAuditDateTime(
+                    submitted.submittedAt ||
+                    direct.submittedAt
+                );
+
+            const distance =
+                submitted.distanceMeters ??
+                direct.distanceMeters ??
+                null;
+
+            const photos: string[] = [];
+
+            const addPointPhoto = (
+                value: any
+            ) => {
+                if (!value) {
+                    return;
+                }
+
+                if (Array.isArray(value)) {
+                    value.forEach(
+                        addPointPhoto
+                    );
+                    return;
+                }
+
+                if (
+                    typeof value === 'object'
+                ) {
+                    addPointPhoto(
+                        value.photo ||
+                        value.photoUrl ||
+                        value.image ||
+                        value.imageUrl ||
+                        value.url
+                    );
+                    return;
+                }
+
+                const resolved =
+                    resolveUrl(
+                        String(value)
+                    );
+
+                if (
+                    resolved &&
+                    !photos.includes(
+                        resolved
+                    )
+                ) {
+                    photos.push(
+                        resolved
+                    );
+                }
+            };
+
+            addPointPhoto(
+                submitted.photo
+            );
+            addPointPhoto(
+                submitted.photoUrl
+            );
+            addPointPhoto(
+                submitted.photos
+            );
+            addPointPhoto(
+                submitted.image
+            );
+            addPointPhoto(
+                submitted.imageUrl
+            );
+            addPointPhoto(
+                direct.photo
+            );
+            addPointPhoto(
+                direct.photoUrl
+            );
+            addPointPhoto(
+                direct.photos
+            );
+            addPointPhoto(
+                direct.image
+            );
+            addPointPhoto(
+                direct.imageUrl
+            );
+
+            points.push({
+                index,
+                pointName,
+                pointCode,
+                pointType,
+                submittedTime,
+                distance,
+                photos
+            });
+        }
+
+        return points;
+    })();
+
+    const normalizeAuditStatus = (
+        value: any
+    ) =>
+        String(
+            value || ''
+        )
+            .trim()
+            .toUpperCase();
+
+    /*
+     * Current operational status.
+     *
+     * Litter Bin may retain the QC status in record.status
+     * while corrective-action state advances separately in
+     * actionStatus. ACTION_REQUIRED / ACTION_TAKEN therefore
+     * take precedence when explicitly present.
+     */
+    const recordStatus =
+        normalizeAuditStatus(
+            record.status
+        );
+
+    const workspaceStatus =
+        normalizeAuditStatus(
+            record.workspaceStatus
+        );
+
+    const actionStatus =
+        normalizeAuditStatus(
+            record.actionStatus
+        );
+
+    const currentAuditStatus =
+        actionStatus === 'ACTION_TAKEN'
+            ? 'ACTION_TAKEN'
+            : actionStatus === 'ACTION_REQUIRED'
+                ? 'ACTION_REQUIRED'
+                : workspaceStatus ||
+                  recordStatus ||
+                  'SUBMITTED';
+
+    /*
+     * SI decision is intentionally separate from the current
+     * workflow state so an escalated/resolved report still shows
+     * its original SI verdict.
+     */
+    const siDecision =
+        normalizeAuditStatus(
+            record.qcDecision ||
+            record.siDecision ||
+            record.reviewDecision
+        ) ||
+        (
+            currentAuditStatus === 'APPROVED' ||
+            currentAuditStatus === 'REJECTED'
+                ? currentAuditStatus
+                : ''
+        );
+
+    const siName =
+        resolvePersonName(
+            record.reviewedByQc
+        ) ||
+        resolvePersonName(
+            record.reviewedBy
+        ) ||
+        resolvePersonName(
+            record.qcReviewer
+        ) ||
+        resolvePersonName(
+            record.sanitaryInspector
+        ) ||
+        reviewerName ||
+        null;
+
+    const ulbName =
+        resolvePersonName(
+            record.ulbReviewer
+        ) ||
+        resolvePersonName(
+            record.ulbReviewedByName
+        ) ||
+        resolvePersonName(
+            record.ulbOfficerName
+        ) ||
+        resolvePersonName(
+            record.ulbReviewerName
+        ) ||
+        resolvePersonName(
+            record.ulbOfficer
+        ) ||
+        resolvePersonName(
+            record.payload?.ulbReviewedByName
+        ) ||
+        resolvePersonName(
+            record.payload?.ulbOfficerName
+        ) ||
+        null;
+
+    const aoName =
+        resolvePersonName(
+            record.actionOfficer
+        ) ||
+        resolvePersonName(
+            record.assignedActionOfficer
+        ) ||
+        resolvePersonName(
+            record.actionTakenByName
+        ) ||
+        resolvePersonName(
+            record.actionOfficerName
+        ) ||
+        resolvePersonName(
+            record.payload?.actionTakenByName
+        ) ||
+        resolvePersonName(
+            record.payload?.actionOfficerName
+        ) ||
+        null;
+
+    const submittedAt =
+        formatAuditDateTime(
+            record.createdAt
+        );
+
+    const siReviewedAt =
+        formatAuditDateTime(
+            record.qcReviewedAt ||
+            record.reviewedAt
+        );
+
+    const ulbReviewedAt =
+        formatAuditDateTime(
+            record.ulbReviewedAt ||
+            record.payload?.ulbReviewedAt ||
+            record.actionRequiredAt
+        );
+
+    const aoActionAt =
+        formatAuditDateTime(
+            record.actionTakenAt ||
+            record.actionOfficerRespondedAt ||
+            record.payload?.actionTakenAt
+        );
+
+    const siRemarks =
+        safeText(
+            record.qcComment,
+            record.qcRemark,
+            record.reviewerNote,
+            record.reviewRemarks,
+            record.payload?.qcComment,
+            record.payload?.qcRemark
+        );
+
+    const ulbRemarks =
+        isSweepingModule
+            ? safeText(
+                record.payload?.ulbRemark,
+                record.ulbRemark,
+                record.ulbRemarks
+            )
+            : (
+                isLitterbinModule &&
+                String(
+                    record.type || ''
+                ).toUpperCase() ===
+                    'VISIT_REPORT'
+            )
+                ? safeText(
+                    record.qcRemark,
+                    record.ulbRemark,
+                    record.ulbRemarks,
+                    record.payload?.ulbRemark
+                )
+                : safeText(
+                    record.ulbRemark,
+                    record.ulbRemarks,
+                    record.payload?.ulbRemark,
+                    record.payload?.ulbRemarks
+                );
+
+    const aoRemarks =
+        safeText(
+            record.actionNote,
+            record.aoNote,
+            record.aoRemark,
+            record.actionDescription,
+            record.actionTakenDescription,
+            record.payload?.aoRemark,
+            record.payload?.actionTakenBy,
+            record.payload?.actionDescription
+        );
+
+    const siAiResult =
+        record.autoQcResult ||
+        record.qcAiResult ||
+        record.payload?.autoQcResult ||
+        record.payload?.qcAiResult ||
+        null;
+
+    const ulbAiResult =
+        record.actionAiResult ||
+        record.ulbAiResult ||
+        record.payload?.actionAiResult ||
+        record.payload?.ulbAiResult ||
+        null;
+
+    const aiSummaryText = (
+        result: any
+    ): string | null => {
+        if (!result) {
+            return null;
+        }
+
+        if (typeof result === 'string') {
+            return safeText(result);
+        }
+
+        return safeText(
+            result.recommendation,
+            result.recommendedAction,
+            result.actionSuggestion,
+            result.suggestion,
+            result.summary,
+            result.reason,
+            result.decision,
+            result.result
+        );
+    };
+
+    const siAiSuggestion =
+        aiSummaryText(
+            siAiResult
+        );
+
+    const ulbAiSuggestion = (() => {
+        if (!ulbAiResult) {
+            return null;
+        }
+
+        if (
+            typeof ulbAiResult ===
+            'string'
+        ) {
+            return safeText(
+                ulbAiResult
+            );
+        }
+
+        const recommendation =
+            safeText(
+                ulbAiResult.recommendation
+            );
+
+        const recommendedAction =
+            safeText(
+                ulbAiResult.recommendedAction
+            );
+
+        const summary =
+            safeText(
+                ulbAiResult.summary
+            );
+
+        const reasons =
+            Array.isArray(
+                ulbAiResult.reasons
+            )
+                ? ulbAiResult.reasons
+                    .map(
+                        (reason: any) =>
+                            safeText(
+                                reason
+                            )
+                    )
+                    .filter(Boolean)
+                    .slice(0, 5)
+                : [];
+
+        const confidenceValue =
+            Number(
+                ulbAiResult.confidence
+            );
+
+        const confidence =
+            Number.isFinite(
+                confidenceValue
+            )
+                ? (
+                    confidenceValue <= 1
+                        ? Math.round(
+                            confidenceValue *
+                            100
+                        )
+                        : Math.round(
+                            confidenceValue
+                        )
+                )
+                : null;
+
+        const lines: string[] = [];
+
+        if (recommendation) {
+            lines.push(
+                'Recommendation: ' +
+                recommendation.replace(
+                    /_/g,
+                    ' '
+                )
+            );
+        }
+
+        if (recommendedAction) {
+            lines.push(
+                'Recommended Action: ' +
+                recommendedAction
+            );
+        }
+
+        if (summary) {
+            lines.push(
+                'Summary: ' +
+                summary
+            );
+        }
+
+        if (reasons.length > 0) {
+            lines.push(
+                'Reasons: ' +
+                reasons.join('; ')
+            );
+        }
+
+        if (confidence !== null) {
+            lines.push(
+                'Confidence: ' +
+                Math.max(
+                    0,
+                    Math.min(
+                        100,
+                        confidence
+                    )
+                ) +
+                '%'
+            );
+        }
+
+        return (
+            lines.length > 0
+                ? lines.join('\n')
+                : aiSummaryText(
+                    ulbAiResult
+                )
+        );
+    })();
+
+    const commissionerZoneName =
+        cleanGeoName(rawZone) ||
+        (
+            record.zoneId &&
+            !String(
+                record.zoneId
+            ).includes('-')
+                ? `Zone ${record.zoneId}`
+                : null
+        ) ||
+        'Not available';
+
+    const commissionerWardName =
+        cleanGeoName(rawWard) ||
+        (
+            record.wardId &&
+            !String(
+                record.wardId
+            ).includes('-')
+                ? `Ward ${record.wardId}`
+                : null
+        ) ||
+        'Not available';
+
+    const commissionerLocationName =
+        safeText(
+            record.locationName,
+            record.locationDescription,
+            record.address,
+            record.bin?.locationName,
+            record.toilet?.locationName,
+            record.toilet?.address,
+            record.payload?.locationName,
+            record.payload?.locationDescription,
+            beatName
+        ) ||
+        'Not available';
+
+    const commissionerAreaName =
+        safeText(
+            record.areaName,
+            record.area?.name,
+            record.bin?.areaName,
+            record.toilet?.areaName,
+            record.payload?.areaName,
+            areaDetail
+        ) ||
+        'Not available';
+
+    const aoEvidencePhotos:
+        string[] = [];
+
+    const addAoPhoto = (
+        value: any
+    ) => {
+        if (!value) {
+            return;
+        }
+
+        if (Array.isArray(value)) {
+            value.forEach(
+                addAoPhoto
+            );
+            return;
+        }
+
+        if (typeof value === 'object') {
+            addAoPhoto(
+                value.url ||
+                value.photoUrl ||
+                value.imageUrl ||
+                value.photo
+            );
+            return;
+        }
+
+        const resolved =
+            resolveUrl(
+                String(value)
+            );
+
+        if (
+            resolved &&
+            !aoEvidencePhotos.includes(
+                resolved
+            )
+        ) {
+            aoEvidencePhotos.push(
+                resolved
+            );
+        }
+    };
+
+    addAoPhoto(
+        record.actionPhotoUrl
+    );
+    addAoPhoto(
+        record.aoPhoto
+    );
+    addAoPhoto(
+        record.actionPhotos
+    );
+    addAoPhoto(
+        record.aoPhotos
+    );
+    addAoPhoto(
+        record.payload?.actionPhotoUrl
+    );
+    addAoPhoto(
+        record.payload?.aoPhoto
+    );
+    addAoPhoto(
+        record.payload?.actionPhotos
+    );
+    addAoPhoto(
+        record.payload?.aoPhotos
+    );
+
+    const auditStatusTone = (
+        auditStatus: string
+    ) => {
+        switch (
+            normalizeAuditStatus(
+                auditStatus
+            )
+        ) {
+            case 'APPROVED':
+                return {
+                    bg: '#ecfdf5',
+                    border: '#a7f3d0',
+                    text: '#047857',
+                    dot: '#10b981'
+                };
+
+            case 'REJECTED':
+                return {
+                    bg: '#fef2f2',
+                    border: '#fecaca',
+                    text: '#b91c1c',
+                    dot: '#ef4444'
+                };
+
+            case 'ACTION_REQUIRED':
+                return {
+                    bg: '#fff7ed',
+                    border: '#fed7aa',
+                    text: '#c2410c',
+                    dot: '#f97316'
+                };
+
+            case 'ACTION_TAKEN':
+                return {
+                    bg: '#ecfdf5',
+                    border: '#86efac',
+                    text: '#166534',
+                    dot: '#16a34a'
+                };
+
+            case 'PENDING_QC':
+            case 'SUBMITTED':
+            case 'PENDING':
+                return {
+                    bg: '#eff6ff',
+                    border: '#bfdbfe',
+                    text: '#1d4ed8',
+                    dot: '#3b82f6'
+                };
+
+            default:
+                return {
+                    bg: '#f8fafc',
+                    border: '#e2e8f0',
+                    text: '#475569',
+                    dot: '#94a3b8'
+                };
+        }
+    };
+
+    const statusLabel = (
+        auditStatus: string
+    ) => {
+        const normalized =
+            normalizeAuditStatus(
+                auditStatus
+            );
+
+        if (
+            normalized ===
+            'ACTION_TAKEN'
+        ) {
+            return 'RESOLVED';
+        }
+
+        if (
+            normalized ===
+            'PENDING_QC'
+        ) {
+            return 'PENDING SI REVIEW';
+        }
+
+        return (
+            normalized.replace(
+                /_/g,
+                ' '
+            ) ||
+            'UNKNOWN'
+        );
+    };
+
+    const AuditBadge = ({
+        value
+    }: {
+        value: string;
+    }) => {
+        const tone =
+            auditStatusTone(
+                value
+            );
+
+        return (
+            <span
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '5px 10px',
+                    borderRadius: 999,
+                    background: tone.bg,
+                    border:
+                        `1px solid ${tone.border}`,
+                    color: tone.text,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: '0.03em',
+                    whiteSpace: 'nowrap'
+                }}
+            >
+                <span
+                    style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background:
+                            tone.dot
+                    }}
+                />
+                {statusLabel(
+                    value
+                )}
+            </span>
+        );
+    };
+
+    const TimelineStage = ({
+        title,
+        person,
+        time,
+        statusValue,
+        remarks: stageRemarks,
+        aiSuggestion: stageAiSuggestion,
+        showAiSection = false,
+        photos,
+        pending = false
+    }: {
+        title: string;
+        person?: string | null;
+        time?: string | null;
+        statusValue?: string | null;
+        remarks?: string | null;
+        aiSuggestion?: string | null;
+        showAiSection?: boolean;
+        photos?: string[];
+        pending?: boolean;
+    }) => {
+        const tone =
+            auditStatusTone(
+                statusValue ||
+                (
+                    pending
+                        ? 'PENDING'
+                        : 'APPROVED'
+                )
+            );
+
+        return (
+            <div
+                style={{
+                    position: 'relative',
+                    paddingLeft: 30,
+                    paddingBottom: 22
+                }}
+            >
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: 7,
+                        top: 14,
+                        bottom: -8,
+                        width: 2,
+                        background:
+                            '#e2e8f0'
+                    }}
+                />
+
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 4,
+                        width: 16,
+                        height: 16,
+                        borderRadius: 999,
+                        background:
+                            pending
+                                ? '#ffffff'
+                                : tone.dot,
+                        border:
+                            `3px solid ${
+                                pending
+                                    ? '#cbd5e1'
+                                    : tone.bg
+                            }`,
+                        boxShadow:
+                            '0 0 0 2px #ffffff'
+                    }}
+                />
+
+                <div
+                    style={{
+                        background:
+                            '#ffffff',
+                        border:
+                            '1px solid #e2e8f0',
+                        borderRadius: 14,
+                        padding:
+                            '12px 13px',
+                        boxShadow:
+                            '0 2px 8px rgba(15,23,42,0.04)'
+                    }}
+                >
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems:
+                                'flex-start',
+                            justifyContent:
+                                'space-between',
+                            gap: 8
+                        }}
+                    >
+                        <div>
+                            <div
+                                style={{
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    color: '#0f172a'
+                                }}
+                            >
+                                {title}
+                            </div>
+
+                            {person &&
+                                !looksLikeUuid(
+                                    person
+                                ) && (
+                                <div
+                                    style={{
+                                        marginTop: 3,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        color: '#334155'
+                                    }}
+                                >
+                                    {person}
+                                </div>
+                            )}
+
+                            <div
+                                style={{
+                                    marginTop: 2,
+                                    fontSize: 10,
+                                    color: '#64748b'
+                                }}
+                            >
+                                {time ||
+                                    (
+                                        pending
+                                            ? 'Awaiting workflow action'
+                                            : 'Time not recorded'
+                                    )}
+                            </div>
+                        </div>
+
+                        {statusValue && (
+                            <AuditBadge
+                                value={
+                                    statusValue
+                                }
+                            />
+                        )}
+                    </div>
+
+                    {(showAiSection || stageAiSuggestion) && (
+                        <div
+                            style={{
+                                marginTop: 10,
+                                padding:
+                                    '9px 10px',
+                                borderRadius: 9,
+                                background:
+                                    '#f5f3ff',
+                                border:
+                                    '1px solid #ddd6fe'
+                            }}
+                        >
+                            <div
+                                style={{
+                                    fontSize: 9,
+                                    fontWeight: 800,
+                                    color: '#6d28d9',
+                                    textTransform:
+                                        'uppercase',
+                                    letterSpacing:
+                                        '0.05em'
+                                }}
+                            >
+                                AI Suggestion
+                            </div>
+
+                            <div
+                                style={{
+                                    marginTop: 4,
+                                    fontSize: 10.5,
+                                    whiteSpace: 'pre-line',
+                                    lineHeight: 1.5,
+                                    color: '#4c1d95'
+                                }}
+                            >
+                                {stageAiSuggestion ||
+                                    'No AI suggestion recorded for this stage.'}
+                            </div>
+                        </div>
+                    )}
+
+                    {stageRemarks && (
+                        <div
+                            style={{
+                                marginTop: 9,
+                                paddingTop: 8,
+                                borderTop:
+                                    '1px dashed #e2e8f0'
+                            }}
+                        >
+                            <div
+                                style={{
+                                    fontSize: 9,
+                                    fontWeight: 800,
+                                    color: '#64748b',
+                                    textTransform:
+                                        'uppercase',
+                                    letterSpacing:
+                                        '0.05em'
+                                }}
+                            >
+                                Remarks
+                            </div>
+
+                            <div
+                                style={{
+                                    marginTop: 3,
+                                    fontSize: 10.5,
+                                    lineHeight: 1.5,
+                                    color: '#334155'
+                                }}
+                            >
+                                {stageRemarks}
+                            </div>
+                        </div>
+                    )}
+
+                    {photos &&
+                        photos.length >
+                            0 && (
+                            <div
+                                style={{
+                                    marginTop: 10,
+                                    display: 'flex',
+                                    flexWrap: 'wrap',
+                                    gap: 7
+                                }}
+                            >
+                                {photos.map(
+                                    (
+                                        photo,
+                                        index
+                                    ) => (
+                                        <button
+                                            key={
+                                                index
+                                            }
+                                            type="button"
+                                            onClick={() =>
+                                                setPreviewPhoto(
+                                                    photo
+                                                )
+                                            }
+                                            style={{
+                                                width: 58,
+                                                height: 58,
+                                                padding: 0,
+                                                overflow:
+                                                    'hidden',
+                                                borderRadius: 9,
+                                                border:
+                                                    '1px solid #cbd5e1',
+                                                background:
+                                                    '#f1f5f9',
+                                                cursor:
+                                                    'pointer'
+                                            }}
+                                            title="Open action evidence"
+                                        >
+                                            <img
+                                                src={
+                                                    photo
+                                                }
+                                                alt={
+                                                    `Action evidence ${index + 1}`
+                                                }
+                                                style={{
+                                                    width:
+                                                        '100%',
+                                                    height:
+                                                        '100%',
+                                                    objectFit:
+                                                        'cover'
+                                                }}
+                                            />
+                                        </button>
+                                    )
+                                )}
+                            </div>
+                        )}
+                </div>
+            </div>
+        );
+    };
+
 
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => {
@@ -448,7 +1632,1249 @@ export default function UniversalReportModal({
 
     if (!mounted || typeof document === 'undefined') return null;
 
+
+    if (isCommissionerUser) {
+        const hasSiStage =
+            Boolean(
+                siName ||
+                siReviewedAt ||
+                siDecision ||
+                siRemarks
+            );
+
+        const hasUlbStage =
+            Boolean(
+                ulbName ||
+                ulbReviewedAt ||
+                ulbRemarks ||
+                ulbAiSuggestion ||
+                currentAuditStatus ===
+                    'ACTION_REQUIRED' ||
+                currentAuditStatus ===
+                    'ACTION_TAKEN'
+            );
+
+        const hasAoStage =
+            Boolean(
+                aoName ||
+                aoActionAt ||
+                aoRemarks ||
+                aoEvidencePhotos.length >
+                    0 ||
+                currentAuditStatus ===
+                    'ACTION_TAKEN'
+            );
+
     return createPortal(
+            <>
+                <div
+                    onClick={onClose}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 99998,
+                        background:
+                            'rgba(15,23,42,0.72)',
+                        backdropFilter:
+                            'blur(5px)'
+                    }}
+                />
+
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 99999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 18,
+                        pointerEvents: 'none'
+                    }}
+                >
+                    <div
+                        onClick={(event) =>
+                            event.stopPropagation()
+                        }
+                        style={{
+                            pointerEvents: 'all',
+                            width: '1180px',
+                            maxWidth: '96vw',
+                            height: '88vh',
+                            maxHeight: '920px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            background: '#ffffff',
+                            borderRadius: 22,
+                            border:
+                                '1px solid rgba(255,255,255,0.4)',
+                            boxShadow:
+                                '0 30px 90px rgba(15,23,42,0.35)'
+                        }}
+                    >
+                        {/* HEADER */}
+                        <div
+                            style={{
+                                padding:
+                                    '18px 22px',
+                                display: 'flex',
+                                alignItems:
+                                    'center',
+                                justifyContent:
+                                    'space-between',
+                                gap: 18,
+                                borderBottom:
+                                    '1px solid #e2e8f0',
+                                background:
+                                    'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)'
+                            }}
+                        >
+                            <div
+                                style={{
+                                    minWidth: 0
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems:
+                                            'center',
+                                        gap: 9,
+                                        flexWrap:
+                                            'wrap'
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: 10,
+                                            fontWeight: 900,
+                                            letterSpacing:
+                                                '0.08em',
+                                            textTransform:
+                                                'uppercase',
+                                            color: '#4f46e5'
+                                        }}
+                                    >
+                                        Inspection Audit
+                                    </div>
+
+                                    <AuditBadge
+                                        value={
+                                            currentAuditStatus
+                                        }
+                                    />
+                                </div>
+
+                                <div
+                                    style={{
+                                        marginTop: 5,
+                                        fontSize: 19,
+                                        fontWeight: 900,
+                                        color: '#0f172a',
+                                        lineHeight: 1.2
+                                    }}
+                                >
+                                    {assetName}
+                                </div>
+
+                                <div
+                                    style={{
+                                        marginTop: 4,
+                                        display: 'flex',
+                                        alignItems:
+                                            'center',
+                                        gap: 8,
+                                        flexWrap:
+                                            'wrap',
+                                        fontSize: 11,
+                                        color: '#64748b'
+                                    }}
+                                >
+                                    <strong
+                                        style={{
+                                            color: '#334155'
+                                        }}
+                                    >
+                                        {moduleTitle}
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={
+                                    onClose
+                                }
+                                style={{
+                                    flexShrink: 0,
+                                    border: 0,
+                                    borderRadius: 10,
+                                    padding:
+                                        '8px 13px',
+                                    background:
+                                        '#f1f5f9',
+                                    color: '#475569',
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        {/* QUICK CONTEXT */}
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns:
+                                    'repeat(3, minmax(0, 1fr))',
+                                gap: 1,
+                                background:
+                                    '#e2e8f0',
+                                borderBottom:
+                                    '1px solid #e2e8f0'
+                            }}
+                        >
+                            {[
+                                [
+                                    'Zone',
+                                    commissionerZoneName
+                                ],
+                                [
+                                    'Ward',
+                                    commissionerWardName
+                                ],
+                                [
+                                    'Location',
+                                    commissionerLocationName
+                                ]
+                            ].map(
+                                (
+                                    item,
+                                    index
+                                ) => (
+                                    <div
+                                        key={
+                                            index
+                                        }
+                                        style={{
+                                            minWidth: 0,
+                                            padding:
+                                                '11px 14px',
+                                            background:
+                                                '#ffffff'
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: 8.5,
+                                                fontWeight: 900,
+                                                color: '#94a3b8',
+                                                textTransform:
+                                                    'uppercase',
+                                                letterSpacing:
+                                                    '0.07em'
+                                            }}
+                                        >
+                                            {item[0]}
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                marginTop: 4,
+                                                fontSize: 11,
+                                                fontWeight: 800,
+                                                color: '#1e293b',
+                                                lineHeight: 1.45
+                                            }}
+                                            title={
+                                                String(
+                                                    item[1]
+                                                )
+                                            }
+                                        >
+                                            {item[1]}
+                                        </div>
+                                    </div>
+                                )
+                            )}
+                        </div>
+
+                        {/* BODY */}
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns:
+                                    'minmax(0, 1fr) 390px',
+                                flex: 1,
+                                minHeight: 0
+                            }}
+                        >
+                            {/* LEFT */}
+                            <div
+                                style={{
+                                    minWidth: 0,
+                                    overflowY:
+                                        'auto',
+                                    padding:
+                                        '18px 20px',
+                                    background:
+                                        '#ffffff'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems:
+                                            'center',
+                                        justifyContent:
+                                            'space-between',
+                                        gap: 12,
+                                        marginBottom: 13
+                                    }}
+                                >
+                                    <div>
+                                        <div
+                                            style={{
+                                                fontSize: 14,
+                                                fontWeight: 900,
+                                                color: '#0f172a'
+                                            }}
+                                        >
+                                            Inspection Questions & Evidence
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                marginTop: 3,
+                                                fontSize: 10.5,
+                                                color: '#64748b'
+                                            }}
+                                        >
+                                            Submitted answers and question-linked photographic evidence
+                                        </div>
+                                    </div>
+
+                                    {resolvedAnswers.length >
+                                        0 && (
+                                        <div
+                                            style={{
+                                                padding:
+                                                    '5px 9px',
+                                                borderRadius: 999,
+                                                background:
+                                                    '#eef2ff',
+                                                color: '#4338ca',
+                                                fontSize: 9.5,
+                                                fontWeight: 900
+                                            }}
+                                        >
+                                            {
+                                                resolvedAnswers.length
+                                            }{' '}
+                                            QUESTIONS
+                                        </div>
+                                    )}
+                                </div>
+
+                                {resolvedAnswers.length ===
+                                0 ? (
+                                    isSweepingModule &&
+                                    sweepingEvidencePoints.length > 0 ? (
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection:
+                                                    'column',
+                                                gap: 10
+                                            }}
+                                        >
+                                            {sweepingEvidencePoints.map(
+                                                (
+                                                    point: any,
+                                                    index: number
+                                                ) => (
+                                                    <div
+                                                        key={
+                                                            index
+                                                        }
+                                                        style={{
+                                                            border:
+                                                                '1px solid #e2e8f0',
+                                                            borderRadius: 14,
+                                                            background:
+                                                                '#ffffff',
+                                                            overflow:
+                                                                'hidden',
+                                                            boxShadow:
+                                                                '0 2px 7px rgba(15,23,42,0.03)'
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                display:
+                                                                    'flex',
+                                                                alignItems:
+                                                                    'flex-start',
+                                                                justifyContent:
+                                                                    'space-between',
+                                                                gap: 12,
+                                                                padding:
+                                                                    '12px 14px'
+                                                            }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    display:
+                                                                        'flex',
+                                                                    gap: 10,
+                                                                    minWidth: 0
+                                                                }}
+                                                            >
+                                                                <div
+                                                                    style={{
+                                                                        width: 30,
+                                                                        height: 30,
+                                                                        flexShrink: 0,
+                                                                        borderRadius: 8,
+                                                                        background:
+                                                                            '#eef2ff',
+                                                                        color:
+                                                                            '#4338ca',
+                                                                        display:
+                                                                            'flex',
+                                                                        alignItems:
+                                                                            'center',
+                                                                        justifyContent:
+                                                                            'center',
+                                                                        fontSize: 10,
+                                                                        fontWeight: 900
+                                                                    }}
+                                                                >
+                                                                    P
+                                                                    {index +
+                                                                        1}
+                                                                </div>
+
+                                                                <div>
+                                                                    <div
+                                                                        style={{
+                                                                            fontSize: 12,
+                                                                            fontWeight: 800,
+                                                                            color:
+                                                                                '#1e293b'
+                                                                        }}
+                                                                    >
+                                                                        {
+                                                                            point.pointName
+                                                                        }
+                                                                    </div>
+
+                                                                    <div
+                                                                        style={{
+                                                                            marginTop: 3,
+                                                                            display:
+                                                                                'flex',
+                                                                            gap: 8,
+                                                                            flexWrap:
+                                                                                'wrap',
+                                                                            fontSize: 9.5,
+                                                                            color:
+                                                                                '#64748b'
+                                                                        }}
+                                                                    >
+                                                                        <span>
+                                                                            {
+                                                                                point.pointCode
+                                                                            }
+                                                                        </span>
+
+                                                                        {point.pointType && (
+                                                                            <span>
+                                                                                {
+                                                                                    point.pointType
+                                                                                }
+                                                                            </span>
+                                                                        )}
+
+                                                                        {point.submittedTime && (
+                                                                            <span>
+                                                                                {
+                                                                                    point.submittedTime
+                                                                                }
+                                                                            </span>
+                                                                        )}
+
+                                                                        {point.distance !==
+                                                                            null && (
+                                                                            <span>
+                                                                                {
+                                                                                    Math.round(
+                                                                                        Number(
+                                                                                            point.distance
+                                                                                        )
+                                                                                    )
+                                                                                }{' '}
+                                                                                m from point
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <span
+                                                                style={{
+                                                                    padding:
+                                                                        '4px 9px',
+                                                                    borderRadius:
+                                                                        999,
+                                                                    background:
+                                                                        point.photos.length >
+                                                                        0
+                                                                            ? '#ecfdf5'
+                                                                            : '#f8fafc',
+                                                                    color:
+                                                                        point.photos.length >
+                                                                        0
+                                                                            ? '#047857'
+                                                                            : '#64748b',
+                                                                    fontSize: 9,
+                                                                    fontWeight: 900
+                                                                }}
+                                                            >
+                                                                {point.photos.length >
+                                                                0
+                                                                    ? 'EVIDENCE CAPTURED'
+                                                                    : 'NO IMAGE'}
+                                                            </span>
+                                                        </div>
+
+                                                        {point.photos.length >
+                                                            0 && (
+                                                            <div
+                                                                style={{
+                                                                    display:
+                                                                        'flex',
+                                                                    flexWrap:
+                                                                        'wrap',
+                                                                    gap: 8,
+                                                                    padding:
+                                                                        '10px 14px 13px',
+                                                                    borderTop:
+                                                                        '1px solid #f1f5f9',
+                                                                    background:
+                                                                        '#fafafa'
+                                                                }}
+                                                            >
+                                                                {point.photos.map(
+                                                                    (
+                                                                        photo: string,
+                                                                        photoIndex: number
+                                                                    ) => (
+                                                                        <button
+                                                                            key={
+                                                                                photoIndex
+                                                                            }
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                setPreviewPhoto(
+                                                                                    photo
+                                                                                )
+                                                                            }
+                                                                            style={{
+                                                                                width: 94,
+                                                                                height: 72,
+                                                                                padding: 0,
+                                                                                border:
+                                                                                    '1px solid #cbd5e1',
+                                                                                borderRadius: 10,
+                                                                                overflow:
+                                                                                    'hidden',
+                                                                                background:
+                                                                                    '#f1f5f9',
+                                                                                cursor:
+                                                                                    'zoom-in'
+                                                                            }}
+                                                                            title="Click to enlarge sweeping evidence"
+                                                                        >
+                                                                            <img
+                                                                                src={
+                                                                                    photo
+                                                                                }
+                                                                                alt={
+                                                                                    `Sweeping point ${index + 1} evidence`
+                                                                                }
+                                                                                style={{
+                                                                                    width:
+                                                                                        '100%',
+                                                                                    height:
+                                                                                        '100%',
+                                                                                    objectFit:
+                                                                                        'cover'
+                                                                                }}
+                                                                            />
+                                                                        </button>
+                                                                    )
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            style={{
+                                                padding: 20,
+                                                border:
+                                                    '1px dashed #cbd5e1',
+                                                borderRadius: 14,
+                                                background:
+                                                    '#f8fafc',
+                                                color:
+                                                    '#64748b',
+                                                fontSize: 11,
+                                                textAlign:
+                                                    'center'
+                                            }}
+                                        >
+                                            No inspection evidence is available for this record.
+                                        </div>
+                                    )
+                                ) : (
+                                    <div
+                                        style={{
+                                            display:
+                                                'flex',
+                                            flexDirection:
+                                                'column',
+                                            gap: 10
+                                        }}
+                                    >
+                                        {resolvedAnswers.map(
+                                            (
+                                                item,
+                                                index
+                                            ) => {
+                                                const answer =
+                                                    String(
+                                                        item.answerText ||
+                                                            ''
+                                                    ).trim();
+
+                                                const upper =
+                                                    answer.toUpperCase();
+
+                                                const answerBg =
+                                                    upper ===
+                                                        'YES' ||
+                                                    upper ===
+                                                        'TRUE'
+                                                        ? '#ecfdf5'
+                                                        : upper ===
+                                                              'NO' ||
+                                                          upper ===
+                                                              'FALSE'
+                                                            ? '#fef2f2'
+                                                            : '#eff6ff';
+
+                                                const answerText =
+                                                    upper ===
+                                                        'YES' ||
+                                                    upper ===
+                                                        'TRUE'
+                                                        ? '#047857'
+                                                        : upper ===
+                                                              'NO' ||
+                                                          upper ===
+                                                              'FALSE'
+                                                            ? '#b91c1c'
+                                                            : '#1d4ed8';
+
+                                                return (
+                                                    <div
+                                                        key={
+                                                            index
+                                                        }
+                                                        style={{
+                                                            border:
+                                                                '1px solid #e2e8f0',
+                                                            borderRadius: 14,
+                                                            overflow:
+                                                                'hidden',
+                                                            background:
+                                                                '#ffffff',
+                                                            boxShadow:
+                                                                '0 2px 7px rgba(15,23,42,0.03)'
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                display:
+                                                                    'flex',
+                                                                alignItems:
+                                                                    'flex-start',
+                                                                gap: 10,
+                                                                padding:
+                                                                    '12px 13px'
+                                                            }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    flexShrink: 0,
+                                                                    width: 28,
+                                                                    height: 28,
+                                                                    display:
+                                                                        'flex',
+                                                                    alignItems:
+                                                                        'center',
+                                                                    justifyContent:
+                                                                        'center',
+                                                                    borderRadius: 8,
+                                                                    background:
+                                                                        '#eef2ff',
+                                                                    color: '#4338ca',
+                                                                    fontSize: 10,
+                                                                    fontWeight: 900
+                                                                }}
+                                                            >
+                                                                Q
+                                                                {index +
+                                                                    1}
+                                                            </div>
+
+                                                            <div
+                                                                style={{
+                                                                    flex: 1,
+                                                                    minWidth: 0
+                                                                }}
+                                                            >
+                                                                <div
+                                                                    style={{
+                                                                        fontSize: 11.5,
+                                                                        fontWeight: 750,
+                                                                        lineHeight: 1.45,
+                                                                        color: '#1e293b'
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        item.questionText
+                                                                    }
+                                                                </div>
+
+                                                                <div
+                                                                    style={{
+                                                                        marginTop: 8,
+                                                                        display:
+                                                                            'flex',
+                                                                        alignItems:
+                                                                            'center',
+                                                                        gap: 6
+                                                                    }}
+                                                                >
+                                                                    <span
+                                                                        style={{
+                                                                            fontSize: 9,
+                                                                            color: '#94a3b8',
+                                                                            textTransform:
+                                                                                'uppercase',
+                                                                            fontWeight: 800
+                                                                        }}
+                                                                    >
+                                                                        Answer
+                                                                    </span>
+
+                                                                    <span
+                                                                        style={{
+                                                                            padding:
+                                                                                '4px 9px',
+                                                                            borderRadius: 999,
+                                                                            background:
+                                                                                answerBg,
+                                                                            color: answerText,
+                                                                            fontSize: 10,
+                                                                            fontWeight: 900
+                                                                        }}
+                                                                    >
+                                                                        {answer ||
+                                                                            'Not answered'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {item.photos &&
+                                                            item
+                                                                .photos
+                                                                .length >
+                                                                0 && (
+                                                                <div
+                                                                    style={{
+                                                                        display:
+                                                                            'flex',
+                                                                        alignItems:
+                                                                            'center',
+                                                                        gap: 8,
+                                                                        flexWrap:
+                                                                            'wrap',
+                                                                        padding:
+                                                                            '9px 13px 12px',
+                                                                        borderTop:
+                                                                            '1px solid #f1f5f9',
+                                                                        background:
+                                                                            '#fafafa'
+                                                                    }}
+                                                                >
+                                                                    <span
+                                                                        style={{
+                                                                            fontSize: 9,
+                                                                            fontWeight: 800,
+                                                                            color: '#64748b',
+                                                                            marginRight: 2
+                                                                        }}
+                                                                    >
+                                                                        Evidence
+                                                                    </span>
+
+                                                                    {item.photos.map(
+                                                                        (
+                                                                            photo,
+                                                                            photoIndex
+                                                                        ) => (
+                                                                            <button
+                                                                                key={
+                                                                                    photoIndex
+                                                                                }
+                                                                                type="button"
+                                                                                onClick={() =>
+                                                                                    setPreviewPhoto(
+                                                                                        photo
+                                                                                    )
+                                                                                }
+                                                                                style={{
+                                                                                    width: 64,
+                                                                                    height: 54,
+                                                                                    padding: 0,
+                                                                                    borderRadius: 9,
+                                                                                    overflow:
+                                                                                        'hidden',
+                                                                                    border:
+                                                                                        '1px solid #cbd5e1',
+                                                                                    background:
+                                                                                        '#f1f5f9',
+                                                                                    cursor:
+                                                                                        'zoom-in'
+                                                                                }}
+                                                                                title="Click to enlarge evidence"
+                                                                            >
+                                                                                <img
+                                                                                    src={
+                                                                                        photo
+                                                                                    }
+                                                                                    alt={
+                                                                                        `Question ${index + 1} evidence ${photoIndex + 1}`
+                                                                                    }
+                                                                                    style={{
+                                                                                        width:
+                                                                                            '100%',
+                                                                                        height:
+                                                                                            '100%',
+                                                                                        objectFit:
+                                                                                            'cover'
+                                                                                    }}
+                                                                                />
+                                                                            </button>
+                                                                        )
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                );
+                                            }
+                                        )}
+                                    </div>
+                                )}
+
+                                {allEvidencePhotos.length >
+                                    0 && (
+                                    <div
+                                        style={{
+                                            marginTop: 18,
+                                            paddingTop: 15,
+                                            borderTop:
+                                                '1px solid #e2e8f0'
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                fontWeight: 900,
+                                                color: '#334155',
+                                                marginBottom: 9
+                                            }}
+                                        >
+                                            All Inspection Evidence
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                flexWrap:
+                                                    'wrap',
+                                                gap: 8
+                                            }}
+                                        >
+                                            {allEvidencePhotos.map(
+                                                (
+                                                    photo,
+                                                    index
+                                                ) => (
+                                                    <button
+                                                        key={
+                                                            index
+                                                        }
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setPreviewPhoto(
+                                                                photo
+                                                            )
+                                                        }
+                                                        style={{
+                                                            width: 76,
+                                                            height: 66,
+                                                            padding: 0,
+                                                            overflow:
+                                                                'hidden',
+                                                            borderRadius: 10,
+                                                            border:
+                                                                '1px solid #cbd5e1',
+                                                            background:
+                                                                '#f1f5f9',
+                                                            cursor:
+                                                                'zoom-in'
+                                                        }}
+                                                        title="Click to enlarge evidence"
+                                                    >
+                                                        <img
+                                                            src={
+                                                                photo
+                                                            }
+                                                            alt={
+                                                                `Inspection evidence ${index + 1}`
+                                                            }
+                                                            style={{
+                                                                width:
+                                                                    '100%',
+                                                                height:
+                                                                    '100%',
+                                                                objectFit:
+                                                                    'cover'
+                                                            }}
+                                                        />
+                                                    </button>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* RIGHT */}
+                            <div
+                                style={{
+                                    minWidth: 0,
+                                    overflowY:
+                                        'auto',
+                                    borderLeft:
+                                        '1px solid #e2e8f0',
+                                    padding:
+                                        '18px 17px',
+                                    background:
+                                        '#f8fafc'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        marginBottom: 13
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: 14,
+                                            fontWeight: 900,
+                                            color: '#0f172a'
+                                        }}
+                                    >
+                                        Workflow Timeline
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop: 3,
+                                            fontSize: 10.5,
+                                            lineHeight: 1.4,
+                                            color: '#64748b'
+                                        }}
+                                    >
+                                        Role-wise audit history with recorded timestamps, remarks and evidence.
+                                    </div>
+                                </div>
+
+                                <TimelineStage
+                                    title="Inspection Submitted"
+                                    person={
+                                        submitterName
+                                    }
+                                    time={
+                                        submittedAt
+                                    }
+                                    statusValue="SUBMITTED"
+                                />
+
+                                <TimelineStage
+                                    title="SI Review"
+                                    person={
+                                        siName
+                                    }
+                                    time={
+                                        siReviewedAt
+                                    }
+                                    statusValue={
+                                        siDecision ||
+                                        (
+                                            hasSiStage
+                                                ? 'REVIEWED'
+                                                : null
+                                        )
+                                    }
+                                    remarks={
+                                        siRemarks
+                                    }
+                                    aiSuggestion={
+                                        siAiSuggestion
+                                    }
+                                    showAiSection={true}
+                                    pending={
+                                        !hasSiStage
+                                    }
+                                />
+
+                                {(hasUlbStage ||
+                                    currentAuditStatus ===
+                                        'ACTION_REQUIRED' ||
+                                    currentAuditStatus ===
+                                        'ACTION_TAKEN') && (
+                                    <TimelineStage
+                                        title="ULB Review"
+                                        person={
+                                            ulbName
+                                        }
+                                        time={
+                                            ulbReviewedAt
+                                        }
+                                        statusValue={
+                                            currentAuditStatus ===
+                                                'ACTION_REQUIRED' ||
+                                            currentAuditStatus ===
+                                                'ACTION_TAKEN'
+                                                ? 'ACTION_REQUIRED'
+                                                : null
+                                        }
+                                        remarks={
+                                            ulbRemarks
+                                        }
+                                        aiSuggestion={
+                                            ulbAiSuggestion
+                                        }
+                                        showAiSection={true}
+                                        pending={
+                                            !hasUlbStage
+                                        }
+                                    />
+                                )}
+
+                                {(hasAoStage ||
+                                    currentAuditStatus ===
+                                        'ACTION_REQUIRED') && (
+                                    <TimelineStage
+                                        title="IEC Action"
+                                        person={
+                                            aoName
+                                        }
+                                        time={
+                                            aoActionAt
+                                        }
+                                        statusValue={
+                                            currentAuditStatus ===
+                                            'ACTION_TAKEN'
+                                                ? 'ACTION_TAKEN'
+                                                : currentAuditStatus ===
+                                                    'ACTION_REQUIRED'
+                                                  ? 'ACTION_REQUIRED'
+                                                  : null
+                                        }
+                                        remarks={
+                                            aoRemarks
+                                        }
+                                        photos={
+                                            aoEvidencePhotos
+                                        }
+                                        pending={
+                                            currentAuditStatus ===
+                                            'ACTION_REQUIRED' &&
+                                            !aoActionAt
+                                        }
+                                    />
+                                )}
+
+                                <div
+                                    style={{
+                                        marginTop: 2,
+                                        padding:
+                                            '13px 14px',
+                                        borderRadius: 14,
+                                        background:
+                                            auditStatusTone(
+                                                currentAuditStatus
+                                            ).bg,
+                                        border:
+                                            `1px solid ${
+                                                auditStatusTone(
+                                                    currentAuditStatus
+                                                ).border
+                                            }`
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            fontSize: 8.5,
+                                            fontWeight: 900,
+                                            color: '#64748b',
+                                            textTransform:
+                                                'uppercase',
+                                            letterSpacing:
+                                                '0.07em'
+                                        }}
+                                    >
+                                        Current Workflow Status
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop: 7
+                                        }}
+                                    >
+                                        <AuditBadge
+                                            value={
+                                                currentAuditStatus
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {previewPhoto && (
+                    <div
+                        onClick={() =>
+                            setPreviewPhoto(
+                                null
+                            )
+                        }
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            zIndex: 100000,
+                            display: 'flex',
+                            alignItems:
+                                'center',
+                            justifyContent:
+                                'center',
+                            padding: 22,
+                            background:
+                                'rgba(2,6,23,0.92)',
+                            backdropFilter:
+                                'blur(8px)'
+                        }}
+                    >
+                        <div
+                            onClick={(event) =>
+                                event.stopPropagation()
+                            }
+                            style={{
+                                position:
+                                    'relative',
+                                maxWidth:
+                                    '92vw',
+                                maxHeight:
+                                    '88vh',
+                                padding: 8,
+                                borderRadius: 16,
+                                background:
+                                    '#ffffff',
+                                boxShadow:
+                                    '0 30px 90px rgba(0,0,0,0.55)'
+                            }}
+                        >
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setPreviewPhoto(
+                                        null
+                                    )
+                                }
+                                style={{
+                                    position:
+                                        'absolute',
+                                    top: 12,
+                                    right: 12,
+                                    zIndex: 2,
+                                    width: 34,
+                                    height: 34,
+                                    border: 0,
+                                    borderRadius:
+                                        999,
+                                    background:
+                                        'rgba(15,23,42,0.85)',
+                                    color: '#ffffff',
+                                    fontSize: 18,
+                                    cursor:
+                                        'pointer'
+                                }}
+                            >
+                                ×
+                            </button>
+
+                            <img
+                                src={
+                                    previewPhoto
+                                }
+                                alt="Inspection evidence"
+                                style={{
+                                    display: 'block',
+                                    maxWidth:
+                                        '88vw',
+                                    maxHeight:
+                                        '82vh',
+                                    objectFit:
+                                        'contain',
+                                    borderRadius: 10
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
+            </>,
+            document.body
+        );
+    }
+
+
+return createPortal(
         <>
             {/* Backdrop */}
             <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 99998, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)' }} />

@@ -50,28 +50,37 @@ const STATUS_LEGEND: Array<{
   label: string;
   color: string;
 }> = [
-    {
-      state: 'NOT_STARTED',
-      label: 'Not started',
-      color: '#94a3b8',
-    },
-    {
-      state: 'SUBMITTED',
-      label: 'Submitted',
-      color: '#2563eb',
-    },
-    {
-      state: 'APPROVED',
-      label: 'SI approved',
-      color: '#10b981',
-    },
-    {
-      state: 'ATTENTION',
-      label: 'Needs attention',
-      color: '#f59e0b',
-    },
-  ];
-
+  {
+    state: 'NOT_REPORTED',
+    label: 'Not Reported',
+    color: '#64748b',
+  },
+  {
+    state: 'PENDING',
+    label: 'Pending',
+    color: '#f59e0b',
+  },
+  {
+    state: 'APPROVED',
+    label: 'Approved',
+    color: '#16a34a',
+  },
+  {
+    state: 'REJECTED',
+    label: 'Rejected',
+    color: '#e11d48',
+  },
+  {
+    state: 'ACTION_REQUIRED',
+    label: 'Action Required',
+    color: '#f97316',
+  },
+  {
+    state: 'ACTION_TAKEN',
+    label: 'Action Taken',
+    color: '#2563eb',
+  },
+];
 type LayerKey = 'beats' | 'toilets' | 'bins';
 
 export default function WardRankingOperationsMap({

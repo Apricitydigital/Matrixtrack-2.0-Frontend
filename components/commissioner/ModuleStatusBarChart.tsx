@@ -27,9 +27,9 @@ export type ModuleStatusDatum = {
   name: string;
   Approved: number;
   Rejected: number;
-  'Action Required': number;
+  'Pending Action': number;
   'Action Taken': number;
-  Pending: number;
+  'Pending SI': number;
 };
 
 export default function ModuleStatusBarChart({
@@ -90,9 +90,44 @@ export default function ModuleStatusBarChart({
             border: '1px solid #e2e8f0',
             fontSize: 11,
           }}
+                  itemStyle={{
+                    color:
+                      '#111827',
+                    fontWeight:
+                      700,
+                  }}
+                  labelStyle={{
+                    color:
+                      '#111827',
+                    fontWeight:
+                      700,
+                  }}
         />
 
-        <Legend wrapperStyle={{ fontSize: 10, fontWeight: 800 }} />
+        <Legend
+                  wrapperStyle={{
+                    fontSize:
+                      10,
+                    fontWeight:
+                      800,
+                    color:
+                      '#111827',
+                  }}
+                  formatter={(
+                    value: any
+                  ) => (
+                    <span
+                      style={{
+                        color:
+                          '#111827',
+                        fontWeight:
+                          800,
+                      }}
+                    >
+                      {value}
+                    </span>
+                  )}
+                />
 
         <Bar
           dataKey="Approved"
@@ -111,7 +146,7 @@ export default function ModuleStatusBarChart({
         />
 
         <Bar
-          dataKey="Action Required"
+          dataKey="Pending Action"
           stackId="status"
           fill="url(#actionRequiredGradient)"
           isAnimationActive
@@ -127,9 +162,9 @@ export default function ModuleStatusBarChart({
         />
 
         <Bar
-          dataKey="Pending"
+          dataKey="Pending SI"
           stackId="status"
-          fill="#cbd5e1"
+          fill="#38bdf8"
           radius={[0, 10, 10, 0]}
           isAnimationActive
           animationDuration={850}
