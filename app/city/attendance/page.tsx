@@ -1492,11 +1492,18 @@ function AttendanceDashboard() {
       .map((role) => String(role).toUpperCase())
   );
   const isUlbOfficer = attendanceRoles.has("ULB_OFFICER");
+  const isCommissioner =
+    attendanceRoles.has("COMMISSIONER") ||
+    (typeof window !== "undefined" &&
+      (window.location.pathname.includes("/commissioner") ||
+        window.location.pathname.includes("/ulb")));
   const isCityAdmin =
     hmsSuperAdmin ||
     attendanceRoles.has("CITY_ADMIN") ||
     attendanceRoles.has("COMMISSIONER") ||
     attendanceRoles.has("ULB_OFFICER");
+  const isCityAdminOnly =
+    (hmsSuperAdmin || attendanceRoles.has("CITY_ADMIN")) && !isCommissioner;
   const canUploadAttendance =
     hmsSuperAdmin ||
     attendanceRoles.has("CITY_ADMIN") ||
@@ -3288,7 +3295,7 @@ function AttendanceDashboard() {
       ) : (
         <>
           {/* Health Worker registered employees stats banner - visible to City Admin & Super Admin */}
-          {employeeGroup === "HEALTH_WORKERS" && isCityAdmin && (
+          {employeeGroup === "HEALTH_WORKERS" && isCityAdminOnly && (
             <section className="rounded-2xl border border-teal-200/80 bg-gradient-to-r from-teal-50 via-emerald-50/60 to-white p-4 shadow-sm">
               {registeredEmpLoading ? (
                 <div className="flex items-center gap-2 text-xs font-semibold text-teal-700">
@@ -3379,9 +3386,9 @@ function AttendanceDashboard() {
 
           <section className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
             <KpiCard
-              label={employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin ? "Registered Employees" : "Total employees"}
+              label={employeeGroup === "HEALTH_WORKERS" ? "Registered Employees" : "Total employees"}
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? numberFormatter.format(registeredEmpData.totalRegistered)
                   : numberFormatter.format(summary.uniqueEmployees)
               }
@@ -3391,10 +3398,10 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "ALL",
                 title: "Total employees",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? `${registeredEmpData.totalRegistered} registered employees · ${registeredEmpData.totalMatched} matched with attendance data.`
                   : "Underlying employee attendance records for the current dashboard filters.",
-                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? numberFormatter.format(registeredEmpData.totalRegistered)
                   : numberFormatter.format(summary.uniqueEmployees),
                 tone: "blue",
@@ -3403,7 +3410,7 @@ function AttendanceDashboard() {
             <KpiCard
               label="Present"
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalPresent / avgDivisor) : numberFormatter.format(registeredEmpData.totalPresent))
                   : (isMultiDayRange ? formatAverageValue(avgPresent) : numberFormatter.format(summary.present))
               }
@@ -3413,10 +3420,10 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "PRESENT",
                 title: "Present employees",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? `${registeredEmpData.totalPresent} registered health workers marked present.`
                   : "Employees marked present within the current date range and active filters.",
-                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? numberFormatter.format(registeredEmpData.totalPresent)
                   : numberFormatter.format(summary.present),
                 tone: "emerald",
@@ -3426,7 +3433,7 @@ function AttendanceDashboard() {
             <KpiCard
               label="Absent"
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalAbsent / avgDivisor) : numberFormatter.format(registeredEmpData.totalAbsent))
                   : (isMultiDayRange ? formatAverageValue(avgAbsent) : numberFormatter.format(summary.absent))
               }
@@ -3436,10 +3443,10 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "ABSENT",
                 title: "Absent employees",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? `${registeredEmpData.totalAbsent} registered health workers marked absent.`
                   : "Employees marked absent within the current date range and active filters.",
-                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? numberFormatter.format(registeredEmpData.totalAbsent)
                   : numberFormatter.format(summary.absent),
                 tone: "rose",
@@ -3449,7 +3456,7 @@ function AttendanceDashboard() {
             <KpiCard
               label="Attendance rate"
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin && registeredEmpData.totalRegistered > 0
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly && registeredEmpData.totalRegistered > 0
                   ? `${((registeredEmpData.totalPresent / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
                   : `${summary.attendanceRate.toFixed(1)}%`
               }
@@ -3459,10 +3466,10 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "RATE",
                 title: "Attendance rate · Present records",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? `Present ÷ total registered (${registeredEmpData.totalPresent} present of ${registeredEmpData.totalRegistered} registered).`
                   : "Present employee records used to calculate the attendance rate for the current selection.",
-                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin && registeredEmpData.totalRegistered > 0
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly && registeredEmpData.totalRegistered > 0
                   ? `${((registeredEmpData.totalPresent / registeredEmpData.totalRegistered) * 100).toFixed(1)}%`
                   : `${summary.attendanceRate.toFixed(1)}%`,
                 tone: "violet",
@@ -3472,7 +3479,7 @@ function AttendanceDashboard() {
             <KpiCard
               label="Punch In"
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? (isMultiDayRange ? formatAverageValue(registeredEmpData.totalPresent / avgDivisor) : numberFormatter.format(registeredEmpData.totalPresent))
                   : (isMultiDayRange ? formatAverageValue(avgPunchIn) : numberFormatter.format(punchInCount))
               }
@@ -3482,10 +3489,10 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "PUNCH_IN",
                 title: "Punch In records",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? `${registeredEmpData.totalPresent} registered health workers recorded a punch in.`
                   : "Employees with a recorded Punch In within the current selection.",
-                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? numberFormatter.format(registeredEmpData.totalPresent)
                   : numberFormatter.format(punchInCount),
                 tone: "blue",
@@ -3510,7 +3517,7 @@ function AttendanceDashboard() {
             <KpiCard
               label="Not punched out"
               value={
-                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? (isMultiDayRange ? formatAverageValue(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut) / avgDivisor) : numberFormatter.format(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut)))
                   : (isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns))
               }
@@ -3520,10 +3527,10 @@ function AttendanceDashboard() {
               onClick={() => openKpiDrilldown({
                 key: "OPEN_PUNCH_IN",
                 title: "Not punched out records",
-                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                subtitle: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? `${Math.max(0, registeredEmpData.totalPresent - summary.checkedOut)} registered health workers with Punch In recorded but Punch Out pending.`
                   : "Employees with Punch In recorded but no Punch Out yet.",
-                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdmin
+                value: employeeGroup === "HEALTH_WORKERS" && registeredEmpData && isCityAdminOnly
                   ? numberFormatter.format(Math.max(0, registeredEmpData.totalPresent - summary.checkedOut))
                   : numberFormatter.format(summary.openCheckIns),
                 tone: "amber",
