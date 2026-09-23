@@ -2064,25 +2064,69 @@ function AttendanceDashboard() {
   const isMultiDayRange = rangeDayCount > 1;
   const avgDivisor = Math.max(rangeDayCount, 1);
 
-  const avgPresent = summary ? summary.present / avgDivisor : 0;
-  const avgAbsent = summary ? summary.absent / avgDivisor : 0;
+  const isHealthWorkerMatchedBase = employeeGroup === "HEALTH_WORKERS" && Boolean(registeredEmpData) && !isCityAdminOnly;
+
+  const effectiveTotalMatched = isHealthWorkerMatchedBase && registeredEmpData
+    ? registeredEmpData.totalMatched
+    : summary?.uniqueEmployees ?? 0;
+
+  const effectivePresent = isHealthWorkerMatchedBase && registeredEmpData
+    ? registeredEmpData.totalPresent
+    : summary?.present ?? 0;
+
+  const effectiveAbsent = isHealthWorkerMatchedBase && registeredEmpData
+    ? registeredEmpData.totalAbsent
+    : summary?.absent ?? 0;
+
+  const effectiveCheckedOut = summary?.checkedOut ?? 0;
+
+  const effectiveOpenCheckIns = isHealthWorkerMatchedBase && registeredEmpData
+    ? Math.max(0, registeredEmpData.totalPresent - effectiveCheckedOut)
+    : summary?.openCheckIns ?? 0;
+
+  const effectiveNoPunch = isHealthWorkerMatchedBase && registeredEmpData
+    ? Math.max(0, registeredEmpData.totalMatched - registeredEmpData.totalPresent)
+    : summary?.noPunch ?? 0;
+
+  const avgPresent = summary ? effectivePresent / avgDivisor : 0;
+  const avgAbsent = summary ? effectiveAbsent / avgDivisor : 0;
   const avgTotalRecords = summary ? summary.totalRecords / avgDivisor : 0;
-  const avgPunchIn = summary ? punchInCount / avgDivisor : 0;
-  const avgCheckedOut = summary ? summary.checkedOut / avgDivisor : 0;
-  const avgOpenCheckIns = summary ? summary.openCheckIns / avgDivisor : 0;
-  const avgNoPunch = summary ? summary.noPunch / avgDivisor : 0;
+  const avgPunchIn = summary ? (isHealthWorkerMatchedBase ? effectivePresent : punchInCount) / avgDivisor : 0;
+  const avgCheckedOut = summary ? effectiveCheckedOut / avgDivisor : 0;
+  const avgOpenCheckIns = summary ? effectiveOpenCheckIns / avgDivisor : 0;
+  const avgNoPunch = summary ? effectiveNoPunch / avgDivisor : 0;
 
   const punchCompletionPie = useMemo(() => {
-    if (!summary) return [];
+    if (!summary && !isHealthWorkerMatchedBase) return [];
     return [
-      { name: "Punch Out", value: summary.checkedOut, color: chartColors.emerald },
-      { name: "Not punched out", value: summary.openCheckIns, color: chartColors.amber },
-      { name: "No punch", value: summary.noPunch, color: chartColors.slate },
+      { name: "Punch Out", value: effectiveCheckedOut, color: chartColors.emerald },
+      { name: "Not punched out", value: effectiveOpenCheckIns, color: chartColors.amber },
+      { name: "No punch", value: effectiveNoPunch, color: chartColors.slate },
     ].filter((item) => item.value > 0);
-  }, [summary?.checkedOut, summary?.openCheckIns, summary?.noPunch]);
+  }, [summary?.checkedOut, effectiveCheckedOut, effectiveOpenCheckIns, effectiveNoPunch, isHealthWorkerMatchedBase]);
 
-  const punchCompletionRate =
-    summary && summary.totalRecords ? (summary.checkedOut / summary.totalRecords) * 100 : 0;
+  const punchCompletionRate = isHealthWorkerMatchedBase
+    ? (effectivePresent > 0 ? (effectiveCheckedOut / effectivePresent) * 100 : 0)
+    : (summary && summary.totalRecords ? (summary.checkedOut / summary.totalRecords) * 100 : 0);
+
+  const dailyTrendData = useMemo(() => {
+    if (!data?.dailyTrend) return [];
+    if (!isHealthWorkerMatchedBase || !registeredEmpData) return data.dailyTrend;
+    if (data.dailyTrend.length <= 1) {
+      return [{
+        ...data.dailyTrend[0],
+        present: registeredEmpData.totalPresent,
+        absent: registeredEmpData.totalAbsent,
+      }];
+    }
+    const rawTotalPresent = data.dailyTrend.reduce((acc, curr) => acc + curr.present, 0) || 1;
+    const rawTotalAbsent = data.dailyTrend.reduce((acc, curr) => acc + curr.absent, 0) || 1;
+    return data.dailyTrend.map((item) => ({
+      ...item,
+      present: Math.round((item.present / rawTotalPresent) * registeredEmpData.totalPresent),
+      absent: Math.round((item.absent / rawTotalAbsent) * registeredEmpData.totalAbsent),
+    }));
+  }, [data?.dailyTrend, isHealthWorkerMatchedBase, registeredEmpData]);
 
   const checkInDistribution = useMemo(() => {
     const byHour = new Map((data?.checkInDistribution || []).map((item) => [item.hour, item.count]));
@@ -3556,7 +3600,7 @@ function AttendanceDashboard() {
               </div>
               <div className="h-[295px] w-full rounded-2xl bg-gradient-to-b from-slate-50/70 to-white px-1 pt-2 ring-1 ring-slate-100">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.dailyTrend} margin={{ left: -15, right: 8, top: 8, bottom: 0 }}>
+                  <AreaChart data={dailyTrendData} margin={{ left: -15, right: 8, top: 8, bottom: 0 }}>
                     <defs>
                       <linearGradient id="presentArea" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={chartColors.blue} stopOpacity={0.28} />
@@ -3606,28 +3650,28 @@ function AttendanceDashboard() {
                 <div className="group/mix rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/70 px-2.5 py-3 ring-1 ring-emerald-100 transition hover:-translate-y-0.5">
                   <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">Punch Out</p>
                   <p className="mt-1 text-base font-black tabular-nums text-slate-950">
-                    {isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(summary.checkedOut)}
+                    {isMultiDayRange ? formatAverageValue(avgCheckedOut) : numberFormatter.format(effectiveCheckedOut)}
                   </p>
                   <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-emerald-700/70">
-                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.checkedOut, rangeDayCount)}` : "Completed Punch In / Punch Out cycle"}
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(effectiveCheckedOut, rangeDayCount)}` : "Completed Punch In / Punch Out cycle"}
                   </p>
                 </div>
                 <div className="group/mix rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50/70 px-2.5 py-3 ring-1 ring-amber-100 transition hover:-translate-y-0.5">
                   <p className="text-[9px] font-black uppercase tracking-wider text-amber-700">Not punched out</p>
                   <p className="mt-1 text-base font-black tabular-nums text-slate-950">
-                    {isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(summary.openCheckIns)}
+                    {isMultiDayRange ? formatAverageValue(avgOpenCheckIns) : numberFormatter.format(effectiveOpenCheckIns)}
                   </p>
                   <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-amber-700/70">
-                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.openCheckIns, rangeDayCount)}` : "Punch In recorded · Punch Out pending"}
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(effectiveOpenCheckIns, rangeDayCount)}` : "Punch In recorded · Punch Out pending"}
                   </p>
                 </div>
                 <div className="group/mix rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50/70 px-2.5 py-3 ring-1 ring-slate-200 transition hover:-translate-y-0.5">
                   <p className="text-[9px] font-black uppercase tracking-wider text-slate-600">No punch</p>
                   <p className="mt-1 text-base font-black tabular-nums text-slate-950">
-                    {isMultiDayRange ? formatAverageValue(avgNoPunch) : numberFormatter.format(summary.noPunch)}
+                    {isMultiDayRange ? formatAverageValue(avgNoPunch) : numberFormatter.format(effectiveNoPunch)}
                   </p>
                   <p className="mt-0.5 text-[8.5px] font-semibold leading-tight text-slate-500">
-                    {isMultiDayRange ? `Avg/day · ${averageFormula(summary.noPunch, rangeDayCount)}` : "No Punch In or Punch Out recorded"}
+                    {isMultiDayRange ? `Avg/day · ${averageFormula(effectiveNoPunch, rangeDayCount)}` : "No Punch In or Punch Out recorded"}
                   </p>
                 </div>
               </div>
@@ -4066,7 +4110,7 @@ function AttendanceDashboard() {
           <section>
             {employeeGroup === "HEALTH_WORKERS" && registeredEmpData ? (
               <EmployeeMatchedSection
-                employees={registeredEmpData.employees.map((re) => ({
+                employees={(!isCityAdminOnly ? registeredEmpData.employees.filter((re) => re.isMatched) : registeredEmpData.employees).map((re) => ({
                   attendanceId: re.attendanceId || re.aadhaarSuffix || "No Aadhaar",
                   employeeName: re.name,
                   designation: null,
