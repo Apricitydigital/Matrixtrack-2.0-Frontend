@@ -40,7 +40,7 @@ export default function ProcessingPlantFilters({ filters, plants, onChange }: Pr
     : plants;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="space-y-1.5">
@@ -103,12 +103,30 @@ export default function ProcessingPlantFilters({ filters, plants, onChange }: Pr
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => quickRange(1)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Today</button>
-          <button onClick={() => quickRange(7)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">7 Days</button>
-          <button onClick={() => quickRange(30)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">30 Days</button>
+          {[
+            [1, 'Today'],
+            [7, '7 Days'],
+            [30, '30 Days'],
+          ].map(([days, label]) => {
+            const range = lastNDaysRange(days as number);
+            const active = filters.from === range.from && filters.to === range.to;
+            return (
+              <button
+                key={label as string}
+                onClick={() => quickRange(days as number)}
+                className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                  active
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
           <button
             onClick={() => onChange({ ...lastNDaysRange(30), plantType: '', plantId: '' })}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white transition hover:bg-slate-800"
           >
             <RotateCcw size={13} /> Reset
           </button>
