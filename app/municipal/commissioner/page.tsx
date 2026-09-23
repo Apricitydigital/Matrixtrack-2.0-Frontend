@@ -219,49 +219,49 @@ const INSPECTION_MODULES: Array<{
   key: InspectionModuleKey;
   label: string;
 }> = [
-  {
-    key: 'TOILET',
-    label: 'Cleanliness of Toilets',
-  },
-  {
-    key: 'LITTERBINS',
-    label: 'Litter Bins',
-  },
-  {
-    key: 'SWEEPING',
-    label: 'Sweeping',
-  },
-];
+    {
+      key: 'TOILET',
+      label: 'Cleanliness of Toilets',
+    },
+    {
+      key: 'LITTERBINS',
+      label: 'Litter Bins',
+    },
+    {
+      key: 'SWEEPING',
+      label: 'Sweeping',
+    },
+  ];
 
 const DASHBOARD_MODULES: Array<{
   key: DashboardModuleKey;
   label: string;
 }> = [
-  {
-    key: 'ALL',
-    label: 'All',
-  },
-  {
-    key: 'TOILET',
-    label: 'Cleanliness of Toilets',
-  },
-  {
-    key: 'LITTERBINS',
-    label: 'Litter Bins',
-  },
-  {
-    key: 'SWEEPING',
-    label: 'Sweeping',
-  },
-  {
-    key: 'ATTENDANCE',
-    label: 'Attendance',
-  },
-  {
-    key: 'WARD_RANKING',
-    label: 'Ward Ranking',
-  },
-];
+    {
+      key: 'ALL',
+      label: 'All',
+    },
+    {
+      key: 'TOILET',
+      label: 'Cleanliness of Toilets',
+    },
+    {
+      key: 'LITTERBINS',
+      label: 'Litter Bins',
+    },
+    {
+      key: 'SWEEPING',
+      label: 'Sweeping',
+    },
+    {
+      key: 'ATTENDANCE',
+      label: 'Attendance',
+    },
+    {
+      key: 'WARD_RANKING',
+      label: 'Ward Performance',
+    },
+  ];
 
 const MODULE_VISUALS: Record<
   string,
@@ -368,65 +368,65 @@ const ROLES: Array<{
   key: RoleKey;
   label: string;
 }> = [
-  {
-    key: 'ALL',
-    label: 'All',
-  },
-  {
-    key: 'SUPERVISOR',
-    label: 'Daroga',
-  },
-  {
-    key: 'QC',
-    label: 'Sanitary Inspector',
-  },
-  {
-    key: 'ULB_OFFICER',
-    label: 'ULB Officer',
-  },
-  {
-    key: 'ACTION_OFFICER',
-    label: 'IEC Member',
-  },
-  {
-    key: 'EMPLOYEE',
-    label: 'Employee',
-  },
-];
+    {
+      key: 'ALL',
+      label: 'All',
+    },
+    {
+      key: 'SUPERVISOR',
+      label: 'Daroga',
+    },
+    {
+      key: 'QC',
+      label: 'Sanitary Inspector',
+    },
+    {
+      key: 'ULB_OFFICER',
+      label: 'ULB Officer',
+    },
+    {
+      key: 'ACTION_OFFICER',
+      label: 'IEC Member',
+    },
+    {
+      key: 'EMPLOYEE',
+      label: 'Employee',
+    },
+  ];
 
 const METRICS: Array<{
   key: MetricKey;
   label: string;
 }> = [
-  {
-    key: 'OVERALL',
-    label: 'Overall Performance',
-  },
-  {
-    key: 'INSPECTION',
-    label: 'Inspection Performance',
-  },
-  {
-    key: 'ATTENDANCE',
-    label: 'Attendance',
-  },
-  {
-    key: 'APPROVAL',
-    label: 'Approval Rate',
-  },
-  {
-    key: 'REJECTION',
-    label: 'Rejection Rate',
-  },
-  {
-    key: 'ACTION_CLOSURE',
-    label: 'Action Closure',
-  },
-  {
-    key: 'WARD_RANKING',
-    label: 'Ward Ranking',
-  },
-];
+    {
+      key: 'OVERALL',
+      label: 'Overall Performance',
+    },
+    {
+      key: 'INSPECTION',
+      label: 'Inspection Performance',
+    },
+    {
+      key: 'ATTENDANCE',
+      label: 'Attendance',
+    },
+    {
+      key: 'APPROVAL',
+      label: 'Approval Rate',
+    },
+    {
+      key: 'REJECTION',
+      label: 'Rejection Rate',
+    },
+    {
+      key: 'ACTION_CLOSURE',
+      label: 'Action Closure',
+    },
+    {
+      key: 'WARD_RANKING',
+      label: 'Ward Performance',
+    },
+  ];
 
 
 /* =========================================================
@@ -571,6 +571,36 @@ function toDateInput(
 
   return `${year}-${month}-${day}`;
 }
+
+
+function inspectionEndDate(
+  from?: string,
+  to?: string
+) {
+  if (!to) {
+    return undefined;
+  }
+
+  const nextDay =
+    new Date(
+      `${to}T00:00:00`
+    );
+
+  nextDay.setDate(
+    nextDay.getDate() + 1
+  );
+
+  return [
+    nextDay.getFullYear(),
+    String(
+      nextDay.getMonth() + 1
+    ).padStart(2, '0'),
+    String(
+      nextDay.getDate()
+    ).padStart(2, '0'),
+  ].join('-');
+}
+
 
 function defaultRange() {
   const today =
@@ -920,30 +950,173 @@ function getDarogaId(
   );
 }
 
+function cleanInspectionDisplayValue(
+  value: unknown
+) {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return '';
+  }
+
+  let result =
+    String(value).trim();
+
+  if (!result) {
+    return '';
+  }
+
+  /*
+   * Remove Unicode replacement / malformed display
+   * characters before showing data to Commissioner.
+   */
+  result =
+    result
+      .replace(/\uFFFD/g, '')
+      .replace(/\?/g, '')
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .trim();
+
+  if (!result) {
+    return '';
+  }
+
+  const normalized =
+    result.toLowerCase();
+
+  if (
+    result === '?' ||
+    result === '-' ||
+    result === '-' ||
+    normalized === 'null' ||
+    normalized === 'undefined' ||
+    normalized === 'nan'
+  ) {
+    return '';
+  }
+
+  return result;
+}
+
+
+function isValidInspectionPersonName(
+  value: unknown
+) {
+  const cleaned =
+    cleanInspectionDisplayValue(
+      value
+    );
+
+  if (!cleaned) {
+    return false;
+  }
+
+  /*
+   * A real person name must contain at least
+   * one letter or number. This rejects broken
+   * replacement glyphs such as ? / diamonds.
+   */
+  return /[A-Za-z0-9]/.test(
+    cleaned
+  );
+}
+
+
 function getSiName(
   item: any
 ) {
-  return (
-    item?.reviewedBy?.name ||
-    item?.qcReviewer?.name ||
-    item?.qc?.name ||
-    item?.reviewedByName ||
-    item?.qcReviewerName ||
-    ''
-  );
+  const candidates = [
+    item?.reviewedBy?.name,
+    item?.reviewedByQc?.name,
+    item?.qcReviewer?.name,
+    item?.qc?.name,
+
+    item?.sanitaryInspector?.name,
+    item?.si?.name,
+    item?.inspector?.name,
+    item?.reviewer?.name,
+
+    item?.assignedQc?.name,
+    item?.assignedQC?.name,
+    item?.assignedReviewer?.name,
+
+    item?.reviewedByName,
+    item?.qcReviewerName,
+    item?.sanitaryInspectorName,
+    item?.siName,
+    item?.inspectorName,
+    item?.reviewerName,
+    item?.assignedQcName,
+    item?.assignedQCName,
+    item?.assignedReviewerName,
+  ];
+
+  for (
+    const candidate of candidates
+  ) {
+    const cleaned =
+      cleanInspectionDisplayValue(
+        candidate
+      );
+
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+
+  return '';
 }
+
 
 function getSiId(
   item: any
 ) {
-  return (
+  const value =
     item?.reviewedBy?.id ||
+    item?.reviewedByQc?.id ||
+    item?.reviewedByQcId ||
     item?.reviewedById ||
+
     item?.qcReviewer?.id ||
+    item?.qcReviewerId ||
+    item?.qc?.id ||
     item?.qcId ||
-    null
-  );
+
+    item?.sanitaryInspector?.id ||
+    item?.sanitaryInspectorId ||
+
+    item?.si?.id ||
+    item?.siId ||
+
+    item?.inspector?.id ||
+    item?.inspectorId ||
+
+    item?.reviewer?.id ||
+    item?.reviewerId ||
+
+    item?.assignedQc?.id ||
+    item?.assignedQcId ||
+
+    item?.assignedQC?.id ||
+    item?.assignedQCId ||
+
+    item?.assignedReviewer?.id ||
+    item?.assignedReviewerId ||
+
+    null;
+
+  if (
+    value === undefined ||
+    value === null ||
+    value === ''
+  ) {
+    return null;
+  }
+
+  return String(value);
 }
+
 
 function getIecName(
   item: any
@@ -1047,6 +1220,29 @@ function userIdsForRecord(
    INSPECTION STATS
 ========================================================= */
 
+function inspectionSiDecisionLabel(
+  value: unknown
+) {
+  const decision =
+    cleanInspectionDisplayValue(
+      value
+    ).toUpperCase();
+
+  /*
+   * SI decision in this table should represent
+   * the SI review verdict only.
+   */
+  if (
+    decision === 'APPROVED' ||
+    decision === 'REJECTED'
+  ) {
+    return decision;
+  }
+
+  return '';
+}
+
+
 function inspectionStats(
   records: DashboardRecord[]
 ): InspectionStats {
@@ -1124,9 +1320,9 @@ function inspectionStats(
   const performance =
     total > 0
       ? (
-          goodOutcome /
-          total
-        ) * 100
+        goodOutcome /
+        total
+      ) * 100
       : null;
 
   // decided uses the permanent QC verdict (getQcDecision), so a report
@@ -1140,17 +1336,17 @@ function inspectionStats(
   const approvalRate =
     decided > 0
       ? (
-          approved /
-          decided
-        ) * 100
+        approved /
+        decided
+      ) * 100
       : null;
 
   const rejectionRate =
     decided > 0
       ? (
-          rejected /
-          decided
-        ) * 100
+        rejected /
+        decided
+      ) * 100
       : null;
 
   // actionRequired is already the superset (Action Required + Action
@@ -1158,9 +1354,9 @@ function inspectionStats(
   const actionClosure =
     actionRequired > 0
       ? (
-          actionTaken /
-          actionRequired
-        ) * 100
+        actionTaken /
+        actionRequired
+      ) * 100
       : null;
 
   return {
@@ -1203,8 +1399,7 @@ async function loadAllModuleRecords(
           tab: 'HISTORY',
           fromDate:
             from || undefined,
-          toDate:
-            to || undefined,
+          toDate: inspectionEndDate(from, to),
         }
       );
 
@@ -1215,12 +1410,12 @@ async function loadAllModuleRecords(
     Math.max(
       1,
       first.meta?.totalPages ||
-        Math.ceil(
-          (
-            first.meta?.total ||
-            firstRows.length
-          ) / limit
-        )
+      Math.ceil(
+        (
+          first.meta?.total ||
+          firstRows.length
+        ) / limit
+      )
     );
 
   if (
@@ -1247,8 +1442,8 @@ async function loadAllModuleRecords(
             Math.min(
               batchSize,
               totalPages -
-                start +
-                1
+              start +
+              1
             ),
         },
         (
@@ -1273,9 +1468,7 @@ async function loadAllModuleRecords(
                   fromDate:
                     from ||
                     undefined,
-                  toDate:
-                    to ||
-                    undefined,
+                  toDate: inspectionEndDate(from, to),
                 }
               )
         )
@@ -1311,7 +1504,7 @@ function monthBoundaries(
     new Date(
       now.getFullYear(),
       now.getMonth() +
-        offsetMonths,
+      offsetMonths,
       1
     );
 
@@ -1319,12 +1512,12 @@ function monthBoundaries(
     offsetMonths === 0
       ? now
       : new Date(
-          now.getFullYear(),
-          now.getMonth() +
-            offsetMonths +
-            1,
-          0
-        );
+        now.getFullYear(),
+        now.getMonth() +
+        offsetMonths +
+        1,
+        0
+      );
 
   return {
     from: toDateInput(first),
@@ -1392,12 +1585,12 @@ async function computePeriodMetrics(
   const attendanceRate =
     attendanceResult.status ===
       'fulfilled' &&
-    attendanceResult.value
-      .hasData
+      attendanceResult.value
+        .hasData
       ? attendanceResult.value
-          .summary
-          ?.attendanceRate ??
-        null
+        .summary
+        ?.attendanceRate ??
+      null
       : null;
 
   /*
@@ -1407,10 +1600,10 @@ async function computePeriodMetrics(
    */
   const wardRankingAverage =
     wardResult.status ===
-    'fulfilled'
+      'fulfilled'
       ? wardResult.value
-          .averageScore ??
-        null
+        .averageScore ??
+      null
       : null;
 
   const overallPerformance =
@@ -1589,9 +1782,8 @@ function CircularProgress({
       <div
         className="relative flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-full transition-transform duration-300 group-enabled:group-hover:scale-[1.03] sm:h-[76px] sm:w-[76px] xl:h-[88px] xl:w-[88px]"
         style={{
-          background: `conic-gradient(${progressColor} ${
-            progress * 3.6
-          }deg, ${trackColor} 0deg)`,
+          background: `conic-gradient(${progressColor} ${progress * 3.6
+            }deg, ${trackColor} 0deg)`,
         }}
       >
         <div className="absolute inset-[6px] rounded-full bg-white shadow-[inset_0_2px_6px_rgba(15,23,42,.06)] sm:inset-[8px] xl:inset-[9px]" />
@@ -1703,7 +1895,7 @@ function KpiCard({
           accentText: 'text-orange-400',
         };
 
-      case 'Ward Ranking':
+      case 'Ward Performance':
         return {
           cornerIcon: <Trophy size={15} strokeWidth={2.8} />,
           accentText: 'text-violet-400',
@@ -1819,11 +2011,10 @@ function KpiCard({
 
                   <div>
                     <div
-                      className={`text-[13px] font-black leading-none ${
-                        isDown
-                          ? 'text-rose-500'
-                          : 'text-emerald-600'
-                      }`}
+                      className={`text-[13px] font-black leading-none ${isDown
+                        ? 'text-rose-500'
+                        : 'text-emerald-600'
+                        }`}
                     >
                       {Math.abs(trend.deltaPct).toFixed(0)}%
                     </div>
@@ -1907,6 +2098,7 @@ function DrilldownDrawer({
   onReport,
   onEmployee,
   onWard,
+  siUsers,
 }: {
   data: DrilldownState;
   onClose: () => void;
@@ -1919,6 +2111,7 @@ function DrilldownDrawer({
   onWard: (
     item: WardRankingRow
   ) => void;
+  siUsers: CityUserSummary[];
 }) {
   type Tab =
     | 'INSPECTION'
@@ -1963,7 +2156,7 @@ function DrilldownDrawer({
           key:
             'WARD_RANKING',
           label:
-            'Ward Ranking',
+            'Ward Performance',
         });
       }
 
@@ -1973,27 +2166,633 @@ function DrilldownDrawer({
   const [tab, setTab] =
     useState<Tab>(
       tabs[0]?.key ||
-        'INSPECTION'
+      'INSPECTION'
     );
 
   const [page, setPage] =
     useState(1);
 
+  const [
+    inspectionModuleFilter,
+    setInspectionModuleFilter,
+  ] =
+    useState<string>('ALL');
+
+  const [
+    inspectionZoneFilter,
+    setInspectionZoneFilter,
+  ] =
+    useState<string>('ALL');
+
+  const [
+    inspectionWardFilter,
+    setInspectionWardFilter,
+  ] =
+    useState<string>('ALL');
+
+  const [
+    inspectionDarogaFilter,
+    setInspectionDarogaFilter,
+  ] =
+    useState<string>('ALL');
+
+  const [
+    inspectionSiFilter,
+    setInspectionSiFilter,
+  ] =
+    useState<string>('ALL');
+
+  const [
+    inspectionWorkflowFilter,
+    setInspectionWorkflowFilter,
+  ] =
+    useState<string>('ALL');
+
+  const [
+    inspectionSearch,
+    setInspectionSearch,
+  ] =
+    useState('');
+
+
   useEffect(() => {
     setTab(
       tabs[0]?.key ||
-        'INSPECTION'
+      'INSPECTION'
     );
 
     setPage(1);
   }, [data, tabs]);
 
+
+  /*
+   * reset inspection workspace when drilldown changes
+   */
+  useEffect(() => {
+    setInspectionModuleFilter(
+      'ALL'
+    );
+    setInspectionZoneFilter(
+      'ALL'
+    );
+    setInspectionWardFilter(
+      'ALL'
+    );
+    setInspectionDarogaFilter(
+      'ALL'
+    );
+    setInspectionSiFilter(
+      'ALL'
+    );
+    setInspectionWorkflowFilter(
+      'ALL'
+    );
+    setInspectionSearch('');
+  }, [data]);
+
   const pageSize =
     40;
 
   const inspectionRows =
-    data.inspectionRecords ||
-    [];
+    (
+      data.inspectionRecords ||
+      []
+    ).filter(
+      (item) =>
+        effectiveStatus(
+          item
+        ) !== 'DRAFT'
+    );
+
+
+
+  const inspectionOverviewStats =
+    useMemo(
+      () =>
+        inspectionStats(
+          inspectionRows
+        ),
+      [inspectionRows]
+    );
+
+  const inspectionModuleOptions =
+    useMemo(
+      () =>
+        INSPECTION_MODULES.filter(
+          (module) =>
+            inspectionRows.some(
+              (item) =>
+                item.dashboardModule ===
+                module.key
+            )
+        ),
+      [inspectionRows]
+    );
+
+  const inspectionZoneOptions =
+    useMemo(
+      () =>
+        naturalSort(
+          Array.from(
+            new Set(
+              inspectionRows
+                .map(
+                  (item) =>
+                    getRecordZone(
+                      item
+                    )
+                )
+                .filter(Boolean)
+            )
+          ) as string[]
+        ),
+      [inspectionRows]
+    );
+
+  const inspectionWardOptions =
+    useMemo(
+      () =>
+        naturalSort(
+          Array.from(
+            new Set(
+              inspectionRows
+                .filter(
+                  (item) =>
+                    inspectionZoneFilter ===
+                    'ALL' ||
+                    getRecordZone(
+                      item
+                    ) ===
+                    inspectionZoneFilter
+                )
+                .map(
+                  (item) =>
+                    getRecordWard(
+                      item
+                    )
+                )
+                .filter(Boolean)
+            )
+          ) as string[]
+        ),
+      [
+        inspectionRows,
+        inspectionZoneFilter,
+      ]
+    );
+
+  const inspectionDarogaOptions =
+    useMemo(
+      () =>
+        naturalSort(
+          Array.from(
+            new Set(
+              inspectionRows
+                .map(
+                  (item) =>
+                    getDarogaName(
+                      item
+                    )
+                )
+                .filter(Boolean)
+            )
+          ) as string[]
+        ),
+      [inspectionRows]
+    );
+
+  const inspectionSiOptions =
+    useMemo(
+      () =>
+        naturalSort(
+          Array.from(
+            new Set(
+              inspectionRows
+                .map(
+                  (item) =>
+                    cleanInspectionDisplayValue(
+                      getInspectionSiDisplayName(
+                        item
+                      )
+                    )
+                )
+                .filter(Boolean)
+            )
+          ) as string[]
+        ),
+      [inspectionRows]
+    );
+
+  const inspectionModuleSummaries =
+    useMemo(
+      () =>
+        INSPECTION_MODULES.map(
+          (module) => {
+            const rows =
+              inspectionRows.filter(
+                (item) =>
+                  item.dashboardModule ===
+                  module.key
+              );
+
+            return {
+              ...module,
+              rows,
+              stats:
+                inspectionStats(
+                  rows
+                ),
+            };
+          }
+        ),
+      [inspectionRows]
+    );
+
+  const filteredInspectionWorkspaceRows =
+    useMemo(
+      () => {
+        const query =
+          normalize(
+            inspectionSearch
+          );
+
+        return inspectionRows.filter(
+          (item) => {
+            if (
+              inspectionModuleFilter !==
+              'ALL' &&
+              item.dashboardModule !==
+              inspectionModuleFilter
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionZoneFilter !==
+              'ALL' &&
+              getRecordZone(
+                item
+              ) !==
+              inspectionZoneFilter
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionWardFilter !==
+              'ALL' &&
+              getRecordWard(
+                item
+              ) !==
+              inspectionWardFilter
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionDarogaFilter !==
+              'ALL' &&
+              getDarogaName(
+                item
+              ) !==
+              inspectionDarogaFilter
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionSiFilter !==
+              'ALL' &&
+              getInspectionSiDisplayName(item) !==
+              inspectionSiFilter
+            ) {
+              return false;
+            }
+
+            const status =
+              effectiveStatus(
+                item
+              );
+
+            const decision =
+              getQcDecision(
+                item
+              );
+
+            if (
+              inspectionWorkflowFilter ===
+              'APPROVED' &&
+              decision !==
+              'APPROVED'
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionWorkflowFilter ===
+              'REJECTED' &&
+              decision !==
+              'REJECTED'
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionWorkflowFilter ===
+              'PENDING' &&
+              status !==
+              'PENDING'
+            ) {
+              return false;
+            }
+
+            /*
+             * Action Required is the complete corrective-action
+             * pool, so it includes both current ACTION_REQUIRED
+             * and already completed ACTION_TAKEN records.
+             */
+            if (
+              inspectionWorkflowFilter ===
+              'ACTION_REQUIRED' &&
+              ![
+                'ACTION_REQUIRED',
+                'ACTION_TAKEN',
+              ].includes(
+                status
+              )
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionWorkflowFilter ===
+              'ACTION_TAKEN' &&
+              status !==
+              'ACTION_TAKEN'
+            ) {
+              return false;
+            }
+
+            if (
+              inspectionWorkflowFilter ===
+              'PENDING_ACTION' &&
+              status !==
+              'ACTION_REQUIRED'
+            ) {
+              return false;
+            }
+
+            if (query) {
+              const haystack =
+                normalize(
+                  [
+                    item.dashboardModuleLabel,
+                    getRecordZone(
+                      item
+                    ),
+                    getRecordWard(
+                      item
+                    ),
+                    getDarogaName(
+                      item
+                    ),
+                    getInspectionSiDisplayName(item),
+                    status,
+                    decision,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                );
+
+              if (
+                !haystack.includes(
+                  query
+                )
+              ) {
+                return false;
+              }
+            }
+
+            return true;
+          }
+        );
+      },
+      [
+        inspectionRows,
+        inspectionModuleFilter,
+        inspectionZoneFilter,
+        inspectionWardFilter,
+        inspectionDarogaFilter,
+        inspectionSiFilter,
+        inspectionWorkflowFilter,
+        inspectionSearch,
+      ]
+    );
+
+  const filteredInspectionWorkspaceStats =
+    useMemo(
+      () =>
+        inspectionStats(
+          filteredInspectionWorkspaceRows
+        ),
+      [
+        filteredInspectionWorkspaceRows,
+      ]
+    );
+
+  const inspectionWorkflowCards = [
+    {
+      key: 'ALL',
+      label:
+        'Total Inspection',
+      value:
+        inspectionOverviewStats.total,
+      tone:
+        'border-blue-200 bg-blue-50 text-blue-700',
+    },
+    {
+      key: 'APPROVED',
+      label:
+        'SI Approved',
+      value:
+        inspectionOverviewStats.approved,
+      tone:
+        'border-emerald-200 bg-emerald-50 text-emerald-700',
+    },
+    {
+      key: 'REJECTED',
+      label:
+        'SI Rejected',
+      value:
+        inspectionOverviewStats.rejected,
+      tone:
+        'border-rose-200 bg-rose-50 text-rose-700',
+    },
+    {
+      key: 'PENDING',
+      label:
+        'SI Pending',
+      value:
+        inspectionOverviewStats.pending,
+      tone:
+        'border-amber-200 bg-amber-50 text-amber-700',
+    },
+    {
+      key: 'ACTION_REQUIRED',
+      label:
+        'Action Required',
+      value:
+        inspectionOverviewStats.actionRequired,
+      tone:
+        'border-orange-200 bg-orange-50 text-orange-700',
+    },
+    {
+      key: 'ACTION_TAKEN',
+      label:
+        'Action Taken',
+      value:
+        inspectionOverviewStats.actionTaken,
+      tone:
+        'border-teal-200 bg-teal-50 text-teal-700',
+    },
+    {
+      key: 'PENDING_ACTION',
+      label:
+        'Pending Action',
+      value:
+        Math.max(
+          0,
+          inspectionOverviewStats.actionRequired -
+          inspectionOverviewStats.actionTaken
+        ),
+      tone:
+        'border-cyan-200 bg-cyan-50 text-cyan-700',
+    },
+  ];
+
+  const resetInspectionWorkspaceFilters =
+    () => {
+      setInspectionModuleFilter(
+        'ALL'
+      );
+      setInspectionZoneFilter(
+        'ALL'
+      );
+      setInspectionWardFilter(
+        'ALL'
+      );
+      setInspectionDarogaFilter(
+        'ALL'
+      );
+      setInspectionSiFilter(
+        'ALL'
+      );
+      setInspectionWorkflowFilter(
+        'ALL'
+      );
+      setInspectionSearch('');
+      setPage(1);
+    };
+
+  useEffect(() => {
+    setInspectionWardFilter(
+      'ALL'
+    );
+    setPage(1);
+  }, [
+    inspectionZoneFilter,
+  ]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    inspectionModuleFilter,
+    inspectionWardFilter,
+    inspectionDarogaFilter,
+    inspectionSiFilter,
+    inspectionWorkflowFilter,
+    inspectionSearch,
+  ]);
+
+  const siUserNameById =
+    useMemo(() => {
+      const map =
+        new Map<string, string>();
+
+      siUsers.forEach(
+        (user) => {
+          const id =
+            cleanInspectionDisplayValue(
+              user.id
+            );
+
+          const name =
+            cleanInspectionDisplayValue(
+              user.name
+            );
+
+          if (
+            id &&
+            name
+          ) {
+            map.set(
+              String(id),
+              name
+            );
+          }
+        }
+      );
+
+      return map;
+    }, [siUsers]);
+
+  function getInspectionSiDisplayName(
+    item: DashboardRecord
+  ) {
+    const directName =
+      cleanInspectionDisplayValue(
+        getSiName(item)
+      );
+
+    /*
+     * Do not accept garbage symbols as names.
+     * Only accept a usable human-readable value.
+     */
+    if (
+      isValidInspectionPersonName(
+        directName
+      )
+    ) {
+      return directName;
+    }
+
+    /*
+     * If name is missing/broken but an SI/QC ID
+     * exists, resolve it against registered QC users.
+     */
+    const id =
+      getSiId(item);
+
+    if (id) {
+      const rosterName =
+        cleanInspectionDisplayValue(
+          siUserNameById.get(
+            String(id)
+          )
+        );
+
+      if (
+        isValidInspectionPersonName(
+          rosterName
+        )
+      ) {
+        return rosterName;
+      }
+    }
+
+    return '';
+  }
+
 
   const attendanceRows =
     data.attendanceEmployees ||
@@ -2005,18 +2804,18 @@ function DrilldownDrawer({
 
   const activeLength =
     tab === 'INSPECTION'
-      ? inspectionRows.length
+      ? filteredInspectionWorkspaceRows.length
       : tab ===
         'ATTENDANCE'
-      ? attendanceRows.length
-      : wardRows.length;
+        ? attendanceRows.length
+        : wardRows.length;
 
   const pages =
     Math.max(
       1,
       Math.ceil(
         activeLength /
-          pageSize
+        pageSize
       )
     );
 
@@ -2057,391 +2856,897 @@ function DrilldownDrawer({
             </button>
           </div>
 
-          {!!data.breakdown
-            ?.length && (
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-              {data.breakdown.map(
-                (row) => (
-                  <div
-                    key={row.label}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5"
-                  >
-                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
-                      {row.label}
-                    </div>
+          {tab !== 'INSPECTION' &&
+            !!data.breakdown?.length && (
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                {data.breakdown.map(
+                  (row) => (
+                    <div
+                      key={row.label}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5"
+                    >
+                      <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
+                        {row.label}
+                      </div>
 
-                    <div className="mt-1 text-sm font-black text-slate-950">
-                      {row.value}
+                      <div className="mt-1 text-sm font-black text-slate-950">
+                        {row.value}
+                      </div>
                     </div>
-                  </div>
-                )
-              )}
-            </div>
-          )}
+                  )
+                )}
+              </div>
+            )}
 
           {tabs.length >
             1 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {tabs.map(
-                (item) => (
-                  <button
-                    key={
-                      item.key
-                    }
-                    type="button"
-                    onClick={() => {
-                      setTab(
+              <div className="mt-4 flex flex-wrap gap-2">
+                {tabs.map(
+                  (item) => (
+                    <button
+                      key={
                         item.key
-                      );
-                      setPage(
-                        1
-                      );
-                    }}
-                    className={`rounded-xl px-4 py-2 text-xs font-black transition ${
-                      tab ===
-                      item.key
+                      }
+                      type="button"
+                      onClick={() => {
+                        setTab(
+                          item.key
+                        );
+                        setPage(
+                          1
+                        );
+                      }}
+                      className={`rounded-xl px-4 py-2 text-xs font-black transition ${tab ===
+                        item.key
                         ? 'bg-slate-950 text-white shadow-lg'
                         : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {
-                      item.label
-                    }
-                  </button>
-                )
-              )}
-            </div>
-          )}
+                        }`}
+                    >
+                      {
+                        item.label
+                      }
+                    </button>
+                  )
+                )}
+              </div>
+            )}
         </div>
 
         <div className="flex-1 overflow-auto p-4 sm:p-6">
           {tab ===
             'INSPECTION' && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left">
-                  <thead className="bg-slate-50">
-                    <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-                      <th className="px-4 py-3">
-                        Date
-                      </th>
-                      <th className="px-4 py-3">
-                        Module
-                      </th>
-                      <th className="px-4 py-3">
-                        Zone
-                      </th>
-                      <th className="px-4 py-3">
-                        Ward
-                      </th>
-                      <th className="px-4 py-3">
-                        Daroga
-                      </th>
-                      <th className="px-4 py-3">
-                        Sanitary Inspector
-                      </th>
-                      <th className="px-4 py-3">
-                        Status
-                      </th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
+              <div className="space-y-5">
 
-                  <tbody className="divide-y divide-slate-100">
-                    {inspectionRows
-                      .slice(
-                        start,
-                        start +
-                          pageSize
-                      )
-                      .map(
-                        (
-                          item,
-                          index
-                        ) => (
-                          <tr
-                            key={
-                              item.id ||
-                              `${start}-${index}`
-                            }
-                            className="transition hover:bg-indigo-50/40"
+                {/* COMPACT INSPECTION SUMMARY */}
+
+
+
+                {/* WORKFLOW */}
+                <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="text-sm font-black text-slate-950">
+                      Inspection Workflow
+                    </div>
+
+                    <div className="text-[9px] font-bold text-slate-400">
+                      Click to filter
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+                    {inspectionWorkflowCards.map(
+                      (item) => {
+                        const active =
+                          inspectionWorkflowFilter ===
+                          item.key;
+
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => {
+                              setInspectionWorkflowFilter(
+                                item.key
+                              );
+
+                              setPage(1);
+                            }}
+                            className={`rounded-xl border px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-md ${item.tone
+                              } ${active
+                                ? 'ring-2 ring-indigo-500 ring-offset-1'
+                                : ''
+                              }`}
                           >
-                            <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600">
-                              {formatDate(
-                                recordDate(
+                            <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">
+                              {item.label}
+                            </div>
+
+                            <div className="mt-1 text-xl font-black leading-none">
+                              {item.value.toLocaleString(
+                                'en-IN'
+                              )}
+                            </div>
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                </section>
+
+
+                {/* MODULE BIFURCATION */}
+                <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                  <div className="mb-4">
+                    <div className="text-sm font-black text-slate-950">
+                      Module Bifurcation
+                    </div>
+
+                  </div>
+
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+
+
+                    {inspectionModuleSummaries.map(
+                      (module) => {
+                        const active =
+                          inspectionModuleFilter ===
+                          module.key;
+
+                        return (
+                          <button
+                            key={module.key}
+                            type="button"
+                            onClick={() => {
+                              setInspectionModuleFilter(
+                                module.key
+                              );
+                              setPage(1);
+                            }}
+                            className={`rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${active
+                              ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100'
+                              : 'border-slate-200 bg-white'
+                              }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="truncate text-xs font-black text-slate-900">
+                                {module.label}
+                              </div>
+
+                              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black text-slate-600">
+                                {module.stats.total}
+                              </div>
+                            </div>
+
+                            <div className="mt-2 text-xl font-black text-slate-950">
+                              {percentText(
+                                module.stats.performance
+                              )}
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                              <div className="rounded-xl bg-emerald-50 px-3 py-2 text-center">
+                                <div className="text-[8px] font-black uppercase tracking-[0.05em] text-emerald-600">
+                                  Approved
+                                </div>
+
+                                <div className="mt-1 text-sm font-black text-emerald-800">
+                                  {module.stats.approved}
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl bg-rose-50 px-3 py-2 text-center">
+                                <div className="text-[8px] font-black uppercase tracking-[0.05em] text-rose-600">
+                                  Rejected
+                                </div>
+
+                                <div className="mt-1 text-sm font-black text-rose-800">
+                                  {module.stats.rejected}
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl bg-amber-50 px-3 py-2 text-center">
+                                <div className="text-[8px] font-black uppercase tracking-[0.05em] text-amber-600">
+                                  Pending
+                                </div>
+
+                                <div className="mt-1 text-sm font-black text-amber-800">
+                                  {module.stats.pending}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                </section>
+
+
+                {/* SMART FILTERS */}
+                <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-black text-slate-950">
+                        Smart Filters
+                      </div>
+                      <div className="mt-1 text-[10px] font-semibold text-slate-500">
+                        Narrow the inspection records without leaving this workspace.
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={
+                        resetInspectionWorkspaceFilters
+                      }
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <label className="block">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                        Module
+                      </span>
+
+                      <select
+                        value={
+                          inspectionModuleFilter
+                        }
+                        onChange={(event) => {
+                          setInspectionModuleFilter(
+                            event.target.value
+                          );
+                          setPage(1);
+                        }}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white"
+                      >
+                        <option value="ALL">
+                          All Modules
+                        </option>
+
+                        {inspectionModuleOptions.map(
+                          (module) => (
+                            <option
+                              key={
+                                module.key
+                              }
+                              value={
+                                module.key
+                              }
+                            >
+                              {module.label}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                        Zone
+                      </span>
+
+                      <select
+                        value={
+                          inspectionZoneFilter
+                        }
+                        onChange={(event) => {
+                          setInspectionZoneFilter(
+                            event.target.value
+                          );
+                        }}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white"
+                      >
+                        <option value="ALL">
+                          All Zones
+                        </option>
+
+                        {inspectionZoneOptions.map(
+                          (zone) => (
+                            <option
+                              key={zone}
+                              value={zone}
+                            >
+                              {zone}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                        Ward
+                      </span>
+
+                      <select
+                        value={
+                          inspectionWardFilter
+                        }
+                        onChange={(event) => {
+                          setInspectionWardFilter(
+                            event.target.value
+                          );
+                          setPage(1);
+                        }}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white"
+                      >
+                        <option value="ALL">
+                          All Wards
+                        </option>
+
+                        {inspectionWardOptions.map(
+                          (ward) => (
+                            <option
+                              key={ward}
+                              value={ward}
+                            >
+                              {ward}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                        Daroga
+                      </span>
+
+                      <select
+                        value={
+                          inspectionDarogaFilter
+                        }
+                        onChange={(event) => {
+                          setInspectionDarogaFilter(
+                            event.target.value
+                          );
+                          setPage(1);
+                        }}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white"
+                      >
+                        <option value="ALL">
+                          All Daroga
+                        </option>
+
+                        {inspectionDarogaOptions.map(
+                          (name) => (
+                            <option
+                              key={name}
+                              value={name}
+                            >
+                              {name}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                        Sanitary Inspector
+                      </span>
+
+                      <select
+                        value={
+                          inspectionSiFilter
+                        }
+                        onChange={(event) => {
+                          setInspectionSiFilter(
+                            event.target.value
+                          );
+                          setPage(1);
+                        }}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white"
+                      >
+                        <option value="ALL">
+                          All Sanitary Inspectors
+                        </option>
+
+                        {inspectionSiOptions.map(
+                          (name) => (
+                            <option
+                              key={name}
+                              value={name}
+                            >
+                              {name}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                        Workflow Status
+                      </span>
+
+                      <select
+                        value={
+                          inspectionWorkflowFilter
+                        }
+                        onChange={(event) => {
+                          setInspectionWorkflowFilter(
+                            event.target.value
+                          );
+                          setPage(1);
+                        }}
+                        className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white"
+                      >
+                        <option value="ALL">
+                          All Workflow
+                        </option>
+                        <option value="APPROVED">
+                          SI Approved
+                        </option>
+                        <option value="REJECTED">
+                          SI Rejected
+                        </option>
+                        <option value="PENDING">
+                          SI Pending
+                        </option>
+                        <option value="ACTION_REQUIRED">
+                          Action Required
+                        </option>
+                        <option value="ACTION_TAKEN">
+                          Action Taken
+                        </option>
+                        <option value="PENDING_ACTION">
+                          Pending Action
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="mt-3">
+                    <label className="block">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                        Search
+                      </span>
+
+                      <input
+                        value={
+                          inspectionSearch
+                        }
+                        onChange={(event) =>
+                          setInspectionSearch(
+                            event.target.value
+                          )
+                        }
+                        placeholder="Search module, zone, ward, Daroga, Sanitary Inspector or status..."
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white"
+                      />
+                    </label>
+                  </div>
+                </section>
+
+
+
+
+
+
+                {/* RECORDS TABLE */}
+                <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+                    <div>
+                      <div className="text-sm font-black text-slate-950">
+                        Inspection Records
+                      </div>
+
+                      <div className="mt-0.5 text-[10px] font-semibold text-slate-500">
+                        Detailed operational proof for the current filter.
+                      </div>
+                    </div>
+
+                    <div className="rounded-full bg-indigo-50 px-3 py-1.5 text-[10px] font-black text-indigo-700">
+                      {
+                        filteredInspectionWorkspaceRows.length
+                      }{' '}
+                      records
+                    </div>
+                  </div>
+
+                  {filteredInspectionWorkspaceRows.length ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left">
+                        <thead className="bg-slate-50">
+                          <tr className="text-[9px] font-black uppercase tracking-[0.08em] text-slate-500">
+                            <th className="px-4 py-3">
+                              Date
+                            </th>
+                            <th className="px-4 py-3">
+                              Module
+                            </th>
+                            <th className="px-4 py-3">
+                              Zone
+                            </th>
+                            <th className="px-4 py-3">
+                              Ward
+                            </th>
+                            <th className="px-4 py-3">
+                              Daroga
+                            </th>
+                            <th className="px-4 py-3">
+                              Sanitary Inspector
+                            </th>
+                            <th className="px-4 py-3">SI Decision</th>
+                            <th className="px-4 py-3">
+                              Current Status
+                            </th>
+                            <th className="px-4 py-3" />
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredInspectionWorkspaceRows
+                            .slice(
+                              start,
+                              start +
+                              pageSize
+                            )
+                            .map(
+                              (
+                                item,
+                                index
+                              ) => {
+                                const status =
+                                  effectiveStatus(
+                                    item
+                                  );
+
+                                const decision =
+                                  getQcDecision(
+                                    item
+                                  );
+
+                                const statusTone =
+                                  status ===
+                                    'ACTION_TAKEN'
+                                    ? 'bg-teal-50 text-teal-700 ring-teal-100'
+                                    : status ===
+                                      'ACTION_REQUIRED'
+                                      ? 'bg-orange-50 text-orange-700 ring-orange-100'
+                                      : status ===
+                                        'APPROVED'
+                                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
+                                        : status ===
+                                          'REJECTED'
+                                          ? 'bg-rose-50 text-rose-700 ring-rose-100'
+                                          : 'bg-amber-50 text-amber-700 ring-amber-100';
+
+                                return (
+                                  <tr
+                                    key={
+                                      item.id ||
+                                      `${start}-${index}`
+                                    }
+                                    className="transition hover:bg-indigo-50/40"
+                                  >
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600">
+                                      {formatDate(
+                                        recordDate(
+                                          item
+                                        )
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-xs font-black text-slate-900">
+                                      {
+                                        item.dashboardModuleLabel
+                                      }
+                                    </td>
+
+                                    <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                                      {getRecordZone(
+                                        item
+                                      ) ||
+                                        '-'}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                                      {getRecordWard(
+                                        item
+                                      ) ||
+                                        '-'}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-xs font-semibold text-slate-700">
+                                      {getDarogaName(
+                                        item
+                                      ) ||
+                                        '-'}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-xs font-semibold text-slate-700">
+                                      {isValidInspectionPersonName(
+                                getInspectionSiDisplayName(
                                   item
                                 )
-                              )}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-black text-slate-900">
-                              {
-                                item.dashboardModuleLabel
-                              }
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-semibold text-slate-600">
-                              {getRecordZone(
-                                item
-                              ) ||
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-semibold text-slate-600">
-                              {getRecordWard(
-                                item
-                              ) ||
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-semibold text-slate-700">
-                              {getDarogaName(
-                                item
-                              ) ||
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-semibold text-slate-700">
-                              {getSiName(
-                                item
-                              ) ||
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3">
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-700">
-                                {effectiveStatus(
-                                  item
-                                ).replace(
-                                  /_/g,
-                                  ' '
-                                )}
-                              </span>
-                            </td>
-
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onReport(
+                              )
+                                ? getInspectionSiDisplayName(
                                     item
                                   )
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-                              >
-                                <Eye
-                                  size={
-                                    13
-                                  }
-                                />
-                                View
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      )}
-                  </tbody>
-                </table>
+                                : '-'}
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                      <span
+                                        className={`rounded-full px-2.5 py-1 text-[9px] font-black ${decision ===
+                                          'APPROVED'
+                                          ? 'bg-emerald-50 text-emerald-700'
+                                          : decision ===
+                                            'REJECTED'
+                                            ? 'bg-rose-50 text-rose-700'
+                                            : 'bg-slate-100 text-slate-500'
+                                          }`}
+                                      >
+                                        {inspectionSiDecisionLabel(
+                                  decision
+                                ) || '-'}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                      <span
+                                        className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-black ring-1 ${statusTone
+                                          }`}
+                                      >
+                                        {status.replace(
+                                          /_/g,
+                                          ' '
+                                        )}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          onReport(
+                                            item
+                                          )
+                                        }
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                                      >
+                                        <Eye
+                                          size={13}
+                                        />
+                                        View
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              }
+                            )}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="flex min-h-[240px] flex-col items-center justify-center p-8 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-400">
+                        0
+                      </div>
+
+                      <div className="mt-4 text-sm font-black text-slate-900">
+                        No inspections match these filters
+                      </div>
+
+                      <div className="mt-1 max-w-md text-xs font-semibold text-slate-500">
+                        Change the module, geography, officer, workflow status or search term.
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={
+                          resetInspectionWorkspaceFilters
+                        }
+                        className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white transition hover:bg-indigo-700"
+                      >
+                        Reset Filters
+                      </button>
+                    </div>
+                  )}
+                </section>
               </div>
-            </div>
-          )}
+            )}
 
           {tab ===
             'ATTENDANCE' && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left">
-                  <thead className="bg-slate-50">
-                    <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-                      <th className="px-4 py-3">
-                        Employee
-                      </th>
-                      <th className="px-4 py-3">
-                        Zone
-                      </th>
-                      <th className="px-4 py-3">
-                        Ward
-                      </th>
-                      <th className="px-4 py-3">
-                        Present
-                      </th>
-                      <th className="px-4 py-3">
-                        Absent
-                      </th>
-                      <th className="px-4 py-3">
-                        Attendance
-                      </th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left">
+                    <thead className="bg-slate-50">
+                      <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
+                        <th className="px-4 py-3">
+                          Employee
+                        </th>
+                        <th className="px-4 py-3">
+                          Zone
+                        </th>
+                        <th className="px-4 py-3">
+                          Ward
+                        </th>
+                        <th className="px-4 py-3">
+                          Present
+                        </th>
+                        <th className="px-4 py-3">
+                          Absent
+                        </th>
+                        <th className="px-4 py-3">
+                          Attendance
+                        </th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
 
-                  <tbody className="divide-y divide-slate-100">
-                    {attendanceRows
-                      .slice(
-                        start,
-                        start +
+                    <tbody className="divide-y divide-slate-100">
+                      {attendanceRows
+                        .slice(
+                          start,
+                          start +
                           pageSize
-                      )
-                      .map(
-                        (
-                          item
-                        ) => (
-                          <tr
-                            key={
-                              item.attendanceId
-                            }
-                            className="transition hover:bg-cyan-50/50"
-                          >
-                            <td className="px-4 py-3 text-xs font-black text-slate-950">
-                              {
-                                item.employeeName
-                              }
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-semibold text-slate-600">
-                              {item.zones?.join(
-                                ', '
-                              ) ||
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-semibold text-slate-600">
-                              {item.wards?.join(
-                                ', '
-                              ) ||
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-black text-emerald-700">
-                              {
-                                item.presentDays
-                              }
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-black text-rose-700">
-                              {
-                                item.absentDays
-                              }
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-black text-slate-950">
-                              {percentText(
-                                item.attendanceRate
-                              )}
-                            </td>
-
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onEmployee(
-                                    item
-                                  )
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700"
-                              >
-                                <Eye
-                                  size={
-                                    13
-                                  }
-                                />
-                                View
-                              </button>
-                            </td>
-                          </tr>
                         )
-                      )}
-                  </tbody>
-                </table>
+                        .map(
+                          (
+                            item
+                          ) => (
+                            <tr
+                              key={
+                                item.attendanceId
+                              }
+                              className="transition hover:bg-cyan-50/50"
+                            >
+                              <td className="px-4 py-3 text-xs font-black text-slate-950">
+                                {
+                                  item.employeeName
+                                }
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                                {item.zones?.join(
+                                  ', '
+                                ) ||
+                                  '—'}
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                                {item.wards?.join(
+                                  ', '
+                                ) ||
+                                  '—'}
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-black text-emerald-700">
+                                {
+                                  item.presentDays
+                                }
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-black text-rose-700">
+                                {
+                                  item.absentDays
+                                }
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-black text-slate-950">
+                                {percentText(
+                                  item.attendanceRate
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onEmployee(
+                                      item
+                                    )
+                                  }
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700"
+                                >
+                                  <Eye
+                                    size={
+                                      13
+                                    }
+                                  />
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {tab ===
             'WARD_RANKING' && (
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-left">
-                  <thead className="bg-slate-50">
-                    <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-                      <th className="px-4 py-3">
-                        Ward
-                      </th>
-                      <th className="px-4 py-3">
-                        Zone
-                      </th>
-                      <th className="px-4 py-3">
-                        Ward Ranking
-                      </th>
-                      <th className="px-4 py-3">
-                        City Rank
-                      </th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left">
+                    <thead className="bg-slate-50">
+                      <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
+                        <th className="px-4 py-3">
+                          Ward
+                        </th>
+                        <th className="px-4 py-3">
+                          Zone
+                        </th>
+                        <th className="px-4 py-3">Ward Performance</th>
+                        <th className="px-4 py-3">
+                          City Rank
+                        </th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
 
-                  <tbody className="divide-y divide-slate-100">
-                    {wardRows
-                      .slice(
-                        start,
-                        start +
+                    <tbody className="divide-y divide-slate-100">
+                      {wardRows
+                        .slice(
+                          start,
+                          start +
                           pageSize
-                      )
-                      .map(
-                        (item) => (
-                          <tr
-                            key={
-                              item.wardId
-                            }
-                            className="transition hover:bg-violet-50/50"
-                          >
-                            <td className="px-4 py-3 text-xs font-black text-slate-950">
-                              {item.wardName ||
-                                item.wardId}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-semibold text-slate-600">
-                              {item.zoneName ||
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-black text-violet-700">
-                              {percentText(
-                                item.finalScore
-                              )}
-                            </td>
-
-                            <td className="px-4 py-3 text-xs font-black text-slate-700">
-                              {item.cityRank ??
-                                '—'}
-                            </td>
-
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  onWard(
-                                    item
-                                  )
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
-                              >
-                                <Eye
-                                  size={
-                                    13
-                                  }
-                                />
-                                View
-                              </button>
-                            </td>
-                          </tr>
                         )
-                      )}
-                  </tbody>
-                </table>
+                        .map(
+                          (item) => (
+                            <tr
+                              key={
+                                item.wardId
+                              }
+                              className="transition hover:bg-violet-50/50"
+                            >
+                              <td className="px-4 py-3 text-xs font-black text-slate-950">
+                                {item.wardName ||
+                                  item.wardId}
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                                {item.zoneName ||
+                                  '—'}
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-black text-violet-700">
+                                {percentText(
+                                  item.finalScore
+                                )}
+                              </td>
+
+                              <td className="px-4 py-3 text-xs font-black text-slate-700">
+                                {item.cityRank ??
+                                  '—'}
+                              </td>
+
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onWard(
+                                      item
+                                    )
+                                  }
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+                                >
+                                  <Eye
+                                    size={
+                                      13
+                                    }
+                                  />
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {pages > 1 && (
@@ -2459,7 +3764,7 @@ function DrilldownDrawer({
                     Math.max(
                       1,
                       current -
-                        1
+                      1
                     )
                 )
               }
@@ -2485,7 +3790,7 @@ function DrilldownDrawer({
                     Math.min(
                       pages,
                       current +
-                        1
+                      1
                     )
                 )
               }
@@ -2891,35 +4196,35 @@ const WARD_COMPONENT_FIELDS: Array<{
   key: keyof WardRankingRow['components'];
   label: string;
 }> = [
-  {
-    key: 'workforce',
-    label: 'Attendance',
-  },
-  {
-    key: 'beat',
-    label: 'Sweeping',
-  },
-  {
-    key: 'toilet',
-    label: 'Cleanliness of Toilets',
-  },
-  {
-    key: 'litterBin',
-    label: 'Litter Bins',
-  },
-  {
-    key: 'supervisor',
-    label: 'Daroga',
-  },
-  {
-    key: 'qc',
-    label: 'Sanitary Inspector',
-  },
-  {
-    key: 'actionOfficer',
-    label: 'IEC Member',
-  },
-];
+    {
+      key: 'workforce',
+      label: 'Attendance',
+    },
+    {
+      key: 'beat',
+      label: 'Sweeping',
+    },
+    {
+      key: 'toilet',
+      label: 'Cleanliness of Toilets',
+    },
+    {
+      key: 'litterBin',
+      label: 'Litter Bins',
+    },
+    {
+      key: 'supervisor',
+      label: 'Daroga',
+    },
+    {
+      key: 'qc',
+      label: 'Sanitary Inspector',
+    },
+    {
+      key: 'actionOfficer',
+      label: 'IEC Member',
+    },
+  ];
 
 function wardCalculationText(
   ward: WardRankingRow
@@ -2970,11 +4275,11 @@ function WardPerformanceScroller({
           (a, b) =>
             String(
               a.wardName ||
-                ''
+              ''
             ).localeCompare(
               String(
                 b.wardName ||
-                  ''
+                ''
               ),
               undefined,
               {
@@ -3061,7 +4366,7 @@ function WardPerformanceScroller({
           node.scrollTop +
           (PIXELS_PER_SECOND *
             delta) /
-            1000;
+          1000;
 
         if (
           next >=
@@ -3183,7 +4488,7 @@ function WardPerformanceScroller({
                 setHoveredWard(
                   (current) =>
                     current ===
-                    ward
+                      ward
                       ? null
                       : current
                 )
@@ -3193,7 +4498,7 @@ function WardPerformanceScroller({
                 {String(
                   (position %
                     sortedWards.length) +
-                    1
+                  1
                 ).padStart(
                   2,
                   '0'
@@ -3282,7 +4587,7 @@ function timeAgoLabel(
       Math.floor(
         (Date.now() -
           date.getTime()) /
-          1000
+        1000
       )
     );
 
@@ -3371,7 +4676,7 @@ function CityPerformancePulse({
         null,
     },
     {
-      metric: 'Ward Ranking',
+      metric: 'Ward Performance',
       current:
         wardRankingAverage,
       lastMonth:
@@ -3422,7 +4727,7 @@ function CityPerformancePulse({
     },
     {
       key: 'wardRankingAverage',
-      label: 'Ward Ranking',
+      label: 'Ward Performance',
       value:
         wardRankingAverage,
       previous:
@@ -3465,9 +4770,9 @@ function CityPerformancePulse({
   const overallFlat =
     !overallTrend ||
     overallTrend.deltaPct ===
-      null ||
+    null ||
     overallTrend.direction ===
-      'flat';
+    'flat';
 
   function trendLabel(
     trend: MonthTrend | undefined
@@ -3562,13 +4867,12 @@ function CityPerformancePulse({
 
               <div className="relative mt-3 flex items-center gap-2">
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black ${
-                    overallFlat
-                      ? 'border-white/15 bg-white/10 text-white/75'
-                      : overallDown
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black ${overallFlat
+                    ? 'border-white/15 bg-white/10 text-white/75'
+                    : overallDown
                       ? 'border-rose-300/20 bg-rose-400/15 text-rose-100'
                       : 'border-emerald-300/20 bg-emerald-400/15 text-emerald-100'
-                  }`}
+                    }`}
                 >
                   {overallFlat ? (
                     <Activity
@@ -3667,7 +4971,7 @@ function CityPerformancePulse({
                   metric.trend &&
                   metric.trend
                     .deltaPct !==
-                    null;
+                  null;
 
                 return (
                   <button
@@ -3694,11 +4998,10 @@ function CityPerformancePulse({
 
                       {hasTrend && (
                         <span
-                          className={`inline-flex items-center gap-0.5 text-[9px] font-black ${
-                            down
-                              ? 'text-rose-500'
-                              : 'text-emerald-600'
-                          }`}
+                          className={`inline-flex items-center gap-0.5 text-[9px] font-black ${down
+                            ? 'text-rose-500'
+                            : 'text-emerald-600'
+                            }`}
                         >
                           {down ? (
                             <TrendingDown
@@ -3762,26 +5065,24 @@ function CityPerformancePulse({
                     key={
                       item.id
                     }
-                    className={`flex min-h-[48px] items-start gap-2 rounded-lg border px-2.5 py-2 ${
-                      item.tone ===
+                    className={`flex min-h-[48px] items-start gap-2 rounded-lg border px-2.5 py-2 ${item.tone ===
                       'warning'
-                        ? 'border-rose-100 bg-rose-50/80'
-                        : item.tone ===
-                          'positive'
+                      ? 'border-rose-100 bg-rose-50/80'
+                      : item.tone ===
+                        'positive'
                         ? 'border-emerald-100 bg-emerald-50/80'
                         : 'border-indigo-100 bg-indigo-50/70'
-                    }`}
+                      }`}
                   >
                     <span
-                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
-                        item.tone ===
+                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${item.tone ===
                         'warning'
-                          ? 'bg-rose-100 text-rose-600'
-                          : item.tone ===
-                            'positive'
+                        ? 'bg-rose-100 text-rose-600'
+                        : item.tone ===
+                          'positive'
                           ? 'bg-emerald-100 text-emerald-600'
                           : 'bg-indigo-100 text-indigo-600'
-                      } [&>svg]:h-[12px] [&>svg]:w-[12px]`}
+                        } [&>svg]:h-[12px] [&>svg]:w-[12px]`}
                     >
                       {
                         item.icon
@@ -3881,6 +5182,20 @@ export default function CommissionerDashboard() {
     setRegisteredEmployeesTotal,
   ] =
     useState<number | null>(
+      null
+    );
+
+
+  const [
+    registeredAttendanceSummary,
+    setRegisteredAttendanceSummary,
+  ] =
+    useState<{
+      totalRegistered: number;
+      totalPresent: number;
+      totalAbsent: number;
+      totalMatched: number;
+    } | null>(
       null
     );
 
@@ -4229,9 +5544,9 @@ export default function CommissionerDashboard() {
                   await loadAllModuleRecords(
                     module.key,
                     appliedFrom ||
-                      undefined,
+                    undefined,
                     appliedTo ||
-                      undefined
+                    undefined
                   );
 
                 return data.map(
@@ -4367,7 +5682,7 @@ export default function CommissionerDashboard() {
           setWardRows(
             wardResult.value
               .rankings ||
-              []
+            []
           );
         } else {
           setWardRows(
@@ -4385,7 +5700,7 @@ export default function CommissionerDashboard() {
           setWardSummaryAverage(
             wardSummaryResult.value
               .averageScore ??
-              null
+            null
           );
         } else {
           setWardSummaryAverage(
@@ -4401,10 +5716,25 @@ export default function CommissionerDashboard() {
             registeredEmployeesResult
               .value
               .totalRegistered ??
-              null
+            null
           );
+
+          setRegisteredAttendanceSummary({
+            totalRegistered:
+              registeredEmployeesResult.value.totalRegistered ?? 0,
+            totalPresent:
+              registeredEmployeesResult.value.totalPresent ?? 0,
+            totalAbsent:
+              registeredEmployeesResult.value.totalAbsent ?? 0,
+            totalMatched:
+              registeredEmployeesResult.value.totalMatched ?? 0,
+          });
         } else {
           setRegisteredEmployeesTotal(
+            null
+          );
+
+          setRegisteredAttendanceSummary(
             null
           );
         }
@@ -4544,7 +5874,7 @@ export default function CommissionerDashboard() {
         if (active) {
           setProofAttendanceRecords(
             result.records ||
-              []
+            []
           );
         }
       } catch {
@@ -4733,9 +6063,9 @@ export default function CommissionerDashboard() {
             ward &&
             (
               zoneFilter ===
-                'ALL' ||
+              'ALL' ||
               zone ===
-                zoneFilter
+              zoneFilter
             )
           ) {
             values.add(
@@ -4750,7 +6080,7 @@ export default function CommissionerDashboard() {
           (employee) => {
             const matchesZone =
               zoneFilter ===
-                'ALL' ||
+              'ALL' ||
               employee.zones
                 ?.includes(
                   zoneFilter
@@ -4779,9 +6109,9 @@ export default function CommissionerDashboard() {
             ward.wardName &&
             (
               zoneFilter ===
-                'ALL' ||
+              'ALL' ||
               ward.zoneName ===
-                zoneFilter
+              zoneFilter
             )
           ) {
             values.add(
@@ -4953,13 +6283,13 @@ export default function CommissionerDashboard() {
 
       return Boolean(
         mappedId &&
-          userIdsForRecord(
-            item
-          ).includes(
-            String(
-              mappedId
-            )
+        userIdsForRecord(
+          item
+        ).includes(
+          String(
+            mappedId
           )
+        )
       );
     }
 
@@ -5054,18 +6384,18 @@ export default function CommissionerDashboard() {
 
           if (
             zoneFilter !==
-              'ALL' &&
+            'ALL' &&
             zone !==
-              zoneFilter
+            zoneFilter
           ) {
             return false;
           }
 
           if (
             wardFilter !==
-              'ALL' &&
+            'ALL' &&
             ward !==
-              wardFilter
+            wardFilter
           ) {
             return false;
           }
@@ -5080,7 +6410,7 @@ export default function CommissionerDashboard() {
 
           if (
             statusFilter !==
-              'ALL' &&
+            'ALL' &&
             [
               'APPROVED',
               'REJECTED',
@@ -5093,7 +6423,7 @@ export default function CommissionerDashboard() {
             effectiveStatus(
               item
             ) !==
-              statusFilter
+            statusFilter
           ) {
             return false;
           }
@@ -5155,9 +6485,9 @@ export default function CommissionerDashboard() {
     useMemo(() => {
       if (
         moduleFilter ===
-          'ATTENDANCE' ||
+        'ATTENDANCE' ||
         moduleFilter ===
-          'WARD_RANKING'
+        'WARD_RANKING'
       ) {
         return [];
       }
@@ -5194,7 +6524,7 @@ export default function CommissionerDashboard() {
         (employee) => {
           if (
             zoneFilter !==
-              'ALL' &&
+            'ALL' &&
             !employee.zones
               ?.includes(
                 zoneFilter
@@ -5205,7 +6535,7 @@ export default function CommissionerDashboard() {
 
           if (
             wardFilter !==
-              'ALL' &&
+            'ALL' &&
             !employee.wards
               ?.includes(
                 wardFilter
@@ -5280,27 +6610,27 @@ export default function CommissionerDashboard() {
 
           if (
             personFilter !==
-              'ALL' &&
+            'ALL' &&
             employee.employeeName !==
-              personFilter
+            personFilter
           ) {
             return false;
           }
 
           if (
             statusFilter ===
-              'PRESENT' &&
+            'PRESENT' &&
             employee.presentDays <=
-              0
+            0
           ) {
             return false;
           }
 
           if (
             statusFilter ===
-              'ABSENT' &&
+            'ABSENT' &&
             employee.absentDays <=
-              0
+            0
           ) {
             return false;
           }
@@ -5349,16 +6679,16 @@ export default function CommissionerDashboard() {
     useMemo(() => {
       if (
         moduleFilter !==
-          'ALL' &&
+        'ALL' &&
         moduleFilter !==
-          'ATTENDANCE'
+        'ATTENDANCE'
       ) {
         return [];
       }
 
       if (
         statusFilter !==
-          'ALL' &&
+        'ALL' &&
         ![
           'PRESENT',
           'ABSENT',
@@ -5385,9 +6715,9 @@ export default function CommissionerDashboard() {
     useMemo(() => {
       if (
         roleFilter !==
-          'ALL' ||
+        'ALL' ||
         personFilter !==
-          'ALL'
+        'ALL'
       ) {
         return [];
       }
@@ -5396,18 +6726,18 @@ export default function CommissionerDashboard() {
         (row) => {
           if (
             zoneFilter !==
-              'ALL' &&
+            'ALL' &&
             row.zoneName !==
-              zoneFilter
+            zoneFilter
           ) {
             return false;
           }
 
           if (
             wardFilter !==
-              'ALL' &&
+            'ALL' &&
             row.wardName !==
-              wardFilter
+            wardFilter
           ) {
             return false;
           }
@@ -5421,7 +6751,7 @@ export default function CommissionerDashboard() {
               statusFilter
             ) &&
             row.performanceBand !==
-              statusFilter
+            statusFilter
           ) {
             return false;
           }
@@ -5466,16 +6796,16 @@ export default function CommissionerDashboard() {
     useMemo(() => {
       if (
         moduleFilter !==
-          'ALL' &&
+        'ALL' &&
         moduleFilter !==
-          'WARD_RANKING'
+        'WARD_RANKING'
       ) {
         return [];
       }
 
       if (
         statusFilter !==
-          'ALL' &&
+        'ALL' &&
         ![
           'GREEN',
           'AMBER',
@@ -5513,6 +6843,123 @@ export default function CommissionerDashboard() {
 
   const attendanceStats =
     useMemo(() => {
+      /*
+       * IMPORTANT:
+       *
+       * Full-city Commissioner attendance follows the
+       * exact same registered-roster definition used by
+       * Attendance Analytics.
+       *
+       * Do NOT replace this with attendance.summary or
+       * attendance.allEmployees totals. Those represent
+       * raw attendance records and produce different
+       * values from the registered Health Worker roster.
+       */
+
+      const useRegisteredCitySummary =
+        zoneFilter === 'ALL' &&
+        wardFilter === 'ALL' &&
+        roleFilter === 'ALL' &&
+        personFilter === 'ALL' &&
+        statusFilter === 'ALL' &&
+        !searchValue &&
+        registeredAttendanceSummary !== null;
+
+      const rangeDayCount = (() => {
+        if (
+          !appliedFrom ||
+          !appliedTo
+        ) {
+          return 1;
+        }
+
+        const start =
+          new Date(
+            `${appliedFrom}T00:00:00Z`
+          );
+
+        const end =
+          new Date(
+            `${appliedTo}T00:00:00Z`
+          );
+
+        const difference =
+          Math.floor(
+            (
+              end.getTime() -
+              start.getTime()
+            ) /
+            (
+              24 *
+              60 *
+              60 *
+              1000
+            )
+          ) + 1;
+
+        return Math.max(
+          1,
+          difference
+        );
+      })();
+
+      if (
+        useRegisteredCitySummary &&
+        registeredAttendanceSummary
+      ) {
+        const totalRegistered =
+          registeredAttendanceSummary
+            .totalRegistered;
+
+        const present =
+          registeredAttendanceSummary
+            .totalPresent;
+
+        const absent =
+          registeredAttendanceSummary
+            .totalAbsent;
+
+        const multiDay =
+          rangeDayCount > 1;
+
+        return {
+          employees:
+            totalRegistered,
+
+          present,
+
+          absent,
+
+          rangeDayCount,
+
+          displayPresent:
+            multiDay
+              ? present /
+              rangeDayCount
+              : present,
+
+          displayAbsent:
+            multiDay
+              ? absent /
+              rangeDayCount
+              : absent,
+
+          rate:
+            totalRegistered > 0
+              ? (
+                present /
+                totalRegistered
+              ) * 100
+              : null,
+        };
+      }
+
+      /*
+       * Filtered fallback.
+       * Keep existing employee-level behavior because
+       * registered-employees does not support all these
+       * dashboard filters.
+       */
       const employees =
         filteredAttendanceEmployees;
 
@@ -5549,38 +6996,57 @@ export default function CommissionerDashboard() {
           0
         );
 
+      const multiDay =
+        rangeDayCount > 1;
+
       return {
         employees:
           employees.length,
-        totalDays,
+
         present,
+
         absent,
+
+        rangeDayCount,
+
+        displayPresent:
+          multiDay
+            ? present /
+            rangeDayCount
+            : present,
+
+        displayAbsent:
+          multiDay
+            ? absent /
+            rangeDayCount
+            : absent,
+
         rate:
           totalDays > 0
             ? (
-                present /
-                totalDays
-              ) *
-              100
+              present /
+              totalDays
+            ) * 100
             : null,
       };
     }, [
+      registeredAttendanceSummary,
       filteredAttendanceEmployees,
+      zoneFilter,
+      wardFilter,
+      roleFilter,
+      personFilter,
+      statusFilter,
+      searchValue,
+      appliedFrom,
+      appliedTo,
     ]);
 
-  /*
-   * With no zone/ward/role narrowing, "Total Employee" uses the
-   * registered Health Worker headcount from the ULB Attendance
-   * Analytics dashboard's Registered Employees tile - the same
-   * number that screen shows. A filter narrows the view further
-   * than that endpoint supports, so it falls back to the filtered
-   * employee count from the attendance records themselves.
-   */
   const attendanceEmployeeTotal =
     zoneFilter === 'ALL' &&
-    wardFilter === 'ALL' &&
-    roleFilter === 'ALL' &&
-    registeredEmployeesTotal !==
+      wardFilter === 'ALL' &&
+      roleFilter === 'ALL' &&
+      registeredEmployeesTotal !==
       null
       ? registeredEmployeesTotal
       : attendanceStats.employees;
@@ -5598,7 +7064,7 @@ export default function CommissionerDashboard() {
         zoneFilter === 'ALL' &&
         wardFilter === 'ALL' &&
         wardSummaryAverage !==
-          null
+        null
       ) {
         return wardSummaryAverage;
       }
@@ -5729,12 +7195,12 @@ export default function CommissionerDashboard() {
           'Attendance',
         performance:
           attendanceTotalDays >
-          0
+            0
             ? (
-                attendancePresent /
-                attendanceTotalDays
-              ) *
-              100
+              attendancePresent /
+              attendanceTotalDays
+            ) *
+            100
             : null,
         count:
           attendanceContextEmployees.length,
@@ -5748,7 +7214,7 @@ export default function CommissionerDashboard() {
         key:
           'WARD_RANKING',
         label:
-          'Ward Ranking',
+          'Ward Performance',
         performance:
           averageApplicable(
             wardContextRows.map(
@@ -5815,13 +7281,13 @@ export default function CommissionerDashboard() {
           (item) => {
             const key =
               level ===
-              'ZONE'
+                'ZONE'
                 ? getRecordZone(
-                    item
-                  )
+                  item
+                )
                 : getRecordWard(
-                    item
-                  );
+                  item
+                );
 
             if (key) {
               bucket(
@@ -5837,7 +7303,7 @@ export default function CommissionerDashboard() {
           (employee) => {
             const values =
               level ===
-              'ZONE'
+                'ZONE'
                 ? employee.zones
                 : employee.wards;
 
@@ -5859,7 +7325,7 @@ export default function CommissionerDashboard() {
           (row) => {
             const key =
               level ===
-              'ZONE'
+                'ZONE'
                 ? row.zoneName
                 : row.wardName;
 
@@ -5909,12 +7375,12 @@ export default function CommissionerDashboard() {
 
             const attendanceRate =
               attendanceDays >
-              0
+                0
                 ? (
-                    attendancePresent /
-                    attendanceDays
-                  ) *
-                  100
+                  attendancePresent /
+                  attendanceDays
+                ) *
+                100
                 : null;
 
             const wardScore =
@@ -6012,7 +7478,7 @@ export default function CommissionerDashboard() {
         if (
           overallTrend &&
           overallTrend.deltaPct !==
-            null &&
+          null &&
           Math.abs(
             overallTrend.deltaPct
           ) >= 1
@@ -6037,13 +7503,12 @@ export default function CommissionerDashboard() {
             ),
             text: `City's overall performance is ${percentText(
               overallPerformance
-            )}, ${
-              up ? 'up' : 'down'
-            } ${Math.abs(
-              overallTrend.deltaPct
-            ).toFixed(
-              0
-            )}% from last month.`,
+            )}, ${up ? 'up' : 'down'
+              } ${Math.abs(
+                overallTrend.deltaPct
+              ).toFixed(
+                0
+              )}% from last month.`,
           });
         } else {
           items.push({
@@ -6065,9 +7530,9 @@ export default function CommissionerDashboard() {
         zoneRows.filter(
           (row) =>
             row.performance !==
-              null &&
+            null &&
             row.records.length >
-              0
+            0
         );
 
       if (scoredZones.length >= 2) {
@@ -6094,7 +7559,7 @@ export default function CommissionerDashboard() {
         if (
           best &&
           best.label !==
-            worst?.label
+          worst?.label
         ) {
           items.push({
             id: 'best-zone',
@@ -6104,11 +7569,10 @@ export default function CommissionerDashboard() {
                 size={18}
               />
             ),
-            text: `${
-              best.label
-            } is the top-performing zone this period at ${percentText(
-              best.performance
-            )}.`,
+            text: `${best.label
+              } is the top-performing zone this period at ${percentText(
+                best.performance
+              )}.`,
           });
         }
 
@@ -6121,11 +7585,10 @@ export default function CommissionerDashboard() {
                 size={18}
               />
             ),
-            text: `${
-              worst.label
-            } needs attention - lowest zone performance at ${percentText(
-              worst.performance
-            )}.`,
+            text: `${worst.label
+              } needs attention - lowest zone performance at ${percentText(
+                worst.performance
+              )}.`,
           });
         }
       }
@@ -6146,17 +7609,14 @@ export default function CommissionerDashboard() {
               size={18}
             />
           ),
-          text: `${
-            redWards.length
-          } ward${
-            redWards.length === 1
+          text: `${redWards.length
+            } ward${redWards.length === 1
               ? ''
               : 's'
-          } ${
-            redWards.length === 1
+            } ${redWards.length === 1
               ? 'is'
               : 'are'
-          } in the Red band and need urgent action.`,
+            } in the Red band and need urgent action.`,
         });
       }
 
@@ -6176,19 +7636,16 @@ export default function CommissionerDashboard() {
               size={18}
             />
           ),
-          text: `${
-            pendingActionCount
-          } report${
-            pendingActionCount ===
-            1
+          text: `${pendingActionCount
+            } report${pendingActionCount ===
+              1
               ? ''
               : 's'
-          } ${
-            pendingActionCount ===
-            1
+            } ${pendingActionCount ===
+              1
               ? 'is'
               : 'are'
-          } awaiting Action Officer response.`,
+            } awaiting Action Officer response.`,
         });
       }
 
@@ -6204,14 +7661,12 @@ export default function CommissionerDashboard() {
               size={18}
             />
           ),
-          text: `${
-            citySnapshotStats.pending
-          } report${
-            citySnapshotStats.pending ===
-            1
+          text: `${citySnapshotStats.pending
+            } report${citySnapshotStats.pending ===
+              1
               ? ''
               : 's'
-          } currently pending SI/QC review.`,
+            } currently pending SI/QC review.`,
         });
       }
 
@@ -6219,7 +7674,7 @@ export default function CommissionerDashboard() {
         moduleCards.filter(
           (item) =>
             item.performance !==
-              null &&
+            null &&
             INSPECTION_MODULES.some(
               (module) =>
                 module.key ===
@@ -6251,7 +7706,7 @@ export default function CommissionerDashboard() {
         if (
           bestModule &&
           bestModule.key !==
-            worstModule?.key
+          worstModule?.key
         ) {
           items.push({
             id: 'best-module',
@@ -6261,11 +7716,10 @@ export default function CommissionerDashboard() {
                 size={18}
               />
             ),
-            text: `${
-              bestModule.label
-            } inspections are leading this period at ${percentText(
-              bestModule.performance
-            )} performance.`,
+            text: `${bestModule.label
+              } inspections are leading this period at ${percentText(
+                bestModule.performance
+              )} performance.`,
           });
 
           items.push({
@@ -6276,11 +7730,10 @@ export default function CommissionerDashboard() {
                 size={18}
               />
             ),
-            text: `${
-              worstModule.label
-            } inspections are the weakest module at ${percentText(
-              worstModule.performance
-            )} performance.`,
+            text: `${worstModule.label
+              } inspections are the weakest module at ${percentText(
+                worstModule.performance
+              )} performance.`,
           });
         }
       }
@@ -6290,10 +7743,10 @@ export default function CommissionerDashboard() {
 
       if (
         attendanceStats.rate !==
-          null &&
+        null &&
         attendanceTrend &&
         attendanceTrend.deltaPct !==
-          null &&
+        null &&
         Math.abs(
           attendanceTrend.deltaPct
         ) >= 1
@@ -6314,13 +7767,12 @@ export default function CommissionerDashboard() {
           ),
           text: `Field staff attendance is ${percentText(
             attendanceStats.rate
-          )}, ${
-            up ? 'up' : 'down'
-          } ${Math.abs(
-            attendanceTrend.deltaPct
-          ).toFixed(
-            0
-          )}% vs last month.`,
+          )}, ${up ? 'up' : 'down'
+            } ${Math.abs(
+              attendanceTrend.deltaPct
+            ).toFixed(
+              0
+            )}% vs last month.`,
         });
       }
 
@@ -6422,21 +7874,21 @@ export default function CommissionerDashboard() {
             (a, b) =>
               negativeMetric
                 ? (
-                    a.metricValue ||
-                    0
-                  ) -
-                  (
-                    b.metricValue ||
-                    0
-                  )
+                  a.metricValue ||
+                  0
+                ) -
+                (
+                  b.metricValue ||
+                  0
+                )
                 : (
-                    b.metricValue ||
-                    0
-                  ) -
-                  (
-                    a.metricValue ||
-                    0
-                  )
+                  b.metricValue ||
+                  0
+                ) -
+                (
+                  a.metricValue ||
+                  0
+                )
           ),
       [
         zoneRows,
@@ -6466,21 +7918,21 @@ export default function CommissionerDashboard() {
             (a, b) =>
               negativeMetric
                 ? (
-                    a.metricValue ||
-                    0
-                  ) -
-                  (
-                    b.metricValue ||
-                    0
-                  )
+                  a.metricValue ||
+                  0
+                ) -
+                (
+                  b.metricValue ||
+                  0
+                )
                 : (
-                    b.metricValue ||
-                    0
-                  ) -
-                  (
-                    a.metricValue ||
-                    0
-                  )
+                  b.metricValue ||
+                  0
+                ) -
+                (
+                  a.metricValue ||
+                  0
+                )
           ),
       [
         wardPerformanceRows,
@@ -6495,9 +7947,9 @@ export default function CommissionerDashboard() {
   const worstZone =
     rankedZones.length
       ? rankedZones[
-          rankedZones.length -
-            1
-        ]
+      rankedZones.length -
+      1
+      ]
       : null;
 
   const topWard =
@@ -6507,9 +7959,9 @@ export default function CommissionerDashboard() {
   const worstWard =
     rankedWards.length
       ? rankedWards[
-          rankedWards.length -
-            1
-        ]
+      rankedWards.length -
+      1
+      ]
       : null;
 
 
@@ -6859,18 +8311,18 @@ export default function CommissionerDashboard() {
 
   const activeRoleRows =
     performanceRole ===
-    'SUPERVISOR'
+      'SUPERVISOR'
       ? darogaRows
       : performanceRole ===
         'QC'
-      ? siRows
-      : performanceRole ===
-        'ULB_OFFICER'
-      ? ulbOfficerRows
-      : performanceRole ===
-        'ACTION_OFFICER'
-      ? iecRows
-      : employeeRows;
+        ? siRows
+        : performanceRole ===
+          'ULB_OFFICER'
+          ? ulbOfficerRows
+          : performanceRole ===
+            'ACTION_OFFICER'
+            ? iecRows
+            : employeeRows;
 
   const roleRowsPageSize =
     7;
@@ -6892,7 +8344,7 @@ export default function CommissionerDashboard() {
       1,
       Math.ceil(
         activeRoleRows.length /
-          roleRowsPageSize
+        roleRowsPageSize
       )
     );
 
@@ -6906,7 +8358,7 @@ export default function CommissionerDashboard() {
     activeRoleRows.slice(
       roleRowsStart,
       roleRowsStart +
-        roleRowsPageSize
+      roleRowsPageSize
     );
 
 
@@ -7084,7 +8536,7 @@ export default function CommissionerDashboard() {
               ) *
               100,
 
-            'Action Required':
+            'Pending Action':
               (
                 actionRequiredCount /
                 total
@@ -7098,7 +8550,7 @@ export default function CommissionerDashboard() {
               ) *
               100,
 
-            Pending:
+            'Pending SI':
               (
                 pendingCount /
                 total
@@ -7195,9 +8647,9 @@ export default function CommissionerDashboard() {
         .filter(
           (zone) =>
             zoneFilter ===
-              'ALL' ||
+            'ALL' ||
             zone ===
-              zoneFilter
+            zoneFilter
         )
         .map(
           (zone) => {
@@ -7242,12 +8694,12 @@ export default function CommissionerDashboard() {
                         module.label,
                       value:
                         total >
-                        0
+                          0
                           ? (
-                              present /
-                              total
-                            ) *
-                            100
+                            present /
+                            total
+                          ) *
+                          100
                           : null,
                       employees,
                       records:
@@ -7332,22 +8784,22 @@ export default function CommissionerDashboard() {
     zoneModuleView === 'ALL'
       ? moduleCards
       : moduleCards.filter(
-          (module) =>
-            module.key ===
-            zoneModuleView
-        );
+        (module) =>
+          module.key ===
+          zoneModuleView
+      );
 
   const activeMapZone =
     selectedMapZone &&
-    zoneModuleMatrix.some(
-      (row) =>
-        row.zone ===
-        selectedMapZone
-    )
+      zoneModuleMatrix.some(
+        (row) =>
+          row.zone ===
+          selectedMapZone
+      )
       ? selectedMapZone
       : zoneModuleMatrix[0]
-          ?.zone ??
-        null;
+        ?.zone ??
+      null;
 
   const activeMapZoneCells =
     zoneModuleMatrix.find(
@@ -7388,9 +8840,9 @@ export default function CommissionerDashboard() {
 
         const sameMonth =
           fromDate.getFullYear() ===
-            toDate.getFullYear() &&
+          toDate.getFullYear() &&
           fromDate.getMonth() ===
-            toDate.getMonth();
+          toDate.getMonth();
 
         if (sameMonth) {
           return toDate.toLocaleDateString(
@@ -7481,19 +8933,19 @@ export default function CommissionerDashboard() {
       const relative = !hasValue
         ? 0
         : maxValue > minValue
-        ? clamp(
+          ? clamp(
             (row.value! - minValue) /
-              (maxValue - minValue),
+            (maxValue - minValue),
             0,
             1
           )
-        : clamp(row.value! / 100, 0, 1);
+          : clamp(row.value! / 100, 0, 1);
 
       const intensity =
         !hasValue || row.value === 0
           ? 0
           : 0.16 +
-            0.84 * Math.pow(relative, 1.8);
+          0.84 * Math.pow(relative, 1.8);
 
       const startLightness =
         96 - intensity * 38;
@@ -7593,7 +9045,7 @@ export default function CommissionerDashboard() {
       },
       {
         label:
-          'Ward Ranking',
+          'Ward Performance',
         value:
           percentText(
             row.wardRanking
@@ -7606,11 +9058,11 @@ export default function CommissionerDashboard() {
     row:
       | GeoPerformanceRow
       | (
-          GeoPerformanceRow & {
-            metricValue:
-              number | null;
-          }
-        )
+        GeoPerformanceRow & {
+          metricValue:
+          number | null;
+        }
+      )
   ) {
     setDrilldown({
       title:
@@ -7730,7 +9182,7 @@ export default function CommissionerDashboard() {
         },
         {
           label:
-            'Ward Ranking',
+            'Ward Performance',
           value:
             percentText(
               wardRankingAverage
@@ -7788,7 +9240,7 @@ export default function CommissionerDashboard() {
   function openWardRanking() {
     setDrilldown({
       title:
-        'Ward Ranking',
+        'Ward Performance',
       value:
         percentText(
           wardRankingAverage
@@ -7893,8 +9345,8 @@ export default function CommissionerDashboard() {
       attendanceEmployees:
         row.attendanceEmployee
           ? [
-              row.attendanceEmployee,
-            ]
+            row.attendanceEmployee,
+          ]
           : [],
     });
   }
@@ -7945,7 +9397,7 @@ export default function CommissionerDashboard() {
     ) {
       start.setDate(
         start.getDate() -
-          6
+        6
       );
     }
 
@@ -7954,7 +9406,7 @@ export default function CommissionerDashboard() {
     ) {
       start.setDate(
         start.getDate() -
-          29
+        29
       );
     }
 
@@ -8105,9 +9557,8 @@ export default function CommissionerDashboard() {
 
         {/* FILTERS */}
         <div
-          className={`grid transition-all duration-300 ease-in-out ${
-            showFilters ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          }`}
+          className={`grid transition-all duration-300 ease-in-out ${showFilters ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+            }`}
         >
           <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_14px_40px_-25px_rgba(15,23,42,.35)] backdrop-blur-xl">
             <div className="flex flex-wrap gap-2">
@@ -8145,11 +9596,11 @@ export default function CommissionerDashboard() {
                     onClick={() =>
                       setPreset(
                         key as
-                          | 'TODAY'
-                          | '7D'
-                          | '30D'
-                          | 'MONTH'
-                          | 'ALL'
+                        | 'TODAY'
+                        | '7D'
+                        | '30D'
+                        | 'MONTH'
+                        | 'ALL'
                       )
                     }
                     className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
@@ -8460,8 +9911,8 @@ export default function CommissionerDashboard() {
               loading
                 ? '—'
                 : percentText(
-                    overallPerformance
-                  )
+                  overallPerformance
+                )
             }
             lastMonthValue={
               lastMonthMetrics
@@ -8499,7 +9950,7 @@ export default function CommissionerDashboard() {
               },
               {
                 label:
-                  'Ward Ranking',
+                  'Ward Performance',
                 value:
                   percentText(
                     wardRankingAverage
@@ -8513,13 +9964,120 @@ export default function CommissionerDashboard() {
           />
 
           <KpiCard
+            label="Attendance"
+            value={
+              loading
+                ? '—'
+                : percentText(
+                  attendanceStats.rate
+                )
+            }
+            lastMonthValue={
+              lastMonthMetrics
+                ? percentText(lastMonthMetrics.attendanceRate)
+                : undefined
+            }
+            cardTint="bg-gradient-to-br from-emerald-50 via-teal-50 to-white"
+            iconGradient="from-emerald-400 to-teal-500"
+            icon={
+              <div className="relative flex items-center justify-center">
+                <UsersRound size={24} strokeWidth={2.2} />
+                <IconBadge
+                  bg="bg-emerald-600"
+                  icon={
+                    <Check
+                      size={10}
+                      strokeWidth={3.2}
+                    />
+                  }
+                />
+              </div>
+            }
+            tooltip={
+              attendanceStats.rangeDayCount > 1
+                ? [
+                  {
+                    label:
+                      'Registered Employees',
+                    value:
+                      attendanceEmployeeTotal.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label:
+                      'Avg Present / Day',
+                    value:
+                      Math.round(
+                        attendanceStats.displayPresent
+                      ).toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label:
+                      'Avg Absent / Day',
+                    value:
+                      Math.round(
+                        attendanceStats.displayAbsent
+                      ).toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label:
+                      'Attendance Days',
+                    value:
+                      attendanceStats.rangeDayCount.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                ]
+                : [
+                  {
+                    label:
+                      'Total Employee',
+                    value:
+                      attendanceEmployeeTotal.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label:
+                      'Present',
+                    value:
+                      Math.round(
+                        attendanceStats.displayPresent
+                      ).toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label:
+                      'Absent',
+                    value:
+                      Math.round(
+                        attendanceStats.displayAbsent
+                      ).toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                ]
+            }
+            trend={monthTrends.attendanceRate}
+            onClick={
+              openAttendance
+            }
+          />
+
+          <KpiCard
             label="Inspection Performance"
             value={
               loading
                 ? '—'
                 : percentText(
-                    inspection.performance
-                  )
+                  inspection.performance
+                )
             }
             lastMonthValue={
               lastMonthMetrics
@@ -8597,20 +10155,20 @@ export default function CommissionerDashboard() {
               },
               {
                 label:
+                  'Action Taken',
+                value:
+                  inspection.actionTaken.toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
                   'Pending Action',
                 value:
                   (
                     inspection.actionRequired -
                     inspection.actionTaken
                   ).toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Action Taken',
-                value:
-                  inspection.actionTaken.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -8628,75 +10186,13 @@ export default function CommissionerDashboard() {
           />
 
           <KpiCard
-            label="Attendance"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                    attendanceStats.rate
-                  )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.attendanceRate)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-emerald-50 via-teal-50 to-white"
-            iconGradient="from-emerald-400 to-teal-500"
-            icon={
-              <div className="relative flex items-center justify-center">
-                <UsersRound size={24} strokeWidth={2.2} />
-                <IconBadge
-                  bg="bg-emerald-600"
-                  icon={
-                    <Check
-                      size={10}
-                      strokeWidth={3.2}
-                    />
-                  }
-                />
-              </div>
-            }
-            tooltip={[
-              {
-                label:
-                  'Total Employee',
-                value:
-                  attendanceEmployeeTotal.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Present',
-                value:
-                  attendanceStats.present.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Absent',
-                value:
-                  attendanceStats.absent.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-            ]}
-            trend={monthTrends.attendanceRate}
-            onClick={
-              openAttendance
-            }
-          />
-
-          <KpiCard
             label="Approval Rate"
             value={
               loading
                 ? '—'
                 : percentText(
-                    inspection.approvalRate
-                  )
+                  inspection.approvalRate
+                )
             }
             lastMonthValue={
               lastMonthMetrics
@@ -8771,8 +10267,8 @@ export default function CommissionerDashboard() {
               loading
                 ? '—'
                 : percentText(
-                    inspection.rejectionRate
-                  )
+                  inspection.rejectionRate
+                )
             }
             lastMonthValue={
               lastMonthMetrics
@@ -8847,8 +10343,8 @@ export default function CommissionerDashboard() {
               loading
                 ? '—'
                 : percentText(
-                    inspection.actionClosure
-                  )
+                  inspection.actionClosure
+                )
             }
             lastMonthValue={
               lastMonthMetrics
@@ -8925,13 +10421,13 @@ export default function CommissionerDashboard() {
           />
 
           <KpiCard
-            label="Ward Ranking"
+            label="Ward Performance"
             value={
               loading
                 ? '—'
                 : percentText(
-                    wardRankingAverage
-                  )
+                  wardRankingAverage
+                )
             }
             lastMonthValue={
               lastMonthMetrics
@@ -9357,9 +10853,9 @@ export default function CommissionerDashboard() {
                 onClick={
                   topZone
                     ? () =>
-                        openGeo(
-                          topZone
-                        )
+                      openGeo(
+                        topZone
+                      )
                     : undefined
                 }
               />
@@ -9377,9 +10873,9 @@ export default function CommissionerDashboard() {
                 onClick={
                   topWard
                     ? () =>
-                        openGeo(
-                          topWard
-                        )
+                      openGeo(
+                        topWard
+                      )
                     : undefined
                 }
               />
@@ -9519,9 +11015,9 @@ export default function CommissionerDashboard() {
                 onClick={
                   worstZone
                     ? () =>
-                        openGeo(
-                          worstZone
-                        )
+                      openGeo(
+                        worstZone
+                      )
                     : undefined
                 }
               />
@@ -9539,9 +11035,9 @@ export default function CommissionerDashboard() {
                 onClick={
                   worstWard
                     ? () =>
-                        openGeo(
-                          worstWard
-                        )
+                      openGeo(
+                        worstWard
+                      )
                     : undefined
                 }
               />
@@ -9679,20 +11175,18 @@ export default function CommissionerDashboard() {
                       module
                     )
                   }
-                  className={`group relative overflow-hidden rounded-[22px] border bg-white p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                    moduleFilter ===
+                  className={`group relative overflow-hidden rounded-[22px] border bg-white p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${moduleFilter ===
                     module.key
-                      ? 'border-indigo-300 ring-2 ring-indigo-100'
-                      : 'border-slate-200'
-                  }`}
+                    ? 'border-indigo-300 ring-2 ring-indigo-100'
+                    : 'border-slate-200'
+                    }`}
                 >
                   <div
-                    className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${
-                      gradients[
-                        index %
-                          gradients.length
-                      ]
-                    }`}
+                    className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${gradients[
+                      index %
+                      gradients.length
+                    ]
+                      }`}
                   />
 
                   <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
@@ -9709,17 +11203,16 @@ export default function CommissionerDashboard() {
 
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className={`h-full rounded-full bg-gradient-to-r ${
-                        gradients[
-                          index %
-                            gradients.length
-                        ]
-                      } transition-all duration-700`}
+                      className={`h-full rounded-full bg-gradient-to-r ${gradients[
+                        index %
+                        gradients.length
+                      ]
+                        } transition-all duration-700`}
                       style={{
                         width:
                           `${clamp(
                             module.performance ||
-                              0
+                            0
                           )}%`,
                       }}
                     />
@@ -9873,12 +11366,11 @@ export default function CommissionerDashboard() {
                         >
                       )
                     }
-                    className={`rounded-xl px-3 py-2 text-[10px] font-black transition ${
-                      performanceRole ===
+                    className={`rounded-xl px-3 py-2 text-[10px] font-black transition ${performanceRole ===
                       role.key
-                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg'
-                        : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
-                    }`}
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+                      }`}
                   >
                     {
                       role.label
@@ -9961,143 +11453,143 @@ export default function CommissionerDashboard() {
 
           {roleRowsPageCount >
             1 && (
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-              <button
-                type="button"
-                disabled={
-                  roleRowsPage <=
-                  1
-                }
-                onClick={() =>
-                  setRoleRowsPage(
-                    (
-                      current
-                    ) =>
-                      Math.max(
-                        1,
-                        current -
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  disabled={
+                    roleRowsPage <=
+                    1
+                  }
+                  onClick={() =>
+                    setRoleRowsPage(
+                      (
+                        current
+                      ) =>
+                        Math.max(
+                          1,
+                          current -
                           1
-                      )
-                  )
-                }
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
-              >
-                Previous
-              </button>
+                        )
+                    )
+                  }
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
+                >
+                  Previous
+                </button>
 
-              <div className="text-xs font-black text-slate-500">
-                {
-                  roleRowsPage
-                }{' '}
-                /{' '}
-                {
-                  roleRowsPageCount
-                }
+                <div className="text-xs font-black text-slate-500">
+                  {
+                    roleRowsPage
+                  }{' '}
+                  /{' '}
+                  {
+                    roleRowsPageCount
+                  }
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    roleRowsPage >=
+                    roleRowsPageCount
+                  }
+                  onClick={() =>
+                    setRoleRowsPage(
+                      (
+                        current
+                      ) =>
+                        Math.min(
+                          roleRowsPageCount,
+                          current +
+                          1
+                        )
+                    )
+                  }
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
+                >
+                  Next
+                </button>
               </div>
-
-              <button
-                type="button"
-                disabled={
-                  roleRowsPage >=
-                  roleRowsPageCount
-                }
-                onClick={() =>
-                  setRoleRowsPage(
-                    (
-                      current
-                    ) =>
-                      Math.min(
-                        roleRowsPageCount,
-                        current +
-                          1
-                      )
-                  )
-                }
-                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          )}
+            )}
         </section>
 
         {/* ATTENDANCE × INSPECTION */}
         {attendanceInspectionPoints.length >
           0 && (
-          <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950">
-              <UserRoundCheck
-                size={18}
-                className="text-cyan-600"
-              />
-              Attendance · Inspection Performance
-            </div>
+            <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950">
+                <UserRoundCheck
+                  size={18}
+                  className="text-cyan-600"
+                />
+                Attendance · Inspection Performance
+              </div>
 
-            <div className="h-[390px]">
-              <AttendanceInspectionScatterChart
-                data={
-                  attendanceInspectionPoints
-                }
-                onPointClick={(row) => {
-                  setDrilldown({
-                    title:
-                      row.name,
-                    value:
-                      percentText(
-                        row.inspection
-                      ),
-                    breakdown: [
-                      {
-                        label:
-                          'Attendance',
-                        value:
-                          percentText(
-                            row.attendance
-                          ),
-                      },
-                      {
-                        label:
-                          'Inspection Performance',
-                        value:
-                          percentText(
-                            row.inspection
-                          ),
-                      },
-                      {
-                        label:
-                          'Records',
-                        value:
-                          String(
-                            row.reports
-                          ),
-                      },
-                    ],
-                    inspectionRecords:
-                      row.records,
-                    attendanceEmployees:
-                      [
-                        row.employee,
+              <div className="h-[390px]">
+                <AttendanceInspectionScatterChart
+                  data={
+                    attendanceInspectionPoints
+                  }
+                  onPointClick={(row) => {
+                    setDrilldown({
+                      title:
+                        row.name,
+                      value:
+                        percentText(
+                          row.inspection
+                        ),
+                      breakdown: [
+                        {
+                          label:
+                            'Attendance',
+                          value:
+                            percentText(
+                              row.attendance
+                            ),
+                        },
+                        {
+                          label:
+                            'Inspection Performance',
+                          value:
+                            percentText(
+                              row.inspection
+                            ),
+                        },
+                        {
+                          label:
+                            'Records',
+                          value:
+                            String(
+                              row.reports
+                            ),
+                        },
                       ],
-                  });
-                }}
-              />
-            </div>
-          </section>
-        )}
+                      inspectionRecords:
+                        row.records,
+                      attendanceEmployees:
+                        [
+                          row.employee,
+                        ],
+                    });
+                  }}
+                />
+              </div>
+            </section>
+          )}
 
         {/* ATTENDANCE CALENDAR */}
         {(
           moduleFilter ===
-            'ALL' ||
+          'ALL' ||
           moduleFilter ===
-            'ATTENDANCE'
+          'ATTENDANCE'
         ) &&
           zoneFilter ===
-            'ALL' &&
+          'ALL' &&
           wardFilter ===
-            'ALL' &&
+          'ALL' &&
           personFilter ===
-            'ALL' &&
+          'ALL' &&
           !!attendance
             ?.dailyTrend
             ?.length && (
@@ -10244,15 +11736,14 @@ export default function CommissionerDashboard() {
                         item.key
                       )
                     }
-                    className={`rounded-[7px] border px-2 py-1.5 text-[8px] font-black transition ${
-                      zoneModuleView ===
-                        item.key
-                        ? 'border-blue-500 bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-sm'
-                        : 'border-[#e3e9f4] bg-white text-[#53678f] hover:border-blue-200 hover:bg-blue-50'
-                    }`}
+                    className={`rounded-[7px] border px-2 py-1.5 text-[8px] font-black transition ${zoneModuleView ===
+                      item.key
+                      ? 'border-blue-500 bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-sm'
+                      : 'border-[#e3e9f4] bg-white text-[#53678f] hover:border-blue-200 hover:bg-blue-50'
+                      }`}
                   >
                     {item.key ===
-                    'ALL'
+                      'ALL'
                       ? 'All Modules'
                       : item.label}
                   </button>
@@ -10298,7 +11789,7 @@ export default function CommissionerDashboard() {
                 ) => {
                   const visual =
                     MODULE_VISUALS[
-                      module.key
+                    module.key
                     ];
 
                   return (
@@ -10340,142 +11831,139 @@ export default function CommissionerDashboard() {
                   row,
                   rowIndex
                 ) => [
-                  <button
-                    key={`${row.zone}-label`}
-                    type="button"
-                    onClick={() =>
-                      setSelectedMapZone(
+                    <button
+                      key={`${row.zone}-label`}
+                      type="button"
+                      onClick={() =>
+                        setSelectedMapZone(
+                          row.zone
+                        )
+                      }
+                      className={`group flex min-h-[30px] items-center justify-between gap-2 rounded-[8px] px-2.5 py-1.5 text-left text-[9px] font-black transition ${activeMapZone ===
                         row.zone
-                      )
-                    }
-                    className={`group flex min-h-[30px] items-center justify-between gap-2 rounded-[8px] px-2.5 py-1.5 text-left text-[9px] font-black transition ${
-                      activeMapZone ===
-                      row.zone
                         ? 'bg-[#eef3ff] text-[#243fa8] ring-1 ring-[#c7d2fe]'
                         : 'bg-[#f7f9fd] text-[#34486f] hover:bg-[#f1f5fb]'
-                    }`}
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        className={`h-2 w-2 shrink-0 rounded-full ${
-                          rowIndex % 4 ===
-                          0
+                        }`}
+                    >
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${rowIndex % 4 ===
+                            0
                             ? 'bg-indigo-500'
                             : rowIndex % 4 ===
                               1
-                            ? 'bg-sky-500'
-                            : rowIndex % 4 ===
-                              2
-                            ? 'bg-cyan-500'
-                            : 'bg-blue-400'
-                        }`}
-                      />
-                      <span className="truncate">
-                        {
-                          row.zone
-                        }
+                              ? 'bg-sky-500'
+                              : rowIndex % 4 ===
+                                2
+                                ? 'bg-cyan-500'
+                                : 'bg-blue-400'
+                            }`}
+                        />
+                        <span className="truncate">
+                          {
+                            row.zone
+                          }
+                        </span>
                       </span>
-                    </span>
 
-                    <ChevronRight
-                      size={11}
-                      className="shrink-0 text-[#9aa7c2] transition group-hover:translate-x-0.5"
-                    />
-                  </button>,
+                      <ChevronRight
+                        size={11}
+                        className="shrink-0 text-[#9aa7c2] transition group-hover:translate-x-0.5"
+                      />
+                    </button>,
 
-                  ...row.cells
-                    .filter(
-                      (
-                        cell
-                      ) =>
-                        visibleZoneModuleCards.some(
-                          (
-                            module
-                          ) =>
-                            module.key ===
+                    ...row.cells
+                      .filter(
+                        (
+                          cell
+                        ) =>
+                          visibleZoneModuleCards.some(
+                            (
+                              module
+                            ) =>
+                              module.key ===
+                              cell.key
+                          )
+                      )
+                      .map(
+                        (
+                          cell
+                        ) => {
+                          const value =
+                            cell.value;
+
+                          const tone =
+                            ZONE_MODULE_BAR_TONES[
                             cell.key
-                        )
-                    )
-                    .map(
-                      (
-                        cell
-                      ) => {
-                        const value =
-                          cell.value;
+                            ] ||
+                            ZONE_MODULE_BAR_TONES.SWEEPING;
 
-                        const tone =
-                          ZONE_MODULE_BAR_TONES[
-                            cell.key
-                          ] ||
-                          ZONE_MODULE_BAR_TONES.SWEEPING;
+                          const barBackground =
+                            value ===
+                              null
+                              ? '#f1f4fa'
+                              : value >= 90
+                                ? `linear-gradient(90deg,${tone.full} 0%,${tone.deep} 100%)`
+                                : value >= 50
+                                  ? `linear-gradient(90deg,${tone.medium} 0%,${tone.full} 100%)`
+                                  : value > 0
+                                    ? `linear-gradient(90deg,${tone.light} 0%,${tone.medium} 100%)`
+                                    : '#e7ecf5';
 
-                        const barBackground =
-                          value ===
-                          null
-                            ? '#f1f4fa'
-                            : value >= 90
-                            ? `linear-gradient(90deg,${tone.full} 0%,${tone.deep} 100%)`
-                            : value >= 50
-                            ? `linear-gradient(90deg,${tone.medium} 0%,${tone.full} 100%)`
-                            : value > 0
-                            ? `linear-gradient(90deg,${tone.light} 0%,${tone.medium} 100%)`
-                            : '#e7ecf5';
+                          return (
+                            <button
+                              key={`${row.zone}-${cell.key}`}
+                              type="button"
+                              onClick={() =>
+                                openZoneModuleCell(
+                                  row.zone,
+                                  cell
+                                )
+                              }
+                              className="group relative flex min-h-[30px] items-center rounded-[8px] border border-[#edf1f8] bg-[#f7f9fd] px-1.5 py-1 transition hover:border-indigo-200 hover:bg-white hover:shadow-sm"
+                            >
+                              {value ===
+                                null ? (
+                                <span className="mx-auto text-[10px] font-black text-[#b1bad0]">
+                                  —
+                                </span>
+                              ) : (
+                                <div className="relative h-[18px] w-full overflow-hidden rounded-[6px] bg-[#e9edf7]">
+                                  <div
+                                    className="absolute inset-y-0 left-0 rounded-[6px] transition-all duration-700"
+                                    style={{
+                                      width:
+                                        `${Math.max(
+                                          value > 0
+                                            ? 4
+                                            : 0,
+                                          clamp(
+                                            value
+                                          )
+                                        )}%`,
+                                      background:
+                                        barBackground,
+                                    }}
+                                  />
 
-                        return (
-                          <button
-                            key={`${row.zone}-${cell.key}`}
-                            type="button"
-                            onClick={() =>
-                              openZoneModuleCell(
-                                row.zone,
-                                cell
-                              )
-                            }
-                            className="group relative flex min-h-[30px] items-center rounded-[8px] border border-[#edf1f8] bg-[#f7f9fd] px-1.5 py-1 transition hover:border-indigo-200 hover:bg-white hover:shadow-sm"
-                          >
-                            {value ===
-                            null ? (
-                              <span className="mx-auto text-[10px] font-black text-[#b1bad0]">
-                                —
-                              </span>
-                            ) : (
-                              <div className="relative h-[18px] w-full overflow-hidden rounded-[6px] bg-[#e9edf7]">
-                                <div
-                                  className="absolute inset-y-0 left-0 rounded-[6px] transition-all duration-700"
-                                  style={{
-                                    width:
-                                      `${Math.max(
-                                        value > 0
-                                          ? 4
-                                          : 0,
-                                        clamp(
-                                          value
-                                        )
-                                      )}%`,
-                                    background:
-                                      barBackground,
-                                  }}
-                                />
-
-                                <div
-                                  className={`absolute inset-0 flex items-center justify-end px-2 text-[8.5px] font-black ${
-                                    value >=
-                                    46
+                                  <div
+                                    className={`absolute inset-0 flex items-center justify-end px-2 text-[8.5px] font-black ${value >=
+                                      46
                                       ? 'text-white'
                                       : 'text-[#1e3264]'
-                                  }`}
-                                >
-                                  {percentText(
-                                    value
-                                  )}
+                                      }`}
+                                  >
+                                    {percentText(
+                                      value
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      }
-                    ),
-                ]
+                              )}
+                            </button>
+                          );
+                        }
+                      ),
+                  ]
               )}
             </div>
           </div>
@@ -10885,11 +12373,10 @@ export default function CommissionerDashboard() {
                               onClick={() =>
                                 setSelectedMapZone(row.zone)
                               }
-                              className={`rounded-full border px-2.5 py-1 text-[8px] font-black shadow-sm transition ${
-                                activeMapZone === row.zone
-                                  ? 'border-indigo-500 bg-indigo-600 text-white'
-                                  : 'border-white/90 bg-white/90 text-slate-600 hover:border-indigo-200 hover:text-indigo-700'
-                              }`}
+                              className={`rounded-full border px-2.5 py-1 text-[8px] font-black shadow-sm transition ${activeMapZone === row.zone
+                                ? 'border-indigo-500 bg-indigo-600 text-white'
+                                : 'border-white/90 bg-white/90 text-slate-600 hover:border-indigo-200 hover:text-indigo-700'
+                                }`}
                             >
                               {row.zone} - {percentText(value)}
                             </button>
@@ -10959,7 +12446,7 @@ export default function CommissionerDashboard() {
                   ) => {
                     const visual =
                       MODULE_VISUALS[
-                        cell.key
+                      cell.key
                       ];
 
                     const value =
@@ -10967,11 +12454,11 @@ export default function CommissionerDashboard() {
 
                     const progress =
                       value ===
-                      null
+                        null
                         ? 0
                         : clamp(
-                            value
-                          );
+                          value
+                        );
 
                     const itemCount =
                       cell.records.length +
@@ -10980,12 +12467,12 @@ export default function CommissionerDashboard() {
 
                     const itemLabel =
                       cell.key ===
-                      'ATTENDANCE'
+                        'ATTENDANCE'
                         ? 'Employees'
                         : cell.key ===
                           'WARD_RANKING'
-                        ? 'Wards'
-                        : 'Records';
+                          ? 'Wards'
+                          : 'Records';
 
                     const accent =
                       visual?.color ||
@@ -11035,12 +12522,11 @@ export default function CommissionerDashboard() {
                           style={{
                             background:
                               value ===
-                              null
+                                null
                                 ? '#edf1f6'
-                                : `conic-gradient(${accent} ${
-                                    progress *
-                                    3.6
-                                  }deg, #e9edf4 0deg)`,
+                                : `conic-gradient(${accent} ${progress *
+                                3.6
+                                }deg, #e9edf4 0deg)`,
                           }}
                         >
                           <div className="absolute inset-[6px] rounded-full bg-white shadow-[inset_0_1px_5px_rgba(15,23,42,.05)]" />
@@ -11050,7 +12536,7 @@ export default function CommissionerDashboard() {
                             style={{
                               color:
                                 value ===
-                                null
+                                  null
                                   ? '#a6b0c5'
                                   : '#1d3263',
                             }}
@@ -11063,7 +12549,7 @@ export default function CommissionerDashboard() {
 
                         <div className="mt-1.5 text-[7.5px] font-bold text-[#98a4bd]">
                           {value ===
-                          null
+                            null
                             ? 'No data'
                             : 'Current filter'}
                         </div>
@@ -11096,12 +12582,12 @@ export default function CommissionerDashboard() {
         {/* WARD RANKING */}
         {(
           moduleFilter ===
-            'ALL' ||
+          'ALL' ||
           moduleFilter ===
-            'WARD_RANKING'
+          'WARD_RANKING'
         ) &&
           filteredWardRows.length >
-            0 && (
+          0 && (
             <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950">
                 <Trophy
@@ -11287,7 +12773,13 @@ export default function CommissionerDashboard() {
             onWard={
               setProofWard
             }
-          />
+
+            siUsers={
+              cityUsersByRole.get(
+                'QC'
+              ) || []
+            }
+/>
         )}
 
         {/* REPORT PROOF */}
