@@ -6860,8 +6860,7 @@ export default function CommissionerDashboard() {
         roleFilter === 'ALL' &&
         personFilter === 'ALL' &&
         statusFilter === 'ALL' &&
-        !searchValue &&
-        registeredAttendanceSummary !== null;
+        !searchValue;
 
       const rangeDayCount = (() => {
         if (
