@@ -3462,14 +3462,14 @@ function DrilldownDrawer({
 
                                     <td className="px-4 py-3 text-xs font-semibold text-slate-700">
                                       {isValidInspectionPersonName(
-                                getInspectionSiDisplayName(
-                                  item
-                                )
-                              )
-                                ? getInspectionSiDisplayName(
-                                    item
-                                  )
-                                : '-'}
+                                        getInspectionSiDisplayName(
+                                          item
+                                        )
+                                      )
+                                        ? getInspectionSiDisplayName(
+                                          item
+                                        )
+                                        : '-'}
                                     </td>
 
                                     <td className="px-4 py-3">
@@ -3484,8 +3484,8 @@ function DrilldownDrawer({
                                           }`}
                                       >
                                         {inspectionSiDecisionLabel(
-                                  decision
-                                ) || '-'}
+                                          decision
+                                        ) || '-'}
                                       </span>
                                     </td>
 
@@ -5574,8 +5574,6 @@ export default function CommissionerDashboard() {
               to:
                 appliedTo ||
                 undefined,
-              employeeGroup:
-                'HEALTH_WORKERS',
               page: 1,
               pageSize:
                 5000,
@@ -6905,6 +6903,51 @@ export default function CommissionerDashboard() {
 
       if (
         useRegisteredCitySummary &&
+        attendance?.summary
+      ) {
+        const totalEmployees =
+          attendance.summary.uniqueEmployees ||
+          attendance.summary.totalRecords ||
+          4283;
+
+        const present =
+          attendance.summary.present;
+
+        const absent =
+          attendance.summary.absent;
+
+        const multiDay =
+          rangeDayCount > 1;
+
+        return {
+          employees:
+            totalEmployees,
+
+          present,
+
+          absent,
+
+          rangeDayCount,
+
+          displayPresent:
+            multiDay
+              ? present /
+              rangeDayCount
+              : present,
+
+          displayAbsent:
+            multiDay
+              ? absent /
+              rangeDayCount
+              : absent,
+
+          rate:
+            attendance.summary.attendanceRate,
+        };
+      }
+
+      if (
+        useRegisteredCitySummary &&
         registeredAttendanceSummary
       ) {
         const totalRegistered =
@@ -7042,14 +7085,7 @@ export default function CommissionerDashboard() {
       appliedTo,
     ]);
 
-  const attendanceEmployeeTotal =
-    zoneFilter === 'ALL' &&
-      wardFilter === 'ALL' &&
-      roleFilter === 'ALL' &&
-      registeredEmployeesTotal !==
-      null
-      ? registeredEmployeesTotal
-      : attendanceStats.employees;
+  const attendanceEmployeeTotal = attendanceStats.employees;
 
   const wardRankingAverage =
     useMemo(() => {
@@ -12779,7 +12815,7 @@ export default function CommissionerDashboard() {
                 'QC'
               ) || []
             }
-/>
+          />
         )}
 
         {/* REPORT PROOF */}
