@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@hooks/useAuth";
 import { canonicalizeModules, moduleEntryPath } from "@utils/modules";
 import { moduleLabel } from "@lib/labels";
@@ -33,6 +33,8 @@ import {
   ChartNoAxesCombined,
   Award,
   Factory,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { UserProfileModal } from "./UserProfileModal";
 
@@ -186,6 +188,29 @@ export default function Sidebar() {
   const [modulesOpen, setModulesOpen] = useState(true);
   const [masterOpen, setMasterOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark") {
+      setIsDarkMode(true);
+      document.documentElement.classList.add("dark-theme");
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const newDark = !prev;
+      if (newDark) {
+        document.documentElement.classList.add("dark-theme");
+        localStorage.setItem("theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark-theme");
+        localStorage.setItem("theme", "light");
+      }
+      return newDark;
+    });
+  };
 
   const isHmsSuperAdmin =
     user?.roles.includes("HMS_SUPER_ADMIN" as Role) ?? false;
@@ -539,6 +564,20 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-slate-100 p-4 space-y-2">
+        <button
+          type="button"
+          onClick={toggleDarkMode}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:bg-slate-100"
+          title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          {isDarkMode ? (
+            <Sun size={16} className="text-amber-500" />
+          ) : (
+            <Moon size={16} className="text-slate-600" />
+          )}
+          {isDarkMode ? "Light Mode" : "Dark Mode"}
+        </button>
+
         {!loading && user && (
           <>
             {!isCommissioner && (
