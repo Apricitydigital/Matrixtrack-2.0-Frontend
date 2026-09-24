@@ -37,7 +37,9 @@
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    /* must end at `none`: a lingering transform (even identity) makes this
+       wrapper the containing block for position:fixed modals */
+    transform: none;
   }
 }
 

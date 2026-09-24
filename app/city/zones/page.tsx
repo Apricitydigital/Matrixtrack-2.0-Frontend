@@ -7,6 +7,7 @@ import { Compass, Plus, Search, Check, X, Loader2, Download, FileSpreadsheet, Fi
 import { RoleGuard } from "@components/Guards";
 import { useAuth } from "@hooks/useAuth";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type GeoNode = { id: string; name: string; createdAt?: string };
 
@@ -296,214 +297,222 @@ export default function ZoneManagementPage() {
 
           {/* Create Zone Modal */}
           {isModalOpen && !isReadOnly && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px"
-            }}>
+            <ModalPortal>
               <div style={{
-                padding: 0, overflow: "hidden", border: "1px solid #e2e8f0",
-                borderRadius: "20px", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                width: "100%", maxWidth: "480px", maxHeight: "calc(100vh - 32px)", overflowY: "auto", backgroundColor: "white"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px"
               }}>
                 <div style={{
-                  padding: "20px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe",
-                  display: "flex", alignItems: "center", justifyContent: "space-between"
+                  padding: 0, overflow: "hidden", border: "1px solid #e2e8f0",
+                  borderRadius: "20px", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                  width: "100%", maxWidth: "480px", maxHeight: "calc(100vh - 32px)", overflowY: "auto", backgroundColor: "white"
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <Compass size={20} color="#2563eb" />
-                    <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>Create New Zone</h2>
-                  </div>
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    style={{ border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <form onSubmit={createZone} style={{ padding: "24px" }}>
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
-                      Zone Name <span style={{ color: "#ef4444" }}>*</span>
-                    </label>
-                    <input
-                      placeholder="e.g. Zone 1 or Central Zone"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      style={{
-                        width: "100%", height: "42px", padding: "0 14px", borderRadius: "10px",
-                        border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
-                      }}
-                    />
-                  </div>
-                  {status && (
-                    <div style={{
-                      marginBottom: "16px", padding: "10px 14px", borderRadius: "8px",
-                      fontSize: "0.8125rem", fontWeight: 700, textAlign: "center",
-                      backgroundColor: status.startsWith("Error") ? "#fef2f2" : "#f0fdf4",
-                      color: status.startsWith("Error") ? "#dc2626" : "#16a34a",
-                      border: status.startsWith("Error") ? "1px solid #fecaca" : "1px solid #bbf7d0"
-                    }}>
-                      {status}
+                  <div style={{
+                    padding: "20px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe",
+                    display: "flex", alignItems: "center", justifyContent: "space-between"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <Compass size={20} color="#2563eb" />
+                      <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>Create New Zone</h2>
                     </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
                     <button
-                      type="button"
                       onClick={() => setIsModalOpen(false)}
-                      style={{
-                        padding: "10px 18px", borderRadius: "10px", border: "1px solid #cbd5e1",
-                        backgroundColor: "white", color: "#475569", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer"
-                      }}
+                      style={{ border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
                     >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={saving || !name.trim()}
-                      style={{
-                        padding: "10px 22px", borderRadius: "10px", border: "none",
-                        backgroundColor: "#2563eb", color: "white", fontSize: "0.875rem", fontWeight: 800, cursor: "pointer"
-                      }}
-                    >
-                      {saving ? "Creating..." : "Create Zone"}
+                      <X size={20} />
                     </button>
                   </div>
-                </form>
+
+                  <form onSubmit={createZone} style={{ padding: "24px" }}>
+                    <div style={{ marginBottom: "20px" }}>
+                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
+                        Zone Name <span style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <input
+                        placeholder="e.g. Zone 1 or Central Zone"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        style={{
+                          width: "100%", height: "42px", padding: "0 14px", borderRadius: "10px",
+                          border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                        }}
+                      />
+                    </div>
+                    {status && (
+                      <div style={{
+                        marginBottom: "16px", padding: "10px 14px", borderRadius: "8px",
+                        fontSize: "0.8125rem", fontWeight: 700, textAlign: "center",
+                        backgroundColor: status.startsWith("Error") ? "#fef2f2" : "#f0fdf4",
+                        color: status.startsWith("Error") ? "#dc2626" : "#16a34a",
+                        border: status.startsWith("Error") ? "1px solid #fecaca" : "1px solid #bbf7d0"
+                      }}>
+                        {status}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        style={{
+                          padding: "10px 18px", borderRadius: "10px", border: "1px solid #cbd5e1",
+                          backgroundColor: "white", color: "#475569", fontSize: "0.875rem", fontWeight: 700, cursor: "pointer"
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={saving || !name.trim()}
+                        style={{
+                          padding: "10px 22px", borderRadius: "10px", border: "none",
+                          backgroundColor: "#2563eb", color: "white", fontSize: "0.875rem", fontWeight: 800, cursor: "pointer"
+                        }}
+                      >
+                        {saving ? "Creating..." : "Create Zone"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Delete Single Confirmation Modal */}
           {deleteConfirmTarget && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
-            }}>
+            <ModalPortal>
               <div style={{
-                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                textAlign: "center"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
               }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <Trash2 size={24} />
-                </div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
-                  Delete Zone ({deleteConfirmTarget.name})?
-                </div>
-                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
-                  Are you sure you want to delete this zone? This action cannot be undone and will remove all associated wards and areas under it.
-                </p>
-                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteConfirmTarget(null)}
-                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmDeleteZone}
-                    disabled={deletingId === deleteConfirmTarget.id}
-                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    {deletingId === deleteConfirmTarget.id ? "Deleting..." : "Yes, Delete Zone"}
-                  </button>
+                <div style={{
+                  backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                  padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                  textAlign: "center"
+                }}>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                    <Trash2 size={24} />
+                  </div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                    Delete Zone ({deleteConfirmTarget.name})?
+                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                    Are you sure you want to delete this zone? This action cannot be undone and will remove all associated wards and areas under it.
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmTarget(null)}
+                      style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmDeleteZone}
+                      disabled={deletingId === deleteConfirmTarget.id}
+                      style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                    >
+                      {deletingId === deleteConfirmTarget.id ? "Deleting..." : "Yes, Delete Zone"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Bulk Delete Confirmation Modal */}
           {showBulkDeleteConfirm && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
-            }}>
+            <ModalPortal>
               <div style={{
-                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                textAlign: "center"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
               }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <Trash2 size={24} />
-                </div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
-                  Delete Multiple Zones?
-                </div>
-                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
-                  Are you sure you want to delete <strong>{selectedZoneIds.length} selected zones</strong> and their associated wards? This action cannot be undone.
-                </p>
-                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowBulkDeleteConfirm(false)}
-                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmBulkDeleteZones}
-                    disabled={bulkDeleting}
-                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    {bulkDeleting ? "Deleting..." : `Yes, Delete ${selectedZoneIds.length}`}
-                  </button>
+                <div style={{
+                  backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                  padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                  textAlign: "center"
+                }}>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                    <Trash2 size={24} />
+                  </div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                    Delete Multiple Zones?
+                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                    Are you sure you want to delete <strong>{selectedZoneIds.length} selected zones</strong> and their associated wards? This action cannot be undone.
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkDeleteConfirm(false)}
+                      style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmBulkDeleteZones}
+                      disabled={bulkDeleting}
+                      style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                    >
+                      {bulkDeleting ? "Deleting..." : `Yes, Delete ${selectedZoneIds.length}`}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Edit Confirmation Modal */}
           {editConfirmTarget && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
-            }}>
+            <ModalPortal>
               <div style={{
-                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                textAlign: "center"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
               }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#dbeafe", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <AlertTriangle size={24} />
-                </div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
-                  Confirm Zone Changes
-                </div>
-                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
-                  Are you sure you want to save the modifications to this zone?
-                </p>
-                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditConfirmTarget(null)}
-                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const id = editConfirmTarget;
-                      setEditConfirmTarget(null);
-                      await updateZone(id);
-                    }}
-                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#2563eb", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    Yes, Save Changes
-                  </button>
+                <div style={{
+                  backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                  padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                  textAlign: "center"
+                }}>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#dbeafe", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                    Confirm Zone Changes
+                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                    Are you sure you want to save the modifications to this zone?
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditConfirmTarget(null)}
+                      style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const id = editConfirmTarget;
+                        setEditConfirmTarget(null);
+                        await updateZone(id);
+                      }}
+                      style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#2563eb", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                    >
+                      Yes, Save Changes
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Stats & Search Toolbar */}

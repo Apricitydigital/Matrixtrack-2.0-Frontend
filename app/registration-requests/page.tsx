@@ -7,6 +7,7 @@ import { useAuth } from "@hooks/useAuth";
 import { RoleGuard } from "@components/Guards";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { roleLabel } from "@lib/labels";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type Request = {
   id: string;
@@ -328,97 +329,99 @@ export default function RegistrationRequestsPage() {
         )}
 
         {modal && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-            backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(6px)",
-            display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000
-          }}>
+          <ModalPortal>
             <div style={{
-              background: "white", width: "90%", maxWidth: "480px", borderRadius: "24px",
-              overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)", border: "1px solid #e2e8f0"
+              position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(6px)",
+              display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000
             }}>
               <div style={{
-                padding: "24px 32px", borderBottom: "1px solid #f1f5f9", display: "flex",
-                justifyContent: "space-between", alignItems: "center", background: "#fcfdfe"
+                background: "white", width: "90%", maxWidth: "480px", borderRadius: "24px",
+                overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)", border: "1px solid #e2e8f0"
               }}>
-                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, color: "#0f172a" }}>Review Application</h3>
-                <button
-                  onClick={closeModal}
-                  style={{ background: "#f1f5f9", border: "none", color: "#64748b", fontSize: "1.25rem", cursor: "pointer", width: "32px", height: "32px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "24px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Select Role</label>
-                  <select
-                    className="input"
-                    style={{ width: "100%", height: "48px", borderRadius: "12px", border: "1.5px solid #e2e8f0", padding: "0 16px", fontWeight: 700, color: "#1e293b", backgroundColor: "#f8fafc" }}
-                    value={modal.role}
-                    onChange={(e) => setModal((m) => (m ? { ...m, role: e.target.value as any } : m))}
+                <div style={{
+                  padding: "24px 32px", borderBottom: "1px solid #f1f5f9", display: "flex",
+                  justifyContent: "space-between", alignItems: "center", background: "#fcfdfe"
+                }}>
+                  <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 800, color: "#0f172a" }}>Review Application</h3>
+                  <button
+                    onClick={closeModal}
+                    style={{ background: "#f1f5f9", border: "none", color: "#64748b", fontSize: "1.25rem", cursor: "pointer", width: "32px", height: "32px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}
                   >
-                    <option value="">Select organizational role</option>
-                    {ROLE_OPTIONS.map((r) => (
-                      <option key={r} value={r}>{roleLabel(r)}</option>
-                    ))}
-                  </select>
+                    ✕
+                  </button>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>System Modules</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                    {modules.map((m) => {
-                      const isActive = modal.moduleIds.has(m.id);
-                      return (
-                        <label
-                          key={m.id}
-                          style={{
-                            display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px", borderRadius: "12px",
-                            border: `1.5px solid ${isActive ? "#2563eb" : "#e2e8f0"}`,
-                            background: isActive ? "#eff6ff" : "white",
-                            color: isActive ? "#2563eb" : "#475569",
-                            fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", transition: "all 0.2s"
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            style={{ width: "16px", height: "16px", accentColor: "#2563eb" }}
-                            checked={isActive}
-                            onChange={() =>
-                              setModal((mod) => (mod ? { ...mod, moduleIds: toggleSet(mod.moduleIds, m.id) } : mod))
-                            }
-                          />
-                          {m.name}
-                        </label>
-                      );
-                    })}
+                <div style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "24px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>Select Role</label>
+                    <select
+                      className="input"
+                      style={{ width: "100%", height: "48px", borderRadius: "12px", border: "1.5px solid #e2e8f0", padding: "0 16px", fontWeight: 700, color: "#1e293b", backgroundColor: "#f8fafc" }}
+                      value={modal.role}
+                      onChange={(e) => setModal((m) => (m ? { ...m, role: e.target.value as any } : m))}
+                    >
+                      <option value="">Select organizational role</option>
+                      {ROLE_OPTIONS.map((r) => (
+                        <option key={r} value={r}>{roleLabel(r)}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <label style={{ fontSize: "0.75rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>System Modules</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {modules.map((m) => {
+                        const isActive = modal.moduleIds.has(m.id);
+                        return (
+                          <label
+                            key={m.id}
+                            style={{
+                              display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px", borderRadius: "12px",
+                              border: `1.5px solid ${isActive ? "#2563eb" : "#e2e8f0"}`,
+                              background: isActive ? "#eff6ff" : "white",
+                              color: isActive ? "#2563eb" : "#475569",
+                              fontSize: "0.85rem", fontWeight: 800, cursor: "pointer", transition: "all 0.2s"
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              style={{ width: "16px", height: "16px", accentColor: "#2563eb" }}
+                              checked={isActive}
+                              onChange={() =>
+                                setModal((mod) => (mod ? { ...mod, moduleIds: toggleSet(mod.moduleIds, m.id) } : mod))
+                              }
+                            />
+                            {m.name}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div style={{ padding: "24px 32px", background: "#f8fafc", borderTop: "1px solid #f1f5f9", display: "flex", gap: "12px" }}>
-                <button
-                  style={{ flex: 1, height: "48px", borderRadius: "12px", border: "1.5px solid #e2e8f0", background: "white", fontWeight: 700, cursor: "pointer" }}
-                  onClick={closeModal}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={{
-                    flex: 2, height: "48px", borderRadius: "12px", border: "none", background: modalValid ? "#2563eb" : "#cbd5e1",
-                    color: "white", fontWeight: 700, cursor: modalValid ? "pointer" : "not-allowed",
-                    boxShadow: modalValid ? "0 10px 15px -3px rgba(37, 99, 235, 0.25)" : "none"
-                  }}
-                  disabled={!modalValid || saving}
-                  onClick={onApprove}
-                >
-                  {saving ? "Processing..." : "Grant Access"}
-                </button>
+                <div style={{ padding: "24px 32px", background: "#f8fafc", borderTop: "1px solid #f1f5f9", display: "flex", gap: "12px" }}>
+                  <button
+                    style={{ flex: 1, height: "48px", borderRadius: "12px", border: "1.5px solid #e2e8f0", background: "white", fontWeight: 700, cursor: "pointer" }}
+                    onClick={closeModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    style={{
+                      flex: 2, height: "48px", borderRadius: "12px", border: "none", background: modalValid ? "#2563eb" : "#cbd5e1",
+                      color: "white", fontWeight: 700, cursor: modalValid ? "pointer" : "not-allowed",
+                      boxShadow: modalValid ? "0 10px 15px -3px rgba(37, 99, 235, 0.25)" : "none"
+                    }}
+                    disabled={!modalValid || saving}
+                    onClick={onApprove}
+                  >
+                    {saving ? "Processing..." : "Grant Access"}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
         <style jsx>{`
             .animate-spin {

@@ -2400,7 +2400,10 @@ function EditCityModal({
           return {
             id: m.id,
             name: m.name,
-            enabled: existing ? existing.enabled : true,
+            // Modules without an existing CityModule row (e.g. opt-in modules
+            // like Plant & Processing) default OFF so saving the form never
+            // silently enables something an admin never touched.
+            enabled: existing ? existing.enabled : false,
           };
         });
         setModuleList(mapped);
@@ -2491,6 +2494,7 @@ function EditCityModal({
     if (upper === "SWACHH_RANKING" || upper === "SWACHH") return { label: "Ward Ranking System", suite: "PLATFORM", activeClass: "bg-white border-emerald-400 font-bold text-emerald-800", checkClass: "accent-emerald-600" };
     if (upper === "WORKFORCE_MONITORING" || upper === "WORKFORCE") return { label: "Workforce Monitoring (Matrix Track)", suite: "PLATFORM", activeClass: "bg-white border-purple-400 font-bold text-purple-800", checkClass: "accent-purple-600" };
     if (upper === "MRF" || upper === "PROCESSING") return { label: "Processing & MRF Telemetry", suite: "PLATFORM", activeClass: "bg-white border-amber-400 font-bold text-amber-800", checkClass: "accent-amber-600" };
+    if (upper === "PROCESSING_PLANT") return { label: "Plant & Processing", suite: "PLATFORM", activeClass: "bg-white border-amber-400 font-bold text-amber-800", checkClass: "accent-amber-600" };
     return {
       label: name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
       suite: "PLATFORM",

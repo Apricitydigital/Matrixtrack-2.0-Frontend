@@ -11,6 +11,7 @@ import {
 import { Protected, RoleGuard } from '@components/Guards';
 import { useAuth } from '@hooks/useAuth';
 import { CityUserApi, CityModulesApi } from '@lib/apiClient';
+import ModalPortal from "@components/ui/ModalPortal";
 
 export type AccessLevel = 'WRITE' | 'READ' | 'RESTRICTED';
 
@@ -1048,283 +1049,289 @@ export default function SuperAdminAccessManagementPage() {
 
         {/* ─── CREATE NEW ACCOUNT MODAL DRAWER ─── */}
         {isCreateModalOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div onClick={() => setIsCreateModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
+          <ModalPortal>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div onClick={() => setIsCreateModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
             
-            <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 600, background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', color: '#fff', display: 'grid', placeItems: 'center' }}>
-                    <UserPlus size={22} />
+              <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 600, background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', color: '#fff', display: 'grid', placeItems: 'center' }}>
+                      <UserPlus size={22} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: '#0f172a' }}>Create User Account</h3>
+                      <div style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Assign ID/Password & configure workspace access levels</div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: '#0f172a' }}>Create User Account</h3>
-                    <div style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>Assign ID/Password & configure workspace access levels</div>
-                  </div>
+
+                  <button onClick={() => setIsCreateModalOpen(false)} style={{ background: '#f1f5f9', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                    <X size={18} />
+                  </button>
                 </div>
 
-                <button onClick={() => setIsCreateModalOpen(false)} style={{ background: '#f1f5f9', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                  <X size={18} />
-                </button>
-              </div>
-
-              <form onSubmit={handleCreateAccount}>
-                {/* Full Name */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Full Name</label>
-                  <input
-                    type="text" required placeholder="e.g. Ramesh Sharma"
-                    value={createFormData.name} onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
-                    style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
-                  />
-                </div>
-
-                {/* Email Address */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Email Address (Login ID)</label>
-                  <input
-                    type="email" required placeholder="ramesh@indore.gov.in"
-                    value={createFormData.email} onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
-                    style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
-                  />
-                </div>
-
-                {/* Password */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Password</label>
-                  <div style={{ position: 'relative' }}>
+                <form onSubmit={handleCreateAccount}>
+                  {/* Full Name */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Full Name</label>
                     <input
-                      type={showPassword ? 'text' : 'password'} required placeholder="••••••••"
-                      value={createFormData.password} onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
-                      style={{ width: '100%', height: 44, padding: '0 44px 0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
+                      type="text" required placeholder="e.g. Ramesh Sharma"
+                      value={createFormData.name} onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
+                      style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
                     />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
                   </div>
-                </div>
 
-                {/* Security Role Selection with RBAC Defaults */}
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
-                    Assigned Security Role (RBAC)
-                  </label>
-                  <select
-                    value={createFormData.role}
-                    onChange={(e) => handleRoleChangeInCreate(e.target.value)}
-                    style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fff' }}
+                  {/* Email Address */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Email Address (Login ID)</label>
+                    <input
+                      type="email" required placeholder="ramesh@indore.gov.in"
+                      value={createFormData.email} onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+                      style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
+                    />
+                  </div>
+
+                  {/* Password */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Password</label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'} required placeholder="••••••••"
+                        value={createFormData.password} onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                        style={{ width: '100%', height: 44, padding: '0 44px 0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Security Role Selection with RBAC Defaults */}
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
+                      Assigned Security Role (RBAC)
+                    </label>
+                    <select
+                      value={createFormData.role}
+                      onChange={(e) => handleRoleChangeInCreate(e.target.value)}
+                      style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fff' }}
+                    >
+                      {RBAC_ROLES.map(r => (
+                        <option key={r.key} value={r.key}>{r.label}</option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: 11.5, color: '#2563eb', fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Sparkles size={13} /> Recommended RBAC 3-tier access presets auto-applied
+                    </div>
+                  </div>
+
+                  {/* 3-Tier Segmented Access Controls */}
+                  <div style={{ marginBottom: 24, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1.5px solid #e2e8f0' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#334155', textTransform: 'uppercase', marginBottom: 14 }}>
+                      Workspace Permissions (Full Write / Read Only / Restricted)
+                    </div>
+
+                    <SegmentedAccessControl
+                      label="Taskforce 20 Workspace Access"
+                      value={createFormData.taskforceAccess}
+                      onChange={(val) => setCreateFormData({ ...createFormData, taskforceAccess: val })}
+                    />
+
+                    <SegmentedAccessControl
+                      label="Swachh Sync Workspace Access"
+                      value={createFormData.swachhAccess}
+                      onChange={(val) => setCreateFormData({ ...createFormData, swachhAccess: val })}
+                    />
+
+                    <SegmentedAccessControl
+                      label="Workforce Monitoring Workspace Access"
+                      value={createFormData.workforceAccess}
+                      onChange={(val) => setCreateFormData({ ...createFormData, workforceAccess: val })}
+                    />
+
+                    <SegmentedAccessControl
+                      label="Processing & MRF Plant Workspace Access"
+                      value={createFormData.mrfAccess}
+                      onChange={(val) => setCreateFormData({ ...createFormData, mrfAccess: val })}
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit" disabled={submitting}
+                    style={{
+                      width: '100%', height: 48, borderRadius: 12, border: 'none',
+                      background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+                      color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
+                    }}
                   >
-                    {RBAC_ROLES.map(r => (
-                      <option key={r.key} value={r.key}>{r.label}</option>
-                    ))}
-                  </select>
-                  <div style={{ fontSize: 11.5, color: '#2563eb', fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Sparkles size={13} /> Recommended RBAC 3-tier access presets auto-applied
-                  </div>
-                </div>
-
-                {/* 3-Tier Segmented Access Controls */}
-                <div style={{ marginBottom: 24, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1.5px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#334155', textTransform: 'uppercase', marginBottom: 14 }}>
-                    Workspace Permissions (Full Write / Read Only / Restricted)
-                  </div>
-
-                  <SegmentedAccessControl
-                    label="Taskforce 20 Workspace Access"
-                    value={createFormData.taskforceAccess}
-                    onChange={(val) => setCreateFormData({ ...createFormData, taskforceAccess: val })}
-                  />
-
-                  <SegmentedAccessControl
-                    label="Swachh Sync Workspace Access"
-                    value={createFormData.swachhAccess}
-                    onChange={(val) => setCreateFormData({ ...createFormData, swachhAccess: val })}
-                  />
-
-                  <SegmentedAccessControl
-                    label="Workforce Monitoring Workspace Access"
-                    value={createFormData.workforceAccess}
-                    onChange={(val) => setCreateFormData({ ...createFormData, workforceAccess: val })}
-                  />
-
-                  <SegmentedAccessControl
-                    label="Processing & MRF Plant Workspace Access"
-                    value={createFormData.mrfAccess}
-                    onChange={(val) => setCreateFormData({ ...createFormData, mrfAccess: val })}
-                  />
-                </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit" disabled={submitting}
-                  style={{
-                    width: '100%', height: 48, borderRadius: 12, border: 'none',
-                    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-                    color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
-                  }}
-                >
-                  {submitting ? 'Creating Account...' : 'Create Account & Save Access Levels'}
-                </button>
-              </form>
+                    {submitting ? 'Creating Account...' : 'Create Account & Save Access Levels'}
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* ─── EDIT USER PERMISSIONS MODAL DRAWER ─── */}
         {isEditModalOpen && editingUser && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div onClick={() => setIsEditModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
+          <ModalPortal>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div onClick={() => setIsEditModalOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
             
-            <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 600, background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', display: 'grid', placeItems: 'center' }}>
-                    <Edit3 size={22} />
+              <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 600, background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', display: 'grid', placeItems: 'center' }}>
+                      <Edit3 size={22} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: '#0f172a' }}>Edit User Access Levels</h3>
+                      <div style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>{editingUser.email}</div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: '#0f172a' }}>Edit User Access Levels</h3>
-                    <div style={{ fontSize: 12.5, color: '#64748b', fontWeight: 600 }}>{editingUser.email}</div>
-                  </div>
+
+                  <button onClick={() => setIsEditModalOpen(false)} style={{ background: '#f1f5f9', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                    <X size={18} />
+                  </button>
                 </div>
 
-                <button onClick={() => setIsEditModalOpen(false)} style={{ background: '#f1f5f9', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                  <X size={18} />
-                </button>
+                <form onSubmit={handleSaveEditModal}>
+                  {/* Full Name */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>User Name</label>
+                    <input
+                      type="text" required
+                      value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
+                    />
+                  </div>
+
+                  {/* Security Role Selection */}
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
+                      Assigned Security Role (RBAC)
+                    </label>
+                    <select
+                      value={editFormData.role}
+                      onChange={(e) => handleRoleChangeInEdit(e.target.value)}
+                      style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fff' }}
+                    >
+                      {RBAC_ROLES.map(r => (
+                        <option key={r.key} value={r.key}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 3-Tier Segmented Access Controls */}
+                  <div style={{ marginBottom: 24, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1.5px solid #e2e8f0' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#334155', textTransform: 'uppercase', marginBottom: 14 }}>
+                      Workspace Permissions (Full Write / Read Only / Restricted)
+                    </div>
+
+                    <SegmentedAccessControl
+                      label="Taskforce 20 Workspace Access"
+                      value={editFormData.taskforceAccess}
+                      onChange={(val) => setEditFormData({ ...editFormData, taskforceAccess: val })}
+                    />
+
+                    <SegmentedAccessControl
+                      label="Swachh Sync Workspace Access"
+                      value={editFormData.swachhAccess}
+                      onChange={(val) => setEditFormData({ ...editFormData, swachhAccess: val })}
+                    />
+
+                    <SegmentedAccessControl
+                      label="Workforce Monitoring Workspace Access"
+                      value={editFormData.workforceAccess}
+                      onChange={(val) => setEditFormData({ ...editFormData, workforceAccess: val })}
+                    />
+
+                    <SegmentedAccessControl
+                      label="Processing & MRF Plant Workspace Access"
+                      value={editFormData.mrfAccess}
+                      onChange={(val) => setEditFormData({ ...editFormData, mrfAccess: val })}
+                    />
+                  </div>
+
+                  {/* Buttons Action Bar */}
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button
+                      type="button" onClick={() => setIsEditModalOpen(false)}
+                      style={{
+                        flex: 1, height: 48, borderRadius: 12, border: '1.5px solid #cbd5e1',
+                        background: '#fff', color: '#475569', fontSize: 14, fontWeight: 700, cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="submit" disabled={submitting}
+                      style={{
+                        flex: 2, height: 48, borderRadius: 12, border: 'none',
+                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                        color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)'
+                      }}
+                    >
+                      <Save size={18} /> {submitting ? 'Saving Changes...' : 'Save Workspace Access Levels'}
+                    </button>
+                  </div>
+                </form>
               </div>
-
-              <form onSubmit={handleSaveEditModal}>
-                {/* Full Name */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>User Name</label>
-                  <input
-                    type="text" required
-                    value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                    style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, outline: 'none', fontWeight: 600 }}
-                  />
-                </div>
-
-                {/* Security Role Selection */}
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: '#334155', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
-                    Assigned Security Role (RBAC)
-                  </label>
-                  <select
-                    value={editFormData.role}
-                    onChange={(e) => handleRoleChangeInEdit(e.target.value)}
-                    style={{ width: '100%', height: 44, padding: '0 16px', borderRadius: 10, border: '1.5px solid #cbd5e1', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: '#fff' }}
-                  >
-                    {RBAC_ROLES.map(r => (
-                      <option key={r.key} value={r.key}>{r.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 3-Tier Segmented Access Controls */}
-                <div style={{ marginBottom: 24, background: '#f8fafc', padding: 20, borderRadius: 16, border: '1.5px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#334155', textTransform: 'uppercase', marginBottom: 14 }}>
-                    Workspace Permissions (Full Write / Read Only / Restricted)
-                  </div>
-
-                  <SegmentedAccessControl
-                    label="Taskforce 20 Workspace Access"
-                    value={editFormData.taskforceAccess}
-                    onChange={(val) => setEditFormData({ ...editFormData, taskforceAccess: val })}
-                  />
-
-                  <SegmentedAccessControl
-                    label="Swachh Sync Workspace Access"
-                    value={editFormData.swachhAccess}
-                    onChange={(val) => setEditFormData({ ...editFormData, swachhAccess: val })}
-                  />
-
-                  <SegmentedAccessControl
-                    label="Workforce Monitoring Workspace Access"
-                    value={editFormData.workforceAccess}
-                    onChange={(val) => setEditFormData({ ...editFormData, workforceAccess: val })}
-                  />
-
-                  <SegmentedAccessControl
-                    label="Processing & MRF Plant Workspace Access"
-                    value={editFormData.mrfAccess}
-                    onChange={(val) => setEditFormData({ ...editFormData, mrfAccess: val })}
-                  />
-                </div>
-
-                {/* Buttons Action Bar */}
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <button
-                    type="button" onClick={() => setIsEditModalOpen(false)}
-                    style={{
-                      flex: 1, height: 48, borderRadius: 12, border: '1.5px solid #cbd5e1',
-                      background: '#fff', color: '#475569', fontSize: 14, fontWeight: 700, cursor: 'pointer'
-                    }}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit" disabled={submitting}
-                    style={{
-                      flex: 2, height: 48, borderRadius: 12, border: 'none',
-                      background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                      color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)'
-                    }}
-                  >
-                    <Save size={18} /> {submitting ? 'Saving Changes...' : 'Save Workspace Access Levels'}
-                  </button>
-                </div>
-              </form>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         {/* ─── RBAC SECURITY MATRIX GUIDELINES MODAL ─── */}
         {isRbacGuideOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div onClick={() => setIsRbacGuideOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
+          <ModalPortal>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div onClick={() => setIsRbacGuideOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)' }} />
             
-            <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 820, maxHeight: '90vh', overflowY: 'auto', background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', display: 'grid', placeItems: 'center' }}>
-                    <ShieldCheck size={24} />
+              <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: 820, maxHeight: '90vh', overflowY: 'auto', background: '#fff', borderRadius: 24, padding: 36, boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', display: 'grid', placeItems: 'center' }}>
+                      <ShieldCheck size={24} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 22, fontWeight: 900, margin: 0, color: '#0f172a' }}>RBAC Role Access Level Matrix</h3>
+                      <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Standardized 3-Tier Security Guidelines (Full Write, Read Only, Restricted)</div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{ fontSize: 22, fontWeight: 900, margin: 0, color: '#0f172a' }}>RBAC Role Access Level Matrix</h3>
-                    <div style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Standardized 3-Tier Security Guidelines (Full Write, Read Only, Restricted)</div>
-                  </div>
+
+                  <button onClick={() => setIsRbacGuideOpen(false)} style={{ background: '#f1f5f9', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                    <X size={18} />
+                  </button>
                 </div>
 
-                <button onClick={() => setIsRbacGuideOpen(false)} style={{ background: '#f1f5f9', border: 'none', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {RBAC_ROLES.map(r => (
-                  <div key={r.key} style={{ padding: 18, borderRadius: 16, background: '#f8fafc', border: '1.5px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Shield size={16} style={{ color: '#2563eb' }} /> {r.label}
-                        <span style={{ fontSize: 11, background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>{r.key}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {RBAC_ROLES.map(r => (
+                    <div key={r.key} style={{ padding: 18, borderRadius: 16, background: '#f8fafc', border: '1.5px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Shield size={16} style={{ color: '#2563eb' }} /> {r.label}
+                          <span style={{ fontSize: 11, background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>{r.key}</span>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: '#64748b', fontWeight: 500 }}>{r.desc}</div>
                       </div>
-                      <div style={{ fontSize: 12.5, color: '#64748b', fontWeight: 500 }}>{r.desc}</div>
-                    </div>
 
-                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                      <BadgeDisplay level={r.defaults.taskforce} name="Taskforce" />
-                      <BadgeDisplay level={r.defaults.swachh} name="Swachh" />
-                      <BadgeDisplay level={r.defaults.workforce} name="Workforce" />
-                      <BadgeDisplay level={r.defaults.mrf} name="MRF" />
+                      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                        <BadgeDisplay level={r.defaults.taskforce} name="Taskforce" />
+                        <BadgeDisplay level={r.defaults.swachh} name="Swachh" />
+                        <BadgeDisplay level={r.defaults.workforce} name="Workforce" />
+                        <BadgeDisplay level={r.defaults.mrf} name="MRF" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
       </div>

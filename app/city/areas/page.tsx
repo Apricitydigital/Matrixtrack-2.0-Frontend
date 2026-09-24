@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@hooks/useAuth";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import { RoleGuard } from "@components/Guards";
+import ModalPortal from "@components/ui/ModalPortal";
 
 const AREA_TYPE_OPTIONS = [
   { value: "RESIDENTIAL", label: "Residential" },
@@ -886,550 +887,558 @@ export default function AreasPage() {
               CREATE AREA MODAL
           ================================================= */}
           {!isReadOnly && showCreateArea && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(15,23,42,0.4)",
-                backdropFilter: "blur(4px)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "16px",
-              }}
-            >
+            <ModalPortal>
               <div
                 style={{
-                  width: "100%",
-                  maxWidth: "600px",
-                  maxHeight: "calc(100vh - 32px)",
-                  overflowY: "auto",
-                  backgroundColor: "white",
-                  borderRadius: "20px",
-                  border: "1px solid #e2e8f0",
-                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(15,23,42,0.4)",
+                  backdropFilter: "blur(4px)",
+                  zIndex: 100,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "16px",
                 }}
               >
                 <div
                   style={{
-                    padding: "20px 24px",
-                    borderBottom: "1px solid #f1f5f9",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    width: "100%",
+                    maxWidth: "600px",
+                    maxHeight: "calc(100vh - 32px)",
+                    overflowY: "auto",
+                    backgroundColor: "white",
+                    borderRadius: "20px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <MapPin size={20} color="#2563eb" />
-                    <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                      Create New Area
-                    </h2>
-                  </div>
-
-                  <button
-                    onClick={() => setShowCreateArea(false)}
+                  <div
                     style={{
-                      border: "none",
-                      background: "transparent",
-                      color: "#94a3b8",
-                      cursor: "pointer",
-                      padding: "4px",
+                      padding: "20px 24px",
+                      borderBottom: "1px solid #f1f5f9",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
                     }}
                   >
-                    <X size={20} />
-                  </button>
-                </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <MapPin size={20} color="#2563eb" />
+                      <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                        Create New Area
+                      </h2>
+                    </div>
 
-                <div style={{ padding: "24px" }}>
-                  <AreaForm
-                    wards={wards}
-                    onSuccess={() => {
-                      setShowCreateArea(false);
-                      loadAreas();
-                    }}
-                    onCancel={() => setShowCreateArea(false)}
-                  />
+                    <button
+                      onClick={() => setShowCreateArea(false)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "#94a3b8",
+                        cursor: "pointer",
+                        padding: "4px",
+                      }}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  <div style={{ padding: "24px" }}>
+                    <AreaForm
+                      wards={wards}
+                      onSuccess={() => {
+                        setShowCreateArea(false);
+                        loadAreas();
+                      }}
+                      onCancel={() => setShowCreateArea(false)}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* =================================================
               EDIT AREA MODAL
           ================================================= */}
           {!isReadOnly && editingArea && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(15,23,42,0.4)",
-                backdropFilter: "blur(4px)",
-                zIndex: 100,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "16px",
-              }}
-            >
+            <ModalPortal>
               <div
                 style={{
-                  width: "100%",
-                  maxWidth: "540px",
-                  maxHeight: "calc(100vh - 32px)",
-                  overflowY: "auto",
-                  backgroundColor: "white",
-                  borderRadius: "20px",
-                  border: "1px solid #e2e8f0",
-                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(15,23,42,0.4)",
+                  backdropFilter: "blur(4px)",
+                  zIndex: 100,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "16px",
                 }}
               >
                 <div
                   style={{
-                    padding: "20px 24px",
-                    borderBottom: "1px solid #f1f5f9",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    width: "100%",
+                    maxWidth: "540px",
+                    maxHeight: "calc(100vh - 32px)",
+                    overflowY: "auto",
+                    backgroundColor: "white",
+                    borderRadius: "20px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <Edit2 size={20} color="#2563eb" />
-                    <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                      Edit Area Details
-                    </h2>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setEditingArea(null);
-                      setShowEditConfirm(false);
-                    }}
+                  <div
                     style={{
-                      border: "none",
-                      background: "transparent",
-                      color: "#94a3b8",
-                      cursor: "pointer",
-                      padding: "4px",
+                      padding: "20px 24px",
+                      borderBottom: "1px solid #f1f5f9",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
                     }}
                   >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div style={{ padding: "24px" }}>
-                  {showEditConfirm ? (
-                    <div style={{ textAlign: "center", padding: "12px 0" }}>
-                      <div
-                        style={{
-                          width: "48px",
-                          height: "48px",
-                          borderRadius: "50%",
-                          backgroundColor: "#dbeafe",
-                          color: "#2563eb",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          margin: "0 auto 16px",
-                        }}
-                      >
-                        <AlertTriangle size={24} />
-                      </div>
-                      <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>
-                        Confirm Area Update
-                      </h3>
-                      <p style={{ margin: "0 0 24px", fontSize: "0.875rem", color: "#64748b" }}>
-                        Are you sure you want to save changes to area <strong>{editAreaName}</strong>?
-                      </p>
-                      <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-                        <button
-                          type="button"
-                          onClick={() => setShowEditConfirm(false)}
-                          style={{
-                            padding: "10px 20px",
-                            borderRadius: "10px",
-                            border: "1px solid #cbd5e1",
-                            backgroundColor: "white",
-                            color: "#475569",
-                            fontSize: "0.875rem",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={confirmSaveEditArea}
-                          disabled={savingEdit}
-                          style={{
-                            padding: "10px 24px",
-                            borderRadius: "10px",
-                            border: "none",
-                            backgroundColor: "#2563eb",
-                            color: "white",
-                            fontSize: "0.875rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {savingEdit ? "Saving..." : "Yes, Save Changes"}
-                        </button>
-                      </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <Edit2 size={20} color="#2563eb" />
+                      <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                        Edit Area Details
+                      </h2>
                     </div>
-                  ) : (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        setShowEditConfirm(true);
+
+                    <button
+                      onClick={() => {
+                        setEditingArea(null);
+                        setShowEditConfirm(false);
+                      }}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "#94a3b8",
+                        cursor: "pointer",
+                        padding: "4px",
                       }}
                     >
-                      <div style={{ marginBottom: "16px" }}>
-                        <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
-                          Area Name <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={editAreaName}
-                          onChange={(e) => setEditAreaName(e.target.value)}
-                          placeholder="e.g. Area 1 or Commercial Plaza"
-                          style={{
-                            width: "100%",
-                            height: "42px",
-                            padding: "0 14px",
-                            borderRadius: "10px",
-                            border: "1px solid #cbd5e1",
-                            fontSize: "0.875rem",
-                            fontWeight: 700,
-                            outline: "none",
-                          }}
-                        />
-                      </div>
+                      <X size={20} />
+                    </button>
+                  </div>
 
-                      <div style={{ marginBottom: "16px" }}>
-                        <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
-                          Area Type <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
-                        <select
-                          value={editAreaType}
-                          onChange={(e) => setEditAreaType(e.target.value)}
+                  <div style={{ padding: "24px" }}>
+                    {showEditConfirm ? (
+                      <div style={{ textAlign: "center", padding: "12px 0" }}>
+                        <div
                           style={{
-                            width: "100%",
-                            height: "42px",
-                            padding: "0 14px",
-                            borderRadius: "10px",
-                            border: "1px solid #cbd5e1",
-                            fontSize: "0.875rem",
-                            fontWeight: 700,
-                            outline: "none",
-                            backgroundColor: "white",
+                            width: "48px",
+                            height: "48px",
+                            borderRadius: "50%",
+                            backgroundColor: "#dbeafe",
+                            color: "#2563eb",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            margin: "0 auto 16px",
                           }}
                         >
-                          {AREA_TYPE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                          <AlertTriangle size={24} />
+                        </div>
+                        <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>
+                          Confirm Area Update
+                        </h3>
+                        <p style={{ margin: "0 0 24px", fontSize: "0.875rem", color: "#64748b" }}>
+                          Are you sure you want to save changes to area <strong>{editAreaName}</strong>?
+                        </p>
+                        <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                          <button
+                            type="button"
+                            onClick={() => setShowEditConfirm(false)}
+                            style={{
+                              padding: "10px 20px",
+                              borderRadius: "10px",
+                              border: "1px solid #cbd5e1",
+                              backgroundColor: "white",
+                              color: "#475569",
+                              fontSize: "0.875rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={confirmSaveEditArea}
+                            disabled={savingEdit}
+                            style={{
+                              padding: "10px 24px",
+                              borderRadius: "10px",
+                              border: "none",
+                              backgroundColor: "#2563eb",
+                              color: "white",
+                              fontSize: "0.875rem",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {savingEdit ? "Saving..." : "Yes, Save Changes"}
+                          </button>
+                        </div>
                       </div>
+                    ) : (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          setShowEditConfirm(true);
+                        }}
+                      >
+                        <div style={{ marginBottom: "16px" }}>
+                          <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
+                            Area Name <span style={{ color: "#ef4444" }}>*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={editAreaName}
+                            onChange={(e) => setEditAreaName(e.target.value)}
+                            placeholder="e.g. Area 1 or Commercial Plaza"
+                            style={{
+                              width: "100%",
+                              height: "42px",
+                              padding: "0 14px",
+                              borderRadius: "10px",
+                              border: "1px solid #cbd5e1",
+                              fontSize: "0.875rem",
+                              fontWeight: 700,
+                              outline: "none",
+                            }}
+                          />
+                        </div>
 
-                      <div style={{ marginBottom: "16px" }}>
-                        <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
-                          Zone (Filter Wards)
-                        </label>
-                        <select
-                          value={editZoneId}
-                          onChange={(e) => {
-                            setEditZoneId(e.target.value);
-                            setEditWardId("");
-                          }}
-                          style={{
-                            width: "100%",
-                            height: "42px",
-                            padding: "0 14px",
-                            borderRadius: "10px",
-                            border: "1px solid #cbd5e1",
-                            fontSize: "0.875rem",
-                            fontWeight: 700,
-                            outline: "none",
-                            backgroundColor: "white",
-                          }}
-                        >
-                          <option value="">All Zones</option>
-                          {zones.map((z) => (
-                            <option key={z.id} value={z.id}>
-                              {z.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                        <div style={{ marginBottom: "16px" }}>
+                          <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
+                            Area Type <span style={{ color: "#ef4444" }}>*</span>
+                          </label>
+                          <select
+                            value={editAreaType}
+                            onChange={(e) => setEditAreaType(e.target.value)}
+                            style={{
+                              width: "100%",
+                              height: "42px",
+                              padding: "0 14px",
+                              borderRadius: "10px",
+                              border: "1px solid #cbd5e1",
+                              fontSize: "0.875rem",
+                              fontWeight: 700,
+                              outline: "none",
+                              backgroundColor: "white",
+                            }}
+                          >
+                            {AREA_TYPE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <div style={{ marginBottom: "24px" }}>
-                        <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
-                          Assigned Ward <span style={{ color: "#ef4444" }}>*</span>
-                        </label>
-                        <select
-                          required
-                          value={editWardId}
-                          onChange={(e) => setEditWardId(e.target.value)}
-                          style={{
-                            width: "100%",
-                            height: "42px",
-                            padding: "0 14px",
-                            borderRadius: "10px",
-                            border: "1px solid #cbd5e1",
-                            fontSize: "0.875rem",
-                            fontWeight: 700,
-                            outline: "none",
-                            backgroundColor: "white",
-                          }}
-                        >
-                          <option value="" disabled>Select Ward</option>
-                          {editWardDropdownOptions.map((w) => (
-                            <option key={w.id} value={w.id}>
-                              {w.name} {w.displayName ? `(${w.displayName})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                        <div style={{ marginBottom: "16px" }}>
+                          <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
+                            Zone (Filter Wards)
+                          </label>
+                          <select
+                            value={editZoneId}
+                            onChange={(e) => {
+                              setEditZoneId(e.target.value);
+                              setEditWardId("");
+                            }}
+                            style={{
+                              width: "100%",
+                              height: "42px",
+                              padding: "0 14px",
+                              borderRadius: "10px",
+                              border: "1px solid #cbd5e1",
+                              fontSize: "0.875rem",
+                              fontWeight: 700,
+                              outline: "none",
+                              backgroundColor: "white",
+                            }}
+                          >
+                            <option value="">All Zones</option>
+                            {zones.map((z) => (
+                              <option key={z.id} value={z.id}>
+                                {z.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                      <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-                        <button
-                          type="button"
-                          onClick={() => setEditingArea(null)}
-                          style={{
-                            padding: "10px 18px",
-                            borderRadius: "10px",
-                            border: "1px solid #cbd5e1",
-                            backgroundColor: "white",
-                            color: "#475569",
-                            fontSize: "0.875rem",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          style={{
-                            padding: "10px 22px",
-                            borderRadius: "10px",
-                            border: "none",
-                            backgroundColor: "#2563eb",
-                            color: "white",
-                            fontSize: "0.875rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Update Area
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                        <div style={{ marginBottom: "24px" }}>
+                          <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 700, color: "#334155", marginBottom: "6px" }}>
+                            Assigned Ward <span style={{ color: "#ef4444" }}>*</span>
+                          </label>
+                          <select
+                            required
+                            value={editWardId}
+                            onChange={(e) => setEditWardId(e.target.value)}
+                            style={{
+                              width: "100%",
+                              height: "42px",
+                              padding: "0 14px",
+                              borderRadius: "10px",
+                              border: "1px solid #cbd5e1",
+                              fontSize: "0.875rem",
+                              fontWeight: 700,
+                              outline: "none",
+                              backgroundColor: "white",
+                            }}
+                          >
+                            <option value="" disabled>Select Ward</option>
+                            {editWardDropdownOptions.map((w) => (
+                              <option key={w.id} value={w.id}>
+                                {w.name} {w.displayName ? `(${w.displayName})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                          <button
+                            type="button"
+                            onClick={() => setEditingArea(null)}
+                            style={{
+                              padding: "10px 18px",
+                              borderRadius: "10px",
+                              border: "1px solid #cbd5e1",
+                              backgroundColor: "white",
+                              color: "#475569",
+                              fontSize: "0.875rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            style={{
+                              padding: "10px 22px",
+                              borderRadius: "10px",
+                              border: "none",
+                              backgroundColor: "#2563eb",
+                              color: "white",
+                              fontSize: "0.875rem",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Update Area
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* =================================================
               DELETE SINGLE AREA MODAL
           ================================================= */}
           {!isReadOnly && deleteAreaTarget && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(15,23,42,0.4)",
-                backdropFilter: "blur(4px)",
-                zIndex: 110,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "16px",
-              }}
-            >
+            <ModalPortal>
               <div
                 style={{
-                  width: "100%",
-                  maxWidth: "440px",
-                  backgroundColor: "white",
-                  borderRadius: "20px",
-                  border: "1px solid #e2e8f0",
-                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-                  padding: "24px",
-                  textAlign: "center",
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(15,23,42,0.4)",
+                  backdropFilter: "blur(4px)",
+                  zIndex: 110,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "16px",
                 }}
               >
                 <div
                   style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "50%",
-                    backgroundColor: "#fee2e2",
-                    color: "#dc2626",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 16px",
+                    width: "100%",
+                    maxWidth: "440px",
+                    backgroundColor: "white",
+                    borderRadius: "20px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                    padding: "24px",
+                    textAlign: "center",
                   }}
                 >
-                  <Trash2 size={24} />
-                </div>
-
-                <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>
-                  Delete Area?
-                </h3>
-
-                <p style={{ margin: "0 0 24px", fontSize: "0.875rem", color: "#64748b", lineHeight: 1.5 }}>
-                  Are you sure you want to delete <strong>{deleteAreaTarget.name}</strong>? This action cannot be undone.
-                </p>
-
-                <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteAreaTarget(null)}
+                  <div
                     style={{
-                      padding: "10px 18px",
-                      borderRadius: "10px",
-                      border: "1px solid #cbd5e1",
-                      backgroundColor: "white",
-                      color: "#475569",
-                      fontSize: "0.875rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "50%",
+                      backgroundColor: "#fee2e2",
+                      color: "#dc2626",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
                     }}
                   >
-                    Cancel
-                  </button>
+                    <Trash2 size={24} />
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={confirmDeleteArea}
-                    disabled={deletingAreaId === deleteAreaTarget.id}
-                    style={{
-                      padding: "10px 22px",
-                      borderRadius: "10px",
-                      border: "none",
-                      backgroundColor: "#dc2626",
-                      color: "white",
-                      fontSize: "0.875rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {deletingAreaId === deleteAreaTarget.id ? "Deleting..." : "Yes, Delete"}
-                  </button>
+                  <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>
+                    Delete Area?
+                  </h3>
+
+                  <p style={{ margin: "0 0 24px", fontSize: "0.875rem", color: "#64748b", lineHeight: 1.5 }}>
+                    Are you sure you want to delete <strong>{deleteAreaTarget.name}</strong>? This action cannot be undone.
+                  </p>
+
+                  <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteAreaTarget(null)}
+                      style={{
+                        padding: "10px 18px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e1",
+                        backgroundColor: "white",
+                        color: "#475569",
+                        fontSize: "0.875rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={confirmDeleteArea}
+                      disabled={deletingAreaId === deleteAreaTarget.id}
+                      style={{
+                        padding: "10px 22px",
+                        borderRadius: "10px",
+                        border: "none",
+                        backgroundColor: "#dc2626",
+                        color: "white",
+                        fontSize: "0.875rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {deletingAreaId === deleteAreaTarget.id ? "Deleting..." : "Yes, Delete"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* =================================================
               BULK DELETE CONFIRMATION MODAL
           ================================================= */}
           {!isReadOnly && showBulkDeleteConfirm && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(15,23,42,0.4)",
-                backdropFilter: "blur(4px)",
-                zIndex: 110,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "16px",
-              }}
-            >
+            <ModalPortal>
               <div
                 style={{
-                  width: "100%",
-                  maxWidth: "440px",
-                  backgroundColor: "white",
-                  borderRadius: "20px",
-                  border: "1px solid #e2e8f0",
-                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-                  padding: "24px",
-                  textAlign: "center",
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: "rgba(15,23,42,0.4)",
+                  backdropFilter: "blur(4px)",
+                  zIndex: 110,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "16px",
                 }}
               >
                 <div
                   style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "50%",
-                    backgroundColor: "#fee2e2",
-                    color: "#dc2626",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 16px",
+                    width: "100%",
+                    maxWidth: "440px",
+                    backgroundColor: "white",
+                    borderRadius: "20px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+                    padding: "24px",
+                    textAlign: "center",
                   }}
                 >
-                  <Trash2 size={24} />
-                </div>
-
-                <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>
-                  Delete Multiple Areas?
-                </h3>
-
-                <p style={{ margin: "0 0 24px", fontSize: "0.875rem", color: "#64748b", lineHeight: 1.5 }}>
-                  Are you sure you want to delete <strong>{selectedAreaIds.length} selected areas</strong>? This action cannot be undone.
-                </p>
-
-                <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowBulkDeleteConfirm(false)}
+                  <div
                     style={{
-                      padding: "10px 18px",
-                      borderRadius: "10px",
-                      border: "1px solid #cbd5e1",
-                      backgroundColor: "white",
-                      color: "#475569",
-                      fontSize: "0.875rem",
-                      fontWeight: 700,
-                      cursor: "pointer",
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "50%",
+                      backgroundColor: "#fee2e2",
+                      color: "#dc2626",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
                     }}
                   >
-                    Cancel
-                  </button>
+                    <Trash2 size={24} />
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={confirmBulkDeleteAreas}
-                    disabled={bulkDeleting}
-                    style={{
-                      padding: "10px 22px",
-                      borderRadius: "10px",
-                      border: "none",
-                      backgroundColor: "#dc2626",
-                      color: "white",
-                      fontSize: "0.875rem",
-                      fontWeight: 800,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {bulkDeleting ? "Deleting..." : `Yes, Delete ${selectedAreaIds.length}`}
-                  </button>
+                  <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>
+                    Delete Multiple Areas?
+                  </h3>
+
+                  <p style={{ margin: "0 0 24px", fontSize: "0.875rem", color: "#64748b", lineHeight: 1.5 }}>
+                    Are you sure you want to delete <strong>{selectedAreaIds.length} selected areas</strong>? This action cannot be undone.
+                  </p>
+
+                  <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkDeleteConfirm(false)}
+                      style={{
+                        padding: "10px 18px",
+                        borderRadius: "10px",
+                        border: "1px solid #cbd5e1",
+                        backgroundColor: "white",
+                        color: "#475569",
+                        fontSize: "0.875rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={confirmBulkDeleteAreas}
+                      disabled={bulkDeleting}
+                      style={{
+                        padding: "10px 22px",
+                        borderRadius: "10px",
+                        border: "none",
+                        backgroundColor: "#dc2626",
+                        color: "white",
+                        fontSize: "0.875rem",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {bulkDeleting ? "Deleting..." : `Yes, Delete ${selectedAreaIds.length}`}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* =================================================

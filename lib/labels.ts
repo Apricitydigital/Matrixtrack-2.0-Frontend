@@ -5,7 +5,7 @@ export const ROLE_LABELS: Record<Role | string, string> = {
   DIVISION_ADMIN: "Division Admin",
   EMPLOYEE: "Employee",
   SUPERVISOR: "Daroga",
-  COMMISSIONER: "ULB Official",
+  COMMISSIONER: "Commissioner",
   QC: "Sanitary Inspector",
   ULB_OFFICER: "ULB Officer",
   CITY_ADMIN: "City Admin",
@@ -25,7 +25,8 @@ export const MODULE_LABELS: Record<string, string> = {
   TASKFORCE: "CTU/GVP Transformation",
   LITTERBINS: "Litter Bins",
   SWEEPING: "Sweeping",
-  TOILET: "Cleanliness of Toilet"
+  TOILET: "Cleanliness of Toilet",
+  PROCESSING_PLANT: "Plant & Processing"
 };
 
 export function moduleLabel(key: string, fallback?: string) {

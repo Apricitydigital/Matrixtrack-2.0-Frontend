@@ -8,6 +8,7 @@ import { useAuth } from "@hooks/useAuth";
 import { RoleGuard } from "@components/Guards";
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import * as XLSX from "xlsx";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type GeoNode = { id: string; name: string; parentId?: string; displayName?: string };
 
@@ -1205,7 +1206,7 @@ export default function WardManagementPage() {
 
           {isImportOpen && !isReadOnly && (
 
-            <div
+            <ModalPortal><div
               onClick={() => {
                 if (!importing) {
                   setIsImportOpen(
@@ -1914,244 +1915,252 @@ export default function WardManagementPage() {
 
               </div>
 
-            </div>
+            </div></ModalPortal>
 
           )}
 
           {/* Create Ward Modal */}
           {isModalOpen && !isReadOnly && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
-            }}>
+            <ModalPortal>
               <div style={{
-                padding: 0, overflow: "hidden", border: "1px solid #e2e8f0",
-                borderRadius: "20px", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                width: "100%", maxWidth: modalTab === 'BULK' ? "560px" : "480px", backgroundColor: "white",
-                transition: "all 0.2s ease"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
               }}>
-                {/* Modal Header */}
                 <div style={{
-                  padding: "20px 24px 16px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe",
-                  display: "flex", alignItems: "center", justifyContent: "space-between"
+                  padding: 0, overflow: "hidden", border: "1px solid #e2e8f0",
+                  borderRadius: "20px", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                  width: "100%", maxWidth: modalTab === 'BULK' ? "560px" : "480px", backgroundColor: "white",
+                  transition: "all 0.2s ease"
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <Map size={20} color="#2563eb" />
-                    <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>Create New Ward</h2>
+                  {/* Modal Header */}
+                  <div style={{
+                    padding: "20px 24px 16px 24px", borderBottom: "1px solid #f1f5f9", backgroundColor: "#fcfdfe",
+                    display: "flex", alignItems: "center", justifyContent: "space-between"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <Map size={20} color="#2563eb" />
+                      <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "#0f172a" }}>Create New Ward</h2>
+                    </div>
+                    <button
+                      onClick={closeModal}
+                      style={{ border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
+                    >
+                      <X size={20} />
+                    </button>
                   </div>
-                  <button
-                    onClick={closeModal}
-                    style={{ border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer", padding: "4px" }}
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
 
-                {/* Single Ward Entry */}
-                  <form onSubmit={createWard} style={{ padding: "24px" }}>
-                    <div style={{ marginBottom: "16px" }}>
-                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
-                        Select Zone <span style={{ color: "#ef4444" }}>*</span>
-                      </label>
-                      <select
-                        value={zoneId}
-                        onChange={(e) => setZoneId(e.target.value)}
-                        required
+                  {/* Single Ward Entry */}
+                    <form onSubmit={createWard} style={{ padding: "24px" }}>
+                      <div style={{ marginBottom: "16px" }}>
+                        <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
+                          Select Zone <span style={{ color: "#ef4444" }}>*</span>
+                        </label>
+                        <select
+                          value={zoneId}
+                          onChange={(e) => setZoneId(e.target.value)}
+                          required
+                          style={{
+                            width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
+                            border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                          }}
+                        >
+                          <option value="">-- Select Zone --</option>
+                          {zones.map((z) => (
+                            <option key={z.id} value={z.id}>{z.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ marginBottom: "20px" }}>
+                        <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
+                          Ward Number <span style={{ color: "#ef4444" }}>*</span>
+                        </label>
+                        <input
+                          placeholder="e.g. Ward 1 or Ward 22"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                          style={{
+                            width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
+                            border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ marginBottom: "20px" }}>
+                        <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
+                          Ward Name
+                        </label>
+                        <input
+                          placeholder="e.g. Lal Ghati"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          style={{
+                            width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
+                            border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                          }}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={saving || !name.trim() || !zoneId}
                         style={{
-                          width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
-                          border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
+                          width: "100%", height: "44px", borderRadius: "10px", backgroundColor: "#2563eb",
+                          color: "white", fontWeight: 800, fontSize: "0.875rem", border: "none", cursor: "pointer",
+                          opacity: (saving || !name.trim() || !zoneId) ? 0.7 : 1
                         }}
                       >
-                        <option value="">-- Select Zone --</option>
-                        {zones.map((z) => (
-                          <option key={z.id} value={z.id}>{z.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={{ marginBottom: "20px" }}>
-                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
-                        Ward Number <span style={{ color: "#ef4444" }}>*</span>
-                      </label>
-                      <input
-                        placeholder="e.g. Ward 1 or Ward 22"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        required
-                        style={{
-                          width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
-                          border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ marginBottom: "20px" }}>
-                      <label style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#334155", display: "block", marginBottom: "8px" }}>
-                        Ward Name
-                      </label>
-                      <input
-                        placeholder="e.g. Lal Ghati"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        style={{
-                          width: "100%", height: "44px", padding: "0 14px", borderRadius: "10px",
-                          border: "1px solid #cbd5e1", fontSize: "0.875rem", fontWeight: 700, outline: "none"
-                        }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={saving || !name.trim() || !zoneId}
-                      style={{
-                        width: "100%", height: "44px", borderRadius: "10px", backgroundColor: "#2563eb",
-                        color: "white", fontWeight: 800, fontSize: "0.875rem", border: "none", cursor: "pointer",
-                        opacity: (saving || !name.trim() || !zoneId) ? 0.7 : 1
-                      }}
-                    >
-                      {saving ? "Creating..." : "Create Ward"}
-                    </button>
-                    {status && (
-                      <div style={{
-                        marginTop: "12px", textAlign: "center", fontSize: "0.8125rem", fontWeight: 700,
-                        color: status.startsWith("Error") ? "#dc2626" : "#16a34a"
-                      }}>
-                        {status}
-                      </div>
-                    )}
-                  </form>
+                        {saving ? "Creating..." : "Create Ward"}
+                      </button>
+                      {status && (
+                        <div style={{
+                          marginTop: "12px", textAlign: "center", fontSize: "0.8125rem", fontWeight: 700,
+                          color: status.startsWith("Error") ? "#dc2626" : "#16a34a"
+                        }}>
+                          {status}
+                        </div>
+                      )}
+                    </form>
+                </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Delete Confirmation Modal */}
           {deleteConfirmTarget && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
-            }}>
+            <ModalPortal>
               <div style={{
-                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                textAlign: "center"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
               }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <Trash2 size={24} />
-                </div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
-                  Delete Ward ({deleteConfirmTarget.name})?
-                </div>
-                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
-                  Are you sure you want to delete this ward and its associated areas/beats? This action cannot be undone.
-                </p>
-                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteConfirmTarget(null)}
-                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmDeleteWard}
-                    disabled={deletingId === deleteConfirmTarget.id}
-                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    {deletingId === deleteConfirmTarget.id ? "Deleting..." : "Yes, Delete Ward"}
-                  </button>
+                <div style={{
+                  backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                  padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                  textAlign: "center"
+                }}>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                    <Trash2 size={24} />
+                  </div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                    Delete Ward ({deleteConfirmTarget.name})?
+                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                    Are you sure you want to delete this ward and its associated areas/beats? This action cannot be undone.
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmTarget(null)}
+                      style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmDeleteWard}
+                      disabled={deletingId === deleteConfirmTarget.id}
+                      style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                    >
+                      {deletingId === deleteConfirmTarget.id ? "Deleting..." : "Yes, Delete Ward"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Bulk Delete Confirmation Modal */}
           {showBulkDeleteConfirm && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
-            }}>
+            <ModalPortal>
               <div style={{
-                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                textAlign: "center"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
               }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <Trash2 size={24} />
-                </div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
-                  Delete Multiple Wards?
-                </div>
-                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
-                  Are you sure you want to delete <strong>{selectedWardIds.length} selected wards</strong> and their children? This action cannot be undone.
-                </p>
-                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowBulkDeleteConfirm(false)}
-                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmBulkDeleteWards}
-                    disabled={bulkDeleting}
-                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    {bulkDeleting ? "Deleting..." : `Yes, Delete ${selectedWardIds.length}`}
-                  </button>
+                <div style={{
+                  backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                  padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                  textAlign: "center"
+                }}>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#fee2e2", color: "#dc2626", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                    <Trash2 size={24} />
+                  </div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                    Delete Multiple Wards?
+                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                    Are you sure you want to delete <strong>{selectedWardIds.length} selected wards</strong> and their children? This action cannot be undone.
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkDeleteConfirm(false)}
+                      style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmBulkDeleteWards}
+                      disabled={bulkDeleting}
+                      style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#dc2626", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                    >
+                      {bulkDeleting ? "Deleting..." : `Yes, Delete ${selectedWardIds.length}`}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Edit Confirmation Modal */}
           {editConfirmTarget && (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
-              zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
-            }}>
+            <ModalPortal>
               <div style={{
-                backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
-                padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-                textAlign: "center"
+                position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.4)", backdropFilter: "blur(4px)",
+                zIndex: 110, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px"
               }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#dbeafe", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <AlertTriangle size={24} />
-                </div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
-                  Confirm Ward Changes
-                </div>
-                <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
-                  Are you sure you want to save the modifications to this ward?
-                </p>
-                <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditConfirmTarget(null)}
-                    style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const id = editConfirmTarget;
-                      setEditConfirmTarget(null);
-                      await updateWard(id);
-                    }}
-                    style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#2563eb", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
-                  >
-                    Yes, Save Changes
-                  </button>
+                <div style={{
+                  backgroundColor: "white", borderRadius: "20px", border: "1px solid #e2e8f0",
+                  padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+                  textAlign: "center"
+                }}>
+                  <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#dbeafe", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#0f172a", marginBottom: "8px" }}>
+                    Confirm Ward Changes
+                  </div>
+                  <p style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600, lineHeight: 1.5, marginBottom: "20px" }}>
+                    Are you sure you want to save the modifications to this ward?
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setEditConfirmTarget(null)}
+                      style={{ padding: "8px 16px", borderRadius: "10px", border: "1px solid #cbd5e1", backgroundColor: "white", color: "#475569", fontSize: "0.8125rem", fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const id = editConfirmTarget;
+                        setEditConfirmTarget(null);
+                        await updateWard(id);
+                      }}
+                      style={{ padding: "8px 18px", borderRadius: "10px", border: "none", backgroundColor: "#2563eb", color: "white", fontSize: "0.8125rem", fontWeight: 800, cursor: "pointer" }}
+                    >
+                      Yes, Save Changes
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ModalPortal>
           )}
 
           {/* Stats & Search Toolbar */}

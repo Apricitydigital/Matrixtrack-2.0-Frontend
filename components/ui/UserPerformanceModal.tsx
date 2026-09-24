@@ -15,6 +15,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type UserPerformanceModalProps = {
   user: any; // The selected user object from the directory
@@ -262,7 +263,7 @@ export default function UserPerformanceModal({
   if (!isOpen || !user) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] p-4 sm:p-6 animate-in fade-in duration-200" onClick={onClose}>
+    <ModalPortal><div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px] p-4 sm:p-6 animate-in fade-in duration-200" onClick={onClose}>
       <div
         className="w-full max-w-5xl max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
@@ -632,7 +633,7 @@ export default function UserPerformanceModal({
         )}
       </div>
     </div>
-    </div>
+    </div></ModalPortal>
   );
 }
 

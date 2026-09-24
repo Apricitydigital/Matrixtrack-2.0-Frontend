@@ -549,6 +549,7 @@ export default function RegisteredUsersPage() {
       });
       setResetPasswordTarget(null);
       setNewPassword("");
+      await loadData();
     } catch (err: any) {
       showToast({
         title: "Password Reset Failed",
@@ -562,7 +563,7 @@ export default function RegisteredUsersPage() {
 
   const copyResetCredentials = () => {
     if (!resetPasswordTarget) return;
-    const credText = `System User Credentials:\nName: ${resetPasswordTarget.name}\nContact: ${resetPasswordTarget.phone || resetPasswordTarget.email || "N/A"}\nNew Password: ${newPassword}`;
+    const credText = `System User Credentials:\nName: ${resetPasswordTarget.name}\nContact: ${resetPasswordTarget.phone || resetPasswordTarget.email || "N/A"}\nNew Password: ${newPassword.trim()}`;
     navigator.clipboard.writeText(credText);
     setCopiedCreds(true);
     setTimeout(() => setCopiedCreds(false), 3000);
@@ -1012,21 +1013,16 @@ export default function RegisteredUsersPage() {
       const stateText = u.stateName || 'Madhya Pradesh';
       const cityText = u.cityName || u.city?.name || cityMap[u.cityId || ''] || 'Indore';
 
-      // Real Password / Registration Pattern calculation
+      // Real password, if the backend has a known plaintext copy on record.
+      // Never fabricate a guess here — a plausible-looking but wrong value
+      // is worse than an explicit "unavailable" because it silently breaks login.
       let passwordDisplay = "";
       if (u.role === "EMPLOYEE") {
         passwordDisplay = "—";
       } else {
-        let rawPass = u.plainPassword || u.password || "";
-        if (rawPass && !rawPass.startsWith("$2b$") && !rawPass.startsWith("$2a$")) {
-          passwordDisplay = rawPass;
-        } else {
-          const namePrefix = (u.name || "").trim().replace(/[^a-zA-Z]/g, "").slice(0, 4) || "User";
-          const capPrefix = namePrefix.charAt(0).toUpperCase() + namePrefix.slice(1).toLowerCase();
-          const digits = (u.phone || "").replace(/\D/g, "");
-          const last4 = digits.length >= 4 ? digits.slice(-4) : "1234";
-          passwordDisplay = `${capPrefix}@${last4}`;
-        }
+        const rawPass = u.plainPassword || u.password || "";
+        const isHashed = rawPass.startsWith("$2b$") || rawPass.startsWith("$2a$");
+        passwordDisplay = rawPass && !isHashed ? rawPass : "Not available — use Reset Password";
       }
 
       const createdDateStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-GB') : "";
