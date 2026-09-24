@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AreaBeatApi } from "@lib/apiClient";
 import { X, Upload, Loader2, AlertCircle } from "lucide-react";
 
@@ -15,6 +16,9 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => setMounted(true), []);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -56,9 +60,11 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
         }
     };
 
-    return (
+    if (!mounted) return null;
+
+    return createPortal(
         <div style={{
-            position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
             backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1001,
             display: "flex", justifyContent: "center", alignItems: "center",
             backdropFilter: "blur(2px)"
@@ -126,6 +132,7 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

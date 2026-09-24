@@ -27,6 +27,7 @@ import {
   Sparkles,
   Lock
 } from "lucide-react";
+import ModalPortal from "@components/ui/ModalPortal";
 
 interface CommonRegistrationModalProps {
   isOpen: boolean;
@@ -864,7 +865,7 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
     : "Register User Across Selected Modules";
 
   return (
-    <div
+    <ModalPortal><div
       style={
         asPage
           ? {
@@ -1985,6 +1986,6 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
           box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
       `}</style>
-    </div>
+    </div></ModalPortal>
   );
 }

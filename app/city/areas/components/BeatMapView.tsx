@@ -9,6 +9,7 @@ import AssignBeatModal from "./AssignBeatModal";
 
 // Dynamic imports for Leaflet
 import type { MapContainerProps, TileLayerProps, GeoJSONProps, PopupProps } from "react-leaflet";
+import ModalPortal from "@components/ui/ModalPortal";
 
 const MapContainer = dynamic<MapContainerProps>(
     () => import("react-leaflet").then((mod) => mod.MapContainer),
@@ -367,7 +368,7 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
     const handleZoomOut = () => window.dispatchEvent(new CustomEvent("map-zoom-out"));
 
     return (
-        <div style={{
+        <ModalPortal><div style={{
             position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
             backgroundColor: "rgba(15, 23, 42, 0.85)", zIndex: 1000,
             display: "flex", justifyContent: "center", alignItems: "center",
@@ -944,6 +945,6 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         .modern-popup .leaflet-popup-content-wrapper { border-radius: 20px; border: 1px solid #f1f5f9; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); }
         .modern-popup .leaflet-popup-tip-container { display: none; }
       `}</style>
-        </div>
+        </div></ModalPortal>
     );
 }

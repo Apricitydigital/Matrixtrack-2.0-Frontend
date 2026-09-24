@@ -29,6 +29,7 @@ import {
     Pencil,
     Check,
 } from "lucide-react";
+import ModalPortal from "@components/ui/ModalPortal";
 
 interface BeatFormProps {
     onSuccess: () => void;
@@ -2661,588 +2662,590 @@ export default function BeatForm({
             )}
 
             {registeringBeat && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        zIndex: 3000,
-
-                        background:
-                            "rgba(15,23,42,0.48)",
-
-                        backdropFilter:
-                            "blur(5px)",
-
-                        display: "flex",
-
-                        alignItems:
-                            "flex-start",
-
-                        justifyContent:
-                            "center",
-
-                        padding:
-                            "24px 16px",
-
-                        overflowY:
-                            "auto",
-
-                        boxSizing:
-                            "border-box",
-                    }}
-                    onClick={() => {
-                        if (
-                            !registeringEmployee
-                        ) {
-                            setRegisteringBeat(
-                                null
-                            );
-                        }
-                    }}
-                >
-                    <form
-                        onSubmit={
-                            handleRegisterEmployee
-                        }
-                        onClick={(e) =>
-                            e.stopPropagation()
-                        }
+                <ModalPortal>
+                    <div
                         style={{
-                            width:
-                                "100%",
-
-                            maxWidth:
-                                "440px",
+                            position: "fixed",
+                            inset: 0,
+                            zIndex: 3000,
 
                             background:
-                                "#fff",
+                                "rgba(15,23,42,0.48)",
 
-                            borderRadius:
-                                "20px",
+                            backdropFilter:
+                                "blur(5px)",
 
-                            border:
-                                "1px solid #e2e8f0",
+                            display: "flex",
 
-                            boxShadow:
-                                "0 25px 60px rgba(15,23,42,0.25)",
+                            alignItems:
+                                "flex-start",
+
+                            justifyContent:
+                                "center",
 
                             padding:
-                                "22px",
+                                "24px 16px",
+
+                            overflowY:
+                                "auto",
 
                             boxSizing:
                                 "border-box",
                         }}
+                        onClick={() => {
+                            if (
+                                !registeringEmployee
+                            ) {
+                                setRegisteringBeat(
+                                    null
+                                );
+                            }
+                        }}
                     >
-                        {/* HEADER */}
-
-                        <div
+                        <form
+                            onSubmit={
+                                handleRegisterEmployee
+                            }
+                            onClick={(e) =>
+                                e.stopPropagation()
+                            }
                             style={{
-                                display:
-                                    "flex",
+                                width:
+                                    "100%",
 
-                                justifyContent:
-                                    "space-between",
+                                maxWidth:
+                                    "440px",
 
-                                alignItems:
-                                    "flex-start",
+                                background:
+                                    "#fff",
 
-                                gap:
-                                    "12px",
+                                borderRadius:
+                                    "20px",
 
-                                paddingBottom:
-                                    "15px",
+                                border:
+                                    "1px solid #e2e8f0",
 
-                                borderBottom:
-                                    "1px solid #f1f5f9",
+                                boxShadow:
+                                    "0 25px 60px rgba(15,23,42,0.25)",
+
+                                padding:
+                                    "22px",
+
+                                boxSizing:
+                                    "border-box",
                             }}
                         >
-                            <div>
-                                <div
+                            {/* HEADER */}
+
+                            <div
+                                style={{
+                                    display:
+                                        "flex",
+
+                                    justifyContent:
+                                        "space-between",
+
+                                    alignItems:
+                                        "flex-start",
+
+                                    gap:
+                                        "12px",
+
+                                    paddingBottom:
+                                        "15px",
+
+                                    borderBottom:
+                                        "1px solid #f1f5f9",
+                                }}
+                            >
+                                <div>
+                                    <div
+                                        style={{
+                                            fontSize:
+                                                "0.68rem",
+
+                                            color:
+                                                "#2563eb",
+
+                                            fontWeight:
+                                                900,
+
+                                            textTransform:
+                                                "uppercase",
+                                        }}
+                                    >
+                                        Register Employee
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop:
+                                                "4px",
+
+                                            fontSize:
+                                                "1rem",
+
+                                            color:
+                                                "#0f172a",
+
+                                            fontWeight:
+                                                900,
+                                        }}
+                                    >
+                                        {
+                                            registeringBeat.employeeName
+                                        }
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop:
+                                                "3px",
+
+                                            color:
+                                                "#64748b",
+
+                                            fontSize:
+                                                "0.7rem",
+
+                                            fontWeight:
+                                                600,
+                                        }}
+                                    >
+                                        {
+                                            registeringBeat.suggestedBeatName
+                                        }
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    disabled={
+                                        registeringEmployee
+                                    }
+                                    onClick={() =>
+                                        setRegisteringBeat(
+                                            null
+                                        )
+                                    }
                                     style={{
+                                        width:
+                                            "32px",
+
+                                        height:
+                                            "32px",
+
+                                        borderRadius:
+                                            "9px",
+
+                                        border:
+                                            "1px solid #e2e8f0",
+
+                                        background:
+                                            "#fff",
+
+                                        color:
+                                            "#64748b",
+
+                                        cursor:
+                                            "pointer",
+
+                                        fontSize:
+                                            "18px",
+                                    }}
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            {/* AUTO ASSIGNMENT */}
+
+                            <div
+                                style={{
+                                    marginTop:
+                                        "15px",
+
+                                    padding:
+                                        "11px 12px",
+
+                                    borderRadius:
+                                        "11px",
+
+                                    background:
+                                        "#eff6ff",
+
+                                    border:
+                                        "1px solid #dbeafe",
+
+                                    display:
+                                        "grid",
+
+                                    gridTemplateColumns:
+                                        "1fr 1fr",
+
+                                    gap:
+                                        "8px",
+                                }}
+                            >
+                                <div>
+                                    <div
+                                        style={{
+                                            color:
+                                                "#64748b",
+
+                                            fontSize:
+                                                "0.58rem",
+
+                                            fontWeight:
+                                                800,
+
+                                            textTransform:
+                                                "uppercase",
+                                        }}
+                                    >
+                                        Role
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop:
+                                                "2px",
+
+                                            color:
+                                                "#1e40af",
+
+                                            fontSize:
+                                                "0.72rem",
+
+                                            fontWeight:
+                                                800,
+                                        }}
+                                    >
+                                        Employee
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div
+                                        style={{
+                                            color:
+                                                "#64748b",
+
+                                            fontSize:
+                                                "0.58rem",
+
+                                            fontWeight:
+                                                800,
+
+                                            textTransform:
+                                                "uppercase",
+                                        }}
+                                    >
+                                        Module
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop:
+                                                "2px",
+
+                                            color:
+                                                "#1e40af",
+
+                                            fontSize:
+                                                "0.72rem",
+
+                                            fontWeight:
+                                                800,
+                                        }}
+                                    >
+                                        Sweeping
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div
+                                        style={{
+                                            color:
+                                                "#64748b",
+
+                                            fontSize:
+                                                "0.58rem",
+
+                                            fontWeight:
+                                                800,
+
+                                            textTransform:
+                                                "uppercase",
+                                        }}
+                                    >
+                                        Zone
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop:
+                                                "2px",
+
+                                            color:
+                                                "#334155",
+
+                                            fontSize:
+                                                "0.7rem",
+
+                                            fontWeight:
+                                                700,
+                                        }}
+                                    >
+                                        {zones.find(
+                                            (z: any) =>
+                                                z.id ===
+                                                selectedZone
+                                        )?.name ||
+                                            "Selected Zone"}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div
+                                        style={{
+                                            color:
+                                                "#64748b",
+
+                                            fontSize:
+                                                "0.58rem",
+
+                                            fontWeight:
+                                                800,
+
+                                            textTransform:
+                                                "uppercase",
+                                        }}
+                                    >
+                                        Ward
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            marginTop:
+                                                "2px",
+
+                                            color:
+                                                "#334155",
+
+                                            fontSize:
+                                                "0.7rem",
+
+                                            fontWeight:
+                                                700,
+                                        }}
+                                    >
+                                        {wards.find(
+                                            (w: any) =>
+                                                w.id ===
+                                                selectedWard
+                                        )?.name ||
+                                            preview?.ward
+                                                ?.name ||
+                                            "Selected Ward"}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* NAME */}
+
+                            <div
+                                style={{
+                                    marginTop:
+                                        "16px",
+                                }}
+                            >
+                                <label
+                                    style={{
+                                        display:
+                                            "block",
+
                                         fontSize:
                                             "0.68rem",
 
-                                        color:
-                                            "#2563eb",
-
                                         fontWeight:
-                                            900,
-
-                                        textTransform:
-                                            "uppercase",
-                                    }}
-                                >
-                                    Register Employee
-                                </div>
-
-                                <div
-                                    style={{
-                                        marginTop:
-                                            "4px",
-
-                                        fontSize:
-                                            "1rem",
+                                            800,
 
                                         color:
-                                            "#0f172a",
+                                            "#475569",
 
-                                        fontWeight:
-                                            900,
+                                        marginBottom:
+                                            "6px",
                                     }}
                                 >
-                                    {
-                                        registeringBeat.employeeName
+                                    Employee Name
+                                </label>
+
+                                <input
+                                    value={
+                                        registeringBeat.employeeName ?? ""
                                     }
-                                </div>
-
-                                <div
+                                    readOnly
                                     style={{
-                                        marginTop:
-                                            "3px",
+                                        width:
+                                            "100%",
+
+                                        height:
+                                            "42px",
+
+                                        padding:
+                                            "0 12px",
+
+                                        borderRadius:
+                                            "10px",
+
+                                        border:
+                                            "1px solid #e2e8f0",
+
+                                        background:
+                                            "#f8fafc",
 
                                         color:
-                                            "#64748b",
-
-                                        fontSize:
-                                            "0.7rem",
+                                            "#334155",
 
                                         fontWeight:
-                                            600,
+                                            700,
+
+                                        boxSizing:
+                                            "border-box",
                                     }}
-                                >
-                                    {
-                                        registeringBeat.suggestedBeatName
-                                    }
-                                </div>
+                                />
                             </div>
 
+                            <div
+                                style={{
+                                    marginTop: "16px",
+                                }}
+                            >
+                                <label
+                                    style={{
+                                        display: "block",
+                                        fontSize: "0.68rem",
+                                        fontWeight: 800,
+                                        color: "#475569",
+                                        marginBottom: "6px",
+                                    }}
+                                >
+                                    Contact Number *
+                                </label>
+
+                                <input
+                                    type="tel"
+                                    inputMode="numeric"
+                                    value={employeePhone}
+                                    onChange={(e) => {
+                                        const value = e.target.value
+                                            .replace(/\D/g, "")
+                                            .slice(0, 10);
+
+                                        setEmployeePhone(value);
+                                    }}
+                                    placeholder="Enter 10 digit contact number"
+                                    required
+                                    maxLength={10}
+                                    pattern="[0-9]{10}"
+                                    style={{
+                                        width: "100%",
+                                        height: "44px",
+                                        padding: "0 12px",
+                                        borderRadius: "10px",
+                                        border: "1px solid #cbd5e1",
+                                        outline: "none",
+                                        boxSizing: "border-box",
+                                        fontWeight: 700,
+                                        color: "#0f172a",
+                                    }}
+                                />
+                            </div>
+
+                            {/* ERROR */}
+
+                            {registrationError && (
+                                <div
+                                    style={{
+                                        marginTop:
+                                            "12px",
+
+                                        padding:
+                                            "9px 11px",
+
+                                        background:
+                                            "#fef2f2",
+
+                                        border:
+                                            "1px solid #fecaca",
+
+                                        borderRadius:
+                                            "9px",
+
+                                        color:
+                                            "#b91c1c",
+
+                                        fontSize:
+                                            "0.68rem",
+
+                                        fontWeight:
+                                            700,
+                                    }}
+                                >
+                                    {
+                                        registrationError
+                                    }
+                                </div>
+                            )}
+
+                            {/* ACTION */}
+
                             <button
-                                type="button"
+                                type="submit"
                                 disabled={
                                     registeringEmployee
                                 }
-                                onClick={() =>
-                                    setRegisteringBeat(
-                                        null
-                                    )
-                                }
                                 style={{
-                                    width:
-                                        "32px",
+                                    marginTop:
+                                        "16px",
 
-                                    height:
-                                        "32px",
-
-                                    borderRadius:
-                                        "9px",
-
-                                    border:
-                                        "1px solid #e2e8f0",
-
-                                    background:
-                                        "#fff",
-
-                                    color:
-                                        "#64748b",
-
-                                    cursor:
-                                        "pointer",
-
-                                    fontSize:
-                                        "18px",
-                                }}
-                            >
-                                ×
-                            </button>
-                        </div>
-
-                        {/* AUTO ASSIGNMENT */}
-
-                        <div
-                            style={{
-                                marginTop:
-                                    "15px",
-
-                                padding:
-                                    "11px 12px",
-
-                                borderRadius:
-                                    "11px",
-
-                                background:
-                                    "#eff6ff",
-
-                                border:
-                                    "1px solid #dbeafe",
-
-                                display:
-                                    "grid",
-
-                                gridTemplateColumns:
-                                    "1fr 1fr",
-
-                                gap:
-                                    "8px",
-                            }}
-                        >
-                            <div>
-                                <div
-                                    style={{
-                                        color:
-                                            "#64748b",
-
-                                        fontSize:
-                                            "0.58rem",
-
-                                        fontWeight:
-                                            800,
-
-                                        textTransform:
-                                            "uppercase",
-                                    }}
-                                >
-                                    Role
-                                </div>
-
-                                <div
-                                    style={{
-                                        marginTop:
-                                            "2px",
-
-                                        color:
-                                            "#1e40af",
-
-                                        fontSize:
-                                            "0.72rem",
-
-                                        fontWeight:
-                                            800,
-                                    }}
-                                >
-                                    Employee
-                                </div>
-                            </div>
-
-                            <div>
-                                <div
-                                    style={{
-                                        color:
-                                            "#64748b",
-
-                                        fontSize:
-                                            "0.58rem",
-
-                                        fontWeight:
-                                            800,
-
-                                        textTransform:
-                                            "uppercase",
-                                    }}
-                                >
-                                    Module
-                                </div>
-
-                                <div
-                                    style={{
-                                        marginTop:
-                                            "2px",
-
-                                        color:
-                                            "#1e40af",
-
-                                        fontSize:
-                                            "0.72rem",
-
-                                        fontWeight:
-                                            800,
-                                    }}
-                                >
-                                    Sweeping
-                                </div>
-                            </div>
-
-                            <div>
-                                <div
-                                    style={{
-                                        color:
-                                            "#64748b",
-
-                                        fontSize:
-                                            "0.58rem",
-
-                                        fontWeight:
-                                            800,
-
-                                        textTransform:
-                                            "uppercase",
-                                    }}
-                                >
-                                    Zone
-                                </div>
-
-                                <div
-                                    style={{
-                                        marginTop:
-                                            "2px",
-
-                                        color:
-                                            "#334155",
-
-                                        fontSize:
-                                            "0.7rem",
-
-                                        fontWeight:
-                                            700,
-                                    }}
-                                >
-                                    {zones.find(
-                                        (z: any) =>
-                                            z.id ===
-                                            selectedZone
-                                    )?.name ||
-                                        "Selected Zone"}
-                                </div>
-                            </div>
-
-                            <div>
-                                <div
-                                    style={{
-                                        color:
-                                            "#64748b",
-
-                                        fontSize:
-                                            "0.58rem",
-
-                                        fontWeight:
-                                            800,
-
-                                        textTransform:
-                                            "uppercase",
-                                    }}
-                                >
-                                    Ward
-                                </div>
-
-                                <div
-                                    style={{
-                                        marginTop:
-                                            "2px",
-
-                                        color:
-                                            "#334155",
-
-                                        fontSize:
-                                            "0.7rem",
-
-                                        fontWeight:
-                                            700,
-                                    }}
-                                >
-                                    {wards.find(
-                                        (w: any) =>
-                                            w.id ===
-                                            selectedWard
-                                    )?.name ||
-                                        preview?.ward
-                                            ?.name ||
-                                        "Selected Ward"}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* NAME */}
-
-                        <div
-                            style={{
-                                marginTop:
-                                    "16px",
-                            }}
-                        >
-                            <label
-                                style={{
-                                    display:
-                                        "block",
-
-                                    fontSize:
-                                        "0.68rem",
-
-                                    fontWeight:
-                                        800,
-
-                                    color:
-                                        "#475569",
-
-                                    marginBottom:
-                                        "6px",
-                                }}
-                            >
-                                Employee Name
-                            </label>
-
-                            <input
-                                value={
-                                    registeringBeat.employeeName ?? ""
-                                }
-                                readOnly
-                                style={{
                                     width:
                                         "100%",
 
                                     height:
-                                        "42px",
-
-                                    padding:
-                                        "0 12px",
-
-                                    borderRadius:
-                                        "10px",
+                                        "44px",
 
                                     border:
-                                        "1px solid #e2e8f0",
-
-                                    background:
-                                        "#f8fafc",
-
-                                    color:
-                                        "#334155",
-
-                                    fontWeight:
-                                        700,
-
-                                    boxSizing:
-                                        "border-box",
-                                }}
-                            />
-                        </div>
-
-                        <div
-                            style={{
-                                marginTop: "16px",
-                            }}
-                        >
-                            <label
-                                style={{
-                                    display: "block",
-                                    fontSize: "0.68rem",
-                                    fontWeight: 800,
-                                    color: "#475569",
-                                    marginBottom: "6px",
-                                }}
-                            >
-                                Contact Number *
-                            </label>
-
-                            <input
-                                type="tel"
-                                inputMode="numeric"
-                                value={employeePhone}
-                                onChange={(e) => {
-                                    const value = e.target.value
-                                        .replace(/\D/g, "")
-                                        .slice(0, 10);
-
-                                    setEmployeePhone(value);
-                                }}
-                                placeholder="Enter 10 digit contact number"
-                                required
-                                maxLength={10}
-                                pattern="[0-9]{10}"
-                                style={{
-                                    width: "100%",
-                                    height: "44px",
-                                    padding: "0 12px",
-                                    borderRadius: "10px",
-                                    border: "1px solid #cbd5e1",
-                                    outline: "none",
-                                    boxSizing: "border-box",
-                                    fontWeight: 700,
-                                    color: "#0f172a",
-                                }}
-                            />
-                        </div>
-
-                        {/* ERROR */}
-
-                        {registrationError && (
-                            <div
-                                style={{
-                                    marginTop:
-                                        "12px",
-
-                                    padding:
-                                        "9px 11px",
-
-                                    background:
-                                        "#fef2f2",
-
-                                    border:
-                                        "1px solid #fecaca",
+                                        "none",
 
                                     borderRadius:
-                                        "9px",
+                                        "11px",
+
+                                    background:
+                                        registeringEmployee
+                                            ? "#93c5fd"
+                                            : "#2563eb",
 
                                     color:
-                                        "#b91c1c",
-
-                                    fontSize:
-                                        "0.68rem",
+                                        "#fff",
 
                                     fontWeight:
-                                        700,
+                                        800,
+
+                                    cursor:
+                                        registeringEmployee
+                                            ? "wait"
+                                            : "pointer",
                                 }}
                             >
-                                {
-                                    registrationError
-                                }
-                            </div>
-                        )}
-
-                        {/* ACTION */}
-
-                        <button
-                            type="submit"
-                            disabled={
-                                registeringEmployee
-                            }
-                            style={{
-                                marginTop:
-                                    "16px",
-
-                                width:
-                                    "100%",
-
-                                height:
-                                    "44px",
-
-                                border:
-                                    "none",
-
-                                borderRadius:
-                                    "11px",
-
-                                background:
-                                    registeringEmployee
-                                        ? "#93c5fd"
-                                        : "#2563eb",
-
-                                color:
-                                    "#fff",
-
-                                fontWeight:
-                                    800,
-
-                                cursor:
-                                    registeringEmployee
-                                        ? "wait"
-                                        : "pointer",
-                            }}
-                        >
-                            {registeringEmployee
-                                ? "Registering..."
-                                : "Register Employee"}
-                        </button>
-                    </form>
-                </div>
+                                {registeringEmployee
+                                    ? "Registering..."
+                                    : "Register Employee"}
+                            </button>
+                        </form>
+                    </div>
+                </ModalPortal>
             )}
 
             {showBeatConfigurator &&

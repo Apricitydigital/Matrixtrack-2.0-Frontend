@@ -92,6 +92,7 @@ import {
   WardRankingApi,
   type WardRankingRow,
 } from '@lib/wardRankingApi';
+import ModalPortal from "@components/ui/ModalPortal";
 
 
 /* =========================================================
@@ -2824,7 +2825,7 @@ function DrilldownDrawer({
     pageSize;
 
   return (
-    <div className="fixed inset-0 z-[80]">
+    <ModalPortal><div className="fixed inset-0 z-[80]">
       <button
         type="button"
         aria-label="Close"
@@ -3801,7 +3802,7 @@ function DrilldownDrawer({
           </div>
         )}
       </aside>
-    </div>
+    </div></ModalPortal>
   );
 }
 
@@ -3822,177 +3823,179 @@ function AttendanceProof({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[100]">
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
-      />
+    <ModalPortal>
+      <div className="fixed inset-0 z-[100]">
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+          className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+        />
 
-      <div className="absolute bottom-0 right-0 top-0 w-full max-w-[760px] overflow-auto border-l border-slate-200 bg-white shadow-[-30px_0_80px_-30px_rgba(15,23,42,.55)]">
-        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white/95 px-6 py-5 backdrop-blur-xl">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.12em] text-cyan-700">
-              Attendance
+        <div className="absolute bottom-0 right-0 top-0 w-full max-w-[760px] overflow-auto border-l border-slate-200 bg-white shadow-[-30px_0_80px_-30px_rgba(15,23,42,.55)]">
+          <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white/95 px-6 py-5 backdrop-blur-xl">
+            <div>
+              <div className="text-xs font-black uppercase tracking-[0.12em] text-cyan-700">
+                Attendance
+              </div>
+
+              <div className="mt-1 text-xl font-black text-slate-950">
+                {
+                  employee.employeeName
+                }
+              </div>
             </div>
 
-            <div className="mt-1 text-xl font-black text-slate-950">
-              {
-                employee.employeeName
-              }
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100"
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="space-y-5 p-6">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {[
-              {
-                label:
-                  'Attendance',
-                value:
-                  percentText(
-                    employee.attendanceRate
-                  ),
-              },
-              {
-                label:
-                  'Present',
-                value:
-                  String(
-                    employee.presentDays
-                  ),
-              },
-              {
-                label:
-                  'Absent',
-                value:
-                  String(
-                    employee.absentDays
-                  ),
-              },
-              {
-                label:
-                  'Working Hours',
-                value:
-                  formatMinutes(
-                    employee.avgWorkMinutes
-                  ),
-              },
-              {
-                label:
-                  'Zone',
-                value:
-                  employee.zones?.join(
-                    ', '
-                  ) ||
-                  '—',
-              },
-              {
-                label:
-                  'Ward',
-                value:
-                  employee.wards?.join(
-                    ', '
-                  ) ||
-                  '—',
-              },
-            ].map(
-              (item) => (
-                <div
-                  key={
-                    item.label
-                  }
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    {
+          <div className="space-y-5 p-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {[
+                {
+                  label:
+                    'Attendance',
+                  value:
+                    percentText(
+                      employee.attendanceRate
+                    ),
+                },
+                {
+                  label:
+                    'Present',
+                  value:
+                    String(
+                      employee.presentDays
+                    ),
+                },
+                {
+                  label:
+                    'Absent',
+                  value:
+                    String(
+                      employee.absentDays
+                    ),
+                },
+                {
+                  label:
+                    'Working Hours',
+                  value:
+                    formatMinutes(
+                      employee.avgWorkMinutes
+                    ),
+                },
+                {
+                  label:
+                    'Zone',
+                  value:
+                    employee.zones?.join(
+                      ', '
+                    ) ||
+                    '—',
+                },
+                {
+                  label:
+                    'Ward',
+                  value:
+                    employee.wards?.join(
+                      ', '
+                    ) ||
+                    '—',
+                },
+              ].map(
+                (item) => (
+                  <div
+                    key={
                       item.label
                     }
-                  </div>
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                      {
+                        item.label
+                      }
+                    </div>
 
-                  <div className="mt-1 text-base font-black text-slate-950">
-                    {
-                      item.value
-                    }
+                    <div className="mt-1 text-base font-black text-slate-950">
+                      {
+                        item.value
+                      }
+                    </div>
                   </div>
-                </div>
-              )
-            )}
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-slate-200">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black text-slate-950">
-              Attendance
+                )
+              )}
             </div>
 
-            {loading ? (
-              <div className="space-y-2 p-4">
-                {Array.from({
-                  length: 6,
-                }).map(
-                  (
-                    _,
-                    index
-                  ) => (
-                    <div
-                      key={
-                        index
-                      }
-                      className="h-12 animate-pulse rounded-xl bg-slate-100"
-                    />
-                  )
-                )}
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black text-slate-950">
+                Attendance
               </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {records.map(
-                  (item) => (
-                    <div
-                      key={
-                        item.id
-                      }
-                      className="grid grid-cols-4 gap-2 px-4 py-3 text-xs"
-                    >
-                      <div className="font-bold text-slate-700">
-                        {formatDate(
-                          item.attendanceDate
-                        )}
-                      </div>
 
-                      <div className="font-black text-slate-950">
-                        {
-                          item.status
+              {loading ? (
+                <div className="space-y-2 p-4">
+                  {Array.from({
+                    length: 6,
+                  }).map(
+                    (
+                      _,
+                      index
+                    ) => (
+                      <div
+                        key={
+                          index
                         }
-                      </div>
+                        className="h-12 animate-pulse rounded-xl bg-slate-100"
+                      />
+                    )
+                  )}
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {records.map(
+                    (item) => (
+                      <div
+                        key={
+                          item.id
+                        }
+                        className="grid grid-cols-4 gap-2 px-4 py-3 text-xs"
+                      >
+                        <div className="font-bold text-slate-700">
+                          {formatDate(
+                            item.attendanceDate
+                          )}
+                        </div>
 
-                      <div className="font-semibold text-slate-500">
-                        {item.inTime ||
-                          '—'}
-                      </div>
+                        <div className="font-black text-slate-950">
+                          {
+                            item.status
+                          }
+                        </div>
 
-                      <div className="font-semibold text-slate-500">
-                        {item.outTime ||
-                          '—'}
+                        <div className="font-semibold text-slate-500">
+                          {item.inTime ||
+                            '—'}
+                        </div>
+
+                        <div className="font-semibold text-slate-500">
+                          {item.outTime ||
+                            '—'}
+                        </div>
                       </div>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
+                    )
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -4069,7 +4072,7 @@ function WardProof({
     ];
 
   return (
-    <div className="fixed inset-0 z-[100]">
+    <ModalPortal><div className="fixed inset-0 z-[100]">
       <button
         type="button"
         aria-label="Close"
@@ -4187,7 +4190,7 @@ function WardProof({
           </div>
         </div>
       </div>
-    </div>
+    </div></ModalPortal>
   );
 }
 

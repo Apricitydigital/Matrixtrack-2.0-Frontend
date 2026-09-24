@@ -24,6 +24,7 @@ import {
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import dynamic from "next/dynamic";
 import "leaflet/dist/leaflet.css";
+import ModalPortal from "@components/ui/ModalPortal";
 
 // Dynamic import Leaflet components for SSR safety
 const MapContainer = dynamic(
@@ -569,7 +570,7 @@ export default function BeatRequestsPage() {
 
         {/* Pro Map Preview Modal with Left Points Explorer Panel */}
         {viewingMapBeat && (
-          <div
+          <ModalPortal><div
             style={{
               position: "fixed",
               top: 0,
@@ -841,118 +842,120 @@ export default function BeatRequestsPage() {
                 })()}
               </div>
             </div>
-          </div>
+          </div></ModalPortal>
         )}
 
         {/* Reject Reason Modal */}
         {rejectingBeat && (
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(15, 23, 42, 0.5)",
-              backdropFilter: "blur(4px)",
-              zIndex: 1000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "24px"
-            }}
-          >
+          <ModalPortal>
             <div
               style={{
-                width: "100%",
-                maxWidth: "480px",
-                backgroundColor: "white",
-                borderRadius: "24px",
-                padding: "28px",
-                boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)"
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(15, 23, 42, 0.5)",
+                backdropFilter: "blur(4px)",
+                zIndex: 1000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "24px"
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                <div
-                  style={{
-                    width: "44px",
-                    height: "44px",
-                    borderRadius: "14px",
-                    backgroundColor: "#fef2f2",
-                    color: "#dc2626",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center"
-                  }}
-                >
-                  <AlertTriangle size={22} />
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: "480px",
+                  backgroundColor: "white",
+                  borderRadius: "24px",
+                  padding: "28px",
+                  boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)"
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                  <div
+                    style={{
+                      width: "44px",
+                      height: "44px",
+                      borderRadius: "14px",
+                      backgroundColor: "#fef2f2",
+                      color: "#dc2626",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center"
+                    }}
+                  >
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>
+                      Reject Beat Request
+                    </h3>
+                    <p style={{ fontSize: "0.85rem", color: "#64748b", margin: 0 }}>
+                      {rejectingBeat.beatName}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0f172a", margin: 0 }}>
-                    Reject Beat Request
-                  </h3>
-                  <p style={{ fontSize: "0.85rem", color: "#64748b", margin: 0 }}>
-                    {rejectingBeat.beatName}
-                  </p>
+
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#334155", marginBottom: "8px" }}>
+                    Reason for Rejection:
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Enter reason for rejecting this beat request..."
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "12px",
+                      borderRadius: "12px",
+                      border: "1.5px solid #cbd5e1",
+                      fontSize: "0.9rem",
+                      outline: "none",
+                      fontFamily: "inherit"
+                    }}
+                  />
                 </div>
-              </div>
 
-              <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 700, color: "#334155", marginBottom: "8px" }}>
-                  Reason for Rejection:
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Enter reason for rejecting this beat request..."
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    borderRadius: "12px",
-                    border: "1.5px solid #cbd5e1",
-                    fontSize: "0.9rem",
-                    outline: "none",
-                    fontFamily: "inherit"
-                  }}
-                />
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-                <button
-                  onClick={() => setRejectingBeat(null)}
-                  style={{
-                    padding: "10px 18px",
-                    borderRadius: "10px",
-                    border: "1px solid #cbd5e1",
-                    backgroundColor: "white",
-                    fontWeight: 700,
-                    fontSize: "0.875rem",
-                    color: "#475569",
-                    cursor: "pointer"
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRejectSubmit}
-                  disabled={processingId === rejectingBeat.id}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "10px",
-                    border: "none",
-                    backgroundColor: "#dc2626",
-                    fontWeight: 700,
-                    fontSize: "0.875rem",
-                    color: "white",
-                    cursor: "pointer"
-                  }}
-                >
-                  Confirm Rejection
-                </button>
+                <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => setRejectingBeat(null)}
+                    style={{
+                      padding: "10px 18px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                      backgroundColor: "white",
+                      fontWeight: 700,
+                      fontSize: "0.875rem",
+                      color: "#475569",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRejectSubmit}
+                    disabled={processingId === rejectingBeat.id}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "10px",
+                      border: "none",
+                      backgroundColor: "#dc2626",
+                      fontWeight: 700,
+                      fontSize: "0.875rem",
+                      color: "white",
+                      cursor: "pointer"
+                    }}
+                  >
+                    Confirm Rejection
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
 
         <style jsx>{`

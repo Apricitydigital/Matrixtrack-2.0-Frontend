@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ModuleRecordsApi, TwinbinApi, ApiError, apiFetch } from "@lib/apiClient";
 import { StatsCard, RecordsTable, StatusBadge, ActionButtons, TableColumn, FilterTabs } from "../../qc-shared";
 import { resolveMediaUrl } from "@lib/mediaUrl";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type RecordItem = {
     id: string;
@@ -374,46 +375,48 @@ function AssignModal({ supervisors, record, onClose, onAssign, loading }: {
     }, [supervisors, record]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white p-6 rounded-lg shadow-xl w-96">
-                <h3 className="text-lg font-bold mb-4">Assign Bin</h3>
-                <p className="mb-4 text-sm">Select a Daroga to assign this bin to. This will also approve the request.</p>
+        <ModalPortal>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="bg-white p-6 rounded-lg shadow-xl w-96">
+                    <h3 className="text-lg font-bold mb-4">Assign Bin</h3>
+                    <p className="mb-4 text-sm">Select a Daroga to assign this bin to. This will also approve the request.</p>
 
-                <div className="form-control w-full mb-4">
-                    <label className="label">
-                        <span className="label-text">Select Employee</span>
-                    </label>
-                    <select
-                        className="select select-bordered w-full"
-                        value={selected}
-                        onChange={(e) => setSelected(e.target.value)}
-                    >
-                        <option value="">-- Choose Employee --</option>
-                        {displayedEmployees.map(emp => (
-                            <option key={emp.id} value={emp.id}>
-                                {emp.name} ({emp.email})
-                            </option>
-                        ))}
-                    </select>
-                    {displayedEmployees.length === 0 && (
-                        <div className="text-xs text-error mt-1">
-                            No Darogas found in this zone.
-                        </div>
-                    )}
-                </div>
+                    <div className="form-control w-full mb-4">
+                        <label className="label">
+                            <span className="label-text">Select Employee</span>
+                        </label>
+                        <select
+                            className="select select-bordered w-full"
+                            value={selected}
+                            onChange={(e) => setSelected(e.target.value)}
+                        >
+                            <option value="">-- Choose Employee --</option>
+                            {displayedEmployees.map(emp => (
+                                <option key={emp.id} value={emp.id}>
+                                    {emp.name} ({emp.email})
+                                </option>
+                            ))}
+                        </select>
+                        {displayedEmployees.length === 0 && (
+                            <div className="text-xs text-error mt-1">
+                                No Darogas found in this zone.
+                            </div>
+                        )}
+                    </div>
 
-                <div className="flex justify-end gap-2">
-                    <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-                    <button
-                        className="btn btn-primary"
-                        disabled={!selected || loading}
-                        onClick={() => onAssign(selected)}
-                    >
-                        {loading ? "Assigning..." : "Assign & Approve"}
-                    </button>
+                    <div className="flex justify-end gap-2">
+                        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+                        <button
+                            className="btn btn-primary"
+                            disabled={!selected || loading}
+                            onClick={() => onAssign(selected)}
+                        >
+                            {loading ? "Assigning..." : "Assign & Approve"}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
+        </ModalPortal>
     );
 }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ModuleGuard, Protected } from "@components/Guards";
 import { ApiError, TaskforceApi } from "@lib/apiClient";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type ActionReport = {
   id: string;
@@ -224,64 +225,66 @@ export default function TaskforceActionOfficerPage() {
         </div>
 
         {active && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-          }}>
+          <ModalPortal>
             <div style={{
-              backgroundColor: 'white', borderRadius: 16,
-              width: '90%', maxWidth: 640,
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-              overflow: 'hidden'
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
             }}>
-              <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Process Report</h3>
-                  <p style={{ margin: '4px 0 0 0', fontSize: 12, fontFamily: 'monospace', color: '#64748b' }}>ID: {active.id}</p>
-                </div>
-                <button onClick={() => { setActive(null); setActionNote(""); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8' }}>✕</button>
-              </div>
-
-              <div style={{ padding: 32 }}>
-                <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: 12, marginBottom: 24 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <Field label="Area Name" value={active.feederPoint?.areaName || active.feederPoint?.feederPointName} />
-                    <Field label="Location Desc" value={active.feederPoint?.locationDescription} />
-                    <Field label="Zone" value={active.feederPoint?.zoneId} />
-                    <Field label="Ward" value={active.feederPoint?.wardId} />
+              <div style={{
+                backgroundColor: 'white', borderRadius: 16,
+                width: '90%', maxWidth: 640,
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+                overflow: 'hidden'
+              }}>
+                <div style={{ padding: '24px 32px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Process Report</h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: 12, fontFamily: 'monospace', color: '#64748b' }}>ID: {active.id}</p>
                   </div>
+                  <button onClick={() => { setActive(null); setActionNote(""); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#94a3b8' }}>✕</button>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
-                    Action Remarks <span style={{ opacity: 0.5, fontWeight: 400 }}>(Optional)</span>
-                  </label>
-                  <textarea
-                    style={{
-                      width: '100%', height: 100, padding: 12, borderRadius: 8,
-                      border: '1px solid #cbd5e1', fontSize: 14, outline: 'none'
-                    }}
-                    value={actionNote}
-                    onChange={(e) => setActionNote(e.target.value)}
-                    placeholder="Describe the action taken to resolve this issue..."
-                  />
-                </div>
+                <div style={{ padding: 32 }}>
+                  <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: 12, marginBottom: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <Field label="Area Name" value={active.feederPoint?.areaName || active.feederPoint?.feederPointName} />
+                      <Field label="Location Desc" value={active.feederPoint?.locationDescription} />
+                      <Field label="Zone" value={active.feederPoint?.zoneId} />
+                      <Field label="Ward" value={active.feederPoint?.wardId} />
+                    </div>
+                  </div>
 
-                <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                  <button className="btn btn-ghost" onClick={() => { setActive(null); setActionNote(""); }}>Cancel</button>
-                  <button
-                    className="btn btn-primary"
-                    disabled={submitLoading}
-                    onClick={handleSubmit}
-                    style={{ opacity: submitLoading ? 0.7 : 1 }}
-                  >
-                    {submitLoading ? "Submitting..." : "Submit to SI"}
-                  </button>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: '#334155', marginBottom: 8 }}>
+                      Action Remarks <span style={{ opacity: 0.5, fontWeight: 400 }}>(Optional)</span>
+                    </label>
+                    <textarea
+                      style={{
+                        width: '100%', height: 100, padding: 12, borderRadius: 8,
+                        border: '1px solid #cbd5e1', fontSize: 14, outline: 'none'
+                      }}
+                      value={actionNote}
+                      onChange={(e) => setActionNote(e.target.value)}
+                      placeholder="Describe the action taken to resolve this issue..."
+                    />
+                  </div>
+
+                  <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button className="btn btn-ghost" onClick={() => { setActive(null); setActionNote(""); }}>Cancel</button>
+                    <button
+                      className="btn btn-primary"
+                      disabled={submitLoading}
+                      onClick={handleSubmit}
+                      style={{ opacity: submitLoading ? 0.7 : 1 }}
+                    >
+                      {submitLoading ? "Submitting..." : "Submit to SI"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </ModalPortal>
         )}
       </ModuleGuard>
     </Protected>

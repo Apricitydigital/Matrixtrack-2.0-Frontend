@@ -36,6 +36,7 @@ import {
 
 import { TableExportDropdown } from "@components/ui/TableExportDropdown";
 import * as XLSX from "xlsx";
+import ModalPortal from "@components/ui/ModalPortal";
 
 
 type GeoNode = {
@@ -2654,596 +2655,606 @@ export default function EmployeesPage() {
                 EDIT EMPLOYEE MODAL
             ========================================================= */}
             {editingEmployee && (
-                <div
-                    className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
-                    onClick={closeEditModal}
-                >
-                    <form
-                        onSubmit={handleEditSaveRequest}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                <ModalPortal>
+                    <div
+                        className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                        onClick={closeEditModal}
                     >
-                        {/* HEADER */}
-                        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
-                                    Employee Master
-                                </p>
-                                <h2 className="mt-1 text-xl font-bold text-slate-900">
-                                    Edit Employee
-                                </h2>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Update employee details, type, zone, and ward assignment.
-                                </p>
-                            </div>
+                        <form
+                            onSubmit={handleEditSaveRequest}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                        >
+                            {/* HEADER */}
+                            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
+                                        Employee Master
+                                    </p>
+                                    <h2 className="mt-1 text-xl font-bold text-slate-900">
+                                        Edit Employee
+                                    </h2>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Update employee details, type, zone, and ward assignment.
+                                    </p>
+                                </div>
 
-                            <button
-                                type="button"
-                                disabled={savingEdit}
-                                onClick={closeEditModal}
-                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        {/* FORM */}
-                        <div className="space-y-4 px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Employee Name *
-                                </label>
-                                <input
-                                    value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
-                                    placeholder="Enter employee name"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Employee ID <span className="text-xs font-normal text-slate-400">(Optional)</span>
-                                </label>
-                                <input
-                                    value={editEmployeeCodeId}
-                                    onChange={(e) => setEditEmployeeCodeId(e.target.value)}
-                                    placeholder="Enter Employee ID (e.g. EMP101)"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Mobile Number <span className="text-xs font-normal text-slate-400">(Optional)</span>
-                                </label>
-                                <input
-                                    type="tel"
-                                    inputMode="numeric"
-                                    value={editPhone}
-                                    maxLength={10}
-                                    onChange={(e) => {
-                                        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
-                                        setEditPhone(value);
-                                    }}
-                                    placeholder="Enter 10 digit mobile number"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Aadhaar Number <span className="text-xs font-normal text-slate-400">(12 Digits - Optional)</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={editAadhaar}
-                                    maxLength={12}
-                                    onChange={(e) => {
-                                        const value = e.target.value.replace(/\D/g, "").slice(0, 12);
-                                        setEditAadhaar(value);
-                                    }}
-                                    placeholder="Enter 12 digit Aadhaar number"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Appointment Type
-                                </label>
-                                <select
-                                    value={editEmploymentType}
-                                    onChange={(e) => setEditEmploymentType(e.target.value)}
-                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                <button
+                                    type="button"
+                                    disabled={savingEdit}
+                                    onClick={closeEditModal}
+                                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
                                 >
-                                    <option value="Permanent">Permanent / स्थायी</option>
-                                    <option value="Regularized">Regularized / विनियमित</option>
-                                    <option value="Temporary">Temporary / अस्थायी</option>
-                                    <option value="Outsource">Outsource / आउटसोर्स</option>
-                                </select>
+                                    <X size={18} />
+                                </button>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            {/* FORM */}
+                            <div className="space-y-4 px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
                                 <div>
                                     <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Zone *
+                                        Employee Name *
                                     </label>
-                                    <select
-                                        value={editZoneId}
+                                    <input
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        placeholder="Enter employee name"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Employee ID <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                    </label>
+                                    <input
+                                        value={editEmployeeCodeId}
+                                        onChange={(e) => setEditEmployeeCodeId(e.target.value)}
+                                        placeholder="Enter Employee ID (e.g. EMP101)"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Mobile Number <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        inputMode="numeric"
+                                        value={editPhone}
+                                        maxLength={10}
                                         onChange={(e) => {
-                                            setEditZoneId(e.target.value);
-                                            setEditWardId("");
+                                            const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                                            setEditPhone(value);
                                         }}
-                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
-                                        required
-                                    >
-                                        <option value="">Select Zone</option>
-                                        {zones.map((zone) => (
-                                            <option key={zone.id} value={zone.id}>
-                                                {zone.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        placeholder="Enter 10 digit mobile number"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    />
                                 </div>
 
                                 <div>
                                     <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Ward *
+                                        Aadhaar Number <span className="text-xs font-normal text-slate-400">(12 Digits - Optional)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={editAadhaar}
+                                        maxLength={12}
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/\D/g, "").slice(0, 12);
+                                            setEditAadhaar(value);
+                                        }}
+                                        placeholder="Enter 12 digit Aadhaar number"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Appointment Type
                                     </label>
                                     <select
-                                        value={editWardId}
-                                        disabled={!editZoneId}
-                                        onChange={(e) => setEditWardId(e.target.value)}
-                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100"
-                                        required
+                                        value={editEmploymentType}
+                                        onChange={(e) => setEditEmploymentType(e.target.value)}
+                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                     >
-                                        <option value="">
-                                            {editZoneId ? "Select Ward" : "Select Zone first"}
-                                        </option>
-                                        {editRegistrationWards.map((ward) => (
-                                            <option key={ward.id} value={ward.id}>
-                                                {ward.name}
-                                            </option>
-                                        ))}
+                                        <option value="Permanent">Permanent / स्थायी</option>
+                                        <option value="Regularized">Regularized / विनियमित</option>
+                                        <option value="Temporary">Temporary / अस्थायी</option>
+                                        <option value="Outsource">Outsource / आउटसोर्स</option>
                                     </select>
                                 </div>
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                            Zone *
+                                        </label>
+                                        <select
+                                            value={editZoneId}
+                                            onChange={(e) => {
+                                                setEditZoneId(e.target.value);
+                                                setEditWardId("");
+                                            }}
+                                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
+                                            required
+                                        >
+                                            <option value="">Select Zone</option>
+                                            {zones.map((zone) => (
+                                                <option key={zone.id} value={zone.id}>
+                                                    {zone.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                            Ward *
+                                        </label>
+                                        <select
+                                            value={editWardId}
+                                            disabled={!editZoneId}
+                                            onChange={(e) => setEditWardId(e.target.value)}
+                                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100"
+                                            required
+                                        >
+                                            <option value="">
+                                                {editZoneId ? "Select Ward" : "Select Zone first"}
+                                            </option>
+                                            {editRegistrationWards.map((ward) => (
+                                                <option key={ward.id} value={ward.id}>
+                                                    {ward.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {editError && (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                        {editError}
+                                    </div>
+                                )}
                             </div>
 
-                            {editError && (
-                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                                    {editError}
-                                </div>
-                            )}
-                        </div>
+                            {/* FOOTER */}
+                            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                                <button
+                                    type="button"
+                                    disabled={savingEdit}
+                                    onClick={closeEditModal}
+                                    className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+                                >
+                                    Cancel
+                                </button>
 
-                        {/* FOOTER */}
-                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-                            <button
-                                type="button"
-                                disabled={savingEdit}
-                                onClick={closeEditModal}
-                                className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
-                            >
-                                Cancel
-                            </button>
-
-                            <button
-                                type="submit"
-                                disabled={savingEdit}
-                                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:bg-blue-300"
-                            >
-                                <Edit2 size={16} />
-                                Save Changes
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                                <button
+                                    type="submit"
+                                    disabled={savingEdit}
+                                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:bg-blue-300"
+                                >
+                                    <Edit2 size={16} />
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </ModalPortal>
             )}
 
             {/* =========================================================
                 EDIT CONFIRMATION MODAL
             ========================================================= */}
             {showEditConfirm && (
-                <div
-                    className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
-                    onClick={() => !savingEdit && setShowEditConfirm(false)}
-                >
+                <ModalPortal>
                     <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                        className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                        onClick={() => !savingEdit && setShowEditConfirm(false)}
                     >
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                            <Edit2 size={24} />
-                        </div>
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                        >
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                <Edit2 size={24} />
+                            </div>
 
-                        <h3 className="text-lg font-bold text-slate-900">
-                            Confirm Employee Update
-                        </h3>
+                            <h3 className="text-lg font-bold text-slate-900">
+                                Confirm Employee Update
+                            </h3>
 
-                        <p className="mt-2 text-sm text-slate-600">
-                            Are you sure you want to save changes for employee <strong className="text-slate-900">"{editName}"</strong>?
-                        </p>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Are you sure you want to save changes for employee <strong className="text-slate-900">"{editName}"</strong>?
+                            </p>
 
-                        <div className="mt-6 flex justify-end gap-2">
-                            <button
-                                type="button"
-                                disabled={savingEdit}
-                                onClick={() => setShowEditConfirm(false)}
-                                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                                Cancel
-                            </button>
+                            <div className="mt-6 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    disabled={savingEdit}
+                                    onClick={() => setShowEditConfirm(false)}
+                                    className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                    Cancel
+                                </button>
 
-                            <button
-                                type="button"
-                                disabled={savingEdit}
-                                onClick={handleConfirmEditSave}
-                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-                            >
-                                {savingEdit ? "Updating..." : "Yes, Save Changes"}
-                            </button>
+                                <button
+                                    type="button"
+                                    disabled={savingEdit}
+                                    onClick={handleConfirmEditSave}
+                                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {savingEdit ? "Updating..." : "Yes, Save Changes"}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
             {/* =========================================================
                 SINGLE DELETE CONFIRMATION MODAL
             ========================================================= */}
             {deleteTarget && (
-                <div
-                    className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
-                    onClick={() => !deletingSingle && setDeleteTarget(null)}
-                >
+                <ModalPortal>
                     <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                        className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                        onClick={() => !deletingSingle && setDeleteTarget(null)}
                     >
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                            <AlertTriangle size={24} />
-                        </div>
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                        >
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                                <AlertTriangle size={24} />
+                            </div>
 
-                        <h3 className="text-lg font-bold text-slate-900">
-                            Delete Employee
-                        </h3>
+                            <h3 className="text-lg font-bold text-slate-900">
+                                Delete Employee
+                            </h3>
 
-                        <p className="mt-2 text-sm text-slate-600">
-                            Are you sure you want to delete employee <strong className="text-slate-900">"{deleteTarget.name}"</strong>? This action cannot be undone.
-                        </p>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Are you sure you want to delete employee <strong className="text-slate-900">"{deleteTarget.name}"</strong>? This action cannot be undone.
+                            </p>
 
-                        <div className="mt-6 flex justify-end gap-2">
-                            <button
-                                type="button"
-                                disabled={deletingSingle}
-                                onClick={() => setDeleteTarget(null)}
-                                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                                Cancel
-                            </button>
+                            <div className="mt-6 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    disabled={deletingSingle}
+                                    onClick={() => setDeleteTarget(null)}
+                                    className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                    Cancel
+                                </button>
 
-                            <button
-                                type="button"
-                                disabled={deletingSingle}
-                                onClick={handleConfirmDeleteSingle}
-                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                            >
-                                {deletingSingle ? "Deleting..." : "Yes, Delete Employee"}
-                            </button>
+                                <button
+                                    type="button"
+                                    disabled={deletingSingle}
+                                    onClick={handleConfirmDeleteSingle}
+                                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                >
+                                    {deletingSingle ? "Deleting..." : "Yes, Delete Employee"}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
             {/* =========================================================
                 BULK DELETE CONFIRMATION MODAL
             ========================================================= */}
             {showBulkDeleteConfirm && (
-                <div
-                    className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
-                    onClick={() => !deletingBulk && setShowBulkDeleteConfirm(false)}
-                >
+                <ModalPortal>
                     <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                        className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                        onClick={() => !deletingBulk && setShowBulkDeleteConfirm(false)}
                     >
-                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                            <AlertTriangle size={24} />
-                        </div>
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+                        >
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                                <AlertTriangle size={24} />
+                            </div>
 
-                        <h3 className="text-lg font-bold text-slate-900">
-                            Delete Selected Employees
-                        </h3>
+                            <h3 className="text-lg font-bold text-slate-900">
+                                Delete Selected Employees
+                            </h3>
 
-                        <p className="mt-2 text-sm text-slate-600">
-                            Are you sure you want to delete <strong className="text-red-600">{selectedEmployeeIds.length}</strong> selected employee(s)? This action cannot be undone.
-                        </p>
+                            <p className="mt-2 text-sm text-slate-600">
+                                Are you sure you want to delete <strong className="text-red-600">{selectedEmployeeIds.length}</strong> selected employee(s)? This action cannot be undone.
+                            </p>
 
-                        <div className="mt-6 flex justify-end gap-2">
-                            <button
-                                type="button"
-                                disabled={deletingBulk}
-                                onClick={() => setShowBulkDeleteConfirm(false)}
-                                className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                            >
-                                Cancel
-                            </button>
+                            <div className="mt-6 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    disabled={deletingBulk}
+                                    onClick={() => setShowBulkDeleteConfirm(false)}
+                                    className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                >
+                                    Cancel
+                                </button>
 
-                            <button
-                                type="button"
-                                disabled={deletingBulk}
-                                onClick={handleConfirmBulkDelete}
-                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-                            >
-                                {deletingBulk ? "Deleting..." : `Yes, Delete (${selectedEmployeeIds.length})`}
-                            </button>
+                                <button
+                                    type="button"
+                                    disabled={deletingBulk}
+                                    onClick={handleConfirmBulkDelete}
+                                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                >
+                                    {deletingBulk ? "Deleting..." : `Yes, Delete (${selectedEmployeeIds.length})`}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </ModalPortal>
             )}
 
             {/* =========================================================
                 REGISTER EMPLOYEE MODAL
             ========================================================= */}
             {showRegisterEmployee && (
-                <div
-                    className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
-                    onClick={closeRegistrationModal}
-                >
-                    <form
-                        onSubmit={handleRegisterEmployee}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                <ModalPortal>
+                    <div
+                        className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
+                        onClick={closeRegistrationModal}
                     >
+                        <form
+                            onSubmit={handleRegisterEmployee}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                        >
 
-                        {/* HEADER */}
-                        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+                            {/* HEADER */}
+                            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
 
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
-                                    Employee Master
-                                </p>
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
+                                        Employee Master
+                                    </p>
 
-                                <h2 className="mt-1 text-xl font-bold text-slate-900">
-                                    Register Employee
-                                </h2>
+                                    <h2 className="mt-1 text-xl font-bold text-slate-900">
+                                        Register Employee
+                                    </h2>
 
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Add an employee for beat assignment.
-                                </p>
-                            </div>
-
-
-                            <button
-                                type="button"
-                                disabled={registeringEmployee}
-                                onClick={closeRegistrationModal}
-                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
-                            >
-                                <X size={18} />
-                            </button>
-
-                        </div>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Add an employee for beat assignment.
+                                    </p>
+                                </div>
 
 
-                        {/* FORM */}
-                        <div className="space-y-4 px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Employee Name *
-                                </label>
-
-                                <input
-                                    value={employeeName}
-                                    onChange={(e) =>
-                                        setEmployeeName(e.target.value)
-                                    }
-                                    placeholder="Enter employee name"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Employee ID <span className="text-xs font-normal text-slate-400">(Optional)</span>
-                                </label>
-
-                                <input
-                                    value={employeeCodeId}
-                                    onChange={(e) =>
-                                        setEmployeeCodeId(e.target.value)
-                                    }
-                                    placeholder="Enter Employee ID (e.g. EMP101)"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                />
-                            </div>
-
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Mobile Number <span className="text-xs font-normal text-slate-400">(Optional)</span>
-                                </label>
-
-                                <input
-                                    type="tel"
-                                    inputMode="numeric"
-                                    value={employeePhone}
-                                    maxLength={10}
-                                    onChange={(e) => {
-                                        const value =
-                                            e.target.value
-                                                .replace(/\D/g, "")
-                                                .slice(0, 10);
-
-                                        setEmployeePhone(value);
-                                    }}
-                                    placeholder="Enter 10 digit mobile number"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Aadhaar Number <span className="text-xs font-normal text-slate-400">(12 Digits - Optional)</span>
-                                </label>
-
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={employeeAadhaar}
-                                    maxLength={12}
-                                    onChange={(e) => {
-                                        const value =
-                                            e.target.value
-                                                .replace(/\D/g, "")
-                                                .slice(0, 12);
-
-                                        setEmployeeAadhaar(value);
-                                    }}
-                                    placeholder="Enter 12 digit Aadhaar number"
-                                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Appointment Type
-                                </label>
-
-                                <select
-                                    value={employeeEmploymentType}
-                                    onChange={(e) =>
-                                        setEmployeeEmploymentType(e.target.value)
-                                    }
-                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                <button
+                                    type="button"
+                                    disabled={registeringEmployee}
+                                    onClick={closeRegistrationModal}
+                                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
                                 >
-                                    <option value="Permanent">Permanent / स्थायी</option>
-                                    <option value="Regularized">Regularized / विनियमित</option>
-                                    <option value="Temporary">Temporary / अस्थायी</option>
-                                    <option value="Outsource">Outsource / आउटसोर्स</option>
-                                </select>
+                                    <X size={18} />
+                                </button>
+
                             </div>
 
 
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            {/* FORM */}
+                            <div className="space-y-4 px-6 py-5 max-h-[calc(100vh-200px)] overflow-y-auto">
 
                                 <div>
                                     <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Zone *
+                                        Employee Name *
                                     </label>
 
-                                    <select
-                                        value={employeeZoneId}
-                                        onChange={(e) => {
-                                            setEmployeeZoneId(
-                                                e.target.value
-                                            );
-                                            setEmployeeWardId("");
-                                        }}
-                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
-                                        required
-                                    >
-                                        <option value="">
-                                            Select Zone
-                                        </option>
-
-                                        {zones.map((zone) => (
-                                            <option
-                                                key={zone.id}
-                                                value={zone.id}
-                                            >
-                                                {zone.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                                        Ward *
-                                    </label>
-
-                                    <select
-                                        value={employeeWardId}
-                                        disabled={!employeeZoneId}
+                                    <input
+                                        value={employeeName}
                                         onChange={(e) =>
-                                            setEmployeeWardId(
-                                                e.target.value
-                                            )
+                                            setEmployeeName(e.target.value)
                                         }
-                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100"
+                                        placeholder="Enter employee name"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                                         required
-                                    >
-                                        <option value="">
-                                            {employeeZoneId
-                                                ? "Select Ward"
-                                                : "Select Zone first"}
-                                        </option>
+                                    />
+                                </div>
 
-                                        {registrationWards.map(
-                                            (ward) => (
-                                                <option
-                                                    key={ward.id}
-                                                    value={ward.id}
-                                                >
-                                                    {ward.name}
-                                                </option>
-                                            )
-                                        )}
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Employee ID <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                    </label>
+
+                                    <input
+                                        value={employeeCodeId}
+                                        onChange={(e) =>
+                                            setEmployeeCodeId(e.target.value)
+                                        }
+                                        placeholder="Enter Employee ID (e.g. EMP101)"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                </div>
+
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Mobile Number <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                                    </label>
+
+                                    <input
+                                        type="tel"
+                                        inputMode="numeric"
+                                        value={employeePhone}
+                                        maxLength={10}
+                                        onChange={(e) => {
+                                            const value =
+                                                e.target.value
+                                                    .replace(/\D/g, "")
+                                                    .slice(0, 10);
+
+                                            setEmployeePhone(value);
+                                        }}
+                                        placeholder="Enter 10 digit mobile number"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Aadhaar Number <span className="text-xs font-normal text-slate-400">(12 Digits - Optional)</span>
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={employeeAadhaar}
+                                        maxLength={12}
+                                        onChange={(e) => {
+                                            const value =
+                                                e.target.value
+                                                    .replace(/\D/g, "")
+                                                    .slice(0, 12);
+
+                                            setEmployeeAadhaar(value);
+                                        }}
+                                        placeholder="Enter 12 digit Aadhaar number"
+                                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                        Appointment Type
+                                    </label>
+
+                                    <select
+                                        value={employeeEmploymentType}
+                                        onChange={(e) =>
+                                            setEmployeeEmploymentType(e.target.value)
+                                        }
+                                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    >
+                                        <option value="Permanent">Permanent / स्थायी</option>
+                                        <option value="Regularized">Regularized / विनियमित</option>
+                                        <option value="Temporary">Temporary / अस्थायी</option>
+                                        <option value="Outsource">Outsource / आउटसोर्स</option>
                                     </select>
                                 </div>
 
-                            </div>
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                            Zone *
+                                        </label>
+
+                                        <select
+                                            value={employeeZoneId}
+                                            onChange={(e) => {
+                                                setEmployeeZoneId(
+                                                    e.target.value
+                                                );
+                                                setEmployeeWardId("");
+                                            }}
+                                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
+                                            required
+                                        >
+                                            <option value="">
+                                                Select Zone
+                                            </option>
+
+                                            {zones.map((zone) => (
+                                                <option
+                                                    key={zone.id}
+                                                    value={zone.id}
+                                                >
+                                                    {zone.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
 
 
-                            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-700">
-                                This employee is registered only for beat assignment. No email or login access is created.
-                            </div>
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                                            Ward *
+                                        </label>
 
+                                        <select
+                                            value={employeeWardId}
+                                            disabled={!employeeZoneId}
+                                            onChange={(e) =>
+                                                setEmployeeWardId(
+                                                    e.target.value
+                                                )
+                                            }
+                                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none disabled:bg-slate-100"
+                                            required
+                                        >
+                                            <option value="">
+                                                {employeeZoneId
+                                                    ? "Select Ward"
+                                                    : "Select Zone first"}
+                                            </option>
 
-                            {registrationError && (
-                                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                                    {registrationError}
+                                            {registrationWards.map(
+                                                (ward) => (
+                                                    <option
+                                                        key={ward.id}
+                                                        value={ward.id}
+                                                    >
+                                                        {ward.name}
+                                                    </option>
+                                                )
+                                            )}
+                                        </select>
+                                    </div>
+
                                 </div>
-                            )}
-
-                        </div>
 
 
-                        {/* FOOTER */}
-                        <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-
-                            <button
-                                type="button"
-                                disabled={registeringEmployee}
-                                onClick={closeRegistrationModal}
-                                className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
-                            >
-                                Cancel
-                            </button>
+                                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-700">
+                                    This employee is registered only for beat assignment. No email or login access is created.
+                                </div>
 
 
-                            <button
-                                type="submit"
-                                disabled={registeringEmployee}
-                                className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:bg-blue-300"
-                            >
-                                <UserPlus size={17} />
+                                {registrationError && (
+                                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                                        {registrationError}
+                                    </div>
+                                )}
 
-                                {registeringEmployee
-                                    ? "Registering..."
-                                    : "Register Employee"}
-                            </button>
+                            </div>
 
-                        </div>
 
-                    </form>
-                </div>
+                            {/* FOOTER */}
+                            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+
+                                <button
+                                    type="button"
+                                    disabled={registeringEmployee}
+                                    onClick={closeRegistrationModal}
+                                    className="h-11 rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700"
+                                >
+                                    Cancel
+                                </button>
+
+
+                                <button
+                                    type="submit"
+                                    disabled={registeringEmployee}
+                                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white disabled:bg-blue-300"
+                                >
+                                    <UserPlus size={17} />
+
+                                    {registeringEmployee
+                                        ? "Registering..."
+                                        : "Register Employee"}
+                                </button>
+
+                            </div>
+
+                        </form>
+                    </div>
+                </ModalPortal>
             )}
 
             {/* =========================================================
@@ -3251,7 +3262,7 @@ export default function EmployeesPage() {
             ========================================================= */}
             {showEmployeeImport && (
 
-                <div
+                <ModalPortal><div
                     className="fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-[2px]"
                     onClick={() => {
                         if (
@@ -3660,7 +3671,7 @@ export default function EmployeesPage() {
 
                     </div>
 
-                </div>
+                </div></ModalPortal>
 
             )}
 

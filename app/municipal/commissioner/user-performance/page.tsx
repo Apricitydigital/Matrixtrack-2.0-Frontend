@@ -39,6 +39,7 @@ import {
   type AttendanceDashboardResponse,
   type AttendanceEmployeeSummary,
 } from '@lib/attendanceApi';
+import ModalPortal from "@components/ui/ModalPortal";
 
 
 /* =========================================================
@@ -801,7 +802,7 @@ function UserDetailDrawer({
   }, [calendarSourceRecords]);
 
   return (
-    <div className="fixed inset-0 z-[80]">
+    <ModalPortal><div className="fixed inset-0 z-[80]">
       <button
         type="button"
         aria-label="Close"
@@ -1273,7 +1274,7 @@ function UserDetailDrawer({
           )}
         </div>
       </aside>
-    </div>
+    </div></ModalPortal>
   );
 }
 

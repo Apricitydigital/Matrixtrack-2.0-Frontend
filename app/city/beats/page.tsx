@@ -28,6 +28,7 @@ import {
   Search,
   RotateCcw,
 } from "lucide-react";
+import ModalPortal from "@components/ui/ModalPortal";
 
 const BeatForm = dynamic(
   () => import("./components/BeatForm"),
@@ -1092,128 +1093,130 @@ export default function BeatsPage() {
 
           {!isReadOnly &&
             showCreateBeat && (
-              <div
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  backgroundColor: "rgba(15,23,42,0.4)",
-                  backdropFilter: "blur(4px)",
-                  zIndex: 1000,
-
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "center",
-
-                  padding: "24px 16px",
-                  boxSizing: "border-box",
-
-                  overflowY: "auto",
-                }}
-              >
+              <ModalPortal>
                 <div
                   style={{
-                    backgroundColor:
-                      "white",
-                    padding:
-                      "32px",
-                    borderRadius:
-                      "24px",
-                    border:
-                      "1px solid #e2e8f0",
-                    boxShadow:
-                      "0 25px 50px -12px rgba(0,0,0,0.15)",
-                    position:
-                      "relative",
-                    width:
-                      "100%",
-                    maxWidth:
-                      "560px",
-                    overflowY:
-                      "auto",
-                    maxHeight:
-                      "90vh",
+                    position: "fixed",
+                    inset: 0,
+                    backgroundColor: "rgba(15,23,42,0.4)",
+                    backdropFilter: "blur(4px)",
+                    zIndex: 1000,
+
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+
+                    padding: "24px 16px",
+                    boxSizing: "border-box",
+
+                    overflowY: "auto",
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowCreateBeat(
-                        false
-                      )
-                    }
-                    style={{
-                      position:
-                        "absolute",
-                      top:
-                        "20px",
-                      right:
-                        "20px",
-                      background:
-                        "transparent",
-                      border:
-                        "none",
-                      cursor:
-                        "pointer",
-                      color:
-                        "#64748b",
-                    }}
-                  >
-                    <X
-                      size={20}
-                    />
-                  </button>
-
                   <div
                     style={{
-                      display:
-                        "flex",
-                      alignItems:
-                        "center",
-                      gap:
-                        "10px",
-                      marginBottom:
-                        "20px",
-                      paddingBottom:
-                        "12px",
-                      borderBottom:
-                        "1px solid #f1f5f9",
+                      backgroundColor:
+                        "white",
+                      padding:
+                        "32px",
+                      borderRadius:
+                        "24px",
+                      border:
+                        "1px solid #e2e8f0",
+                      boxShadow:
+                        "0 25px 50px -12px rgba(0,0,0,0.15)",
+                      position:
+                        "relative",
+                      width:
+                        "100%",
+                      maxWidth:
+                        "560px",
+                      overflowY:
+                        "auto",
+                      maxHeight:
+                        "90vh",
                     }}
                   >
-                    <Target
-                      size={22}
-                      color="#2563eb"
-                    />
-
-                    <h2
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowCreateBeat(
+                          false
+                        )
+                      }
                       style={{
-                        fontSize:
-                          "1.15rem",
-                        fontWeight:
-                          800,
-                        margin:
-                          0,
+                        position:
+                          "absolute",
+                        top:
+                          "20px",
+                        right:
+                          "20px",
+                        background:
+                          "transparent",
+                        border:
+                          "none",
+                        cursor:
+                          "pointer",
                         color:
-                          "#0f172a",
+                          "#64748b",
                       }}
                     >
-                      Create New Beat
-                    </h2>
+                      <X
+                        size={20}
+                      />
+                    </button>
+
+                    <div
+                      style={{
+                        display:
+                          "flex",
+                        alignItems:
+                          "center",
+                        gap:
+                          "10px",
+                        marginBottom:
+                          "20px",
+                        paddingBottom:
+                          "12px",
+                        borderBottom:
+                          "1px solid #f1f5f9",
+                      }}
+                    >
+                      <Target
+                        size={22}
+                        color="#2563eb"
+                      />
+
+                      <h2
+                        style={{
+                          fontSize:
+                            "1.15rem",
+                          fontWeight:
+                            800,
+                          margin:
+                            0,
+                          color:
+                            "#0f172a",
+                        }}
+                      >
+                        Create New Beat
+                      </h2>
+                    </div>
+
+                    <BeatForm
+                      onSuccess={() => {
+                        loadBeats();
+
+                        setShowCreateBeat(
+                          false
+                        );
+                      }}
+                      geoVersion={
+                        geoVersion
+                      }
+                    />
                   </div>
-
-                  <BeatForm
-                    onSuccess={() => {
-                      loadBeats();
-
-                      setShowCreateBeat(
-                        false
-                      );
-                    }}
-                    geoVersion={
-                      geoVersion
-                    }
-                  />
                 </div>
-              </div>
+              </ModalPortal>
             )}
 
           {/* =================================================

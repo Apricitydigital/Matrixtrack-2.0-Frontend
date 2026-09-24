@@ -18,6 +18,7 @@ import {
   Globe, CheckCircle2, AlertCircle, Search,
   ArrowRight, ShieldCheck, UserCog, X, Download, FileSpreadsheet, FileText
 } from "lucide-react";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type CityModule = { id: string; key: string; name: string; enabled?: boolean };
 type UserModule = { id: string; key: string; name: string; canWrite: boolean; zoneIds?: string[]; wardIds?: string[] };
@@ -630,7 +631,7 @@ function CityUsersPage() {
 
           {/* Create User Form Modal */}
           {!isReadOnly && isModalOpen && (
-            <div style={{
+            <ModalPortal><div style={{
               position: "fixed",
               top: 0, left: 0, right: 0, bottom: 0,
               backgroundColor: "rgba(15, 23, 42, 0.4)",
@@ -850,7 +851,7 @@ function CityUsersPage() {
                   </div>
                 </form>
               </div>
-            </div>
+            </div></ModalPortal>
           )}
 
 

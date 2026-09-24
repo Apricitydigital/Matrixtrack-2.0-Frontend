@@ -3489,7 +3489,7 @@ function PortalHomeLayoutContent({
             key={
               pathname
             }
-            className="relative z-10 animate-page-entrance"
+            className="relative animate-page-entrance"
           >
             {
               children

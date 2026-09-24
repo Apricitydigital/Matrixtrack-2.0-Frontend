@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { apiFetch } from "@lib/apiClient";
+import ModalPortal from "@components/ui/ModalPortal";
 
 type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN";
 
@@ -425,7 +426,7 @@ export default function TargetStatus({
       </section>
 
       {drillModule && (
-        <div
+        <ModalPortal><div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-[2px]"
           onClick={() => setDrillModule(null)}
         >
@@ -576,7 +577,7 @@ export default function TargetStatus({
               </table>
             </div>
           </div>
-        </div>
+        </div></ModalPortal>
       )}
     </>
   );
