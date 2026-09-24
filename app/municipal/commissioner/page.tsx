@@ -6864,44 +6864,13 @@ export default function CommissionerDashboard() {
         personFilter === 'ALL' &&
         statusFilter === 'ALL' &&
         !searchValue;
-
-      const rangeDayCount = (() => {
-        if (
-          !appliedFrom ||
-          !appliedTo
-        ) {
-          return 1;
-        }
-
-        const start =
-          new Date(
-            `${appliedFrom}T00:00:00Z`
-          );
-
-        const end =
-          new Date(
-            `${appliedTo}T00:00:00Z`
-          );
-
-        const difference =
-          Math.floor(
-            (
-              end.getTime() -
-              start.getTime()
-            ) /
-            (
-              24 *
-              60 *
-              60 *
-              1000
-            )
-          ) + 1;
-
-        return Math.max(
+      const rangeDayCount =
+        Math.max(
           1,
-          difference
+          attendance?.dailyTrend?.filter(
+            (day) => day.total > 0
+          ).length ?? 0
         );
-      })();
 
       if (
         useRegisteredCitySummary &&
@@ -10085,7 +10054,7 @@ export default function CommissionerDashboard() {
                       'Present',
                     value:
                       Math.round(
-                        attendanceStats.displayPresent
+                        attendanceStats.present
                       ).toLocaleString(
                         'en-IN'
                       ),
@@ -10095,7 +10064,7 @@ export default function CommissionerDashboard() {
                       'Absent',
                     value:
                       Math.round(
-                        attendanceStats.displayAbsent
+                        attendanceStats.absent
                       ).toLocaleString(
                         'en-IN'
                       ),
