@@ -5608,17 +5608,17 @@ export default function CommissionerDashboard() {
           );
 
         const registeredEmployeesPromise =
-          AttendanceApi.registeredEmployees(
-            {
-              cityId,
-              from:
-                appliedFrom ||
-                undefined,
-              to:
-                appliedTo ||
-                undefined,
-            }
-          );
+          AttendanceApi.registeredEmployees({
+            cityId,
+            from:
+              appliedFrom ||
+              undefined,
+            to:
+              appliedTo ||
+              undefined,
+            employeeGroup:
+              'HEALTH_WORKERS',
+          });
 
         const results =
           await Promise.allSettled(

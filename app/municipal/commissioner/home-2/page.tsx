@@ -81,37 +81,37 @@ const STATUS_META: Array<{
   label: string;
   color: string;
 }> = [
-  {
-    id: 'NOT_REPORTED',
-    label: 'Not Reported',
-    color: '#64748b',
-  },
-  {
-    id: 'PENDING',
-    label: 'Pending',
-    color: '#f59e0b',
-  },
-  {
-    id: 'APPROVED',
-    label: 'Approved',
-    color: '#16a34a',
-  },
-  {
-    id: 'REJECTED',
-    label: 'Rejected',
-    color: '#e11d48',
-  },
-  {
-    id: 'ACTION_REQUIRED',
-    label: 'Action Required',
-    color: '#f97316',
-  },
-  {
-    id: 'ACTION_TAKEN',
-    label: 'Action Taken',
-    color: '#2563eb',
-  },
-];
+    {
+      id: 'NOT_REPORTED',
+      label: 'Not Reported',
+      color: '#64748b',
+    },
+    {
+      id: 'PENDING',
+      label: 'Pending',
+      color: '#f59e0b',
+    },
+    {
+      id: 'APPROVED',
+      label: 'Approved',
+      color: '#16a34a',
+    },
+    {
+      id: 'REJECTED',
+      label: 'Rejected',
+      color: '#e11d48',
+    },
+    {
+      id: 'ACTION_REQUIRED',
+      label: 'Action Required',
+      color: '#f97316',
+    },
+    {
+      id: 'ACTION_TAKEN',
+      label: 'Action Taken',
+      color: '#2563eb',
+    },
+  ];
 
 const emptySummary = (): OperationsSummary => ({
   total: 0,
@@ -246,7 +246,7 @@ export default function CommissionerHome2Page() {
     const syncFullscreen = () =>
       setIsFullscreen(
         document.fullscreenElement ===
-          mapSectionRef.current,
+        mapSectionRef.current,
       );
 
     document.addEventListener(
@@ -295,11 +295,11 @@ export default function CommissionerHome2Page() {
 
         setData(response);
       } catch (
-        requestError: any
+      requestError: any
       ) {
         setError(
           requestError?.message ||
-            'Unable to load city operations map.',
+          'Unable to load city operations map.',
         );
       } finally {
         setLoading(false);
@@ -373,18 +373,18 @@ export default function CommissionerHome2Page() {
     () =>
       moduleFilter ===
         'TOILET' ||
-      moduleFilter ===
+        moduleFilter ===
         'LITTERBIN'
         ? []
         : (
-            data?.beats || []
-          ).filter((item) =>
-            matchesActorFilter(
-              item.actors,
-              roleFilter,
-              userId,
-            ),
+          data?.beats || []
+        ).filter((item) =>
+          matchesActorFilter(
+            item.actors,
+            roleFilter,
+            userId,
           ),
+        ),
     [
       data,
       moduleFilter,
@@ -398,19 +398,19 @@ export default function CommissionerHome2Page() {
       () =>
         moduleFilter ===
           'SWEEPING' ||
-        moduleFilter ===
+          moduleFilter ===
           'LITTERBIN'
           ? []
           : (
-              data?.toilets ||
-              []
-            ).filter((item) =>
-              matchesActorFilter(
-                item.actors,
-                roleFilter,
-                userId,
-              ),
+            data?.toilets ||
+            []
+          ).filter((item) =>
+            matchesActorFilter(
+              item.actors,
+              roleFilter,
+              userId,
             ),
+          ),
       [
         data,
         moduleFilter,
@@ -423,17 +423,17 @@ export default function CommissionerHome2Page() {
     () =>
       moduleFilter ===
         'SWEEPING' ||
-      moduleFilter === 'TOILET'
+        moduleFilter === 'TOILET'
         ? []
         : (
-            data?.bins || []
-          ).filter((item) =>
-            matchesActorFilter(
-              item.actors,
-              roleFilter,
-              userId,
-            ),
+          data?.bins || []
+        ).filter((item) =>
+          matchesActorFilter(
+            item.actors,
+            roleFilter,
+            userId,
           ),
+        ),
     [
       data,
       moduleFilter,
@@ -476,10 +476,10 @@ export default function CommissionerHome2Page() {
     statusFilter === 'ALL'
       ? items
       : items.filter(
-          (item) =>
-            item.state ===
-            statusFilter,
-        );
+        (item) =>
+          item.state ===
+          statusFilter,
+      );
 
   const filteredBeats =
     useMemo(
@@ -660,22 +660,22 @@ export default function CommissionerHome2Page() {
     | 'ZONE'
     | 'WARD'
     | 'USER' = userId
-    ? 'USER'
-    : wardId
-      ? 'WARD'
-      : zoneId
-        ? 'ZONE'
-        : 'CITY';
+      ? 'USER'
+      : wardId
+        ? 'WARD'
+        : zoneId
+          ? 'ZONE'
+          : 'CITY';
 
   const activeStatusLabel =
     statusFilter === 'ALL'
       ? 'All Statuses'
       : STATUS_META.find(
-          (item) =>
-            item.id ===
-            statusFilter,
-        )?.label ||
-        'All Statuses';
+        (item) =>
+          item.id ===
+          statusFilter,
+      )?.label ||
+      'All Statuses';
 
   return (
     <main className="min-h-full bg-[#f6f8fc] pb-10">
@@ -801,11 +801,10 @@ export default function CommissionerHome2Page() {
                     kpi.id,
                   )
                 }
-                className={`group relative min-w-0 overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-                  isActive
+                className={`group relative min-w-0 overflow-hidden rounded-2xl border p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${isActive
                     ? `${kpi.active} ring-2`
                     : 'border-slate-200/80 bg-white hover:border-slate-300'
-                }`}
+                  }`}
               >
                 <div
                   className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${kpi.accent}`}
@@ -1027,8 +1026,8 @@ export default function CommissionerHome2Page() {
                 ) => {
                   setRoleFilter(
                     value as
-                      | OperationalRole
-                      | '',
+                    | OperationalRole
+                    | '',
                   );
 
                   setUserId('');
@@ -1153,11 +1152,10 @@ export default function CommissionerHome2Page() {
 
         <section
           ref={mapSectionRef}
-          className={`relative overflow-hidden border border-slate-200 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,.40)] ${
-            isFullscreen
+          className={`relative overflow-hidden border border-slate-200 bg-white shadow-[0_20px_60px_-28px_rgba(15,23,42,.40)] ${isFullscreen
               ? 'h-screen min-h-screen w-screen rounded-none'
               : 'h-[700px] min-h-[560px] rounded-[26px]'
-          }`}
+            }`}
         >
           <OperationsMapCanvas
             beats={filteredBeats}
@@ -1253,13 +1251,12 @@ export default function CommissionerHome2Page() {
                       layer.key,
                     )
                   }
-                  className={`mt-1 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs transition ${
-                    visible[
+                  className={`mt-1 flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs transition ${visible[
                       layer.key
                     ]
                       ? `${layer.activeClass} font-black`
                       : 'bg-white font-semibold text-slate-400 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <span className="flex items-center gap-2">
                     <Icon
@@ -1275,13 +1272,12 @@ export default function CommissionerHome2Page() {
                   </span>
 
                   <span
-                    className={`rounded-lg px-2 py-0.5 text-[10px] font-black ${
-                      visible[
+                    className={`rounded-lg px-2 py-0.5 text-[10px] font-black ${visible[
                         layer.key
                       ]
                         ? layer.countClass
                         : 'bg-slate-100 text-slate-400'
-                    }`}
+                      }`}
                   >
                     {
                       layer.count
@@ -1347,11 +1343,10 @@ export default function CommissionerHome2Page() {
                             : item.id,
                         )
                       }
-                      className={`flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-[10px] font-bold transition ${
-                        active
+                      className={`flex items-center gap-2 rounded-full border px-2.5 py-1.5 text-[10px] font-bold transition ${active
                           ? 'border-slate-900 bg-slate-900 text-white shadow'
                           : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
-                      }`}
+                        }`}
                     >
                       <span
                         className="h-2.5 w-2.5 rounded-full ring-2 ring-white shadow"

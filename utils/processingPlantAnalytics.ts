@@ -9,9 +9,15 @@ const n = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const pick = (obj: any, keys: string[], fallback = 0) => {
+const pick = <T = number>(
+  obj: any,
+  keys: string[],
+  fallback: T = 0 as T
+): T => {
   for (const key of keys) {
-    if (obj?.[key] !== undefined && obj?.[key] !== null) return obj[key];
+    if (obj?.[key] !== undefined && obj?.[key] !== null) {
+      return obj[key] as T;
+    }
   }
   return fallback;
 };
@@ -115,3 +121,4 @@ export function lastNDaysRange(days: number) {
   from.setDate(to.getDate() - Math.max(days - 1, 0));
   return { from: dateInputValue(from), to: dateInputValue(to) };
 }
+

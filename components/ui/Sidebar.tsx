@@ -27,14 +27,14 @@ import {
   Database,
   Bell,
   LogOut,
+  Moon,
+  Sun,
   User as UserIcon,
   Building2,
   CheckCircle2,
   ChartNoAxesCombined,
   Award,
   Factory,
-  Moon,
-  Sun,
 } from "lucide-react";
 import { UserProfileModal } from "./UserProfileModal";
 
@@ -192,26 +192,31 @@ export default function Sidebar() {
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
+
     if (savedTheme === "dark") {
       setIsDarkMode(true);
       document.documentElement.classList.add("dark-theme");
+    } else {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove("dark-theme");
     }
   }, []);
 
   const toggleDarkMode = () => {
-    setIsDarkMode((prev) => {
-      const newDark = !prev;
-      if (newDark) {
+    setIsDarkMode((current) => {
+      const nextDark = !current;
+
+      if (nextDark) {
         document.documentElement.classList.add("dark-theme");
         localStorage.setItem("theme", "dark");
       } else {
         document.documentElement.classList.remove("dark-theme");
         localStorage.setItem("theme", "light");
       }
-      return newDark;
+
+      return nextDark;
     });
   };
-
   const isHmsSuperAdmin =
     user?.roles.includes("HMS_SUPER_ADMIN" as Role) ?? false;
 
@@ -325,12 +330,12 @@ export default function Sidebar() {
         },
         ...(hasProcessingPlantModule
           ? [
-              {
-                label: "Plant & Processing",
-                href: "/municipal/commissioner/processing-plant",
-                icon: <Factory size={18} />,
-              },
-            ]
+            {
+              label: "Plant & Processing",
+              href: "/municipal/commissioner/processing-plant",
+              icon: <Factory size={18} />,
+            },
+          ]
           : []),
         {
           label: "User Performance",
@@ -523,25 +528,6 @@ export default function Sidebar() {
         {user && !isCommissioner && moduleLinks.length > 0 && (
           <CollapsibleGroup
             label="Active Operational System"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             icon={<Layout size={18} />}
             open={modulesOpen}
             onToggle={() =>
@@ -629,3 +615,4 @@ export default function Sidebar() {
     </aside>
   );
 }
+
