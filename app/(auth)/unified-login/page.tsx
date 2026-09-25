@@ -2292,6 +2292,7 @@ export default function LoginPage() {
                           { key: "SWEEPING", label: "Sweeping" },
                           { key: "LITTERBINS", label: "Litter Bins" },
                           { key: "TOILET", label: "Toilet" },
+                           { key: "NALA", label: "Nala" },
                         ].map((module) => {
                           const moduleKey = module.key as UnifiedTaskforceModuleKey;
                           const selected = selectedTaskforceModules.includes(moduleKey);

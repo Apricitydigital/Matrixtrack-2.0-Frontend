@@ -109,23 +109,23 @@ export function isReportVisibleToAO(
 
   // Extract record zone ID/name
   const recZoneId = String(
-    record.zoneId || record.toilet?.zoneId || record.beat?.zoneId ||
+    record.zoneId || record.toilet?.zoneId || record.beat?.zoneId || record.nala?.zoneId ||
     record.segment?.zoneId || record.payload?.zoneId || record.feederPoint?.zoneId ||
     record.toilet?.ward?.parentId || ''
   );
   const recZoneName = String(
     record.zoneName || record.zone?.name || record.toilet?.zoneName ||
-    record.beat?.zoneName || record.payload?.zoneName || ''
+    record.beat?.zoneName || record.nala?.zoneName || record.payload?.zoneName || ''
   ).toLowerCase();
 
   // Extract record ward ID/name
   const recWardId = String(
-    record.wardId || record.toilet?.wardId || record.beat?.wardId ||
+    record.wardId || record.toilet?.wardId || record.beat?.wardId || record.nala?.wardId ||
     record.segment?.wardId || record.payload?.wardId || record.feederPoint?.wardId || ''
   );
   const recWardName = String(
     record.wardName || record.ward?.name || record.toilet?.wardName ||
-    record.beat?.wardName || record.payload?.wardName || ''
+    record.beat?.wardName || record.nala?.wardName || record.payload?.wardName || ''
   ).toLowerCase();
 
   let zoneMatches = true;

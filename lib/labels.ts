@@ -26,6 +26,7 @@ export const MODULE_LABELS: Record<string, string> = {
   LITTERBINS: "Litter Bins",
   SWEEPING: "Sweeping",
   TOILET: "Cleanliness of Toilet",
+  NALA: "Nala",
   PROCESSING_PLANT: "Plant & Processing"
 };
 

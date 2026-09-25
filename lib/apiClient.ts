@@ -184,7 +184,8 @@ export type UnifiedTaskforceModuleKey =
   | "TASKFORCE"
   | "SWEEPING"
   | "LITTERBINS"
-  | "TOILET";
+  | "TOILET"
+  | "NALA";
 
 export type UnifiedRegistrationRole =
   | "SUPERVISOR"
@@ -690,6 +691,92 @@ export const AreaBeatApi = {
     apiFetch<{ success: boolean; points: any[] }>(`/city/areas/${id}/points`, {
       method: "PUT",
       body: JSON.stringify({ points })
+    })
+};
+
+export type NalaPointInput = {
+  lat: number;
+  lng: number;
+  code?: string;
+  name?: string;
+  type?: string;
+};
+
+export type NalaCreateInput = {
+  zoneId: string;
+  wardId: string;
+  areaId: string;
+  nalaName: string;
+  nalaCode?: string | null;
+  geometry?: any;
+  points: NalaPointInput[];
+};
+
+export type NalaUpdateInput = {
+  zoneId?: string;
+  wardId?: string;
+  areaId?: string;
+  nalaName?: string;
+  nalaCode?: string | null;
+  geometry?: any;
+};
+
+export const NalaApi = {
+  list: () =>
+    apiFetch<{ nalas: any[] }>("/city/nalas"),
+
+  get: (id: string) =>
+    apiFetch<{ nala: any }>(`/city/nalas/${id}`),
+
+  create: (body: NalaCreateInput) =>
+    apiFetch<{ nala: any }>("/city/nalas", {
+      method: "POST",
+      body: JSON.stringify(body)
+    }),
+
+  update: (id: string, body: NalaUpdateInput) =>
+    apiFetch<{ nala: any }>(`/city/nalas/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body)
+    }),
+
+  updatePoints: (id: string, points: NalaPointInput[]) =>
+    apiFetch<{ success: boolean; nala: any }>(
+      `/city/nalas/${id}/points`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ points })
+      }
+    ),
+
+  remove: (id: string) =>
+    apiFetch<{ success: boolean }>(`/city/nalas/${id}`, {
+      method: "DELETE"
+    }),
+
+  listPotentialAssignees: (
+    id: string,
+    role?: "SUPERVISOR" | "EMPLOYEE"
+  ) =>
+    apiFetch<any[]>(
+      `/city/nalas/${id}/potential-assignees${role ? `?role=${role}` : ""}`
+    ),
+
+  assign: (
+    id: string,
+    userId: string | null,
+    pointId?: string | null,
+    pointIds?: string[],
+    targetRole: "SUPERVISOR" | "EMPLOYEE" = "SUPERVISOR"
+  ) =>
+    apiFetch<{ nala: any }>(`/city/nalas/${id}/assign`, {
+      method: "POST",
+      body: JSON.stringify({
+        userId,
+        pointId: pointId || undefined,
+        pointIds,
+        targetRole
+      })
     })
 };
 

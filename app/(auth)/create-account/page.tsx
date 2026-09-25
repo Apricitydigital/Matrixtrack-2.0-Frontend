@@ -99,6 +99,11 @@ const TASKFORCE_MODULE_OPTIONS: Array<{
             title: "Public Toilet",
             description: "Public toilet cleanliness inspections.",
         },
+        {
+            key: "NALA",
+            title: "Nala",
+            description: "Nala inspection and geo-tagged photo monitoring.",
+        },
     ];
 
 const ROLE_OPTIONS: Array<{

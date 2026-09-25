@@ -6,7 +6,7 @@ import { useAuth } from '@hooks/useAuth';
 import { isReportVisibleToAO } from '@lib/aoScope';
 
 interface SubmittedReportsTabProps {
-    moduleKey: 'TOILET' | 'SWEEPING' | 'LITTERBINS';
+    moduleKey: 'TOILET' | 'SWEEPING' | 'LITTERBINS' | 'NALA';
     assetLabel: string;
     cityId?: string;
     initialStatus?: string;
@@ -96,6 +96,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
         if (record.toilet?.wardName) return record.toilet.wardName;
         if (record.beat?.wardName) return record.beat.wardName;
         if (record.bin?.wardName) return record.bin.wardName;
+        if (record.nala?.wardName) return record.nala.wardName;
         if (record.wardId) {
             const found = allWards.find(w => w.id === record.wardId || String(w.code) === String(record.wardId));
             if (found) return found.name;
@@ -109,6 +110,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
         if (record.toilet?.zoneName) return record.toilet.zoneName;
         if (record.beat?.zoneName) return record.beat.zoneName;
         if (record.bin?.zoneName) return record.bin.zoneName;
+        if (record.nala?.zoneName) return record.nala.zoneName;
         if (record.zoneId) {
             const found = zones.find(z => z.id === record.zoneId || String(z.code) === String(record.zoneId));
             if (found) return found.name;
@@ -210,7 +212,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
 
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const name = (rec.toiletName || rec.beatName || rec.locationName || rec.areaName || '').toLowerCase();
+                const name = (rec.toiletName || rec.beatName || rec.nalaName || rec.nala?.name || rec.locationName || rec.areaName || '').toLowerCase();
                 const staff = getStaffName(rec.createdBy || rec.supervisor || rec.submittedBy).toLowerCase();
                 if (!name.includes(q) && !staff.includes(q)) return false;
             }
@@ -229,9 +231,10 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
     }, [reports]);
 
     const formatTypeDisplay = (rawType: any): string => {
-        if (!rawType || typeof rawType !== 'string') return 'Street Beat';
+        if (!rawType || typeof rawType !== 'string') return moduleKey === 'NALA' ? 'Nala' : 'Street Beat';
         const t = rawType.trim().toUpperCase();
         if (t === 'SWEEPING_ASSESSMENT' || t === 'BEAT_INSPECTION' || t === 'SWEEPING') return 'Street Beat';
+        if (t === 'NALA_ASSESSMENT' || t === 'NALA') return 'Nala';
         if (t === 'MAIN_ROAD') return 'Main Road Sweeping';
         if (t === 'RESIDENTIAL') return 'Residential Area';
         if (t === 'COMMERCIAL') return 'Commercial Zone';
@@ -248,8 +251,8 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
         const rows = filteredReports.map((r, idx) => {
             const dt = new Date(r.createdAt);
             const dateStr = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-            const name = r.toiletName || r.beatName || r.locationName || r.areaName || assetLabel;
-            const assetId = r.toiletId || r.beatId || r.binId || r.id;
+            const name = r.toiletName || r.beatName || r.nalaName || r.nala?.name || r.locationName || r.areaName || assetLabel;
+            const assetId = r.toiletId || r.beatId || r.binId || r.nalaId || r.nala?.id || r.id;
             return [
                 idx + 1,
                 `"${dateStr}"`,

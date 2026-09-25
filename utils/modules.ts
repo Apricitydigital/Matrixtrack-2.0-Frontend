@@ -1,6 +1,6 @@
 import type { AuthUser, Role } from "../types/auth";
 
-export const CANONICAL_MODULE_KEYS = ["TASKFORCE", "LITTERBINS", "SWEEPING", "TOILET"] as const;
+export const CANONICAL_MODULE_KEYS = ["TASKFORCE", "LITTERBINS", "SWEEPING", "TOILET", "NALA"] as const;
 export type CanonicalModuleKey = (typeof CANONICAL_MODULE_KEYS)[number];
 
 export const normalizeModuleKey = (key: string) => (key || "").trim().toUpperCase();
@@ -49,6 +49,7 @@ export function moduleQcPath(key: CanonicalModuleKey) {
   if (key === "LITTERBINS") return "/modules/litterbins/admin";
   if (key === "TASKFORCE") return `/modules/${base}/qc`;
   if (key === "SWEEPING") return "/modules/sweeping";
+  if (key === "NALA") return "/modules/nala";
   return `/modules/${base}`;
 }
 
@@ -56,6 +57,7 @@ export function moduleAdminPath(key: CanonicalModuleKey) {
   const base = routeForModule(key);
   if (key === "TOILET") return `/modules/${base}`;
   if (key === "SWEEPING") return "/modules/sweeping";
+  if (key === "NALA") return "/modules/nala";
   return `/modules/${base}/admin`;
 }
 
