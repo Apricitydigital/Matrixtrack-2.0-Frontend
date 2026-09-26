@@ -60,6 +60,45 @@ export default function GroupedBeatTable({ beats, onRefresh, onView, onEdit, onA
         }));
     }, [beats]);
 
+    const handleViewCombined = (group: BeatGroup) => {
+        const combinedBeat = {
+            id: `group-${group.key}`,
+            beatName: `${group.title} (${group.beats.length} Combined Beats)`,
+            zoneName: group.beats[0]?.zoneName,
+            wardName: group.beats[0]?.wardName,
+            areaName: group.beats[0]?.areaName,
+            geometry: {
+                type: "FeatureCollection",
+                features: group.beats.flatMap((b) => {
+                    let geom = b.geometry;
+                    if (typeof geom === "string") {
+                        try { geom = JSON.parse(geom); } catch { geom = null; }
+                    }
+                    if (!geom) return [];
+                    if (geom.type === "FeatureCollection") {
+                        return (geom.features || []).map((f: any) => ({
+                            ...f,
+                            properties: { ...(f.properties || {}), name: f.properties?.name || b.beatName }
+                        }));
+                    }
+                    if (geom.type === "Feature") {
+                        return [{ ...geom, properties: { ...(geom.properties || {}), name: geom.properties?.name || b.beatName } }];
+                    }
+                    return [{ type: "Feature", geometry: geom, properties: { name: b.beatName } }];
+                })
+            },
+            points: group.beats.flatMap((b) => b.points || []),
+            segments: group.beats.flatMap((b) => b.segments || []),
+            supervisorsSummary: Array.from(
+                new Map(group.beats.flatMap((b) => getSupervisors(b)).map((s) => [s.id, s])).values()
+            ),
+            employeesSummary: Array.from(
+                new Map(group.beats.flatMap((b) => getEmployees(b)).map((e) => [e.id, e])).values()
+            ),
+        };
+        onView(combinedBeat);
+    };
+
     const remove = async (beat: any) => {
         if (!window.confirm(`Delete ${beat.beatName}?`)) return;
         try { setDeletingId(beat.id); await AreaBeatApi.remove(beat.id); onRefresh(); }
@@ -83,10 +122,34 @@ export default function GroupedBeatTable({ beats, onRefresh, onView, onEdit, onA
                         <span className="group-icon"><MapPinned size={21} /></span>
                         <div className="group-name"><h4>{group.title}</h4><p>{group.subtitle} • {group.beats.length} beats</p></div>
                         <div className="group-progress"><strong>{configured}/{group.beats.length}</strong><span>Configured</span></div>
-                        {!isReadOnly && <div className="group-actions" onClick={(event) => event.stopPropagation()}>
-                            <button onClick={() => onAssignGroup(group, "SUPERVISOR")}><Users size={15} /> Assign Daroga to all</button>
-                            <button onClick={() => onAssignGroup(group, "EMPLOYEE")}><UserPlus size={15} /> Assign Employee to all</button>
-                        </div>}
+                        <div className="group-actions" onClick={(event) => event.stopPropagation()}>
+                            <button
+                                title="View all combined beats in map"
+                                onClick={() => handleViewCombined(group)}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    height: "36px",
+                                    borderRadius: "9px",
+                                    border: "1px solid #cbd5e1",
+                                    backgroundColor: "#f8fafc",
+                                    color: "#0f172a",
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    padding: "0 11px",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                <Eye size={15} /> View Map
+                            </button>
+                            {!isReadOnly && (
+                                <>
+                                    <button onClick={() => onAssignGroup(group, "SUPERVISOR")}><Users size={15} /> Assign Daroga to all</button>
+                                    <button onClick={() => onAssignGroup(group, "EMPLOYEE")}><UserPlus size={15} /> Assign Employee to all</button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     {isOpen && <div className="beat-group-children">
