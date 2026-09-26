@@ -116,8 +116,9 @@ const parseGeometry = (value: any) => {
     return value;
 };
 
-const pointIcon = (label: string) =>
-    L.divIcon({
+const pointIcon = (label: string) => {
+    if (typeof window === "undefined" || !L) return null as any;
+    return L.divIcon({
         className: "zbm-point-marker",
         html:
             "<span>" +
@@ -128,6 +129,7 @@ const pointIcon = (label: string) =>
         iconSize: [34, 34],
         iconAnchor: [17, 17],
     });
+};
 
 function FitBounds({ beats }: { beats: any[] }) {
     const map = useMap();
@@ -146,7 +148,7 @@ function FitBounds({ beats }: { beats: any[] }) {
                         group.addLayer(
                             L.geoJSON(geometry)
                         );
-                    } catch {}
+                    } catch { }
                 }
             });
 
@@ -233,7 +235,7 @@ export default function GroupBeatMappingModal({
                             {beats.length} beats
                             {group.subtitle
                                 ? " - " +
-                                  group.subtitle
+                                group.subtitle
                                 : ""}
                         </p>
                     </div>
@@ -308,7 +310,7 @@ export default function GroupBeatMappingModal({
 
                             const ready =
                                 supervisors.length >
-                                    0 &&
+                                0 &&
                                 employees.length > 0 &&
                                 pointCount === 5;
 
@@ -393,7 +395,7 @@ export default function GroupBeatMappingModal({
                                 <button
                                     className={
                                         mapType ===
-                                        "streets"
+                                            "streets"
                                             ? "active"
                                             : ""
                                     }
@@ -409,7 +411,7 @@ export default function GroupBeatMappingModal({
                                 <button
                                     className={
                                         mapType ===
-                                        "satellite"
+                                            "satellite"
                                             ? "active"
                                             : ""
                                     }
@@ -438,7 +440,7 @@ export default function GroupBeatMappingModal({
                                     attribution="Google Maps"
                                     url={
                                         mapType ===
-                                        "streets"
+                                            "streets"
                                             ? "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
                                             : "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
                                     }
@@ -482,7 +484,7 @@ export default function GroupBeatMappingModal({
                                                                     : 4,
                                                             opacity:
                                                                 selectedBeat &&
-                                                                !isSelected
+                                                                    !isSelected
                                                                     ? 0.3
                                                                     : 0.85,
                                                         }}
@@ -520,14 +522,14 @@ export default function GroupBeatMappingModal({
                                                             const lat =
                                                                 Number(
                                                                     point.latitude ??
-                                                                        point.lat
+                                                                    point.lat
                                                                 );
 
                                                             const lng =
                                                                 Number(
                                                                     point.longitude ??
-                                                                        point.lng ??
-                                                                        point.lon
+                                                                    point.lng ??
+                                                                    point.lon
                                                                 );
 
                                                             if (
@@ -545,8 +547,8 @@ export default function GroupBeatMappingModal({
                                                                 point.code ||
                                                                 point.label ||
                                                                 "P" +
-                                                                    (index +
-                                                                        1);
+                                                                (index +
+                                                                    1);
 
                                                             return (
                                                                 <Marker
@@ -671,8 +673,8 @@ export default function GroupBeatMappingModal({
                                                 selectedBeat.points
                                             )
                                                 ? selectedBeat
-                                                      .points
-                                                      .length
+                                                    .points
+                                                    .length
                                                 : 0}
                                             /5
                                         </strong>

@@ -2,8 +2,13 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, Edit2, Eye, MapPinned, MapPin, Trash2, UserPlus, Users } from "lucide-react";
+import dynamic from "next/dynamic";
 import { AreaBeatApi } from "@lib/apiClient";
-import GroupBeatMappingModal from "./GroupBeatMappingModal";
+
+const GroupBeatMappingModal = dynamic(
+    () => import("./GroupBeatMappingModal"),
+    { ssr: false }
+);
 
 export interface BeatGroup {
     key: string;
