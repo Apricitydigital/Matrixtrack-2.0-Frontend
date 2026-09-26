@@ -36,6 +36,19 @@ interface CommonRegistrationModalProps {
   asPage?: boolean;
 }
 
+function RegistrationShell({
+  children,
+  asPage
+}: {
+  children: React.ReactNode;
+  asPage?: boolean;
+}) {
+  return asPage
+    ? <>{children}</>
+    : <ModalPortal>{children}</ModalPortal>;
+}
+
+
 type RegistrationRole =
   | "SUPERVISOR"
   | "QC"
@@ -889,17 +902,8 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
     : "Register User Across Selected Modules";
 
   
-  const RegistrationShell = ({
-    children
-  }: {
-    children: React.ReactNode;
-  }) =>
-    asPage
-      ? <>{children}</>
-      : <ModalPortal>{children}</ModalPortal>;
-
   return (
-    <RegistrationShell><div
+    <RegistrationShell asPage={asPage}><div
       style={
         asPage
           ? {

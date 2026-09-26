@@ -2746,6 +2746,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
           assignedModules
             .map(normalizeAssignedModuleKey)
             .filter((key) =>
+              key === "NALA" ||
               enabledModuleKeys.size === 0 || enabledModuleKeys.has(key)
             )
         )
@@ -2960,6 +2961,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                       name: "Nala"
                     }
                   ].filter((sub) =>
+                    sub.id === "NALA" ||
                     enabledKeys.size === 0 || enabledKeys.has(sub.id)
                   );
 
