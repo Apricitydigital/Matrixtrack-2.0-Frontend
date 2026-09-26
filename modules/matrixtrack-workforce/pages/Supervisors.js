@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback , useRef} from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import { API_BASE_URL, ALLOWED_CITIES_ENDPOINT } from "../config";
 import Swal from "sweetalert2";
@@ -27,7 +27,7 @@ const ExpandableListCell = ({ value, label, textClass = "text-slate-600", emptyT
   const firstItem = items[0];
   const moreCount = items.length - 1;
 
-  const filteredItems = items.filter(item => 
+  const filteredItems = items.filter(item =>
     item.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -175,7 +175,7 @@ function Supervisors() {
   const [formErrors, setFormErrors] = useState({});
   const [openActionMenuId, setOpenActionMenuId] = useState(null);
   const [isEditing, setIsEditing] = useState(null);
-  
+
   // Registration Flow states
   const [regStep, setRegStep] = useState(1); // 1: Identity, 2: Location, 3: Photo, 4: Password
   const [capturedPhoto, setCapturedPhoto] = useState(null);
@@ -367,7 +367,7 @@ function Supervisors() {
 
       if (zonesRes.status === "fulfilled") setZones(zonesRes.value.data || []);
       if (wardsRes.status === "fulfilled") setWards(flattenWardResponse(wardsRes.value.data));
-      
+
       if (sectorsRes.status === "fulfilled") {
         const flatSectors = (sectorsRes.value.data || []).flatMap((city) =>
           (city.zones || []).flatMap((zone) =>
@@ -383,7 +383,7 @@ function Supervisors() {
       }
 
       if (employeesRes.status === "fulfilled") setEmployees(employeesRes.value.data || []);
-      
+
       if (assignmentsRes.status === "fulfilled") {
         setAssignments((assignmentsRes.value.data || []).map((a) => ({
           supervisor_id: String(a.user_id),
@@ -548,7 +548,7 @@ function Supervisors() {
     }
 
     if (selectedRoleFilter) result = result.filter(s => s.role === selectedRoleFilter);
-    
+
     // Workforce Location Filters
     if (wfFilterCity) result = result.filter(s => resolveSupervisorCity(s) === wfFilterCity);
     if (wfFilterZone) result = result.filter(s => s.zone_name === wfFilterZone);
@@ -738,7 +738,7 @@ function Supervisors() {
     }
     setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
- 
+
   // Camera Functions
   const startCamera = async () => {
     setShowCamera(true);
@@ -769,7 +769,7 @@ function Supervisors() {
       try {
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        
+
         // Ensure video is playing and has dimensions
         if (video.videoWidth === 0 || video.videoHeight === 0) {
           console.warn("[Camera] Video dimensions are 0. Waiting for metadata...");
@@ -779,17 +779,17 @@ function Supervisors() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const context = canvas.getContext("2d");
-        
+
         // Draw video frame to canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
+
         // Get data URL
         const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
         console.log("[Camera] Photo captured successfully. Data URL length:", dataUrl.length);
-        
+
         setCapturedPhoto(dataUrl);
         stopCamera();
-        
+
         // Visual feedback
         Swal.fire({
           icon: 'success',
@@ -810,7 +810,7 @@ function Supervisors() {
 
   const goToNextStep = async () => {
     const errors = validateCurrentStep();
-    
+
     if (Object.keys(errors).length > 0) {
       // Check if ALL mandatory fields for this step are missing
       let allMissing = false;
@@ -838,7 +838,7 @@ function Supervisors() {
         });
         // Still set errors but maybe the user wants them hidden if all missing?
         // Let's hide them if all missing so it's not "red red" everywhere as requested.
-        setFormErrors({}); 
+        setFormErrors({});
         return;
       }
 
@@ -892,7 +892,7 @@ function Supervisors() {
       if (!formData.emp_code.trim()) errors.emp_code = "Employee code is required";
       if (!formData.phone.trim()) errors.phone = "Phone number is required";
       else if (!/^\d{10}$/.test(formData.phone.trim())) errors.phone = "Phone must be 10 digits";
-      if (formData.aadhar_number && !/^\d{12}$/.test(formData.aadhar_number.trim())) errors.aadhar_number = "Aadhar must be 12 digits";
+      if (formData.aadhar_number && formData.aadhar_number.trim().length < 8) errors.aadhar_number = "Aadhaar must be at least 8 digits";
     } else if (regStep === 2) { // Location
       if (!formData.reg_city_id) errors.reg_city_id = "City is required";
       if (!formData.reg_zone_id) errors.reg_zone_id = "Zone is required";
@@ -903,7 +903,7 @@ function Supervisors() {
         errors.photo = "Photo is mandatory";
       }
     }
-    
+
     // Password validation (Step 4 for New OR if changePassword is true for Edit)
     if (regStep === 4 || (isEditing && changePassword)) {
       if (!formData.password) errors.password = "Password is required";
@@ -1000,16 +1000,16 @@ function Supervisors() {
 
   const dataURLtoFile = (dataurl, filename) => {
     let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
-    bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
+      bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
     }
-    return new File([u8arr], filename, {type:mime});
+    return new File([u8arr], filename, { type: mime });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // If not on the last step, go to next step
     if (regStep < 5 && !isEditing) {
       await goToNextStep();
@@ -1027,7 +1027,7 @@ function Supervisors() {
       const requestConfig = buildRequestConfig({ "Content-Type": "application/json" });
       if (isEditing && !changePassword) {
         await axios.put(`${apiUrl}/auth/update`, { passChange: false, user_id: formData.user_id, name: formData.name, emp_code: formData.emp_code, email: formData.email, phone: formData.phone, role: formData.role }, requestConfig);
-        
+
         // Handle photo upload during edit if captured
         if (capturedPhoto) {
           try {
@@ -1046,7 +1046,7 @@ function Supervisors() {
         Swal.fire({ icon: "success", title: "Success", text: "Daroga updated successfully.", timer: 2000, showConfirmButton: false });
       } else if (isEditing && changePassword) {
         await axios.put(`${apiUrl}/auth/update`, { passChange: true, user_id: formData.user_id, name: formData.name, emp_code: formData.emp_code, email: formData.email, phone: formData.phone, role: formData.role, password: formData.password }, requestConfig);
-        
+
         // Handle photo upload during edit if captured
         if (capturedPhoto) {
           try {
@@ -1116,9 +1116,9 @@ function Supervisors() {
 
         fetchSupervisor();
         resetLabel();
-        Swal.fire({ 
-          icon: "success", 
-          title: "Registration Complete", 
+        Swal.fire({
+          icon: "success",
+          title: "Registration Complete",
           text: "Daroga account and media saved successfully.",
           confirmButtonColor: '#4f46e5'
         });
@@ -1329,12 +1329,12 @@ gap-2
                     <div className="flex items-center justify-between relative">
                       {/* Progress Line */}
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-100 dark:bg-slate-800 z-0">
-                        <div 
-                          className="h-full bg-indigo-600 transition-all duration-500 ease-out" 
+                        <div
+                          className="h-full bg-indigo-600 transition-all duration-500 ease-out"
                           style={{ width: `${((regStep - 1) / 3) * 100}%` }}
                         />
                       </div>
-                      
+
                       {[
                         { step: 1, label: "Identity", icon: User },
                         { step: 2, label: "Location", icon: MapPin },
@@ -1344,28 +1344,26 @@ gap-2
                         const StepIcon = s.icon;
                         const isActive = regStep >= s.step;
                         const isCurrent = regStep === s.step;
-                        
+
                         return (
                           <div key={s.step} className="flex flex-col items-center z-10">
-                            <div 
-                              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 font-bold border-2 ${
-                                isCurrent 
-                                  ? "bg-indigo-600 border-indigo-600 text-white shadow-lg ring-4 ring-indigo-100 dark:ring-indigo-900/30 scale-110" 
-                                  : isActive 
-                                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md" 
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 font-bold border-2 ${isCurrent
+                                  ? "bg-indigo-600 border-indigo-600 text-white shadow-lg ring-4 ring-indigo-100 dark:ring-indigo-900/30 scale-110"
+                                  : isActive
+                                    ? "bg-emerald-500 border-emerald-500 text-white shadow-md"
                                     : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500"
-                              }`}
+                                }`}
                             >
                               {isActive && regStep > s.step ? <Check size={18} /> : <StepIcon size={18} />}
                             </div>
-                            <span 
-                              className={`text-[11px] font-bold mt-2 uppercase tracking-wider transition-colors duration-300 ${
-                                isCurrent 
-                                  ? "text-indigo-600 dark:text-indigo-400 font-extrabold" 
-                                  : isActive 
-                                    ? "text-slate-700 dark:text-slate-300" 
+                            <span
+                              className={`text-[11px] font-bold mt-2 uppercase tracking-wider transition-colors duration-300 ${isCurrent
+                                  ? "text-indigo-600 dark:text-indigo-400 font-extrabold"
+                                  : isActive
+                                    ? "text-slate-700 dark:text-slate-300"
                                     : "text-slate-400 dark:text-slate-500"
-                              }`}
+                                }`}
                             >
                               {s.label}
                             </span>
@@ -1459,7 +1457,7 @@ gap-2
                           <MapPin size={20} className="text-amber-600" />
                           <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Location Assignment</h3>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">City <span className="text-red-500">*</span></label>
@@ -1469,7 +1467,7 @@ gap-2
                             </select>
                             {formErrors.reg_city_id && <p className="text-red-500 text-xs mt-1">{formErrors.reg_city_id}</p>}
                           </div>
-                          
+
                           <div>
                             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">Zone <span className="text-red-500">*</span></label>
                             <select name="reg_zone_id" value={formData.reg_zone_id} onChange={handleInputChange} disabled={!formData.reg_city_id} className={`w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-slate-800 dark:text-white disabled:bg-slate-50 dark:disabled:bg-slate-800/50 ${formErrors.reg_zone_id ? "border-red-500" : "border-slate-300 dark:border-slate-700"}`}>
@@ -1565,14 +1563,14 @@ gap-2
                           <Key size={20} className="text-indigo-600" />
                           <h3 className="text-lg font-bold text-slate-800">Security Credentials</h3>
                         </div>
-                        
+
                         <div className="grid grid-cols-1 gap-4">
                           <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1.5">Login Password <span className="text-red-500">*</span></label>
                             <input type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder="Min 6 characters" className={`w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all ${formErrors.password ? "border-red-500" : "border-slate-300"}`} />
                             {formErrors.password && <p className="text-red-500 text-xs mt-1">{formErrors.password}</p>}
                           </div>
-                          
+
                           <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1.5">Confirm Password <span className="text-red-500">*</span></label>
                             <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} placeholder="Repeat password" className={`w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all ${formErrors.confirmPassword ? "border-red-500" : "border-slate-300"}`} />
@@ -1584,92 +1582,92 @@ gap-2
                   )}
                 </div>
 
-                  {/* Photo Section for Edit Mode */}
-                  {isEditing && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8 max-w-5xl mx-auto">
-                      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
-                        <div className="flex items-center gap-3 mb-4 border-b border-slate-100 pb-2 text-left">
-                          <Camera size={18} className="text-indigo-600" />
-                          <h3 className="text-md font-bold text-slate-800">Update Profile Photo</h3>
-                        </div>
+                {/* Photo Section for Edit Mode */}
+                {isEditing && (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mb-8 max-w-5xl mx-auto">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                      <div className="flex items-center gap-3 mb-4 border-b border-slate-100 pb-2 text-left">
+                        <Camera size={18} className="text-indigo-600" />
+                        <h3 className="text-md font-bold text-slate-800">Update Profile Photo</h3>
+                      </div>
 
-                        <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-                          {capturedPhoto ? (
-                            <div className="relative inline-block">
-                              <img src={capturedPhoto} alt="Captured" className="w-40 h-40 object-cover rounded-xl border-4 border-slate-100 shadow-md" />
-                              <button type="button" onClick={() => setCapturedPhoto(null)} className="absolute -top-3 -right-3 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors">
-                                <X size={14} />
-                              </button>
-                            </div>
-                          ) : showCamera ? (
-                            <div className="relative bg-slate-900 rounded-xl overflow-hidden w-64 h-64 border-4 border-slate-100 shadow-inner">
-                              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover mirror" />
-                              <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent flex justify-center gap-4">
-                                <button type="button" onClick={stopCamera} className="bg-white/20 p-2 rounded-lg text-white hover:bg-white/30"><X size={18} /></button>
-                                <button type="button" onClick={capturePhoto} className="bg-white p-2.5 rounded-full text-indigo-600 shadow-xl hover:scale-110 transition-transform"><Camera size={20} /></button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex gap-4">
-                              <button type="button" onClick={startCamera} className="px-5 py-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all flex flex-col items-center gap-2 min-w-[140px]">
-                                <Camera size={24} className="text-indigo-600" />
-                                <span className="text-xs font-bold text-slate-600">Use Camera</span>
-                              </button>
-                              <label className="px-5 py-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all flex flex-col items-center gap-2 cursor-pointer min-w-[140px]">
-                                <ImageIcon size={24} className="text-amber-600" />
-                                <span className="text-xs font-bold text-slate-600">Upload Photo</span>
-                                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                                  const file = e.target.files[0];
-                                  if (file) {
-                                    try {
-                                      const processedFile = await compressImage(file, 0.8);
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => setCapturedPhoto(reader.result);
-                                      reader.readAsDataURL(processedFile);
-                                    } catch (err) {
-                                      console.warn("Compression failed", err);
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => setCapturedPhoto(reader.result);
-                                      reader.readAsDataURL(file);
-                                    }
-                                  }
-                                }} />
-                              </label>
-                            </div>
-                          )}
-                          <div className="text-left max-w-xs">
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed">Only capture or upload if you want to replace the current profile photo with a new one. All standard formats (JPG, PNG, WebP) are supported.</p>
+                      <div className="flex flex-col md:flex-row items-center justify-center gap-6">
+                        {capturedPhoto ? (
+                          <div className="relative inline-block">
+                            <img src={capturedPhoto} alt="Captured" className="w-40 h-40 object-cover rounded-xl border-4 border-slate-100 shadow-md" />
+                            <button type="button" onClick={() => setCapturedPhoto(null)} className="absolute -top-3 -right-3 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors">
+                              <X size={14} />
+                            </button>
                           </div>
+                        ) : showCamera ? (
+                          <div className="relative bg-slate-900 rounded-xl overflow-hidden w-64 h-64 border-4 border-slate-100 shadow-inner">
+                            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover mirror" />
+                            <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent flex justify-center gap-4">
+                              <button type="button" onClick={stopCamera} className="bg-white/20 p-2 rounded-lg text-white hover:bg-white/30"><X size={18} /></button>
+                              <button type="button" onClick={capturePhoto} className="bg-white p-2.5 rounded-full text-indigo-600 shadow-xl hover:scale-110 transition-transform"><Camera size={20} /></button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-4">
+                            <button type="button" onClick={startCamera} className="px-5 py-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all flex flex-col items-center gap-2 min-w-[140px]">
+                              <Camera size={24} className="text-indigo-600" />
+                              <span className="text-xs font-bold text-slate-600">Use Camera</span>
+                            </button>
+                            <label className="px-5 py-4 border-2 border-dashed border-slate-300 rounded-xl hover:border-amber-500 hover:bg-amber-50 transition-all flex flex-col items-center gap-2 cursor-pointer min-w-[140px]">
+                              <ImageIcon size={24} className="text-amber-600" />
+                              <span className="text-xs font-bold text-slate-600">Upload Photo</span>
+                              <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  try {
+                                    const processedFile = await compressImage(file, 0.8);
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setCapturedPhoto(reader.result);
+                                    reader.readAsDataURL(processedFile);
+                                  } catch (err) {
+                                    console.warn("Compression failed", err);
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => setCapturedPhoto(reader.result);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }
+                              }} />
+                            </label>
+                          </div>
+                        )}
+                        <div className="text-left max-w-xs">
+                          <p className="text-xs text-slate-500 font-medium leading-relaxed">Only capture or upload if you want to replace the current profile photo with a new one. All standard formats (JPG, PNG, WebP) are supported.</p>
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap justify-center gap-4 mt-4 pt-6 border-t border-slate-100 max-w-5xl mx-auto w-full">
+                  {!isEditing && regStep > 1 && (
+                    <button type="button" onClick={goToPrevStep} className="bg-slate-100 text-slate-600 px-8 py-2.5 rounded-lg font-bold hover:bg-slate-200 transition-all flex items-center gap-2 border border-slate-200">
+                      <ChevronLeft size={18} /> Back
+                    </button>
                   )}
 
-                  <div className="flex flex-wrap justify-center gap-4 mt-4 pt-6 border-t border-slate-100 max-w-5xl mx-auto w-full">
-                    {!isEditing && regStep > 1 && (
-                      <button type="button" onClick={goToPrevStep} className="bg-slate-100 text-slate-600 px-8 py-2.5 rounded-lg font-bold hover:bg-slate-200 transition-all flex items-center gap-2 border border-slate-200">
-                        <ChevronLeft size={18} /> Back
-                      </button>
-                    )}
-                    
-                    <button type="submit" className="min-w-[200px] bg-indigo-600 text-white px-8 py-2.5 rounded-lg shadow-lg font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 transform hover:translate-y-[-1px] active:translate-y-[0px]">
-                      {isEditing ? "Save Changes" : regStep === 4 ? "Complete Registration" : "Next Step"}
-                      {regStep < 4 && !isEditing && <ChevronRight size={18} />}
-                    </button>
+                  <button type="submit" className="min-w-[200px] bg-indigo-600 text-white px-8 py-2.5 rounded-lg shadow-lg font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 transform hover:translate-y-[-1px] active:translate-y-[0px]">
+                    {isEditing ? "Save Changes" : regStep === 4 ? "Complete Registration" : "Next Step"}
+                    {regStep < 4 && !isEditing && <ChevronRight size={18} />}
+                  </button>
 
-                    {isEditing && (
-                      <div className="flex gap-2">
-                        <button type="button" onClick={togglePasswordChange} className="bg-amber-500 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-md">
-                          <Key size={18} />
-                          {changePassword ? "Keep Old" : "Reset Pass"}
-                        </button>
-                        <button type="button" onClick={resetLabel} className="bg-slate-500 text-white px-8 py-2.5 rounded-lg font-bold hover:bg-slate-600 transition-all shadow-md">
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <canvas ref={canvasRef} className="hidden" />
+                  {isEditing && (
+                    <div className="flex gap-2">
+                      <button type="button" onClick={togglePasswordChange} className="bg-amber-500 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-amber-600 transition-all flex items-center gap-2 shadow-md">
+                        <Key size={18} />
+                        {changePassword ? "Keep Old" : "Reset Pass"}
+                      </button>
+                      <button type="button" onClick={resetLabel} className="bg-slate-500 text-white px-8 py-2.5 rounded-lg font-bold hover:bg-slate-600 transition-all shadow-md">
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <canvas ref={canvasRef} className="hidden" />
               </form>
 
 
@@ -1751,8 +1749,8 @@ dark:border-slate-700
 shadow-sm
 dark:shadow-slate-950/20">
                 <div className="w-full md:w-1/4">
-<select
-  className="
+                  <select
+                    className="
 w-full
 
 border
@@ -1778,9 +1776,9 @@ dark:text-white
 
 h-full
 "
-  value={selectedRoleFilter}
-  onChange={e => setSelectedRoleFilter(e.target.value)}
->                    <option value="">All Roles</option>
+                    value={selectedRoleFilter}
+                    onChange={e => setSelectedRoleFilter(e.target.value)}
+                  >                    <option value="">All Roles</option>
                     {uniqueRoles.map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
                   </select>
                 </div>
@@ -2066,74 +2064,74 @@ dark:hover:bg-slate-800/60
                             </td>
                             <td className="px-4 py-3"><div className="text-sm font-medium text-slate-800 dark:text-slate-100">{sup.email || "N/A"}</div></td>
                             <td className="px-4 py-3"><div className="text-sm text-slate-600 dark:text-slate-500 dark:text-slate-400 whitespace-nowrap">{sup.phone || "No contact"}</div></td>
-                             <td className="px-4 py-4 text-sm font-medium">
-                               <ExpandableListCell value={sup.city_name} label="Cities" textClass="text-slate-800 font-bold" emptyText="Unassigned" emptyClass="text-rose-500 italic" />
-                             </td>
-                             <td className="px-4 py-4 text-sm font-medium">
-                               <ExpandableListCell value={sup.zone_name} label="Zones" textClass="text-slate-600 font-medium" />
-                             </td>
-                             <td className="px-4 py-4 text-sm font-medium">
-                               <ExpandableListCell value={sup.ward_group} label="Ward Groups" textClass="text-slate-600 font-medium" />
-                             </td>
-                             <td className="px-4 py-4 text-sm font-medium">
-                               <ExpandableListCell value={sup.kothi_name} label="Kothis" textClass="text-indigo-600 font-black" />
-                             </td>
-                             <td className="px-4 py-4">
-                               <div className="flex flex-col gap-0.5 text-sm">
-                                 <div className="flex items-center gap-1.5 text-slate-800 font-medium">
-                                   <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                                   {sup.phone || "N/A"}
-                                 </div>
-                                 <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium">
-                                   <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                                   {sup.email || "N/A"}
-                                 </div>
-                               </div>
-                             </td>
-                             <td className="px-4 py-4">
-                               <div className="flex flex-col gap-1.5">
-                                 <button 
-                                   onClick={() => window.open(`${apiUrl}/supervisor-photo/${sup.user_id}/view`, "_blank")} 
-                                   className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded border border-indigo-100 hover:bg-indigo-100 transition-all text-[10px] font-black uppercase tracking-tighter w-fit"
-                                 >
-                                   <ImageIcon size={10} /> Daroga Face
-                                 </button>
-                                 <button 
-                                   onClick={() => window.open(`${apiUrl}/supervisor-aadhar/${sup.user_id}/view`, "_blank")} 
-                                   className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 text-amber-700 rounded border border-amber-100 hover:bg-amber-100 transition-all text-[10px] font-black uppercase tracking-tighter w-fit"
-                                 >
-                                   <FileText size={10} /> Aadhar Doc
-                                 </button>
-                               </div>
-                             </td>
-                             <td className="px-4 py-4 relative">
-                               <div className="relative">
-                                 <button 
-                                   onClick={() => setOpenActionMenuId(openActionMenuId === sup.user_id ? null : sup.user_id)}
-                                   className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${openActionMenuId === sup.user_id ? "bg-indigo-600 text-white shadow-md" : "bg-white text-slate-500 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600"}`}
-                                 >
-                                   Actions <ChevronDown size={12} className={`transition-transform duration-200 ${openActionMenuId === sup.user_id ? "rotate-180" : ""}`} />
-                                 </button>
+                            <td className="px-4 py-4 text-sm font-medium">
+                              <ExpandableListCell value={sup.city_name} label="Cities" textClass="text-slate-800 font-bold" emptyText="Unassigned" emptyClass="text-rose-500 italic" />
+                            </td>
+                            <td className="px-4 py-4 text-sm font-medium">
+                              <ExpandableListCell value={sup.zone_name} label="Zones" textClass="text-slate-600 font-medium" />
+                            </td>
+                            <td className="px-4 py-4 text-sm font-medium">
+                              <ExpandableListCell value={sup.ward_group} label="Ward Groups" textClass="text-slate-600 font-medium" />
+                            </td>
+                            <td className="px-4 py-4 text-sm font-medium">
+                              <ExpandableListCell value={sup.kothi_name} label="Kothis" textClass="text-indigo-600 font-black" />
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-col gap-0.5 text-sm">
+                                <div className="flex items-center gap-1.5 text-slate-800 font-medium">
+                                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                                  {sup.phone || "N/A"}
+                                </div>
+                                <div className="flex items-center gap-1.5 text-slate-500 text-xs font-medium">
+                                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                  {sup.email || "N/A"}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-col gap-1.5">
+                                <button
+                                  onClick={() => window.open(`${apiUrl}/supervisor-photo/${sup.user_id}/view`, "_blank")}
+                                  className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded border border-indigo-100 hover:bg-indigo-100 transition-all text-[10px] font-black uppercase tracking-tighter w-fit"
+                                >
+                                  <ImageIcon size={10} /> Daroga Face
+                                </button>
+                                <button
+                                  onClick={() => window.open(`${apiUrl}/supervisor-aadhar/${sup.user_id}/view`, "_blank")}
+                                  className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 text-amber-700 rounded border border-amber-100 hover:bg-amber-100 transition-all text-[10px] font-black uppercase tracking-tighter w-fit"
+                                >
+                                  <FileText size={10} /> Aadhar Doc
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 relative">
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenActionMenuId(openActionMenuId === sup.user_id ? null : sup.user_id)}
+                                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${openActionMenuId === sup.user_id ? "bg-indigo-600 text-white shadow-md" : "bg-white text-slate-500 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600"}`}
+                                >
+                                  Actions <ChevronDown size={12} className={`transition-transform duration-200 ${openActionMenuId === sup.user_id ? "rotate-180" : ""}`} />
+                                </button>
 
-                                 {openActionMenuId === sup.user_id && (
-                                   <>
-                                     <div className="fixed inset-0 z-10" onClick={() => setOpenActionMenuId(null)}></div>
-                                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-slate-100 z-20 py-2 animate-in fade-in zoom-in duration-200 origin-top-right">
-                                       <button onClick={() => { handleEdit(sup); setOpenActionMenuId(null); }} className="w-full px-4 py-2 text-left text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors">
-                                         <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg"><Search size={14} /></div> Edit Profile
-                                       </button>
-                                       <button onClick={() => { handleUpdatePassword(sup); setOpenActionMenuId(null); }} className="w-full px-4 py-2 text-left text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors">
-                                         <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Key size={14} /></div> Update Password
-                                       </button>
-                                       <div className="my-1 border-t border-slate-50"></div>
-                                       <button onClick={() => { handleDelete(sup.user_id); setOpenActionMenuId(null); }} className="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors">
-                                         <div className="p-1.5 bg-red-50 text-red-600 rounded-lg"><X size={14} /></div> Delete User
-                                       </button>
-                                     </div>
-                                   </>
-                                 )}
-                               </div>
-                             </td>
+                                {openActionMenuId === sup.user_id && (
+                                  <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setOpenActionMenuId(null)}></div>
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-slate-100 z-20 py-2 animate-in fade-in zoom-in duration-200 origin-top-right">
+                                      <button onClick={() => { handleEdit(sup); setOpenActionMenuId(null); }} className="w-full px-4 py-2 text-left text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors">
+                                        <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg"><Search size={14} /></div> Edit Profile
+                                      </button>
+                                      <button onClick={() => { handleUpdatePassword(sup); setOpenActionMenuId(null); }} className="w-full px-4 py-2 text-left text-xs font-bold text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-3 transition-colors">
+                                        <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Key size={14} /></div> Update Password
+                                      </button>
+                                      <div className="my-1 border-t border-slate-50"></div>
+                                      <button onClick={() => { handleDelete(sup.user_id); setOpenActionMenuId(null); }} className="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors">
+                                        <div className="p-1.5 bg-red-50 text-red-600 rounded-lg"><X size={14} /></div> Delete User
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         ))
                       ) : (
@@ -2249,7 +2247,7 @@ dark:shadow-none">
               </div>
             </div> */}
             <div
-  className="
+              className="
 bg-gradient-to-r
 from-indigo-600
 to-indigo-700
@@ -2272,30 +2270,30 @@ border-b
 border-indigo-500/30
 dark:border-slate-700
 "
->
-  <div>
-    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-      <MapPin size={18} />
-      City-wise Daroga List
-    </h3>
+            >
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <MapPin size={18} />
+                  City-wise Daroga List
+                </h3>
 
-    <p className="text-indigo-200 dark:text-slate-400 text-xs mt-0.5">
-      {selectedCityId && selectedCityId !== "ALL"
-        ? "Filtered by your city scope"
-        : "All assigned cities"}{" "}
-      · {new Set(cityWiseSupervisors.map(r => String(r.user_id))).size} daroga
-      {cityWiseSupervisors.length !== 1 ? "s" : ""}
-    </p>
-  </div>
+                <p className="text-indigo-200 dark:text-slate-400 text-xs mt-0.5">
+                  {selectedCityId && selectedCityId !== "ALL"
+                    ? "Filtered by your city scope"
+                    : "All assigned cities"}{" "}
+                  · {new Set(cityWiseSupervisors.map(r => String(r.user_id))).size} daroga
+                  {cityWiseSupervisors.length !== 1 ? "s" : ""}
+                </p>
+              </div>
 
-  <div className="flex items-center gap-3">
-    <div className="relative">
-      <input
-        type="text"
-        placeholder="Search darogas, zones, kothis..."
-        value={cityWiseSearch}
-        onChange={(e) => setCityWiseSearch(e.target.value)}
-        className="
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search darogas, zones, kothis..."
+                    value={cityWiseSearch}
+                    onChange={(e) => setCityWiseSearch(e.target.value)}
+                    className="
 w-64
 
 px-4
@@ -2324,28 +2322,28 @@ dark:focus:ring-indigo-500/40
 
 text-sm
 "
-      />
+                  />
 
-      <svg
-        className="w-4 h-4 text-indigo-300 dark:text-slate-500 absolute left-2.5 top-2.5"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-        />
-      </svg>
-    </div>
+                  <svg
+                    className="w-4 h-4 text-indigo-300 dark:text-slate-500 absolute left-2.5 top-2.5"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
 
-    <button
-      onClick={fetchCityWiseSupervisors}
-      disabled={cityWiseLoading}
-      className="
+                <button
+                  onClick={fetchCityWiseSupervisors}
+                  disabled={cityWiseLoading}
+                  className="
 flex
 items-center
 gap-2
@@ -2375,16 +2373,16 @@ transition-all
 
 active:scale-95
 "
-    >
-      <RefreshCw
-        size={13}
-        className={cityWiseLoading ? "animate-spin" : ""}
-      />
+                >
+                  <RefreshCw
+                    size={13}
+                    className={cityWiseLoading ? "animate-spin" : ""}
+                  />
 
-      {cityWiseLoading ? "Loading..." : "Refresh"}
-    </button>
-  </div>
-</div>
+                  {cityWiseLoading ? "Loading..." : "Refresh"}
+                </button>
+              </div>
+            </div>
 
             {/* Body */}
             {cityWiseLoading ? (
@@ -2415,7 +2413,7 @@ active:scale-95
                       <button
                         type="button"
                         onClick={() => setExpandedCity(isOpen ? null : cityName)}
-className={`
+                        className={`
 w-full
 
 flex
@@ -2434,16 +2432,15 @@ border-b
 border-slate-100
 dark:border-slate-700
 
-${
-  isOpen
-    ? `
+${isOpen
+                            ? `
       bg-indigo-50
       dark:bg-indigo-950/20
 
       text-indigo-700
       dark:text-indigo-300
     `
-    : `
+                            : `
       bg-white
       dark:bg-slate-900
 
@@ -2453,7 +2450,7 @@ ${
       hover:bg-slate-50
       dark:hover:bg-slate-800
     `
-}
+                          }
 `}                      >
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${isOpen ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 dark:text-slate-500 dark:text-slate-400"}`}>
@@ -2637,7 +2634,7 @@ dark:border-slate-700
                                   </tr>
                                 </thead>
                                 <tbody
-  className="
+                                  className="
 divide-y
 divide-slate-100
 dark:divide-slate-700
@@ -2645,11 +2642,11 @@ dark:divide-slate-700
 bg-white
 dark:bg-slate-900
 "
->
+                                >
                                   {rows.map((row, idx) => (
                                     <tr
-  key={row.user_id}
-  className="
+                                      key={row.user_id}
+                                      className="
 bg-white
 dark:bg-slate-900
 
@@ -2659,7 +2656,7 @@ dark:hover:bg-slate-800
 transition-all
 duration-200
 "
->
+                                    >
                                       <td className="px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400">{idx + 1}</td>
                                       <td className="px-4 py-3">
                                         <div className="flex items-center gap-2.5">
@@ -2740,7 +2737,7 @@ duration-200
             {/* Grand total footer */}
             {!cityWiseLoading && groupedCityWise.length > 0 && (
               <div
-  className="
+                className="
 px-6
 py-3
 
@@ -2755,7 +2752,7 @@ border-t
 border-indigo-500/30
 dark:border-slate-700
 "
->
+              >
                 <span className="
 text-indigo-200
 dark:text-slate-400

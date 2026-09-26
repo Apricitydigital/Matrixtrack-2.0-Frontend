@@ -298,9 +298,9 @@ export default function BeatsPage() {
      EXISTING API
   ========================================================= */
 
-  const loadBeats = useCallback(async () => {
+  const loadBeats = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       const [
         beatsRes,
@@ -334,7 +334,7 @@ export default function BeatsPage() {
         err
       );
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -1274,34 +1274,34 @@ export default function BeatsPage() {
               </div>
             ) : (
               <GroupedBeatTable
-                  beats={
-                    filteredBeats
-                  }
-                  onRefresh={
-                    loadBeats
-                  }
-                  onView={
-                    setViewingBeat
-                  }
-                  onEdit={
-                    setEditingBeat
-                  }
-                  onAssign={
-                    setAssigningBeat
-                  }
-                  onAssignEmployees={
-                    setDeployingBeat
-                  }
-                  onEditPoints={
-                    setPointEditingBeat
-                  }
-                  onAssignGroup={(group, mode) =>
-                    setGroupAssignment({ group, mode })
-                  }
-                  isReadOnly={
-                    isReadOnly
-                  }
-                />
+                beats={
+                  filteredBeats
+                }
+                onRefresh={() =>
+                  loadBeats(true)
+                }
+                onView={
+                  setViewingBeat
+                }
+                onEdit={
+                  setEditingBeat
+                }
+                onAssign={
+                  setAssigningBeat
+                }
+                onAssignEmployees={
+                  setDeployingBeat
+                }
+                onEditPoints={
+                  setPointEditingBeat
+                }
+                onAssignGroup={(group, mode) =>
+                  setGroupAssignment({ group, mode })
+                }
+                isReadOnly={
+                  isReadOnly
+                }
+              />
             )}
           </section>
         </div>
@@ -1329,8 +1329,8 @@ export default function BeatsPage() {
                 b
               );
             }}
-            onRefresh={
-              loadBeats
+            onRefresh={() =>
+              loadBeats(true)
             }
           />
         )}
@@ -1345,8 +1345,8 @@ export default function BeatsPage() {
                 null
               )
             }
-            onSuccess={
-              loadBeats
+            onSuccess={() =>
+              loadBeats(true)
             }
           />
         )}
@@ -1375,8 +1375,8 @@ export default function BeatsPage() {
                 null
               )
             }
-            onSuccess={
-              loadBeats
+            onSuccess={() =>
+              loadBeats(true)
             }
           />
         )}
@@ -1392,8 +1392,8 @@ export default function BeatsPage() {
                 null
               )
             }
-            onSuccess={
-              loadBeats
+            onSuccess={() =>
+              loadBeats(true)
             }
           />
         )}
@@ -1404,7 +1404,7 @@ export default function BeatsPage() {
             title={groupAssignment.group.title}
             mode={groupAssignment.mode}
             onClose={() => setGroupAssignment(null)}
-            onSuccess={loadBeats}
+            onSuccess={() => loadBeats(true)}
           />
         )}
 
@@ -1412,7 +1412,7 @@ export default function BeatsPage() {
           <BeatPointEditor
             beat={pointEditingBeat}
             onClose={() => setPointEditingBeat(null)}
-            onSuccess={loadBeats}
+            onSuccess={() => loadBeats(true)}
           />
         )}
 

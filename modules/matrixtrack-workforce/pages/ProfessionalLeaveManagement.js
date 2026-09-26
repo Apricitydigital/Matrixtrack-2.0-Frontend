@@ -161,59 +161,67 @@ export default function ProfessionalLeaveManagementPage() {
   const errorMessage = useMemo(() => parseApiError(error, "Failed to load leave requests."), [error]);
   const actionPending = approveMutation.isPending || rejectMutation.isPending;
 
+  const hierarchyData = useMemo(() => {
+    if (!hierarchyQuery.data) return [];
+    if (Array.isArray(hierarchyQuery.data)) return hierarchyQuery.data;
+    if (Array.isArray(hierarchyQuery.data.data)) return hierarchyQuery.data.data;
+    if (Array.isArray(hierarchyQuery.data.cities)) return hierarchyQuery.data.cities;
+    if (Array.isArray(hierarchyQuery.data.sectors)) return hierarchyQuery.data.sectors;
+    return [];
+  }, [hierarchyQuery.data]);
+
   const cityOptions = useMemo(() => {
-    const source = Array.isArray(hierarchyQuery.data) ? hierarchyQuery.data : [];
     const unique = new Map();
-    source.forEach((city) => {
-      const id = String(city.cityId || city.city_id || "");
-      const name = city.city || city.city_name;
+    hierarchyData.forEach((city) => {
+      const id = String(city.cityId || city.city_id || city.id || "");
+      const name = city.city || city.city_name || city.name || city.cityName;
       if (!id || !name) return;
       if (!unique.has(id)) unique.set(id, { id, name });
     });
     return Array.from(unique.values());
-  }, [hierarchyQuery.data]);
+  }, [hierarchyData]);
 
   const zoneOptions = useMemo(() => {
-    const source = Array.isArray(hierarchyQuery.data) ? hierarchyQuery.data : [];
-    const collected = source.flatMap((city) => {
-      const cityIdentifier = String(city.cityId || city.city_id || "");
+    const collected = hierarchyData.flatMap((city) => {
+      const cityIdentifier = String(city.cityId || city.city_id || city.id || "");
       if (cityId && cityIdentifier !== String(cityId)) return [];
       const zones = Array.isArray(city?.zones) ? city.zones : [];
       return zones.map((zone) => ({
-        id: String(zone.zoneId || zone.zone_id),
-        name: zone.zone || zone.zone_name,
+        id: String(zone.zoneId || zone.zone_id || zone.id || ""),
+        name: zone.zone || zone.zone_name || zone.name || zone.zoneName,
       }));
     });
     const unique = new Map();
     collected.forEach((item) => {
+      if (!item.id || !item.name) return;
       if (!unique.has(item.id)) unique.set(item.id, item);
     });
     return Array.from(unique.values());
-  }, [hierarchyQuery.data, cityId]);
+  }, [hierarchyData, cityId]);
 
   const wardOptions = useMemo(() => {
-    const source = Array.isArray(hierarchyQuery.data) ? hierarchyQuery.data : [];
-    const flattened = source.flatMap((city) => {
-      const cityIdentifier = String(city.cityId || city.city_id || "");
+    const flattened = hierarchyData.flatMap((city) => {
+      const cityIdentifier = String(city.cityId || city.city_id || city.id || "");
       if (cityId && cityIdentifier !== String(cityId)) return [];
       const zones = Array.isArray(city?.zones) ? city.zones : [];
       return zones.flatMap((zone) => {
-        const zoneIdentifier = String(zone.zoneId || zone.zone_id || "");
+        const zoneIdentifier = String(zone.zoneId || zone.zone_id || zone.id || "");
         if (zoneId && zoneIdentifier !== String(zoneId)) return [];
         const sectors = Array.isArray(zone?.sectors) ? zone.sectors : [];
         return sectors.map((sector) => ({
-          id: String(sector.sectorId || sector.sector_id),
-          name: sector.sectorName || sector.sector_name,
+          id: String(sector.sectorId || sector.sector_id || sector.id || ""),
+          name: sector.sectorName || sector.sector_name || sector.name || sector.sector,
           kothis: Array.isArray(sector.kothis) ? sector.kothis : [],
         }));
       });
     });
     const unique = new Map();
     flattened.forEach((item) => {
+      if (!item.id || !item.name) return;
       if (!unique.has(item.id)) unique.set(item.id, item);
     });
     return Array.from(unique.values());
-  }, [hierarchyQuery.data, cityId, zoneId]);
+  }, [hierarchyData, cityId, zoneId]);
 
   const kothiOptions = useMemo(() => {
     const uniqueMap = new Map();
@@ -221,8 +229,8 @@ export default function ProfessionalLeaveManagementPage() {
       ? (wardOptions.find((item) => item.id === String(wardId))?.kothis || [])
       : wardOptions.flatMap((item) => item.kothis || []);
     sourceKothis.forEach((kothi) => {
-      const id = String(kothi.wardId || kothi.ward_id);
-      const name = kothi.wardName || kothi.ward_name;
+      const id = String(kothi.wardId || kothi.ward_id || kothi.id || "");
+      const name = kothi.wardName || kothi.ward_name || kothi.name || kothi.kothi_name || kothi.ward;
       if (!id || !name) return;
       if (!uniqueMap.has(id)) uniqueMap.set(id, { id, name });
     });
@@ -260,11 +268,10 @@ export default function ProfessionalLeaveManagementPage() {
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
-                    activeTab === tab
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-semibold transition ${activeTab === tab
                       ? "border-indigo-500 bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow"
                       : "border-white/60 bg-white/80 text-slate-700 hover:bg-white"
-                  }`}
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   {meta.label}
@@ -470,34 +477,34 @@ export default function ProfessionalLeaveManagementPage() {
                             )}
                             {/* Allocations button ΓÇö only for users with Write permission on Professional Leave Management */}
                             {canManageAllocations && (
-                             <button
-                              type="button"
-                              onClick={async () => {
-                                setAllocItem(item);
-                                setAllocModalTab("edit");
-                                // Fetch existing allocations
-                                try {
-                                  const res = await professionalLeaveMgmtApi.getLeaveAllocations(item.professional_id || item.id);
-                                  const d = res?.data || {};
-                                  setAllocWeekOff(d.week_off?.week_off_days || []);
-                                  setAllocRows(
-                                    (d.allocations || []).length > 0
-                                      ? d.allocations.map((a) => ({
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setAllocItem(item);
+                                  setAllocModalTab("edit");
+                                  // Fetch existing allocations
+                                  try {
+                                    const res = await professionalLeaveMgmtApi.getLeaveAllocations(item.professional_id || item.id);
+                                    const d = res?.data || {};
+                                    setAllocWeekOff(d.week_off?.week_off_days || []);
+                                    setAllocRows(
+                                      (d.allocations || []).length > 0
+                                        ? d.allocations.map((a) => ({
                                           leave_type: a.leave_type,
                                           period: a.period,
                                           allocated_count: String(a.allocated_count),
                                         }))
-                                      : [{ leave_type: "CASUAL", period: "monthly", allocated_count: "" }]
-                                  );
-                                } catch (_) {
-                                  setAllocRows([{ leave_type: "CASUAL", period: "monthly", allocated_count: "" }]);
-                                  setAllocWeekOff([]);
-                                }
-                              }}
-                              className="rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
-                            >
-                              Allocations
-                            </button>
+                                        : [{ leave_type: "CASUAL", period: "monthly", allocated_count: "" }]
+                                    );
+                                  } catch (_) {
+                                    setAllocRows([{ leave_type: "CASUAL", period: "monthly", allocated_count: "" }]);
+                                    setAllocWeekOff([]);
+                                  }
+                                }}
+                                className="rounded-lg border border-violet-300 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100"
+                              >
+                                Allocations
+                              </button>
                             )}
                           </div>
                         </td>
@@ -570,9 +577,8 @@ export default function ProfessionalLeaveManagementPage() {
                   if (actionMode === "approve") { approveMutation.mutate({ id: actionItem.id, note: actionNote.trim() }); return; }
                   rejectMutation.mutate({ id: actionItem.id, note: actionNote.trim() });
                 }}
-                className={`rounded px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-                  actionMode === "approve" ? "bg-emerald-600" : "bg-rose-600"
-                }`}
+                className={`rounded px-3 py-2 text-sm font-semibold text-white disabled:opacity-50 ${actionMode === "approve" ? "bg-emerald-600" : "bg-rose-600"
+                  }`}
               >
                 {actionPending ? "Submitting..." : (actionMode === "approve" ? "Approve" : "Reject")}
               </button>
@@ -594,9 +600,8 @@ export default function ProfessionalLeaveManagementPage() {
                 <button
                   type="button"
                   onClick={() => setAllocModalTab("edit")}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${
-                    allocModalTab === "edit" ? "bg-violet-600 text-white border-violet-600" : "border-slate-300 text-slate-700"
-                  }`}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border ${allocModalTab === "edit" ? "bg-violet-600 text-white border-violet-600" : "border-slate-300 text-slate-700"
+                    }`}
                 >
                   Edit
                 </button>
@@ -611,9 +616,8 @@ export default function ProfessionalLeaveManagementPage() {
                     } catch (_) { setAllocLogs([]); }
                     finally { setAllocLogsLoading(false); }
                   }}
-                  className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border ${
-                    allocModalTab === "logs" ? "bg-amber-500 text-white border-amber-500" : "border-slate-300 text-slate-700"
-                  }`}
+                  className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg border ${allocModalTab === "logs" ? "bg-amber-500 text-white border-amber-500" : "border-slate-300 text-slate-700"
+                    }`}
                 >
                   <History className="h-3 w-3" /> History
                 </button>
@@ -627,16 +631,15 @@ export default function ProfessionalLeaveManagementPage() {
                 <div className="mb-4">
                   <p className="text-sm font-semibold text-slate-700 mb-2">Week Off Days</p>
                   <div className="flex flex-wrap gap-2">
-                    {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day, idx) => (
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
                       <button
                         key={day}
                         type="button"
                         onClick={() => toggleAllocWeekDay(idx)}
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                          allocWeekOff.includes(idx)
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${allocWeekOff.includes(idx)
                             ? "border-violet-500 bg-violet-600 text-white"
                             : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         {day}
                       </button>
@@ -656,11 +659,11 @@ export default function ProfessionalLeaveManagementPage() {
                     {allocRows.map((row, i) => (
                       <div key={i} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
                         <select value={row.leave_type} onChange={(e) => updateAllocRow(i, "leave_type", e.target.value)} className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs bg-white">
-                          {["CASUAL","MEDICAL","PAID"].map((t) => <option key={t} value={t}>{t}</option>)}
+                          {["CASUAL", "MEDICAL", "PAID"].map((t) => <option key={t} value={t}>{t}</option>)}
                         </select>
                         <select value={row.period} onChange={(e) => updateAllocRow(i, "period", e.target.value)} className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs bg-white">
-                          {["monthly","quarterly","half_yearly","yearly"].map((p) => (
-                            <option key={p} value={p}>{{ monthly:"Monthly", quarterly:"Quarterly", half_yearly:"Half-Yearly", yearly:"Yearly" }[p]}</option>
+                          {["monthly", "quarterly", "half_yearly", "yearly"].map((p) => (
+                            <option key={p} value={p}>{{ monthly: "Monthly", quarterly: "Quarterly", half_yearly: "Half-Yearly", yearly: "Yearly" }[p]}</option>
                           ))}
                         </select>
                         <input type="number" min={0} value={row.allocated_count} onChange={(e) => updateAllocRow(i, "allocated_count", e.target.value)} placeholder="Count" className="w-16 rounded border border-slate-300 px-2 py-1 text-xs" />

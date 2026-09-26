@@ -632,6 +632,10 @@ function PortalHomeLayoutContent({
     pageTitle = 'Inspection and Performance';
   }
 
+  if (pathname.startsWith('/ulb/field-issues')) {
+    pageTitle = 'AO Complaints / अधिकारी की शिकायतें';
+  }
+
   if (pathname.startsWith('/ulb/attendance')) {
     pageTitle = 'Attendance Analytics';
   }
@@ -1056,6 +1060,7 @@ function PortalHomeLayoutContent({
   ].filter((item) => item.visible);
 
   const ulbNavigationItems = [
+    { name: 'AO Complaints / अधिकारी की शिकायतें', href: '/ulb/field-issues', icon: <ClipboardCheck size={15} />, isActive: pathname.startsWith('/ulb/field-issues') },
     {
       name: 'Dashboard',
 
@@ -2739,6 +2744,10 @@ function PortalHomeLayoutContent({
 
             {isUlbUser && (
               <div className="flex flex-col gap-1.5">
+                <Link href="/ulb/field-issues" title="AO Complaints / अधिकारी की शिकायतें" className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold ${pathname.startsWith('/ulb/field-issues') ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+                  <ClipboardCheck size={15} className="shrink-0" />
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>AO Complaints / अधिकारी की शिकायतें</span>
+                </Link>
 
                 {/* DASHBOARD */}
 

@@ -271,56 +271,63 @@ export default function SupervisorProfessionalAttendancePage() {
   const rowsPerPage = Number(pagination.limit || 20) || 20;
   const serialStart = (currentPage - 1) * rowsPerPage + 1;
 
+  const hierarchyData = useMemo(() => {
+    if (!hierarchyQuery.data) return [];
+    if (Array.isArray(hierarchyQuery.data)) return hierarchyQuery.data;
+    if (Array.isArray(hierarchyQuery.data.data)) return hierarchyQuery.data.data;
+    if (Array.isArray(hierarchyQuery.data.cities)) return hierarchyQuery.data.cities;
+    if (Array.isArray(hierarchyQuery.data.sectors)) return hierarchyQuery.data.sectors;
+    return [];
+  }, [hierarchyQuery.data]);
+
   const zoneOptions = useMemo(() => {
-    const source = Array.isArray(hierarchyQuery.data) ? hierarchyQuery.data : [];
-    const collected = source.flatMap((city) => {
-      const cityIdentifier = String(city.cityId || city.city_id || "");
+    const collected = hierarchyData.flatMap((city) => {
+      const cityIdentifier = String(city.cityId || city.city_id || city.id || "");
       if (cityId && cityIdentifier !== String(cityId)) {
         return [];
       }
       const zones = Array.isArray(city?.zones) ? city.zones : [];
       return zones.map((zone) => ({
-        id: String(zone.zoneId || zone.zone_id),
-        name: zone.zone || zone.zone_name,
+        id: String(zone.zoneId || zone.zone_id || zone.id || ""),
+        name: zone.zone || zone.zone_name || zone.name || zone.zoneName,
       }));
     });
     const unique = new Map();
     collected.forEach((item) => {
+      if (!item.id || !item.name) return;
       const key = `${item.id}-${item.name}`;
       if (!unique.has(key)) unique.set(key, item);
     });
     return Array.from(unique.values());
-  }, [hierarchyQuery.data, cityId]);
+  }, [hierarchyData, cityId]);
 
   const cityOptions = useMemo(() => {
-    const source = Array.isArray(hierarchyQuery.data) ? hierarchyQuery.data : [];
     const unique = new Map();
-    source.forEach((city) => {
-      const id = String(city.cityId || city.city_id || "");
-      const name = city.city || city.city_name;
+    hierarchyData.forEach((city) => {
+      const id = String(city.cityId || city.city_id || city.id || "");
+      const name = city.city || city.city_name || city.name || city.cityName;
       if (!id || !name) return;
       if (!unique.has(id)) {
         unique.set(id, { id, name });
       }
     });
     return Array.from(unique.values());
-  }, [hierarchyQuery.data]);
+  }, [hierarchyData]);
 
   const wardOptions = useMemo(() => {
-    const source = Array.isArray(hierarchyQuery.data) ? hierarchyQuery.data : [];
-    const flattened = source.flatMap((city) => {
-      const cityIdentifier = String(city.cityId || city.city_id || "");
+    const flattened = hierarchyData.flatMap((city) => {
+      const cityIdentifier = String(city.cityId || city.city_id || city.id || "");
       if (cityId && cityIdentifier !== String(cityId)) return [];
       const zones = Array.isArray(city?.zones) ? city.zones : [];
       return zones.flatMap((zone) => {
-        const zoneIdentifier = String(zone.zoneId || zone.zone_id || "");
+        const zoneIdentifier = String(zone.zoneId || zone.zone_id || zone.id || "");
         if (zoneId && zoneIdentifier !== String(zoneId)) return [];
         const sectors = Array.isArray(zone?.sectors) ? zone.sectors : [];
         return sectors.map((sector) => ({
-          id: String(sector.sectorId || sector.sector_id),
-          name: sector.sectorName || sector.sector_name,
-          zoneId: String(zone.zoneId || zone.zone_id),
-          cityId: String(city.cityId || city.city_id),
+          id: String(sector.sectorId || sector.sector_id || sector.id || ""),
+          name: sector.sectorName || sector.sector_name || sector.name || sector.sector,
+          zoneId: String(zone.zoneId || zone.zone_id || zone.id || ""),
+          cityId: String(city.cityId || city.city_id || city.id || ""),
           kothis: Array.isArray(sector.kothis) ? sector.kothis : [],
         }));
       });
@@ -328,11 +335,12 @@ export default function SupervisorProfessionalAttendancePage() {
 
     const unique = new Map();
     flattened.forEach((item) => {
+      if (!item.id || !item.name) return;
       const key = `${item.id}-${item.zoneId}`;
       if (!unique.has(key)) unique.set(key, item);
     });
     return Array.from(unique.values());
-  }, [hierarchyQuery.data, zoneId, cityId]);
+  }, [hierarchyData, zoneId, cityId]);
 
   const kothiOptions = useMemo(() => {
     const uniqueMap = new Map();
@@ -340,8 +348,8 @@ export default function SupervisorProfessionalAttendancePage() {
       ? (wardOptions.find((item) => item.id === String(wardId))?.kothis || [])
       : wardOptions.flatMap((item) => item.kothis || []);
     sourceKothis.forEach((kothi) => {
-      const id = String(kothi.wardId || kothi.ward_id);
-      const name = kothi.wardName || kothi.ward_name;
+      const id = String(kothi.wardId || kothi.ward_id || kothi.id || "");
+      const name = kothi.wardName || kothi.ward_name || kothi.name || kothi.kothi_name || kothi.ward;
       if (!id || !name) return;
       if (!uniqueMap.has(id)) uniqueMap.set(id, { id, name });
     });
@@ -492,52 +500,52 @@ export default function SupervisorProfessionalAttendancePage() {
   const handleExport = () => {
     const csvRows = isDateRange
       ? [
-          ["Sr No", "Employee Name", "Emp Code", "Mobile", "Ward", "Zone", "City",
-           "Total Days (Range)", "Week Off Days", "Working Days",
-           "Attendance Days", "Approved Leave Days", "Effective Present",
-           "Absent Days", "Payable Days", "Hours Worked"],
-          ...visibleRows.map((entry, index) => [
-            index + 1,
-            entry.full_name,
-            entry.emp_code || "",
-            entry.mobile || "",
-            entry.ward_name,
-            entry.zone_name || "",
-            entry.city_name || "",
-            entry.total_range_days ?? "",
-            entry.week_off_days_count ?? 0,
-            entry.working_days ?? "",
-            entry.attendance_count,
-            entry.leave_days || 0,
-            entry.effective_present ?? (entry.attendance_count + (entry.leave_days || 0)),
-            entry.absent_days ?? 0,
-            entry.payable_days ?? entry.effective_present ?? 0,
-            entry.total_hours_worked,
-          ]),
-        ]
+        ["Sr No", "Employee Name", "Emp Code", "Mobile", "Ward", "Zone", "City",
+          "Total Days (Range)", "Week Off Days", "Working Days",
+          "Attendance Days", "Approved Leave Days", "Effective Present",
+          "Absent Days", "Payable Days", "Hours Worked"],
+        ...visibleRows.map((entry, index) => [
+          index + 1,
+          entry.full_name,
+          entry.emp_code || "",
+          entry.mobile || "",
+          entry.ward_name,
+          entry.zone_name || "",
+          entry.city_name || "",
+          entry.total_range_days ?? "",
+          entry.week_off_days_count ?? 0,
+          entry.working_days ?? "",
+          entry.attendance_count,
+          entry.leave_days || 0,
+          entry.effective_present ?? (entry.attendance_count + (entry.leave_days || 0)),
+          entry.absent_days ?? 0,
+          entry.payable_days ?? entry.effective_present ?? 0,
+          entry.total_hours_worked,
+        ]),
+      ]
       : [
-          ["Sr No", "Employee Name", "Emp Code", "Email", "Mobile", "Ward", "Kothi", "Zone", "City", "Punch In", "Punch Out", "Punch-Out Type", "Leave Type", "Leave Status", "Reviewed By", "In Location", "Out Location", "Hours Worked"],
-          ...visibleRows.map((entry, index) => [
-            index + 1,
-            entry.full_name,
-            entry.emp_code || "",
-            entry.email || "",
-            entry.mobile || "",
-            entry.ward_name,
-            entry.kothi_name || "",
-            entry.zone_name || "",
-            entry.city_name || "",
-            formatClock(entry.punch_in),
-            formatClock(entry.punch_out),
-            getPunchOutType(entry),
-            entry.leave_type || "",
-            entry.leave_status || "",
-            entry.leave_reviewed_by_name || "",
-            formatLocation(entry.punch_in_latitude, entry.punch_in_longitude),
-            formatLocation(entry.punch_out_latitude, entry.punch_out_longitude),
-            entry.hours_worked || "",
-          ]),
-        ];
+        ["Sr No", "Employee Name", "Emp Code", "Email", "Mobile", "Ward", "Kothi", "Zone", "City", "Punch In", "Punch Out", "Punch-Out Type", "Leave Type", "Leave Status", "Reviewed By", "In Location", "Out Location", "Hours Worked"],
+        ...visibleRows.map((entry, index) => [
+          index + 1,
+          entry.full_name,
+          entry.emp_code || "",
+          entry.email || "",
+          entry.mobile || "",
+          entry.ward_name,
+          entry.kothi_name || "",
+          entry.zone_name || "",
+          entry.city_name || "",
+          formatClock(entry.punch_in),
+          formatClock(entry.punch_out),
+          getPunchOutType(entry),
+          entry.leave_type || "",
+          entry.leave_status || "",
+          entry.leave_reviewed_by_name || "",
+          formatLocation(entry.punch_in_latitude, entry.punch_in_longitude),
+          formatLocation(entry.punch_out_latitude, entry.punch_out_longitude),
+          entry.hours_worked || "",
+        ]),
+      ];
 
     downloadCsv(`professional-attendance-${Date.now()}.csv`, csvRows);
   };
@@ -662,7 +670,7 @@ export default function SupervisorProfessionalAttendancePage() {
                   }}
                   className="mt-1 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800"
                 >
-                <option value="">All Sectors</option>
+                  <option value="">All Sectors</option>
                   {wardOptions.map((item) => (
                     <option key={item.id} value={item.id}>{item.name}</option>
                   ))}
@@ -855,40 +863,37 @@ export default function SupervisorProfessionalAttendancePage() {
                     <button
                       type="button"
                       onClick={() => setPunchOutScope("all")}
-                      className={`rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
-                        punchOutScope === "all"
+                      className={`rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition ${punchOutScope === "all"
                           ? "border-indigo-500 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md"
                           : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
-                      }`}
+                        }`}
                     >
                       All Records
                     </button>
                     <button
                       type="button"
                       onClick={() => setPunchOutScope("system")}
-                      className={`rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
-                        punchOutScope === "system"
+                      className={`rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition ${punchOutScope === "system"
                           ? "border-orange-400 bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md"
                           : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
-                      }`}
+                        }`}
                     >
                       Auto Punch Out
                     </button>
                     <button
                       type="button"
                       onClick={() => setPunchOutScope("manual")}
-                      className={`rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
-                        punchOutScope === "manual"
+                      className={`rounded-full border px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide transition ${punchOutScope === "manual"
                           ? "border-emerald-400 bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md"
                           : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
-                      }`}
+                        }`}
                     >
                       Manual Punch Out
                     </button>
                   </div>
                 ) : null}
                 <div className="max-h-[62vh] overflow-auto rounded-2xl border border-slate-200">
-                {isDateRange ? (
+                  {isDateRange ? (
                     <table className="min-w-[1500px] divide-y divide-slate-200 text-[14px]">
                       <thead className="sticky top-0 z-10">
                         <tr className="bg-slate-100 text-left text-[11px] uppercase tracking-[0.12em] text-slate-600">

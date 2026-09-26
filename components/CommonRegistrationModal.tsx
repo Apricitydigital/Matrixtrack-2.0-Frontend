@@ -483,11 +483,11 @@ export default function CommonRegistrationModal({
       return;
     }
 
-    // Validate Aadhaar number (exactly 12 digits if provided)
+    // Validate Aadhaar number (at least 8 digits if provided)
     if (form.aadharNumber) {
       const aadharDigits = form.aadharNumber.replace(/\D/g, "");
-      if (aadharDigits.length !== 12) {
-        setErrorMsg("Aadhaar number must be exactly 12 digits");
+      if (aadharDigits.length < 8) {
+        setErrorMsg("Aadhaar number must be at least 8 digits");
         return;
       }
     }

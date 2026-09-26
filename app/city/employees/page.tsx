@@ -597,12 +597,12 @@ export default function EmployeesPage() {
                 query
             );
         }).sort((a, b) =>
-    String(a.name || "").localeCompare(
-        String(b.name || ""),
-        undefined,
-        { sensitivity: "base", numeric: true }
-    )
-);
+            String(a.name || "").localeCompare(
+                String(b.name || ""),
+                undefined,
+                { sensitivity: "base", numeric: true }
+            )
+        );
 
     }, [
         employees,
@@ -767,8 +767,8 @@ export default function EmployeesPage() {
             return;
         }
 
-        if (cleanAadhaar && !/^\d{12}$/.test(cleanAadhaar)) {
-            setEditError("Aadhaar number must be exactly 12 digits.");
+        if (cleanAadhaar && cleanAadhaar.length < 8) {
+            setEditError("Aadhaar number must be at least 8 digits.");
             return;
         }
 
@@ -1146,7 +1146,7 @@ export default function EmployeesPage() {
                         emp
                     );
                 }
-                
+
                 const normName = normalizeEmployeeImportValue(emp.name);
                 const arr = existingEmployeesByName.get(normName) || [];
                 arr.push(emp);
@@ -1200,8 +1200,8 @@ export default function EmployeesPage() {
                             aadhaarIdx !== -1
                                 ? String(rawRow?.[aadhaarIdx] ?? "").replace(/\D/g, "").trim()
                                 : "";
-                        // If 12 digits, keep it; otherwise blank/null without invalidating the row
-                        const aadhaarNumber = rawAadhaar.length === 12 ? rawAadhaar : "";
+                        // If min 8 digits, keep it; otherwise blank/null without invalidating the row
+                        const aadhaarNumber = rawAadhaar.length >= 8 ? rawAadhaar : "";
 
                         const rawEmploymentType =
                             employmentTypeIdx !== -1
@@ -1714,9 +1714,9 @@ export default function EmployeesPage() {
         }
 
 
-        if (cleanAadhaar && !/^\d{12}$/.test(cleanAadhaar)) {
+        if (cleanAadhaar && cleanAadhaar.length < 8) {
             setRegistrationError(
-                "Aadhaar number must be exactly 12 digits."
+                "Aadhaar number must be at least 8 digits."
             );
             return;
         }
@@ -2364,9 +2364,8 @@ export default function EmployeesPage() {
                                                 return (
                                                     <tr
                                                         key={employee.id}
-                                                        className={`transition hover:bg-slate-50/80 ${
-                                                            isSelected ? "bg-blue-50/40" : ""
-                                                        }`}
+                                                        className={`transition hover:bg-slate-50/80 ${isSelected ? "bg-blue-50/40" : ""
+                                                            }`}
                                                     >
 
                                                         {!isHmsAdmin && (
@@ -2411,15 +2410,14 @@ export default function EmployeesPage() {
                                                                 const typeInfo = getEmploymentTypeDisplay(employee.employmentType);
                                                                 return (
                                                                     <span
-                                                                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                                                            typeInfo.key === "Permanent"
-                                                                                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                                                                : typeInfo.key === "Regularized"
+                                                                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${typeInfo.key === "Permanent"
+                                                                            ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                                                            : typeInfo.key === "Regularized"
                                                                                 ? "bg-purple-50 text-purple-700 border border-purple-200"
                                                                                 : typeInfo.key === "Temporary"
-                                                                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                                                                : "bg-teal-50 text-teal-700 border border-teal-200"
-                                                                        }`}
+                                                                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                                                                    : "bg-teal-50 text-teal-700 border border-teal-200"
+                                                                            }`}
                                                                     >
                                                                         <span>{typeInfo.labelEn}</span>
                                                                         <span className="text-[11px] opacity-75 font-normal">/ {typeInfo.labelHi}</span>
@@ -2499,11 +2497,10 @@ export default function EmployeesPage() {
                                                                                 openActionMenuId === employee.id ? null : employee.id
                                                                             );
                                                                         }}
-                                                                        className={`flex h-8 w-8 items-center justify-center rounded-lg border transition cursor-pointer ${
-                                                                            openActionMenuId === employee.id
-                                                                                ? "border-blue-300 bg-blue-50 text-blue-700 shadow-xs"
-                                                                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                                                                        }`}
+                                                                        className={`flex h-8 w-8 items-center justify-center rounded-lg border transition cursor-pointer ${openActionMenuId === employee.id
+                                                                            ? "border-blue-300 bg-blue-50 text-blue-700 shadow-xs"
+                                                                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                                                                            }`}
                                                                         title="Actions"
                                                                     >
                                                                         <MoreVertical size={16} />
@@ -2621,11 +2618,10 @@ export default function EmployeesPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setCurrentPage(p)}
-                                                        className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition cursor-pointer ${
-                                                            p === currentPage
-                                                                ? "bg-blue-600 text-white shadow-xs"
-                                                                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                                                        }`}
+                                                        className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-bold transition cursor-pointer ${p === currentPage
+                                                            ? "bg-blue-600 text-white shadow-xs"
+                                                            : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                                            }`}
                                                     >
                                                         {p}
                                                     </button>
@@ -3586,8 +3582,8 @@ export default function EmployeesPage() {
                                                                         row.status === "READY"
                                                                             ? "Ready"
                                                                             : row.status === "ALREADY_EXISTS"
-                                                                            ? "Already Exists"
-                                                                            : row.message
+                                                                                ? "Already Exists"
+                                                                                : row.message
                                                                     }
                                                                 </span>
 
