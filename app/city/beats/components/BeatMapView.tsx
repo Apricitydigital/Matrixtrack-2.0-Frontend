@@ -212,6 +212,50 @@ const getFeatureColor = (feature: any) => {
     return VIBRANT_COLORS[Math.abs(hash) % VIBRANT_COLORS.length];
 };
 
+function findClosestPointIndex(
+    coord: [number, number],
+    points: any[]
+): number {
+    if (
+        !Array.isArray(points) ||
+        points.length === 0 ||
+        !coord
+    ) {
+        return 0;
+    }
+
+    let bestIdx = 0;
+    let minDistance = Infinity;
+
+    points.forEach((point: any, index: number) => {
+        const lng =
+            point.longitude ??
+            point.lng ??
+            point.lon;
+
+        const lat =
+            point.latitude ??
+            point.lat;
+
+        if (
+            typeof lng === "number" &&
+            typeof lat === "number"
+        ) {
+            const distance = Math.hypot(
+                lng - coord[0],
+                lat - coord[1]
+            );
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                bestIdx = index;
+            }
+        }
+    });
+
+    return bestIdx;
+}
+
 const parseGeoJSON = (value: any) => {
     if (!value) return null;
 
@@ -692,6 +736,48 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
         beat?.employeesSummary,
         beat?.segments,
     ]);
+
+    const routeAssignmentRows = React.useMemo(() => {
+        const points = Array.isArray(beat?.points)
+            ? beat.points
+            : [];
+
+        const segments = Array.isArray(beat?.segments)
+            ? [...beat.segments]
+            : [];
+
+        if (points.length > 0) {
+            segments.sort((a: any, b: any) => {
+                const startA =
+                    a.geometry?.coordinates?.[0] || [0, 0];
+
+                const startB =
+                    b.geometry?.coordinates?.[0] || [0, 0];
+
+                return (
+                    findClosestPointIndex(startA, points) -
+                    findClosestPointIndex(startB, points)
+                );
+            });
+        }
+
+        return segments.map(
+            (segment: any, index: number) => ({
+                id: segment.id || `segment-${index}`,
+                routeLabel:
+                    points[index] && points[index + 1]
+                        ? `${points[index]?.code || `P${index + 1}`} ? ${points[index + 1]?.code || `P${index + 2}`}`
+                        : `Route ${index + 1}`,
+                supervisorName:
+                    segment.supervisorAssignedToName ||
+                    beat?.assignedToName ||
+                    "Not assigned",
+                employeeName:
+                    segment.employeeAssignedToName ||
+                    "Not assigned",
+            })
+        );
+    }, [beat]);
 
     const pointGeoJSON =
         React.useMemo(() => {
@@ -1281,12 +1367,19 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                                 textOverflow: "ellipsis",
                                             }}
                                         >
-                                            {beat?.employeesSummary?.[0]?.name ||
-                                                beat?.segments?.find(
-                                                    (segment: any) =>
-                                                        segment?.employeeAssignedToName
-                                                )?.employeeAssignedToName ||
-                                                "Not assigned"}
+                                            {Array.from(
+                                                new Set(
+                                                    [
+                                                        ...(beat?.employeesSummary || []).map(
+                                                            (item: any) => item?.name
+                                                        ),
+                                                        ...(beat?.segments || []).map(
+                                                            (segment: any) =>
+                                                                segment?.employeeAssignedToName
+                                                        ),
+                                                    ].filter(Boolean)
+                                                )
+                                            ).join(", ") || "Not assigned"}
                                         </div>
                                     </div>
                                 </div>
@@ -1348,15 +1441,237 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                                 textOverflow: "ellipsis",
                                             }}
                                         >
-                                            {beat?.supervisorsSummary?.[0]?.name ||
-                                                beat?.assignedToName ||
-                                                beat?.segments?.find(
-                                                    (segment: any) =>
-                                                        segment?.supervisorAssignedToName
-                                                )?.supervisorAssignedToName ||
-                                                "Not assigned"}
+                                            {Array.from(
+                                                new Set(
+                                                    [
+                                                        ...(beat?.supervisorsSummary || []).map(
+                                                            (item: any) => item?.name
+                                                        ),
+                                                        ...(beat?.segments || []).map(
+                                                            (segment: any) =>
+                                                                segment?.supervisorAssignedToName
+                                                        ),
+                                                        beat?.assignedToName,
+                                                    ].filter(Boolean)
+                                                )
+                                            ).join(", ") || "Not assigned"}
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+
+
+                            {/* ROUTE ASSIGNMENT */}
+
+                            <div
+                                style={{
+                                    marginBottom: "18px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        marginBottom: "8px",
+                                        fontSize: "10px",
+                                        color: "#94a3b8",
+                                        fontWeight: 900,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.08em",
+                                    }}
+                                >
+                                    Route Assignment
+                                </div>
+
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gap: "7px",
+                                    }}
+                                >
+                                    {routeAssignmentRows.length ? (
+                                        routeAssignmentRows.map(
+                                            (row: any) => (
+                                                <div
+                                                    key={row.id}
+                                                    style={{
+                                                        border:
+                                                            "1px solid #e2e8f0",
+                                                        borderRadius:
+                                                            "12px",
+                                                        padding:
+                                                            "10px",
+                                                        background:
+                                                            "#ffffff",
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            display:
+                                                                "flex",
+                                                            alignItems:
+                                                                "center",
+                                                            justifyContent:
+                                                                "space-between",
+                                                            gap: "8px",
+                                                            marginBottom:
+                                                                "7px",
+                                                        }}
+                                                    >
+                                                        <strong
+                                                            style={{
+                                                                fontSize:
+                                                                    "11px",
+                                                                color:
+                                                                    "#2563eb",
+                                                            }}
+                                                        >
+                                                            {
+                                                                row.routeLabel
+                                                            }
+                                                        </strong>
+
+                                                        <MapPin
+                                                            size={13}
+                                                            color="#64748b"
+                                                        />
+                                                    </div>
+
+                                                    <div
+                                                        style={{
+                                                            display:
+                                                                "grid",
+                                                            gridTemplateColumns:
+                                                                "1fr 1fr",
+                                                            gap: "7px",
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                padding:
+                                                                    "8px",
+                                                                borderRadius:
+                                                                    "9px",
+                                                                background:
+                                                                    "#ecfdf5",
+                                                            }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    fontSize:
+                                                                        "8px",
+                                                                    fontWeight:
+                                                                        900,
+                                                                    color:
+                                                                        "#059669",
+                                                                    textTransform:
+                                                                        "uppercase",
+                                                                }}
+                                                            >
+                                                                Daroga
+                                                            </div>
+
+                                                            <div
+                                                                style={{
+                                                                    marginTop:
+                                                                        "3px",
+                                                                    fontSize:
+                                                                        "10px",
+                                                                    fontWeight:
+                                                                        800,
+                                                                    color:
+                                                                        "#0f172a",
+                                                                    overflow:
+                                                                        "hidden",
+                                                                    textOverflow:
+                                                                        "ellipsis",
+                                                                    whiteSpace:
+                                                                        "nowrap",
+                                                                }}
+                                                                title={
+                                                                    row.supervisorName
+                                                                }
+                                                            >
+                                                                {
+                                                                    row.supervisorName
+                                                                }
+                                                            </div>
+                                                        </div>
+
+                                                        <div
+                                                            style={{
+                                                                padding:
+                                                                    "8px",
+                                                                borderRadius:
+                                                                    "9px",
+                                                                background:
+                                                                    "#eff6ff",
+                                                            }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    fontSize:
+                                                                        "8px",
+                                                                    fontWeight:
+                                                                        900,
+                                                                    color:
+                                                                        "#2563eb",
+                                                                    textTransform:
+                                                                        "uppercase",
+                                                                }}
+                                                            >
+                                                                Employee
+                                                            </div>
+
+                                                            <div
+                                                                style={{
+                                                                    marginTop:
+                                                                        "3px",
+                                                                    fontSize:
+                                                                        "10px",
+                                                                    fontWeight:
+                                                                        800,
+                                                                    color:
+                                                                        "#0f172a",
+                                                                    overflow:
+                                                                        "hidden",
+                                                                    textOverflow:
+                                                                        "ellipsis",
+                                                                    whiteSpace:
+                                                                        "nowrap",
+                                                                }}
+                                                                title={
+                                                                    row.employeeName
+                                                                }
+                                                            >
+                                                                {
+                                                                    row.employeeName
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        )
+                                    ) : (
+                                        <div
+                                            style={{
+                                                padding: "12px",
+                                                border:
+                                                    "1px dashed #cbd5e1",
+                                                borderRadius:
+                                                    "11px",
+                                                color:
+                                                    "#64748b",
+                                                fontSize:
+                                                    "10px",
+                                                fontWeight:
+                                                    700,
+                                                textAlign:
+                                                    "center",
+                                            }}
+                                        >
+                                            No route assignment available.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

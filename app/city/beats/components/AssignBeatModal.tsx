@@ -144,14 +144,21 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
 
     const filteredUsers = useMemo(() => {
         const q = search.toLowerCase();
+
         return users
+            .filter((u) => u.matchesContext !== false)
             .filter((u) =>
                 (u.name || "").toLowerCase().includes(q) ||
                 (u.email || "").toLowerCase().includes(q) ||
                 (u.phone || "").toLowerCase().includes(q)
             )
-            // In-scope people first
-            .sort((a, b) => Number(!!b.matchesContext) - Number(!!a.matchesContext));
+            .sort((a, b) =>
+                (a.currentBeatCount || 0) -
+                    (b.currentBeatCount || 0) ||
+                String(a.name || "").localeCompare(
+                    String(b.name || "")
+                )
+            );
     }, [search, users]);
 
     const isDaroga = targetRole === "SUPERVISOR";

@@ -75,7 +75,8 @@ export default function CommonRegistrationModal({
       { key: "SWEEPING", name: "Sweeping Beat Management" },
       { key: "LITTERBINS", name: "Litter Bins / Twinbin" },
       { key: "TOILET", name: "Cleanliness of Toilets" },
-      { key: "TASKFORCE", name: "CTU / GVP Feeder Points" }
+      { key: "TASKFORCE", name: "CTU / GVP Feeder Points" },
+      { key: "NALA", name: "Nala" }
     ],
     taskforceRoles: [
       { key: "SUPERVISOR", label: "Daroga" },
@@ -185,7 +186,29 @@ export default function CommonRegistrationModal({
         setConfig((prev) => ({
           ...prev,
           cities: res.cities || [],
-          modules: res.modules?.length ? res.modules : prev.modules,
+          modules: (() => {
+          const source =
+            res.modules?.length
+              ? res.modules
+              : prev.modules;
+
+          const hasNala =
+            source.some(
+              (module: any) =>
+                String(module.key || "")
+                  .toUpperCase() === "NALA"
+            );
+
+          return hasNala
+            ? source
+            : [
+                ...source,
+                {
+                  key: "NALA",
+                  name: "Nala"
+                }
+              ];
+        })(),
           taskforceRoles: res.taskforceRoles?.length ? res.taskforceRoles : prev.taskforceRoles,
           swachhRoles: res.swachhRoles?.length ? res.swachhRoles : prev.swachhRoles,
           swachhAccessorTypes: res.swachhAccessorTypes?.length ? res.swachhAccessorTypes : prev.swachhAccessorTypes
@@ -251,7 +274,8 @@ export default function CommonRegistrationModal({
         cityModulesMap['TASKFORCE'] ||
         cityModulesMap['LITTERBINS'] ||
         cityModulesMap['SWEEPING'] ||
-        cityModulesMap['TOILET']
+        cityModulesMap['TOILET'] ||
+        cityModulesMap['NALA']
       ));
 
   useEffect(() => {
@@ -596,10 +620,10 @@ export default function CommonRegistrationModal({
       const zoneName = getCol("zone_name", "zone") || "";
       const wardName = getCol("ward_name", "ward") || "";
       const roleRaw = getCol("role", "taskforcerole") || "SUPERVISOR";
-      const modulesStr = getCol("modules", "module") || "SWEEPING;LITTERBINS;TOILET;GVP";
+      const modulesStr = getCol("modules", "module") || "SWEEPING;LITTERBINS;TOILET;GVP;NALA";
 
       const moduleKeys = modulesStr.toUpperCase() === "ALL"
-        ? ["SWEEPING", "LITTERBINS", "TOILET", "TASKFORCE"]
+        ? ["SWEEPING", "LITTERBINS", "TOILET", "TASKFORCE", "NALA"]
         : modulesStr.split(/[;,]+/).map((m) => m.trim().toUpperCase()).filter(Boolean);
 
       const systemsStr = getCol("targetsystems", "systems") || "BOTH";
@@ -844,9 +868,9 @@ export default function CommonRegistrationModal({
 
   const downloadSampleCsv = () => {
     const sample = `full_name,email,mobile_number,password,aadhaar_number,zone_name,ward_name,role,modules
-Priya Patel,priya.qc@example.com,9812345678,Pass@9876,123456789011,Zone 1,Ward 2,QC,SWEEPING;LITTERBINS;TOILET;GVP
+Priya Patel,priya.qc@example.com,9812345678,Pass@9876,123456789011,Zone 1,Ward 2,QC,SWEEPING;LITTERBINS;TOILET;GVP;NALA
 Amit Kumar,amit.ao@example.com,9765432109,Pass@9876,123456789012,Zone 2,Ward 5,ACTION_OFFICER,ALL
-Ramesh Kumar,ramesh.sup@example.com,9876543210,,123456789013,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP
+Ramesh Kumar,ramesh.sup@example.com,9876543210,,123456789013,Zone 1,Ward 1,SUPERVISOR,SWEEPING;LITTERBINS;TOILET;GVP;NALA
 Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOYEE,SWEEPING`;
     // UTF-8 BOM makes Excel recognize the sample as Unicode, so Hindi names are preserved.
     const blob = new Blob(["\uFEFF", sample], { type: "text/csv;charset=utf-8;" });
@@ -864,8 +888,18 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
     ? `Register ${registrationRoleLabel}`
     : "Register User Across Selected Modules";
 
+  
+  const RegistrationShell = ({
+    children
+  }: {
+    children: React.ReactNode;
+  }) =>
+    asPage
+      ? <>{children}</>
+      : <ModalPortal>{children}</ModalPortal>;
+
   return (
-    <ModalPortal><div
+    <RegistrationShell><div
       style={
         asPage
           ? {
@@ -1173,7 +1207,7 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
                             <ShieldCheck size={16} /> Inspection and performance system
                           </div>
                           <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#64748b", lineHeight: 1.4 }}>
-                            Assign to Inspection and performance System's module - litterbin, sweeping, and toilets.
+                            Assign to Inspection and Performance System modules - litter bins, sweeping, toilets, GVP and Nala.
                           </p>
                         </div>
                       </div>
@@ -1495,6 +1529,7 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
                               if (nameUpper.includes("SWEEPING")) displayName = "Sweeping";
                               if (nameUpper.includes("LITTER")) displayName = "Litter Bins";
                               if (nameUpper.includes("TOILET")) displayName = "Cleanliness of Toilets";
+                          if (nameUpper.includes("NALA")) displayName = "Nala";
                               if (nameUpper.includes("TASKFORCE") || nameUpper.includes("CTU") || nameUpper.includes("GVP")) displayName = "GVP";
 
                               return (
@@ -1986,6 +2021,7 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
           box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
       `}</style>
-    </div></ModalPortal>
+    </div></RegistrationShell>
   );
 }
+

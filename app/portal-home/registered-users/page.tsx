@@ -984,7 +984,7 @@ export default function RegisteredUsersPage() {
             : ['Ward 1'];
 
       // Collect Assigned Modules
-      const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN"];
+      const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN", "NALA"];
       const mods: string[] = [];
       if (u.modules && u.modules.length > 0) {
         u.modules.forEach((m: any) => {
@@ -1607,7 +1607,7 @@ export default function RegisteredUsersPage() {
                         <div className="flex flex-wrap items-center gap-1">
                           {(() => {
                             // Collect only Inspection & Performance System (Taskforce) modules
-                            const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN"];
+                            const allowedTaskforceKeys = ["TOILET", "SWEEPING", "LITTERBINS", "TASKFORCE", "LITTERBIN", "NALA"];
                             const mods: string[] = [];
                             if (u.modules && u.modules.length > 0) {
                               u.modules.forEach((m: any) => {
@@ -2954,6 +2954,10 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                     {
                       id: "TASKFORCE",
                       name: "CTU / GVP Transformation"
+                    },
+                    {
+                      id: "NALA",
+                      name: "Nala"
                     }
                   ].filter((sub) =>
                     enabledKeys.size === 0 || enabledKeys.has(sub.id)
@@ -3006,7 +3010,8 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                     "TASKFORCE",
                     "LITTERBINS",
                     "TOILET",
-                    "SWEEPING"
+                    "SWEEPING",
+                    "NALA"
                   ];
 
                   const isTaskforceActive =

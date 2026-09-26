@@ -512,6 +512,7 @@ function PortalHomeLayoutContent({
           'SWEEPING',
           'LITTERBINS',
           'TOILET',
+          'NALA',
         ].includes(r)
     );
 
@@ -936,6 +937,13 @@ function PortalHomeLayoutContent({
       'TASKFORCE'
     );
 
+  const nalaHref =
+    moduleEntryPath(
+      user || null,
+      'NALA'
+    );
+
+
 
   const activeModuleKeys = (userModules || []).map((m: any) => (m.key || m.name || '').toUpperCase());
   const hasSubModule = (key: string) =>
@@ -1000,6 +1008,25 @@ function PortalHomeLayoutContent({
 
       visible:
         hasSubModule('TOILET'),
+    },
+
+    {
+      name:
+        'Nala',
+
+      href:
+        nalaHref,
+
+      icon:
+        <Map size={15} />,
+
+      isActive:
+        pathname.startsWith(
+          '/modules/nala'
+        ),
+
+      visible:
+        hasSubModule('NALA'),
     },
 
     {
@@ -3569,3 +3596,4 @@ export default function PortalHomeLayout({
     </Suspense>
   );
 }
+
