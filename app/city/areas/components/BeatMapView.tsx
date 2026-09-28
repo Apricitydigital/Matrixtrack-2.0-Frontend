@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Search, Plus, Minus, FileText, X, Navigation, UserPlus, Edit2, User, Users, Filter, CheckCircle2 } from "lucide-react";
+import { MapPin, Search, Plus, Minus, FileText, X, Navigation, UserPlus, Edit2, User, Users, Filter, CheckCircle2, ExternalLink } from "lucide-react";
 import AssignBeatModal from "./AssignBeatModal";
+import { getBeatGoogleMapsUrl } from "@utils/googleMapsUrl";
 
 // Dynamic imports for Leaflet
 import type { MapContainerProps, TileLayerProps, GeoJSONProps, PopupProps } from "react-leaflet";
@@ -43,20 +44,20 @@ function FitBounds({ beat }: { beat: any }) {
 
             let geom = beat.geometry;
             if (typeof geom === "string") {
-                try { geom = JSON.parse(geom); } catch {}
+                try { geom = JSON.parse(geom); } catch { }
             }
             if (geom) {
-                try { group.addLayer(L.geoJSON(geom)); } catch {}
+                try { group.addLayer(L.geoJSON(geom)); } catch { }
             }
 
             if (beat.segments && Array.isArray(beat.segments)) {
                 beat.segments.forEach((seg: any) => {
                     let segGeom = seg.geometry;
                     if (typeof segGeom === "string") {
-                        try { segGeom = JSON.parse(segGeom); } catch {}
+                        try { segGeom = JSON.parse(segGeom); } catch { }
                     }
                     if (segGeom) {
-                        try { group.addLayer(L.geoJSON(segGeom)); } catch {}
+                        try { group.addLayer(L.geoJSON(segGeom)); } catch { }
                     }
                 });
             }
@@ -91,10 +92,10 @@ function FitSupervisorBounds({ beat, selectedSupervisorId }: { beat: any; select
                 if (supId === selectedSupervisorId) {
                     let segGeom = seg.geometry;
                     if (typeof segGeom === "string") {
-                        try { segGeom = JSON.parse(segGeom); } catch {}
+                        try { segGeom = JSON.parse(segGeom); } catch { }
                     }
                     if (segGeom) {
-                        try { group.addLayer(L.geoJSON(segGeom)); } catch {}
+                        try { group.addLayer(L.geoJSON(segGeom)); } catch { }
                     }
                 }
             });
@@ -533,13 +534,35 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                         border: "1px solid #e2e8f0", backgroundColor: "#fff", color: "#475569",
                                         fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-                                        marginBottom: "12px", transition: "all 0.2s"
+                                        marginBottom: "8px", transition: "all 0.2s"
                                     }}
                                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f8fafc"}
                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#fff"}
                                 >
                                     <Edit2 size={18} />
                                     Edit Beat Details
+                                </button>
+                            )}
+
+                            {beat && (
+                                <button
+                                    onClick={() => {
+                                        const url = getBeatGoogleMapsUrl(beat);
+                                        if (url) window.open(url, "_blank");
+                                    }}
+                                    style={{
+                                        width: "100%", padding: "12px", borderRadius: "16px",
+                                        border: "none", backgroundColor: "#059669", color: "#fff",
+                                        fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
+                                        display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+                                        marginBottom: "12px", boxShadow: "0 4px 12px rgba(5, 150, 105, 0.25)",
+                                        transition: "all 0.2s"
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#047857"}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#059669"}
+                                >
+                                    <ExternalLink size={18} />
+                                    Open in Google Maps
                                 </button>
                             )}
 

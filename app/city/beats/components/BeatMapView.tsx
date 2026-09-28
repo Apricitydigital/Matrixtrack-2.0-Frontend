@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import type { LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Search, Plus, Minus, FileText, X, Navigation, UserPlus, Edit2, User, Users, Filter, CheckCircle2 } from "lucide-react";
+import { MapPin, Search, Plus, Minus, FileText, X, Navigation, UserPlus, Edit2, User, Users, Filter, CheckCircle2, ExternalLink } from "lucide-react";
 import AssignBeatModal from "./AssignBeatModal";
+import { getBeatGoogleMapsUrl, getPointGoogleMapsUrl } from "@utils/googleMapsUrl";
 
 // Dynamic imports for Leaflet
 import type { MapContainerProps, TileLayerProps, GeoJSONProps, PopupProps } from "react-leaflet";
@@ -452,6 +453,11 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
     const [searchQuery, setSearchQuery] = useState("");
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [mounted, setMounted] = useState(false);
+
+    const googleMapsUrl = React.useMemo(
+        () => getBeatGoogleMapsUrl(beat),
+        [beat]
+    );
 
     useEffect(() => {
         setMounted(true);
@@ -1080,6 +1086,32 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                 </button>
                             ))}
                         </div>
+                        {googleMapsUrl && (
+                            <a
+                                href={googleMapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    backgroundColor: "#2563eb",
+                                    color: "#ffffff",
+                                    padding: "8px 14px",
+                                    borderRadius: "14px",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 700,
+                                    textDecoration: "none",
+                                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
+                                    transition: "all 0.2s"
+                                }}
+                                title="Open Beat Route in Google Maps"
+                            >
+                                <Navigation size={14} />
+                                <span>Open in Google Maps</span>
+                                <ExternalLink size={13} />
+                            </a>
+                        )}
                         <button
                             onClick={onClose}
                             style={{
@@ -1216,6 +1248,36 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                     </div>
                                 </div>
                             </div>
+
+                            {/* OPEN IN GOOGLE MAPS ACTION BUTTON */}
+                            {googleMapsUrl && (
+                                <a
+                                    href={googleMapsUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: "8px",
+                                        width: "100%",
+                                        padding: "12px",
+                                        borderRadius: "14px",
+                                        background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                                        color: "#ffffff",
+                                        fontSize: "12px",
+                                        fontWeight: 800,
+                                        textDecoration: "none",
+                                        boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+                                        marginBottom: "18px",
+                                        transition: "all 0.2s ease",
+                                    }}
+                                >
+                                    <Navigation size={15} />
+                                    <span>Open in Google Maps</span>
+                                    <ExternalLink size={14} />
+                                </a>
+                            )}
 
 
                             {/* LOCATION */}
@@ -1830,6 +1892,35 @@ export default function BeatMapView({ beat, filterUserId, assignmentMode = "SUPE
                                                             {pointType}
                                                         </div>
                                                     </div>
+
+                                                    {(() => {
+                                                        const pLat = Number(point?.latitude ?? point?.lat);
+                                                        const pLng = Number(point?.longitude ?? point?.lng ?? point?.lon);
+                                                        const pUrl = getPointGoogleMapsUrl(pLat, pLng);
+                                                        if (!pUrl) return null;
+                                                        return (
+                                                            <a
+                                                                href={pUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                style={{
+                                                                    width: "28px",
+                                                                    height: "28px",
+                                                                    borderRadius: "8px",
+                                                                    background: "#eff6ff",
+                                                                    color: "#2563eb",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    textDecoration: "none",
+                                                                    flexShrink: 0,
+                                                                }}
+                                                                title={`Open ${point?.code || `P${index + 1}`} in Google Maps`}
+                                                            >
+                                                                <ExternalLink size={13} />
+                                                            </a>
+                                                        );
+                                                    })()}
                                                 </div>
                                             );
                                         }

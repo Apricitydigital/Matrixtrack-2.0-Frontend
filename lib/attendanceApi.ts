@@ -323,12 +323,14 @@ export const AttendanceApi = {
       `/city/attendance/dashboard${toQueryString(query)}`
     ),
 
-  registeredEmployees: (query: { cityId?: string; from?: string; to?: string; employeeGroup?: string } = {}) => {
+  registeredEmployees: (query: { cityId?: string; from?: string; to?: string; employeeGroup?: string; zoneId?: string; wardId?: string } = {}) => {
     const params = new URLSearchParams();
     if (query.cityId) params.set("cityId", query.cityId);
     if (query.from) params.set("from", query.from);
     if (query.to) params.set("to", query.to);
     if (query.employeeGroup) params.set("employeeGroup", query.employeeGroup);
+    if (query.zoneId) params.set("zoneId", query.zoneId);
+    if (query.wardId) params.set("wardId", query.wardId);
     const qs = params.toString() ? `?${params.toString()}` : "";
     return apiFetch<RegisteredEmployeesResponse>(`/city/attendance/registered-employees${qs}`);
   },

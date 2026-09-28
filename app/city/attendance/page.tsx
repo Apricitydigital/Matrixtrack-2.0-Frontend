@@ -1883,6 +1883,9 @@ function AttendanceDashboard() {
       cityId: attendanceCityId,
       from,
       to,
+      zoneId: appliedFilters.zoneId || undefined,
+      wardId: appliedFilters.wardId || undefined,
+      employeeGroup: employeeGroup === "ALL" ? undefined : employeeGroup,
     })
       .then((result) => {
         if (!cancelled) setRegisteredEmpData(result);
