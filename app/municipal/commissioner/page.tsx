@@ -75,6 +75,7 @@ import UniversalReportModal from '@components/UniversalReportModal';
 import { useAuth } from '@hooks/useAuth';
 
 import {
+  apiFetch,
   AreaBeatApi,
   CityUserApi,
   GeoApi,
@@ -195,6 +196,9 @@ type GeoPerformanceRow = {
   wards: WardRankingRow[];
 
   inspectionStats: InspectionStats;
+
+  inspectionRequired: number;
+  inspectionCompleted: number;
 };
 
 type DrilldownState = {
@@ -209,6 +213,17 @@ type DrilldownState = {
   inspectionRecords?: DashboardRecord[];
   attendanceEmployees?: AttendanceEmployeeSummary[];
   wardRows?: WardRankingRow[];
+
+  inspectionModuleCompletion?: Partial<
+    Record<
+      InspectionModuleKey,
+      {
+        required: number;
+        completed: number;
+        performance: number | null;
+      }
+    >
+  >;
 };
 
 
@@ -1378,6 +1393,335 @@ function inspectionStats(
 }
 
 
+
+function inclusiveDayCount(
+  from?: string | null,
+  to?: string | null
+) {
+  if (!from && !to) return 1;
+
+  const startText = from || to;
+  const endText = to || from;
+
+  if (!startText || !endText) return 1;
+
+  const start = new Date(`${startText}T00:00:00`);
+  const end = new Date(`${endText}T00:00:00`);
+
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime())
+  ) {
+    return 1;
+  }
+
+  const diff =
+    Math.floor(
+      (end.getTime() - start.getTime()) /
+      86400000
+    );
+
+  return Math.max(1, diff + 1);
+}
+
+
+function completionRate(
+  completed: number,
+  required: number
+): number | null {
+  if (required <= 0) return null;
+
+  return (
+    completed /
+    required
+  ) * 100;
+}
+
+
+function nonDraftInspectionCount(
+  records: DashboardRecord[]
+) {
+  return records.filter(
+    (item) =>
+      effectiveStatus(item) !== 'DRAFT'
+  ).length;
+}
+
+
+function inspectionRecordDateKey(
+  item: DashboardRecord
+) {
+  const raw =
+    item?.createdAt ||
+    item?.submittedAt ||
+    item?.visitedAt ||
+    item?.updatedAt;
+
+  if (!raw) return '';
+
+  const date =
+    new Date(raw);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return '';
+  }
+
+  const year =
+    date.getFullYear();
+
+  const month =
+    String(
+      date.getMonth() + 1
+    ).padStart(2, '0');
+
+  const day =
+    String(
+      date.getDate()
+    ).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+
+function sweepingBeatKey(
+  item: DashboardRecord
+) {
+  const directId =
+    item?.beat?.id ||
+    item?.beatId ||
+    item?.area?.id ||
+    item?.areaId ||
+    item?.payload?.beatId ||
+    '';
+
+  if (directId) {
+    return String(
+      directId
+    );
+  }
+
+  return [
+    getRecordZone(item),
+    getRecordWard(item),
+    item?.beatName ||
+      item?.beat?.beatName ||
+      item?.areaName ||
+      getRecordTitle(item),
+  ]
+    .filter(Boolean)
+    .join('::');
+}
+
+
+function sweepingSubmittedPointIndexes(
+  item: DashboardRecord
+) {
+  const points =
+    new Set<number>();
+
+  const aggregatePoints =
+    Array.isArray(
+      item?.payload?.points
+    )
+      ? item.payload.points
+      : [];
+
+  aggregatePoints.forEach(
+    (point: any) => {
+      const index =
+        Number(
+          point?.pointIndex
+        );
+
+      if (
+        Number.isInteger(index) &&
+        index >= 0
+      ) {
+        points.add(index);
+      }
+    }
+  );
+
+  const directIndex =
+    Number(
+      item?.payload?.pointIndex
+    );
+
+  if (
+    Number.isInteger(
+      directIndex
+    ) &&
+    directIndex >= 0
+  ) {
+    points.add(
+      directIndex
+    );
+  }
+
+  /*
+   * Legacy Sweeping record without pointIndex:
+   * treat it as one submitted point so old records remain visible
+   * but do not incorrectly complete a Beat by themselves.
+   */
+  if (
+    points.size === 0 &&
+    effectiveStatus(item) !==
+      'DRAFT'
+  ) {
+    points.add(0);
+  }
+
+  return points;
+}
+
+
+function completedSweepingBeatDays(
+  records: DashboardRecord[]
+) {
+  const groups =
+    new Map<
+      string,
+      Set<number>
+    >();
+
+  records
+    .filter(
+      (item) =>
+        item.dashboardModule ===
+          'SWEEPING' &&
+        effectiveStatus(item) !==
+          'DRAFT'
+    )
+    .forEach(
+      (item) => {
+        const beatKey =
+          sweepingBeatKey(item);
+
+        const dateKey =
+          inspectionRecordDateKey(
+            item
+          );
+
+        if (
+          !beatKey ||
+          !dateKey
+        ) {
+          return;
+        }
+
+        const key =
+          `${beatKey}::${dateKey}`;
+
+        if (
+          !groups.has(key)
+        ) {
+          groups.set(
+            key,
+            new Set<number>()
+          );
+        }
+
+        const bucket =
+          groups.get(key)!;
+
+        sweepingSubmittedPointIndexes(
+          item
+        ).forEach(
+          (pointIndex) =>
+            bucket.add(
+              pointIndex
+            )
+        );
+      }
+    );
+
+  let completed = 0;
+
+  groups.forEach(
+    (points) => {
+      /*
+       * Backend business rule:
+       * normal 5-point Beat is completed when >= 3 points
+       * are assessed for that Beat/day.
+       */
+      if (
+        points.size >= 3
+      ) {
+        completed += 1;
+      }
+    }
+  );
+
+  return completed;
+}
+
+
+function completedInspectionCount(
+  records: DashboardRecord[],
+  module:
+    | DashboardModuleKey
+    | InspectionModuleKey
+) {
+  if (
+    module === 'SWEEPING'
+  ) {
+    return completedSweepingBeatDays(
+      records
+    );
+  }
+
+  if (
+    module === 'TOILET'
+  ) {
+    return nonDraftInspectionCount(
+      records.filter(
+        (item) =>
+          item.dashboardModule ===
+          'TOILET'
+      )
+    );
+  }
+
+  if (
+    module === 'LITTERBINS'
+  ) {
+    return nonDraftInspectionCount(
+      records.filter(
+        (item) =>
+          item.dashboardModule ===
+          'LITTERBINS'
+      )
+    );
+  }
+
+  if (
+    module === 'ALL'
+  ) {
+    const nonSweeping =
+      nonDraftInspectionCount(
+        records.filter(
+          (item) =>
+            item.dashboardModule !==
+            'SWEEPING'
+        )
+      );
+
+    return (
+      nonSweeping +
+      completedSweepingBeatDays(
+        records
+      )
+    );
+  }
+
+  return 0;
+}
+
+
 /* =========================================================
    LOAD ALL INSPECTION PAGES
 ========================================================= */
@@ -1553,10 +1897,104 @@ async function computePeriodMetrics(
       )
     );
 
+  const periodRecords =
+    moduleRows.flat();
+
   const inspection =
     inspectionStats(
-      moduleRows.flat()
+      periodRecords
     );
+
+  /*
+   * Commissioner Inspection Performance is operational completion:
+   *
+   *   Completed inspections / Required inspections
+   *
+   * Required per day:
+   *   Toilet     = approved operational toilets
+   *   Litter Bin = assigned operational bins
+   *   Sweeping   = total registered sub-beats / segments
+   */
+  const [
+    toiletTargetResult,
+    litterBinTargetResult,
+    sweepingTargetResult,
+  ] = await Promise.allSettled([
+    apiFetch<any>(
+      `/modules/toilet/stats${cityId ? `?cityId=${encodeURIComponent(cityId)}` : ''}`
+    ),
+    apiFetch<any>(
+      "/modules/twinbin/bins/all"
+    ),
+    AreaBeatApi.list(),
+  ]);
+
+  const targetSourcesReady =
+    toiletTargetResult.status === 'fulfilled' &&
+    litterBinTargetResult.status === 'fulfilled' &&
+    sweepingTargetResult.status === 'fulfilled';
+
+  const approvedToilets =
+    toiletTargetResult.status === 'fulfilled'
+      ? Number(
+        toiletTargetResult.value?.approvedToilets ||
+        0
+      )
+      : 0;
+
+  const litterBins =
+    litterBinTargetResult.status === 'fulfilled'
+      ? (
+        litterBinTargetResult.value?.bins ||
+        []
+      ).filter(
+        (bin: any) =>
+          String(
+            bin?.status ||
+            ''
+          ).toUpperCase() ===
+          'APPROVED'
+      )
+      : [];
+
+  const targetBeats =
+    sweepingTargetResult.status === 'fulfilled'
+      ? (
+        sweepingTargetResult.value?.beats ||
+        []
+      )
+      : [];
+
+  const sweepingBeats =
+    targetBeats.length;
+
+  const rangeDays =
+    inclusiveDayCount(
+      from,
+      to
+    );
+
+  const requiredInspections =
+    (
+      approvedToilets +
+      litterBins.length +
+      sweepingBeats
+    ) *
+    rangeDays;
+
+  const completedInspections =
+    completedInspectionCount(
+      periodRecords,
+      'ALL'
+    );
+
+  const inspectionPerformance =
+    targetSourcesReady
+      ? completionRate(
+        completedInspections,
+        requiredInspections
+      )
+      : null;
 
   const [
     attendanceResult,
@@ -1609,15 +2047,14 @@ async function computePeriodMetrics(
 
   const overallPerformance =
     averageApplicable([
-      inspection.performance,
+      inspectionPerformance,
       attendanceRate,
       wardRankingAverage,
     ]);
 
   return {
     overallPerformance,
-    inspectionPerformance:
-      inspection.performance,
+    inspectionPerformance,
     attendanceRate,
     approvalRate:
       inspection.approvalRate,
@@ -1917,7 +2354,7 @@ function KpiCard({
       style={{ perspective: '1200px' }}
       className="group block h-full w-full text-left"
     >
-      <div className="relative h-full min-h-[258px] w-full transition-transform duration-500 ease-out [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+      <div className="relative h-full min-h-[270px] w-full transition-transform duration-500 ease-out [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
         {/* FRONT */}
         <div
           className={`absolute inset-0 flex h-full w-full flex-col overflow-hidden rounded-[18px] border border-white/80 ${cardTint} shadow-[0_12px_30px_-20px_rgba(15,23,42,.32)] transition-shadow duration-300 group-hover:shadow-[0_20px_46px_-20px_rgba(15,23,42,.32)]`}
@@ -2063,20 +2500,51 @@ function KpiCard({
             </div>
           </div>
 
-          <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
-            {tooltip.map((row) => (
-              <div
-                key={`${row.label}-${row.value}`}
-                className="flex w-full min-w-0 items-center justify-between gap-1.5 rounded-[9px] bg-white/10 px-2 py-1 text-[9px] ring-1 ring-white/5"
-              >
-                <span className="min-w-0 flex-1 truncate font-semibold leading-tight text-white/75">
-                  {row.label}
-                </span>
-                <span className="shrink-0 whitespace-nowrap text-[10px] font-black leading-tight text-white">
-                  {row.value}
-                </span>
-              </div>
-            ))}
+          <div
+            className={`mt-2 flex-1 ${
+              tooltip.length > 4
+                ? 'grid grid-cols-2 content-start gap-1.5'
+                : 'space-y-1.5'
+            }`}
+          >
+            {tooltip.map((row) => {
+              const isPrimaryInspectionMetric =
+                label === 'Inspection Performance' &&
+                (
+                  row.label === 'Required Inspections' ||
+                  row.label === 'Completed Inspections'
+                );
+
+              return (
+                <div
+                  key={`${row.label}-${row.value}`}
+                  className={`flex min-w-0 items-center justify-between gap-2 rounded-[9px] bg-white/10 px-2 py-1.5 text-[8.5px] ring-1 ring-white/5 transition hover:bg-white/20 ${
+                    isPrimaryInspectionMetric
+                      ? 'col-span-2'
+                      : ''
+                  }`}
+                >
+                  <div
+                    className="group/label relative min-w-0 flex-1"
+                    title={row.label}
+                  >
+                    <span className="block truncate font-semibold leading-tight text-white/75 group-hover/label:invisible">
+                      {row.label}
+                    </span>
+
+                    <span className="pointer-events-none absolute inset-y-[-4px] left-[-4px] z-20 hidden min-w-max items-center rounded-md bg-slate-950 px-2 text-[9px] font-bold leading-tight text-white shadow-lg group-hover/label:flex">
+                      {row.label}
+                    </span>
+
+                    
+                  </div>
+
+                  <span className="shrink-0 whitespace-nowrap text-[10px] font-black leading-tight text-white">
+                    {row.value}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           <div className="mt-1.5 shrink-0 truncate border-t border-white/10 pt-1.5 text-[8px] font-semibold text-white/60">
@@ -2396,17 +2864,36 @@ function DrilldownDrawer({
                   module.key
               );
 
+            const stats =
+              inspectionStats(
+                rows
+              );
+
+            const completion =
+              data.inspectionModuleCompletion?.[
+                module.key
+              ];
+
             return {
               ...module,
               rows,
-              stats:
-                inspectionStats(
-                  rows
-                ),
+              stats,
+              required:
+                completion?.required ??
+                0,
+              completed:
+                completion?.completed ??
+                stats.total,
+              performance:
+                completion?.performance ??
+                null,
             };
           }
         ),
-      [inspectionRows]
+      [
+        inspectionRows,
+        data.inspectionModuleCompletion,
+      ]
     );
 
   const filteredInspectionWorkspaceRows =
@@ -2601,7 +3088,66 @@ function DrilldownDrawer({
       ]
     );
 
+  const totalRequiredInspection =
+    (() => {
+      const moduleRequired =
+        Object.values(
+          data.inspectionModuleCompletion ||
+          {}
+        ).reduce(
+          (
+            total: number,
+            item: any
+          ) =>
+            total +
+            Number(
+              item?.required ||
+              0
+            ),
+          0
+        );
+
+      if (
+        moduleRequired > 0
+      ) {
+        return moduleRequired;
+      }
+
+      const breakdownValue =
+        data.breakdown?.find(
+          (row) =>
+            row.label ===
+            'Required Inspections'
+        )?.value;
+
+      const parsed =
+        Number(
+          String(
+            breakdownValue || ''
+          ).replace(
+            /[^0-9.-]/g,
+            ''
+          )
+        );
+
+      return Number.isFinite(parsed)
+        ? Math.max(0, parsed)
+        : 0;
+    })();
+
+
   const inspectionWorkflowCards = [
+    {
+      key: 'REQUIRED',
+      label:
+        'Total Required Inspection',
+      value:
+        totalRequiredInspection,
+      tone:
+        'border-indigo-200 bg-indigo-50 text-indigo-700',
+      filterable:
+        false,
+    },
     {
       key: 'ALL',
       label:
@@ -2934,10 +3480,14 @@ function DrilldownDrawer({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
                     {inspectionWorkflowCards.map(
                       (item) => {
+                        const filterable =
+                          item.filterable !== false;
+
                         const active =
+                          filterable &&
                           inspectionWorkflowFilter ===
                           item.key;
 
@@ -2946,6 +3496,10 @@ function DrilldownDrawer({
                             key={item.key}
                             type="button"
                             onClick={() => {
+                              if (!filterable) {
+                                return;
+                              }
+
                               setInspectionWorkflowFilter(
                                 item.key
                               );
@@ -3003,7 +3557,7 @@ function DrilldownDrawer({
                               );
                               setPage(1);
                             }}
-                            className={`rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${active
+                            className={`min-h-[190px] rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${active
                               ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100'
                               : 'border-slate-200 bg-white'
                               }`}
@@ -3014,13 +3568,15 @@ function DrilldownDrawer({
                               </div>
 
                               <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black text-slate-600">
-                                {module.stats.total}
+                                {module.completed.toLocaleString('en-IN')}
+                                {' / '}
+                                {module.required.toLocaleString('en-IN')}
                               </div>
                             </div>
 
                             <div className="mt-2 text-xl font-black text-slate-950">
                               {percentText(
-                                module.stats.performance
+                                module.performance
                               )}
                             </div>
 
@@ -5333,6 +5889,136 @@ export default function CommissionerDashboard() {
     };
   }, []);
 
+
+  /*
+   * Operational inspection targets used only by the Commissioner
+   * completion KPI. These are asset registries, not inspection
+   * submissions.
+   */
+  const [
+    inspectionTargets,
+    setInspectionTargets,
+  ] = useState<{
+    ready: boolean;
+    approvedToilets: number;
+    approvedToiletsByZone: Array<{
+      zoneId: string;
+      count: number;
+    }>;
+    approvedToiletsByWard: Array<{
+      wardId: string;
+      count: number;
+    }>;
+    litterBins: any[];
+    beats: any[];
+  }>({
+    ready: false,
+    approvedToilets: 0,
+    approvedToiletsByZone: [],
+    approvedToiletsByWard: [],
+    litterBins: [],
+    beats: [],
+  });
+
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      const [
+        toiletResult,
+        litterBinResult,
+        beatsResult,
+      ] = await Promise.allSettled([
+        apiFetch<any>(
+          `/modules/toilet/stats${cityId ? `?cityId=${encodeURIComponent(cityId)}` : ''}`
+        ),
+        apiFetch<any>(
+          "/modules/twinbin/bins/all"
+        ),
+        AreaBeatApi.list(),
+      ]);
+
+      if (!active) return;
+
+      const ready =
+        toiletResult.status === 'fulfilled' &&
+        litterBinResult.status === 'fulfilled' &&
+        beatsResult.status === 'fulfilled';
+
+      if (!ready) {
+        console.error(
+          '[Commissioner] Unable to load one or more inspection target sources.',
+          {
+            toilet:
+              toiletResult.status,
+            litterBin:
+              litterBinResult.status,
+            sweeping:
+              beatsResult.status,
+          }
+        );
+      }
+
+      setInspectionTargets({
+        ready,
+
+        approvedToilets:
+          toiletResult.status === 'fulfilled'
+            ? Number(
+              toiletResult.value?.approvedToilets ||
+              0
+            )
+            : 0,
+
+        approvedToiletsByZone:
+          toiletResult.status === 'fulfilled'
+            ? (
+              toiletResult.value?.approvedToiletsByZone ||
+              []
+            )
+            : [],
+
+        approvedToiletsByWard:
+          toiletResult.status === 'fulfilled'
+            ? (
+              toiletResult.value?.approvedToiletsByWard ||
+              []
+            )
+            : [],
+
+        litterBins:
+          litterBinResult.status === 'fulfilled'
+            ? (
+              litterBinResult.value?.bins ||
+              []
+            ).filter(
+              (bin: any) =>
+                String(
+                  bin?.status ||
+                  ''
+                ).toUpperCase() ===
+                'APPROVED'
+            )
+            : [],
+
+        beats:
+          beatsResult.status === 'fulfilled'
+            ? (
+              beatsResult.value?.beats ||
+              []
+            )
+            : [],
+      });
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [cityId]);
+
+
+
   const cityUsersByRole = useMemo(() => {
     const map = new Map<string, CityUserSummary[]>();
     cityUsers.forEach((entry) => {
@@ -5378,6 +6064,172 @@ export default function CommissionerDashboard() {
     useState(
       initial.to
     );
+
+
+  const requiredInspectionsFor =
+    useCallback(
+      (
+        module:
+          | DashboardModuleKey
+          | InspectionModuleKey,
+        zone = 'ALL',
+        ward = 'ALL'
+      ) => {
+        if (!inspectionTargets.ready) {
+          return 0;
+        }
+
+        const days =
+          inclusiveDayCount(
+            appliedFrom,
+            appliedTo
+          );
+
+        const matchesGeo = (
+          asset: any
+        ) => {
+          const assetZone =
+            asset?.zoneName ||
+            asset?.zone?.name ||
+            asset?.ward?.zone?.name ||
+            geoNameById.get(
+              String(
+                asset?.zoneId ||
+                asset?.ward?.zoneId ||
+                ''
+              )
+            ) ||
+            '';
+
+          const assetWard =
+            asset?.wardName ||
+            asset?.ward?.name ||
+            geoNameById.get(
+              String(
+                asset?.wardId ||
+                ''
+              )
+            ) ||
+            '';
+
+          if (
+            zone !== 'ALL' &&
+            assetZone !== zone
+          ) {
+            return false;
+          }
+
+          if (
+            ward !== 'ALL' &&
+            assetWard !== ward
+          ) {
+            return false;
+          }
+
+          return true;
+        };
+
+
+        let toiletDaily = 0;
+
+        if (ward !== 'ALL') {
+          toiletDaily =
+            inspectionTargets
+              .approvedToiletsByWard
+              .filter(
+                (row) =>
+                  geoNameById.get(
+                    String(row.wardId)
+                  ) === ward
+              )
+              .reduce(
+                (
+                  total,
+                  row
+                ) =>
+                  total +
+                  Number(row.count || 0),
+                0
+              );
+        } else if (zone !== 'ALL') {
+          toiletDaily =
+            inspectionTargets
+              .approvedToiletsByZone
+              .filter(
+                (row) =>
+                  geoNameById.get(
+                    String(row.zoneId)
+                  ) === zone
+              )
+              .reduce(
+                (
+                  total,
+                  row
+                ) =>
+                  total +
+                  Number(row.count || 0),
+                0
+              );
+        } else {
+          toiletDaily =
+            inspectionTargets
+              .approvedToilets;
+        }
+
+
+        const litterBinDaily =
+          inspectionTargets
+            .litterBins
+            .filter(matchesGeo)
+            .length;
+
+
+        const sweepingDaily =
+          inspectionTargets
+            .beats
+            .filter(matchesGeo)
+            .length;
+
+
+        let dailyRequired = 0;
+
+        if (
+          module === 'TOILET'
+        ) {
+          dailyRequired =
+            toiletDaily;
+        } else if (
+          module === 'LITTERBINS'
+        ) {
+          dailyRequired =
+            litterBinDaily;
+        } else if (
+          module === 'SWEEPING'
+        ) {
+          dailyRequired =
+            sweepingDaily;
+        } else if (
+          module === 'ALL'
+        ) {
+          dailyRequired =
+            toiletDaily +
+            litterBinDaily +
+            sweepingDaily;
+        }
+
+        return (
+          dailyRequired *
+          days
+        );
+      },
+      [
+        inspectionTargets,
+        geoNameById,
+        appliedFrom,
+        appliedTo,
+      ]
+    );
+
 
   /* =========================
      FILTERS
@@ -6511,6 +7363,74 @@ export default function CommissionerDashboard() {
     ]);
 
 
+
+  const completionBaseRecords =
+    useMemo(() => {
+      return records.filter(
+        (item) => {
+          const zone =
+            getRecordZone(
+              item
+            );
+
+          const ward =
+            getRecordWard(
+              item
+            );
+
+          if (
+            zoneFilter !== 'ALL' &&
+            zone !== zoneFilter
+          ) {
+            return false;
+          }
+
+          if (
+            wardFilter !== 'ALL' &&
+            ward !== wardFilter
+          ) {
+            return false;
+          }
+
+          return (
+            effectiveStatus(item) !==
+            'DRAFT'
+          );
+        }
+      );
+    }, [
+      records,
+      zoneFilter,
+      wardFilter,
+    ]);
+
+
+  const completionContextRecords =
+    useMemo(() => {
+      if (
+        moduleFilter === 'ATTENDANCE' ||
+        moduleFilter === 'WARD_RANKING'
+      ) {
+        return [];
+      }
+
+      if (
+        moduleFilter === 'ALL'
+      ) {
+        return completionBaseRecords;
+      }
+
+      return completionBaseRecords.filter(
+        (item) =>
+          item.dashboardModule ===
+          moduleFilter
+      );
+    }, [
+      completionBaseRecords,
+      moduleFilter,
+    ]);
+
+
   /* =========================================================
      ATTENDANCE CONTEXT
   ========================================================= */
@@ -6842,6 +7762,42 @@ export default function CommissionerDashboard() {
       ]
     );
 
+  const inspectionRequired =
+    useMemo(
+      () =>
+        requiredInspectionsFor(
+          moduleFilter,
+          zoneFilter,
+          wardFilter
+        ),
+      [
+        requiredInspectionsFor,
+        moduleFilter,
+        zoneFilter,
+        wardFilter,
+      ]
+    );
+
+  const inspectionCompleted =
+    useMemo(
+      () =>
+        completedInspectionCount(
+          completionContextRecords,
+          moduleFilter
+        ),
+      [
+        completionContextRecords,
+      ]
+    );
+
+  const inspectionPerformance =
+    inspectionTargets.ready
+      ? completionRate(
+        inspectionCompleted,
+        inspectionRequired
+      )
+      : null;
+
   const attendanceStats =
     useMemo(() => {
       /*
@@ -7096,7 +8052,7 @@ export default function CommissionerDashboard() {
       () =>
         averageApplicable(
           [
-            inspection.performance,
+            inspectionPerformance,
             attendanceStats.rate,
             wardRankingAverage,
           ]
@@ -7123,6 +8079,37 @@ export default function CommissionerDashboard() {
         ),
       [records]
     );
+
+  const citySnapshotRequired =
+    useMemo(
+      () =>
+        requiredInspectionsFor(
+          'ALL',
+          'ALL',
+          'ALL'
+        ),
+      [
+        requiredInspectionsFor,
+      ]
+    );
+
+  const citySnapshotCompleted =
+    useMemo(
+      () =>
+        completedInspectionCount(
+          records,
+          'ALL'
+        ),
+      [records]
+    );
+
+  const citySnapshotInspectionPerformance =
+    inspectionTargets.ready
+      ? completionRate(
+        citySnapshotCompleted,
+        citySnapshotRequired
+      )
+      : null;
 
   const cityZoneCount =
     registeredZoneCount;
@@ -7154,15 +8141,43 @@ export default function CommissionerDashboard() {
                 moduleRecords
               );
 
+            const completionRecords =
+              completionBaseRecords.filter(
+                (item) =>
+                  item.dashboardModule ===
+                  module.key
+              );
+
+            const required =
+              requiredInspectionsFor(
+                module.key,
+                zoneFilter,
+                wardFilter
+              );
+
+            const completed =
+              completedInspectionCount(
+                completionRecords,
+                module.key
+              );
+
+            const modulePerformance =
+              inspectionTargets.ready
+                ? completionRate(
+                  completed,
+                  required
+                )
+                : null;
+
             return {
               key:
                 module.key as DashboardModuleKey,
               label:
                 module.label,
               performance:
-                stats.performance,
+                modulePerformance,
               count:
-                stats.total,
+                completed,
               records:
                 moduleRecords,
               employees:
@@ -7240,6 +8255,11 @@ export default function CommissionerDashboard() {
       return rows;
     }, [
       inspectionContextRecords,
+      completionBaseRecords,
+      requiredInspectionsFor,
+      inspectionTargets.ready,
+      zoneFilter,
+      wardFilter,
       attendanceContextEmployees,
       wardContextRows,
     ]);
@@ -7358,6 +8378,53 @@ export default function CommissionerDashboard() {
                 values.records
               );
 
+            const geoCompletionRecords =
+              completionBaseRecords.filter(
+                (item) => {
+                  const itemKey =
+                    level === 'ZONE'
+                      ? getRecordZone(item)
+                      : getRecordWard(item);
+
+                  return (
+                    itemKey === label &&
+                    (
+                      moduleFilter === 'ALL' ||
+                      (
+                        moduleFilter !== 'ATTENDANCE' &&
+                        moduleFilter !== 'WARD_RANKING' &&
+                        item.dashboardModule === moduleFilter
+                      )
+                    )
+                  );
+                }
+              );
+
+            const geoRequired =
+              requiredInspectionsFor(
+                moduleFilter,
+                level === 'ZONE'
+                  ? label
+                  : zoneFilter,
+                level === 'WARD'
+                  ? label
+                  : 'ALL'
+              );
+
+            const geoCompleted =
+              completedInspectionCount(
+                geoCompletionRecords,
+                moduleFilter
+              );
+
+            const geoInspectionPerformance =
+              inspectionTargets.ready
+                ? completionRate(
+                  geoCompleted,
+                  geoRequired
+                )
+                : null;
+
             const attendanceDays =
               values.employees.reduce(
                 (
@@ -7403,7 +8470,7 @@ export default function CommissionerDashboard() {
             const performance =
               averageApplicable(
                 [
-                  stats.performance,
+                  geoInspectionPerformance,
                   attendanceRate,
                   wardScore,
                 ]
@@ -7413,7 +8480,7 @@ export default function CommissionerDashboard() {
               label,
               performance,
               inspection:
-                stats.performance,
+                geoInspectionPerformance,
               attendance:
                 attendanceRate,
               approval:
@@ -7434,12 +8501,23 @@ export default function CommissionerDashboard() {
 
               inspectionStats:
                 stats,
+
+              inspectionRequired:
+                geoRequired,
+
+              inspectionCompleted:
+                geoCompleted,
             };
           }
         );
       },
       [
         filteredInspectionRecords,
+        completionBaseRecords,
+        requiredInspectionsFor,
+        inspectionTargets.ready,
+        moduleFilter,
+        zoneFilter,
         filteredAttendanceEmployees,
         filteredWardRows,
       ]
@@ -9028,6 +10106,22 @@ export default function CommissionerDashboard() {
       },
       {
         label:
+          'Completed Inspections',
+        value:
+          row.inspectionCompleted.toLocaleString(
+            'en-IN'
+          ),
+      },
+      {
+        label:
+          'Required Inspections',
+        value:
+          row.inspectionRequired.toLocaleString(
+            'en-IN'
+          ),
+      },
+      {
+        label:
           'Attendance',
         value:
           percentText(
@@ -9104,6 +10198,54 @@ export default function CommissionerDashboard() {
         recordsForDrill
       );
 
+    const inspectionModuleCompletion =
+      Object.fromEntries(
+        INSPECTION_MODULES.map(
+          (module) => {
+            const completed =
+              completedInspectionCount(
+                completionBaseRecords.filter(
+                  (item) =>
+                    item.dashboardModule ===
+                    module.key
+                ),
+                module.key
+              );
+
+            const required =
+              requiredInspectionsFor(
+                module.key,
+                zoneFilter,
+                wardFilter
+              );
+
+            return [
+              module.key,
+              {
+                required,
+                completed,
+                performance:
+                  inspectionTargets.ready
+                    ? completionRate(
+                      completed,
+                      required
+                    )
+                    : null,
+              },
+            ];
+          }
+        )
+      ) as Partial<
+        Record<
+          InspectionModuleKey,
+          {
+            required: number;
+            completed: number;
+            performance: number | null;
+          }
+        >
+      >;
+
     setDrilldown({
       title,
       value,
@@ -9159,6 +10301,8 @@ export default function CommissionerDashboard() {
       ],
       inspectionRecords:
         recordsForDrill,
+
+      inspectionModuleCompletion,
     });
   }
 
@@ -9176,7 +10320,7 @@ export default function CommissionerDashboard() {
             'Inspection Performance',
           value:
             percentText(
-              inspection.performance
+              inspectionPerformance
             ),
         },
         {
@@ -10083,7 +11227,7 @@ export default function CommissionerDashboard() {
               loading
                 ? '—'
                 : percentText(
-                  inspection.performance
+                  inspectionPerformance
                 )
             }
             lastMonthValue={
@@ -10110,9 +11254,17 @@ export default function CommissionerDashboard() {
             tooltip={[
               {
                 label:
-                  'Total Inspection',
+                  'Required Inspections',
                 value:
-                  inspection.total.toLocaleString(
+                  inspectionRequired.toLocaleString(
+                    'en-IN'
+                  ),
+              },
+              {
+                label:
+                  'Completed Inspections',
+                value:
+                  inspectionCompleted.toLocaleString(
                     'en-IN'
                   ),
               },
@@ -10186,7 +11338,7 @@ export default function CommissionerDashboard() {
                 'Inspection Performance',
                 filteredInspectionRecords,
                 percentText(
-                  inspection.performance
+                  inspectionPerformance
                 )
               )
             }
@@ -10530,9 +11682,9 @@ export default function CommissionerDashboard() {
               type="button"
               onClick={() =>
                 openInspectionMetric(
-                  'Total Inspection',
+                  'Completed Inspections',
                   records,
-                  citySnapshotStats.total.toLocaleString(
+                  citySnapshotCompleted.toLocaleString(
                     'en-IN'
                   )
                 )
@@ -10544,12 +11696,17 @@ export default function CommissionerDashboard() {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100/80 text-sky-700">
                     <ClipboardList size={16} />
                   </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    Total Inspection
+                  <div>
+                    <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+                      Completed Inspections
+                    </div>
+                    <div className="mt-1 text-[8px] font-bold text-slate-400">
+                      Required {citySnapshotRequired.toLocaleString('en-IN')}
+                    </div>
                   </div>
                 </div>
                 <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.total}
+                  {citySnapshotCompleted}
                 </div>
               </div>
             </button>
