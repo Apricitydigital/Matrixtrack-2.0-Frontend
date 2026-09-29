@@ -150,11 +150,12 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
             .filter((u) =>
                 (u.name || "").toLowerCase().includes(q) ||
                 (u.email || "").toLowerCase().includes(q) ||
-                (u.phone || "").toLowerCase().includes(q)
+                (u.phone || "").toLowerCase().includes(q) ||
+                (u.employeeId || u.empId || u.employeeCode || u.aadhaar || u.code || "").toLowerCase().includes(q)
             )
             .sort((a, b) =>
                 (a.currentBeatCount || 0) -
-                    (b.currentBeatCount || 0) ||
+                (b.currentBeatCount || 0) ||
                 String(a.name || "").localeCompare(
                     String(b.name || "")
                 )
@@ -345,7 +346,7 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
                                 <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
-                                    placeholder={isDaroga ? "Search daroga by name, email or phone..." : "Search employee by name, email or phone..."}
+                                    placeholder={isDaroga ? "Search daroga by name, ID, phone..." : "Search employee by name, ID, phone..."}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
@@ -358,38 +359,47 @@ export default function AssignBeatModal({ beat, initialSelectedSegmentIds = [], 
                                         <Loader2 className="animate-spin text-blue-600" />
                                         Loading {isDaroga ? "darogas" : "employees"}...
                                     </div>
-                                ) : filteredUsers.map((user: any) => (
-                                    <div
-                                        key={user.id}
-                                        className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${user.matchesContext ? "border-slate-200 bg-slate-50/60 hover:bg-slate-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
-                                    >
-                                        <div className="flex min-w-0 items-center gap-3">
-                                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${user.matchesContext ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
-                                                {getInitials(user.name)}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="truncate font-bold text-slate-900">{user.name}</div>
-                                                {(user.email || user.phone) && (
-                                                    <div className="truncate text-xs text-slate-500">
-                                                        {[user.email, user.phone].filter(Boolean).join(" · ")}
+                                ) : filteredUsers.map((user: any) => {
+                                    const empCode = user.employeeId || user.empId || user.employeeCode || user.aadhaar || user.code;
+                                    return (
+                                        <div
+                                            key={user.id}
+                                            className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${user.matchesContext ? "border-slate-200 bg-slate-50/60 hover:bg-slate-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+                                        >
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${user.matchesContext ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
+                                                    {getInitials(user.name)}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 truncate font-bold text-slate-900">
+                                                        <span className="truncate">{user.name}</span>
                                                     </div>
-                                                )}
-                                                <div className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${user.matchesContext ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                                                    <MapPin size={10} />
-                                                    {user.matchesContext ? "Matches this zone/ward" : "Outside current zone/ward"}
+                                                    <div className="truncate text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                                        {empCode ? (
+                                                            <span className="font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 px-1.5 py-0.5 rounded text-[11px] shrink-0">
+                                                                ID: {empCode}
+                                                            </span>
+                                                        ) : null}
+                                                        {user.phone ? <span>📞 {user.phone}</span> : null}
+                                                        {user.email && !empCode && !user.phone ? <span>{user.email}</span> : null}
+                                                    </div>
+                                                    <div className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${user.matchesContext ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                                                        <MapPin size={10} />
+                                                        {user.matchesContext ? "Matches this zone/ward" : "Outside current zone/ward"}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAssign(user.id)}
+                                                disabled={actionsDisabled}
+                                                className={`flex min-w-[88px] shrink-0 items-center justify-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed ${actionsDisabled && assigningUserId !== user.id ? "opacity-50" : ""}`}
+                                            >
+                                                {loading && assigningUserId === user.id ? <Loader2 size={16} className="animate-spin" /> : "Assign"}
+                                            </button>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleAssign(user.id)}
-                                            disabled={actionsDisabled}
-                                            className={`flex min-w-[88px] shrink-0 items-center justify-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed ${actionsDisabled && assigningUserId !== user.id ? "opacity-50" : ""}`}
-                                        >
-                                            {loading && assigningUserId === user.id ? <Loader2 size={16} className="animate-spin" /> : "Assign"}
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
 
                                 {!fetching && filteredUsers.length === 0 && (
                                     <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
