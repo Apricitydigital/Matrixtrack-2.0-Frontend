@@ -2501,50 +2501,23 @@ function KpiCard({
           </div>
 
           <div
-            className={`mt-2 flex-1 ${
-              tooltip.length > 4
-                ? 'grid grid-cols-2 content-start gap-1.5'
-                : 'space-y-1.5'
-            }`}
+            className="mt-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-color:rgba(255,255,255,.45)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/40 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1"
+            onWheel={(event) => event.stopPropagation()}
           >
-            {tooltip.map((row) => {
-              const isPrimaryInspectionMetric =
-                label === 'Inspection Performance' &&
-                (
-                  row.label === 'Required Inspections' ||
-                  row.label === 'Completed Inspections'
-                );
-
-              return (
-                <div
-                  key={`${row.label}-${row.value}`}
-                  className={`flex min-w-0 items-center justify-between gap-2 rounded-[9px] bg-white/10 px-2 py-1.5 text-[8.5px] ring-1 ring-white/5 transition hover:bg-white/20 ${
-                    isPrimaryInspectionMetric
-                      ? 'col-span-2'
-                      : ''
-                  }`}
-                >
-                  <div
-                    className="group/label relative min-w-0 flex-1"
-                    title={row.label}
-                  >
-                    <span className="block truncate font-semibold leading-tight text-white/75 group-hover/label:invisible">
-                      {row.label}
-                    </span>
-
-                    <span className="pointer-events-none absolute inset-y-[-4px] left-[-4px] z-20 hidden min-w-max items-center rounded-md bg-slate-950 px-2 text-[9px] font-bold leading-tight text-white shadow-lg group-hover/label:flex">
-                      {row.label}
-                    </span>
-
-                    
-                  </div>
-
-                  <span className="shrink-0 whitespace-nowrap text-[10px] font-black leading-tight text-white">
-                    {row.value}
-                  </span>
-                </div>
-              );
-            })}
+            {tooltip.map((row) => (
+              <div
+                key={`${row.label}-${row.value}`}
+                className="flex w-full min-w-0 shrink-0 items-center justify-between gap-2 rounded-[9px] bg-white/10 px-2 py-1 text-[9px] ring-1 ring-white/5"
+                title={`${row.label}: ${row.value}`}
+              >
+                <span className="min-w-0 flex-1 break-words font-semibold leading-tight text-white/80">
+                  {row.label}
+                </span>
+                <span className="shrink-0 whitespace-nowrap text-[10px] font-black leading-tight text-white">
+                  {row.value}
+                </span>
+              </div>
+            ))}
           </div>
 
           <div className="mt-1.5 shrink-0 truncate border-t border-white/10 pt-1.5 text-[8px] font-semibold text-white/60">

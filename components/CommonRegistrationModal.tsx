@@ -1535,6 +1535,7 @@ Sunil Sharma,sunil.emp@example.com,9876543214,,123456789014,Zone 1,Ward 1,EMPLOY
                               if (nameUpper.includes("TOILET")) displayName = "Cleanliness of Toilets";
                           if (nameUpper.includes("NALA")) displayName = "Nala";
                               if (nameUpper.includes("TASKFORCE") || nameUpper.includes("CTU") || nameUpper.includes("GVP")) displayName = "GVP";
+                              if (nameUpper.includes("PLANT")) displayName = "Plant Processing";
 
                               return (
                                 <button
