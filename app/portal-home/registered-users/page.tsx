@@ -2461,8 +2461,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
       MATRIX_TRACK: "WORKFORCE_MONITORING",
 
       PROCESSING: "MRF",
-      PROCESSING_MRF: "MRF",
-      PROCESSING_PLANT: "MRF"
+      PROCESSING_MRF: "MRF"
     };
 
     return aliases[key] || key;
@@ -3002,6 +3001,13 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                     });
                   }
 
+                  if (enabledKeys.has("PROCESSING_PLANT")) {
+                    mainSystems.push({
+                      id: "PROCESSING_PLANT",
+                      name: "Plant & Processing"
+                    });
+                  }
+
                   const selectedKeys = new Set(
                     assignedModules.map(
                       normalizeAssignedModuleKey
@@ -3033,6 +3039,9 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
                   const isProcessingActive =
                     selectedKeys.has("MRF");
+
+                  const isProcessingPlantActive =
+                    selectedKeys.has("PROCESSING_PLANT");
 
                   const removeKeys = (
                     current: string[],
@@ -3124,6 +3133,20 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                             "MRF"
                           ])
                       );
+
+                      return;
+                    }
+
+                    if (sysId === "PROCESSING_PLANT") {
+                      setAssignedModules((prev) =>
+                        isProcessingPlantActive
+                          ? removeKeys(prev, [
+                            "PROCESSING_PLANT"
+                          ])
+                          : addKeys(prev, [
+                            "PROCESSING_PLANT"
+                          ])
+                      );
                     }
                   };
 
@@ -3166,6 +3189,11 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                         if (sys.id === "MRF") {
                           isSelected =
                             isProcessingActive;
+                        }
+
+                        if (sys.id === "PROCESSING_PLANT") {
+                          isSelected =
+                            isProcessingPlantActive;
                         }
 
                         return (
