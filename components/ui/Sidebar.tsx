@@ -342,11 +342,6 @@ export default function Sidebar() {
           href: "/municipal/commissioner/user-performance",
           icon: <Users size={18} />,
         },
-        {
-          label: "AO Complaints / अधिकारी की शिकायतें",
-          href: "/municipal/commissioner/field-issues",
-          icon: <LayoutDashboard size={18} />,
-        },
       );
     } else if (isCityAdmin) {
       links.push({
