@@ -176,6 +176,14 @@ type RolePerformanceRow = {
   performance: number;
   records: DashboardRecord[];
 
+  requiredInspections?: number;
+
+  requiredByModule?: {
+    TOILET: number;
+    LITTERBINS: number;
+    SWEEPING: number;
+  };
+
   attendance?: number | null;
   attendanceEmployee?: AttendanceEmployeeSummary | null;
 };
@@ -221,6 +229,7 @@ type DrilldownState = {
         required: number;
         completed: number;
         performance: number | null;
+        assigned?: number;
       }
     >
   >;
@@ -237,11 +246,11 @@ const INSPECTION_MODULES: Array<{
 }> = [
     {
       key: 'TOILET',
-      label: 'Cleanliness of Toilets',
+      label: 'Toilet',
     },
     {
       key: 'LITTERBINS',
-      label: 'Litter Bins',
+      label: 'Litter Bin',
     },
     {
       key: 'SWEEPING',
@@ -259,11 +268,11 @@ const DASHBOARD_MODULES: Array<{
     },
     {
       key: 'TOILET',
-      label: 'Cleanliness of Toilets',
+      label: 'Toilet',
     },
     {
       key: 'LITTERBINS',
-      label: 'Litter Bins',
+      label: 'Litter Bin',
     },
     {
       key: 'SWEEPING',
@@ -271,11 +280,11 @@ const DASHBOARD_MODULES: Array<{
     },
     {
       key: 'ATTENDANCE',
-      label: 'Attendance',
+      label: 'Workforce Score',
     },
     {
       key: 'WARD_RANKING',
-      label: 'Ward Performance',
+      label: 'Ward Ranking',
     },
   ];
 
@@ -390,11 +399,11 @@ const ROLES: Array<{
     },
     {
       key: 'SUPERVISOR',
-      label: 'Daroga',
+      label: 'Daroga Score',
     },
     {
       key: 'QC',
-      label: 'Sanitary Inspector',
+      label: 'Sanitary Inspector Score',
     },
     {
       key: 'ULB_OFFICER',
@@ -402,7 +411,7 @@ const ROLES: Array<{
     },
     {
       key: 'ACTION_OFFICER',
-      label: 'IEC Member',
+      label: 'IEC Member Score',
     },
     {
       key: 'EMPLOYEE',
@@ -420,11 +429,11 @@ const METRICS: Array<{
     },
     {
       key: 'INSPECTION',
-      label: 'Inspection Performance',
+      label: 'Inspection Completion',
     },
     {
       key: 'ATTENDANCE',
-      label: 'Attendance',
+      label: 'Workforce Score',
     },
     {
       key: 'APPROVAL',
@@ -440,7 +449,7 @@ const METRICS: Array<{
     },
     {
       key: 'WARD_RANKING',
-      label: 'Ward Performance',
+      label: 'Ward Ranking',
     },
   ];
 
@@ -748,8 +757,8 @@ function heatTextClass(
   value: number
 ) {
   return value >= 66
-    ? 'text-white'
-    : 'text-slate-950';
+    ? 'text-[#10235e]'
+    : 'text-slate-950 dark:text-white';
 }
 
 
@@ -772,20 +781,86 @@ function moduleLabel(
 function recordDate(
   item: any
 ) {
+  /*
+   * Commissioner operational date.
+   *
+   * A later SI review / ULB action / AO resolution must
+   * NOT move the original inspection to another date.
+   */
   return (
-    item?.actionTakenAt ||
-    item?.actionOfficerRespondedAt ||
-    item?.updatedAt ||
-    item?.reviewedAt ||
-    item?.qcReviewedAt ||
-    item?.submittedAt ||
+    item?.operationalDate ||
     item?.inspectionDate ||
     item?.reportDate ||
-    item?.createdAt ||
+    item?.submittedAt ||
     item?.visitedAt ||
+    item?.createdAt ||
     null
   );
 }
+
+
+function inspectionModuleDisplayName(
+  module:
+    | DashboardModuleKey
+    | InspectionModuleKey
+    | string
+) {
+  switch (module) {
+    case 'SWEEPING':
+      return 'Sweeping';
+
+    case 'LITTERBINS':
+      return 'Litter Bin';
+
+    case 'TOILET':
+      return 'Toilet';
+
+    default:
+      return String(module || '—');
+  }
+}
+
+
+function cleanlinessStatusLabel(
+  item: DashboardRecord
+) {
+  const decision =
+    getQcDecision(
+      item
+    );
+
+  const status =
+    effectiveStatus(
+      item
+    );
+
+  if (
+    status === 'ACTION_TAKEN'
+  ) {
+    return 'Resolved';
+  }
+
+  if (
+    status === 'ACTION_REQUIRED'
+  ) {
+    return 'Action Required';
+  }
+
+  if (
+    decision === 'APPROVED'
+  ) {
+    return 'Clean';
+  }
+
+  if (
+    decision === 'REJECTED'
+  ) {
+    return 'Not Clean';
+  }
+
+  return 'Pending Review';
+}
+
 
 function effectiveStatus(
   item: any
@@ -1169,7 +1244,7 @@ function getRecordTitle(
       item?.toilet?.name ||
       item?.toiletName ||
       item?.name ||
-      'Cleanliness of Toilets'
+      'Toilet'
     );
   }
 
@@ -1190,7 +1265,7 @@ function getRecordTitle(
     item?.bin?.locationName ||
     item?.areaName ||
     item?.bin?.areaName ||
-    'Litter Bins'
+    'Litter Bin'
   );
 }
 
@@ -1451,11 +1526,17 @@ function nonDraftInspectionCount(
 function inspectionRecordDateKey(
   item: DashboardRecord
 ) {
+  /*
+   * Use the original operational/inspection date.
+   * Never use updatedAt or review/action timestamps here.
+   */
   const raw =
-    item?.createdAt ||
+    (item as any)?.operationalDate ||
+    (item as any)?.inspectionDate ||
+    (item as any)?.reportDate ||
     item?.submittedAt ||
     item?.visitedAt ||
-    item?.updatedAt;
+    item?.createdAt;
 
   if (!raw) return '';
 
@@ -1490,12 +1571,22 @@ function inspectionRecordDateKey(
 function sweepingBeatKey(
   item: DashboardRecord
 ) {
+  /*
+   * Existing backend Sweeping rule:
+   *
+   * segmentId is the Beat/segment asset identifier used to
+   * find the single daily Sweeping report.
+   *
+   * All submitted points for that Beat/day belong to this
+   * same segmentId.
+   */
   const directId =
+    (item as any)?.segmentId ||
     item?.beat?.id ||
     item?.beatId ||
+    item?.payload?.beatId ||
     item?.area?.id ||
     item?.areaId ||
-    item?.payload?.beatId ||
     '';
 
   if (directId) {
@@ -1504,18 +1595,20 @@ function sweepingBeatKey(
     );
   }
 
+  /*
+   * Legacy fallback only when no real identifier exists.
+   */
   return [
     getRecordZone(item),
     getRecordWard(item),
     item?.beatName ||
-      item?.beat?.beatName ||
-      item?.areaName ||
-      getRecordTitle(item),
+    item?.beat?.beatName ||
+    item?.areaName ||
+    getRecordTitle(item),
   ]
     .filter(Boolean)
     .join('::');
 }
-
 
 function sweepingSubmittedPointIndexes(
   item: DashboardRecord
@@ -1570,7 +1663,7 @@ function sweepingSubmittedPointIndexes(
   if (
     points.size === 0 &&
     effectiveStatus(item) !==
-      'DRAFT'
+    'DRAFT'
   ) {
     points.add(0);
   }
@@ -1592,9 +1685,9 @@ function completedSweepingBeatDays(
     .filter(
       (item) =>
         item.dashboardModule ===
-          'SWEEPING' &&
+        'SWEEPING' &&
         effectiveStatus(item) !==
-          'DRAFT'
+        'DRAFT'
     )
     .forEach(
       (item) => {
@@ -1906,7 +1999,7 @@ async function computePeriodMetrics(
     );
 
   /*
-   * Commissioner Inspection Performance is operational completion:
+   * Commissioner Inspection Completion is operational completion:
    *
    *   Completed inspections / Required inspections
    *
@@ -2156,7 +2249,7 @@ function IconBadge({
 
 /* =========================================================
    CIRCULAR PROGRESS
-   (Top / Worst Performance rings - presentation only, the
+   (Top / Lowest Cleanliness Performance rings - presentation only, the
    value/name/onClick it renders come straight from the
    existing rankedZones/rankedWards rows)
 ========================================================= */
@@ -2303,7 +2396,7 @@ function KpiCard({
           accentText: 'text-violet-400',
         };
 
-      case 'Inspection Performance':
+      case 'Inspection Completion':
         return {
           cornerIcon: <Eye size={15} strokeWidth={2.8} />,
           accentText: 'text-blue-400',
@@ -2333,7 +2426,7 @@ function KpiCard({
           accentText: 'text-orange-400',
         };
 
-      case 'Ward Performance':
+      case 'Ward Ranking':
         return {
           cornerIcon: <Trophy size={15} strokeWidth={2.8} />,
           accentText: 'text-violet-400',
@@ -2404,14 +2497,14 @@ function KpiCard({
 
             {/* large primary icon */}
             <div
-              className={`absolute bottom-1 left-1/2 z-10 flex h-[52px] w-[52px] -translate-x-1/2 items-center justify-center rounded-[15px] bg-gradient-to-br ${iconGradient} text-white shadow-[0_10px_18px_-9px_rgba(15,23,42,.45)] ring-[3px] ring-white/45 [&>svg]:h-[26px] [&>svg]:w-[26px]`}
+              className={`absolute bottom-1 left-1/2 z-10 flex h-[52px] w-[52px] -translate-x-1/2 items-center justify-center rounded-[15px] bg-gradient-to-br ${iconGradient} text-[#10235e] shadow-[0_10px_18px_-9px_rgba(15,23,42,.45)] ring-[3px] ring-white/45 [&>svg]:h-[26px] [&>svg]:w-[26px]`}
             >
               {icon}
             </div>
 
             {/* small top-right secondary icon */}
             <div
-              className={`absolute right-3 top-3 z-20 flex h-[28px] w-[28px] items-center justify-center rounded-[9px] bg-gradient-to-br ${iconGradient} text-white shadow-[0_6px_14px_-7px_rgba(15,23,42,.45)] ring-2 ring-white/70 [&>svg]:h-[13px] [&>svg]:w-[13px]`}
+              className={`absolute right-3 top-3 z-20 flex h-[28px] w-[28px] items-center justify-center rounded-[9px] bg-gradient-to-br ${iconGradient} text-[#10235e] shadow-[0_6px_14px_-7px_rgba(15,23,42,.45)] ring-2 ring-white/70 [&>svg]:h-[13px] [&>svg]:w-[13px]`}
             >
               {visual.cornerIcon}
             </div>
@@ -2463,7 +2556,7 @@ function KpiCard({
                   </div>
                 </div>
               ) : (
-                <div className="flex min-h-[30px] items-center text-[10px] font-semibold text-slate-400">
+                <div className="flex min-h-[30px] items-center text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                   No prior data
                 </div>
               )}
@@ -2483,7 +2576,7 @@ function KpiCard({
 
         {/* BACK - existing drill/tooltip behaviour preserved */}
         <div
-          className={`absolute inset-0 flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-gradient-to-br ${iconGradient} p-3.5 text-white shadow-[0_14px_34px_-18px_rgba(15,23,42,.45)]`}
+          className={`absolute inset-0 flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/10 bg-gradient-to-br ${iconGradient} p-3.5 text-[#10235e] shadow-[0_14px_34px_-18px_rgba(15,23,42,.45)]`}
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
@@ -2491,7 +2584,7 @@ function KpiCard({
           }}
         >
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1 text-[9.5px] font-black uppercase leading-[1.35] tracking-[0.1em] text-white/75">
+            <div className="min-w-0 flex-1 text-[9.5px] font-black uppercase leading-[1.35] tracking-[0.1em] text-[#10235e]/75">
               {label}
             </div>
 
@@ -2510,17 +2603,17 @@ function KpiCard({
                 className="flex w-full min-w-0 shrink-0 items-center justify-between gap-2 rounded-[9px] bg-white/10 px-2 py-1 text-[9px] ring-1 ring-white/5"
                 title={`${row.label}: ${row.value}`}
               >
-                <span className="min-w-0 flex-1 break-words font-semibold leading-tight text-white/80">
+                <span className="min-w-0 flex-1 break-words font-semibold leading-tight text-[#10235e]/80">
                   {row.label}
                 </span>
-                <span className="shrink-0 whitespace-nowrap text-[10px] font-black leading-tight text-white">
+                <span className="shrink-0 whitespace-nowrap text-[10px] font-black leading-tight text-[#10235e]">
                   {row.value}
                 </span>
               </div>
             ))}
           </div>
 
-          <div className="mt-1.5 shrink-0 truncate border-t border-white/10 pt-1.5 text-[8px] font-semibold text-white/60">
+          <div className="mt-1.5 shrink-0 truncate border-t border-white/10 pt-1.5 text-[8px] font-semibold text-[#10235e]/60">
             Breakdown for the current filter
           </div>
         </div>
@@ -2574,8 +2667,7 @@ function DrilldownDrawer({
         list.push({
           key:
             'INSPECTION',
-          label:
-            'Inspection & Performance',
+          label: 'Cleanliness Performance',
         });
       }
 
@@ -2597,8 +2689,7 @@ function DrilldownDrawer({
         list.push({
           key:
             'WARD_RANKING',
-          label:
-            'Ward Performance',
+          label: 'Ward Ranking',
         });
       }
 
@@ -2614,11 +2705,28 @@ function DrilldownDrawer({
   const [page, setPage] =
     useState(1);
 
+  const initialInspectionModule =
+    data.title.endsWith(
+      'Sweeping'
+    )
+      ? 'SWEEPING'
+      : data.title.endsWith(
+        'Litter Bin'
+      )
+        ? 'LITTERBINS'
+        : data.title.endsWith(
+          'Toilet'
+        )
+          ? 'TOILET'
+          : 'ALL';
+
   const [
     inspectionModuleFilter,
     setInspectionModuleFilter,
   ] =
-    useState<string>('ALL');
+    useState<string>(
+      initialInspectionModule
+    );
 
   const [
     inspectionZoneFilter,
@@ -2672,7 +2780,7 @@ function DrilldownDrawer({
    */
   useEffect(() => {
     setInspectionModuleFilter(
-      'ALL'
+      initialInspectionModule
     );
     setInspectionZoneFilter(
       'ALL'
@@ -2828,8 +2936,14 @@ function DrilldownDrawer({
   const inspectionModuleSummaries =
     useMemo(
       () =>
-        INSPECTION_MODULES.map(
-          (module) => {
+        INSPECTION_MODULES
+          .filter(
+            (module) =>
+              initialInspectionModule === 'ALL' ||
+              module.key ===
+              initialInspectionModule
+          )
+          .map((module) => {
             const rows =
               inspectionRows.filter(
                 (item) =>
@@ -2844,7 +2958,7 @@ function DrilldownDrawer({
 
             const completion =
               data.inspectionModuleCompletion?.[
-                module.key
+              module.key
               ];
 
             return {
@@ -2860,9 +2974,12 @@ function DrilldownDrawer({
               performance:
                 completion?.performance ??
                 null,
+      assigned:
+        completion?.assigned ??
+        0,
             };
           }
-        ),
+          ),
       [
         inspectionRows,
         data.inspectionModuleCompletion,
@@ -3063,57 +3180,102 @@ function DrilldownDrawer({
 
   const totalRequiredInspection =
     (() => {
+      if (
+        initialInspectionModule !==
+        'ALL'
+      ) {
+        const completion =
+          data.inspectionModuleCompletion?.[
+          initialInspectionModule
+          ];
+
+        const parsed =
+          Number(
+            completion?.required ??
+            0
+          );
+
+        return Number.isFinite(parsed)
+          ? Math.max(0, parsed)
+          : 0;
+      }
+
       const moduleRequired =
         Object.values(
           data.inspectionModuleCompletion ||
           {}
         ).reduce(
-          (
-            total: number,
-            item: any
-          ) =>
-            total +
+          (sum, item) =>
+            sum +
             Number(
-              item?.required ||
-              0
+              item?.required || 0
             ),
           0
         );
 
-      if (
-        moduleRequired > 0
-      ) {
-        return moduleRequired;
-      }
-
-      const breakdownValue =
-        data.breakdown?.find(
-          (row) =>
-            row.label ===
-            'Required Inspections'
-        )?.value;
-
-      const parsed =
-        Number(
-          String(
-            breakdownValue || ''
-          ).replace(
-            /[^0-9.-]/g,
-            ''
-          )
-        );
-
-      return Number.isFinite(parsed)
-        ? Math.max(0, parsed)
+      return Number.isFinite(
+        moduleRequired
+      )
+        ? Math.max(
+          0,
+          moduleRequired
+        )
         : 0;
     })();
 
 
+  const isSweepingDrawer =
+    initialInspectionModule ===
+    'SWEEPING';
+
+  const isLitterBinDrawer =
+    initialInspectionModule ===
+    'LITTERBINS';
+
+  const isToiletDrawer =
+    initialInspectionModule ===
+    'TOILET';
+
+  const inspectionUnitLabel =
+    isSweepingDrawer
+      ? 'Beats'
+      : isLitterBinDrawer
+        ? 'Litter Bins'
+        : isToiletDrawer
+          ? 'Toilets'
+          : '';
+
   const inspectionWorkflowCards = [
+    {
+      key: 'ASSIGNED',
+      label:
+        isSweepingDrawer
+          ? 'Assigned Beats'
+          : isLitterBinDrawer
+            ? 'Assigned Litter Bins'
+            : isToiletDrawer
+              ? 'Assigned Toilets'
+              : 'Assigned',
+      value:
+        initialInspectionModule === 'ALL'
+          ? 0
+          : (
+              data.inspectionModuleCompletion?.[
+                initialInspectionModule
+              ]?.assigned ??
+              0
+            ),
+      tone:
+        'border-indigo-200 bg-indigo-50 text-indigo-700',
+      filterable:
+        false,
+    },
     {
       key: 'REQUIRED',
       label:
-        'Total Required Inspection',
+        isSweepingDrawer
+          ? 'Inspections Required'
+          : 'Required Inspections',
       value:
         totalRequiredInspection,
       tone:
@@ -3124,7 +3286,9 @@ function DrilldownDrawer({
     {
       key: 'ALL',
       label:
-        'Total Inspection',
+        isSweepingDrawer
+          ? 'Completed Beats'
+          : 'Completed Inspections',
       value:
         inspectionOverviewStats.total,
       tone:
@@ -3133,7 +3297,9 @@ function DrilldownDrawer({
     {
       key: 'APPROVED',
       label:
-        'SI Approved',
+        inspectionUnitLabel
+          ? `Cleaned ${inspectionUnitLabel}`
+          : 'Cleaned',
       value:
         inspectionOverviewStats.approved,
       tone:
@@ -3142,7 +3308,9 @@ function DrilldownDrawer({
     {
       key: 'REJECTED',
       label:
-        'SI Rejected',
+        inspectionUnitLabel
+          ? `Not Cleaned ${inspectionUnitLabel}`
+          : 'Not Cleaned',
       value:
         inspectionOverviewStats.rejected,
       tone:
@@ -3151,7 +3319,9 @@ function DrilldownDrawer({
     {
       key: 'PENDING',
       label:
-        'SI Pending',
+        inspectionUnitLabel
+          ? `Pending Review ${inspectionUnitLabel}`
+          : 'Pending Review',
       value:
         inspectionOverviewStats.pending,
       tone:
@@ -3160,7 +3330,7 @@ function DrilldownDrawer({
     {
       key: 'ACTION_REQUIRED',
       label:
-        'Action Required',
+        'Attention Required',
       value:
         inspectionOverviewStats.actionRequired,
       tone:
@@ -3169,7 +3339,7 @@ function DrilldownDrawer({
     {
       key: 'ACTION_TAKEN',
       label:
-        'Action Taken',
+        'Resolved',
       value:
         inspectionOverviewStats.actionTaken,
       tone:
@@ -3178,7 +3348,7 @@ function DrilldownDrawer({
     {
       key: 'PENDING_ACTION',
       label:
-        'Pending Action',
+        'Resolution Pending',
       value:
         Math.max(
           0,
@@ -3189,6 +3359,7 @@ function DrilldownDrawer({
         'border-cyan-200 bg-cyan-50 text-cyan-700',
     },
   ];
+
 
   const resetInspectionWorkspaceFilters =
     () => {
@@ -3356,7 +3527,7 @@ function DrilldownDrawer({
         <div className="border-b border-slate-200 bg-white px-5 py-5 sm:px-7">
           <div className="flex items-start justify-between gap-5">
             <div>
-              <div className="text-lg font-black tracking-tight text-slate-950">
+              <div className="text-lg font-black tracking-tight text-slate-950 dark:text-white">
                 {data.title}
               </div>
 
@@ -3370,7 +3541,7 @@ function DrilldownDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 text-slate-500 dark:text-slate-400 dark:text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 dark:text-white"
             >
               <X size={18} />
             </button>
@@ -3385,11 +3556,11 @@ function DrilldownDrawer({
                       key={row.label}
                       className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5"
                     >
-                      <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
+                      <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">
                         {row.label}
                       </div>
 
-                      <div className="mt-1 text-sm font-black text-slate-950">
+                      <div className="mt-1 text-sm font-black text-slate-950 dark:text-white">
                         {row.value}
                       </div>
                     </div>
@@ -3416,10 +3587,13 @@ function DrilldownDrawer({
                           1
                         );
                       }}
-                      className={`rounded-xl px-4 py-2 text-xs font-black transition ${tab ===
-                        item.key
-                        ? 'bg-slate-950 text-white shadow-lg'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      className={`rounded-xl px-4 py-2 text-xs font-black transition ${tab === item.key
+                        ? item.key === 'INSPECTION'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                          : item.key === 'ATTENDANCE'
+                            ? 'border-cyan-200 bg-cyan-50 text-cyan-700 shadow-sm ring-1 ring-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-300'
+                            : 'border-violet-200 bg-violet-50 text-violet-700 shadow-sm ring-1 ring-violet-100 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                         }`}
                     >
                       {
@@ -3442,13 +3616,13 @@ function DrilldownDrawer({
 
 
                 {/* WORKFLOW */}
-                <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-3 shadow-sm">
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="text-sm font-black text-slate-950">
+                    <div className="text-sm font-black text-slate-950 dark:text-white">
                       Inspection Workflow
                     </div>
 
-                    <div className="text-[9px] font-bold text-slate-400">
+                    <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500">
                       Click to filter
                     </div>
                   </div>
@@ -3503,103 +3677,116 @@ function DrilldownDrawer({
 
 
                 {/* MODULE BIFURCATION */}
-                <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                  <div className="mb-4">
-                    <div className="text-sm font-black text-slate-950">
-                      Module Bifurcation
+                {initialInspectionModule === 'ALL' && (
+                  <section className="rounded-[22px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-4 shadow-sm sm:p-5">
+                    <div className="mb-4">
+                      <div className="text-sm font-black text-slate-950 dark:text-white">
+                        Module Bifurcation
+                      </div>
+
                     </div>
 
-                  </div>
-
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
 
 
-                    {inspectionModuleSummaries.map(
-                      (module) => {
-                        const active =
-                          inspectionModuleFilter ===
-                          module.key;
+                      {inspectionModuleSummaries.map(
+                        (module) => {
+                          const active =
+                            inspectionModuleFilter ===
+                            module.key;
 
-                        return (
-                          <button
-                            key={module.key}
-                            type="button"
-                            onClick={() => {
-                              setInspectionModuleFilter(
-                                module.key
-                              );
-                              setPage(1);
-                            }}
-                            className={`min-h-[190px] rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${active
-                              ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100'
-                              : 'border-slate-200 bg-white'
-                              }`}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="truncate text-xs font-black text-slate-900">
-                                {module.label}
+                          return (
+                            <button
+                              key={module.key}
+                              type="button"
+                              onClick={() => {
+                                setInspectionModuleFilter(
+                                  module.key
+                                );
+                                setPage(1);
+                              }}
+                              className={`min-h-[190px] rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${active
+                                ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100'
+                                : 'border-slate-200 bg-white'
+                                }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="truncate text-xs font-black text-slate-900 dark:text-slate-100">
+                                  {module.label}
+                                </div>
+
+                                <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black text-slate-600 dark:text-slate-300">
+                          Completed / Required:{' '}
+                          {module.completed.toLocaleString('en-IN')}
+                          {' / '}
+                          {module.required.toLocaleString('en-IN')}
+                        </div>
                               </div>
 
-                              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black text-slate-600">
-                                {module.completed.toLocaleString('en-IN')}
-                                {' / '}
-                                {module.required.toLocaleString('en-IN')}
-                              </div>
-                            </div>
-
-                            <div className="mt-2 text-xl font-black text-slate-950">
-                              {percentText(
-                                module.performance
-                              )}
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-3 gap-2">
-                              <div className="rounded-xl bg-emerald-50 px-3 py-2 text-center">
-                                <div className="text-[8px] font-black uppercase tracking-[0.05em] text-emerald-600">
-                                  Approved
-                                </div>
-
-                                <div className="mt-1 text-sm font-black text-emerald-800">
-                                  {module.stats.approved}
-                                </div>
+                              <div className="mt-2 text-xl font-black text-slate-950 dark:text-white">
+                                {percentText(
+                                  module.performance
+                                )}
                               </div>
 
-                              <div className="rounded-xl bg-rose-50 px-3 py-2 text-center">
-                                <div className="text-[8px] font-black uppercase tracking-[0.05em] text-rose-600">
-                                  Rejected
+                      <div className="mt-2 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
+                        <span className="text-[9px] font-black uppercase tracking-[0.06em] text-indigo-500">
+                          {module.key === 'SWEEPING'
+                            ? 'Assigned Beats'
+                            : module.key === 'LITTERBINS'
+                              ? 'Assigned Litter Bins'
+                              : 'Assigned Toilets'}
+                        </span>
+
+                        <span className="text-sm font-black text-indigo-700">
+                          {module.assigned.toLocaleString(
+                            'en-IN'
+                          )}
+                        </span>
+                      </div>
+
+                              <div className="mt-3 grid grid-cols-3 gap-2">
+                                <div className="rounded-xl bg-emerald-50 px-3 py-2 text-center">
+                                  <div className="text-[8px] font-black uppercase tracking-[0.05em] text-emerald-600">CLEAN</div>
+
+                                  <div className="mt-1 text-sm font-black text-emerald-800">
+                                    {module.stats.approved}
+                                  </div>
                                 </div>
 
-                                <div className="mt-1 text-sm font-black text-rose-800">
-                                  {module.stats.rejected}
+                                <div className="rounded-xl bg-rose-50 px-3 py-2 text-center">
+                                  <div className="text-[8px] font-black uppercase tracking-[0.05em] text-rose-600">NOT CLEAN</div>
+
+                                  <div className="mt-1 text-sm font-black text-rose-800">
+                                    {module.stats.rejected}
+                                  </div>
+                                </div>
+
+                                <div className="rounded-xl bg-amber-50 px-3 py-2 text-center">
+                                  <div className="text-[8px] font-black uppercase tracking-[0.05em] text-amber-600">PENDING REVIEW</div>
+
+                                  <div className="mt-1 text-sm font-black text-amber-800">
+                                    {module.stats.pending}
+                                  </div>
                                 </div>
                               </div>
-
-                              <div className="rounded-xl bg-amber-50 px-3 py-2 text-center">
-                                <div className="text-[8px] font-black uppercase tracking-[0.05em] text-amber-600">
-                                  Pending
-                                </div>
-
-                                <div className="mt-1 text-sm font-black text-amber-800">
-                                  {module.stats.pending}
-                                </div>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      }
-                    )}
-                  </div>
-                </section>
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  </section>
+                )}
 
 
                 {/* SMART FILTERS */}
-                <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <section className="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-3 shadow-sm">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-sm font-black text-slate-950">
+                      <div className="text-sm font-black text-slate-950 dark:text-white">
                         Smart Filters
                       </div>
-                      <div className="mt-1 text-[10px] font-semibold text-slate-500">
+                      <div className="mt-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                         Narrow the inspection records without leaving this workspace.
                       </div>
                     </div>
@@ -3609,7 +3796,7 @@ function DrilldownDrawer({
                       onClick={
                         resetInspectionWorkspaceFilters
                       }
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black text-slate-600 transition hover:bg-slate-50"
+                      className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-2 text-[10px] font-black text-slate-600 dark:text-slate-300 transition hover:bg-slate-50"
                     >
                       Reset Filters
                     </button>
@@ -3617,7 +3804,7 @@ function DrilldownDrawer({
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <label className="block">
-                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
                         Module
                       </span>
 
@@ -3655,7 +3842,7 @@ function DrilldownDrawer({
                     </label>
 
                     <label className="block">
-                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
                         Zone
                       </span>
 
@@ -3688,7 +3875,7 @@ function DrilldownDrawer({
                     </label>
 
                     <label className="block">
-                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
                         Ward
                       </span>
 
@@ -3722,7 +3909,7 @@ function DrilldownDrawer({
                     </label>
 
                     <label className="block">
-                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
                         Daroga
                       </span>
 
@@ -3756,7 +3943,7 @@ function DrilldownDrawer({
                     </label>
 
                     <label className="block">
-                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
                         Sanitary Inspector
                       </span>
 
@@ -3790,7 +3977,7 @@ function DrilldownDrawer({
                     </label>
 
                     <label className="block">
-                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
                         Workflow Status
                       </span>
 
@@ -3833,7 +4020,7 @@ function DrilldownDrawer({
 
                   <div className="mt-3">
                     <label className="block">
-                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+                      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500">
                         Search
                       </span>
 
@@ -3847,7 +4034,7 @@ function DrilldownDrawer({
                           )
                         }
                         placeholder="Search module, zone, ward, Daroga, Sanitary Inspector or status..."
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 dark:text-slate-500 focus:border-indigo-400 focus:bg-white"
                       />
                     </label>
                   </div>
@@ -3859,14 +4046,14 @@ function DrilldownDrawer({
 
 
                 {/* RECORDS TABLE */}
-                <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm">
+                <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 shadow-sm">
                   <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
                     <div>
-                      <div className="text-sm font-black text-slate-950">
+                      <div className="text-sm font-black text-slate-950 dark:text-white">
                         Inspection Records
                       </div>
 
-                      <div className="mt-0.5 text-[10px] font-semibold text-slate-500">
+                      <div className="mt-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                         Detailed operational proof for the current filter.
                       </div>
                     </div>
@@ -3883,7 +4070,7 @@ function DrilldownDrawer({
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-left">
                         <thead className="bg-slate-50">
-                          <tr className="text-[9px] font-black uppercase tracking-[0.08em] text-slate-500">
+                          <tr className="text-[9px] font-black uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400 dark:text-slate-500">
                             <th className="px-4 py-3">
                               Date
                             </th>
@@ -3955,7 +4142,7 @@ function DrilldownDrawer({
                                     }
                                     className="transition hover:bg-indigo-50/40"
                                   >
-                                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600">
+                                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                       {formatDate(
                                         recordDate(
                                           item
@@ -3963,20 +4150,20 @@ function DrilldownDrawer({
                                       )}
                                     </td>
 
-                                    <td className="px-4 py-3 text-xs font-black text-slate-900">
+                                    <td className="px-4 py-3 text-xs font-black text-slate-900 dark:text-slate-100">
                                       {
                                         item.dashboardModuleLabel
                                       }
                                     </td>
 
-                                    <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                                    <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                       {getRecordZone(
                                         item
                                       ) ||
                                         '-'}
                                     </td>
 
-                                    <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                                    <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                       {getRecordWard(
                                         item
                                       ) ||
@@ -4010,7 +4197,7 @@ function DrilldownDrawer({
                                           : decision ===
                                             'REJECTED'
                                             ? 'bg-rose-50 text-rose-700'
-                                            : 'bg-slate-100 text-slate-500'
+                                            : 'bg-slate-100 text-slate-500 dark:text-slate-400 dark:text-slate-500'
                                           }`}
                                       >
                                         {inspectionSiDecisionLabel(
@@ -4039,7 +4226,7 @@ function DrilldownDrawer({
                                             item
                                           )
                                         }
-                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
                                       >
                                         <Eye
                                           size={13}
@@ -4056,15 +4243,15 @@ function DrilldownDrawer({
                     </div>
                   ) : (
                     <div className="flex min-h-[240px] flex-col items-center justify-center p-8 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-400">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl font-black text-slate-400 dark:text-slate-500">
                         0
                       </div>
 
-                      <div className="mt-4 text-sm font-black text-slate-900">
+                      <div className="mt-4 text-sm font-black text-slate-900 dark:text-slate-100">
                         No inspections match these filters
                       </div>
 
-                      <div className="mt-1 max-w-md text-xs font-semibold text-slate-500">
+                      <div className="mt-1 max-w-md text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                         Change the module, geography, officer, workflow status or search term.
                       </div>
 
@@ -4073,7 +4260,7 @@ function DrilldownDrawer({
                         onClick={
                           resetInspectionWorkspaceFilters
                         }
-                        className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white transition hover:bg-indigo-700"
+                        className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-[#10235e] transition hover:bg-indigo-700"
                       >
                         Reset Filters
                       </button>
@@ -4085,11 +4272,11 @@ function DrilldownDrawer({
 
           {tab ===
             'ATTENDANCE' && (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-left">
                     <thead className="bg-slate-50">
-                      <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
+                      <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 dark:text-slate-500">
                         <th className="px-4 py-3">
                           Employee
                         </th>
@@ -4129,20 +4316,20 @@ function DrilldownDrawer({
                               }
                               className="transition hover:bg-cyan-50/50"
                             >
-                              <td className="px-4 py-3 text-xs font-black text-slate-950">
+                              <td className="px-4 py-3 text-xs font-black text-slate-950 dark:text-white">
                                 {
                                   item.employeeName
                                 }
                               </td>
 
-                              <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                 {item.zones?.join(
                                   ', '
                                 ) ||
                                   '—'}
                               </td>
 
-                              <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                 {item.wards?.join(
                                   ', '
                                 ) ||
@@ -4161,7 +4348,7 @@ function DrilldownDrawer({
                                 }
                               </td>
 
-                              <td className="px-4 py-3 text-xs font-black text-slate-950">
+                              <td className="px-4 py-3 text-xs font-black text-slate-950 dark:text-white">
                                 {percentText(
                                   item.attendanceRate
                                 )}
@@ -4175,7 +4362,7 @@ function DrilldownDrawer({
                                       item
                                     )
                                   }
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700"
                                 >
                                   <Eye
                                     size={
@@ -4196,11 +4383,11 @@ function DrilldownDrawer({
 
           {tab ===
             'WARD_RANKING' && (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-left">
                     <thead className="bg-slate-50">
-                      <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
+                      <tr className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 dark:text-slate-500">
                         <th className="px-4 py-3">
                           Ward
                         </th>
@@ -4230,12 +4417,12 @@ function DrilldownDrawer({
                               }
                               className="transition hover:bg-violet-50/50"
                             >
-                              <td className="px-4 py-3 text-xs font-black text-slate-950">
+                              <td className="px-4 py-3 text-xs font-black text-slate-950 dark:text-white">
                                 {item.wardName ||
                                   item.wardId}
                               </td>
 
-                              <td className="px-4 py-3 text-xs font-semibold text-slate-600">
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                 {item.zoneName ||
                                   '—'}
                               </td>
@@ -4259,7 +4446,7 @@ function DrilldownDrawer({
                                       item
                                     )
                                   }
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 py-1.5 text-[10px] font-black text-slate-700 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
                                 >
                                   <Eye
                                     size={
@@ -4298,12 +4485,12 @@ function DrilldownDrawer({
                     )
                 )
               }
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 dark:text-slate-300 disabled:opacity-40"
             >
               Previous
             </button>
 
-            <div className="text-xs font-black text-slate-500">
+            <div className="text-xs font-black text-slate-500 dark:text-slate-400 dark:text-slate-500">
               {page} / {pages}
             </div>
 
@@ -4324,7 +4511,7 @@ function DrilldownDrawer({
                     )
                 )
               }
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 dark:text-slate-300 disabled:opacity-40"
             >
               Next
             </button>
@@ -4368,7 +4555,7 @@ function AttendanceProof({
                 Attendance
               </div>
 
-              <div className="mt-1 text-xl font-black text-slate-950">
+              <div className="mt-1 text-xl font-black text-slate-950 dark:text-white">
                 {
                   employee.employeeName
                 }
@@ -4378,7 +4565,7 @@ function AttendanceProof({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100"
             >
               <X size={18} />
             </button>
@@ -4445,13 +4632,13 @@ function AttendanceProof({
                     }
                     className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                   >
-                    <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                       {
                         item.label
                       }
                     </div>
 
-                    <div className="mt-1 text-base font-black text-slate-950">
+                    <div className="mt-1 text-base font-black text-slate-950 dark:text-white">
                       {
                         item.value
                       }
@@ -4462,7 +4649,7 @@ function AttendanceProof({
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black text-slate-950">
+              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black text-slate-950 dark:text-white">
                 Attendance
               </div>
 
@@ -4500,18 +4687,18 @@ function AttendanceProof({
                           )}
                         </div>
 
-                        <div className="font-black text-slate-950">
+                        <div className="font-black text-slate-950 dark:text-white">
                           {
                             item.status
                           }
                         </div>
 
-                        <div className="font-semibold text-slate-500">
+                        <div className="font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                           {item.inTime ||
                             '—'}
                         </div>
 
-                        <div className="font-semibold text-slate-500">
+                        <div className="font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                           {item.outTime ||
                             '—'}
                         </div>
@@ -4544,59 +4731,66 @@ function WardProof({
     [
       {
         label:
-          'Attendance',
+          'Workforce Score',
         value:
-          ward.components
-            ?.workforce
-            ?.percentage,
+          wardComponentText(
+            ward.components
+              ?.workforce
+          ),
       },
       {
         label:
-          'Sweeping',
+          'Sweeping Score',
         value:
-          ward.components
-            ?.beat
-            ?.percentage,
+          wardComponentText(
+            ward.components
+              ?.beat
+          ),
       },
       {
         label:
-          'Cleanliness of Toilets',
+          'Toilet Score',
         value:
-          ward.components
-            ?.toilet
-            ?.percentage,
+          wardComponentText(
+            ward.components
+              ?.toilet
+          ),
       },
       {
         label:
-          'Litter Bins',
+          'Litter Bin Score',
         value:
-          ward.components
-            ?.litterBin
-            ?.percentage,
+          wardComponentText(
+            ward.components
+              ?.litterBin
+          ),
       },
       {
         label:
-          'Daroga',
+          'Daroga Score',
         value:
-          ward.components
-            ?.supervisor
-            ?.percentage,
+          wardComponentText(
+            ward.components
+              ?.supervisor
+          ),
       },
       {
         label:
-          'Sanitary Inspector',
+          'Sanitary Inspector Score',
         value:
-          ward.components
-            ?.qc
-            ?.percentage,
+          wardComponentText(
+            ward.components
+              ?.qc
+          ),
       },
       {
         label:
-          'IEC Member',
+          'IEC Member Score',
         value:
-          ward.components
-            ?.actionOfficer
-            ?.percentage,
+          wardComponentText(
+            ward.components
+              ?.actionOfficer
+          ),
       },
     ];
 
@@ -4616,7 +4810,7 @@ function WardProof({
               Ward Ranking
             </div>
 
-            <div className="mt-1 text-xl font-black text-slate-950">
+            <div className="mt-1 text-xl font-black text-slate-950 dark:text-white">
               {ward.wardName ||
                 ward.wardId}
             </div>
@@ -4625,7 +4819,7 @@ function WardProof({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-100"
           >
             <X size={18} />
           </button>
@@ -4646,22 +4840,22 @@ function WardProof({
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                 City Rank
               </div>
 
-              <div className="mt-1 text-2xl font-black text-slate-950">
+              <div className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
                 {ward.cityRank ??
                   '—'}
               </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+              <div className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                 Zone
               </div>
 
-              <div className="mt-1 text-base font-black text-slate-950">
+              <div className="mt-1 text-base font-black text-slate-950 dark:text-white">
                 {ward.zoneName ||
                   '—'}
               </div>
@@ -4681,7 +4875,7 @@ function WardProof({
                     key={
                       component.label
                     }
-                    className="rounded-2xl border border-slate-200 bg-white p-4"
+                    className="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-4"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <span className="text-xs font-black text-slate-700">
@@ -4690,10 +4884,8 @@ function WardProof({
                         }
                       </span>
 
-                      <span className="text-sm font-black text-slate-950">
-                        {percentText(
-                          component.value
-                        )}
+                      <span className="text-sm font-black text-slate-950 dark:text-white">
+                        {component.value}
                       </span>
                     </div>
 
@@ -4730,33 +4922,56 @@ const WARD_COMPONENT_FIELDS: Array<{
 }> = [
     {
       key: 'workforce',
-      label: 'Attendance',
+      label: 'Workforce Score',
     },
     {
       key: 'beat',
-      label: 'Sweeping',
+      label: 'Sweeping Score',
     },
     {
       key: 'toilet',
-      label: 'Cleanliness of Toilets',
+      label: 'Toilet',
     },
     {
       key: 'litterBin',
-      label: 'Litter Bins',
+      label: 'Litter Bin',
     },
     {
       key: 'supervisor',
-      label: 'Daroga',
+      label: 'Daroga Score',
     },
     {
       key: 'qc',
-      label: 'Sanitary Inspector',
+      label: 'Sanitary Inspector Score',
     },
     {
       key: 'actionOfficer',
-      label: 'IEC Member',
+      label: 'IEC Member Score',
     },
   ];
+
+
+function wardComponentText(
+  component:
+    | {
+      percentage?: number | null;
+      applicable?: boolean;
+    }
+    | null
+    | undefined
+) {
+  if (
+    !component ||
+    component.applicable === false
+  ) {
+    return 'N/A';
+  }
+
+  return percentText(
+    component.percentage
+  );
+}
+
 
 function wardCalculationText(
   ward: WardRankingRow
@@ -4769,10 +4984,10 @@ function wardCalculationText(
         ]?.applicable
     ).map(
       (field) =>
-        `${field.label} ${percentText(
+        `${field.label} ${wardComponentText(
           ward.components?.[
-            field.key
-          ]?.percentage
+          field.key
+          ]
         )}`
     );
 
@@ -4938,7 +5153,7 @@ function WardPerformanceScroller({
   if (!sortedWards.length) {
     return (
       <div
-        className="flex items-center justify-center text-xs font-bold text-slate-400"
+        className="flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500"
         style={{
           height:
             VISIBLE_ROWS *
@@ -5038,12 +5253,12 @@ function WardPerformanceScroller({
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-black text-slate-950">
+                <div className="truncate text-sm font-black text-slate-950 dark:text-white">
                   {ward.wardName ||
                     ward.wardId}
                 </div>
 
-                <div className="truncate text-[10px] font-bold text-slate-400">
+                <div className="truncate text-[10px] font-bold text-slate-400 dark:text-slate-500">
                   {ward.zoneName ||
                     'Unassigned Zone'}
                 </div>
@@ -5076,19 +5291,19 @@ function WardPerformanceScroller({
 
       {hoveredWard && (
         <div className="absolute inset-x-3 bottom-3 rounded-xl border border-indigo-100 bg-white/95 p-3 text-[11px] shadow-xl backdrop-blur">
-          <div className="font-black text-slate-950">
+          <div className="font-black text-slate-950 dark:text-white">
             {hoveredWard.wardName ||
               hoveredWard.wardId}
           </div>
 
           <div className="mt-1 font-bold text-indigo-700">
-            Overall Performance:{' '}
+            Ward Ranking:{' '}
             {percentText(
               hoveredWard.finalScore
             )}
           </div>
 
-          <div className="mt-1.5 font-semibold leading-snug text-slate-500">
+          <div className="mt-1.5 font-semibold leading-snug text-slate-500 dark:text-slate-400 dark:text-slate-500">
             {wardCalculationText(
               hoveredWard
             )}
@@ -5208,7 +5423,7 @@ function CityPerformancePulse({
         null,
     },
     {
-      metric: 'Ward Performance',
+      metric: 'Ward Ranking',
       current:
         wardRankingAverage,
       lastMonth:
@@ -5240,7 +5455,7 @@ function CityPerformancePulse({
     },
     {
       key: 'attendanceRate',
-      label: 'Attendance',
+      label: 'Workforce Score',
       value:
         attendanceRate,
       previous:
@@ -5259,7 +5474,7 @@ function CityPerformancePulse({
     },
     {
       key: 'wardRankingAverage',
-      label: 'Ward Performance',
+      label: 'Ward Ranking',
       value:
         wardRankingAverage,
       previous:
@@ -5336,17 +5551,17 @@ function CityPerformancePulse({
               City Performance Pulse
             </span>
 
-            <span className="hidden text-[10px] font-bold text-slate-400 sm:inline">
+            <span className="hidden text-[10px] font-bold text-slate-400 dark:text-slate-500 sm:inline">
               {periodLabel}
             </span>
           </div>
 
-          <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
+          <p className="mt-1.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
             City-level performance compared with last month
           </p>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -5365,7 +5580,7 @@ function CityPerformancePulse({
             <button
               type="button"
               onClick={onOverall}
-              className="group relative overflow-hidden rounded-2xl bg-[linear-gradient(145deg,#312e81_0%,#4f46e5_45%,#7c3aed_100%)] p-4 text-left text-white shadow-[0_18px_35px_-18px_rgba(79,70,229,.75)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-18px_rgba(79,70,229,.8)]"
+              className="group relative overflow-hidden rounded-2xl bg-[linear-gradient(145deg,#312e81_0%,#4f46e5_45%,#7c3aed_100%)] p-4 text-left text-[#10235e] shadow-[0_18px_35px_-18px_rgba(79,70,229,.75)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-18px_rgba(79,70,229,.8)]"
             >
               <div
                 className="pointer-events-none absolute inset-0 opacity-[0.12]"
@@ -5400,7 +5615,7 @@ function CityPerformancePulse({
               <div className="relative mt-3 flex items-center gap-2">
                 <span
                   className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black ${overallFlat
-                    ? 'border-white/15 bg-white/10 text-white/75'
+                    ? 'border-white/15 bg-white/10 text-[#10235e]/75'
                     : overallDown
                       ? 'border-rose-300/20 bg-rose-400/15 text-rose-100'
                       : 'border-emerald-300/20 bg-emerald-400/15 text-emerald-100'
@@ -5425,17 +5640,17 @@ function CityPerformancePulse({
                   )}
                 </span>
 
-                <span className="text-[10px] font-semibold text-white/65">
+                <span className="text-[10px] font-semibold text-[#10235e]/65">
                   vs last month
                 </span>
               </div>
 
               <div className="relative mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-sm">
-                  <div className="text-[8px] font-black uppercase tracking-[0.1em] text-white/55">
+                  <div className="text-[8px] font-black uppercase tracking-[0.1em] text-[#10235e]/55">
                     Last Month
                   </div>
-                  <div className="mt-1 text-sm font-black text-white">
+                  <div className="mt-1 text-sm font-black text-[#10235e]">
                     {percentText(
                       lastMonthMetrics
                         ?.overallPerformance
@@ -5444,16 +5659,16 @@ function CityPerformancePulse({
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-sm">
-                  <div className="text-[8px] font-black uppercase tracking-[0.1em] text-white/55">
+                  <div className="text-[8px] font-black uppercase tracking-[0.1em] text-[#10235e]/55">
                     Components
                   </div>
-                  <div className="mt-1 text-sm font-black text-white">
+                  <div className="mt-1 text-sm font-black text-[#10235e]">
                     3 Signals
                   </div>
                 </div>
               </div>
 
-              <div className="relative mt-3 text-[9px] font-semibold text-white/55">
+              <div className="relative mt-3 text-[9px] font-semibold text-[#10235e]/55">
                 Inspection + Attendance + Ward Ranking
               </div>
             </button>
@@ -5461,15 +5676,15 @@ function CityPerformancePulse({
             <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-3 shadow-sm backdrop-blur-sm">
               <div className="mb-2 flex items-center justify-between gap-3 px-1">
                 <div>
-                  <div className="text-[11px] font-black text-slate-800">
+                  <div className="text-[11px] font-black text-slate-800 dark:text-slate-100">
                     Performance Comparison
                   </div>
-                  <div className="text-[9px] font-semibold text-slate-400">
+                  <div className="text-[9px] font-semibold text-slate-400 dark:text-slate-500">
                     Current period vs last month
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-[9px] font-bold text-slate-500">
+                <div className="flex items-center gap-3 text-[9px] font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-indigo-600" />
                     Current
@@ -5517,7 +5732,7 @@ function CityPerformancePulse({
                     className="group rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-slate-600">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-slate-600 dark:text-slate-300">
                         <span className="text-indigo-600">
                           {
                             metric.icon
@@ -5552,17 +5767,17 @@ function CityPerformancePulse({
                     </div>
 
                     <div className="mt-1.5 flex items-end justify-between gap-2">
-                      <div className="text-xl font-black leading-none text-slate-950">
+                      <div className="text-xl font-black leading-none text-slate-950 dark:text-white">
                         {percentText(
                           metric.value
                         )}
                       </div>
 
-                      <div className="text-right text-[8px] font-bold text-slate-400">
+                      <div className="text-right text-[8px] font-bold text-slate-400 dark:text-slate-500">
                         <div>
                           Last month
                         </div>
-                        <div className="mt-0.5 text-[10px] font-black text-slate-500">
+                        <div className="mt-0.5 text-[10px] font-black text-slate-500 dark:text-slate-400 dark:text-slate-500">
                           {percentText(
                             metric.previous
                           )}
@@ -5577,7 +5792,7 @@ function CityPerformancePulse({
 
           <div className="relative mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-2.5">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">
+              <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400 dark:text-slate-500">
                 <AlertTriangle
                   size={11}
                   className="text-amber-500"
@@ -5585,7 +5800,7 @@ function CityPerformancePulse({
                 Attention Signals
               </div>
 
-              <div className="text-[8px] font-bold text-slate-400">
+              <div className="text-[8px] font-bold text-slate-400 dark:text-slate-500">
                 Auto-generated from current dashboard data
               </div>
             </div>
@@ -5621,7 +5836,7 @@ function CityPerformancePulse({
                       }
                     </span>
 
-                    <p className="text-[9px] font-bold leading-[1.35] text-slate-600">
+                    <p className="text-[9px] font-bold leading-[1.35] text-slate-600 dark:text-slate-300">
                       {
                         item.text
                       }
@@ -5641,6 +5856,597 @@ function CityPerformancePulse({
 /* =========================================================
    MAIN
 ========================================================= */
+
+
+
+
+
+function wardRankingJustification(
+  ward: WardRankingRow
+) {
+  const components =
+    (ward as any)
+      .components || {};
+
+  const componentText = (
+    key: string,
+    label: string
+  ) => {
+    const component =
+      components?.[key];
+
+    if (
+      !component ||
+      component.applicable === false
+    ) {
+      return `${label}: N/A`;
+    }
+
+    const value =
+      Number(
+        component.percentage
+      );
+
+    if (
+      !Number.isFinite(
+        value
+      )
+    ) {
+      return `${label}: N/A`;
+    }
+
+    return `${label}: ${Number(
+      value.toFixed(
+        1
+      )
+    )}%`;
+  };
+
+  const score =
+    Number(
+      ward.finalScore
+    );
+
+  const cityRank =
+    (ward as any)
+      .cityRank;
+
+  const applicableWeight =
+    Number(
+      (ward as any)
+        .applicableWeight
+    );
+
+  const lines = [
+    `${ward.wardName || 'Ward'}`,
+    '',
+    Number.isFinite(score)
+      ? `Ward Ranking: ${Number(
+          score.toFixed(
+            1
+          )
+        )}%`
+      : 'Ward Ranking: N/A',
+
+    cityRank != null
+      ? `City Rank: #${cityRank}`
+      : 'City Rank: N/A',
+
+    '',
+    'Score components:',
+    componentText(
+      'workforce',
+      'Workforce'
+    ),
+    componentText(
+      'beat',
+      'Sweeping'
+    ),
+    componentText(
+      'toilet',
+      'Toilet'
+    ),
+    componentText(
+      'litterBin',
+      'Litter Bin'
+    ),
+    componentText(
+      'supervisor',
+      'Daroga'
+    ),
+    componentText(
+      'qc',
+      'Sanitary Inspector'
+    ),
+    componentText(
+      'actionOfficer',
+      'IEC Member'
+    ),
+  ];
+
+  if (
+    Number.isFinite(
+      applicableWeight
+    ) &&
+    applicableWeight > 0
+  ) {
+    lines.push(
+      '',
+      `Applicable weight: ${applicableWeight}%`
+    );
+  }
+
+  lines.push(
+    '',
+    'N/A components are excluded from the score denominator.',
+    'Applicable weighted components are normalized back to 100%.'
+  );
+
+  return lines.join(
+    '\n'
+  );
+}
+
+
+function WardRankingScroller({
+  wards,
+}: {
+  wards: WardRankingRow[];
+}) {
+  const scrollRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+  const pausedRef =
+    useRef(false);
+
+  /*
+   * Always show wards in natural numeric order:
+   * Ward 1, Ward 2, Ward 3 ... Ward 54
+   *
+   * Ranking score does NOT control display order.
+   */
+  const orderedWards =
+    useMemo(
+      () =>
+        [...wards].sort(
+          (a, b) => {
+            const aName =
+              a.wardName ||
+              '';
+
+            const bName =
+              b.wardName ||
+              '';
+
+            const aNumber =
+              Number(
+                aName.match(
+                  /\d+/
+                )?.[0] ||
+                Number.MAX_SAFE_INTEGER
+              );
+
+            const bNumber =
+              Number(
+                bName.match(
+                  /\d+/
+                )?.[0] ||
+                Number.MAX_SAFE_INTEGER
+              );
+
+            if (
+              aNumber !==
+              bNumber
+            ) {
+              return (
+                aNumber -
+                bNumber
+              );
+            }
+
+            return aName.localeCompare(
+              bName,
+              undefined,
+              {
+                numeric: true,
+              }
+            );
+          }
+        ),
+      [wards]
+    );
+
+  /*
+   * Restore automatic continuous scrolling.
+   *
+   * Pauses while the user hovers over the card.
+   */
+  useEffect(() => {
+    const container =
+      scrollRef.current;
+
+    if (
+      !container ||
+      orderedWards.length <= 1
+    ) {
+      return;
+    }
+
+    container.scrollTop = 0;
+
+    let frameId = 0;
+    let lastTime = 0;
+
+    const speed =
+      32; // pixels per second
+
+    const animate = (
+      time: number
+    ) => {
+      if (!lastTime) {
+        lastTime = time;
+      }
+
+      const delta =
+        time - lastTime;
+
+      lastTime = time;
+
+      if (
+        !pausedRef.current
+      ) {
+        const maxScroll =
+          container.scrollHeight -
+          container.clientHeight;
+
+        if (
+          maxScroll > 0
+        ) {
+          container.scrollTop +=
+            speed *
+            (
+              delta /
+              1000
+            );
+
+          if (
+            container.scrollTop >=
+            maxScroll - 1
+          ) {
+            container.scrollTop =
+              0;
+          }
+        }
+      }
+
+      frameId =
+        requestAnimationFrame(
+          animate
+        );
+    };
+
+    frameId =
+      requestAnimationFrame(
+        animate
+      );
+
+    return () => {
+      cancelAnimationFrame(
+        frameId
+      );
+    };
+  }, [
+    orderedWards.length,
+  ]);
+
+  return (
+    <div
+      ref={
+        scrollRef
+      }
+      onMouseEnter={() => {
+        pausedRef.current =
+          true;
+      }}
+      onMouseLeave={() => {
+        pausedRef.current =
+          false;
+      }}
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+    >
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+        {orderedWards.map(
+          (ward) => {
+            const rawScore =
+              Number(
+                ward.finalScore
+              );
+
+            const cityRank =
+              (ward as any)
+                .cityRank;
+
+            const explicitlyNotRankable =
+              (ward as any)
+                .rankable ===
+              false;
+
+            const rankable =
+              !explicitlyNotRankable &&
+              (
+                cityRank != null ||
+                (
+                  Number.isFinite(
+                    rawScore
+                  ) &&
+                  rawScore > 0
+                )
+              );
+
+            const score =
+              rankable &&
+              Number.isFinite(
+                rawScore
+              )
+                ? Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      rawScore
+                    )
+                  )
+                : null;
+
+            const wardName =
+              ward.wardName ||
+              `Ward ${ward.wardId}`;
+
+            const zoneName =
+              ward.zoneName ||
+              'Zone not mapped';
+
+            return (
+              <div
+                key={
+                  ward.wardId
+                }
+                className="group relative px-5 py-4 transition hover:bg-violet-50/40 dark:hover:bg-violet-950/20"
+                title={
+                  wardRankingJustification(
+                    ward
+                  )
+                }
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-50 text-[11px] font-black text-violet-600 dark:bg-violet-950/40 dark:text-violet-300">
+                    {
+                      String(
+                        wardName
+                      )
+                        .match(
+                          /\d+/
+                        )?.[0] ||
+                      '—'
+                    }
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="truncate text-[15px] font-black text-slate-900 dark:text-white">
+                          {
+                            wardName
+                          }
+                        </div>
+
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                          <span>
+                            {
+                              zoneName
+                            }
+                          </span>
+
+                          {cityRank != null && (
+                            <>
+                              <span className="text-slate-300 dark:text-slate-600">
+                                —
+                              </span>
+
+                              <span className="text-violet-500 dark:text-violet-400">
+                                City Rank #
+                                {
+                                  cityRank
+                                }
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={
+                          score == null
+                            ? "shrink-0 text-sm font-black text-slate-400 dark:text-slate-500"
+                            : "shrink-0 text-lg font-black text-violet-600 dark:text-violet-300"
+                        }
+                      >
+                        {
+                          score == null
+                            ? 'N/A'
+                            : `${Number(
+                                score.toFixed(
+                                  1
+                                )
+                              )}%`
+                        }
+                      </div>
+                    </div>
+
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      {score != null && (
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-600 transition-all duration-700"
+                          style={{
+                            width:
+                              `${score}%`,
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    <div className="mt-1.5 text-[9px] font-semibold text-slate-400 dark:text-slate-500">
+                      {
+                        score == null
+                          ? 'No Ward Ranking data for the selected period'
+                          : 'Hover to see score justification'
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
+function teamLeaderboardScore(
+  role: RoleKey,
+  stats: {
+    total: number;
+    approved: number;
+    rejected: number;
+    pending: number;
+    actionRequired: number;
+    actionTaken: number;
+  },
+  attendanceEmployee:
+    | AttendanceEmployeeSummary
+    | null
+) {
+  /*
+   * HEALTH WORKER
+   * = attendance performance
+   */
+  if (
+    role === 'EMPLOYEE'
+  ) {
+    const rate =
+      Number(
+        attendanceEmployee
+          ?.attendanceRate
+      );
+
+    return Number.isFinite(
+      rate
+    )
+      ? clamp(rate)
+      : 0;
+  }
+
+  /*
+   * SANITARY INSPECTOR
+   *
+   * Reviewed reports
+   * ----------------
+   * Reports requiring review
+   *
+   * Approved + Rejected are completed reviews.
+   */
+  if (
+    role === 'QC'
+  ) {
+    if (
+      stats.total <= 0
+    ) {
+      return 0;
+    }
+
+    return clamp(
+      (
+        (
+          stats.approved +
+          stats.rejected
+        ) /
+        stats.total
+      ) *
+      100
+    );
+  }
+
+  /*
+   * IEC MEMBER
+   *
+   * Action Taken
+   * ----------------------------
+   * Action Required + Action Taken
+   *
+   * No assigned action work = 0 in this leaderboard.
+   */
+  if (
+    role === 'ACTION_OFFICER'
+  ) {
+    const assigned =
+      stats.actionRequired +
+      stats.actionTaken;
+
+    if (
+      assigned <= 0
+    ) {
+      return 0;
+    }
+
+    return clamp(
+      (
+        stats.actionTaken /
+        assigned
+      ) *
+      100
+    );
+  }
+
+  /*
+   * DAROGA
+   *
+   * Clean
+   * ---------------------------------
+   * Clean + Not Clean + Pending Review
+   *
+   * This follows the current inspected
+   * cleanliness-outcome logic.
+   */
+  if (
+    role === 'SUPERVISOR'
+  ) {
+    const inspected =
+      stats.approved +
+      stats.rejected +
+      stats.pending;
+
+    if (
+      inspected <= 0
+    ) {
+      return 0;
+    }
+
+    return clamp(
+      (
+        stats.approved /
+        inspected
+      ) *
+      100
+    );
+  }
+
+  return 0;
+}
+
 
 export default function CommissionerDashboard() {
   const { user } =
@@ -6308,7 +7114,251 @@ export default function CommissionerDashboard() {
       null
     );
 
-  const [
+
+  const openProofReport =
+    useCallback(
+      (
+        report:
+          DashboardRecord
+      ) => {
+        if (
+          report.dashboardModule !==
+          'SWEEPING'
+        ) {
+          setProofReport(
+            report
+          );
+
+          return;
+        }
+
+        const reportAny =
+          report as any;
+
+        /*
+         * SweepingRecord belongs to a BeatSegment.
+         *
+         * Therefore segmentId is the authoritative link:
+         *
+         * inspection.segmentId
+         *   -> beat.segments[].id
+         *   -> employeeAssignedTo
+         */
+        const reportSegmentId =
+          String(
+            reportAny.segmentId ||
+            reportAny.segment?.id ||
+            ''
+          );
+
+        let matchedBeat:
+          any =
+          null;
+
+        let matchedSegment:
+          any =
+          null;
+
+        if (
+          reportSegmentId
+        ) {
+          for (
+            const beat
+            of inspectionTargets.beats
+          ) {
+            const segments =
+              Array.isArray(
+                (beat as any)?.segments
+              )
+                ? (beat as any).segments
+                : [];
+
+            const segment =
+              segments.find(
+                (item: any) =>
+                  String(
+                    item?.id ||
+                    item?.segmentId ||
+                    ''
+                  ) ===
+                  reportSegmentId
+              );
+
+            if (
+              segment
+            ) {
+              matchedBeat =
+                beat;
+
+              matchedSegment =
+                segment;
+
+              break;
+            }
+          }
+        }
+
+        /*
+         * Fallback to Beat name only when the report
+         * does not contain a usable segmentId.
+         */
+        if (
+          !matchedBeat
+        ) {
+          const reportBeatName =
+            String(
+              reportAny.beatName ||
+              reportAny.beat?.beatName ||
+              reportAny.beat?.name ||
+              reportAny.locationName ||
+              ''
+            )
+              .trim()
+              .toLowerCase();
+
+          matchedBeat =
+            inspectionTargets.beats.find(
+              (beat: any) => {
+                const name =
+                  String(
+                    beat?.beatName ||
+                    beat?.name ||
+                    beat?.areaName ||
+                    ''
+                  )
+                    .trim()
+                    .toLowerCase();
+
+                return (
+                  Boolean(
+                    reportBeatName
+                  ) &&
+                  name ===
+                    reportBeatName
+                );
+              }
+            ) ||
+            null;
+        }
+
+        /*
+         * /city/areas already hydrates
+         * segment.employeeAssignedTo.
+         */
+
+        /*
+         * /city/areas -> mapBeatResponse()
+         * flattens the Health Worker onto the segment:
+         *
+         * employeeAssignedToId
+         * employeeAssignedToName
+         * employeeAssignedToEmail
+         * employeeAssignedToPhone
+         */
+        const employeeId =
+          String(
+            matchedSegment
+              ?.employeeAssignedToId ||
+            ''
+          );
+
+
+        const employeeName =
+          matchedSegment
+            ?.employeeAssignedToName ||
+          null;
+
+
+        const employeeFromUsers =
+          employeeId
+            ? cityUsers.find(
+                (user) =>
+                  String(
+                    user.id
+                  ) ===
+                  employeeId
+              )
+            : null;
+
+
+        const resolvedEmployee =
+          employeeName
+            ? {
+                id:
+                  employeeId,
+                name:
+                  employeeName,
+                email:
+                  matchedSegment
+                    ?.employeeAssignedToEmail ||
+                  null,
+                phone:
+                  matchedSegment
+                    ?.employeeAssignedToPhone ||
+                  matchedSegment
+                    ?.employeeAssignedToMobile ||
+                  null,
+              }
+            : employeeFromUsers ||
+              null;
+
+
+setProofReport(
+          {
+            ...reportAny,
+
+            employee:
+              resolvedEmployee ||
+              null,
+
+            assignedEmployee:
+              resolvedEmployee ||
+              null,
+
+            healthWorker:
+              employeeName
+                ? {
+                    id:
+                      employeeId ||
+                      resolvedEmployee?.id ||
+                      '',
+                    name:
+                      employeeName,
+                  }
+                : null,
+
+            segment: {
+              ...(reportAny.segment ||
+                {}),
+
+              ...(matchedSegment ||
+                {}),
+
+              employeeAssignedTo:
+                resolvedEmployee ||
+                matchedSegment
+                  ?.employeeAssignedTo ||
+                null,
+            },
+
+            beat: {
+              ...(matchedBeat ||
+                {}),
+
+              ...(reportAny.beat ||
+                {}),
+            },
+          } as DashboardRecord
+        );
+      },
+      [
+        inspectionTargets.beats,
+        cityUsers,
+      ]
+    );
+
+
+const [
     proofAttendance,
     setProofAttendance,
   ] =
@@ -6859,6 +7909,11 @@ export default function CommissionerDashboard() {
       return naturalSort(
         Array.from(
           values
+        ).filter(
+          (value) =>
+            /^Zone\s+\d+$/i.test(
+              String(value).trim()
+            )
         )
       );
     }, [
@@ -6950,6 +8005,11 @@ export default function CommissionerDashboard() {
       return naturalSort(
         Array.from(
           values
+        ).filter(
+          (value) =>
+            /^Ward\s+\d+$/i.test(
+              String(value).trim()
+            )
         )
       );
     }, [
@@ -7411,29 +8471,46 @@ export default function CommissionerDashboard() {
   const attendanceContextEmployees =
     useMemo(() => {
       const employees =
-        attendance?.employees ||
-        [];
+        (attendance?.employees || []).map(
+          (employee) => ({
+            ...employee,
+
+            zones:
+              (employee.zones || []).filter(
+                (value) =>
+                  /^Zone\s+\d+$/i.test(
+                    String(value).trim()
+                  )
+              ),
+
+            wards:
+              (employee.wards || []).filter(
+                (value) =>
+                  /^Ward\s+\d+$/i.test(
+                    String(value).trim()
+                  )
+              ),
+          })
+        );
 
       return employees.filter(
         (employee) => {
           if (
             zoneFilter !==
-            'ALL' &&
-            !employee.zones
-              ?.includes(
-                zoneFilter
-              )
+              'ALL' &&
+            !employee.zones?.includes(
+              zoneFilter
+            )
           ) {
             return false;
           }
 
           if (
             wardFilter !==
-            'ALL' &&
-            !employee.wards
-              ?.includes(
-                wardFilter
-              )
+              'ALL' &&
+            !employee.wards?.includes(
+              wardFilter
+            )
           ) {
             return false;
           }
@@ -7444,11 +8521,13 @@ export default function CommissionerDashboard() {
           ) {
             if (
               !employee.matrixTrackUserId ||
-              !roleUserIds.daroga.has(
-                String(
-                  employee.matrixTrackUserId
+              !roleUserIds
+                .daroga
+                ?.has(
+                  String(
+                    employee.matrixTrackUserId
+                  )
                 )
-              )
             ) {
               return false;
             }
@@ -7460,11 +8539,13 @@ export default function CommissionerDashboard() {
           ) {
             if (
               !employee.matrixTrackUserId ||
-              !roleUserIds.si.has(
-                String(
-                  employee.matrixTrackUserId
+              !roleUserIds
+                .si
+                ?.has(
+                  String(
+                    employee.matrixTrackUserId
+                  )
                 )
-              )
             ) {
               return false;
             }
@@ -7476,46 +8557,41 @@ export default function CommissionerDashboard() {
           ) {
             if (
               !employee.matrixTrackUserId ||
-              !roleUserIds.iec.has(
-                String(
-                  employee.matrixTrackUserId
+              !roleUserIds
+                .iec
+                ?.has(
+                  String(
+                    employee.matrixTrackUserId
+                  )
                 )
-              )
             ) {
               return false;
             }
           }
 
-          if (
-            roleFilter ===
-            'ULB_OFFICER'
-          ) {
-            if (
-              !employee.matrixTrackUserId ||
-              !roleUserIds.ulb.has(
-                String(
-                  employee.matrixTrackUserId
-                )
-              )
-            ) {
-              return false;
-            }
-          }
+
 
           if (
             personFilter !==
-            'ALL' &&
-            employee.employeeName !==
-            personFilter
+            'ALL'
           ) {
-            return false;
+            if (
+              String(
+                employee.matrixTrackUserId ||
+                  employee.employeeName
+              ) !==
+              String(
+                personFilter
+              )
+            ) {
+              return false;
+            }
           }
 
           if (
             statusFilter ===
             'PRESENT' &&
-            employee.presentDays <=
-            0
+            employee.presentDays <= 0
           ) {
             return false;
           }
@@ -7523,15 +8599,12 @@ export default function CommissionerDashboard() {
           if (
             statusFilter ===
             'ABSENT' &&
-            employee.absentDays <=
-            0
+            employee.absentDays <= 0
           ) {
             return false;
           }
 
-          if (
-            searchValue
-          ) {
+          if (searchValue) {
             const haystack =
               normalize(
                 [
@@ -7541,9 +8614,7 @@ export default function CommissionerDashboard() {
                     []),
                   ...(employee.wards ||
                     []),
-                ].join(
-                  ' '
-                )
+                ].join(' ')
               );
 
             if (
@@ -8090,8 +9161,24 @@ export default function CommissionerDashboard() {
   const cityWardCount =
     registeredWardCount;
 
-  const cityBeatCount =
+  // Count actual registered sweeping beats, never inspection points.
+  const citySweepingBeatCount =
     registeredBeatCount;
+
+  const cityLitterBinCount =
+    inspectionTargets.litterBins.length;
+
+  const cityToiletCount =
+    inspectionTargets.approvedToilets;
+
+  const inspectionRangeDayCount =
+    Math.max(
+      1,
+      inclusiveDayCount(
+        appliedFrom,
+        appliedTo
+      )
+    );
 
   /* =========================================================
      MODULE PERFORMANCE
@@ -8209,7 +9296,7 @@ export default function CommissionerDashboard() {
         key:
           'WARD_RANKING',
         label:
-          'Ward Performance',
+          'Ward Ranking',
         performance:
           averageApplicable(
             wardContextRows.map(
@@ -8238,9 +9325,457 @@ export default function CommissionerDashboard() {
     ]);
 
 
+
+
+  /*
+   * Shared Commissioner inspection-module logic.
+   *
+   * The headline performance is:
+   * completed required inspections / required inspections.
+   *
+   * Status counts come from the same module's inspection records.
+   */
+  /*
+   * Commissioner-facing status breakdown.
+   *
+   * IMPORTANT:
+   * inspectionStats() contains historical/overlapping supersets.
+   * This helper creates mutually exclusive CURRENT status buckets.
+   *
+   * Sweeping is counted at Beat + Day level, never point level.
+   */
+  const commissionerModuleStatusBreakdown = (
+    moduleKey: InspectionModuleKey,
+    sourceRecords: DashboardRecord[]
+  ) => {
+    const records =
+      sourceRecords.filter(
+        (item) =>
+          item.dashboardModule ===
+          moduleKey &&
+          effectiveStatus(item) !==
+          'DRAFT'
+      );
+
+    /*
+     * Preserve the existing inspection/report-level QC logic.
+     *
+     * IMPORTANT:
+     * Sweeping Required/Completed is Beat based,
+     * but QC workflow counts are inspection/report based.
+     */
+    const stats =
+      inspectionStats(records);
+
+    return {
+      clean:
+        stats.approved,
+
+      notClean:
+        stats.rejected,
+
+      pendingReview:
+        stats.pending,
+
+      attentionRequired:
+        stats.actionRequired,
+
+      resolutionPending:
+        Math.max(
+          0,
+          stats.actionRequired -
+          stats.actionTaken
+        ),
+
+      resolved:
+        stats.actionTaken,
+    };
+  };
+
+
+  const commissionerModuleInspection = (
+    moduleKey: InspectionModuleKey
+  ) => {
+    const module =
+      moduleCards.find(
+        (item) =>
+          item.key === moduleKey
+      );
+
+    const records =
+      module?.records || [];
+
+    const stats =
+      inspectionStats(
+        records
+      );
+
+    const statusBreakdown =
+      commissionerModuleStatusBreakdown(
+        moduleKey,
+        records
+      );
+
+    const required =
+      requiredInspectionsFor(
+        moduleKey,
+        zoneFilter,
+        wardFilter
+      );
+
+    const completionRecords =
+      completionBaseRecords.filter(
+        (item) =>
+          item.dashboardModule ===
+          moduleKey
+      );
+
+    const completed =
+      completedInspectionCount(
+        completionRecords,
+        moduleKey
+      );
+
+    return {
+      module,
+      records,
+      stats,
+      statusBreakdown,
+      required,
+      completed,
+      performance:
+        inspectionTargets.ready
+          ? completionRate(
+            completed,
+            required
+          )
+          : null,
+    };
+  };
+
+  const sweepingInspection =
+    commissionerModuleInspection(
+      'SWEEPING'
+    );
+
+  if (typeof window !== 'undefined') {
+    const sweepingGroupingAudit =
+      sweepingInspection.records
+        .filter(
+          (item) =>
+            effectiveStatus(item) !==
+            'DRAFT'
+        )
+        .map((item) => ({
+          id:
+            item?.id,
+
+          segmentId:
+            (item as any)?.segmentId,
+
+          beatId:
+            (item as any)?.beatId,
+
+          beatObjectId:
+            (item as any)?.beat?.id,
+
+          areaId:
+            (item as any)?.areaId,
+
+          beatName:
+            (item as any)?.beatName ||
+            (item as any)?.beat?.beatName,
+
+          zone:
+            getRecordZone(item),
+
+          ward:
+            getRecordWard(item),
+
+          dateKey:
+            inspectionRecordDateKey(
+              item
+            ),
+
+          computedBeatKey:
+            sweepingBeatKey(
+              item
+            ),
+
+          points:
+            Array.from(
+              sweepingSubmittedPointIndexes(
+                item
+              )
+            ),
+
+          qcDecision:
+            getQcDecision(
+              item
+            ),
+
+          status:
+            effectiveStatus(
+              item
+            ),
+        }));
+
+    console.log(
+      "SWEEPING GROUPING AUDIT",
+      sweepingGroupingAudit
+    );
+
+    console.log(
+      "SWEEPING UNIQUE GROUPS",
+      Array.from(
+        new Set(
+          sweepingGroupingAudit.map(
+            (row) =>
+              `${row.computedBeatKey}::${row.dateKey}`
+          )
+        )
+      )
+    );
+
+    console.table(
+      sweepingGroupingAudit
+    );
+  }
+
+
+  /*
+   * Commissioner executive Sweeping status.
+   *
+   * Backend rule:
+   * 1 Beat + 1 operational day = 1 Sweeping report.
+   * >= 3 submitted points = completed Beat/day.
+   *
+   * Legacy point-per-row data can contain multiple rows,
+   * therefore group them back to Beat + Day and count
+   * the completed Beat only once.
+   *
+   * The oldest non-draft row is the canonical Beat/day
+   * report, matching the backend consolidation rule.
+   */
+
+  function cleanlinessPerformancePercent(
+    clean: number,
+    notClean: number,
+    pendingReview: number
+  ) {
+    const total =
+      clean +
+      notClean +
+      pendingReview;
+
+    return total > 0
+      ? (clean / total) * 100
+      : null;
+  }
+
+
+  const sweepingBeatStatusBreakdown =
+    (() => {
+      let clean = 0;
+      let notClean = 0;
+      let pendingReview = 0;
+
+      let resolutionPending = 0;
+      let resolved = 0;
+
+      const groups =
+        new Map<
+          string,
+          {
+            records: DashboardRecord[];
+            points: Set<number>;
+          }
+        >();
+
+      sweepingInspection.records
+        .filter(
+          (item) =>
+            item.dashboardModule ===
+            'SWEEPING' &&
+            effectiveStatus(item) !==
+            'DRAFT'
+        )
+        .forEach((item) => {
+          const beatKey =
+            sweepingBeatKey(item);
+
+          const dateKey =
+            inspectionRecordDateKey(
+              item
+            );
+
+          if (
+            !beatKey ||
+            !dateKey
+          ) {
+            return;
+          }
+
+          const key =
+            `${beatKey}::${dateKey}`;
+
+          if (!groups.has(key)) {
+            groups.set(key, {
+              records: [],
+              points:
+                new Set<number>(),
+            });
+          }
+
+          const group =
+            groups.get(key)!;
+
+          group.records.push(item);
+
+          sweepingSubmittedPointIndexes(
+            item
+          ).forEach(
+            (pointIndex) => {
+              group.points.add(
+                pointIndex
+              );
+            }
+          );
+        });
+
+      const createdTime = (
+        item: DashboardRecord
+      ) => {
+        const row =
+          item as any;
+
+        const raw =
+          row.createdAt ||
+          row.submittedAt ||
+          row.visitedAt ||
+          null;
+
+        if (!raw) {
+          return Number.MAX_SAFE_INTEGER;
+        }
+
+        const value =
+          new Date(raw)
+            .getTime();
+
+        return Number.isFinite(value)
+          ? value
+          : Number.MAX_SAFE_INTEGER;
+      };
+
+      groups.forEach((group) => {
+        /*
+         * Existing Sweeping completion rule.
+         */
+        if (
+          group.points.size < 3
+        ) {
+          return;
+        }
+
+        const canonicalRecord =
+          [...group.records]
+            .sort(
+              (a, b) =>
+                createdTime(a) -
+                createdTime(b)
+            )[0];
+
+        if (!canonicalRecord) {
+          pendingReview += 1;
+          return;
+        }
+
+        const decision =
+          getQcDecision(
+            canonicalRecord
+          );
+
+        if (
+          decision === 'APPROVED'
+        ) {
+          clean += 1;
+        } else if (
+          decision === 'REJECTED'
+        ) {
+          notClean += 1;
+        } else {
+          pendingReview += 1;
+        }
+
+        const status =
+          effectiveStatus(
+            canonicalRecord
+          );
+
+        if (
+          status === 'ACTION_TAKEN'
+        ) {
+          resolved += 1;
+        } else if (
+          status === 'ACTION_REQUIRED'
+        ) {
+          resolutionPending += 1;
+        }
+      });
+
+      return {
+        clean,
+        notClean,
+        pendingReview,
+
+        attentionRequired:
+          resolutionPending +
+          resolved,
+
+        resolutionPending,
+        resolved,
+      };
+    })();
+
+
+  const sweepingCleanlinessPerformance =
+    cleanlinessPerformancePercent(
+      sweepingBeatStatusBreakdown.clean,
+      sweepingBeatStatusBreakdown.notClean,
+      sweepingBeatStatusBreakdown.pendingReview
+    );
+
+  const litterBinInspection =
+    commissionerModuleInspection(
+      'LITTERBINS'
+    );
+
+  const toiletInspection =
+    commissionerModuleInspection(
+      'TOILET'
+    );
+
+
+
+  const litterBinCleanlinessPerformance =
+    cleanlinessPerformancePercent(
+      litterBinInspection.statusBreakdown.clean,
+      litterBinInspection.statusBreakdown.notClean,
+      litterBinInspection.statusBreakdown.pendingReview
+    );
+
+  const toiletCleanlinessPerformance =
+    cleanlinessPerformancePercent(
+      toiletInspection.statusBreakdown.clean,
+      toiletInspection.statusBreakdown.notClean,
+      toiletInspection.statusBreakdown.pendingReview
+    );
+
+
   /* =========================================================
-     GEO PERFORMANCE
-  ========================================================= */
+         GEO PERFORMANCE
+      ========================================================= */
 
   const buildGeoRows =
     useCallback(
@@ -8858,6 +10393,368 @@ export default function CommissionerDashboard() {
       attendanceStats,
     ]);
 
+
+  /*
+   * Cleanliness-only geographic ranking for Top/Worst cards.
+   *
+   * IMPORTANT:
+   * - Sweeping follows existing Beat + Day completion/QC rule.
+   * - Litter Bin and Toilet follow existing report-level QC rule.
+   * - Attendance and Ward Ranking do NOT affect this score.
+   */
+  const cleanlinessBreakdownForGeo = (
+    level: 'ZONE' | 'WARD',
+    label: string
+  ) => {
+    let clean = 0;
+    let notClean = 0;
+    let pendingReview = 0;
+
+    const matchesGeo = (
+      item: DashboardRecord
+    ) =>
+      (
+        level === 'ZONE'
+          ? getRecordZone(item)
+          : getRecordWard(item)
+      ) === label;
+
+    /*
+     * Sweeping:
+     * group by Beat + operational day exactly like the
+     * Commissioner Sweeping executive rule.
+     */
+    const sweepingGroups =
+      new Map<
+        string,
+        {
+          records: DashboardRecord[];
+          points: Set<number>;
+        }
+      >();
+
+    filteredInspectionRecords
+      .filter(
+        (item) =>
+          item.dashboardModule === 'SWEEPING' &&
+          effectiveStatus(item) !== 'DRAFT' &&
+          matchesGeo(item)
+      )
+      .forEach((item) => {
+        const beatKey =
+          sweepingBeatKey(item);
+
+        const dateKey =
+          inspectionRecordDateKey(item);
+
+        if (!beatKey || !dateKey) {
+          return;
+        }
+
+        const key =
+          `${beatKey}::${dateKey}`;
+
+        if (!sweepingGroups.has(key)) {
+          sweepingGroups.set(key, {
+            records: [],
+            points: new Set<number>(),
+          });
+        }
+
+        const group =
+          sweepingGroups.get(key)!;
+
+        group.records.push(item);
+
+        sweepingSubmittedPointIndexes(
+          item
+        ).forEach((pointIndex) => {
+          group.points.add(pointIndex);
+        });
+      });
+
+    const createdTime = (
+      item: DashboardRecord
+    ) => {
+      const row = item as any;
+
+      const raw =
+        row.createdAt ||
+        row.submittedAt ||
+        row.visitedAt ||
+        null;
+
+      if (!raw) {
+        return Number.MAX_SAFE_INTEGER;
+      }
+
+      const value =
+        new Date(raw).getTime();
+
+      return Number.isFinite(value)
+        ? value
+        : Number.MAX_SAFE_INTEGER;
+    };
+
+    sweepingGroups.forEach((group) => {
+      if (group.points.size < 3) {
+        return;
+      }
+
+      const canonicalRecord =
+        [...group.records]
+          .sort(
+            (a, b) =>
+              createdTime(a) -
+              createdTime(b)
+          )[0];
+
+      if (!canonicalRecord) {
+        pendingReview += 1;
+        return;
+      }
+
+      const decision =
+        getQcDecision(
+          canonicalRecord
+        );
+
+      if (decision === 'APPROVED') {
+        clean += 1;
+      } else if (
+        decision === 'REJECTED'
+      ) {
+        notClean += 1;
+      } else {
+        pendingReview += 1;
+      }
+    });
+
+    /*
+     * Litter Bin + Toilet:
+     * preserve existing report-level QC logic.
+     */
+    filteredInspectionRecords
+      .filter(
+        (item) =>
+          (
+            item.dashboardModule ===
+            'LITTERBINS' ||
+            item.dashboardModule ===
+            'TOILET'
+          ) &&
+          effectiveStatus(item) !==
+          'DRAFT' &&
+          matchesGeo(item)
+      )
+      .forEach((item) => {
+        const decision =
+          getQcDecision(item);
+
+        if (decision === 'APPROVED') {
+          clean += 1;
+        } else if (
+          decision === 'REJECTED'
+        ) {
+          notClean += 1;
+        } else {
+          pendingReview += 1;
+        }
+      });
+
+    const totalReviewed =
+      clean +
+      notClean +
+      pendingReview;
+
+    return {
+      clean,
+      notClean,
+      pendingReview,
+      totalReviewed,
+      performance:
+        totalReviewed > 0
+          ? (
+            clean /
+            totalReviewed
+          ) *
+          100
+          : null,
+    };
+  };
+
+  const cleanlinessZoneRows =
+    useMemo(
+      () =>
+        zoneRows
+          .map((row) => {
+            const cleanliness =
+              cleanlinessBreakdownForGeo(
+                'ZONE',
+                row.label
+              );
+
+            const required =
+              requiredInspectionsFor(
+                'ALL',
+                row.label,
+                'ALL'
+              );
+
+            const completed =
+              cleanliness.clean +
+              cleanliness.notClean +
+              cleanliness.pendingReview;
+
+            /*
+             * Coverage-aware cleanliness ranking.
+             *
+             * Raw cleanliness remains:
+             * Clean / inspected outcomes
+             *
+             * Ranking uses:
+             * Clean / required inspections
+             *
+             * This prevents 2 clean inspections out of a
+             * very large target from appearing as 100%
+             * overall Zone performance.
+             */
+            const rankingPerformance =
+              required > 0
+                ? clamp(
+                  (
+                    cleanliness.clean /
+                    required
+                  ) * 100,
+                  0,
+                  100
+                )
+                : null;
+
+            return {
+              row,
+              cleanliness,
+              required,
+              completed,
+              rankingPerformance,
+            };
+          })
+          .filter(
+            (item) =>
+              item.rankingPerformance !==
+              null
+          )
+          .sort(
+            (a, b) =>
+              (
+                b.rankingPerformance ||
+                0
+              ) -
+              (
+                a.rankingPerformance ||
+                0
+              )
+          ),
+      [
+        zoneRows,
+        filteredInspectionRecords,
+        requiredInspectionsFor,
+      ]
+    );
+
+
+  const cleanlinessWardRows =
+    useMemo(
+      () =>
+        wardPerformanceRows
+          .map((row) => {
+            const cleanliness =
+              cleanlinessBreakdownForGeo(
+                'WARD',
+                row.label
+              );
+
+            const required =
+              requiredInspectionsFor(
+                'ALL',
+                'ALL',
+                row.label
+              );
+
+            const completed =
+              cleanliness.clean +
+              cleanliness.notClean +
+              cleanliness.pendingReview;
+
+            const rankingPerformance =
+              required > 0
+                ? clamp(
+                  (
+                    cleanliness.clean /
+                    required
+                  ) * 100,
+                  0,
+                  100
+                )
+                : null;
+
+            return {
+              row,
+              cleanliness,
+              required,
+              completed,
+              rankingPerformance,
+            };
+          })
+          .filter(
+            (item) =>
+              item.rankingPerformance !==
+              null
+          )
+          .sort(
+            (a, b) =>
+              (
+                b.rankingPerformance ||
+                0
+              ) -
+              (
+                a.rankingPerformance ||
+                0
+              )
+          ),
+      [
+        wardPerformanceRows,
+        filteredInspectionRecords,
+        requiredInspectionsFor,
+      ]
+    );
+
+
+  const topCleanlinessZone =
+    cleanlinessZoneRows.length
+      ? cleanlinessZoneRows[0]
+      : null;
+
+  const worstCleanlinessZone =
+    cleanlinessZoneRows.length
+      ? cleanlinessZoneRows[
+      cleanlinessZoneRows.length - 1
+      ]
+      : null;
+
+  const topCleanlinessWard =
+    cleanlinessWardRows.length
+      ? cleanlinessWardRows[0]
+      : null;
+
+  const worstCleanlinessWard =
+    cleanlinessWardRows.length
+      ? cleanlinessWardRows[
+      cleanlinessWardRows.length - 1
+      ]
+      : null;
+
+
   function geoMetric(
     row: GeoPerformanceRow
   ): number | null {
@@ -8999,27 +10896,67 @@ export default function CommissionerDashboard() {
     );
 
   const topZone =
-    rankedZones[0] ||
-    null;
+    topCleanlinessZone
+      ? {
+        ...topCleanlinessZone.row,
+        geoLevel: 'ZONE' as const,
+        metricValue:
+          topCleanlinessZone.rankingPerformance,
+        cleanlinessPerformance:
+          topCleanlinessZone.cleanliness.performance,
+        inspectionRequired:
+          topCleanlinessZone.required,
+        inspectionCompleted:
+          topCleanlinessZone.completed,
+      }
+      : null;
 
   const worstZone =
-    rankedZones.length
-      ? rankedZones[
-      rankedZones.length -
-      1
-      ]
+    worstCleanlinessZone
+      ? {
+        ...worstCleanlinessZone.row,
+        geoLevel: 'ZONE' as const,
+        metricValue:
+          worstCleanlinessZone.rankingPerformance,
+        cleanlinessPerformance:
+          worstCleanlinessZone.cleanliness.performance,
+        inspectionRequired:
+          worstCleanlinessZone.required,
+        inspectionCompleted:
+          worstCleanlinessZone.completed,
+      }
       : null;
 
   const topWard =
-    rankedWards[0] ||
-    null;
+    topCleanlinessWard
+      ? {
+        ...topCleanlinessWard.row,
+        geoLevel: 'WARD' as const,
+        metricValue:
+          topCleanlinessWard.rankingPerformance,
+        cleanlinessPerformance:
+          topCleanlinessWard.cleanliness.performance,
+        inspectionRequired:
+          topCleanlinessWard.required,
+        inspectionCompleted:
+          topCleanlinessWard.completed,
+      }
+      : null;
 
   const worstWard =
-    rankedWards.length
-      ? rankedWards[
-      rankedWards.length -
-      1
-      ]
+    worstCleanlinessWard
+      ? {
+        ...worstCleanlinessWard.row,
+        geoLevel: 'WARD' as const,
+        metricValue:
+          worstCleanlinessWard.rankingPerformance,
+        cleanlinessPerformance:
+          worstCleanlinessWard.cleanliness.performance,
+        inspectionRequired:
+          worstCleanlinessWard.required,
+        inspectionCompleted:
+          worstCleanlinessWard.completed,
+      }
       : null;
 
 
@@ -9110,7 +11047,150 @@ export default function CommissionerDashboard() {
 
             const stats = inspectionStats(matchedRecords);
 
-            const attendanceEmployee =
+      /*
+       * Daroga leaderboard performance must use the same
+       * coverage-aware cleanliness logic as the Commissioner
+       * dashboard:
+       *
+       * clean inspections achieved
+       * --------------------------
+       * required inspections
+       *
+       * Required inspections come from the Daroga's assigned
+       * ward(s), or assigned zone(s) when ward mapping is absent.
+       */
+      /*
+       * Role leaderboard uses the same coverage-aware cleanliness formula
+       * for Daroga, Sanitary Inspector, IEC Member and Health Worker:
+       *
+       * cleaned inspections achieved
+       * ----------------------------
+       * required inspections
+       */
+
+      const assignedWardNames = (person.wardIds || [])
+        .map((id) => geoNameById.get(String(id)))
+        .filter((name): name is string => Boolean(name));
+
+      const assignedZoneNames = (person.zoneIds || [])
+        .map((id) => geoNameById.get(String(id)))
+        .filter((name): name is string => Boolean(name));
+
+      /*
+       * If the user record does not directly contain ward/zone mapping,
+       * derive the operational scope from records currently mapped to them.
+       */
+      const recordWardNames = Array.from(
+        new Set(
+          matchedRecords
+            .map((item) => getRecordWard(item))
+            .filter(Boolean)
+        )
+      );
+
+      const recordZoneNames = Array.from(
+        new Set(
+          matchedRecords
+            .map((item) => getRecordZone(item))
+            .filter(Boolean)
+        )
+      );
+
+      const scopedWardNames =
+        assignedWardNames.length > 0
+          ? assignedWardNames
+          : recordWardNames;
+
+      const scopedZoneNames =
+        assignedZoneNames.length > 0
+          ? assignedZoneNames
+          : recordZoneNames;
+
+      const requiredForModule = (
+        module:
+          | 'TOILET'
+          | 'LITTERBINS'
+          | 'SWEEPING'
+      ) => {
+        if (scopedWardNames.length > 0) {
+          return scopedWardNames.reduce(
+            (total, wardName) => {
+              const matchingRecord =
+                matchedRecords.find(
+                  (item) =>
+                    getRecordWard(item) === wardName
+                );
+
+              const zoneName =
+                matchingRecord
+                  ? getRecordZone(matchingRecord)
+                  : scopedZoneNames[0] || 'ALL';
+
+              return (
+                total +
+                requiredInspectionsFor(
+                  module,
+                  zoneName || 'ALL',
+                  wardName
+                )
+              );
+            },
+            0
+          );
+        }
+
+        if (scopedZoneNames.length > 0) {
+          return scopedZoneNames.reduce(
+            (total, zoneName) =>
+              total +
+              requiredInspectionsFor(
+                module,
+                zoneName,
+                'ALL'
+              ),
+            0
+          );
+        }
+
+        return 0;
+      };
+
+      const roleRequiredByModule = {
+        TOILET:
+          requiredForModule(
+            'TOILET'
+          ),
+
+        LITTERBINS:
+          requiredForModule(
+            'LITTERBINS'
+          ),
+
+        SWEEPING:
+          requiredForModule(
+            'SWEEPING'
+          ),
+      };
+
+      const roleRequiredInspections =
+        roleRequiredByModule.TOILET +
+        roleRequiredByModule.LITTERBINS +
+        roleRequiredByModule.SWEEPING;
+
+      const roleCleanAchieved =
+        stats.goodOutcome;
+
+      const roleCoveragePerformance =
+        roleRequiredInspections > 0
+          ? clamp(
+              (
+                roleCleanAchieved /
+                roleRequiredInspections
+              ) * 100
+            )
+          : 0;
+
+      const attendanceEmployee =
               attendanceEmployeeByUserId.get(String(person.id)) || null;
 
             return {
@@ -9125,13 +11205,21 @@ export default function CommissionerDashboard() {
               actionTaken: stats.actionTaken,
               pending: stats.pending,
 
-              performance: stats.performance || 0,
 
-              records: matchedRecords,
+              performance:
+                roleCoveragePerformance,
 
-              attendance: attendanceEmployee?.attendanceRate ?? null,
 
-              attendanceEmployee,
+              records:
+              matchedRecords,
+
+            requiredInspections:
+              roleRequiredInspections,
+
+            requiredByModule:
+              roleRequiredByModule,
+
+            attendanceEmployee,
             } satisfies RolePerformanceRow;
           })
           .sort((a, b) => b.performance - a.performance);
@@ -9140,6 +11228,8 @@ export default function CommissionerDashboard() {
         cityUsersByRole,
         filteredInspectionRecords,
         attendanceEmployeeByUserId,
+        geoNameById,
+        requiredInspectionsFor,
       ]
     );
 
@@ -9315,7 +11405,11 @@ export default function CommissionerDashboard() {
             actionTaken: 0,
             pending: 0,
 
-            performance: attendanceEmployee?.attendanceRate ?? 0,
+            performance:
+      Number(
+        attendanceEmployee?.attendanceRate ||
+        0
+      ),
 
             records: [],
 
@@ -9383,7 +11477,7 @@ export default function CommissionerDashboard() {
             : employeeRows;
 
   const roleRowsPageSize =
-    7;
+    10;
 
   const [
     roleRowsPage,
@@ -9803,16 +11897,56 @@ export default function CommissionerDashboard() {
                       `${zone}__${module.key}`
                     ) || [];
 
+                  const inspectionModule =
+                    module.key as InspectionModuleKey;
+
+                  /*
+                   * Same completion logic used by the main
+                   * Commissioner module cards:
+                   *
+                   * completed operational units
+                   * ---------------------------
+                   * required operational units
+                   */
+                  const required =
+                    requiredInspectionsFor(
+                      inspectionModule,
+                      zone,
+                      'ALL'
+                    );
+
+                  const completionRecords =
+                    completionBaseRecords.filter(
+                      (item) =>
+                        item.dashboardModule ===
+                        inspectionModule &&
+                        getRecordZone(item) ===
+                        zone
+                    );
+
+                  const completed =
+                    completedInspectionCount(
+                      completionRecords,
+                      inspectionModule
+                    );
+
+                  const performance =
+                    inspectionTargets.ready
+                      ? completionRate(
+                        completed,
+                        required
+                      )
+                      : null;
+
                   return {
                     key:
                       module.key,
                     label:
                       module.label,
                     value:
-                      inspectionStats(
-                        recordsForCell
-                      )
-                        .performance,
+                      performance,
+                    required,
+                    completed,
                     employees:
                       [] as AttendanceEmployeeSummary[],
                     records:
@@ -10041,9 +12175,55 @@ export default function CommissionerDashboard() {
     zoneLabel: string,
     cell: (typeof zoneModuleMatrix)[number]['cells'][number]
   ) {
+    const inspectionModule =
+      cell.key === 'SWEEPING' ||
+        cell.key === 'LITTERBINS' ||
+        cell.key === 'TOILET'
+        ? (
+          cell.key as InspectionModuleKey
+        )
+        : null;
+
+    if (inspectionModule) {
+      const required =
+        Number(
+          (cell as any).required || 0
+        );
+
+      const completed =
+        Number(
+          (cell as any).completed || 0
+        );
+
+      setDrilldown({
+        title:
+          `${zoneLabel} — ${cell.label}`,
+        value:
+          percentText(
+            cell.value
+          ),
+        inspectionRecords:
+          cell.records,
+        attendanceEmployees:
+          [],
+        wardRows:
+          [],
+        inspectionModuleCompletion: {
+          [inspectionModule]: {
+            required,
+            completed,
+            performance:
+              cell.value,
+          },
+        },
+      });
+
+      return;
+    }
+
     setDrilldown({
       title:
-        `${zoneLabel} · ${cell.label}`,
+        `${zoneLabel} — ${cell.label}`,
       value:
         percentText(
           cell.value
@@ -10056,6 +12236,7 @@ export default function CommissionerDashboard() {
         cell.wards,
     });
   }
+
 
   function breakdownForGeo(
     row: GeoPerformanceRow
@@ -10071,7 +12252,7 @@ export default function CommissionerDashboard() {
       },
       {
         label:
-          'Inspection Performance',
+          'Inspection Completion',
         value:
           percentText(
             row.inspection
@@ -10119,7 +12300,7 @@ export default function CommissionerDashboard() {
       },
       {
         label:
-          'Ward Performance',
+          'Ward Ranking',
         value:
           percentText(
             row.wardRanking
@@ -10138,14 +12319,90 @@ export default function CommissionerDashboard() {
         }
       )
   ) {
+
+    /*
+     * Geo-specific inspection targets for the drawer.
+     *
+     * Do not use the page-level zoneFilter / wardFilter here.
+     * Top/Lowest cards can be clicked while those filters are ALL.
+     */
+    const geoLevel =
+      'geoLevel' in row
+        ? row.geoLevel
+        : null;
+
+    const geoZone =
+      geoLevel === 'ZONE'
+        ? row.label
+        : 'ALL';
+
+    const geoWard =
+      geoLevel === 'WARD'
+        ? row.label
+        : 'ALL';
+
+    const geoInspectionModuleCompletion =
+      Object.fromEntries(
+        INSPECTION_MODULES.map(
+          (module) => {
+            const moduleRecords =
+              row.records.filter(
+                (item) =>
+                  item.dashboardModule ===
+                  module.key
+              );
+
+            const required =
+              requiredInspectionsFor(
+                module.key,
+                geoZone,
+                geoWard
+              );
+
+            const completed =
+              completedInspectionCount(
+                moduleRecords,
+                module.key
+              );
+
+            return [
+              module.key,
+              {
+                required,
+                completed,
+                performance:
+                  inspectionTargets.ready
+                    ? completionRate(
+                      completed,
+                      required
+                    )
+                    : null,
+              },
+            ];
+          }
+        )
+      ) as Partial<
+        Record<
+          InspectionModuleKey,
+          {
+            required: number;
+            completed: number;
+            performance:
+            | number
+            | null;
+          }
+        >
+      >;
+
+
     setDrilldown({
       title:
         row.label,
       value:
         percentText(
-          geoMetric(
-            row
-          )
+          'metricValue' in row
+            ? row.metricValue
+            : geoMetric(row)
         ),
       breakdown:
         breakdownForGeo(
@@ -10153,6 +12410,8 @@ export default function CommissionerDashboard() {
         ),
       inspectionRecords:
         row.records,
+      inspectionModuleCompletion:
+        geoInspectionModuleCompletion,
       attendanceEmployees:
         row.employees,
       wardRows:
@@ -10164,8 +12423,18 @@ export default function CommissionerDashboard() {
     title: string,
     recordsForDrill:
       DashboardRecord[],
-    value: string
+    value: string,
+    moduleKey?: InspectionModuleKey
   ) {
+
+    /*
+     * Module-specific Commissioner performance cards
+     * open the same inspection workspace already
+     * filtered to the selected sanitation module.
+     *
+     * Generic Inspection Completion calls omit
+     * moduleKey and continue to open All Modules.
+     */
     const stats =
       inspectionStats(
         recordsForDrill
@@ -10197,6 +12466,13 @@ export default function CommissionerDashboard() {
               {
                 required,
                 completed,
+            assigned:
+              required > 0
+                ? Math.round(
+                    required /
+                    inspectionRangeDayCount
+                  )
+                : 0,
                 performance:
                   inspectionTargets.ready
                     ? completionRate(
@@ -10225,7 +12501,7 @@ export default function CommissionerDashboard() {
       breakdown: [
         {
           label:
-            'Approved',
+            'Clean',
           value:
             stats.approved.toLocaleString(
               'en-IN'
@@ -10233,7 +12509,7 @@ export default function CommissionerDashboard() {
         },
         {
           label:
-            'Rejected',
+            'Not Clean',
           value:
             stats.rejected.toLocaleString(
               'en-IN'
@@ -10290,7 +12566,7 @@ export default function CommissionerDashboard() {
       breakdown: [
         {
           label:
-            'Inspection Performance',
+            'Inspection Completion',
           value:
             percentText(
               inspectionPerformance
@@ -10306,7 +12582,7 @@ export default function CommissionerDashboard() {
         },
         {
           label:
-            'Ward Performance',
+            'Ward Ranking',
           value:
             percentText(
               wardRankingAverage
@@ -10364,7 +12640,7 @@ export default function CommissionerDashboard() {
   function openWardRanking() {
     setDrilldown({
       title:
-        'Ward Performance',
+        'Ward Ranking',
       value:
         percentText(
           wardRankingAverage
@@ -10407,7 +12683,81 @@ export default function CommissionerDashboard() {
   function openRoleRow(
     row: RolePerformanceRow
   ) {
-    setDrilldown({
+
+    /*
+     * Static assignment count vs selected-period requirement:
+     * assigned = required / selected date range days
+     */
+    const roleRangeDayCount =
+      Math.max(
+        1,
+        inclusiveDayCount(
+          appliedFrom,
+          appliedTo
+        )
+      );
+
+    const roleInspectionModuleCompletion =
+      Object.fromEntries(
+        INSPECTION_MODULES.map(
+          (module) => {
+            const moduleRecords =
+              row.records.filter(
+                (item) =>
+                  item.dashboardModule ===
+                  module.key
+              );
+
+            const completed =
+              completedInspectionCount(
+                moduleRecords,
+                module.key
+              );
+
+            const required =
+              row.requiredByModule?.[
+                module.key
+              ] ??
+              0;
+
+            return [
+              module.key,
+              {
+                required,
+                completed,
+          assigned:
+            required > 0
+              ? Math.round(
+                  required /
+                  roleRangeDayCount
+                )
+              : 0,
+                performance:
+                  required > 0
+                    ? completionRate(
+                        completed,
+                        required
+                      )
+                    : null,
+              },
+            ];
+          }
+        )
+      ) as Partial<
+        Record<
+          InspectionModuleKey,
+          {
+            required: number;
+            completed: number;
+          assigned?: number;
+            performance:
+              number | null;
+          }
+        >
+      >;
+
+
+setDrilldown({
       title:
         row.label,
       value:
@@ -10415,6 +12765,25 @@ export default function CommissionerDashboard() {
           row.performance
         ),
       breakdown: [
+        {
+          label:
+            'Required Inspections',
+          value:
+            (
+              row.requiredInspections ??
+              0
+            ).toLocaleString(
+              'en-IN'
+            ),
+        },
+        {
+          label:
+            'Completed Inspections',
+          value:
+            row.total.toLocaleString(
+              'en-IN'
+            ),
+        },
         {
           label:
             'Records',
@@ -10425,7 +12794,7 @@ export default function CommissionerDashboard() {
         },
         {
           label:
-            'Approved',
+            'Clean',
           value:
             row.approved.toLocaleString(
               'en-IN'
@@ -10433,7 +12802,7 @@ export default function CommissionerDashboard() {
         },
         {
           label:
-            'Rejected',
+            'Not Clean',
           value:
             row.rejected.toLocaleString(
               'en-IN'
@@ -10466,6 +12835,9 @@ export default function CommissionerDashboard() {
       ],
       inspectionRecords:
         row.records,
+
+      inspectionModuleCompletion:
+        roleInspectionModuleCompletion,
       attendanceEmployees:
         row.attendanceEmployee
           ? [
@@ -10727,7 +13099,7 @@ export default function CommissionerDashboard() {
                         | 'ALL'
                       )
                     }
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-600 dark:text-slate-300 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
                   >
                     {
                       label
@@ -10739,7 +13111,7 @@ export default function CommissionerDashboard() {
 
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
               <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   From
                 </span>
 
@@ -10757,12 +13129,12 @@ export default function CommissionerDashboard() {
                         .value
                     )
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 />
               </label>
 
               <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   To
                 </span>
 
@@ -10780,12 +13152,12 @@ export default function CommissionerDashboard() {
                         .value
                     )
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 />
               </label>
 
               <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   Zone
                 </span>
 
@@ -10802,7 +13174,7 @@ export default function CommissionerDashboard() {
                         .value
                     )
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
                 >
                   <option value="ALL">
                     All
@@ -10828,7 +13200,7 @@ export default function CommissionerDashboard() {
               </label>
 
               <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   Ward
                 </span>
 
@@ -10845,7 +13217,7 @@ export default function CommissionerDashboard() {
                         .value
                     )
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
                 >
                   <option value="ALL">
                     All
@@ -10871,7 +13243,7 @@ export default function CommissionerDashboard() {
               </label>
 
               <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   Module
                 </span>
 
@@ -10888,7 +13260,7 @@ export default function CommissionerDashboard() {
                         .value as DashboardModuleKey
                     )
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
                 >
                   {DASHBOARD_MODULES.map(
                     (
@@ -10912,7 +13284,7 @@ export default function CommissionerDashboard() {
               </label>
 
               <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   Role
                 </span>
 
@@ -10929,7 +13301,7 @@ export default function CommissionerDashboard() {
                         .value as RoleKey
                     )
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
                 >
                   {ROLES.map(
                     (
@@ -10955,14 +13327,14 @@ export default function CommissionerDashboard() {
 
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
               <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">
                   Search
                 </span>
 
                 <div className="relative">
                   <Search
                     size={15}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
                   />
 
                   <input
@@ -10978,7 +13350,7 @@ export default function CommissionerDashboard() {
                           .value
                       )
                     }
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400"
                   />
                 </div>
               </label>
@@ -10988,7 +13360,7 @@ export default function CommissionerDashboard() {
                 onClick={
                   applyDates
                 }
-                className="mt-auto h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5"
+                className="mt-auto h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-[#10235e] shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5"
               >
                 Apply
               </button>
@@ -10998,7 +13370,7 @@ export default function CommissionerDashboard() {
                 onClick={
                   resetFilters
                 }
-                className="mt-auto h-10 rounded-xl border border-slate-200 bg-white px-5 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+                className="mt-auto h-10 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 px-5 text-xs font-black text-slate-600 dark:text-slate-300 transition hover:bg-slate-50"
               >
                 Reset
               </button>
@@ -11027,578 +13399,15 @@ export default function CommissionerDashboard() {
           </div>
         )}
 
-        {/* KPI */}
-        <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
-          <KpiCard
-            label="Overall Performance"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                  overallPerformance
-                )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.overallPerformance)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-violet-50 via-purple-50 to-white"
-            iconGradient="from-violet-500 to-purple-600"
-            icon={
-              <div className="relative flex items-center justify-center">
-                <BarChart3 size={26} strokeWidth={2.2} />
-                <TrendingUp
-                  size={13}
-                  strokeWidth={3}
-                  className="absolute -right-1.5 -top-1.5"
-                />
-              </div>
-            }
-            tooltip={[
-              {
-                label:
-                  'Inspection Performance',
-                value:
-                  percentText(
-                    inspection.performance
-                  ),
-              },
-              {
-                label:
-                  'Attendance',
-                value:
-                  percentText(
-                    attendanceStats.rate
-                  ),
-              },
-              {
-                label:
-                  'Ward Performance',
-                value:
-                  percentText(
-                    wardRankingAverage
-                  ),
-              },
-            ]}
-            trend={monthTrends.overallPerformance}
-            onClick={
-              openOverall
-            }
-          />
-
-          <KpiCard
-            label="Attendance"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                  attendanceStats.rate
-                )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.attendanceRate)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-emerald-50 via-teal-50 to-white"
-            iconGradient="from-emerald-400 to-teal-500"
-            icon={
-              <div className="relative flex items-center justify-center">
-                <UsersRound size={24} strokeWidth={2.2} />
-                <IconBadge
-                  bg="bg-emerald-600"
-                  icon={
-                    <Check
-                      size={10}
-                      strokeWidth={3.2}
-                    />
-                  }
-                />
-              </div>
-            }
-            tooltip={
-              attendanceStats.rangeDayCount > 1
-                ? [
-                  {
-                    label:
-                      'Registered Employees',
-                    value:
-                      attendanceEmployeeTotal.toLocaleString(
-                        'en-IN'
-                      ),
-                  },
-                  {
-                    label:
-                      'Avg Present / Day',
-                    value:
-                      Math.round(
-                        attendanceStats.displayPresent
-                      ).toLocaleString(
-                        'en-IN'
-                      ),
-                  },
-                  {
-                    label:
-                      'Avg Absent / Day',
-                    value:
-                      Math.round(
-                        attendanceStats.displayAbsent
-                      ).toLocaleString(
-                        'en-IN'
-                      ),
-                  },
-                  {
-                    label:
-                      'Attendance Days',
-                    value:
-                      attendanceStats.rangeDayCount.toLocaleString(
-                        'en-IN'
-                      ),
-                  },
-                ]
-                : [
-                  {
-                    label:
-                      'Total Employee',
-                    value:
-                      attendanceEmployeeTotal.toLocaleString(
-                        'en-IN'
-                      ),
-                  },
-                  {
-                    label:
-                      'Present',
-                    value:
-                      Math.round(
-                        attendanceStats.present
-                      ).toLocaleString(
-                        'en-IN'
-                      ),
-                  },
-                  {
-                    label:
-                      'Absent',
-                    value:
-                      Math.round(
-                        attendanceStats.absent
-                      ).toLocaleString(
-                        'en-IN'
-                      ),
-                  },
-                ]
-            }
-            trend={monthTrends.attendanceRate}
-            onClick={
-              openAttendance
-            }
-          />
-
-          <KpiCard
-            label="Inspection Performance"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                  inspectionPerformance
-                )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.inspectionPerformance)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-blue-50 via-sky-50 to-white"
-            iconGradient="from-blue-500 to-indigo-500"
-            icon={
-              <div className="relative flex items-center justify-center">
-                <ClipboardList size={24} strokeWidth={2.2} />
-                <IconBadge
-                  bg="bg-blue-700"
-                  icon={
-                    <Search
-                      size={9}
-                      strokeWidth={3}
-                    />
-                  }
-                />
-              </div>
-            }
-            tooltip={[
-              {
-                label:
-                  'Required Inspections',
-                value:
-                  inspectionRequired.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Completed Inspections',
-                value:
-                  inspectionCompleted.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                /*
-                 * SI Approved (inspection.approved) already counts
-                 * every report the SI ever approved, including ones
-                 * later flagged for corrective action - so Total
-                 * Inspection = SI Approved + SI Rejected + SI Pending
-                 * holds.
-                 */
-                label:
-                  'SI Approved',
-                value:
-                  inspection.approved.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'SI Rejected',
-                value:
-                  inspection.rejected.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'SI Pending',
-                value:
-                  inspection.pending.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                /*
-                 * Action Required (inspection.actionRequired) is
-                 * already a superset that also includes records
-                 * whose action has since been taken.
-                 */
-                label:
-                  'Action Required',
-                value:
-                  inspection.actionRequired.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Action Taken',
-                value:
-                  inspection.actionTaken.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Pending Action',
-                value:
-                  (
-                    inspection.actionRequired -
-                    inspection.actionTaken
-                  ).toLocaleString(
-                    'en-IN'
-                  ),
-              },
-            ]}
-            trend={monthTrends.inspectionPerformance}
-            onClick={() =>
-              openInspectionMetric(
-                'Inspection Performance',
-                filteredInspectionRecords,
-                percentText(
-                  inspectionPerformance
-                )
-              )
-            }
-          />
-
-          <KpiCard
-            label="Approval Rate"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                  inspection.approvalRate
-                )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.approvalRate)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-teal-50 via-emerald-50 to-white"
-            iconGradient="from-teal-400 to-emerald-600"
-            icon={
-              <div className="relative flex items-center justify-center">
-                <FileText size={24} strokeWidth={2.2} />
-                <IconBadge
-                  bg="bg-emerald-600"
-                  icon={
-                    <Check
-                      size={10}
-                      strokeWidth={3.2}
-                    />
-                  }
-                />
-              </div>
-            }
-            tooltip={[
-              {
-                label:
-                  'Total',
-                value:
-                  inspection.total.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'SI Approved',
-                value:
-                  inspection.approved.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'SI Rejected',
-                value:
-                  inspection.rejected.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-            ]}
-            trend={monthTrends.approvalRate}
-            onClick={() =>
-              openInspectionMetric(
-                'Approval Rate',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    getQcDecision(
-                      item
-                    ) ===
-                    'APPROVED'
-                ),
-                percentText(
-                  inspection.approvalRate
-                )
-              )
-            }
-          />
-
-          <KpiCard
-            label="Rejection Rate"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                  inspection.rejectionRate
-                )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.rejectionRate)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-rose-50 via-red-50 to-white"
-            iconGradient="from-rose-500 to-red-600"
-            icon={
-              <div className="relative flex items-center justify-center">
-                <FileText size={24} strokeWidth={2.2} />
-                <IconBadge
-                  bg="bg-rose-600"
-                  icon={
-                    <X
-                      size={10}
-                      strokeWidth={3.2}
-                    />
-                  }
-                />
-              </div>
-            }
-            tooltip={[
-              {
-                label:
-                  'Total',
-                value:
-                  inspection.total.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'SI Approved',
-                value:
-                  inspection.approved.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'SI Rejected',
-                value:
-                  inspection.rejected.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-            ]}
-            trend={monthTrends.rejectionRate}
-            onClick={() =>
-              openInspectionMetric(
-                'Rejection Rate',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    getQcDecision(
-                      item
-                    ) ===
-                    'REJECTED'
-                ),
-                percentText(
-                  inspection.rejectionRate
-                )
-              )
-            }
-          />
-
-          <KpiCard
-            label="Action Closure"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                  inspection.actionClosure
-                )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.actionClosure)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-orange-50 via-amber-50 to-white"
-            iconGradient="from-orange-400 to-amber-500"
-            icon={
-              <div className="relative flex items-center justify-center">
-                <Settings2 size={24} strokeWidth={2.2} />
-                <IconBadge
-                  bg="bg-orange-600"
-                  icon={
-                    <Check
-                      size={10}
-                      strokeWidth={3.2}
-                    />
-                  }
-                />
-              </div>
-            }
-            tooltip={[
-              {
-                label:
-                  'Action Required',
-                value:
-                  inspection.actionRequired.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Action Pending',
-                value:
-                  (
-                    inspection.actionRequired -
-                    inspection.actionTaken
-                  ).toLocaleString(
-                    'en-IN'
-                  ),
-              },
-              {
-                label:
-                  'Action Taken',
-                value:
-                  inspection.actionTaken.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-            ]}
-            trend={monthTrends.actionClosure}
-            onClick={() =>
-              openInspectionMetric(
-                'Action Closure',
-                filteredInspectionRecords.filter(
-                  (
-                    item
-                  ) =>
-                    [
-                      'ACTION_REQUIRED',
-                      'ACTION_TAKEN',
-                    ].includes(
-                      effectiveStatus(
-                        item
-                      )
-                    )
-                ),
-                percentText(
-                  inspection.actionClosure
-                )
-              )
-            }
-          />
-
-          <KpiCard
-            label="Ward Performance"
-            value={
-              loading
-                ? '—'
-                : percentText(
-                  wardRankingAverage
-                )
-            }
-            lastMonthValue={
-              lastMonthMetrics
-                ? percentText(lastMonthMetrics.wardRankingAverage)
-                : undefined
-            }
-            cardTint="bg-gradient-to-br from-violet-50 via-fuchsia-50 to-white"
-            iconGradient="from-violet-500 to-fuchsia-600"
-            icon={
-              <Trophy
-                size={26}
-                strokeWidth={2.2}
-              />
-            }
-            tooltip={[
-              {
-                label:
-                  'Ward',
-                value:
-                  filteredWardRows.length.toLocaleString(
-                    'en-IN'
-                  ),
-              },
-            ]}
-            trend={monthTrends.wardRankingAverage}
-            onClick={
-              openWardRanking
-            }
-          />
-        </section>
-
-        {/* CITY SNAPSHOT */}
-        <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        {/* CITY COVERAGE SNAPSHOT */}
+        <section className="mt-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-4 shadow-sm">
           <div className="mb-3">
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
-              City Snapshot
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+              City Coverage Snapshot
             </h2>
-            <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-              Overall city totals and today&apos;s report status across all inspection modules
+
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+              City-wide operational coverage across zones, wards and sanitation assets
             </p>
           </div>
 
@@ -11609,12 +13418,14 @@ export default function CommissionerDashboard() {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100/80 text-blue-600">
                     <MapPin size={16} />
                   </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600 dark:text-slate-300">
                     Total Zones
                   </div>
                 </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {cityZoneCount}
+
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900 dark:text-slate-100">
+                  {cityZoneCount.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
@@ -11625,12 +13436,14 @@ export default function CommissionerDashboard() {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100/80 text-violet-600">
                     <Layers3 size={16} />
                   </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
+
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600 dark:text-slate-300">
                     Total Wards
                   </div>
                 </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {cityWardCount}
+
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900 dark:text-slate-100">
+                  {cityWardCount.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
@@ -11641,268 +13454,462 @@ export default function CommissionerDashboard() {
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-100/80 text-cyan-600">
                     <Activity size={16} />
                   </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    Total Beats
+
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600 dark:text-slate-300">
+                    Sweeping Beats
                   </div>
                 </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {cityBeatCount}
+
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900 dark:text-slate-100">
+                  {citySweepingBeatCount.toLocaleString('en-IN')}
                 </div>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                openInspectionMetric(
-                  'Completed Inspections',
-                  records,
-                  citySnapshotCompleted.toLocaleString(
-                    'en-IN'
-                  )
-                )
-              }
-              className="group min-h-[76px] rounded-xl border border-sky-100 bg-sky-50/50 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
-            >
-              <div className="flex h-full items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100/80 text-sky-700">
-                    <ClipboardList size={16} />
-                  </div>
-                  <div>
-                    <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                      Completed Inspections
-                    </div>
-                    <div className="mt-1 text-[8px] font-bold text-slate-400">
-                      Required {citySnapshotRequired.toLocaleString('en-IN')}
-                    </div>
-                  </div>
-                </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotCompleted}
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                openInspectionMetric(
-                  'SI Pending',
-                  records.filter(
-                    (
-                      item
-                    ) =>
-                      effectiveStatus(
-                        item
-                      ) ===
-                      'PENDING'
-                  ),
-                  citySnapshotStats.pending.toLocaleString(
-                    'en-IN'
-                  )
-                )
-              }
-              className="group min-h-[76px] rounded-xl border border-amber-100 bg-amber-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md"
-            >
-              <div className="flex h-full items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100/80 text-amber-600">
-                    <Clock3 size={16} />
-                  </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    SI Pending
-                  </div>
-                </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.pending}
-                </div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                openInspectionMetric(
-                  'SI Approved',
-                  records.filter(
-                    (
-                      item
-                    ) =>
-                      getQcDecision(
-                        item
-                      ) ===
-                      'APPROVED'
-                  ),
-                  citySnapshotStats.approved.toLocaleString(
-                    'en-IN'
-                  )
-                )
-              }
-              className="group min-h-[76px] rounded-xl border border-emerald-100 bg-emerald-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
-            >
+            <div className="min-h-[76px] rounded-xl border border-emerald-100 bg-emerald-50/45 px-3 py-2.5">
               <div className="flex h-full items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100/80 text-emerald-600">
-                    <CheckCircle2 size={16} />
+                    <Trash2 size={16} />
                   </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    SI Approved
+
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600 dark:text-slate-300">
+                    Litter Bins
                   </div>
                 </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.approved}
+
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900 dark:text-slate-100">
+                  {cityLitterBinCount.toLocaleString('en-IN')}
                 </div>
               </div>
-            </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                openInspectionMetric(
-                  'SI Rejected',
-                  records.filter(
-                    (
-                      item
-                    ) =>
-                      getQcDecision(
-                        item
-                      ) ===
-                      'REJECTED'
-                  ),
-                  citySnapshotStats.rejected.toLocaleString(
-                    'en-IN'
-                  )
-                )
-              }
-              className="group min-h-[76px] rounded-xl border border-rose-100 bg-rose-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-rose-200 hover:shadow-md"
-            >
+            <div className="min-h-[76px] rounded-xl border border-amber-100 bg-amber-50/45 px-3 py-2.5">
               <div className="flex h-full items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100/80 text-rose-600">
-                    <XCircle size={16} />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100/80 text-amber-600">
+                    <ClipboardList size={16} />
                   </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    SI Rejected
+
+                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600 dark:text-slate-300">
+                    Toilets
                   </div>
                 </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.rejected}
+
+                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900 dark:text-slate-100">
+                  {cityToiletCount.toLocaleString('en-IN')}
                 </div>
               </div>
-            </button>
+            </div>
+          </div>
+        </section>
 
-            <button
-              type="button"
+        {/* CITY PERFORMANCE */}
+        <section className="mt-4">
+          <div className="mb-3">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+              City Performance
+            </h2>
+
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+              Attendance, ward performance and sanitation inspection performance for the selected period
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+            <KpiCard
+              label="Attendance Rate"
+              value={
+                loading
+                  ? '—'
+                  : percentText(attendanceStats.rate)
+              }
+              lastMonthValue={
+                lastMonthMetrics
+                  ? percentText(lastMonthMetrics.attendanceRate)
+                  : undefined
+              }
+              cardTint="bg-gradient-to-br from-emerald-50 via-teal-50 to-white"
+              iconGradient="from-emerald-400 to-teal-500"
+              icon={
+                <UsersRound
+                  size={24}
+                  strokeWidth={2.2}
+                />
+              }
+              tooltip={
+                attendanceStats.rangeDayCount > 1
+                  ? [
+                    {
+                      label: 'Registered Employees',
+                      value:
+                        attendanceEmployeeTotal.toLocaleString(
+                          'en-IN'
+                        ),
+                    },
+                    {
+                      label: 'Avg Present / Day',
+                      value:
+                        Math.round(
+                          attendanceStats.displayPresent
+                        ).toLocaleString(
+                          'en-IN'
+                        ),
+                    },
+                    {
+                      label: 'Avg Absent / Day',
+                      value:
+                        Math.round(
+                          attendanceStats.displayAbsent
+                        ).toLocaleString(
+                          'en-IN'
+                        ),
+                    },
+                    {
+                      label: 'Attendance Days',
+                      value:
+                        attendanceStats.rangeDayCount.toLocaleString(
+                          'en-IN'
+                        ),
+                    },
+                  ]
+                  : [
+                    {
+                      label: 'Total Employees',
+                      value:
+                        attendanceEmployeeTotal.toLocaleString(
+                          'en-IN'
+                        ),
+                    },
+                    {
+                      label: 'Present',
+                      value:
+                        Math.round(
+                          attendanceStats.present
+                        ).toLocaleString(
+                          'en-IN'
+                        ),
+                    },
+                    {
+                      label: 'Absent',
+                      value:
+                        Math.round(
+                          attendanceStats.absent
+                        ).toLocaleString(
+                          'en-IN'
+                        ),
+                    },
+                  ]
+              }
+              trend={monthTrends.attendanceRate}
+              onClick={openAttendance}
+            />
+
+            <KpiCard
+              label="Average Ward Score"
+              value={
+                loading
+                  ? '—'
+                  : percentText(wardRankingAverage)
+              }
+              lastMonthValue={
+                lastMonthMetrics
+                  ? percentText(
+                    lastMonthMetrics.wardRankingAverage
+                  )
+                  : undefined
+              }
+              cardTint="bg-gradient-to-br from-violet-50 via-fuchsia-50 to-white"
+              iconGradient="from-violet-500 to-fuchsia-600"
+              icon={
+                <Trophy
+                  size={26}
+                  strokeWidth={2.2}
+                />
+              }
+              tooltip={[
+                {
+                  label: 'Average Ward Score',
+                  value:
+                    percentText(
+                      wardRankingAverage
+                    ),
+                },
+                {
+                  label: 'Ranked Wards',
+                  value:
+                    filteredWardRows.length.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+              ]}
+              trend={monthTrends.wardRankingAverage}
+              onClick={openWardRanking}
+            />
+
+            <KpiCard
+              label="Sweeping"
+              value={
+                loading
+                  ? '—'
+                  : percentText(
+                    sweepingInspection.performance
+                  )
+              }
+              cardTint="bg-gradient-to-br from-blue-50 via-indigo-50 to-white"
+              iconGradient="from-blue-500 to-indigo-600"
+              icon={
+                <Activity
+                  size={25}
+                  strokeWidth={2.2}
+                />
+              }
+              tooltip={[
+                {
+                  label: 'Inspections Required',
+                  value:
+                    sweepingInspection.required.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Completed Beats',
+                  value:
+                    sweepingInspection.completed.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Cleaned Beats',
+                  value:
+                    sweepingBeatStatusBreakdown.clean.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Not Cleaned Beats',
+                  value:
+                    sweepingBeatStatusBreakdown.notClean.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Pending Review Beats',
+                  value:
+                    sweepingBeatStatusBreakdown.pendingReview.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Attention Required',
+                  value:
+                    sweepingBeatStatusBreakdown.attentionRequired.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Resolution Pending',
+                  value:
+                    sweepingBeatStatusBreakdown.resolutionPending.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Resolved',
+                  value:
+                    sweepingBeatStatusBreakdown.resolved.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+              ]}
               onClick={() =>
                 openInspectionMetric(
-                  'Action Required',
-                  records.filter(
-                    (
-                      item
-                    ) =>
-                      [
-                        'ACTION_REQUIRED',
-                        'ACTION_TAKEN',
-                      ].includes(
-                        effectiveStatus(
-                          item
-                        )
-                      )
-                  ),
-                  citySnapshotStats.actionRequired.toLocaleString(
-                    'en-IN'
+                  'Sweeping',
+                  sweepingInspection.records,
+                  percentText(
+                    sweepingInspection.performance
                   )
+                  ,
+                  'SWEEPING'
                 )
               }
-              className="group min-h-[76px] rounded-xl border border-orange-100 bg-orange-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
-            >
-              <div className="flex h-full items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-100/80 text-orange-600">
-                    <AlertTriangle size={16} />
-                  </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    Action Required
-                  </div>
-                </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.actionRequired}
-                </div>
-              </div>
-            </button>
+            />
 
-            <button
-              type="button"
+            <KpiCard
+              label="Litter Bin"
+              value={
+                loading
+                  ? '—'
+                  : percentText(
+                    litterBinInspection.performance
+                  )
+              }
+              cardTint="bg-gradient-to-br from-green-50 via-emerald-50 to-white"
+              iconGradient="from-green-500 to-emerald-600"
+              icon={
+                <Trash2
+                  size={25}
+                  strokeWidth={2.2}
+                />
+              }
+              tooltip={[
+                {
+                  label: 'Required Inspections',
+                  value:
+                    litterBinInspection.required.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Completed Inspections',
+                  value:
+                    litterBinInspection.completed.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Cleaned Litter Bins',
+                  value:
+                    litterBinInspection.statusBreakdown.clean.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Not Cleaned Litter Bins',
+                  value:
+                    litterBinInspection.statusBreakdown.notClean.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Pending Review Litter Bins',
+                  value:
+                    litterBinInspection.statusBreakdown.pendingReview.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Attention Required',
+                  value:
+                    litterBinInspection.statusBreakdown.attentionRequired.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Resolution Pending',
+                  value:
+                    litterBinInspection.statusBreakdown.resolutionPending.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Resolved',
+                  value:
+                    litterBinInspection.statusBreakdown.resolved.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+              ]}
               onClick={() =>
                 openInspectionMetric(
-                  'Action Taken',
-                  records.filter(
-                    (
-                      item
-                    ) =>
-                      effectiveStatus(
-                        item
-                      ) ===
-                      'ACTION_TAKEN'
-                  ),
-                  citySnapshotStats.actionTaken.toLocaleString(
-                    'en-IN'
+                  'Litter Bin',
+                  litterBinInspection.records,
+                  percentText(
+                    litterBinInspection.performance
                   )
+                  ,
+                  'LITTERBINS'
                 )
               }
-              className="group min-h-[76px] rounded-xl border border-teal-100 bg-teal-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md"
-            >
-              <div className="flex h-full items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-100/80 text-teal-600">
-                    <ShieldCheck size={16} />
-                  </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    Action Taken
-                  </div>
-                </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.actionTaken}
-                </div>
-              </div>
-            </button>
+            />
 
-            <button
-              type="button"
+            <KpiCard
+              label="Toilet"
+              value={
+                loading
+                  ? '—'
+                  : percentText(
+                    toiletInspection.performance
+                  )
+              }
+              cardTint="bg-gradient-to-br from-amber-50 via-orange-50 to-white"
+              iconGradient="from-amber-500 to-orange-600"
+              icon={
+                <ClipboardList
+                  size={25}
+                  strokeWidth={2.2}
+                />
+              }
+              tooltip={[
+                {
+                  label: 'Required Inspections',
+                  value:
+                    toiletInspection.required.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Completed Inspections',
+                  value:
+                    toiletInspection.completed.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Cleaned Toilets',
+                  value:
+                    toiletInspection.statusBreakdown.clean.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Not Cleaned Toilets',
+                  value:
+                    toiletInspection.statusBreakdown.notClean.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Pending Review Toilets',
+                  value:
+                    toiletInspection.statusBreakdown.pendingReview.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Attention Required',
+                  value:
+                    toiletInspection.statusBreakdown.attentionRequired.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Resolution Pending',
+                  value:
+                    toiletInspection.statusBreakdown.resolutionPending.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+                {
+                  label: 'Resolved',
+                  value:
+                    toiletInspection.statusBreakdown.resolved.toLocaleString(
+                      'en-IN'
+                    ),
+                },
+              ]}
               onClick={() =>
                 openInspectionMetric(
-                  'Pending Action',
-                  records.filter(
-                    (item) =>
-                      effectiveStatus(item) ===
-                      'ACTION_REQUIRED'
-                  ),
-                  (
-                    citySnapshotStats.actionRequired -
-                    citySnapshotStats.actionTaken
-                  ).toLocaleString(
-                    'en-IN'
+                  'Toilet',
+                  toiletInspection.records,
+                  percentText(
+                    toiletInspection.performance
                   )
+                  ,
+                  'TOILET'
                 )
               }
-              className="group min-h-[76px] rounded-xl border border-cyan-100 bg-cyan-50/45 px-3 py-2.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md"
-            >
-              <div className="flex h-full items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-100/80 text-cyan-600">
-                    <Timer size={16} />
-                  </div>
-                  <div className="truncate text-[9px] font-black uppercase tracking-[0.04em] text-slate-600">
-                    Pending Action
-                  </div>
-                </div>
-                <div className="shrink-0 text-[20px] font-black leading-none text-slate-900">
-                  {citySnapshotStats.actionRequired -
-                    citySnapshotStats.actionTaken}
-                </div>
-              </div>
-            </button>
+            />
           </div>
         </section>
 
@@ -11960,7 +13967,7 @@ export default function CommissionerDashboard() {
                       '#0F1B4C',
                   }}
                 >
-                  Top Performance
+                  Top Cleanliness Performance Based on Zone & Ward
                 </div>
 
                 <div
@@ -11970,7 +13977,7 @@ export default function CommissionerDashboard() {
                       '#31518F',
                   }}
                 >
-                  Best performing zone and ward
+                  Highest cleanliness achieved against required inspections
                 </div>
               </div>
             </div>
@@ -12068,7 +14075,7 @@ export default function CommissionerDashboard() {
                     '#065F46',
                 }}
               >
-                On the Basis of Approval Rate and Action Closure
+                Based on clean inspections achieved vs required inspections
               </div>
             </div>
           </div>
@@ -12122,7 +14129,7 @@ export default function CommissionerDashboard() {
                       '#0F1B4C',
                   }}
                 >
-                  Worst Performance
+                  Lowest Cleanliness Performance Based on Zone & Ward
                 </div>
 
                 <div
@@ -12132,7 +14139,7 @@ export default function CommissionerDashboard() {
                       '#31518F',
                   }}
                 >
-                  Lowest performing zone and ward
+                  Lowest cleanliness achieved against required inspections
                 </div>
               </div>
             </div>
@@ -12227,217 +14234,379 @@ export default function CommissionerDashboard() {
                     '#9F1239',
                 }}
               >
-                On the Basis of Approval Rate and Action Closure
+                Based on clean inspections achieved vs required inspections
               </div>
             </div>
           </div>
         </section>
 
-        {/* MODULES */}
-        <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {moduleCards.map(
-            (
-              module,
-              index
-            ) => {
-              const gradients =
-                [
-                  'from-violet-500 via-indigo-500 to-blue-600',
-                  'from-cyan-400 via-teal-500 to-emerald-600',
-                  'from-blue-400 via-indigo-500 to-violet-600',
-                  'from-emerald-400 via-teal-500 to-cyan-600',
-                  'from-violet-400 via-purple-500 to-fuchsia-600',
-                ];
-
-              /*
-               * Full calculation shown on hover - derived from the
-               * same raw records/employees/wards already carried on
-               * this module card, using the existing performance
-               * formulas (no new calculation logic introduced).
-               */
-              const calculation =
-                (() => {
-                  if (
-                    module.key ===
-                    'ATTENDANCE'
-                  ) {
-                    const totalDays =
-                      module.employees.reduce(
-                        (
-                          sum,
-                          employee
-                        ) =>
-                          sum +
-                          employee.totalDays,
-                        0
-                      );
-
-                    const present =
-                      module.employees.reduce(
-                        (
-                          sum,
-                          employee
-                        ) =>
-                          sum +
-                          employee.presentDays,
-                        0
-                      );
-
-                    return `${present.toLocaleString('en-IN')} Present / ${totalDays.toLocaleString('en-IN')} Total Days = ${percentText(module.performance)}`;
-                  }
-
-                  if (
-                    module.key ===
-                    'WARD_RANKING'
-                  ) {
-                    return `Average of ${module.wards.length.toLocaleString('en-IN')} Ward${module.wards.length === 1 ? '' : 's'} = ${percentText(module.performance)}`;
-                  }
-
-                  const stats =
-                    inspectionStats(
-                      module.records
-                    );
-
-                  return `${stats.goodOutcome.toLocaleString('en-IN')} Approved or Action Taken / ${stats.total.toLocaleString('en-IN')} Total = ${percentText(module.performance)}`;
-                })();
-
-              return (
-                <button
-                  key={
-                    module.key
-                  }
-                  type="button"
-                  onClick={() =>
-                    openModule(
-                      module
-                    )
-                  }
-                  className={`group relative overflow-hidden rounded-[22px] border bg-white p-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${moduleFilter ===
-                    module.key
-                    ? 'border-indigo-300 ring-2 ring-indigo-100'
-                    : 'border-slate-200'
-                    }`}
-                >
-                  <div
-                    className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${gradients[
-                      index %
-                      gradients.length
-                    ]
-                      }`}
-                  />
-
-                  <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
-                    {
-                      module.label
-                    }
-                  </div>
-
-                  <div className="mt-3 text-3xl font-black tracking-tight text-slate-950">
-                    {percentText(
-                      module.performance
-                    )}
-                  </div>
-
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full bg-gradient-to-r ${gradients[
-                        index %
-                        gradients.length
-                      ]
-                        } transition-all duration-700`}
-                      style={{
-                        width:
-                          `${clamp(
-                            module.performance ||
-                            0
-                          )}%`,
-                      }}
-                    />
-                  </div>
-
-                  <div className="pointer-events-none absolute inset-x-3 top-10 z-10 hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold leading-snug text-slate-700 shadow-xl group-hover:block">
-                    {calculation}
-                  </div>
-                </button>
-              );
-            }
-          )}
-        </section>
-
         {/* TREND + ZONE */}
-        <section className="mt-4 grid grid-cols-1 gap-4 2xl:grid-cols-[1.45fr_1fr]">
-          <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950">
+        <section className="items-stretch min-h-0 mt-4 grid grid-cols-1 gap-4 2xl:grid-cols-[1.45fr_1fr]">
+          <div className="rounded-[26px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-5 shadow-sm">
+            <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white">
               <Activity
                 size={18}
                 className="text-indigo-600"
               />
-              Overall Performance
+              Inspection & Cleanliness
             </div>
 
-            <CityPerformancePulse
-              loading={
-                loading
-              }
-              periodLabel={
-                zoneModuleDateLabel
-              }
-              overallPerformance={
-                overallPerformance
-              }
-              inspectionPerformance={
-                inspection.performance
-              }
-              attendanceRate={
-                attendanceStats.rate
-              }
-              wardRankingAverage={
-                wardRankingAverage
-              }
-              lastMonthMetrics={
-                lastMonthMetrics
-              }
-              monthTrends={
-                monthTrends
-              }
-              insights={
-                smartInsights
-              }
-              lastUpdatedAt={
-                lastUpdatedAt
-              }
-              onOverall={
-                openOverall
-              }
-              onInspection={() =>
-                openInspectionMetric(
-                  'Inspection Performance',
-                  filteredInspectionRecords,
-                  percentText(
-                    inspection.performance
-                  )
-                )
-              }
-              onAttendance={
-                openAttendance
-              }
-              onWardRanking={
-                openWardRanking
-              }
-            />
+            <div className="space-y-3">
+              {[
+                {
+                  key: 'SWEEPING',
+                  title: 'Sweeping',
+                  icon: (
+                    <Activity
+                      size={18}
+                      strokeWidth={2.4}
+                    />
+                  ),
+                  theme:
+                    'border-blue-100 bg-gradient-to-r from-blue-50/80 via-indigo-50/45 to-white',
+                  iconTheme:
+                    'bg-gradient-to-br from-blue-500 to-indigo-600 text-[#10235e] shadow-blue-200',
+                  accent:
+                    'text-blue-700',
+                  requiredLabel:
+                    'Inspections Required',
+                  assignedLabel:
+                    'Assigned Beats',
+                  assigned:
+                    Math.round(
+                      sweepingInspection.required /
+                      inspectionRangeDayCount
+                    ),
+                  completedLabel:
+                    'Completed Beats',
+                  cleanLabel:
+                    'Cleaned Beats',
+                  notCleanLabel:
+                    'Not Cleaned Beats',
+                  pendingLabel:
+                    'Pending Review Beats',
+                  unitLabel:
+                    'Beats',
+                  required:
+                    sweepingInspection.required,
+                  completed:
+                    sweepingInspection.completed,
+                  clean:
+                    sweepingInspection.statusBreakdown.clean,
+                  notClean:
+                    sweepingInspection.statusBreakdown.notClean,
+                  pending:
+                    sweepingInspection.statusBreakdown.pendingReview,
+                  attention:
+                    sweepingInspection.statusBreakdown.attentionRequired,
+                  resolutionPending:
+                    sweepingInspection.statusBreakdown.resolutionPending,
+                  resolved:
+                    sweepingInspection.statusBreakdown.resolved,
+                  performance:
+                    sweepingInspection.performance,
+                  cleanlinessPerformance:
+                    sweepingCleanlinessPerformance,
+                },
+                {
+                  key: 'LITTERBINS',
+                  title: 'Litter Bin',
+                  icon: (
+                    <Trash2
+                      size={18}
+                      strokeWidth={2.4}
+                    />
+                  ),
+                  theme:
+                    'border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-green-50/45 to-white',
+                  iconTheme:
+                    'bg-gradient-to-br from-emerald-500 to-green-600 text-[#10235e] shadow-emerald-200',
+                  accent:
+                    'text-emerald-700',
+                  requiredLabel:
+                    'Required Litter Bins',
+          assignedLabel:
+            'Assigned Litter Bins',
+          assigned:
+            Math.round(
+              litterBinInspection.required /
+              inspectionRangeDayCount
+            ),
+                  completedLabel:
+                    'Inspected Litter Bins',
+                  cleanLabel:
+                    'Cleaned Litter Bins',
+                  notCleanLabel:
+                    'Not Cleaned Litter Bins',
+                  pendingLabel:
+                    'Pending Review Litter Bins',
+                  unitLabel:
+                    'Litter Bins',
+                  required:
+                    litterBinInspection.required,
+                  completed:
+                    litterBinInspection.completed,
+                  clean:
+                    litterBinInspection.statusBreakdown.clean,
+                  notClean:
+                    litterBinInspection.statusBreakdown.notClean,
+                  pending:
+                    litterBinInspection.statusBreakdown.pendingReview,
+                  attention:
+                    litterBinInspection.statusBreakdown.attentionRequired,
+                  resolutionPending:
+                    litterBinInspection.statusBreakdown.resolutionPending,
+                  resolved:
+                    litterBinInspection.statusBreakdown.resolved,
+                  performance:
+                    litterBinInspection.performance,
+                  cleanlinessPerformance:
+                    litterBinCleanlinessPerformance,
+                },
+                {
+                  key: 'TOILET',
+                  title: 'Toilet',
+                  icon: (
+                    <ClipboardList
+                      size={18}
+                      strokeWidth={2.4}
+                    />
+                  ),
+                  theme:
+                    'border-amber-100 bg-gradient-to-r from-amber-50/80 via-orange-50/45 to-white',
+                  iconTheme:
+                    'bg-gradient-to-br from-amber-500 to-orange-600 text-[#10235e] shadow-amber-200',
+                  accent:
+                    'text-amber-700',
+                  requiredLabel:
+                    'Required Toilets',
+          assignedLabel:
+            'Assigned Toilets',
+          assigned:
+            Math.round(
+              toiletInspection.required /
+              inspectionRangeDayCount
+            ),
+                  completedLabel:
+                    'Inspected Toilets',
+                  cleanLabel:
+                    'Cleaned Toilets',
+                  notCleanLabel:
+                    'Not Cleaned Toilets',
+                  pendingLabel:
+                    'Pending Review Toilets',
+                  unitLabel:
+                    'Toilets',
+                  required:
+                    toiletInspection.required,
+                  completed:
+                    toiletInspection.completed,
+                  clean:
+                    toiletInspection.statusBreakdown.clean,
+                  notClean:
+                    toiletInspection.statusBreakdown.notClean,
+                  pending:
+                    toiletInspection.statusBreakdown.pendingReview,
+                  attention:
+                    toiletInspection.statusBreakdown.attentionRequired,
+                  resolutionPending:
+                    toiletInspection.statusBreakdown.resolutionPending,
+                  resolved:
+                    toiletInspection.statusBreakdown.resolved,
+                  performance:
+                    toiletInspection.performance,
+                  cleanlinessPerformance:
+                    toiletCleanlinessPerformance,
+                },
+              ].map((module) => (
+                <div
+                  key={module.key}
+                  className={`rounded-2xl border p-3.5 shadow-sm ${module.theme}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-md ${module.iconTheme}`}
+                      >
+                        {module.icon}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-black uppercase tracking-[0.05em] text-slate-700">
+                          {module.title}
+                        </div>
+
+                        <div className="mt-0.5 text-[9px] font-semibold text-slate-400 dark:text-slate-500">
+                          {module.completed.toLocaleString(
+                            'en-IN'
+                          )}{' '}
+                          of{' '}
+                          {module.required.toLocaleString(
+                            'en-IN'
+                          )}{' '}
+                          {module.unitLabel} inspected
+                        </div>
+                      </div>
+                    </div>
+
+
+                    <div className="flex shrink-0 items-stretch gap-2">
+                      <div className="min-w-[104px] rounded-xl border border-indigo-100 bg-indigo-50/90 px-3 py-2 text-right shadow-sm dark:border-indigo-800 dark:bg-indigo-950/30">
+                        <div className="text-[20px] font-black leading-none text-indigo-700 dark:text-indigo-300">
+                          {(module.assigned ?? 0).toLocaleString(
+                            'en-IN'
+                          )}
+                        </div>
+
+                        <div className="mt-1 text-[7px] font-black uppercase leading-tight tracking-wider text-indigo-500 dark:text-indigo-400">
+                          {module.key === 'SWEEPING'
+                            ? 'Assigned Beats'
+                            : module.key === 'LITTERBINS'
+                              ? 'Assigned Litter Bins'
+                              : 'Assigned Toilets'}
+                        </div>
+                      </div>
+
+                      <div className="min-w-[94px] rounded-xl border border-white/80 bg-white/80 px-3 py-2 text-right shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+                        <div
+                          className={`text-[20px] font-black leading-none ${module.accent}`}
+                        >
+                          {percentText(
+                            module.performance
+                          )}
+                        </div>
+
+                        <div className="mt-1 text-[7px] font-black uppercase leading-tight tracking-wider text-slate-400 dark:text-slate-500">
+                          Inspection
+                          <br />
+                          Completion
+                        </div>
+                      </div>
+
+                      <div className="min-w-[104px] rounded-xl border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-right shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30">
+                        <div className="text-[20px] font-black leading-none text-emerald-700 dark:text-emerald-300">
+                          {percentText(
+                            module.cleanlinessPerformance
+                          )}
+                        </div>
+
+                        <div className="mt-1 text-[7px] font-black uppercase leading-tight tracking-wider text-emerald-600 dark:text-emerald-400">
+                          Cleanliness
+                          <br />
+                          Performance
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-xl border border-white/80 bg-white/80 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        {module.requiredLabel}
+                      </div>
+                      <div className="mt-1 text-sm font-black text-slate-800 dark:text-slate-100">
+                        {module.required.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+
+
+                    <div className="rounded-xl border border-white/80 bg-white/80 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        {module.completedLabel}
+                      </div>
+                      <div className="mt-1 text-sm font-black text-slate-800 dark:text-slate-100">
+                        {module.completed.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-emerald-600">
+                        {module.cleanLabel}
+                      </div>
+                      <div className="mt-1 text-sm font-black text-emerald-700">
+                        {module.clean.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-rose-100 bg-rose-50/80 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-rose-500">
+                        {module.notCleanLabel}
+                      </div>
+                      <div className="mt-1 text-sm font-black text-rose-700">
+                        {module.notClean.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-sky-600">
+                        {module.pendingLabel}
+                      </div>
+                      <div className="mt-1 text-xs font-black text-sky-700">
+                        {module.pending.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-orange-600">
+                        Attention Required
+                      </div>
+                      <div className="mt-1 text-xs font-black text-orange-700">
+                        {module.attention.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-cyan-600">
+                        Resolution Pending
+                      </div>
+                      <div className="mt-1 text-xs font-black text-cyan-700">
+                        {module.resolutionPending.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-2">
+                      <div className="text-[8px] font-black uppercase tracking-wide text-indigo-600">
+                        Resolved
+                      </div>
+                      <div className="mt-1 text-xs font-black text-indigo-700">
+                        {module.resolved.toLocaleString(
+                          'en-IN'
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+          <div className="min-h-full h-0 overflow-hidden flex flex-col rounded-[26px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white">
                 <BarChart3
                   size={18}
                   className="text-violet-600"
                 />
-                Ward Performance
+                Ward Ranking
               </div>
 
-              <div className="text-[10px] font-black text-slate-400">
+              <div className="text-[10px] font-black text-slate-400 dark:text-slate-500">
                 {
                   wardRows.length
                 }{' '}
@@ -12445,7 +14614,7 @@ export default function CommissionerDashboard() {
               </div>
             </div>
 
-            <WardPerformanceScroller
+            <WardRankingScroller
               wards={
                 wardRows
               }
@@ -12453,43 +14622,49 @@ export default function CommissionerDashboard() {
           </div>
         </section>
 
-        {/* STATUS GRAPH */}
-        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950">
-            <Activity
-              size={18}
-              className="text-blue-600"
-            />
-            Inspection & Performance
-          </div>
-
-          <div className="h-[300px]">
-            <ModuleStatusBarChart
-              data={
-                moduleStatusRows
-              }
-            />
-          </div>
-        </section>
-
         {/* ROLE PERFORMANCE */}
-        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+            <div className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white">
               <UsersRound
                 size={18}
                 className="text-violet-600"
               />
-              User Performance
+              Team Leaderboard
+            </div>
+
+            <div className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+              Top 10 role-specific operational performers for the selected period
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {ROLES.filter(
-                (item) =>
-                  item.key !==
-                  'ALL'
-              ).map(
-                (role) => (
+              {([
+              {
+                key:
+                  'SUPERVISOR',
+                label:
+                  'Daroga',
+              },
+              {
+                key:
+                  'QC',
+                label:
+                  'Sanitary Inspector',
+              },
+              {
+                key:
+                  'ACTION_OFFICER',
+                label:
+                  'IEC Member',
+              },
+              {
+                key:
+                  'EMPLOYEE',
+                label:
+                  'Health Worker',
+              },
+            ] as const).map(
+              (role) => (
                   <button
                     key={
                       role.key
@@ -12505,13 +14680,11 @@ export default function CommissionerDashboard() {
                     }
                     className={`rounded-xl px-3 py-2 text-[10px] font-black transition ${performanceRole ===
                       role.key
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg'
-                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+                      ? 'border border-indigo-500 bg-indigo-600 text-white shadow-[0_6px_16px_rgba(79,70,229,0.18)]'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-950/30'
                       }`}
                   >
-                    {
-                      role.label
-                    }
+                    {role.label}
                   </button>
                 )
               )}
@@ -12519,7 +14692,7 @@ export default function CommissionerDashboard() {
           </div>
 
           <div className="mt-5 space-y-2">
-            {pagedRoleRows.map(
+            {pagedRoleRows.slice(0, 10).map(
               (
                 row,
                 index
@@ -12534,12 +14707,10 @@ export default function CommissionerDashboard() {
                       row
                     )
                   }
-                  className="group grid w-full grid-cols-[32px_minmax(120px,220px)_1fr_70px] items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-left transition hover:border-indigo-100 hover:bg-indigo-50/50"
+                  className="group grid w-full grid-cols-[32px_minmax(140px,240px)_1fr_72px] items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-left transition hover:border-indigo-200 hover:bg-indigo-50/60 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-800 dark:hover:bg-indigo-950/20"
                 >
                   <div className="text-center text-[10px] font-black text-slate-400">
-                    {roleRowsStart +
-                      index +
-                      1}
+                    {index + 1}
                   </div>
 
                   <div className="truncate text-xs font-black text-slate-800">
@@ -12571,14 +14742,12 @@ export default function CommissionerDashboard() {
                             row.performance
                           )}% - 8px)`,
                         background:
-                          positiveColor(
-                            row.performance
-                          ),
+                          '#4338ca',
                       }}
                     />
                   </div>
 
-                  <div className="text-right text-xs font-black text-slate-950">
+                  <div className="text-right text-xs font-black text-slate-950 dark:text-white">
                     {percentText(
                       row.performance
                     )}
@@ -12588,78 +14757,21 @@ export default function CommissionerDashboard() {
             )}
           </div>
 
-          {roleRowsPageCount >
-            1 && (
-              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  disabled={
-                    roleRowsPage <=
-                    1
-                  }
-                  onClick={() =>
-                    setRoleRowsPage(
-                      (
-                        current
-                      ) =>
-                        Math.max(
-                          1,
-                          current -
-                          1
-                        )
-                    )
-                  }
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
-                >
-                  Previous
-                </button>
 
-                <div className="text-xs font-black text-slate-500">
-                  {
-                    roleRowsPage
-                  }{' '}
-                  /{' '}
-                  {
-                    roleRowsPageCount
-                  }
-                </div>
-
-                <button
-                  type="button"
-                  disabled={
-                    roleRowsPage >=
-                    roleRowsPageCount
-                  }
-                  onClick={() =>
-                    setRoleRowsPage(
-                      (
-                        current
-                      ) =>
-                        Math.min(
-                          roleRowsPageCount,
-                          current +
-                          1
-                        )
-                    )
-                  }
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-600 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
         </section>
 
         {/* ATTENDANCE × INSPECTION */}
         {attendanceInspectionPoints.length >
           0 && (
-            <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950">
+
+
+            <section className="mt-4 rounded-[26px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 p-5 shadow-sm">
+              <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white">
                 <UserRoundCheck
                   size={18}
                   className="text-cyan-600"
                 />
-                Attendance · Inspection Performance
+                Attendance · Inspection Completion
               </div>
 
               <div className="h-[390px]">
@@ -12686,7 +14798,7 @@ export default function CommissionerDashboard() {
                         },
                         {
                           label:
-                            'Inspection Performance',
+                            'Inspection Completion',
                           value:
                             percentText(
                               row.inspection
@@ -12714,129 +14826,12 @@ export default function CommissionerDashboard() {
             </section>
           )}
 
-        {/* ATTENDANCE CALENDAR */}
-        {(
-          moduleFilter ===
-          'ALL' ||
-          moduleFilter ===
-          'ATTENDANCE'
-        ) &&
-          zoneFilter ===
-          'ALL' &&
-          wardFilter ===
-          'ALL' &&
-          personFilter ===
-          'ALL' &&
-          !!attendance
-            ?.dailyTrend
-            ?.length && (
-            <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-950">
-                <CalendarDays
-                  size={18}
-                  className="text-rose-600"
-                />
-                Attendance
-              </div>
-
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 md:grid-cols-10 xl:grid-cols-14">
-                {attendance.dailyTrend.map(
-                  (
-                    item
-                  ) => {
-                    const value =
-                      item.rate ||
-                      0;
-
-                    return (
-                      <button
-                        key={
-                          item.date
-                        }
-                        type="button"
-                        onClick={() =>
-                          setDrilldown(
-                            {
-                              title:
-                                formatDate(
-                                  item.date
-                                ),
-                              value:
-                                percentText(
-                                  value
-                                ),
-                              breakdown: [
-                                {
-                                  label:
-                                    'Present',
-                                  value:
-                                    item.present.toLocaleString(
-                                      'en-IN'
-                                    ),
-                                },
-                                {
-                                  label:
-                                    'Absent',
-                                  value:
-                                    item.absent.toLocaleString(
-                                      'en-IN'
-                                    ),
-                                },
-                              ],
-                              attendanceEmployees:
-                                filteredAttendanceEmployees,
-                            }
-                          )
-                        }
-                        className={`group relative min-h-[64px] rounded-xl border border-white/50 p-2 text-center transition duration-300 hover:-translate-y-1 hover:shadow-lg ${heatTextClass(
-                          value
-                        )}`}
-                        style={{
-                          background:
-                            attendanceHeatColor(
-                              value
-                            ),
-                        }}
-                      >
-                        <div className="text-[9px] font-black">
-                          {new Date(
-                            item.date
-                          ).toLocaleDateString(
-                            'en-IN',
-                            {
-                              day:
-                                '2-digit',
-                              month:
-                                'short',
-                            }
-                          )}
-                        </div>
-
-                        <div className="mt-1 text-sm font-black">
-                          {percentText(
-                            value
-                          )}
-                        </div>
-
-                        <div className="absolute inset-x-1 bottom-1 hidden rounded-md bg-white/95 px-1 py-0.5 text-[8px] font-black text-slate-950 group-hover:block">
-                          {
-                            item.total
-                          }
-                        </div>
-                      </button>
-                    );
-                  }
-                )}
-              </div>
-            </section>
-          )}
-
         {/* ZONE × MODULE */}
         <section className="mt-4 overflow-hidden rounded-[22px] border border-[#dfe7f5] bg-[#fbfdff] shadow-[0_10px_34px_-22px_rgba(30,64,175,.28)]">
           {/* HEADER */}
           <div className="flex flex-col gap-3 border-b border-[#e8edf7] bg-white/95 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-[0_6px_16px_-8px_rgba(37,99,235,.65)]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-blue-500 to-indigo-600 text-[#10235e] shadow-[0_6px_16px_-8px_rgba(37,99,235,.65)]">
                 <BarChart3
                   size={17}
                   strokeWidth={2.5}
@@ -12875,7 +14870,7 @@ export default function CommissionerDashboard() {
                     }
                     className={`rounded-[7px] border px-2 py-1.5 text-[8px] font-black transition ${zoneModuleView ===
                       item.key
-                      ? 'border-blue-500 bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-sm'
+                      ? 'border-blue-500 bg-gradient-to-r from-blue-500 to-indigo-600 text-[#10235e] shadow-sm'
                       : 'border-[#e3e9f4] bg-white text-[#53678f] hover:border-blue-200 hover:bg-blue-50'
                       }`}
                   >
@@ -12887,19 +14882,7 @@ export default function CommissionerDashboard() {
                 )
               )}
 
-              <span className="ml-1 flex items-center gap-1.5 rounded-[8px] border border-[#dfe6f2] bg-white px-2.5 py-1.5 text-[8.5px] font-black text-[#53678f] shadow-sm">
-                <CalendarDays
-                  size={11}
-                  className="text-[#8292b5]"
-                />
-                {
-                  zoneModuleDateLabel
-                }
-                <ChevronDown
-                  size={10}
-                  className="text-[#9aa8c5]"
-                />
-              </span>
+              
             </div>
           </div>
 
@@ -13086,7 +15069,7 @@ export default function CommissionerDashboard() {
                                   <div
                                     className={`absolute inset-0 flex items-center justify-end px-2 text-[8.5px] font-black ${value >=
                                       46
-                                      ? 'text-white'
+                                      ? 'text-[#10235e]'
                                       : 'text-[#1e3264]'
                                       }`}
                                   >
@@ -13166,7 +15149,7 @@ export default function CommissionerDashboard() {
             <div className="overflow-hidden rounded-[18px] border border-[#dfe7f3] bg-white shadow-[0_14px_35px_-24px_rgba(37,99,235,.38)]">
               <div className="flex items-center justify-between gap-3 border-b border-[#eef2f7] px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-[0_8px_18px_-9px_rgba(79,70,229,.75)]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-indigo-500 to-blue-600 text-[#10235e] shadow-[0_8px_18px_-9px_rgba(79,70,229,.75)]">
                     <MapPin size={14} />
                   </span>
 
@@ -13511,8 +15494,8 @@ export default function CommissionerDashboard() {
                                 setSelectedMapZone(row.zone)
                               }
                               className={`rounded-full border px-2.5 py-1 text-[8px] font-black shadow-sm transition ${activeMapZone === row.zone
-                                ? 'border-indigo-500 bg-indigo-600 text-white'
-                                : 'border-white/90 bg-white/90 text-slate-600 hover:border-indigo-200 hover:text-indigo-700'
+                                ? 'border-indigo-500 bg-indigo-600 text-[#10235e]'
+                                : 'border-white/90 bg-white/90 text-slate-600 dark:text-slate-300 hover:border-indigo-200 hover:text-indigo-700'
                                 }`}
                             >
                               {row.zone} - {percentText(value)}
@@ -13533,7 +15516,7 @@ export default function CommissionerDashboard() {
             <div className="flex h-full flex-col overflow-hidden rounded-[16px] border border-[#e1e8f3] bg-white shadow-[0_7px_22px_-18px_rgba(37,99,235,.32)]">
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#edf1f7] px-3.5 py-2.5">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-[0_6px_16px_-8px_rgba(37,99,235,.7)]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[#10235e] shadow-[0_6px_16px_-8px_rgba(37,99,235,.7)]">
                     <MapPin
                       size={14}
                     />
@@ -13716,174 +15699,6 @@ export default function CommissionerDashboard() {
           </div>
         </section>
 
-        {/* WARD RANKING */}
-        {(
-          moduleFilter ===
-          'ALL' ||
-          moduleFilter ===
-          'WARD_RANKING'
-        ) &&
-          filteredWardRows.length >
-          0 && (
-            <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-5 flex items-center gap-2 text-sm font-black text-slate-950">
-                <Trophy
-                  size={18}
-                  className="text-violet-600"
-                />
-                Ward Ranking
-              </div>
-
-              <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
-                    Top Performance
-                  </div>
-
-                  {[...filteredWardRows]
-                    .sort(
-                      (
-                        a,
-                        b
-                      ) =>
-                        b.finalScore -
-                        a.finalScore
-                    )
-                    .slice(
-                      0,
-                      10
-                    )
-                    .map(
-                      (
-                        ward,
-                        index
-                      ) => (
-                        <button
-                          key={
-                            ward.wardId
-                          }
-                          type="button"
-                          onClick={() =>
-                            setProofWard(
-                              ward
-                            )
-                          }
-                          className="grid w-full grid-cols-[28px_1fr_70px] items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-emerald-50"
-                        >
-                          <span className="text-[10px] font-black text-slate-400">
-                            {index +
-                              1}
-                          </span>
-
-                          <div>
-                            <div className="text-xs font-black text-slate-800">
-                              {ward.wardName ||
-                                ward.wardId}
-                            </div>
-
-                            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className="h-full rounded-full transition-all duration-700"
-                                style={{
-                                  width:
-                                    `${clamp(
-                                      ward.finalScore
-                                    )}%`,
-                                  background:
-                                    positiveColor(
-                                      ward.finalScore
-                                    ),
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <span className="text-right text-xs font-black text-emerald-700">
-                            {percentText(
-                              ward.finalScore
-                            )}
-                          </span>
-                        </button>
-                      )
-                    )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-rose-700">
-                    Worst Performance
-                  </div>
-
-                  {[...filteredWardRows]
-                    .sort(
-                      (
-                        a,
-                        b
-                      ) =>
-                        a.finalScore -
-                        b.finalScore
-                    )
-                    .slice(
-                      0,
-                      10
-                    )
-                    .map(
-                      (
-                        ward,
-                        index
-                      ) => (
-                        <button
-                          key={
-                            ward.wardId
-                          }
-                          type="button"
-                          onClick={() =>
-                            setProofWard(
-                              ward
-                            )
-                          }
-                          className="grid w-full grid-cols-[28px_1fr_70px] items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-rose-50"
-                        >
-                          <span className="text-[10px] font-black text-slate-400">
-                            {index +
-                              1}
-                          </span>
-
-                          <div>
-                            <div className="text-xs font-black text-slate-800">
-                              {ward.wardName ||
-                                ward.wardId}
-                            </div>
-
-                            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                              <div
-                                className="h-full rounded-full transition-all duration-700"
-                                style={{
-                                  width:
-                                    `${clamp(
-                                      ward.finalScore
-                                    )}%`,
-                                  background:
-                                    positiveColor(
-                                      ward.finalScore
-                                    ),
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          <span className="text-right text-xs font-black text-rose-700">
-                            {percentText(
-                              ward.finalScore
-                            )}
-                          </span>
-                        </button>
-                      )
-                    )}
-                </div>
-              </div>
-            </section>
-          )}
-
         {loading && (
           <div className="pointer-events-none fixed inset-x-0 bottom-0 top-0 z-[70] bg-white/10 backdrop-blur-[1px]">
             <div className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
@@ -13902,8 +15717,8 @@ export default function CommissionerDashboard() {
               )
             }
             onReport={
-              setProofReport
-            }
+        openProofReport
+      }
             onEmployee={
               setProofAttendance
             }
@@ -13980,3 +15795,21 @@ export default function CommissionerDashboard() {
     </RoleGuard>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -83,33 +83,33 @@ const STATUS_META: Array<{
 }> = [
     {
       id: 'NOT_REPORTED',
-      label: 'Not Reported',
+      label: 'Not Inspected',
       color: '#64748b',
     },
     {
       id: 'PENDING',
-      label: 'Pending',
+      label: 'Pending Review',
       color: '#f59e0b',
     },
     {
       id: 'APPROVED',
-      label: 'Approved',
+      label: 'Cleaned',
       color: '#16a34a',
     },
     {
       id: 'REJECTED',
-      label: 'Rejected',
+      label: 'Not Cleaned',
       color: '#e11d48',
     },
     {
       id: 'ACTION_REQUIRED',
-      label: 'Action Required',
+      label: 'Attention Required',
       color: '#f97316',
     },
     {
       id: 'ACTION_TAKEN',
-      label: 'Action Taken',
-      color: '#2563eb',
+      label: 'Resolved',
+      color: '#0d9488',
     },
   ];
 
@@ -566,9 +566,9 @@ export default function CommissionerHome2Page() {
   const kpis = [
     {
       id: 'ALL' as StatusFilter,
-      label: 'Total Mapped',
+      label: 'Assigned Scope',
       value: scopeSummary.total,
-      helper: 'Current operational scope',
+      helper: 'Assigned operational assets',
       icon: MapPinned,
       accent:
         'from-slate-700 to-slate-950',
@@ -577,11 +577,11 @@ export default function CommissionerHome2Page() {
     },
     {
       id: 'NOT_REPORTED' as StatusFilter,
-      label: 'Not Reported',
+      label: 'Not Inspected',
       value:
         scopeSummary.notReported,
       helper:
-        'No report for selected date',
+        'Inspection not completed',
       icon: Clock3,
       accent:
         'from-slate-400 to-slate-600',
@@ -590,11 +590,11 @@ export default function CommissionerHome2Page() {
     },
     {
       id: 'PENDING' as StatusFilter,
-      label: 'Pending',
+      label: 'Pending Review',
       value:
         scopeSummary.pending,
       helper:
-        'Awaiting workflow review',
+        'Awaiting SI review',
       icon: RefreshCw,
       accent:
         'from-amber-400 to-amber-600',
@@ -603,11 +603,11 @@ export default function CommissionerHome2Page() {
     },
     {
       id: 'APPROVED' as StatusFilter,
-      label: 'Approved',
+      label: 'Cleaned',
       value:
         scopeSummary.approved,
       helper:
-        'Approved inspections',
+        'Cleaned inspections',
       icon: CheckCircle2,
       accent:
         'from-emerald-500 to-green-700',
@@ -616,11 +616,11 @@ export default function CommissionerHome2Page() {
     },
     {
       id: 'REJECTED' as StatusFilter,
-      label: 'Rejected',
+      label: 'Not Cleaned',
       value:
         scopeSummary.rejected,
       helper:
-        'Rejected inspections',
+        'Not cleaned inspections',
       icon: AlertTriangle,
       accent:
         'from-rose-500 to-red-700',
@@ -629,11 +629,11 @@ export default function CommissionerHome2Page() {
     },
     {
       id: 'ACTION_REQUIRED' as StatusFilter,
-      label: 'Action Required',
+      label: 'Attention Required',
       value:
         scopeSummary.actionRequired,
       helper:
-        'Needs operational action',
+        'Needs corrective attention',
       icon: AlertTriangle,
       accent:
         'from-orange-400 to-orange-600',
@@ -642,16 +642,16 @@ export default function CommissionerHome2Page() {
     },
     {
       id: 'ACTION_TAKEN' as StatusFilter,
-      label: 'Action Taken',
+      label: 'Resolved',
       value:
         scopeSummary.actionTaken,
       helper:
-        'Corrective action completed',
+        'Corrective action resolved',
       icon: ShieldCheck,
       accent:
-        'from-blue-500 to-indigo-700',
+        'from-teal-500 to-teal-700',
       active:
-        'border-blue-500 bg-blue-50 ring-blue-500/20',
+        'border-teal-500 bg-teal-50 ring-teal-500/20',
     },
   ];
 
@@ -677,7 +677,27 @@ export default function CommissionerHome2Page() {
       )?.label ||
       'All Statuses';
 
-  return (
+  
+  /*
+   * Header reflects the active workflow filter.
+   *
+   * ALL:
+   *   Inspected = total assigned - not inspected
+   *
+   * Selected status:
+   *   show only assets in that selected state
+   */
+  const currentViewLabel =
+    statusFilter === 'ALL'
+      ? 'Inspected'
+      : activeStatusLabel;
+
+  const currentViewCount =
+    statusFilter === 'ALL'
+      ? reported
+      : displayedTotal;
+
+return (
     <main className="min-h-full bg-[#f6f8fc] pb-10">
       <div className="mx-auto max-w-[1800px] space-y-5">
         <section className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-6 py-6 text-white shadow-[0_24px_70px_-32px_rgba(15,23,42,0.9)] sm:px-8 lg:px-9">
@@ -753,11 +773,11 @@ export default function CommissionerHome2Page() {
             <div className="grid min-w-[310px] grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.06] p-2 backdrop-blur-xl">
               <div className="rounded-xl bg-white/[0.05] px-4 py-3">
                 <div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-                  Reported
+                  {currentViewLabel}
                 </div>
 
                 <div className="mt-1 text-2xl font-black">
-                  {reported}
+                  {currentViewCount}
 
                   <span className="ml-1 text-xs font-semibold text-slate-400">
                     /{' '}
@@ -1433,3 +1453,6 @@ function FilterSelect({
     </label>
   );
 }
+
+
+

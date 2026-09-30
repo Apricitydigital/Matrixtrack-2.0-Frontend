@@ -28,16 +28,16 @@ const STATE_COLORS: Record<WorkState, string> = {
   APPROVED: '#16a34a',
   REJECTED: '#e11d48',
   ACTION_REQUIRED: '#f97316',
-  ACTION_TAKEN: '#2563eb',
+  ACTION_TAKEN: '#0d9488',
 };
 
 const STATE_LABELS: Record<WorkState, string> = {
-  NOT_REPORTED: 'Not Reported',
-  PENDING: 'Pending',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-  ACTION_REQUIRED: 'Action Required',
-  ACTION_TAKEN: 'Action Taken',
+  NOT_REPORTED: 'Not Inspected',
+  PENDING: 'Pending Review',
+  APPROVED: 'Cleaned',
+  REJECTED: 'Not Cleaned',
+  ACTION_REQUIRED: 'Attention Required',
+  ACTION_TAKEN: 'Resolved',
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -200,14 +200,14 @@ function buildWorkflow(
     return [
       {
         key: 'report-awaited',
-        label: 'Report Awaited',
+        label: 'Inspection Awaited',
         status:
           'NOT_REPORTED',
         at: null,
         actor: null,
         completed: false,
         detail:
-          'No report received for the selected date.',
+          'No inspection completed for the selected date.',
       },
     ];
   }
@@ -217,7 +217,7 @@ function buildWorkflow(
       {
         key: 'reported',
         label:
-          'Report Submitted',
+          'Inspection Submitted',
         status: 'PENDING',
         at:
           times?.reportedAt ||
@@ -248,7 +248,7 @@ function buildWorkflow(
   if (state === 'APPROVED') {
     events.push({
       key: 'si-approved',
-      label: 'SI Approved',
+      label: 'SI Cleaned',
       status: 'APPROVED',
       at:
         times?.reviewedAt ||
@@ -1485,3 +1485,4 @@ export default function OperationsMapCanvas({
     </MapContainer>
   );
 }
+
