@@ -555,7 +555,7 @@ function percentText(
     value === undefined ||
     !Number.isFinite(value)
   ) {
-    return '—';
+    return '-';
   }
 
   return `${round1(value)}%`;
@@ -662,7 +662,7 @@ function formatDate(
   value: any
 ) {
   if (!value) {
-    return '—';
+    return '-';
   }
 
   const date =
@@ -673,7 +673,7 @@ function formatDate(
       date.getTime()
     )
   ) {
-    return '—';
+    return '-';
   }
 
   return date.toLocaleDateString(
@@ -694,7 +694,7 @@ function formatMinutes(
     value === undefined ||
     !Number.isFinite(value)
   ) {
-    return '—';
+    return '-';
   }
 
   const hours =
@@ -830,7 +830,7 @@ function inspectionModuleDisplayName(
       return 'Toilet';
 
     default:
-      return String(module || '—');
+      return String(module || '-');
   }
 }
 
@@ -2350,7 +2350,7 @@ function CircularProgress({
             color: '#0F1B4C',
           }}
         >
-          {name || '—'}
+          {name || '-'}
         </div>
 
         <div
@@ -2581,7 +2581,7 @@ function KpiCard({
                 </div>
 
                 <div className="mt-1 text-[13px] font-black leading-none text-[#172d5d]">
-                  {lastMonthValue ?? '—'}
+                  {lastMonthValue ?? '-'}
                 </div>
               </div>
             </div>
@@ -4340,14 +4340,14 @@ function DrilldownDrawer({
                                 {item.zones?.join(
                                   ', '
                                 ) ||
-                                  '—'}
+                                  '-'}
                               </td>
 
                               <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                 {item.wards?.join(
                                   ', '
                                 ) ||
-                                  '—'}
+                                  '-'}
                               </td>
 
                               <td className="px-4 py-3 text-xs font-black text-emerald-700">
@@ -4438,7 +4438,7 @@ function DrilldownDrawer({
 
                               <td className="px-4 py-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                                 {item.zoneName ||
-                                  '—'}
+                                  '-'}
                               </td>
 
                               <td className="px-4 py-3 text-xs font-black text-violet-700">
@@ -4449,7 +4449,7 @@ function DrilldownDrawer({
 
                               <td className="px-4 py-3 text-xs font-black text-slate-700">
                                 {item.cityRank ??
-                                  '—'}
+                                  '-'}
                               </td>
 
                               <td className="px-4 py-3 text-right">
@@ -4627,7 +4627,7 @@ function AttendanceProof({
                     employee.zones?.join(
                       ', '
                     ) ||
-                    '—',
+                    '-',
                 },
                 {
                   label:
@@ -4636,7 +4636,7 @@ function AttendanceProof({
                     employee.wards?.join(
                       ', '
                     ) ||
-                    '—',
+                    '-',
                 },
               ].map(
                 (item) => (
@@ -4709,12 +4709,12 @@ function AttendanceProof({
 
                         <div className="font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                           {item.inTime ||
-                            '—'}
+                            '-'}
                         </div>
 
                         <div className="font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
                           {item.outTime ||
-                            '—'}
+                            '-'}
                         </div>
                       </div>
                     )
@@ -4860,7 +4860,7 @@ function WardProof({
 
               <div className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
                 {ward.cityRank ??
-                  '—'}
+                  '-'}
               </div>
             </div>
 
@@ -4871,7 +4871,7 @@ function WardProof({
 
               <div className="mt-1 text-base font-black text-slate-950 dark:text-white">
                 {ward.zoneName ||
-                  '—'}
+                  '-'}
               </div>
             </div>
           </div>
@@ -6242,7 +6242,7 @@ function WardRankingScroller({
                         .match(
                           /\d+/
                         )?.[0] ||
-                      '—'
+                      '-'
                     }
                   </div>
 
@@ -6265,7 +6265,7 @@ function WardRankingScroller({
                           {cityRank != null && (
                             <>
                               <span className="text-slate-300 dark:text-slate-600">
-                                —
+                                -
                               </span>
 
                               <span className="text-violet-500 dark:text-violet-400">
@@ -11597,7 +11597,7 @@ const [
 
 
   /* =========================================================
-     ATTENDANCE × INSPECTION
+     ATTENDANCE x INSPECTION
   ========================================================= */
 
   const attendanceInspectionPoints =
@@ -11802,7 +11802,7 @@ const [
 
 
   /* =========================================================
-     ZONE × MODULE
+     ZONE x MODULE
   ========================================================= */
 
   const [
@@ -12279,7 +12279,7 @@ const [
 
       setDrilldown({
         title:
-          `${zoneLabel} — ${cell.label}`,
+          `${zoneLabel} - ${cell.label}`,
         value:
           percentText(
             cell.value
@@ -12294,6 +12294,13 @@ const [
           [inspectionModule]: {
             required,
             completed,
+            assigned:
+              required > 0
+                ? Math.round(
+                    required /
+                    inspectionRangeDayCount
+                  )
+                : 0,
             performance:
               cell.value,
           },
@@ -12305,7 +12312,7 @@ const [
 
     setDrilldown({
       title:
-        `${zoneLabel} — ${cell.label}`,
+        `${zoneLabel} - ${cell.label}`,
       value:
         percentText(
           cell.value
@@ -12452,6 +12459,13 @@ const [
               {
                 required,
                 completed,
+                assigned:
+                  required > 0
+                    ? Math.round(
+                        required /
+                        inspectionRangeDayCount
+                      )
+                    : 0,
                 performance:
                   inspectionTargets.ready
                     ? completionRate(
@@ -12469,6 +12483,7 @@ const [
           {
             required: number;
             completed: number;
+            assigned?: number;
             performance:
             | number
             | null;
@@ -13603,7 +13618,7 @@ setDrilldown({
               label="Attendance Rate"
               value={
                 loading
-                  ? '—'
+                  ? '-'
                   : percentText(attendanceStats.rate)
               }
               lastMonthValue={
@@ -13691,7 +13706,7 @@ setDrilldown({
               label="Average Ward Score"
               value={
                 loading
-                  ? '—'
+                  ? '-'
                   : percentText(wardRankingAverage)
               }
               lastMonthValue={
@@ -13733,7 +13748,7 @@ setDrilldown({
               label="Sweeping"
               value={
                 loading
-                  ? '—'
+                  ? '-'
                   : percentText(
                     sweepingInspection.performance
                   )
@@ -13821,7 +13836,7 @@ setDrilldown({
               label="Litter Bin"
               value={
                 loading
-                  ? '—'
+                  ? '-'
                   : percentText(
                     litterBinInspection.performance
                   )
@@ -13909,7 +13924,7 @@ setDrilldown({
               label="Toilet"
               value={
                 loading
-                  ? '—'
+                  ? '-'
                   : percentText(
                     toiletInspection.performance
                   )
@@ -14072,7 +14087,7 @@ setDrilldown({
                 }
                 name={
                   topZone?.label ??
-                  '—'
+                  '-'
                 }
                 label="ZONE"
                 variant="success"
@@ -14092,7 +14107,7 @@ setDrilldown({
                 }
                 name={
                   topWard?.label ??
-                  '—'
+                  '-'
                 }
                 label="WARD"
                 variant="success"
@@ -14234,7 +14249,7 @@ setDrilldown({
                 }
                 name={
                   worstZone?.label ??
-                  '—'
+                  '-'
                 }
                 label="ZONE"
                 variant="danger"
@@ -14254,7 +14269,7 @@ setDrilldown({
                 }
                 name={
                   worstWard?.label ??
-                  '—'
+                  '-'
                 }
                 label="WARD"
                 variant="danger"
@@ -14842,7 +14857,7 @@ setDrilldown({
 
         </section>
 
-        {/* ATTENDANCE × INSPECTION */}
+        {/* ATTENDANCE x INSPECTION */}
         {attendanceInspectionPoints.length >
           0 && (
 
@@ -14853,7 +14868,7 @@ setDrilldown({
                   size={18}
                   className="text-cyan-600"
                 />
-                Attendance · Inspection Completion
+                Attendance  -  Inspection Completion
               </div>
 
               <div className="h-[390px]">
@@ -14908,7 +14923,7 @@ setDrilldown({
             </section>
           )}
 
-        {/* ZONE × MODULE */}
+        {/* ZONE x MODULE */}
         <section className="mt-4 overflow-hidden rounded-[22px] border border-[#dfe7f5] bg-[#fbfdff] shadow-[0_10px_34px_-22px_rgba(30,64,175,.28)]">
           {/* HEADER */}
           <div className="flex flex-col gap-3 border-b border-[#e8edf7] bg-white/95 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
@@ -14922,7 +14937,7 @@ setDrilldown({
 
               <div className="min-w-0">
                 <div className="truncate text-[14px] font-black leading-tight text-[#11265b]">
-                  Zone · Module Performance
+                  Zone  -  Module Performance
                 </div>
 
                 <div className="mt-0.5 text-[9px] font-semibold text-[#8190b5]">
@@ -15127,7 +15142,7 @@ setDrilldown({
                               {value ===
                                 null ? (
                                 <span className="mx-auto text-[10px] font-black text-[#b1bad0]">
-                                  —
+                                  -
                                 </span>
                               ) : (
                                 <div className="relative h-[18px] w-full overflow-hidden rounded-[6px] bg-[#e9edf7]">
@@ -15211,7 +15226,7 @@ setDrilldown({
 
               <span className="flex items-center gap-1">
                 <span className="text-[11px] font-black text-[#c0c8d8]">
-                  —
+                  -
                 </span>
                 Not Applicable
               </span>
