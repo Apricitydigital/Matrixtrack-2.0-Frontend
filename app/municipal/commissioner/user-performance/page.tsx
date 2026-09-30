@@ -15,7 +15,6 @@ import {
   Filter,
   MapPin,
   RefreshCw,
-  Route,
   Search,
   ShieldCheck,
   Table2,
@@ -32,7 +31,15 @@ import UniversalReportModal from '@components/UniversalReportModal';
 import { BarComparisonChart, DonutDistributionChart } from '@components/ui/charts/ExecutiveCharts';
 
 import { useAuth } from '@hooks/useAuth';
-import { CityUserApi, GeoApi, ModuleRecordsApi, type UserWorkSummaryResponse } from '@lib/apiClient';
+import {
+  CityUserApi,
+  GeoApi,
+  ModuleRecordsApi,
+  type IecPerformance,
+  type SiPerformance,
+  type DarogaPerformance,
+  type UserWorkSummaryResponse,
+} from '@lib/apiClient';
 
 import {
   AttendanceApi,
@@ -40,6 +47,15 @@ import {
   type AttendanceEmployeeSummary,
 } from '@lib/attendanceApi';
 import ModalPortal from "@components/ui/ModalPortal";
+import {
+  darogaScore,
+  iecScore,
+  performanceRangeParams,
+  restrictDarogaModules,
+  restrictIecModules,
+  restrictSiModules,
+  siScore,
+} from '@lib/userPerformanceScores';
 
 
 /* =========================================================
@@ -84,6 +100,15 @@ type UserPerformanceRow = {
   zones: string[];
   wards: string[];
   modules: string[];
+
+  /** Daroga only: required vs completed inspections in the date range. */
+  coverage?: DarogaCoverage | null;
+
+  /** Sanitary Inspector only: scope totals and report ids by SI decision. */
+  si?: SiPerformance | null;
+
+  /** IEC Member only: action-cycle report ids in scope and who resolved them. */
+  iec?: IecPerformance | null;
 };
 
 
@@ -225,6 +250,163 @@ function effectiveStatus(item: any) {
   return status || 'PENDING';
 }
 
+function submittedDate(item: any) {
+  return item?.submittedAt || item?.inspectionDate || item?.reportDate || item?.createdAt || item?.visitedAt || null;
+}
+
+/* -------- Inspection workflow (same cards as the Commissioner dashboard) -------- */
+
+type WorkflowKey = 'ALL' | 'APPROVED' | 'REJECTED' | 'PENDING' | 'ACTION_REQUIRED' | 'ACTION_TAKEN' | 'PENDING_ACTION';
+
+const WORKFLOW_LABELS: Record<WorkflowKey, string> = {
+  ALL: 'Completed Inspection',
+  APPROVED: 'Cleaned',
+  REJECTED: 'Not Cleaned',
+  PENDING: 'Pending Review',
+  ACTION_REQUIRED: 'Attention Required',
+  ACTION_TAKEN: 'Resolved',
+  PENDING_ACTION: 'Resolution Pending',
+};
+
+/*
+ * The SI's own decision. `status` moves on to ACTION_REQUIRED /
+ * ACTION_TAKEN once ULB escalates, so the permanent `qcDecision` wins.
+ * Legacy escalated records without a stored decision return 'REVIEWED'.
+ */
+const DRAWER_PRESETS = [
+  ['TODAY', 'Today'],
+  ['7D', '7 Days'],
+  ['30D', '30 Days'],
+  ['MONTH', 'This Month'],
+  ['ALL', 'All Time'],
+] as const;
+
+const WORKFLOW_CARDS: Array<[WorkflowKey, string]> = [
+  ['ALL', 'border-blue-200 bg-blue-50 text-blue-700'],
+  ['APPROVED', 'border-emerald-200 bg-emerald-50 text-emerald-700'],
+  ['REJECTED', 'border-rose-200 bg-rose-50 text-rose-700'],
+  ['PENDING', 'border-amber-200 bg-amber-50 text-amber-700'],
+  ['ACTION_REQUIRED', 'border-orange-200 bg-orange-50 text-orange-700'],
+  ['ACTION_TAKEN', 'border-teal-200 bg-teal-50 text-teal-700'],
+  ['PENDING_ACTION', 'border-cyan-200 bg-cyan-50 text-cyan-700'],
+];
+
+const STATUS_DISPLAY: Record<string, string> = {
+  APPROVED: 'Cleaned',
+  REJECTED: 'Not Cleaned',
+  PENDING: 'Pending Review',
+  PENDING_QC: 'Pending Review',
+  SUBMITTED: 'Pending Review',
+  IN_PROGRESS: 'Pending Review',
+  ACTION_REQUIRED: 'Attention Required',
+  ACTION_TAKEN: 'Resolved',
+};
+
+function statusDisplay(status: string) {
+  return STATUS_DISPLAY[status] || status.replace(/_/g, ' ');
+}
+
+function siDecision(item: any): 'APPROVED' | 'REJECTED' | 'PENDING' | 'REVIEWED' {
+  const decision = String(item?.qcDecision || '').toUpperCase();
+  if (decision === 'APPROVED' || decision === 'REJECTED') return decision;
+  const status = effectiveStatus(item);
+  if (status === 'APPROVED' || status === 'REJECTED') return status;
+  if (status === 'ACTION_REQUIRED' || status === 'ACTION_TAKEN' || status === 'REVIEWED') return 'REVIEWED';
+  // PENDING_QC / SUBMITTED / IN_PROGRESS: not reviewed by the SI yet.
+  return 'PENDING';
+}
+
+function matchesWorkflow(item: any, key: WorkflowKey) {
+  const status = effectiveStatus(item);
+  if (status === 'DRAFT') return false;
+  switch (key) {
+    case 'ALL':
+      return true;
+    case 'APPROVED':
+    case 'REJECTED':
+    case 'PENDING':
+      return siDecision(item) === key;
+    // Raised = everything ULB escalated, whether or not it's resolved yet.
+    case 'ACTION_REQUIRED':
+      return status === 'ACTION_REQUIRED' || status === 'ACTION_TAKEN';
+    case 'ACTION_TAKEN':
+      return status === 'ACTION_TAKEN';
+    case 'PENDING_ACTION':
+      return status === 'ACTION_REQUIRED';
+  }
+}
+
+/* Daroga required vs completed inspections come from the backend (shared with the Team Leaderboard). */
+type DarogaCoverage = DarogaPerformance;
+
+/* -------- Sanitary Inspector (QC) scope and decisions -------- */
+
+type SiBucketKey = 'reports' | 'cleaned' | 'notCleaned' | 'pendingReview' | 'carriedOverPending';
+
+const SI_WORKFLOW_BUCKET: Partial<Record<WorkflowKey, SiBucketKey>> = {
+  ALL: 'reports',
+  APPROVED: 'cleaned',
+  REJECTED: 'notCleaned',
+  PENDING: 'pendingReview',
+};
+
+/** Report ids are only unique per module, so key them by module. */
+function recordKey(record: DashboardRecord) {
+  return `${record.dashboardModule}:${record.id}`;
+}
+
+function siBucketKeys(si: SiPerformance | null | undefined) {
+  const keys: Record<SiBucketKey, Set<string>> = {
+    reports: new Set(),
+    cleaned: new Set(),
+    notCleaned: new Set(),
+    pendingReview: new Set(),
+    carriedOverPending: new Set(),
+  };
+  if (!si) return keys;
+  INSPECTION_MODULES.forEach(({ key: module }) => {
+    (Object.keys(keys) as SiBucketKey[]).forEach((bucket) =>
+      si.modules[module][bucket].forEach((id) => keys[bucket].add(`${module}:${id}`))
+    );
+  });
+  return keys;
+}
+
+/* -------- IEC Member (Action Officer) action cycle -------- */
+
+type IecBucketKey = 'attentionRequired' | 'resolved' | 'resolutionPending' | 'carriedOverPending';
+
+const IEC_WORKFLOW_BUCKET: Partial<Record<WorkflowKey, IecBucketKey>> = {
+  ACTION_REQUIRED: 'attentionRequired',
+  ACTION_TAKEN: 'resolved',
+  PENDING_ACTION: 'resolutionPending',
+};
+
+function iecBucketKeys(iec: IecPerformance | null | undefined) {
+  const keys: Record<IecBucketKey, Set<string>> = {
+    attentionRequired: new Set(),
+    resolved: new Set(),
+    resolutionPending: new Set(),
+    carriedOverPending: new Set(),
+  };
+  if (!iec) return keys;
+  INSPECTION_MODULES.forEach(({ key: module }) => {
+    (Object.keys(keys) as IecBucketKey[]).forEach((bucket) =>
+      iec.modules[module][bucket].forEach((id) => keys[bucket].add(`${module}:${id}`))
+    );
+  });
+  return keys;
+}
+
+/* The API filters on exact timestamps, so send the full local day. */
+function rangeStartIso(date?: string) {
+  return date ? new Date(`${date}T00:00:00`).toISOString() : undefined;
+}
+
+function rangeEndIso(date?: string) {
+  return date ? new Date(`${date}T23:59:59.999`).toISOString() : undefined;
+}
+
 function recordDate(item: any) {
   return (
     item?.actionTakenAt ||
@@ -298,8 +480,14 @@ function getRecordAssetId(item: any) {
   );
 }
 
+/*
+ * A Daroga is credited with the reports they submitted. Submitter fields
+ * come first: on Sweeping records `supervisor` is the beat segment's
+ * current assignee, not the person who filed the report.
+ */
 function getDarogaName(item: any) {
   return (
+    (typeof item?.createdBy === 'string' ? item.createdBy : '') ||
     item?.supervisor?.name ||
     item?.employee?.name ||
     item?.submittedBy?.name ||
@@ -313,6 +501,8 @@ function getDarogaName(item: any) {
 
 function getDarogaId(item: any) {
   return (
+    item?.createdById ||
+    item?.submittedBy?.id ||
     item?.supervisor?.id ||
     item?.supervisorId ||
     item?.employee?.id ||
@@ -405,8 +595,8 @@ async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: strin
     page: 1,
     limit,
     tab: 'HISTORY',
-    fromDate: from || undefined,
-    toDate: to || undefined,
+    fromDate: rangeStartIso(from),
+    toDate: rangeEndIso(to),
   });
 
   const firstRows = first.data || [];
@@ -435,8 +625,8 @@ async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: strin
           page,
           limit,
           tab: 'HISTORY',
-          fromDate: from || undefined,
-          toDate: to || undefined,
+          fromDate: rangeStartIso(from),
+          toDate: rangeEndIso(to),
         })
       )
     );
@@ -454,11 +644,11 @@ async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: strin
 
 const STATUS_COLORS: Record<string, string> = {
   Approved: '#10b981',
-  'SI Approved': '#10b981',
   Rejected: '#f43f5e',
-  'SI Rejected': '#f43f5e',
-  'Action Required': '#f59e0b',
-  'Action Taken': '#6366f1',
+  Cleaned: '#10b981',
+  'Not Cleaned': '#f43f5e',
+  'Attention Required': '#f59e0b',
+  Resolved: '#6366f1',
   Pending: '#94a3b8',
   Present: '#10b981',
   Absent: '#f43f5e',
@@ -499,11 +689,15 @@ function StatTile({
 }
 
 function UserDetailDrawer({
-  row,
+  row: baseRow,
   roleLabel,
   roleKey,
-  fromDate,
-  toDate,
+  fromDate: pageFrom,
+  toDate: pageTo,
+  loadRowForRange,
+  assetsStatus,
+  siStatus,
+  iecStatus,
   allRecords,
   onClose,
   onOpenRecord,
@@ -513,17 +707,114 @@ function UserDetailDrawer({
   roleKey: UserRoleKey;
   fromDate: string;
   toDate: string;
+  loadRowForRange: (rowKey: string, from: string, to: string) => Promise<UserPerformanceRow | null>;
+  assetsStatus: 'loading' | 'ready' | 'error';
+  siStatus: 'loading' | 'ready' | 'error';
+  iecStatus: 'loading' | 'ready' | 'error';
   allRecords: DashboardRecord[];
   onClose: () => void;
   onOpenRecord: (record: DashboardRecord) => void;
 }) {
+  /*
+   * Drawer date filter. Starts on the page's range (reusing its row);
+   * any other range reloads records and rebuilds this user's row, so
+   * every card, chart, calendar and table below follows it.
+   */
+  const [draftFrom, setDraftFrom] = useState(pageFrom);
+  const [draftTo, setDraftTo] = useState(pageTo);
+  const [fromDate, setFromDate] = useState(pageFrom);
+  const [toDate, setToDate] = useState(pageTo);
+  const [rangeRow, setRangeRow] = useState<UserPerformanceRow | null>(null);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState(false);
+  const usingPageRange = fromDate === pageFrom && toDate === pageTo;
+
+  useEffect(() => {
+    setDraftFrom(pageFrom);
+    setDraftTo(pageTo);
+    setFromDate(pageFrom);
+    setToDate(pageTo);
+  }, [baseRow.key, pageFrom, pageTo]);
+
+  useEffect(() => {
+    setRangeRow(null);
+    setRangeError(false);
+    if (usingPageRange) {
+      setRangeLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRangeLoading(true);
+    loadRowForRange(baseRow.key, fromDate, toDate)
+      .then((result) => {
+        if (!cancelled) setRangeRow(result);
+      })
+      .catch((error) => {
+        console.error('Failed to load records for the selected range', error);
+        if (!cancelled) setRangeError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setRangeLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseRow.key, fromDate, toDate, usingPageRange]);
+
+  const row: UserPerformanceRow = useMemo(
+    () =>
+      usingPageRange
+        ? baseRow
+        : rangeRow || {
+            ...baseRow,
+            total: 0,
+            approved: 0,
+            rejected: 0,
+            actionRequired: 0,
+            actionTaken: 0,
+            pending: 0,
+            performance: null,
+            records: [],
+            zones: [],
+            wards: [],
+            modules: [],
+          },
+    [usingPageRange, baseRow, rangeRow]
+  );
+
+  function applyRange(nextFrom: string, nextTo: string) {
+    setDraftFrom(nextFrom);
+    setDraftTo(nextTo);
+    setFromDate(nextFrom);
+    setToDate(nextTo);
+    setTableFilterDate(null);
+  }
+
+  function applyPreset(preset: 'TODAY' | '7D' | '30D' | 'MONTH' | 'ALL') {
+    if (preset === 'ALL') {
+      applyRange('', '');
+      return;
+    }
+    const today = new Date();
+    const start = new Date(today);
+    if (preset === '7D') start.setDate(start.getDate() - 6);
+    if (preset === '30D') start.setDate(start.getDate() - 29);
+    if (preset === 'MONTH') start.setDate(1);
+    applyRange(toDateInput(start), toDateInput(today));
+  }
+
   const [tab, setTab] = useState<'charts' | 'calendar' | 'table'>('charts');
   const [workSummary, setWorkSummary] = useState<UserWorkSummaryResponse | null>(null);
   const [workSummaryLoading, setWorkSummaryLoading] = useState(false);
+  const [workSummaryError, setWorkSummaryError] = useState(false);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; openUpward: boolean } | null>(null);
   const [tableFilterDate, setTableFilterDate] = useState<string | null>(null);
   const [tableFilterModule, setTableFilterModule] = useState<InspectionModuleKey | null>(null);
+  const [tableWorkflowFilter, setTableWorkflowFilter] = useState<WorkflowKey | null>(null);
   const closeTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const TOOLTIP_WIDTH = 176;
@@ -583,8 +874,10 @@ function UserDetailDrawer({
   useEffect(() => {
     let cancelled = false;
     setWorkSummary(null);
+    setWorkSummaryError(false);
     setTableFilterDate(null);
     setTableFilterModule(null);
+    setTableWorkflowFilter(null);
     setHoverDate(null);
     setTab('charts');
 
@@ -595,8 +888,12 @@ function UserDetailDrawer({
       .then((result) => {
         if (!cancelled) setWorkSummary(result);
       })
-      .catch(() => {
-        if (!cancelled) setWorkSummary(null);
+      .catch((error) => {
+        console.error('Failed to load work summary', error);
+        if (!cancelled) {
+          setWorkSummary(null);
+          setWorkSummaryError(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setWorkSummaryLoading(false);
@@ -608,15 +905,17 @@ function UserDetailDrawer({
   }, [row.id]);
 
   const isEmployee = roleKey === 'EMPLOYEE';
-  const approvedLabel = 'SI Approved';
-  const rejectedLabel = 'SI Rejected';
-  const pendingLabel = 'SI Pending';
+  const approvedLabel = 'Cleaned';
+  const rejectedLabel = 'Not Cleaned';
+  const pendingLabel = 'Pending Review';
 
-  const beatsCount = workSummary?.assignments.beats.length ?? null;
   const toiletsCount = workSummary?.assignments.toilets.length ?? null;
   const litterBinsCount = workSummary?.assignments.litterBins.length ?? null;
-  const assetsTotal = (beatsCount ?? 0) + (toiletsCount ?? 0) + (litterBinsCount ?? 0);
-  const coveragePct = assetsTotal > 0 ? clamp((row.total / assetsTotal) * 100) : null;
+
+  const coverage = roleKey === 'SUPERVISOR' ? row.coverage ?? null : null;
+
+  const assignmentText = (count: number | null) =>
+    workSummaryLoading ? '…' : workSummaryError ? '—' : (count ?? 0).toLocaleString('en-IN');
 
   /*
    * Employees aren't reviewers - their inspection-record trail only
@@ -650,24 +949,21 @@ function UserDetailDrawer({
 
   const employeeAssetStats = useMemo(() => inspectionStats(employeeAssetRecords), [employeeAssetRecords]);
 
-  const coveredAssetsCount = useMemo(() => {
-    if (roleKey !== 'SUPERVISOR') return 0;
-    const keys = new Set<string>();
-    row.records.forEach((record) => {
-      const key = getRecordAssetId(record) || normalize(getRecordTitle(record));
-      if (key) keys.add(String(key));
-    });
-    return keys.size;
-  }, [roleKey, row.records]);
-
   const calendarSourceRecords = isEmployee ? employeeAssetRecords : row.records;
+  // A Daroga's calendar tracks when reports were submitted, not when they
+  // were last reviewed or actioned.
+  const dateOf = (record: DashboardRecord) =>
+    roleKey === 'SUPERVISOR' || roleKey === 'QC' || roleKey === 'ACTION_OFFICER'
+      ? submittedDate(record)
+      : recordDate(record);
 
   const recentRecords = useMemo(
     () =>
       [...calendarSourceRecords].sort(
-        (a, b) => new Date(recordDate(b) || 0).getTime() - new Date(recordDate(a) || 0).getTime()
+        (a, b) => new Date(dateOf(b) || 0).getTime() - new Date(dateOf(a) || 0).getTime()
       ),
-    [calendarSourceRecords]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [calendarSourceRecords, roleKey]
   );
 
   /* -------- Submission Calendar -------- */
@@ -676,7 +972,7 @@ function UserDetailDrawer({
     const map = new Map<string, Record<InspectionModuleKey, number> & { total: number }>();
 
     calendarSourceRecords.forEach((record) => {
-      const raw = recordDate(record);
+      const raw = dateOf(record);
       if (!raw) return;
       const parsed = new Date(raw);
       if (Number.isNaN(parsed.getTime())) return;
@@ -692,7 +988,8 @@ function UserDetailDrawer({
     });
 
     return map;
-  }, [calendarSourceRecords]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarSourceRecords, roleKey]);
 
   const calendarRange = useMemo(() => {
     if (fromDate && toDate) return { from: fromDate, to: toDate };
@@ -718,32 +1015,178 @@ function UserDetailDrawer({
   function goToDateTable(dateStr: string, moduleKey: InspectionModuleKey | null) {
     setTableFilterDate(dateStr);
     setTableFilterModule(moduleKey);
+    setTableWorkflowFilter(null);
     clearCloseTimer();
     setHoverDate(null);
     setTooltipPos(null);
     setTab('table');
   }
 
+  const tableFilterActive = Boolean(tableFilterDate || tableFilterModule || tableWorkflowFilter);
+
+  const si = roleKey === 'QC' ? row.si ?? null : null;
+  const siKeys = useMemo(() => siBucketKeys(si), [si]);
+  const iec = roleKey === 'ACTION_OFFICER' ? row.iec ?? null : null;
+  const iecKeys = useMemo(() => iecBucketKeys(iec), [iec]);
+  const iecCountText = (value: number | null | undefined) =>
+    iecStatus === 'loading' ? '…' : value === null || value === undefined ? '—' : value.toLocaleString('en-IN');
+
+  /** Who resolved this member's reports (a zone can have several IEC members). */
+  const iecResolvedBy = useMemo(() => {
+    if (!iec) return [];
+    const counts = new Map<string | null, number>();
+    iecKeys.resolved.forEach((key) => {
+      const resolverId = iec.resolvers[key] ?? null;
+      counts.set(resolverId, (counts.get(resolverId) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .map(([id, count]) => ({
+        id,
+        count,
+        name: id ? iec.resolverNames[id] || 'Unknown user' : 'Not recorded',
+        self: id === row.id,
+      }))
+      .sort((a, b) => Number(b.self) - Number(a.self) || b.count - a.count);
+  }, [iec, iecKeys, row.id]);
+
+  const siCountText = (value: number | null | undefined) =>
+    siStatus === 'loading' ? '…' : value === null || value === undefined ? '—' : value.toLocaleString('en-IN');
+
   const filteredTableRecords = useMemo(() => {
-    if (!tableFilterDate) return recentRecords;
+    if (!tableFilterActive) return recentRecords;
     return recentRecords.filter((record) => {
-      const raw = recordDate(record);
-      if (!raw) return false;
-      const parsed = new Date(raw);
-      if (Number.isNaN(parsed.getTime())) return false;
-      if (toDateInput(parsed) !== tableFilterDate) return false;
+      if (tableFilterDate) {
+        const raw = dateOf(record);
+        if (!raw) return false;
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return false;
+        if (toDateInput(parsed) !== tableFilterDate) return false;
+      }
       if (tableFilterModule && record.dashboardModule !== tableFilterModule) return false;
+      if (tableWorkflowFilter) {
+        const siBucket = roleKey === 'QC' ? SI_WORKFLOW_BUCKET[tableWorkflowFilter] : undefined;
+        const iecBucket = roleKey === 'ACTION_OFFICER' ? IEC_WORKFLOW_BUCKET[tableWorkflowFilter] : undefined;
+        if (iecBucket) {
+          if (!iecKeys[iecBucket].has(recordKey(record))) return false;
+        } else if (siBucket ? !siKeys[siBucket].has(recordKey(record)) : !matchesWorkflow(record, tableWorkflowFilter)) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [recentRecords, tableFilterDate, tableFilterModule]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recentRecords, tableFilterActive, tableFilterDate, tableFilterModule, tableWorkflowFilter, siKeys, iecKeys]);
+
+  /* -------- Inspection Workflow + Module Bifurcation (Daroga / SI) -------- */
+
+  const showWorkflowPanel = roleKey === 'SUPERVISOR' || roleKey === 'QC' || roleKey === 'ACTION_OFFICER';
+
+  const workflowCounts = useMemo(() => {
+    const keys: WorkflowKey[] = ['ALL', 'APPROVED', 'REJECTED', 'PENDING', 'ACTION_REQUIRED', 'ACTION_TAKEN', 'PENDING_ACTION'];
+    return Object.fromEntries(
+      keys.map((key) => [key, row.records.filter((record) => matchesWorkflow(record, key)).length])
+    ) as Record<WorkflowKey, number>;
+  }, [row.records]);
+
+  const legacyReviewedCount = useMemo(
+    () => row.records.filter((record) => effectiveStatus(record) !== 'DRAFT' && siDecision(record) === 'REVIEWED').length,
+    [row.records]
+  );
+
+  const moduleSummaries = useMemo(
+    () =>
+      INSPECTION_MODULES.map((module) => {
+        const records = row.records.filter(
+          (record) => record.dashboardModule === module.key && effectiveStatus(record) !== 'DRAFT'
+        );
+        const count = (key: WorkflowKey) => records.filter((record) => matchesWorkflow(record, key)).length;
+
+        // Only a Daroga has assigned assets, so only a Daroga has a requirement.
+        const moduleCoverage = coverage ? coverage.modules[module.key] : null;
+        const required = moduleCoverage ? moduleCoverage.required : null;
+        const completed = moduleCoverage ? moduleCoverage.completed : records.length;
+
+        if (iec) {
+          const buckets = iec.modules[module.key];
+          const attention = buckets.attentionRequired.length;
+          return {
+            ...module,
+            assigned: null,
+            required: null,
+            completed: buckets.resolved.length,
+            performance: attention ? (buckets.resolved.length / attention) * 100 : null,
+            workload: null,
+            pendingInspection: null,
+            reports: attention,
+            approved: 0,
+            rejected: 0,
+            pending: buckets.resolutionPending.length,
+          };
+        }
+
+        if (si) {
+          const buckets = si.modules[module.key];
+          const reviewed = buckets.cleaned.length + buckets.notCleaned.length;
+          const workload = reviewed + buckets.pendingReview.length;
+          return {
+            ...module,
+            assigned: null,
+            required: null,
+            completed: reviewed,
+            performance: workload ? (reviewed / workload) * 100 : null,
+            workload,
+            pendingInspection: null,
+            reports: buckets.reports.length,
+            approved: buckets.cleaned.length,
+            rejected: buckets.notCleaned.length,
+            pending: buckets.pendingReview.length,
+          };
+        }
+
+        return {
+          ...module,
+          assigned: moduleCoverage ? moduleCoverage.assigned : null,
+          required,
+          completed,
+          performance: required ? clamp((completed / required) * 100) : null,
+          pendingInspection: required !== null ? Math.max(required - completed, 0) : null,
+          workload: null,
+          reports: records.length,
+          approved: count('APPROVED'),
+          rejected: count('REJECTED'),
+          pending: count('PENDING'),
+        };
+      }),
+    [row.records, coverage, si, iec]
+  );
+
+  const assetCountText = (value: number | null | undefined) =>
+    assetsStatus === 'loading' ? '…' : value === null || value === undefined ? '—' : value.toLocaleString('en-IN');
+
+  function openWorkflowTable(key: WorkflowKey) {
+    setTableFilterDate(null);
+    setTableFilterModule(null);
+    setTableWorkflowFilter(key);
+    setTab('table');
+  }
+
+  function openModuleTable(moduleKey: InspectionModuleKey) {
+    setTableFilterDate(null);
+    setTableWorkflowFilter(null);
+    setTableFilterModule(moduleKey);
+    setTab('table');
+  }
+
+  const headerZones = row.zones.length ? row.zones : (workSummary?.scope.zones || []).map((zone) => zone.name);
+  const headerWards = row.wards.length ? row.wards : (workSummary?.scope.wards || []).map((ward) => ward.name);
 
   const donutTitle =
     roleKey === 'SUPERVISOR'
-      ? 'Asset Coverage'
+      ? 'Inspection Coverage'
       : roleKey === 'ULB_OFFICER'
       ? 'Action Cycle · Raised vs Resolved'
       : roleKey === 'ACTION_OFFICER'
-      ? 'Action Cycle · Pending vs Resolved'
+      ? 'Action Cycle · Resolved vs Pending'
       : isEmployee
       ? 'Attendance'
       : 'Status Distribution';
@@ -756,19 +1199,26 @@ function UserDetailDrawer({
       ];
     }
 
-    if (roleKey === 'ULB_OFFICER' || roleKey === 'ACTION_OFFICER') {
+    if (roleKey === 'ACTION_OFFICER') {
       return [
-        { label: 'Action Required', value: row.actionRequired, color: STATUS_COLORS['Action Required'] },
-        { label: 'Action Taken', value: row.actionTaken, color: STATUS_COLORS['Action Taken'] },
+        { label: 'Resolved', value: row.actionTaken, color: STATUS_COLORS.Resolved },
+        { label: 'Resolution Pending', value: row.actionRequired, color: STATUS_COLORS['Attention Required'] },
+      ];
+    }
+
+    if (roleKey === 'ULB_OFFICER') {
+      return [
+        { label: 'Attention Required', value: row.actionRequired, color: STATUS_COLORS['Attention Required'] },
+        { label: 'Resolved', value: row.actionTaken, color: STATUS_COLORS.Resolved },
       ];
     }
 
     if (roleKey === 'SUPERVISOR') {
-      const covered = Math.min(coveredAssetsCount, assetsTotal || coveredAssetsCount);
-      const notCovered = Math.max(assetsTotal - coveredAssetsCount, 0);
+      const completed = coverage?.completed ?? 0;
+      const pending = Math.max((coverage?.required ?? 0) - completed, 0);
       return [
-        { label: 'Assets Covered', value: covered, color: STATUS_COLORS.Approved },
-        { label: 'Assets Not Covered', value: notCovered, color: STATUS_COLORS.Pending },
+        { label: 'Completed Inspection', value: completed, color: STATUS_COLORS.Approved },
+        { label: 'Pending Inspection', value: pending, color: STATUS_COLORS.Pending },
       ];
     }
 
@@ -777,12 +1227,12 @@ function UserDetailDrawer({
       { label: rejectedLabel, value: row.rejected, color: STATUS_COLORS[rejectedLabel] },
       { label: pendingLabel, value: row.pending, color: STATUS_COLORS.Pending },
     ];
-  }, [isEmployee, roleKey, row, approvedLabel, rejectedLabel, pendingLabel, coveredAssetsCount, assetsTotal]);
+  }, [isEmployee, roleKey, row, approvedLabel, rejectedLabel, pendingLabel, coverage]);
 
   const assetCleanlinessSegments = useMemo(
     () => [
-      { label: 'Approved (Clean)', value: employeeAssetStats.approved, color: STATUS_COLORS.Approved },
-      { label: 'Rejected (Unclean)', value: employeeAssetStats.rejected, color: STATUS_COLORS.Rejected },
+      { label: 'Cleaned', value: employeeAssetStats.approved, color: STATUS_COLORS.Approved },
+      { label: 'Not Cleaned', value: employeeAssetStats.rejected, color: STATUS_COLORS.Rejected },
       { label: 'Pending Review', value: employeeAssetStats.pending, color: STATUS_COLORS.Pending },
     ],
     [employeeAssetStats]
@@ -810,7 +1260,7 @@ function UserDetailDrawer({
         className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
       />
 
-      <aside className="absolute bottom-0 right-0 top-0 flex w-full max-w-[760px] flex-col overflow-y-auto border-l border-slate-200 bg-[#f8fafc] shadow-[-30px_0_80px_-30px_rgba(15,23,42,.42)]">
+      <aside className="absolute bottom-0 right-0 top-0 flex w-full max-w-[1120px] flex-col overflow-y-auto border-l border-slate-200 bg-[#f8fafc] shadow-[-30px_0_80px_-30px_rgba(15,23,42,.42)]">
         <div className="border-b border-slate-200 bg-white px-6 py-5">
           <div className="flex items-start justify-between gap-5">
             <div>
@@ -834,68 +1284,17 @@ function UserDetailDrawer({
             </button>
           </div>
 
-          {(row.zones.length > 0 || row.wards.length > 0) && (
+          {(headerZones.length > 0 || headerWards.length > 0) && (
             <div className="mt-3 flex flex-wrap items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
               <MapPin size={11} />
-              {[...row.zones, ...row.wards].join(', ')}
-            </div>
-          )}
-
-          {row.modules.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {row.modules.map((module) => (
-                <span
-                  key={module}
-                  className="rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700"
-                >
-                  {module}
-                </span>
-              ))}
+              {[...headerZones, ...headerWards].join(', ')}
             </div>
           )}
 
           {/* STAT CARDS */}
+          {!showWorkflowPanel && (
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {roleKey === 'SUPERVISOR' && (
-              <>
-                <StatTile label="Reports Submitted" value={row.total.toLocaleString('en-IN')} icon={<Activity size={13} />} tone="slate" />
-                <StatTile
-                  label="Assigned Beats"
-                  value={workSummaryLoading ? '…' : (beatsCount ?? 0).toLocaleString('en-IN')}
-                  icon={<Route size={13} />}
-                  tone="violet"
-                />
-                <StatTile
-                  label="Assigned Toilets"
-                  value={workSummaryLoading ? '…' : (toiletsCount ?? 0).toLocaleString('en-IN')}
-                  icon={<Droplet size={13} />}
-                  tone="sky"
-                />
-                <StatTile
-                  label="Assigned Litter Bins"
-                  value={workSummaryLoading ? '…' : (litterBinsCount ?? 0).toLocaleString('en-IN')}
-                  icon={<Trash2 size={13} />}
-                  tone="emerald"
-                />
-                <StatTile
-                  label="Coverage"
-                  value={workSummaryLoading ? '…' : percentText(coveragePct)}
-                  icon={<ShieldCheck size={13} />}
-                  tone="amber"
-                />
-              </>
-            )}
-
-            {roleKey === 'QC' && (
-              <>
-                <StatTile label="Total Reports" value={row.total.toLocaleString('en-IN')} icon={<Activity size={13} />} tone="slate" />
-                <StatTile label={approvedLabel} value={row.approved.toLocaleString('en-IN')} icon={<CheckCircle2 size={13} />} tone="emerald" />
-                <StatTile label={rejectedLabel} value={row.rejected.toLocaleString('en-IN')} icon={<XCircle size={13} />} tone="rose" />
-                <StatTile label={pendingLabel} value={row.pending.toLocaleString('en-IN')} icon={<ShieldCheck size={13} />} tone="amber" />
-              </>
-            )}
-
-            {(roleKey === 'ULB_OFFICER' || roleKey === 'ACTION_OFFICER') && (
+            {roleKey === 'ULB_OFFICER' && (
               <>
                 <StatTile
                   label={roleKey === 'ULB_OFFICER' ? 'Total In Jurisdiction' : 'Total Action Items'}
@@ -908,13 +1307,13 @@ function UserDetailDrawer({
                   Action Cycle
                 </div>
                 <StatTile
-                  label={roleKey === 'ULB_OFFICER' ? 'Action Required (Raised)' : 'Pending Action'}
+                  label={roleKey === 'ULB_OFFICER' ? 'Attention Required' : 'Resolution Pending'}
                   value={row.actionRequired.toLocaleString('en-IN')}
                   icon={<ShieldCheck size={13} />}
                   tone="amber"
                 />
                 <StatTile
-                  label="Action Taken (Resolved)"
+                  label="Resolved"
                   value={row.actionTaken.toLocaleString('en-IN')}
                   icon={<CheckCircle2 size={13} />}
                   tone="violet"
@@ -935,13 +1334,13 @@ function UserDetailDrawer({
                 <StatTile label="Absent Days" value={row.rejected.toLocaleString('en-IN')} icon={<XCircle size={13} />} tone="rose" />
                 <StatTile
                   label="Assigned Toilets"
-                  value={workSummaryLoading ? '…' : (toiletsCount ?? 0).toLocaleString('en-IN')}
+                  value={assignmentText(toiletsCount)}
                   icon={<Droplet size={13} />}
                   tone="sky"
                 />
                 <StatTile
                   label="Assigned Litter Bins"
-                  value={workSummaryLoading ? '…' : (litterBinsCount ?? 0).toLocaleString('en-IN')}
+                  value={assignmentText(litterBinsCount)}
                   icon={<Trash2 size={13} />}
                   tone="emerald"
                 />
@@ -952,13 +1351,13 @@ function UserDetailDrawer({
                       Asset Inspection Results
                     </div>
                     <StatTile
-                      label="Approved (Clean)"
+                      label="Cleaned"
                       value={employeeAssetStats.approved.toLocaleString('en-IN')}
                       icon={<CheckCircle2 size={13} />}
                       tone="emerald"
                     />
                     <StatTile
-                      label="Rejected (Unclean)"
+                      label="Not Cleaned"
                       value={employeeAssetStats.rejected.toLocaleString('en-IN')}
                       icon={<XCircle size={13} />}
                       tone="rose"
@@ -968,7 +1367,410 @@ function UserDetailDrawer({
               </>
             )}
           </div>
+          )}
         </div>
+
+        {showWorkflowPanel && (
+          <div className="space-y-4 border-b border-slate-200 px-6 py-5">
+            {/* DATE FILTER - applies to the whole drawer */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="mr-auto">
+                  <div className="text-sm font-black text-slate-950">Date Range</div>
+                  <div className="mt-0.5 text-[10px] font-semibold text-slate-500">
+                    {fromDate && toDate ? `${formatDate(fromDate)} – ${formatDate(toDate)}` : 'All time'}
+                    {rangeLoading && <span className="ml-2 text-indigo-600">Loading…</span>}
+                    {rangeError && <span className="ml-2 text-rose-600">Couldn&apos;t load this range.</span>}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {DRAWER_PRESETS.map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => applyPreset(key)}
+                      disabled={rangeLoading}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[10px] font-black text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="block">
+                  <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">From</span>
+                  <input
+                    type="date"
+                    value={draftFrom}
+                    max={draftTo || undefined}
+                    onChange={(event) => setDraftFrom(event.target.value)}
+                    className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold text-slate-700 outline-none focus:border-indigo-400 focus:bg-white"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">To</span>
+                  <input
+                    type="date"
+                    value={draftTo}
+                    min={draftFrom || undefined}
+                    onChange={(event) => setDraftTo(event.target.value)}
+                    className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] font-bold text-slate-700 outline-none focus:border-indigo-400 focus:bg-white"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => applyRange(draftFrom, draftTo)}
+                  disabled={rangeLoading || Boolean(draftFrom && draftTo && draftFrom > draftTo)}
+                  className="h-8 rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-3 text-[10px] font-black text-white shadow-sm transition hover:opacity-90 disabled:opacity-50"
+                >
+                  Apply
+                </button>
+                {!usingPageRange && (
+                  <button
+                    type="button"
+                    onClick={() => applyRange(pageFrom, pageTo)}
+                    disabled={rangeLoading}
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </section>
+
+            {/* INSPECTION WORKFLOW */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-sm font-black text-slate-950">Inspection Workflow</div>
+                <div className="text-[9px] font-bold text-slate-400">Click to filter</div>
+              </div>
+
+              <div
+                className={`grid grid-cols-2 gap-2 ${
+                  roleKey === 'SUPERVISOR'
+                    ? 'sm:grid-cols-3 lg:grid-cols-6'
+                    : roleKey === 'ACTION_OFFICER'
+                    ? 'sm:grid-cols-3 lg:grid-cols-6'
+                    : 'sm:grid-cols-4 lg:grid-cols-8'
+                }`}
+              >
+                {roleKey === 'SUPERVISOR' &&
+                  (
+                    [
+                      [
+                        'Assigned Toilets',
+                        coverage?.modules.TOILET.assigned,
+                        'border-sky-200 bg-sky-50 text-sky-700',
+                        'Toilets assigned to this Daroga',
+                      ],
+                      [
+                        'Assigned Litter Bins',
+                        coverage?.modules.LITTERBINS.assigned,
+                        'border-emerald-200 bg-emerald-50 text-emerald-700',
+                        'Litter bins assigned to this Daroga',
+                      ],
+                      [
+                        'Assigned Beats',
+                        coverage?.modules.SWEEPING.assigned,
+                        'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+                        'Sweeping beats assigned to this Daroga',
+                      ],
+                      [
+                        'Required Inspection',
+                        coverage?.required,
+                        'border-indigo-200 bg-indigo-50 text-indigo-700',
+                        'Assigned beats, toilets and litter bins x days in the selected range',
+                      ],
+                      [
+                        'Completed Inspection',
+                        coverage?.completed,
+                        'border-blue-200 bg-blue-50 text-blue-700',
+                        'Assigned asset-days this Daroga inspected in the selected range',
+                      ],
+                      [
+                        'Pending Inspection',
+                        coverage && coverage.required !== null ? Math.max(coverage.required - coverage.completed, 0) : null,
+                        'border-violet-200 bg-violet-50 text-violet-700',
+                        'Required - completed inspections',
+                      ],
+                    ] as Array<[string, number | null | undefined, string, string]>
+                  ).map(([label, value, tone, hint]) => (
+                    <div key={label} className={`rounded-xl border px-3 py-2 text-left ${tone}`} title={hint}>
+                      <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
+                      <div className="mt-1 text-xl font-black leading-none">{assetCountText(value)}</div>
+                    </div>
+                  ))}
+
+                {roleKey === 'ACTION_OFFICER' && (
+                  <>
+                    <div
+                      className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-left text-indigo-700"
+                      title="Darogas working inside this IEC member's zones / wards"
+                    >
+                      <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">Total Daroga</div>
+                      <div className="mt-1 text-xl font-black leading-none">{iecCountText(iec?.darogas)}</div>
+                    </div>
+
+                    {(
+                      [
+                        ['ACTION_REQUIRED', 'Attention Required', 'border-orange-200 bg-orange-50 text-orange-700', 'Reports in this scope that ULB sent for action'],
+                        ['ACTION_TAKEN', 'Resolved', 'border-teal-200 bg-teal-50 text-teal-700', 'Of those, reports already resolved'],
+                        ['PENDING_ACTION', 'Resolution Pending', 'border-cyan-200 bg-cyan-50 text-cyan-700', 'Of those, reports still waiting for action'],
+                      ] as Array<[WorkflowKey, string, string, string]>
+                    ).map(([key, label, tone, hint]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        title={hint}
+                        onClick={() => openWorkflowTable(key)}
+                        className={`rounded-xl border px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-md ${tone} ${
+                          tab === 'table' && tableWorkflowFilter === key ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                        }`}
+                      >
+                        <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
+                        <div className="mt-1 text-xl font-black leading-none">
+                          {iecCountText(iec ? iecKeys[IEC_WORKFLOW_BUCKET[key]!].size : null)}
+                        </div>
+                      </button>
+                    ))}
+
+                    <div
+                      className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-slate-700"
+                      title="Who resolved these reports - a zone can have several IEC members"
+                    >
+                      <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">Resolved By</div>
+                      {iecStatus === 'loading' ? (
+                        <div className="mt-1 text-xl font-black leading-none">…</div>
+                      ) : iecResolvedBy.length === 0 ? (
+                        <div className="mt-1 text-xl font-black leading-none">—</div>
+                      ) : (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {iecResolvedBy.map((resolver) => (
+                            <span
+                              key={resolver.id || 'unknown'}
+                              className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
+                                resolver.self
+                                  ? 'border-teal-200 bg-teal-50 text-teal-700'
+                                  : resolver.id
+                                  ? 'border-slate-200 bg-white text-slate-700'
+                                  : 'border-dashed border-slate-300 bg-white text-slate-400'
+                              }`}
+                            >
+                              {resolver.name}
+                              {resolver.self ? ' (self)' : ''} · {resolver.count.toLocaleString('en-IN')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {roleKey === 'QC' && (
+                  <>
+                    {(
+                      [
+                        ['Total Daroga', si?.darogas, 'border-indigo-200 bg-indigo-50 text-indigo-700', 'Darogas working inside this SI\'s zones / wards'],
+                        ['Total Toilets', si?.assets.toilets, 'border-sky-200 bg-sky-50 text-sky-700', 'Approved toilets in this SI\'s scope'],
+                        ['Total Litter Bins', si?.assets.litterBins, 'border-emerald-200 bg-emerald-50 text-emerald-700', 'Approved litter bins in this SI\'s scope'],
+                        ['Total Beats', si?.assets.beats, 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700', 'Sweeping beats in this SI\'s scope'],
+                      ] as Array<[string, number | undefined, string, string]>
+                    ).map(([label, value, tone, hint]) => (
+                      <div key={label} className={`rounded-xl border px-3 py-2 text-left ${tone}`} title={hint}>
+                        <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
+                        <div className="mt-1 text-xl font-black leading-none">{siCountText(si ? value : null)}</div>
+                      </div>
+                    ))}
+
+                    {(
+                      [
+                        ['ALL', 'Total Inspection Reports', 'border-blue-200 bg-blue-50 text-blue-700', 'Reports submitted in this SI\'s scope'],
+                        ['APPROVED', 'Cleaned', 'border-emerald-200 bg-emerald-50 text-emerald-700', 'Reports this SI approved'],
+                        ['REJECTED', 'Not Cleaned', 'border-rose-200 bg-rose-50 text-rose-700', 'Reports this SI rejected'],
+                        ['PENDING', 'Pending Review', 'border-amber-200 bg-amber-50 text-amber-700', 'Reports waiting for SI review'],
+                      ] as Array<[WorkflowKey, string, string, string]>
+                    ).map(([key, label, tone, hint]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        title={hint}
+                        onClick={() => openWorkflowTable(key)}
+                        className={`rounded-xl border px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-md ${tone} ${
+                          tab === 'table' && tableWorkflowFilter === key ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                        }`}
+                      >
+                        <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
+                        <div className="mt-1 text-xl font-black leading-none">
+                          {siCountText(si ? siKeys[SI_WORKFLOW_BUCKET[key]!].size : null)}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )}
+
+                {roleKey === 'SUPERVISOR' && WORKFLOW_CARDS.filter(([key]) => key !== 'ALL').map(([key, tone]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => openWorkflowTable(key)}
+                    className={`rounded-xl border px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-md ${tone} ${
+                      tab === 'table' && tableWorkflowFilter === key ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                    }`}
+                  >
+                    <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">
+                      {WORKFLOW_LABELS[key]}
+                    </div>
+                    <div className="mt-1 text-xl font-black leading-none">
+                      {workflowCounts[key].toLocaleString('en-IN')}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {roleKey === 'ACTION_OFFICER' && iecKeys.carriedOverPending.size > 0 && (
+                <div className="mt-2 text-[9px] font-semibold text-slate-400">
+                  Attention Required and Resolution Pending include {iecKeys.carriedOverPending.size.toLocaleString('en-IN')} older{' '}
+                  {iecKeys.carriedOverPending.size === 1 ? 'report' : 'reports'} submitted before this date range that{' '}
+                  {iecKeys.carriedOverPending.size === 1 ? 'is' : 'are'} still unresolved (not listed in the Data Table).
+                  Performance = resolved ÷ attention required.
+                </div>
+              )}
+
+              {roleKey === 'QC' && siKeys.carriedOverPending.size > 0 && (
+                <div className="mt-2 text-[9px] font-semibold text-slate-400">
+                  Pending Review includes {siKeys.carriedOverPending.size.toLocaleString('en-IN')} older{' '}
+                  {siKeys.carriedOverPending.size === 1 ? 'report' : 'reports'} submitted before this date range that{' '}
+                  {siKeys.carriedOverPending.size === 1 ? 'is' : 'are'} still waiting for review (not listed in the Data Table).
+                  Performance = reviewed ÷ (reviewed + pending review).
+                </div>
+              )}
+
+              {roleKey === 'SUPERVISOR' && legacyReviewedCount > 0 && (
+                <div className="mt-2 text-[9px] font-semibold text-slate-400">
+                  {legacyReviewedCount.toLocaleString('en-IN')} older escalated{' '}
+                  {legacyReviewedCount === 1 ? 'report has' : 'reports have'} no stored SI decision, so{' '}
+                  {legacyReviewedCount === 1 ? "it isn't" : "they aren't"} counted in Cleaned / Not Cleaned / Pending Review.
+                </div>
+              )}
+            </section>
+
+            {/* MODULE BIFURCATION */}
+            <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 text-sm font-black text-slate-950">Module Bifurcation</div>
+
+              <div className="grid gap-2 sm:grid-cols-3">
+                {moduleSummaries.map((module) => (
+                  <button
+                    key={module.key}
+                    type="button"
+                    onClick={() => openModuleTable(module.key)}
+                    className={`rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                      tab === 'table' && tableFilterModule === module.key && !tableFilterDate
+                        ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100'
+                        : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="truncate text-xs font-black text-slate-900">{module.label}</div>
+                      <div
+                        className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-600"
+                        title={
+                          roleKey === 'SUPERVISOR'
+                            ? 'Completed / required inspections'
+                            : roleKey === 'ACTION_OFFICER'
+                            ? 'Resolved / attention required'
+                            : 'Reviewed / (reviewed + pending review)'
+                        }
+                      >
+                        {roleKey === 'ACTION_OFFICER' ? (
+                          <>
+                            {iecCountText(iec ? module.completed : null)}
+                            {' / '}
+                            {iecCountText(iec ? module.reports : null)}
+                          </>
+                        ) : roleKey === 'SUPERVISOR' ? (
+                          <>
+                            {assetCountText(coverage ? module.completed : null)}
+                            {' / '}
+                            {assetCountText(module.required)}
+                          </>
+                        ) : (
+                          <>
+                            {siCountText(si ? module.completed : null)}
+                            {' / '}
+                            {siCountText(si ? module.workload : null)}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 text-xl font-black text-slate-950">{percentText(module.performance)}</div>
+                    {module.assigned !== null && (
+                      <div className="text-[9px] font-bold text-slate-400">
+                        {module.assigned.toLocaleString('en-IN')} assigned
+                        {coverage?.days ? ` × ${coverage.days.toLocaleString('en-IN')} ${coverage.days === 1 ? 'day' : 'days'}` : ''}
+                      </div>
+                    )}
+
+                    {roleKey === 'ACTION_OFFICER' ? (
+                      <div className="mt-3 grid grid-cols-3 gap-1.5">
+                        <div className="rounded-xl bg-orange-50 px-1 py-2 text-center">
+                          <div className="text-[8px] font-black uppercase text-orange-600">Attention Req.</div>
+                          <div className="mt-1 text-sm font-black text-orange-800">{module.reports}</div>
+                        </div>
+                        <div className="rounded-xl bg-teal-50 px-1 py-2 text-center">
+                          <div className="text-[8px] font-black uppercase text-teal-600">Resolved</div>
+                          <div className="mt-1 text-sm font-black text-teal-800">{module.completed}</div>
+                        </div>
+                        <div className="rounded-xl bg-cyan-50 px-1 py-2 text-center">
+                          <div className="text-[8px] font-black uppercase text-cyan-600">Res. Pending</div>
+                          <div className="mt-1 text-sm font-black text-cyan-800">{module.pending}</div>
+                        </div>
+                      </div>
+                    ) : (
+                    <div
+                      className={`mt-3 grid gap-1.5 ${
+                        module.pendingInspection !== null || roleKey === 'QC' ? 'grid-cols-4' : 'grid-cols-3'
+                      }`}
+                    >
+                      {roleKey === 'QC' && (
+                        <div className="rounded-xl bg-blue-50 px-1 py-2 text-center" title="Reports submitted in this SI's scope">
+                          <div className="text-[8px] font-black uppercase text-blue-600">Reports</div>
+                          <div className="mt-1 text-sm font-black text-blue-800">{module.reports}</div>
+                        </div>
+                      )}
+                      <div className="rounded-xl bg-emerald-50 px-1 py-2 text-center">
+                        <div className="text-[8px] font-black uppercase text-emerald-600">Cleaned</div>
+                        <div className="mt-1 text-sm font-black text-emerald-800">{module.approved}</div>
+                      </div>
+                      <div className="rounded-xl bg-rose-50 px-1 py-2 text-center">
+                        <div className="text-[8px] font-black uppercase text-rose-600">Not Cleaned</div>
+                        <div className="mt-1 text-sm font-black text-rose-800">{module.rejected}</div>
+                      </div>
+                      <div className="rounded-xl bg-amber-50 px-1 py-2 text-center">
+                        <div className="text-[8px] font-black uppercase text-amber-600">Pending Review</div>
+                        <div className="mt-1 text-sm font-black text-amber-800">{module.pending}</div>
+                      </div>
+                      {module.pendingInspection !== null && (
+                        <div
+                          className="rounded-xl bg-violet-50 px-1 py-2 text-center"
+                          title="Required inspections not done yet (required - completed)"
+                        >
+                          <div className="text-[8px] font-black uppercase text-violet-600">Pending Insp.</div>
+                          <div className="mt-1 text-sm font-black text-violet-800">
+                            {module.pendingInspection.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
 
         {/* TABS */}
         <div className="grid grid-cols-3 gap-2 border-b border-slate-200 bg-white px-6 py-3">
@@ -1019,7 +1821,25 @@ function UserDetailDrawer({
                 <div className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
                   {donutTitle}
                 </div>
-                {donutSegments.every((segment) => segment.value === 0) ? (
+                {roleKey === 'SUPERVISOR' && assetsStatus === 'loading' ? (
+                  <div className="flex h-32 items-center justify-center text-xs font-bold text-slate-400">
+                    Loading assigned assets…
+                  </div>
+                ) : roleKey === 'SUPERVISOR' && (assetsStatus === 'error' || !coverage) ? (
+                  <div className="flex h-32 items-center justify-center text-xs font-bold text-rose-500">
+                    Couldn&apos;t load assigned assets for this Daroga.
+                  </div>
+                ) : roleKey === 'SUPERVISOR' && coverage?.days === null ? (
+                  <div className="flex h-32 items-center justify-center text-xs font-bold text-slate-400">
+                    Pick a date range to see required inspections.
+                  </div>
+                ) : roleKey === 'SUPERVISOR' && !coverage?.required ? (
+                  <div className="flex h-32 items-center justify-center text-center text-xs font-bold text-slate-400">
+                    No beats, toilets or litter bins are assigned to this Daroga,
+                    <br />
+                    so coverage can&apos;t be calculated.
+                  </div>
+                ) : donutSegments.every((segment) => segment.value === 0) ? (
                   <div className="flex h-32 items-center justify-center text-xs font-bold text-slate-400">
                     No records in the selected range.
                   </div>
@@ -1180,19 +2000,28 @@ function UserDetailDrawer({
 
           {tab === 'table' && (
             <>
-              {tableFilterDate && (
+              {tableFilterActive && (
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3.5 py-2.5">
                   <span className="text-[10px] font-bold text-indigo-700">
-                    Showing reports for <strong>{formatDate(tableFilterDate)}</strong>
-                    {tableFilterModule
-                      ? ` · ${INSPECTION_MODULES.find((module) => module.key === tableFilterModule)?.label || tableFilterModule}`
-                      : ''}
+                    Showing{' '}
+                    <strong>
+                      {[
+                        tableWorkflowFilter ? WORKFLOW_LABELS[tableWorkflowFilter] : null,
+                        tableFilterModule
+                          ? INSPECTION_MODULES.find((module) => module.key === tableFilterModule)?.label || tableFilterModule
+                          : null,
+                        tableFilterDate ? formatDate(tableFilterDate) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => {
                       setTableFilterDate(null);
                       setTableFilterModule(null);
+                      setTableWorkflowFilter(null);
                     }}
                     className="rounded-md border border-indigo-200 bg-white px-2 py-1 text-[9px] font-black text-indigo-600 transition hover:bg-indigo-100"
                   >
@@ -1204,7 +2033,7 @@ function UserDetailDrawer({
               {filteredTableRecords.length > 0 ? (
                 <>
                   <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    {tableFilterDate ? 'Filtered Records' : 'All Records'} ({filteredTableRecords.length})
+                    {tableFilterActive ? 'Filtered Records' : 'All Records'} ({filteredTableRecords.length})
                   </div>
 
                   <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -1240,11 +2069,11 @@ function UserDetailDrawer({
                                 {record.dashboardModuleLabel}
                               </td>
                               <td className="p-3 text-[10px] font-bold text-slate-500">
-                                {formatDate(recordDate(record))}
+                                {formatDate(dateOf(record))}
                               </td>
                               <td className="p-3">
                                 <span className={`rounded-md border px-2 py-1 text-[9px] font-black uppercase ${statusStyle}`}>
-                                  {status.replace(/_/g, ' ')}
+                                  {statusDisplay(status)}
                                 </span>
                               </td>
                               <td className="p-3 text-right">
@@ -1320,6 +2149,15 @@ export default function UserPerformancePage() {
    */
   const [cityUsers, setCityUsers] = useState<CityUserSummary[]>([]);
   const [geoNameById, setGeoNameById] = useState<Map<string, string>>(new Map());
+  // Daroga required vs completed inspections for the applied date range.
+  const [darogaPerformance, setDarogaPerformance] = useState<Record<string, DarogaPerformance> | null>(null);
+  const [darogaStatus, setDarogaStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  // Sanitary Inspector scope totals + decisions for the applied date range.
+  const [siPerformance, setSiPerformance] = useState<Record<string, SiPerformance> | null>(null);
+  const [siStatus, setSiStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  // IEC Member action-cycle reports for the applied date range.
+  const [iecPerformance, setIecPerformance] = useState<Record<string, IecPerformance> | null>(null);
+  const [iecStatus, setIecStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -1368,8 +2206,11 @@ export default function UserPerformancePage() {
       else setLoading(true);
 
       setLoadError(false);
+      setSiStatus('loading');
+      setIecStatus('loading');
+      setDarogaStatus('loading');
 
-      const [moduleResult, attendanceResult] = await Promise.allSettled([
+      const [moduleResult, attendanceResult, siResult, iecResult, darogaResult] = await Promise.allSettled([
         Promise.all(
           INSPECTION_MODULES.map((module) =>
             loadAllModuleRecords(module.key, appliedFrom || undefined, appliedTo || undefined).then(
@@ -1390,10 +2231,44 @@ export default function UserPerformancePage() {
           page: 1,
           pageSize: 5000,
         }),
+        CityUserApi.siPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) }),
+        CityUserApi.iecPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) }),
+        CityUserApi.darogaPerformance(performanceRangeParams(appliedFrom, appliedTo)),
       ]);
 
+      if (darogaResult.status === 'fulfilled') {
+        setDarogaPerformance(darogaResult.value.users || {});
+        setDarogaStatus('ready');
+      } else {
+        console.error('Failed to load Daroga performance', darogaResult.reason);
+        setDarogaPerformance(null);
+        setDarogaStatus('error');
+      }
+
+      if (iecResult.status === 'fulfilled') {
+        setIecPerformance(iecResult.value.users || {});
+        setIecStatus('ready');
+      } else {
+        console.error('Failed to load IEC Member performance', iecResult.reason);
+        setIecPerformance(null);
+        setIecStatus('error');
+      }
+
+      if (siResult.status === 'fulfilled') {
+        setSiPerformance(siResult.value.users || {});
+        setSiStatus('ready');
+      } else {
+        console.error('Failed to load Sanitary Inspector performance', siResult.reason);
+        setSiPerformance(null);
+        setSiStatus('error');
+      }
+
       if (moduleResult.status === 'fulfilled') {
-        setRecords(moduleResult.value.flat());
+        // LITTERBINS history also returns bin registration requests; those
+        // are asset master rows, not inspection reports.
+        setRecords(
+          moduleResult.value.flat().filter((record: any) => record.type !== 'BIN_REGISTRATION')
+        );
       } else {
         setRecords([]);
         setLoadError(true);
@@ -1432,16 +2307,30 @@ export default function UserPerformancePage() {
    * out downstream).
    */
   const buildInspectionRows = useCallback(
-    (role: 'SUPERVISOR' | 'QC'): UserPerformanceRow[] => {
+    (
+      role: 'SUPERVISOR' | 'QC',
+      sourceRecords: DashboardRecord[] = filteredRecords,
+      siData: Record<string, SiPerformance> | null = siPerformance,
+      darogaData: Record<string, DarogaPerformance> | null = darogaPerformance
+    ): UserPerformanceRow[] => {
       const roster = cityUsersByRole.get(role) || [];
 
       return roster.map((person) => {
-        const matchedRecords = filteredRecords.filter((item) => {
-          const id = personIdForRole(item, role);
-          if (id) return String(id) === String(person.id);
-          const name = personForRole(item, role);
-          return Boolean(name) && normalize(name) === normalize(person.name);
-        });
+        // An SI owns the reports in their scope (from the backend), not the
+        // ones they happen to have reviewed.
+        const siFull = role === 'QC' ? siData?.[person.id] : undefined;
+        const si = siFull ? restrictSiModules(siFull, moduleFilter) : null;
+        const siKeys = siBucketKeys(si);
+
+        const matchedRecords =
+          role === 'QC'
+            ? sourceRecords.filter((item) => siKeys.reports.has(recordKey(item)))
+            : sourceRecords.filter((item) => {
+                const id = personIdForRole(item, role);
+                if (id) return String(id) === String(person.id);
+                const name = personForRole(item, role);
+                return Boolean(name) && normalize(name) === normalize(person.name);
+              });
 
         const stats = inspectionStats(matchedRecords);
 
@@ -1463,23 +2352,22 @@ export default function UserPerformancePage() {
           if (item.dashboardModuleLabel) modules.add(item.dashboardModuleLabel);
         });
 
-        const performance =
-          role === 'QC'
-            ? stats.total > 0
-              ? ((stats.total - stats.pending) / stats.total) * 100
-              : null
-            : stats.performance;
+        const darogaFull = role === 'SUPERVISOR' ? darogaData?.[person.id] : undefined;
+        const coverage = darogaFull ? restrictDarogaModules(darogaFull, moduleFilter) : null;
+
+        // Shared with the Team Leaderboard (lib/userPerformanceScores).
+        const performance = role === 'QC' ? siScore(si) : darogaScore(coverage);
 
         return {
           key: `${role}-${person.id}`,
           id: person.id,
           label: person.name,
-          total: stats.total,
-          approved: stats.approved,
-          rejected: stats.rejected,
+          total: role === 'QC' ? siKeys.reports.size : stats.total,
+          approved: role === 'QC' ? siKeys.cleaned.size : stats.approved,
+          rejected: role === 'QC' ? siKeys.notCleaned.size : stats.rejected,
           actionRequired: stats.actionRequired,
           actionTaken: stats.actionTaken,
-          pending: stats.pending,
+          pending: role === 'QC' ? siKeys.pendingReview.size : stats.pending,
           performance,
           records: matchedRecords,
           attendance: attendanceEmployee?.attendanceRate ?? null,
@@ -1487,10 +2375,12 @@ export default function UserPerformancePage() {
           zones: Array.from(zones),
           wards: Array.from(wards),
           modules: Array.from(modules),
+          coverage,
+          si,
         };
       });
     },
-    [cityUsersByRole, filteredRecords, attendance]
+    [cityUsersByRole, filteredRecords, attendance, darogaPerformance, siPerformance, moduleFilter]
   );
 
   const employeeRows = useMemo<UserPerformanceRow[]>(() => {
@@ -1593,77 +2483,68 @@ export default function UserPerformancePage() {
   }, [cityUsersByRole, geoNameById, filteredRecords, attendance]);
 
   /*
-   * IEC (Action Officer) records are matched two ways: records they've
-   * already resolved (actionTakenBy = them) PLUS records still sitting
-   * in Action Required within their own zone/ward scope - those are the
-   * items still "pending action" on their side. Performance is the
-   * resolution rate of that action cycle (Taken / (Required + Taken)),
-   * so a growing pending pile drags performance down.
+   * IEC Members own the reports that ULB sent to action inside their zone /
+   * ward scope (computed by the backend with the same filter as their own
+   * report queue). Performance = resolved / attention required; a report
+   * resolved by another IEC member of the same zone still counts as resolved.
    */
-  const buildActionOfficerRows = useCallback((): UserPerformanceRow[] => {
-    const roster = cityUsersByRole.get('ACTION_OFFICER') || [];
+  const buildActionOfficerRows = useCallback(
+    (
+      sourceRecords: DashboardRecord[] = filteredRecords,
+      iecData: Record<string, IecPerformance> | null = iecPerformance
+    ): UserPerformanceRow[] => {
+      const roster = cityUsersByRole.get('ACTION_OFFICER') || [];
 
-    return roster.map((officer) => {
-      const zoneNames = (officer.zoneIds || [])
-        .map((id) => geoNameById.get(id))
-        .filter((name): name is string => Boolean(name));
-      const wardNames = (officer.wardIds || [])
-        .map((id) => geoNameById.get(id))
-        .filter((name): name is string => Boolean(name));
+      return roster.map((officer) => {
+        const zoneNames = (officer.zoneIds || [])
+          .map((id) => geoNameById.get(id))
+          .filter((name): name is string => Boolean(name));
+        const wardNames = (officer.wardIds || [])
+          .map((id) => geoNameById.get(id))
+          .filter((name): name is string => Boolean(name));
 
-      const zoneSet = new Set(zoneNames.map(normalize));
-      const wardSet = new Set(wardNames.map(normalize));
+        const iecFull = iecData?.[officer.id];
+        const iec = iecFull ? restrictIecModules(iecFull, moduleFilter) : null;
+        const keys = iecBucketKeys(iec);
+        const matchedRecords = sourceRecords.filter((item) => keys.attentionRequired.has(recordKey(item)));
+        const stats = inspectionStats(matchedRecords);
 
-      const matchedRecords = filteredRecords.filter((item) => {
-        const iecId = getIecId(item);
-        const iecName = getIecName(item);
-        const resolvedByOfficer = iecId
-          ? String(iecId) === String(officer.id)
-          : Boolean(iecName) && normalize(iecName) === normalize(officer.name);
-        if (resolvedByOfficer) return true;
+        const attendanceEmployee =
+          attendance?.employees?.find(
+            (employee) =>
+              employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(officer.id)
+          ) || null;
 
-        if (effectiveStatus(item) !== 'ACTION_REQUIRED') return false;
-        if (!(zoneSet.size || wardSet.size)) return false;
-        const zone = normalize(getRecordZone(item));
-        const ward = normalize(getRecordWard(item));
-        return (zone && zoneSet.has(zone)) || (ward && wardSet.has(ward));
+        const modules = new Set<string>();
+        matchedRecords.forEach((item) => {
+          if (item.dashboardModuleLabel) modules.add(item.dashboardModuleLabel);
+        });
+
+        const attention = keys.attentionRequired.size;
+
+        return {
+          key: `ACTION_OFFICER-${officer.id}`,
+          id: officer.id,
+          label: officer.name,
+          total: attention,
+          approved: stats.approved,
+          rejected: stats.rejected,
+          actionRequired: keys.resolutionPending.size,
+          actionTaken: keys.resolved.size,
+          pending: stats.pending,
+          performance: iecScore(iec),
+          records: matchedRecords,
+          attendance: attendanceEmployee?.attendanceRate ?? null,
+          attendanceEmployee,
+          zones: zoneNames,
+          wards: wardNames,
+          modules: Array.from(modules),
+          iec,
+        };
       });
-
-      const stats = inspectionStats(matchedRecords);
-
-      const attendanceEmployee =
-        attendance?.employees?.find(
-          (employee) =>
-            employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(officer.id)
-        ) || null;
-
-      const modules = new Set<string>();
-      matchedRecords.forEach((item) => {
-        if (item.dashboardModuleLabel) modules.add(item.dashboardModuleLabel);
-      });
-
-      const actionable = stats.actionRequired + stats.actionTaken;
-
-      return {
-        key: `ACTION_OFFICER-${officer.id}`,
-        id: officer.id,
-        label: officer.name,
-        total: stats.total,
-        approved: stats.approved,
-        rejected: stats.rejected,
-        actionRequired: stats.actionRequired,
-        actionTaken: stats.actionTaken,
-        pending: stats.pending,
-        performance: actionable > 0 ? (stats.actionTaken / actionable) * 100 : null,
-        records: matchedRecords,
-        attendance: attendanceEmployee?.attendanceRate ?? null,
-        attendanceEmployee,
-        zones: zoneNames,
-        wards: wardNames,
-        modules: Array.from(modules),
-      };
-    });
-  }, [cityUsersByRole, geoNameById, filteredRecords, attendance]);
+    },
+    [cityUsersByRole, geoNameById, filteredRecords, attendance, iecPerformance, moduleFilter]
+  );
 
   /*
    * Daroga performance is judged on submission volume against the rest
@@ -1687,16 +2568,52 @@ export default function UserPerformancePage() {
       rows = buildInspectionRows(roleFilter as 'SUPERVISOR' | 'QC');
     }
 
-    if (roleFilter === 'SUPERVISOR') {
-      const maxTotal = Math.max(0, ...rows.map((row) => row.total));
-      rows = rows.map((row) => ({
-        ...row,
-        performance: maxTotal > 0 ? (row.total / maxTotal) * 100 : null,
-      }));
-    }
-
     return [...rows].sort((a, b) => (b.performance ?? -1) - (a.performance ?? -1));
   }, [roleFilter, employeeRows, buildUlbOfficerRows, buildActionOfficerRows, buildInspectionRows]);
+
+  /*
+   * The drawer's own date filter: reload records for another range and
+   * rebuild this user's row exactly as the table does (same module
+   * filter, matching and Daroga relative score).
+   */
+  const loadRowForRange = useCallback(
+    async (rowKey: string, rangeFrom: string, rangeTo: string) => {
+      if (roleFilter !== 'SUPERVISOR' && roleFilter !== 'QC' && roleFilter !== 'ACTION_OFFICER') return null;
+
+      const moduleRecords = await Promise.all(
+        INSPECTION_MODULES.map((module) =>
+          loadAllModuleRecords(module.key, rangeFrom || undefined, rangeTo || undefined).then((rows) =>
+            rows.map((row: any) => ({ ...row, dashboardModule: module.key, dashboardModuleLabel: module.label }))
+          )
+        )
+      );
+
+      const rangeRecords = moduleRecords
+        .flat()
+        .filter((record: any) => record.type !== 'BIN_REGISTRATION')
+        .filter((record: any) => moduleFilter === 'ALL' || record.dashboardModule === moduleFilter);
+
+      if (roleFilter === 'ACTION_OFFICER') {
+        const iecData = (
+          await CityUserApi.iecPerformance({ startDate: rangeStartIso(rangeFrom), endDate: rangeEndIso(rangeTo) })
+        ).users;
+        return buildActionOfficerRows(rangeRecords, iecData).find((row) => row.key === rowKey) || null;
+      }
+
+      const siData =
+        roleFilter === 'QC'
+          ? (await CityUserApi.siPerformance({ startDate: rangeStartIso(rangeFrom), endDate: rangeEndIso(rangeTo) })).users
+          : undefined;
+      const darogaData =
+        roleFilter === 'SUPERVISOR'
+          ? (await CityUserApi.darogaPerformance(performanceRangeParams(rangeFrom, rangeTo))).users
+          : undefined;
+
+      const rows = buildInspectionRows(roleFilter, rangeRecords, siData, darogaData);
+      return rows.find((row) => row.key === rowKey) || null;
+    },
+    [roleFilter, moduleFilter, buildInspectionRows, buildActionOfficerRows]
+  );
 
   const filteredRows = useMemo(() => {
     const query = normalize(search);
@@ -2256,6 +3173,10 @@ export default function UserPerformancePage() {
             roleKey={roleFilter}
             fromDate={appliedFrom}
             toDate={appliedTo}
+            loadRowForRange={loadRowForRange}
+            assetsStatus={darogaStatus}
+            siStatus={siStatus}
+            iecStatus={iecStatus}
             allRecords={filteredRecords}
             onClose={() => setActiveRow(null)}
             onOpenRecord={setProofRecord}
