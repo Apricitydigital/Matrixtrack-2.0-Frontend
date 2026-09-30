@@ -131,6 +131,7 @@ export default function ModuleStatusBarChart({
 
         <Bar
           dataKey="Approved"
+          name="Clean"
           stackId="status"
           fill="url(#approvedGradient)"
           isAnimationActive
@@ -139,6 +140,7 @@ export default function ModuleStatusBarChart({
 
         <Bar
           dataKey="Rejected"
+          name="Not Clean"
           stackId="status"
           fill="url(#rejectedGradient)"
           isAnimationActive
@@ -147,6 +149,7 @@ export default function ModuleStatusBarChart({
 
         <Bar
           dataKey="Pending Action"
+          name="Attention Required"
           stackId="status"
           fill="url(#actionRequiredGradient)"
           isAnimationActive
@@ -155,6 +158,7 @@ export default function ModuleStatusBarChart({
 
         <Bar
           dataKey="Action Taken"
+          name="Resolved"
           stackId="status"
           fill="url(#actionTakenGradient)"
           isAnimationActive
@@ -163,6 +167,7 @@ export default function ModuleStatusBarChart({
 
         <Bar
           dataKey="Pending SI"
+          name="Pending Review"
           stackId="status"
           fill="#38bdf8"
           radius={[0, 10, 10, 0]}

@@ -163,12 +163,31 @@ export default function UniversalReportModal({
         || resolvePersonName(record.createdBy)
         || resolvePersonName(record.createdByName)
         || resolvePersonName(record.requestedBy)
-        || resolvePersonName(record.assignedEmployee)
+
         || resolvePersonName(record.payload?.submittedBy)
         || resolvePersonName(record.payload?.supervisor)
         || 'Daroga';
 
-    const submitterPhone = record.phone || record.supervisor?.phone || record.employee?.phone || record.user?.phone || '';
+
+    /*
+     * Sweeping field employee / Health Worker.
+     *
+     * Keep this separate from the Daroga submitter.
+     * Try all currently observed assignment shapes.
+     */
+    const sweepingEmployeeName =
+        resolvePersonName(record.employee)
+        || resolvePersonName(record.assignedEmployee)
+        || resolvePersonName(record.assignedWorker)
+        || resolvePersonName(record.healthWorker)
+        || resolvePersonName(record.payload?.employee)
+        || resolvePersonName(record.payload?.assignedEmployee)
+        || resolvePersonName(record.beat?.assignedEmployee)
+        || resolvePersonName(record.beat?.employee)
+        || null;
+
+
+const submitterPhone = record.phone || record.supervisor?.phone || record.employee?.phone || record.user?.phone || '';
 
     const titleLower = (moduleTitle || '').toLowerCase();
     const isSweepingModule = titleLower.includes('sweeping') || titleLower.includes('beat');
@@ -450,7 +469,13 @@ export default function UniversalReportModal({
         reviewerRoleText = '';
     }
 
-    const reviewedAtRaw = record.reviewedAt || record.approvedAt || record.updatedAt || null;
+    const reviewedAtRaw =
+        record.qcReviewedAt ||
+        record.reviewedAt ||
+        record.payload?.reviewedAt ||
+        record.payload?.qcReviewedAt ||
+        record.approvedAt ||
+        null;
     const formattedReviewedAt = reviewedAtRaw ? new Date(reviewedAtRaw).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
 
 
@@ -847,8 +872,54 @@ export default function UniversalReportModal({
     const siReviewedAt =
         formatAuditDateTime(
             record.qcReviewedAt ||
-            record.reviewedAt
+            record.reviewedAt ||
+            record.payload?.reviewedAt ||
+            record.payload?.qcReviewedAt
         );
+
+    if (
+        typeof window !== 'undefined' &&
+        String(record?.dashboardModule || '').toUpperCase() === 'LITTERBINS'
+    ) {
+        console.log(
+            'LITTER BIN REVIEW DEBUG',
+            {
+                id: record?.id,
+                dashboardModule: record?.dashboardModule,
+
+                qcDecision: record?.qcDecision,
+                qcReviewedAt: record?.qcReviewedAt,
+                reviewedAt: record?.reviewedAt,
+
+                reviewedByQc: record?.reviewedByQc,
+                reviewedByQcId: record?.reviewedByQcId,
+
+                qcReviewer: record?.qcReviewer,
+                qcReviewerId: record?.qcReviewerId,
+
+                assignedQc: record?.assignedQc,
+                assignedQcId: record?.assignedQcId,
+
+                approvedBy: record?.approvedBy,
+                approvedById: record?.approvedById,
+
+                payloadReviewedAt:
+                    record?.payload?.reviewedAt,
+
+                payloadQcReviewedAt:
+                    record?.payload?.qcReviewedAt,
+
+                payloadReviewedByQc:
+                    record?.payload?.reviewedByQc,
+
+                payloadReviewedByQcId:
+                    record?.payload?.reviewedByQcId,
+
+                createdAt: record?.createdAt,
+                submittedAt: record?.submittedAt,
+            }
+        );
+    }
 
     const ulbReviewedAt =
         formatAuditDateTime(
@@ -2925,6 +2996,14 @@ return createPortal(
                                         <MetaRow label="Zone" value={zoneName} />
                                         <MetaRow label="Ward" value={wardName} />
                                         {beatName && <MetaRow label="Beat" value={beatName} />}
+
+                                {isSweepingModule &&
+                                  sweepingEmployeeName && (
+                                    <MetaRow
+                                      label="Health Worker"
+                                      value={sweepingEmployeeName}
+                                    />
+                                  )}
                                         {areaDetail && <MetaRow label="Area" value={areaDetail} />}
                                         {segmentId && <MetaRow label="Segment" value={segmentId} />}
                                         {assetType && <MetaRow label="Asset Type" value={String(assetType)} />}

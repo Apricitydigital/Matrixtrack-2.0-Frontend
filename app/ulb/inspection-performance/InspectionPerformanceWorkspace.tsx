@@ -351,6 +351,28 @@ function submittedByName(item: any) {
   );
 }
 
+function qcReviewerName(item: any) {
+  const reviewer =
+    item?.reviewedByQc ||
+    item?.reviewedBy ||
+    item?.qcReviewedBy ||
+    item?.qcReviewer ||
+    item?.qcReviewedByUser ||
+    null;
+
+  if (typeof reviewer === 'string') {
+    return reviewer;
+  }
+
+  return (
+    reviewer?.name ||
+    item?.reviewedByName ||
+    item?.qcReviewedByName ||
+    item?.qcReviewerName ||
+    ''
+  );
+}
+
 function reportTimestamp(item: any) {
   /*
    * createdAt is the original submission date and never moves, so
@@ -413,8 +435,8 @@ function normalizeImages(values: any[]) {
   return resolveMediaUrls(values);
 }
 
-function displayAnswer(value: any) {
-  if (value === null || value === undefined || value === '') return '—';
+function displayAnswer(value: any, emptyText = '—') {
+  if (value === null || value === undefined || value === '') return emptyText;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'string' || typeof value === 'number') return String(value);
 
@@ -479,7 +501,13 @@ function extractAnswers(item: any): AnswerRow[] {
 
       return {
         question: String(question),
-        answer: displayAnswer(answer ?? raw),
+        answer: displayAnswer(
+          answer,
+          String(raw.section || '').toLowerCase() === 'remarks' ||
+          String(question || '').toLowerCase().includes('remark')
+            ? 'No remarks provided'
+            : '—'
+        ),
         photos,
         section: raw.section || raw.category || raw.group || undefined,
       };
@@ -1916,20 +1944,20 @@ export default function InspectionPerformanceWorkspace() {
 
       {imagePreview && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setImagePreview(null)}
         >
           <button
             type="button"
             onClick={() => setImagePreview(null)}
-            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+            className="fixed right-5 top-5 z-[20001] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
           >
             <X className="h-5 w-5" />
           </button>
           <img
             src={imagePreview}
             alt="Inspection evidence"
-            className="max-h-full max-w-full rounded-xl object-contain"
+            className="max-h-[90vh] max-w-[92vw] rounded-xl object-contain shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           />
         </div>,
@@ -2583,7 +2611,7 @@ function ReportJourneySection({
       icon: Clock3,
       title: 'Submitted',
       time: formatFullDate(report?.createdAt || report?.submittedAt || report?.visitedAt),
-      description: 'Daroga submitted report',
+      description: `${submittedByName(report)} submitted report`,
     },
   ];
 
@@ -2606,7 +2634,13 @@ function ReportJourneySection({
       icon: ShieldCheck,
       title: 'SI Review',
       time: formatFullDate(report?.qcReviewedAt || report?.reviewedAt),
-      description: qcDecision === 'REJECTED' ? 'Rejected' : 'Approved',
+      description: qcReviewerName(report)
+        ? `${qcReviewerName(report)} • ${
+            qcDecision === 'REJECTED' ? 'Rejected' : 'Approved'
+          }`
+        : qcDecision === 'REJECTED'
+          ? 'Rejected'
+          : 'Approved',
       descriptionColor: qcDecision === 'REJECTED' ? 'text-rose-600' : 'text-emerald-600',
     });
   }
