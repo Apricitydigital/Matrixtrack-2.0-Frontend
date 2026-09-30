@@ -80,7 +80,20 @@ import {
   CityUserApi,
   GeoApi,
   ModuleRecordsApi,
+  type DarogaPerformance,
+  type IecPerformance,
+  type SiPerformance,
 } from '@lib/apiClient';
+import {
+  darogaScore,
+  iecScore,
+  performanceRangeParams,
+  restrictDarogaModules,
+  restrictIecModules,
+  restrictSiModules,
+  scoreModuleFilter,
+  siScore,
+} from '@lib/userPerformanceScores';
 
 import {
   AttendanceApi,
@@ -173,7 +186,8 @@ type RolePerformanceRow = {
   actionTaken: number;
   pending: number;
 
-  performance: number;
+  /** null = not applicable (nothing assigned / nothing to review). */
+  performance: number | null;
   records: DashboardRecord[];
 
   requiredInspections?: number;
@@ -10992,6 +11006,42 @@ const [
    * being silently dropped, which used to make this widget's counts
    * disagree with the Registered Users Directory.
    */
+  /*
+   * Team Leaderboard scores come from the same backend endpoints and
+   * formulas as the User Performance page (lib/userPerformanceScores),
+   * so both screens always show the same % for the same person.
+   */
+  const [roleScores, setRoleScores] = useState<{
+    daroga: Record<string, DarogaPerformance> | null;
+    si: Record<string, SiPerformance> | null;
+    iec: Record<string, IecPerformance> | null;
+  }>({ daroga: null, si: null, iec: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    const range = performanceRangeParams(appliedFrom || undefined, appliedTo || undefined);
+
+    Promise.allSettled([
+      CityUserApi.darogaPerformance(range),
+      CityUserApi.siPerformance(range),
+      CityUserApi.iecPerformance(range),
+    ]).then(([daroga, si, iec]) => {
+      if (cancelled) return;
+      [daroga, si, iec].forEach((result) => {
+        if (result.status === 'rejected') console.error('Failed to load Team Leaderboard scores', result.reason);
+      });
+      setRoleScores({
+        daroga: daroga.status === 'fulfilled' ? daroga.value.users || {} : null,
+        si: si.status === 'fulfilled' ? si.value.users || {} : null,
+        iec: iec.status === 'fulfilled' ? iec.value.users || {} : null,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedFrom, appliedTo]);
+
   const buildRoleRows =
     useCallback(
       (
@@ -11177,18 +11227,39 @@ const [
         roleRequiredByModule.LITTERBINS +
         roleRequiredByModule.SWEEPING;
 
-      const roleCleanAchieved =
-        stats.goodOutcome;
+      /*
+       * Same score as the User Performance page (backend + shared formula):
+       * Daroga = asset-days inspected / required, SI = reviewed /
+       * (reviewed + pending), IEC = resolved / attention required.
+       */
+      const scoreModule =
+        scoreModuleFilter(
+          moduleFilter
+        );
+
+      const darogaCoverage =
+        role === 'SUPERVISOR' &&
+        roleScores.daroga?.[person.id]
+          ? restrictDarogaModules(
+              roleScores.daroga[person.id],
+              scoreModule
+            )
+          : null;
 
       const roleCoveragePerformance =
-        roleRequiredInspections > 0
-          ? clamp(
-              (
-                roleCleanAchieved /
-                roleRequiredInspections
-              ) * 100
-            )
-          : 0;
+        role === 'SUPERVISOR'
+          ? darogaScore(darogaCoverage)
+          : role === 'QC'
+            ? siScore(
+                roleScores.si?.[person.id]
+                  ? restrictSiModules(roleScores.si[person.id], scoreModule)
+                  : null
+              )
+            : iecScore(
+                roleScores.iec?.[person.id]
+                  ? restrictIecModules(roleScores.iec[person.id], scoreModule)
+                  : null
+              );
 
       const attendanceEmployee =
               attendanceEmployeeByUserId.get(String(person.id)) || null;
@@ -11214,15 +11285,24 @@ const [
               matchedRecords,
 
             requiredInspections:
-              roleRequiredInspections,
+              darogaCoverage
+                ? darogaCoverage.required ?? 0
+                : roleRequiredInspections,
 
             requiredByModule:
-              roleRequiredByModule,
+              darogaCoverage
+                ? {
+                    TOILET: darogaCoverage.modules.TOILET.required ?? 0,
+                    LITTERBINS: darogaCoverage.modules.LITTERBINS.required ?? 0,
+                    SWEEPING: darogaCoverage.modules.SWEEPING.required ?? 0,
+                  }
+                : roleRequiredByModule,
 
             attendanceEmployee,
             } satisfies RolePerformanceRow;
           })
-          .sort((a, b) => b.performance - a.performance);
+          // Not-applicable scores (nothing assigned / nothing to review) go last.
+          .sort((a, b) => (b.performance ?? -1) - (a.performance ?? -1));
       },
       [
         cityUsersByRole,
@@ -11230,6 +11310,8 @@ const [
         attendanceEmployeeByUserId,
         geoNameById,
         requiredInspectionsFor,
+        roleScores,
+        moduleFilter,
       ]
     );
 
@@ -14725,11 +14807,11 @@ setDrilldown({
                       style={{
                         width:
                           `${clamp(
-                            row.performance
+                            row.performance ?? 0
                           )}%`,
                         background:
                           `linear-gradient(90deg,#c7d2fe,${positiveColor(
-                            row.performance
+                            row.performance ?? 0
                           )})`,
                       }}
                     />
@@ -14739,7 +14821,7 @@ setDrilldown({
                       style={{
                         left:
                           `calc(${clamp(
-                            row.performance
+                            row.performance ?? 0
                           )}% - 8px)`,
                         background:
                           '#4338ca',

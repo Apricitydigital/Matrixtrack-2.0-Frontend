@@ -37,7 +37,7 @@ import {
   ModuleRecordsApi,
   type IecPerformance,
   type SiPerformance,
-  type UserAssignedAssets,
+  type DarogaPerformance,
   type UserWorkSummaryResponse,
 } from '@lib/apiClient';
 
@@ -47,6 +47,15 @@ import {
   type AttendanceEmployeeSummary,
 } from '@lib/attendanceApi';
 import ModalPortal from "@components/ui/ModalPortal";
+import {
+  darogaScore,
+  iecScore,
+  performanceRangeParams,
+  restrictDarogaModules,
+  restrictIecModules,
+  restrictSiModules,
+  siScore,
+} from '@lib/userPerformanceScores';
 
 
 /* =========================================================
@@ -245,13 +254,6 @@ function submittedDate(item: any) {
   return item?.submittedAt || item?.inspectionDate || item?.reportDate || item?.createdAt || item?.visitedAt || null;
 }
 
-function submittedDateKey(item: any) {
-  const raw = submittedDate(item);
-  if (!raw) return '';
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? '' : toDateInput(parsed);
-}
-
 /* -------- Inspection workflow (same cards as the Commissioner dashboard) -------- */
 
 type WorkflowKey = 'ALL' | 'APPROVED' | 'REJECTED' | 'PENDING' | 'ACTION_REQUIRED' | 'ACTION_TAKEN' | 'PENDING_ACTION';
@@ -334,121 +336,12 @@ function matchesWorkflow(item: any, key: WorkflowKey) {
   }
 }
 
-/* -------- Required vs completed inspections (Daroga) -------- */
-
-/** Days in [from, to] that have started, so future days aren't "required" yet. */
-function elapsedDaysInRange(from: string, to: string) {
-  if (!from || !to) return null;
-  const start = new Date(`${from}T00:00:00`);
-  const todayStart = new Date(`${toDateInput(new Date())}T00:00:00`);
-  const endRaw = new Date(`${to}T00:00:00`);
-  const end = endRaw > todayStart ? todayStart : endRaw;
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-  if (end < start) return 0;
-  return Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
-}
-
-/** Sweeping point indexes in a record (same rule as the Commissioner dashboard). */
-function sweepingPointIndexes(item: any) {
-  const points = new Set<number>();
-  (Array.isArray(item?.payload?.points) ? item.payload.points : []).forEach((point: any) => {
-    const index = Number(point?.pointIndex);
-    if (Number.isInteger(index) && index >= 0) points.add(index);
-  });
-  const direct = Number(item?.payload?.pointIndex);
-  if (Number.isInteger(direct) && direct >= 0) points.add(direct);
-  if (points.size === 0) points.add(0);
-  return points;
-}
-
-/*
- * Completed = distinct assigned asset-days inspected. A Beat-day counts
- * only once >= 3 of its points are assessed (backend business rule).
- */
-function completedAssetDays(records: DashboardRecord[], module: InspectionModuleKey, assignedIds: Set<string>) {
-  const assetIdOf = (item: any) =>
-    module === 'TOILET'
-      ? item?.toiletId || item?.toilet?.id
-      : module === 'LITTERBINS'
-      ? item?.binId || item?.bin?.id
-      : item?.beatId || item?.beat?.id;
-
-  const groups = new Map<string, Set<number>>();
-  records.forEach((item) => {
-    if (item.dashboardModule !== module || effectiveStatus(item) === 'DRAFT') return;
-    const assetId = assetIdOf(item);
-    const day = submittedDateKey(item);
-    if (!assetId || !day || !assignedIds.has(String(assetId))) return;
-    const key = `${assetId}::${day}`;
-    const bucket = groups.get(key) || new Set<number>();
-    if (module === 'SWEEPING') sweepingPointIndexes(item).forEach((point) => bucket.add(point));
-    groups.set(key, bucket);
-  });
-
-  if (module !== 'SWEEPING') return groups.size;
-  let completed = 0;
-  groups.forEach((points) => {
-    if (points.size >= 3) completed += 1;
-  });
-  return completed;
-}
-
-type DarogaCoverage = {
-  /** Days in the range that count (future days excluded); null = no range. */
-  days: number | null;
-  modules: Record<InspectionModuleKey, { assigned: number; required: number | null; completed: number }>;
-  /** Assigned assets x days. */
-  required: number | null;
-  /** Assigned asset-days inspected by this Daroga. */
-  completed: number;
-  /** completed / required, null when nothing is required. */
-  performance: number | null;
-};
-
-const MODULE_ASSET_KEY: Record<InspectionModuleKey, keyof UserAssignedAssets> = {
-  TOILET: 'toilets',
-  LITTERBINS: 'litterBins',
-  SWEEPING: 'beats',
-};
-
-/*
- * Daroga performance: every assigned asset must be inspected every day.
- *   required  = assigned assets x days in range
- *   completed = assigned asset-days inspected (see completedAssetDays)
- *   score     = completed / required
- */
-function darogaCoverage(
-  records: DashboardRecord[],
-  assets: UserAssignedAssets,
-  from: string,
-  to: string
-): DarogaCoverage {
-  const days = elapsedDaysInRange(from, to);
-  const modules = {} as DarogaCoverage['modules'];
-  let required = 0;
-  let completed = 0;
-
-  INSPECTION_MODULES.forEach(({ key }) => {
-    const assignedIds = new Set((assets[MODULE_ASSET_KEY[key]] || []).map(String));
-    const moduleRequired = days === null ? null : assignedIds.size * days;
-    const moduleCompleted = completedAssetDays(records, key, assignedIds);
-    modules[key] = { assigned: assignedIds.size, required: moduleRequired, completed: moduleCompleted };
-    required += moduleRequired || 0;
-    completed += moduleCompleted;
-  });
-
-  return {
-    days,
-    modules,
-    required: days === null ? null : required,
-    completed,
-    performance: days !== null && required > 0 ? clamp((completed / required) * 100) : null,
-  };
-}
+/* Daroga required vs completed inspections come from the backend (shared with the Team Leaderboard). */
+type DarogaCoverage = DarogaPerformance;
 
 /* -------- Sanitary Inspector (QC) scope and decisions -------- */
 
-type SiBucketKey = 'reports' | 'cleaned' | 'notCleaned' | 'pendingReview';
+type SiBucketKey = 'reports' | 'cleaned' | 'notCleaned' | 'pendingReview' | 'carriedOverPending';
 
 const SI_WORKFLOW_BUCKET: Partial<Record<WorkflowKey, SiBucketKey>> = {
   ALL: 'reports',
@@ -468,6 +361,7 @@ function siBucketKeys(si: SiPerformance | null | undefined) {
     cleaned: new Set(),
     notCleaned: new Set(),
     pendingReview: new Set(),
+    carriedOverPending: new Set(),
   };
   if (!si) return keys;
   INSPECTION_MODULES.forEach(({ key: module }) => {
@@ -478,23 +372,9 @@ function siBucketKeys(si: SiPerformance | null | undefined) {
   return keys;
 }
 
-/** Keep only the modules the page's module filter allows. */
-function restrictSiModules(si: SiPerformance, moduleFilter: 'ALL' | InspectionModuleKey): SiPerformance {
-  if (moduleFilter === 'ALL') return si;
-  const empty = { reports: [], cleaned: [], notCleaned: [], pendingReview: [] };
-  return {
-    ...si,
-    modules: {
-      TOILET: moduleFilter === 'TOILET' ? si.modules.TOILET : empty,
-      LITTERBINS: moduleFilter === 'LITTERBINS' ? si.modules.LITTERBINS : empty,
-      SWEEPING: moduleFilter === 'SWEEPING' ? si.modules.SWEEPING : empty,
-    },
-  };
-}
-
 /* -------- IEC Member (Action Officer) action cycle -------- */
 
-type IecBucketKey = 'attentionRequired' | 'resolved' | 'resolutionPending';
+type IecBucketKey = 'attentionRequired' | 'resolved' | 'resolutionPending' | 'carriedOverPending';
 
 const IEC_WORKFLOW_BUCKET: Partial<Record<WorkflowKey, IecBucketKey>> = {
   ACTION_REQUIRED: 'attentionRequired',
@@ -507,6 +387,7 @@ function iecBucketKeys(iec: IecPerformance | null | undefined) {
     attentionRequired: new Set(),
     resolved: new Set(),
     resolutionPending: new Set(),
+    carriedOverPending: new Set(),
   };
   if (!iec) return keys;
   INSPECTION_MODULES.forEach(({ key: module }) => {
@@ -515,20 +396,6 @@ function iecBucketKeys(iec: IecPerformance | null | undefined) {
     );
   });
   return keys;
-}
-
-/** Keep only the modules the page's module filter allows. */
-function restrictIecModules(iec: IecPerformance, moduleFilter: 'ALL' | InspectionModuleKey): IecPerformance {
-  if (moduleFilter === 'ALL') return iec;
-  const empty = { attentionRequired: [], resolved: [], resolutionPending: [] };
-  return {
-    ...iec,
-    modules: {
-      TOILET: moduleFilter === 'TOILET' ? iec.modules.TOILET : empty,
-      LITTERBINS: moduleFilter === 'LITTERBINS' ? iec.modules.LITTERBINS : empty,
-      SWEEPING: moduleFilter === 'SWEEPING' ? iec.modules.SWEEPING : empty,
-    },
-  };
 }
 
 /* The API filters on exact timestamps, so send the full local day. */
@@ -1248,6 +1115,7 @@ function UserDetailDrawer({
             required: null,
             completed: buckets.resolved.length,
             performance: attention ? (buckets.resolved.length / attention) * 100 : null,
+            workload: null,
             pendingInspection: null,
             reports: attention,
             approved: 0,
@@ -1259,12 +1127,14 @@ function UserDetailDrawer({
         if (si) {
           const buckets = si.modules[module.key];
           const reviewed = buckets.cleaned.length + buckets.notCleaned.length;
+          const workload = reviewed + buckets.pendingReview.length;
           return {
             ...module,
             assigned: null,
             required: null,
             completed: reviewed,
-            performance: buckets.reports.length ? (reviewed / buckets.reports.length) * 100 : null,
+            performance: workload ? (reviewed / workload) * 100 : null,
+            workload,
             pendingInspection: null,
             reports: buckets.reports.length,
             approved: buckets.cleaned.length,
@@ -1280,6 +1150,7 @@ function UserDetailDrawer({
           completed,
           performance: required ? clamp((completed / required) * 100) : null,
           pendingInspection: required !== null ? Math.max(required - completed, 0) : null,
+          workload: null,
           reports: records.length,
           approved: count('APPROVED'),
           rejected: count('REJECTED'),
@@ -1757,6 +1628,24 @@ function UserDetailDrawer({
                 ))}
               </div>
 
+              {roleKey === 'ACTION_OFFICER' && iecKeys.carriedOverPending.size > 0 && (
+                <div className="mt-2 text-[9px] font-semibold text-slate-400">
+                  Attention Required and Resolution Pending include {iecKeys.carriedOverPending.size.toLocaleString('en-IN')} older{' '}
+                  {iecKeys.carriedOverPending.size === 1 ? 'report' : 'reports'} submitted before this date range that{' '}
+                  {iecKeys.carriedOverPending.size === 1 ? 'is' : 'are'} still unresolved (not listed in the Data Table).
+                  Performance = resolved ÷ attention required.
+                </div>
+              )}
+
+              {roleKey === 'QC' && siKeys.carriedOverPending.size > 0 && (
+                <div className="mt-2 text-[9px] font-semibold text-slate-400">
+                  Pending Review includes {siKeys.carriedOverPending.size.toLocaleString('en-IN')} older{' '}
+                  {siKeys.carriedOverPending.size === 1 ? 'report' : 'reports'} submitted before this date range that{' '}
+                  {siKeys.carriedOverPending.size === 1 ? 'is' : 'are'} still waiting for review (not listed in the Data Table).
+                  Performance = reviewed ÷ (reviewed + pending review).
+                </div>
+              )}
+
               {roleKey === 'SUPERVISOR' && legacyReviewedCount > 0 && (
                 <div className="mt-2 text-[9px] font-semibold text-slate-400">
                   {legacyReviewedCount.toLocaleString('en-IN')} older escalated{' '}
@@ -1791,7 +1680,7 @@ function UserDetailDrawer({
                             ? 'Completed / required inspections'
                             : roleKey === 'ACTION_OFFICER'
                             ? 'Resolved / attention required'
-                            : 'Reviewed / total reports'
+                            : 'Reviewed / (reviewed + pending review)'
                         }
                       >
                         {roleKey === 'ACTION_OFFICER' ? (
@@ -1810,7 +1699,7 @@ function UserDetailDrawer({
                           <>
                             {siCountText(si ? module.completed : null)}
                             {' / '}
-                            {siCountText(si ? module.reports : null)}
+                            {siCountText(si ? module.workload : null)}
                           </>
                         )}
                       </div>
@@ -2260,9 +2149,9 @@ export default function UserPerformancePage() {
    */
   const [cityUsers, setCityUsers] = useState<CityUserSummary[]>([]);
   const [geoNameById, setGeoNameById] = useState<Map<string, string>>(new Map());
-  // Every Daroga's assigned beats / toilets / litter bins, for coverage scoring.
-  const [darogaAssets, setDarogaAssets] = useState<Record<string, UserAssignedAssets> | null>(null);
-  const [darogaAssetsStatus, setDarogaAssetsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  // Daroga required vs completed inspections for the applied date range.
+  const [darogaPerformance, setDarogaPerformance] = useState<Record<string, DarogaPerformance> | null>(null);
+  const [darogaStatus, setDarogaStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   // Sanitary Inspector scope totals + decisions for the applied date range.
   const [siPerformance, setSiPerformance] = useState<Record<string, SiPerformance> | null>(null);
   const [siStatus, setSiStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -2274,25 +2163,16 @@ export default function UserPerformancePage() {
     let cancelled = false;
 
     (async () => {
-      const [usersResult, zonesResult, wardsResult, assetsResult] = await Promise.allSettled([
+      const [usersResult, zonesResult, wardsResult] = await Promise.allSettled([
         CityUserApi.list(),
         GeoApi.list('ZONE'),
         GeoApi.list('WARD'),
-        CityUserApi.assignedAssets('SUPERVISOR'),
       ]);
 
       if (cancelled) return;
 
       if (usersResult.status === 'fulfilled') {
         setCityUsers(usersResult.value.users || []);
-      }
-
-      if (assetsResult.status === 'fulfilled') {
-        setDarogaAssets(assetsResult.value.users || {});
-        setDarogaAssetsStatus('ready');
-      } else {
-        console.error('Failed to load Daroga assigned assets', assetsResult.reason);
-        setDarogaAssetsStatus('error');
       }
 
       const nameMap = new Map<string, string>();
@@ -2328,8 +2208,9 @@ export default function UserPerformancePage() {
       setLoadError(false);
       setSiStatus('loading');
       setIecStatus('loading');
+      setDarogaStatus('loading');
 
-      const [moduleResult, attendanceResult, siResult, iecResult] = await Promise.allSettled([
+      const [moduleResult, attendanceResult, siResult, iecResult, darogaResult] = await Promise.allSettled([
         Promise.all(
           INSPECTION_MODULES.map((module) =>
             loadAllModuleRecords(module.key, appliedFrom || undefined, appliedTo || undefined).then(
@@ -2352,7 +2233,17 @@ export default function UserPerformancePage() {
         }),
         CityUserApi.siPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) }),
         CityUserApi.iecPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) }),
+        CityUserApi.darogaPerformance(performanceRangeParams(appliedFrom, appliedTo)),
       ]);
+
+      if (darogaResult.status === 'fulfilled') {
+        setDarogaPerformance(darogaResult.value.users || {});
+        setDarogaStatus('ready');
+      } else {
+        console.error('Failed to load Daroga performance', darogaResult.reason);
+        setDarogaPerformance(null);
+        setDarogaStatus('error');
+      }
 
       if (iecResult.status === 'fulfilled') {
         setIecPerformance(iecResult.value.users || {});
@@ -2419,9 +2310,8 @@ export default function UserPerformancePage() {
     (
       role: 'SUPERVISOR' | 'QC',
       sourceRecords: DashboardRecord[] = filteredRecords,
-      rangeFrom: string = appliedFrom,
-      rangeTo: string = appliedTo,
-      siData: Record<string, SiPerformance> | null = siPerformance
+      siData: Record<string, SiPerformance> | null = siPerformance,
+      darogaData: Record<string, DarogaPerformance> | null = darogaPerformance
     ): UserPerformanceRow[] => {
       const roster = cityUsersByRole.get(role) || [];
 
@@ -2462,17 +2352,11 @@ export default function UserPerformancePage() {
           if (item.dashboardModuleLabel) modules.add(item.dashboardModuleLabel);
         });
 
-        const assets = role === 'SUPERVISOR' ? darogaAssets?.[person.id] : undefined;
-        const coverage = assets ? darogaCoverage(matchedRecords, assets, rangeFrom, rangeTo) : null;
+        const darogaFull = role === 'SUPERVISOR' ? darogaData?.[person.id] : undefined;
+        const coverage = darogaFull ? restrictDarogaModules(darogaFull, moduleFilter) : null;
 
-        // SI: share of in-scope reports they have reviewed (cleaned + not cleaned).
-        const siReviewed = siKeys.cleaned.size + siKeys.notCleaned.size;
-        const performance =
-          role === 'QC'
-            ? siKeys.reports.size > 0
-              ? (siReviewed / siKeys.reports.size) * 100
-              : null
-            : coverage?.performance ?? null;
+        // Shared with the Team Leaderboard (lib/userPerformanceScores).
+        const performance = role === 'QC' ? siScore(si) : darogaScore(coverage);
 
         return {
           key: `${role}-${person.id}`,
@@ -2496,7 +2380,7 @@ export default function UserPerformancePage() {
         };
       });
     },
-    [cityUsersByRole, filteredRecords, attendance, darogaAssets, appliedFrom, appliedTo, siPerformance, moduleFilter]
+    [cityUsersByRole, filteredRecords, attendance, darogaPerformance, siPerformance, moduleFilter]
   );
 
   const employeeRows = useMemo<UserPerformanceRow[]>(() => {
@@ -2648,7 +2532,7 @@ export default function UserPerformancePage() {
           actionRequired: keys.resolutionPending.size,
           actionTaken: keys.resolved.size,
           pending: stats.pending,
-          performance: attention > 0 ? (keys.resolved.size / attention) * 100 : null,
+          performance: iecScore(iec),
           records: matchedRecords,
           attendance: attendanceEmployee?.attendanceRate ?? null,
           attendanceEmployee,
@@ -2720,8 +2604,12 @@ export default function UserPerformancePage() {
         roleFilter === 'QC'
           ? (await CityUserApi.siPerformance({ startDate: rangeStartIso(rangeFrom), endDate: rangeEndIso(rangeTo) })).users
           : undefined;
+      const darogaData =
+        roleFilter === 'SUPERVISOR'
+          ? (await CityUserApi.darogaPerformance(performanceRangeParams(rangeFrom, rangeTo))).users
+          : undefined;
 
-      const rows = buildInspectionRows(roleFilter, rangeRecords, rangeFrom, rangeTo, siData);
+      const rows = buildInspectionRows(roleFilter, rangeRecords, siData, darogaData);
       return rows.find((row) => row.key === rowKey) || null;
     },
     [roleFilter, moduleFilter, buildInspectionRows, buildActionOfficerRows]
@@ -3286,7 +3174,7 @@ export default function UserPerformancePage() {
             fromDate={appliedFrom}
             toDate={appliedTo}
             loadRowForRange={loadRowForRange}
-            assetsStatus={darogaAssetsStatus}
+            assetsStatus={darogaStatus}
             siStatus={siStatus}
             iecStatus={iecStatus}
             allRecords={filteredRecords}

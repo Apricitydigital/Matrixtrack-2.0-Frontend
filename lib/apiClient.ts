@@ -907,6 +907,14 @@ export const CityUserApi = {
   remove: (id: string) => apiFetch<{ success: boolean }>(`/city/users/${id}`, { method: "DELETE" }),
   workSummary: (id: string) =>
     apiFetch<UserWorkSummaryResponse>(`/city/users/${id}/work-summary`),
+  darogaPerformance: (range: { startDate?: string; endDate?: string; tzOffset?: number }) => {
+    const params = new URLSearchParams();
+    if (range.startDate) params.append("startDate", range.startDate);
+    if (range.endDate) params.append("endDate", range.endDate);
+    if (range.tzOffset !== undefined) params.append("tzOffset", String(range.tzOffset));
+    const query = params.toString();
+    return apiFetch<{ users: Record<string, DarogaPerformance> }>(`/city/users/daroga-performance${query ? `?${query}` : ""}`);
+  },
   iecPerformance: (range: { startDate?: string; endDate?: string }) => {
     const params = new URLSearchParams();
     if (range.startDate) params.append("startDate", range.startDate);
@@ -921,10 +929,6 @@ export const CityUserApi = {
     const query = params.toString();
     return apiFetch<{ users: Record<string, SiPerformance> }>(`/city/users/si-performance${query ? `?${query}` : ""}`);
   },
-  assignedAssets: (role: string) =>
-    apiFetch<{ users: Record<string, UserAssignedAssets> }>(
-      `/city/users/assigned-assets?${new URLSearchParams({ role })}`
-    ),
   assignmentOptions: (id: string, type: UserAssignmentType, role: string) =>
     apiFetch<{ items: UserAssignmentOption[] }>(`/city/users/${encodeURIComponent(id)}/assignments/options?${new URLSearchParams({ type, role })}`),
   addAssignment: (id: string, body: { type: UserAssignmentType; role: string; itemId: string; extendScope?: boolean; enableModule?: boolean; reassign?: boolean; expectedAssigneeIds?: string[] }) =>
@@ -939,7 +943,14 @@ export type UserAssignmentOption = {
 };
 
 /** Report ids in a Sanitary Inspector's scope, split by the SI's decision. */
-export type SiReportBuckets = { reports: string[]; cleaned: string[]; notCleaned: string[]; pendingReview: string[] };
+export type SiReportBuckets = {
+  reports: string[];
+  cleaned: string[];
+  notCleaned: string[];
+  pendingReview: string[];
+  /** Subset of pendingReview submitted before the range start (backlog). */
+  carriedOverPending: string[];
+};
 
 export type SiPerformance = {
   darogas: number;
@@ -947,8 +958,24 @@ export type SiPerformance = {
   modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", SiReportBuckets>;
 };
 
+/** Daroga required vs completed inspections (asset-days) in a date range. */
+export type DarogaPerformance = {
+  /** Days in the range that count (future days excluded); null = no range. */
+  days: number | null;
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", { assigned: number; required: number | null; completed: number }>;
+  required: number | null;
+  completed: number;
+  performance: number | null;
+};
+
 /** Action-cycle report ids in an IEC member's scope. */
-export type IecReportBuckets = { attentionRequired: string[]; resolved: string[]; resolutionPending: string[] };
+export type IecReportBuckets = {
+  attentionRequired: string[];
+  resolved: string[];
+  resolutionPending: string[];
+  /** Subset of resolutionPending sent to action before the range start (backlog). */
+  carriedOverPending: string[];
+};
 
 export type IecPerformance = {
   darogas: number;
@@ -957,8 +984,6 @@ export type IecPerformance = {
   resolvers: Record<string, string | null>;
   resolverNames: Record<string, string>;
 };
-
-export type UserAssignedAssets = { beats: string[]; toilets: string[]; litterBins: string[] };
 
 export type UserWorkSummaryCounts = { total: number; approved: number; completed?: number; pending: number; attention: number };
 
