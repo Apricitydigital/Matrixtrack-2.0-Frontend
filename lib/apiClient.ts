@@ -907,6 +907,24 @@ export const CityUserApi = {
   remove: (id: string) => apiFetch<{ success: boolean }>(`/city/users/${id}`, { method: "DELETE" }),
   workSummary: (id: string) =>
     apiFetch<UserWorkSummaryResponse>(`/city/users/${id}/work-summary`),
+  iecPerformance: (range: { startDate?: string; endDate?: string }) => {
+    const params = new URLSearchParams();
+    if (range.startDate) params.append("startDate", range.startDate);
+    if (range.endDate) params.append("endDate", range.endDate);
+    const query = params.toString();
+    return apiFetch<{ users: Record<string, IecPerformance> }>(`/city/users/iec-performance${query ? `?${query}` : ""}`);
+  },
+  siPerformance: (range: { startDate?: string; endDate?: string }) => {
+    const params = new URLSearchParams();
+    if (range.startDate) params.append("startDate", range.startDate);
+    if (range.endDate) params.append("endDate", range.endDate);
+    const query = params.toString();
+    return apiFetch<{ users: Record<string, SiPerformance> }>(`/city/users/si-performance${query ? `?${query}` : ""}`);
+  },
+  assignedAssets: (role: string) =>
+    apiFetch<{ users: Record<string, UserAssignedAssets> }>(
+      `/city/users/assigned-assets?${new URLSearchParams({ role })}`
+    ),
   assignmentOptions: (id: string, type: UserAssignmentType, role: string) =>
     apiFetch<{ items: UserAssignmentOption[] }>(`/city/users/${encodeURIComponent(id)}/assignments/options?${new URLSearchParams({ type, role })}`),
   addAssignment: (id: string, body: { type: UserAssignmentType; role: string; itemId: string; extendScope?: boolean; enableModule?: boolean; reassign?: boolean; expectedAssigneeIds?: string[] }) =>
@@ -919,6 +937,28 @@ export type UserAssignmentOption = {
   requiresScopeExtension?: boolean; requiresModuleAccess?: boolean; requiresReassignment?: boolean;
   currentAssigneeIds?: string[]; currentAssigneeNames?: string[]; disabledReason?: string;
 };
+
+/** Report ids in a Sanitary Inspector's scope, split by the SI's decision. */
+export type SiReportBuckets = { reports: string[]; cleaned: string[]; notCleaned: string[]; pendingReview: string[] };
+
+export type SiPerformance = {
+  darogas: number;
+  assets: { toilets: number; litterBins: number; beats: number };
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", SiReportBuckets>;
+};
+
+/** Action-cycle report ids in an IEC member's scope. */
+export type IecReportBuckets = { attentionRequired: string[]; resolved: string[]; resolutionPending: string[] };
+
+export type IecPerformance = {
+  darogas: number;
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", IecReportBuckets>;
+  /** Resolver user id per resolved report, keyed "MODULE:reportId" (null = not recorded). */
+  resolvers: Record<string, string | null>;
+  resolverNames: Record<string, string>;
+};
+
+export type UserAssignedAssets = { beats: string[]; toilets: string[]; litterBins: string[] };
 
 export type UserWorkSummaryCounts = { total: number; approved: number; completed?: number; pending: number; attention: number };
 

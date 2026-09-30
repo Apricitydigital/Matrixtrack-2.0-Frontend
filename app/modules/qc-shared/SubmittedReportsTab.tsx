@@ -163,14 +163,25 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
                 endDate = new Date(toDate).toISOString();
             }
 
-            const res = await ModuleRecordsApi.getRecords(moduleKey, {
+            const filters = {
                 limit: 500,
                 fromDate: startDate,
                 toDate: endDate,
                 cityId: cityId && cityId !== 'ALL' ? cityId : undefined,
                 tab: 'DAILY_REPORTS'
-            });
-            const rawList = res.data || [];
+            };
+            const res = await ModuleRecordsApi.getRecords(moduleKey, { ...filters, page: 1 });
+            const rawList = [...(res.data || [])];
+
+            // Litter bins merge visit + citizen reports into one paginated
+            // list, so fetch every page to show all reports in range.
+            if (moduleKey === 'LITTERBINS') {
+                const totalPages = res.meta?.totalPages || 1;
+                for (let page = 2; page <= totalPages; page++) {
+                    const next = await ModuleRecordsApi.getRecords(moduleKey, { ...filters, page });
+                    rawList.push(...(next.data || []));
+                }
+            }
             const inspectionOnly = rawList.filter((r: any) => {
                 const t = (r.type || '').toUpperCase();
                 return t !== 'BIN_REGISTRATION' && t !== 'ASSET_REGISTRATION' && t !== 'TOILET_REGISTRATION' && t !== 'BIN_REQUEST';
