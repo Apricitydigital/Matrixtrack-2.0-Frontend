@@ -71,7 +71,8 @@ export default function NalaReviewModal({
       rec: any,
       actionDescription: string,
       remarks?: string,
-      photoUrl?: string
+      photoUrl?: string,
+      photoUrls?: string[]
     ) => {
       await ModuleRecordsApi.updateRecordStatus(
         "NALA",
@@ -82,7 +83,8 @@ export default function NalaReviewModal({
           actionTaken:
             actionDescription,
           aoRemark: remarks,
-          aoPhoto: photoUrl
+          aoPhoto: photoUrl,
+          aoPhotos: photoUrls?.length ? photoUrls : photoUrl ? [photoUrl] : []
         }
       );
 

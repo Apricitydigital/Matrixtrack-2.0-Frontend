@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CityApi } from "@lib/apiClient";
 import ModalPortal from "@components/ui/ModalPortal";
 
-type AutoAssignModule = "SWEEPING" | "LITTERBINS" | "TOILET";
+type AutoAssignModule = "SWEEPING" | "LITTERBINS" | "TOILET" | "NALA";
 type ModuleSummary = {
   eligibleSupervisors: number;
   supervisorsWithoutScope: number;
@@ -18,6 +18,7 @@ type AutoAssignSummary = {
   beats: ModuleSummary;
   toilets: ModuleSummary;
   litterbins: ModuleSummary;
+  nalas?: ModuleSummary;
 };
 
 const MODULE_OPTIONS: Array<{
@@ -28,6 +29,7 @@ const MODULE_OPTIONS: Array<{
   { key: "SWEEPING", label: "Sweeping", description: "Assign approved sweeping beats" },
   { key: "LITTERBINS", label: "Litter Bin", description: "Assign approved litter bins" },
   { key: "TOILET", label: "Toilet", description: "Assign approved toilets" },
+  { key: "NALA", label: "Nala", description: "Assign approved nala points" },
 ];
 
 function formatSummary(summary: AutoAssignSummary) {
@@ -40,6 +42,9 @@ function formatSummary(summary: AutoAssignSummary) {
   }
   if (summary.selectedModules.includes("TOILET")) {
     rows.push(`Toilet: ${summary.toilets.assignedAssets}/${summary.toilets.totalAssets} matched, ${summary.toilets.unmatchedAssets} unmatched`);
+  }
+  if (summary.selectedModules.includes("NALA") && summary.nalas) {
+    rows.push(`Nala: ${summary.nalas.assignedAssets}/${summary.nalas.totalAssets} matched, ${summary.nalas.unmatchedAssets} unmatched`);
   }
   return rows.join("\n");
 }

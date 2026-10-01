@@ -103,6 +103,10 @@ const SUPPORTED_MODULES: SupportedModule[] = [
     identity: "TASKFORCE",
     candidates: ["TASKFORCE"],
   },
+  {
+    identity: "NALA",
+    candidates: ["NALA"],
+  },
 ];
 
 /* =========================================================
@@ -122,6 +126,10 @@ function resolveModule(
 
   if (text.includes("SWEEP")) {
     return SUPPORTED_MODULES[0];
+  }
+
+  if (text.includes("NALA")) {
+    return SUPPORTED_MODULES[4];
   }
 
   if (text.includes("TOILET")) {

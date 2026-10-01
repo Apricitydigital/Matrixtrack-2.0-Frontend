@@ -135,9 +135,14 @@ export type OperationsMapData = {
   summary: Record<
     'overall' | 'beats' | 'toilets' | 'bins',
     OperationsSummary
-  >;
+  > & {
+    nalas?: OperationsSummary;
+  };
 
   beats: BeatMapItem[];
   toilets: PointMapItem[];
   bins: PointMapItem[];
+
+  // One marker per NalaPoint; absent on older backends.
+  nalas?: PointMapItem[];
 };

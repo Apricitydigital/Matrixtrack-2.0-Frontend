@@ -213,6 +213,9 @@ function moduleLabel(
     case "SWEEPING":
       return "Sweeping";
 
+    case "NALA":
+      return "Nala";
+
     case "TOILET":
       return "Toilet";
 

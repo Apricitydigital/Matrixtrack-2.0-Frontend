@@ -40,6 +40,7 @@ import {
   Trophy,
   UserRoundCheck,
   UsersRound,
+  Waves,
   X,
   XCircle,
 } from 'lucide-react';
@@ -78,6 +79,7 @@ import {
   apiFetch,
   AreaBeatApi,
   CityUserApi,
+  NalaApi,
   GeoApi,
   ModuleRecordsApi,
   type DarogaPerformance,
@@ -116,7 +118,8 @@ import ModalPortal from "@components/ui/ModalPortal";
 type InspectionModuleKey =
   | 'TOILET'
   | 'LITTERBINS'
-  | 'SWEEPING';
+  | 'SWEEPING'
+  | 'NALA';
 
 type DashboardModuleKey =
   | 'ALL'
@@ -196,6 +199,7 @@ type RolePerformanceRow = {
     TOILET: number;
     LITTERBINS: number;
     SWEEPING: number;
+    NALA?: number;
   };
 
   attendance?: number | null;
@@ -270,6 +274,10 @@ const INSPECTION_MODULES: Array<{
       key: 'SWEEPING',
       label: 'Sweeping',
     },
+    {
+      key: 'NALA',
+      label: 'Nala',
+    },
   ];
 
 const DASHBOARD_MODULES: Array<{
@@ -291,6 +299,10 @@ const DASHBOARD_MODULES: Array<{
     {
       key: 'SWEEPING',
       label: 'Sweeping',
+    },
+    {
+      key: 'NALA',
+      label: 'Nala',
     },
     {
       key: 'ATTENDANCE',
@@ -336,6 +348,15 @@ const MODULE_VISUALS: Record<
     ),
     color: '#4f46e5',
     soft: '#eef2ff',
+  },
+  NALA: {
+    icon: (
+      <Waves
+        size={14}
+      />
+    ),
+    color: '#0284c7',
+    soft: '#f0f9ff',
   },
   ATTENDANCE: {
     icon: (
@@ -388,6 +409,12 @@ const ZONE_MODULE_BAR_TONES: Record<
     medium: '#a5b4fc',
     full: '#6366f1',
     deep: '#4338ca',
+  },
+  NALA: {
+    light: '#e0f2fe',
+    medium: '#7dd3fc',
+    full: '#0284c7',
+    deep: '#075985',
   },
   ATTENDANCE: {
     light: '#e0f2fe',
@@ -822,6 +849,9 @@ function inspectionModuleDisplayName(
   switch (module) {
     case 'SWEEPING':
       return 'Sweeping';
+
+    case 'NALA':
+      return 'Nala';
 
     case 'LITTERBINS':
       return 'Litter Bin';
@@ -1271,6 +1301,22 @@ function getRecordTitle(
       item?.beat?.beatName ||
       item?.areaName ||
       'Sweeping'
+    );
+  }
+
+  if (
+    item.dashboardModule ===
+    'NALA'
+  ) {
+    return (
+      [
+        item?.nalaName ||
+        item?.nala?.nalaName,
+        item?.nalaPointName,
+      ]
+        .filter(Boolean)
+        .join(' - ') ||
+      'Nala'
     );
   }
 
@@ -1806,6 +1852,18 @@ function completedInspectionCount(
   }
 
   if (
+    module === 'NALA'
+  ) {
+    return nonDraftInspectionCount(
+      records.filter(
+        (item) =>
+          item.dashboardModule ===
+          'NALA'
+      )
+    );
+  }
+
+  if (
     module === 'ALL'
   ) {
     const nonSweeping =
@@ -1833,7 +1891,52 @@ function completedInspectionCount(
    LOAD ALL INSPECTION PAGES
 ========================================================= */
 
+function flattenNalaTargetPoints(
+  nalas: any[]
+) {
+  return nalas.flatMap(
+    (nala: any) =>
+      (nala?.nalaPoints || []).map(
+        (point: any) => ({
+          ...point,
+          zoneId: nala.zoneId,
+          zoneName: nala.zoneName,
+          wardId: nala.wardId,
+          wardName: nala.wardName,
+        })
+      )
+  );
+}
+
+
+/*
+ * Cities without the Nala module must not fail the dashboard.
+ */
 async function loadAllModuleRecords(
+  moduleKey: InspectionModuleKey,
+  from?: string,
+  to?: string
+): Promise<any[]> {
+  if (moduleKey === 'NALA') {
+    return loadAllModuleRecordsStrict(
+      moduleKey,
+      from,
+      to
+    ).catch((err) => {
+      console.warn('Nala reports unavailable', err);
+      return [];
+    });
+  }
+
+  return loadAllModuleRecordsStrict(
+    moduleKey,
+    from,
+    to
+  );
+}
+
+
+async function loadAllModuleRecordsStrict(
   moduleKey: InspectionModuleKey,
   from?: string,
   to?: string
@@ -2026,6 +2129,7 @@ async function computePeriodMetrics(
     toiletTargetResult,
     litterBinTargetResult,
     sweepingTargetResult,
+    nalaTargetResult,
   ] = await Promise.allSettled([
     apiFetch<any>(
       `/modules/toilet/stats${cityId ? `?cityId=${encodeURIComponent(cityId)}` : ''}`
@@ -2034,7 +2138,16 @@ async function computePeriodMetrics(
       "/modules/twinbin/bins/all"
     ),
     AreaBeatApi.list(),
+    NalaApi.list(),
   ]);
+
+  // Optional: a city without Nala simply has no NalaPoints.
+  const nalaTargetPoints =
+    nalaTargetResult.status === 'fulfilled'
+      ? flattenNalaTargetPoints(
+        nalaTargetResult.value?.nalas || []
+      ).length
+      : 0;
 
   const targetSourcesReady =
     toiletTargetResult.status === 'fulfilled' &&
@@ -2085,7 +2198,8 @@ async function computePeriodMetrics(
     (
       approvedToilets +
       litterBins.length +
-      sweepingBeats
+      sweepingBeats +
+      nalaTargetPoints
     ) *
     rangeDays;
 
@@ -2725,6 +2839,10 @@ function DrilldownDrawer({
     )
       ? 'SWEEPING'
       : data.title.endsWith(
+        'Nala'
+      )
+        ? 'NALA'
+        : data.title.endsWith(
         'Litter Bin'
       )
         ? 'LITTERBINS'
@@ -3250,6 +3368,10 @@ function DrilldownDrawer({
     initialInspectionModule ===
     'TOILET';
 
+  const isNalaDrawer =
+    initialInspectionModule ===
+    'NALA';
+
   const inspectionUnitLabel =
     isSweepingDrawer
       ? 'Beats'
@@ -3257,7 +3379,9 @@ function DrilldownDrawer({
         ? 'Litter Bins'
         : isToiletDrawer
           ? 'Toilets'
-          : '';
+          : isNalaDrawer
+            ? 'Nala Points'
+            : '';
 
   const inspectionWorkflowCards = [
     {
@@ -3269,7 +3393,9 @@ function DrilldownDrawer({
             ? 'Assigned Litter Bins'
             : isToiletDrawer
               ? 'Assigned Toilets'
-              : 'Assigned',
+              : isNalaDrawer
+                ? 'Assigned Nala Points'
+                : 'Assigned',
       value:
         initialInspectionModule === 'ALL'
           ? 0
@@ -3747,9 +3873,11 @@ function DrilldownDrawer({
                         <span className="text-[9px] font-black uppercase tracking-[0.06em] text-indigo-500">
                           {module.key === 'SWEEPING'
                             ? 'Assigned Beats'
-                            : module.key === 'LITTERBINS'
-                              ? 'Assigned Litter Bins'
-                              : 'Assigned Toilets'}
+                            : module.key === 'NALA'
+                              ? 'Assigned Nala Points'
+                              : module.key === 'LITTERBINS'
+                                ? 'Assigned Litter Bins'
+                                : 'Assigned Toilets'}
                         </span>
 
                         <span className="text-sm font-black text-indigo-700">
@@ -6704,6 +6832,7 @@ export default function CommissionerDashboard() {
     }>;
     litterBins: any[];
     beats: any[];
+    nalaPoints: any[];
   }>({
     ready: false,
     approvedToilets: 0,
@@ -6711,6 +6840,7 @@ export default function CommissionerDashboard() {
     approvedToiletsByWard: [],
     litterBins: [],
     beats: [],
+    nalaPoints: [],
   });
 
 
@@ -6722,6 +6852,7 @@ export default function CommissionerDashboard() {
         toiletResult,
         litterBinResult,
         beatsResult,
+        nalaResult,
       ] = await Promise.allSettled([
         apiFetch<any>(
           `/modules/toilet/stats${cityId ? `?cityId=${encodeURIComponent(cityId)}` : ''}`
@@ -6730,6 +6861,7 @@ export default function CommissionerDashboard() {
           "/modules/twinbin/bins/all"
         ),
         AreaBeatApi.list(),
+        NalaApi.list(),
       ]);
 
       if (!active) return;
@@ -6800,6 +6932,13 @@ export default function CommissionerDashboard() {
             ? (
               beatsResult.value?.beats ||
               []
+            )
+            : [],
+
+        nalaPoints:
+          nalaResult.status === 'fulfilled'
+            ? flattenNalaTargetPoints(
+              nalaResult.value?.nalas || []
             )
             : [],
       });
@@ -6984,6 +7123,13 @@ export default function CommissionerDashboard() {
             .length;
 
 
+        const nalaDaily =
+          inspectionTargets
+            .nalaPoints
+            .filter(matchesGeo)
+            .length;
+
+
         let dailyRequired = 0;
 
         if (
@@ -7002,12 +7148,18 @@ export default function CommissionerDashboard() {
           dailyRequired =
             sweepingDaily;
         } else if (
+          module === 'NALA'
+        ) {
+          dailyRequired =
+            nalaDaily;
+        } else if (
           module === 'ALL'
         ) {
           dailyRequired =
             toiletDaily +
             litterBinDaily +
-            sweepingDaily;
+            sweepingDaily +
+            nalaDaily;
         }
 
         return (
@@ -9786,6 +9938,23 @@ const [
       toiletInspection.statusBreakdown.pendingReview
     );
 
+  const nalaInspection =
+    commissionerModuleInspection(
+      'NALA'
+    );
+
+  const nalaCleanlinessPerformance =
+    cleanlinessPerformancePercent(
+      nalaInspection.statusBreakdown.clean,
+      nalaInspection.statusBreakdown.notClean,
+      nalaInspection.statusBreakdown.pendingReview
+    );
+
+  // Show Nala only for cities that actually run the Nala module.
+  const showNalaModule =
+    inspectionTargets.nalaPoints.length > 0 ||
+    nalaInspection.records.length > 0;
+
 
   /* =========================================================
          GEO PERFORMANCE
@@ -11161,6 +11330,7 @@ const [
           | 'TOILET'
           | 'LITTERBINS'
           | 'SWEEPING'
+          | 'NALA'
       ) => {
         if (scopedWardNames.length > 0) {
           return scopedWardNames.reduce(
@@ -11220,12 +11390,18 @@ const [
           requiredForModule(
             'SWEEPING'
           ),
+
+        NALA:
+          requiredForModule(
+            'NALA'
+          ),
       };
 
       const roleRequiredInspections =
         roleRequiredByModule.TOILET +
         roleRequiredByModule.LITTERBINS +
-        roleRequiredByModule.SWEEPING;
+        roleRequiredByModule.SWEEPING +
+        roleRequiredByModule.NALA;
 
       /*
        * Same score as the User Performance page (backend + shared formula):
@@ -11295,6 +11471,7 @@ const [
                     TOILET: darogaCoverage.modules.TOILET.required ?? 0,
                     LITTERBINS: darogaCoverage.modules.LITTERBINS.required ?? 0,
                     SWEEPING: darogaCoverage.modules.SWEEPING.required ?? 0,
+                    NALA: darogaCoverage.modules.NALA?.required ?? 0,
                   }
                 : roleRequiredByModule,
 
@@ -12259,6 +12436,7 @@ const [
   ) {
     const inspectionModule =
       cell.key === 'SWEEPING' ||
+        cell.key === 'NALA' ||
         cell.key === 'LITTERBINS' ||
         cell.key === 'TOILET'
         ? (
@@ -13598,7 +13776,7 @@ setDrilldown({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+          <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${showNalaModule ? '2xl:grid-cols-6' : '2xl:grid-cols-5'}`}>
             <KpiCard
               label="Attendance Rate"
               value={
@@ -13992,6 +14170,96 @@ setDrilldown({
                 )
               }
             />
+
+            {showNalaModule && (
+              <KpiCard
+                label="Nala"
+                value={
+                  loading
+                    ? '—'
+                    : percentText(
+                      nalaInspection.performance
+                    )
+                }
+                cardTint="bg-gradient-to-br from-sky-50 via-cyan-50 to-white"
+                iconGradient="from-sky-500 to-cyan-600"
+                icon={
+                  <Waves
+                    size={25}
+                    strokeWidth={2.2}
+                  />
+                }
+                tooltip={[
+                  {
+                    label: 'Required Inspections',
+                    value:
+                      nalaInspection.required.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label: 'Completed Nala Points',
+                    value:
+                      nalaInspection.completed.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label: 'Cleaned Nala Points',
+                    value:
+                      nalaInspection.statusBreakdown.clean.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label: 'Not Cleaned Nala Points',
+                    value:
+                      nalaInspection.statusBreakdown.notClean.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label: 'Pending Review Nala Points',
+                    value:
+                      nalaInspection.statusBreakdown.pendingReview.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label: 'Attention Required',
+                    value:
+                      nalaInspection.statusBreakdown.attentionRequired.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label: 'Resolution Pending',
+                    value:
+                      nalaInspection.statusBreakdown.resolutionPending.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                  {
+                    label: 'Resolved',
+                    value:
+                      nalaInspection.statusBreakdown.resolved.toLocaleString(
+                        'en-IN'
+                      ),
+                  },
+                ]}
+                onClick={() =>
+                  openInspectionMetric(
+                    'Nala',
+                    nalaInspection.records,
+                    percentText(
+                      nalaInspection.performance
+                    )
+                    ,
+                    'NALA'
+                  )
+                }
+              />
+            )}
           </div>
         </section>
 
@@ -14500,6 +14768,65 @@ setDrilldown({
                   cleanlinessPerformance:
                     toiletCleanlinessPerformance,
                 },
+                ...(showNalaModule
+                  ? [
+                    {
+                      key: 'NALA',
+                      title: 'Nala',
+                      icon: (
+                        <Waves
+                          size={18}
+                          strokeWidth={2.4}
+                        />
+                      ),
+                      theme:
+                        'border-sky-100 bg-gradient-to-r from-sky-50/80 via-cyan-50/45 to-white',
+                      iconTheme:
+                        'bg-gradient-to-br from-sky-500 to-cyan-600 text-[#10235e] shadow-sky-200',
+                      accent:
+                        'text-sky-700',
+                      requiredLabel:
+                        'Required Nala Points',
+                      assignedLabel:
+                        'Assigned Nala Points',
+                      assigned:
+                        Math.round(
+                          nalaInspection.required /
+                          inspectionRangeDayCount
+                        ),
+                      completedLabel:
+                        'Inspected Nala Points',
+                      cleanLabel:
+                        'Cleaned Nala Points',
+                      notCleanLabel:
+                        'Not Cleaned Nala Points',
+                      pendingLabel:
+                        'Pending Review Nala Points',
+                      unitLabel:
+                        'Nala Points',
+                      required:
+                        nalaInspection.required,
+                      completed:
+                        nalaInspection.completed,
+                      clean:
+                        nalaInspection.statusBreakdown.clean,
+                      notClean:
+                        nalaInspection.statusBreakdown.notClean,
+                      pending:
+                        nalaInspection.statusBreakdown.pendingReview,
+                      attention:
+                        nalaInspection.statusBreakdown.attentionRequired,
+                      resolutionPending:
+                        nalaInspection.statusBreakdown.resolutionPending,
+                      resolved:
+                        nalaInspection.statusBreakdown.resolved,
+                      performance:
+                        nalaInspection.performance,
+                      cleanlinessPerformance:
+                        nalaCleanlinessPerformance,
+                    },
+                  ]
+                  : []),
               ].map((module) => (
                 <div
                   key={module.key}
@@ -14543,9 +14870,11 @@ setDrilldown({
                         <div className="mt-1 text-[7px] font-black uppercase leading-tight tracking-wider text-indigo-500 dark:text-indigo-400">
                           {module.key === 'SWEEPING'
                             ? 'Assigned Beats'
-                            : module.key === 'LITTERBINS'
-                              ? 'Assigned Litter Bins'
-                              : 'Assigned Toilets'}
+                            : module.key === 'NALA'
+                              ? 'Assigned Nala Points'
+                              : module.key === 'LITTERBINS'
+                                ? 'Assigned Litter Bins'
+                                : 'Assigned Toilets'}
                         </div>
                       </div>
 

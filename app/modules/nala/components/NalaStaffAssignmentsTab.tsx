@@ -12,6 +12,9 @@ import {
   NalaApi
 } from "@lib/apiClient";
 
+import { useAuth } from "@hooks/useAuth";
+import NalaGroupAssignModal from "./NalaGroupAssignModal";
+
 type ViewMode =
   | "supervisor"
   | "employee";
@@ -43,6 +46,17 @@ export default function NalaStaffAssignmentsTab() {
 
   const [selectedNala, setSelectedNala] =
     useState<any | null>(null);
+
+  const [groupAssignOpen, setGroupAssignOpen] =
+    useState(false);
+
+  const { user } = useAuth();
+
+  // POST /city/nalas/bulk-assign is City Admin only.
+  const canBulkAssign =
+    [user?.role, ...(user?.roles || [])]
+      .map((value) => String(value || "").toUpperCase())
+      .some((role) => role === "CITY_ADMIN" || role === "HMS_SUPER_ADMIN");
 
   const loadData = useCallback(async () => {
     try {
@@ -474,6 +488,36 @@ export default function NalaStaffAssignmentsTab() {
               </button>
             )}
           </div>
+
+          {canBulkAssign && (
+            <button
+              type="button"
+              disabled={
+                !selectedWard ||
+                filteredNalas.length === 0
+              }
+              title={
+                selectedWard
+                  ? undefined
+                  : "Select a Ward to assign its Nalas together"
+              }
+              onClick={() =>
+                setGroupAssignOpen(true)
+              }
+              style={{
+                ...resetStyle,
+                background:
+                  selectedWard ? "#2563eb" : "#f1f5f9",
+                color:
+                  selectedWard ? "#ffffff" : "#94a3b8",
+                border: "none",
+                cursor:
+                  selectedWard ? "pointer" : "not-allowed"
+              }}
+            >
+              Assign All {isSupervisorView ? "Darogas" : "Employees"} ({filteredNalas.length})
+            </button>
+          )}
         </div>
 
         <div
@@ -849,6 +893,25 @@ export default function NalaStaffAssignmentsTab() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {groupAssignOpen && selectedWard && (
+        <NalaGroupAssignModal
+          nalas={filteredNalas}
+          title={
+            allWards.find((ward) => ward.id === selectedWard)?.name ||
+            "Selected Ward"
+          }
+          mode={
+            isSupervisorView
+              ? "SUPERVISOR"
+              : "EMPLOYEE"
+          }
+          onClose={() =>
+            setGroupAssignOpen(false)
+          }
+          onSuccess={loadData}
+        />
       )}
 
       {selectedNala && (
