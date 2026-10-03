@@ -35,6 +35,7 @@ import {
   ChartNoAxesCombined,
   Award,
   Factory,
+  Waves,
 } from "lucide-react";
 import { UserProfileModal } from "./UserProfileModal";
 
@@ -47,6 +48,10 @@ const getModuleIcon = (key: string) => {
 
   if (normalizedKey.includes("SWEEPING")) {
     return <Wind size={16} />;
+  }
+
+  if (normalizedKey.includes("NALA")) {
+    return <Waves size={16} />;
   }
 
   if (

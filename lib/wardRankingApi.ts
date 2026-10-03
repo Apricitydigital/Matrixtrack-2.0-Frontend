@@ -7,12 +7,14 @@ export type WardPerformanceBand =
 
 export type WardRankingModule =
   | 'SWEEPING'
+  | 'NALA'
   | 'TOILET'
   | 'LITTERBINS';
 
 export type WardRankingComponent =
   | 'WORKFORCE'
   | 'BEAT'
+  | 'NALA'
   | 'TOILET'
   | 'LITTERBIN'
   | 'SUPERVISOR'
@@ -90,6 +92,8 @@ export type WardRankingRow = {
   components: {
     workforce: WardComponentScore;
     beat: WardComponentScore;
+    // Absent on snapshots saved before the Nala component existed.
+    nala?: WardComponentScore;
     toilet: WardComponentScore;
     litterBin: WardComponentScore;
     supervisor: WardComponentScore;

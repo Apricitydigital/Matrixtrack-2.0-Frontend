@@ -93,6 +93,7 @@ const COMPONENT_DRILLDOWN_KEYS:
   WardRankingComponent[] = [
     'WORKFORCE',
     'BEAT',
+    'NALA',
     'TOILET',
     'LITTERBIN',
     'SUPERVISOR',
@@ -111,6 +112,9 @@ const COMPONENT_FIELD_BY_KEY:
 
   BEAT:
     'beat',
+
+  NALA:
+    'nala',
 
   TOILET:
     'toilet',
@@ -176,6 +180,10 @@ const MODULE_OPTIONS: Array<{
     {
       key: 'SWEEPING',
       label: 'Sweeping',
+    },
+    {
+      key: 'NALA',
+      label: 'Nala',
     },
   ];
 
@@ -2656,7 +2664,7 @@ export default function WardRankingWorkspace() {
             {/* DESKTOP TABLE */}
 
             <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-[1540px] w-full border-collapse">
+              <table className="min-w-[1640px] w-full border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/80 text-left">
                     {[
@@ -2667,6 +2675,7 @@ export default function WardRankingWorkspace() {
                       'Status',
                       'Workforce',
                       'Beat',
+                      'Nala',
                       'Toilet',
                       'Litter Bin',
                       'Daroga',
@@ -2781,6 +2790,8 @@ export default function WardRankingWorkspace() {
                             ?.workforce,
                           item.components
                             ?.beat,
+                          item.components
+                            ?.nala,
                           item.components
                             ?.toilet,
                           item.components
@@ -2972,6 +2983,11 @@ export default function WardRankingWorkspace() {
                           'Beat',
                           item.components
                             ?.beat,
+                        ],
+                        [
+                          'Nala',
+                          item.components
+                            ?.nala,
                         ],
                         [
                           'Toilet',

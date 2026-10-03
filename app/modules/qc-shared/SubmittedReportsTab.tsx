@@ -25,6 +25,13 @@ const getStaffName = (val: any): string => {
     return '';
 };
 
+// "Nala name - Point name" for NALA reports (one report per NalaPoint per day).
+function nalaPointLabel(record: any): string | null {
+    const nalaName = record?.nalaName || record?.nala?.nalaName;
+    if (!nalaName) return null;
+    return [nalaName, record.nalaPointName].filter(Boolean).join(' - ');
+}
+
 export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onViewReport, initialStatus }: SubmittedReportsTabProps) {
     const { user } = useAuth();
     const [reports, setReports] = useState<any[]>([]);
@@ -262,8 +269,8 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
         const rows = filteredReports.map((r, idx) => {
             const dt = new Date(r.createdAt);
             const dateStr = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-            const name = r.toiletName || r.beatName || r.nalaName || r.nala?.name || r.locationName || r.areaName || assetLabel;
-            const assetId = r.toiletId || r.beatId || r.binId || r.nalaId || r.nala?.id || r.id;
+            const name = r.toiletName || r.beatName || nalaPointLabel(r) || r.nala?.name || r.locationName || r.areaName || assetLabel;
+            const assetId = r.toiletId || r.beatId || r.binId || r.nalaPointId || r.nalaId || r.nala?.id || r.id;
             return [
                 idx + 1,
                 `"${dateStr}"`,
@@ -468,8 +475,8 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
                                 const sc = statusConfig[st] || { bg: '#f1f5f9', color: '#64748b', label: st };
                                 const dt = new Date(record.createdAt);
 
-                                const assetName = record.toiletName || record.beatName || record.locationName || record.areaName || assetLabel;
-                                const assetId = record.toiletId || record.beatId || record.binId || record.id;
+                                const assetName = record.toiletName || record.beatName || nalaPointLabel(record) || record.locationName || record.areaName || assetLabel;
+                                const assetId = record.toiletId || record.beatId || record.binId || record.nalaPointId || record.nalaId || record.id;
                                 const submitterName = getStaffName(record.supervisor)
                                     || getStaffName(record.employee)
                                     || getStaffName(record.submittedBy)

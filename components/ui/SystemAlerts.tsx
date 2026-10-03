@@ -107,6 +107,13 @@ const MODULE_DEFINITIONS = [
     route: "/modules/taskforce",
     candidates: ["TASKFORCE"],
   },
+
+  {
+    identity: "NALA",
+    title: "Nala Cleaning",
+    route: "/modules/nala",
+    candidates: ["NALA"],
+  },
 ];
 
 
@@ -148,6 +155,15 @@ function getModuleDefinition(
     )
   ) {
     return MODULE_DEFINITIONS[1];
+  }
+
+
+  if (
+    value.includes(
+      "NALA"
+    )
+  ) {
+    return MODULE_DEFINITIONS[4];
   }
 
 

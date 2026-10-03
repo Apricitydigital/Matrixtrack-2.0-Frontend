@@ -736,13 +736,31 @@ function geometryToFeature(geometry: any) {
 }
 
 function markerIcon(
-  kind: 'toilet' | 'bin',
+  kind: 'toilet' | 'bin' | 'nala',
   state: WorkState,
 ) {
   const statusColor = STATE_COLORS[state];
 
   const glyph =
-    kind === 'toilet'
+    kind === 'nala'
+      ? `
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+          <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+          <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>
+        </svg>
+      `
+      : kind === 'toilet'
       ? `
         <svg
           width="16"
@@ -837,11 +855,13 @@ function FitAssets({
   beats,
   toilets,
   bins,
+  nalas = [],
   focusLevel,
 }: {
   beats: BeatMapItem[];
   toilets: PointMapItem[];
   bins: PointMapItem[];
+  nalas?: PointMapItem[];
   focusLevel: MapFocusLevel;
 }) {
   const map = useMap();
@@ -910,7 +930,7 @@ function FitAssets({
       }
     });
 
-    [...toilets, ...bins].forEach(
+    [...toilets, ...bins, ...nalas].forEach(
       (item) => {
         const latitude = Number(
           item.latitude,
@@ -1166,12 +1186,14 @@ export default function OperationsMapCanvas({
   beats,
   toilets,
   bins,
+  nalas = [],
   visible,
   focusLevel,
 }: {
   beats: BeatMapItem[];
   toilets: PointMapItem[];
   bins: PointMapItem[];
+  nalas?: PointMapItem[];
 
   focusLevel: MapFocusLevel;
 
@@ -1179,6 +1201,7 @@ export default function OperationsMapCanvas({
     beats: boolean;
     toilets: boolean;
     bins: boolean;
+    nalas?: boolean;
   };
 }) {
   const fallbackCenter =
@@ -1222,6 +1245,9 @@ export default function OperationsMapCanvas({
         }
         bins={
           visible.bins ? bins : []
+        }
+        nalas={
+          visible.nalas ? nalas : []
         }
         focusLevel={focusLevel}
       />
@@ -1476,6 +1502,78 @@ export default function OperationsMapCanvas({
                   actors={bin.actors}
                   workflowTimes={
                     bin.workflowTimes
+                  }
+                />
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+      {visible.nalas &&
+        nalas
+          .filter(
+            (point) =>
+              Number.isFinite(Number(point.latitude)) &&
+              Number.isFinite(Number(point.longitude)),
+          )
+          .map((point) => (
+          <Marker
+            key={`${point.id}-${point.state}`}
+            position={[
+              point.latitude,
+              point.longitude,
+            ]}
+            icon={markerIcon(
+              'nala',
+              point.state,
+            )}
+          >
+            <Tooltip
+              direction="top"
+              offset={[0, -10]}
+              opacity={1}
+            >
+              <QuickAssetPreview
+                moduleLabel="Nala Point"
+                name={point.name}
+                state={point.state}
+                zoneName={point.zoneName}
+                wardName={point.wardName}
+                actors={point.actors}
+              />
+            </Tooltip>
+
+            <Popup>
+              <div className="w-[320px] max-w-[calc(100vw-80px)] max-h-[440px] overflow-y-auto overflow-x-hidden pr-1 font-sans">
+                <div className="text-[10px] font-bold uppercase tracking-[.18em] text-sky-600">
+                  Nala Point
+                </div>
+
+                <div className="mt-1 text-base font-black text-slate-900">
+                  {point.name}
+                </div>
+
+                <div className="mt-1 text-xs font-semibold text-slate-500">
+                  {point.zoneName} ·{' '}
+                  {point.wardName}
+                </div>
+
+                <div className="mt-3">
+                  <StatusBadge
+                    state={point.state}
+                  />
+                </div>
+
+                <ResponsibilitySummary
+                  state={point.state}
+                  actors={point.actors}
+                />
+
+                <WorkflowTimeline
+                  state={point.state}
+                  actors={point.actors}
+                  workflowTimes={
+                    point.workflowTimes
                   }
                 />
               </div>

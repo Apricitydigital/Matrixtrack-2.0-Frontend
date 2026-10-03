@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Trash2,
   UsersRound,
+  Waves,
 } from 'lucide-react';
 
 import { apiFetch } from '@lib/apiClient';
@@ -81,7 +82,7 @@ const STATUS_LEGEND: Array<{
     color: '#2563eb',
   },
 ];
-type LayerKey = 'beats' | 'toilets' | 'bins';
+type LayerKey = 'beats' | 'toilets' | 'bins' | 'nalas';
 
 export default function WardRankingOperationsMap({
   date,
@@ -108,6 +109,7 @@ export default function WardRankingOperationsMap({
     beats: true,
     toilets: true,
     bins: true,
+    nalas: true,
   });
 
   const mapSectionRef =
@@ -124,6 +126,9 @@ export default function WardRankingOperationsMap({
       bins:
         !module ||
         module === 'LITTERBINS',
+      nalas:
+        !module ||
+        module === 'NALA',
     });
   }, [module]);
 
@@ -219,6 +224,14 @@ export default function WardRankingOperationsMap({
               allowedWardIds.has(item.wardId),
             ),
         ),
+      nalas:
+        (data?.nalas || []).filter(
+          (item) =>
+            Boolean(
+              item.wardId &&
+              allowedWardIds.has(item.wardId),
+            ),
+        ),
     };
   }, [data, rankingWardIds]);
 
@@ -266,6 +279,15 @@ export default function WardRankingOperationsMap({
         'bg-cyan-50 text-cyan-900 ring-cyan-100',
       iconClass: 'text-cyan-600',
     },
+    {
+      key: 'nalas' as const,
+      label: 'Nala points',
+      icon: Waves,
+      count: visibleData.nalas.length,
+      activeClass:
+        'bg-sky-50 text-sky-900 ring-sky-100',
+      iconClass: 'text-sky-600',
+    },
   ];
 
   return (
@@ -298,6 +320,7 @@ export default function WardRankingOperationsMap({
           beats={visibleData.beats}
           toilets={visibleData.toilets}
           bins={visibleData.bins}
+          nalas={visibleData.nalas}
           visible={visible}
           focusLevel={focusLevel}
         />

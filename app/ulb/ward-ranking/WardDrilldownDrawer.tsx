@@ -77,6 +77,11 @@ const COMPONENTS: Array<{
       label: 'Beat',
     },
     {
+      key: 'NALA',
+      field: 'nala',
+      label: 'Nala',
+    },
+    {
       key: 'TOILET',
       field: 'toilet',
       label: 'Toilet',
@@ -111,6 +116,15 @@ const STATUS_OPTIONS: Partial<
   >
 > = {
   BEAT: [
+    'CHECKED',
+    'NOT_CHECKED',
+    'IN_PROGRESS',
+    'PENDING_QC',
+    'APPROVED',
+    'REJECTED',
+  ],
+
+  NALA: [
     'CHECKED',
     'NOT_CHECKED',
     'IN_PROGRESS',
@@ -214,6 +228,7 @@ function operationalStatusLabel(
   }
   if (
     component === 'BEAT' ||
+    component === 'NALA' ||
     component === 'TOILET' ||
     component === 'LITTERBIN'
   ) {
@@ -734,7 +749,8 @@ type FlatRecord = {
 type ReportModule =
   | 'TOILET'
   | 'LITTERBINS'
-  | 'SWEEPING';
+  | 'SWEEPING'
+  | 'NALA';
 
 
 function reportModuleForRecord(
@@ -781,6 +797,13 @@ function reportModuleForRecord(
     }
 
 
+    if (
+      moduleKey === 'NALA'
+    ) {
+      return 'NALA';
+    }
+
+
     return null;
   }
 
@@ -818,6 +841,15 @@ function reportModuleForRecord(
   }
 
 
+  if (
+    section.includes(
+      'NALA'
+    )
+  ) {
+    return 'NALA';
+  }
+
+
   return null;
 }
 
@@ -837,6 +869,12 @@ function reportModuleLabel(
     return 'Litter Bins';
   }
 
+  if (
+    moduleKey === 'NALA'
+  ) {
+    return 'Nala Cleaning';
+  }
+
   return 'Sweeping';
 }
 
@@ -848,6 +886,29 @@ function flattenRecords(
   if (!data) {
     return [];
   }
+
+  if (
+    component === 'NALA'
+  ) {
+    return [
+      ...(data.obligations || []).map(
+        (item: any) => ({
+          section:
+            'Nala Point Obligation',
+          item,
+        })
+      ),
+
+      ...(data.reports || []).map(
+        (item: any) => ({
+          section:
+            'Nala Report',
+          item,
+        })
+      ),
+    ];
+  }
+
 
   if (
     component === 'BEAT'
@@ -1087,6 +1148,18 @@ function flattenRecords(
 
       ...(
         data.submittedReports
+          ?.nala ||
+        []
+      ).map(
+        (item: any) => ({
+          section:
+            'Nala Report',
+          item,
+        })
+      ),
+
+      ...(
+        data.submittedReports
           ?.toilet ||
         []
       ).map(
@@ -1124,6 +1197,14 @@ function flattenRecords(
         })
       ),
 
+      ...(data.nala || []).map(
+        (item: any) => ({
+          section:
+            'Nala QC',
+          item,
+        })
+      ),
+
       ...(data.toilet || []).map(
         (item: any) => ({
           section:
@@ -1144,6 +1225,74 @@ function flattenRecords(
 
 
   return [];
+}
+
+
+/*
+ * One row per NalaPoint: due reports, photos captured
+ * against 5 per report, and QC outcome.
+ */
+function NalaPointBreakdown({
+  rows,
+}: {
+  rows: any[];
+}) {
+  return (
+    <div className="mb-3 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-100 px-4 py-3 text-xs font-black text-slate-700">
+        NalaPoint Breakdown
+        <span className="ml-2 text-[10px] font-semibold text-slate-400">
+          {rows.length} points
+        </span>
+      </div>
+
+      <table className="w-full min-w-[640px] border-collapse text-left">
+        <thead>
+          <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-[0.06em] text-slate-400">
+            <th className="px-3 py-2">Nala / Point</th>
+            <th className="px-3 py-2">Reports</th>
+            <th className="px-3 py-2">Photos</th>
+            <th className="px-3 py-2">SI Approved</th>
+            <th className="px-3 py-2">SI Rejected</th>
+            <th className="px-3 py-2">Status</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {rows.map((row) => (
+            <tr
+              key={row.nalaPointId}
+              className="border-t border-slate-100 text-[11px] font-semibold text-slate-600"
+            >
+              <td className="px-3 py-2">
+                <div className="font-black text-slate-800">
+                  {row.nalaName}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  {[row.pointCode, row.pointName].filter(Boolean).join(' - ')}
+                </div>
+              </td>
+              <td className="px-3 py-2">
+                {row.submittedReports} / {row.dueReports}
+              </td>
+              <td className="px-3 py-2">
+                {row.photosCaptured} / {row.expectedPhotos}
+              </td>
+              <td className="px-3 py-2 text-emerald-700">
+                {row.qcApproved}
+              </td>
+              <td className="px-3 py-2 text-rose-700">
+                {row.qcRejected}
+              </td>
+              <td className="px-3 py-2">
+                {humanize(String(row.progressStatus || 'NOT_STARTED'))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 
@@ -2674,7 +2823,8 @@ export default function WardDrilldownDrawer({
                * to hydrate the exact Sweeping record.
                */
               tab:
-                moduleKey === 'SWEEPING'
+                moduleKey === 'SWEEPING' ||
+                  moduleKey === 'NALA'
                   ? 'ALL'
                   : 'HISTORY',
             }
@@ -2933,6 +3083,7 @@ export default function WardDrilldownDrawer({
                   {(
                     selectedComponent === 'WORKFORCE' ||
                     selectedComponent === 'BEAT' ||
+                    selectedComponent === 'NALA' ||
                     selectedComponent === 'TOILET' ||
                     selectedComponent === 'LITTERBIN' ||
                     selectedComponent === 'SUPERVISOR' ||
@@ -2995,6 +3146,7 @@ export default function WardDrilldownDrawer({
                             ? 'All Actions'
 
                             : selectedComponent === 'BEAT' ||
+                              selectedComponent === 'NALA' ||
                               selectedComponent === 'TOILET' ||
                               selectedComponent === 'LITTERBIN' ||
                               selectedComponent === 'QC'
@@ -6938,6 +7090,17 @@ export default function WardDrilldownDrawer({
 
                   </div>
                 )}
+              {detailView === 'OVERVIEW' &&
+                selectedComponent === 'NALA' &&
+                !loading &&
+                !error &&
+                Array.isArray(payload?.data?.pointBreakdown) &&
+                payload!.data.pointBreakdown.length > 0 && (
+                  <NalaPointBreakdown
+                    rows={payload!.data.pointBreakdown}
+                  />
+                )}
+
               {detailView === 'OVERVIEW' &&
                 loading && (
                   <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-slate-200 bg-white">

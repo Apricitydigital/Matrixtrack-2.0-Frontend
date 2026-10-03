@@ -512,12 +512,12 @@ export const CityApi = {
       };
     }>(`/city/stats${query}`);
   },
-  autoAssignSupervisors: (modules: Array<"SWEEPING" | "TOILET" | "LITTERBINS">) =>
+  autoAssignSupervisors: (modules: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA">) =>
     apiFetch<{
       success: boolean;
       summary: {
         cityId: string;
-        selectedModules: Array<"SWEEPING" | "TOILET" | "LITTERBINS">;
+        selectedModules: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA">;
         beats: {
           eligibleSupervisors: number;
           supervisorsWithoutScope: number;
@@ -533,6 +533,13 @@ export const CityApi = {
           unmatchedAssets: number;
         };
         litterbins: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+        nalas?: {
           eligibleSupervisors: number;
           supervisorsWithoutScope: number;
           totalAssets: number;
@@ -712,6 +719,36 @@ export type NalaCreateInput = {
   points: NalaPointInput[];
 };
 
+export type NalaRequestInput = {
+  zoneId: string;
+  wardId: string;
+  areaId?: string;
+  areaName?: string;
+  nalaName: string;
+  nalaCode?: string;
+  points: Array<{
+    latitude: number;
+    longitude: number;
+    code?: string;
+    name?: string;
+    type?: string;
+  }>;
+};
+
+export type NalaImportCommitInput = {
+  zoneId: string;
+  wardId: string;
+  areaId: string;
+  nalas: Array<{
+    sourceIndex: number;
+    nalaName: string;
+    nalaCode?: string | null;
+    geometry?: any;
+    supervisorId?: string | null;
+    points: Array<NalaPointInput & { employeeId?: string | null }>;
+  }>;
+};
+
 export type NalaUpdateInput = {
   zoneId?: string;
   wardId?: string;
@@ -722,8 +759,94 @@ export type NalaUpdateInput = {
 };
 
 export const NalaApi = {
-  list: () =>
-    apiFetch<{ nalas: any[] }>("/city/nalas"),
+  // Approved Nalas only (pending / rejected requests are excluded).
+  list: (params?: { zoneId?: string; wardId?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.zoneId) sp.append("zoneId", params.zoneId);
+    if (params?.wardId) sp.append("wardId", params.wardId);
+    const query = sp.toString();
+    return apiFetch<{ nalas: any[] }>(`/city/nalas${query ? `?${query}` : ""}`);
+  },
+
+  listMyNalas: (params?: { date?: string; startDate?: string; endDate?: string; allTime?: boolean }) => {
+    const sp = new URLSearchParams();
+    if (params?.date) sp.append("date", params.date);
+    if (params?.startDate) sp.append("startDate", params.startDate);
+    if (params?.endDate) sp.append("endDate", params.endDate);
+    if (params?.allTime) sp.append("allTime", "true");
+    const query = sp.toString();
+    return apiFetch<{
+      roleMode: string;
+      maxPhotosPerPoint: number;
+      minimumRequiredPhotos: number;
+      summary: { nalas: number; points: number; completedPoints: number; inProgressPoints: number; notDonePoints: number };
+      nalas: any[];
+    }>(`/city/nalas/my-nalas${query ? `?${query}` : ""}`);
+  },
+
+  statusOverview: (params?: { status?: string; zoneId?: string; wardId?: string; date?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.append("status", params.status);
+    if (params?.zoneId) sp.append("zoneId", params.zoneId);
+    if (params?.wardId) sp.append("wardId", params.wardId);
+    if (params?.date) sp.append("date", params.date);
+    const query = sp.toString();
+    return apiFetch<{
+      nalas: any[];
+      summary: { total: number; completed: number; inProgress: number; notDone: number; totalPoints: number; completedPoints: number };
+    }>(`/city/nalas/status-overview${query ? `?${query}` : ""}`);
+  },
+
+  // Supervisor field request (Sweeping: beat requests).
+  request: (body: NalaRequestInput) =>
+    apiFetch<any>("/city/nalas/request", {
+      method: "POST",
+      body: JSON.stringify(body)
+    }),
+
+  listMyRequested: () =>
+    apiFetch<{ requestedNalas: any[] }>("/city/nalas/my-requested"),
+
+  listPendingRequests: (status?: "PENDING_QC" | "APPROVED" | "REJECTED" | "ALL") =>
+    apiFetch<{
+      pendingNalas: any[];
+      counts?: { pending: number; approved: number; rejected: number; all: number };
+    }>(`/city/nalas/pending-requests${status ? `?status=${status}` : ""}`),
+
+  reviewRequest: (id: string, action: "APPROVE" | "REJECT", rejectionReason?: string) =>
+    apiFetch<{ success: boolean; nala: any }>(`/city/nalas/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify({ action, rejectionReason })
+    }),
+
+  // KML / KMZ ward import: one Folder = one Nala, its Placemarks = NalaPoints.
+  importPreview: (file: File, scope?: { zoneId?: string; wardId?: string; areaId?: string }) => {
+    const formData = new FormData();
+    formData.append("kmlFile", file);
+    if (scope?.zoneId) formData.append("zoneId", scope.zoneId);
+    if (scope?.wardId) formData.append("wardId", scope.wardId);
+    if (scope?.areaId) formData.append("areaId", scope.areaId);
+    return apiFetch<{ preview: any }>("/city/nalas/import-preview", {
+      method: "POST",
+      body: formData,
+      headers: {}
+    });
+  },
+
+  importCommit: (body: NalaImportCommitInput) =>
+    apiFetch<{ success: boolean; message: string; nalaCount: number; nalaIds: string[] }>(
+      "/city/nalas/import-commit",
+      {
+        method: "POST",
+        body: JSON.stringify(body)
+      }
+    ),
+
+  bulkAssign: (nalaIds: string[], userId: string | null, targetRole: "SUPERVISOR" | "EMPLOYEE") =>
+    apiFetch<{ success: boolean; updatedNalaCount: number }>("/city/nalas/bulk-assign", {
+      method: "POST",
+      body: JSON.stringify({ nalaIds, userId, targetRole })
+    }),
 
   get: (id: string) =>
     apiFetch<{ nala: any }>(`/city/nalas/${id}`),
@@ -954,15 +1077,18 @@ export type SiReportBuckets = {
 
 export type SiPerformance = {
   darogas: number;
-  assets: { toilets: number; litterBins: number; beats: number };
-  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", SiReportBuckets>;
+  assets: { toilets: number; litterBins: number; beats: number; nalaPoints?: number };
+  // NALA is absent on backends that predate the Nala module.
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", SiReportBuckets> & { NALA?: SiReportBuckets };
 };
 
 /** Daroga required vs completed inspections (asset-days) in a date range. */
 export type DarogaPerformance = {
   /** Days in the range that count (future days excluded); null = no range. */
   days: number | null;
-  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", { assigned: number; required: number | null; completed: number }>;
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", { assigned: number; required: number | null; completed: number }> & {
+    NALA?: { assigned: number; required: number | null; completed: number };
+  };
   required: number | null;
   completed: number;
   performance: number | null;
@@ -979,7 +1105,7 @@ export type IecReportBuckets = {
 
 export type IecPerformance = {
   darogas: number;
-  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", IecReportBuckets>;
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", IecReportBuckets> & { NALA?: IecReportBuckets };
   /** Resolver user id per resolved report, keyed "MODULE:reportId" (null = not recorded). */
   resolvers: Record<string, string | null>;
   resolverNames: Record<string, string>;
@@ -1030,7 +1156,7 @@ export type SupervisorAssignmentStatus = {
       id: string;
       name: string;
       phone: string | null;
-      moduleKeys: Array<"SWEEPING" | "TOILET" | "LITTERBINS">;
+      moduleKeys: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA">;
       zoneIds: string[];
       wardIds: string[];
       reason: string;
@@ -1049,7 +1175,20 @@ export type SupervisorAssignmentStatus = {
         wardId: string | null;
       }>;
     }
-  >;
+  > & {
+    // One asset per NalaPoint; absent on older backends.
+    NALA?: {
+      totalAssets: number;
+      assignedAssets: number;
+      unassignedAssets: number;
+      unassignedItems: Array<{
+        id: string;
+        name: string;
+        zoneId: string | null;
+        wardId: string | null;
+      }>;
+    };
+  };
 };
 
 export const SupervisorAssignmentApi = {

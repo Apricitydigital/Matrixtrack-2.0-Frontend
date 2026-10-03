@@ -18,6 +18,7 @@ import {
   Toilet,
   Trash2,
   Truck,
+  Waves,
 } from "lucide-react";
 
 import {
@@ -34,7 +35,8 @@ type ModuleId =
   | "SWEEPING"
   | "TOILET"
   | "TWINBIN"
-  | "TASKFORCE";
+  | "TASKFORCE"
+  | "NALA";
 
 type ModuleTargetMap =
   Partial<
@@ -101,6 +103,7 @@ const DEFAULT_DAILY_TARGETS: ModuleTargetMap = {
   TOILET: null,
   TWINBIN: null,
   TASKFORCE: null,
+  NALA: null,
 };
 
 /* =========================================================
@@ -200,6 +203,29 @@ const MODULES = [
     border:
       "#ded5ff",
   },
+
+  {
+    id: "NALA" as ModuleId,
+
+    name:
+      "Nala Cleaning",
+
+    candidates: [
+      "NALA",
+    ],
+
+    icon:
+      Waves,
+
+    color:
+      "#0284c7",
+
+    soft:
+      "#f0f9ff",
+
+    border:
+      "#cdeafe",
+  },
 ];
 
 /* =========================================================
@@ -253,6 +279,14 @@ function resolveModule(
     )
   ) {
     return MODULES[0];
+  }
+
+  if (
+    text.includes(
+      "NALA"
+    )
+  ) {
+    return MODULES[4];
   }
 
   if (

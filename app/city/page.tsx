@@ -32,6 +32,7 @@ import {
   Toilet,
   Trash2,
   BrushCleaning,
+  Waves,
   Truck,
   FileUser,
   Eye,
@@ -484,7 +485,7 @@ export default function CityDashboardPage() {
   const [recentRegistrationRequests, setRecentRegistrationRequests] = useState<any[]>([]);
   const [pendingRegCount, setPendingRegCount] = useState(0);
   // Bar chart: per-day inspection counts for last 6 days by module
-  const [barChartData, setBarChartData] = useState<{ date: string; sweeping: number; toilet: number; twinbin: number }[]>([]);
+  const [barChartData, setBarChartData] = useState<{ date: string; sweeping: number; toilet: number; twinbin: number; nala: number }[]>([]);
 
   // Commissioner-only states (untouched)
   const [sweepingDetailStats, setSweepingDetailStats] = useState({
@@ -586,10 +587,11 @@ export default function CityDashboardPage() {
           return d;
         });
         // Group allLogs (from all modules recent records) by date + module
-        const [swpRec, toilRec, binRec] = await Promise.all([
+        const [swpRec, toilRec, binRec, nalaRec] = await Promise.all([
           ModuleRecordsApi.getRecords('SWEEPING', { limit: 200, cityId: filterCity !== 'ALL' ? filterCity : undefined }).catch(() => ({ data: [] })),
           ModuleRecordsApi.getRecords('TOILET', { limit: 200, cityId: filterCity !== 'ALL' ? filterCity : undefined }).catch(() => ({ data: [] })),
-          ModuleRecordsApi.getRecords('TWINBIN', { limit: 200, cityId: filterCity !== 'ALL' ? filterCity : undefined }).catch(() => ({ data: [] }))
+          ModuleRecordsApi.getRecords('TWINBIN', { limit: 200, cityId: filterCity !== 'ALL' ? filterCity : undefined }).catch(() => ({ data: [] })),
+          ModuleRecordsApi.getRecords('NALA', { limit: 200, cityId: filterCity !== 'ALL' ? filterCity : undefined }).catch(() => ({ data: [] }))
         ]);
         const countByDay = (records: any[], dayDate: Date) => {
           return (records || []).filter((r: any) => {
@@ -607,6 +609,7 @@ export default function CityDashboardPage() {
             sweeping: countByDay(swpRec.data || [], d),
             toilet: countByDay(toilRec.data || [], d),
             twinbin: countByDay(binRec.data || [], d),
+            nala: countByDay(nalaRec.data || [], d),
           };
         });
         setBarChartData(chartRows);
@@ -615,7 +618,8 @@ export default function CityDashboardPage() {
         const allFetchedActivity = [
           ...(swpRec.data || []).map((r: any) => ({ ...r, moduleName: 'Sweeping' })),
           ...(toilRec.data || []).map((r: any) => ({ ...r, moduleName: 'Toilet' })),
-          ...(binRec.data || []).map((r: any) => ({ ...r, moduleName: 'Litterbin' }))
+          ...(binRec.data || []).map((r: any) => ({ ...r, moduleName: 'Litterbin' })),
+          ...(nalaRec.data || []).map((r: any) => ({ ...r, moduleName: 'Nala' }))
         ];
 
         const supMap: Record<string, any> = {};
@@ -3673,6 +3677,7 @@ export default function CityDashboardPage() {
                     { key: 'TOILET', keyMatch: ['toilet'], name: 'Cleanliness of Toilets', color: '#3d76df', soft: '#eff5ff', border: '#d2e2ff', icon: Toilet, link: '/modules/toilet' },
                     { key: 'TWINBIN', keyMatch: ['twinbin', 'litter', 'bin'], name: 'Litterbins', color: '#d78212', soft: '#fff7e9', border: '#f4dfb8', icon: Trash2, link: '/modules/litterbins/admin' },
                     { key: 'TASKFORCE', keyMatch: ['taskforce', 'gvp', 'ctu'], name: 'GVP', color: '#7657e8', soft: '#f4f1ff', border: '#ded5ff', icon: Truck, link: '/modules/taskforce/admin' },
+                    { key: 'NALA', keyMatch: ['nala'], name: 'Nala Cleaning', color: '#0284c7', soft: '#f0f9ff', border: '#cdeafe', icon: Waves, link: '/modules/nala' },
                   ];
                   const cards = moduleCards.map((mc) => {
                     const found = moduleActivity.find((m) => mc.keyMatch.some((k) => m.key.toLowerCase().includes(k)));
@@ -4064,6 +4069,19 @@ export default function CityDashboardPage() {
                       }
                     ];
 
+                    const nalaActivity = moduleActivity.find(m => m.key === 'NALA');
+                    if (nalaActivity) {
+                      const nlApp = nalaActivity.approved || 0;
+                      const nlRej = nalaActivity.actionRequired || 0;
+                      const nlPen = nalaActivity.pending || 0;
+                      const nlTot = nlApp + nlRej + nlPen;
+                      healthModules.push({
+                        moduleName: 'Nala Cleaning', icon: Waves, color: nlApp >= Math.max(nlRej, nlPen) ? '#17966f' : (nlRej >= nlPen ? '#ee5c5c' : '#eba62d'), iconBg: '#f0f9ff', border: '#cdeafe', wash: '#f7fbff',
+                        score: nlApp, percent: nlTot > 0 ? Math.round((nlApp / nlTot) * 100) : (nlApp > 0 ? 100 : 0),
+                        approved: nlApp, rejected: nlRej, pending: nlPen, link: '/modules/nala'
+                      } as any);
+                    }
+
                     if (tfTot > 0 || moduleActivity.find(m => m.key === 'TASKFORCE')) {
                       healthModules.push({
                         moduleName: 'CTU / GVP Module', icon: Truck, color: tfApp >= Math.max(tfRej, tfPen) ? '#17966f' : (tfRej >= tfPen ? '#ee5c5c' : '#eba62d'), iconBg: '#f4f1ff', border: '#ded5ff', wash: '#faf8ff',
@@ -4135,7 +4153,7 @@ export default function CityDashboardPage() {
                     <div className="mx-empty-chart">No inspection data available for the past 6 days</div>
                   </div>
                 ) : (() => {
-                  const maxVal = Math.max(...barChartData.flatMap((d) => [d.sweeping, d.toilet, d.twinbin]), 1);
+                  const maxVal = Math.max(...barChartData.flatMap((d) => [d.sweeping, d.toilet, d.twinbin, d.nala]), 1);
                   const ticks = [maxVal, Math.ceil(maxVal * .75), Math.ceil(maxVal * .5), Math.ceil(maxVal * .25), 0];
                   const heightFor = (value: number) => value > 0 ? Math.max((value / maxVal) * 188, 12) : 4;
 
@@ -4153,6 +4171,7 @@ export default function CityDashboardPage() {
                                 { value: d.sweeping, color: '#15976e' },
                                 { value: d.toilet, color: '#3974df' },
                                 { value: d.twinbin, color: '#d98112' },
+                                { value: d.nala, color: '#0284c7' },
                               ].map((bar, barIndex) => (
                                 <div className="mx-bar-wrap" key={barIndex}>
                                   {bar.value > 0 ? (
@@ -4176,6 +4195,7 @@ export default function CityDashboardPage() {
                           { label: 'Sweeping Module', color: '#15976e' },
                           { label: 'Cleanliness of Toilets', color: '#3974df' },
                           { label: 'Litterbins Module', color: '#d98112' },
+                          { label: 'Nala Cleaning', color: '#0284c7' },
                         ].map((item, i) => (
                           <span className="mx-legend-chip" key={i}>
                             <span className="mx-legend-dot" style={{ background: item.color }} />
@@ -4338,6 +4358,10 @@ export default function CityDashboardPage() {
                   { name: 'Sweeping', count: sweeping.total, pending: sweeping.actionRequired, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5', link: '/modules/sweeping' },
                   { name: 'Litter Bins', count: twinbin.total, pending: twinbin.actionRequired, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb', link: '/modules/litterbins' },
                 ];
+                const nalaAct = moduleActivity.find(m => m.key === 'NALA');
+                if (nalaAct) {
+                  actions.push({ name: 'Nala Cleaning', count: nalaAct.total, pending: nalaAct.actionRequired, icon: Waves, iconColor: '#0284c7', iconBg: '#f0f9ff', link: '/modules/nala' } as any);
+                }
                 if (taskforce.total > 0 || moduleActivity.find(m => m.key === 'TASKFORCE')) {
                   actions.push({ name: 'CTU / GVP Transformation', count: taskforce.total, pending: taskforce.actionRequired, icon: Truck, iconColor: '#8b5cf6', iconBg: '#f5f3ff', link: '/modules/taskforce' });
                 }
@@ -4402,6 +4426,10 @@ export default function CityDashboardPage() {
                   { name: 'Sweeping', count: sweeping.total, pending: sweeping.pending, icon: BrushCleaning, iconColor: '#10b981', iconBg: '#ecfdf5', link: '/modules/sweeping' },
                   { name: 'Litter Bins', count: twinbin.total, pending: twinbin.pending, icon: Trash2, iconColor: '#f59e0b', iconBg: '#fffbeb', link: '/modules/litterbins' },
                 ];
+                const nalaAudit = moduleActivity.find(m => m.key === 'NALA');
+                if (nalaAudit) {
+                  audits.push({ name: 'Nala Cleaning', count: nalaAudit.total, pending: nalaAudit.pending, icon: Waves, iconColor: '#0284c7', iconBg: '#f0f9ff', link: '/modules/nala' } as any);
+                }
                 if (taskforce.total > 0 || moduleActivity.find(m => m.key === 'TASKFORCE')) {
                   audits.push({ name: 'CTU / GVP Transformation', count: taskforce.total, pending: taskforce.pending, icon: Truck, iconColor: '#8b5cf6', iconBg: '#f5f3ff', link: '/modules/taskforce' });
                 }

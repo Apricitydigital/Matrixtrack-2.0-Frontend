@@ -25,6 +25,7 @@ import {
     Trash2,
     UserCheck,
     Users,
+    Waves,
 } from 'lucide-react';
 
 import {
@@ -86,6 +87,13 @@ const EXECUTIVE_COMPONENTS: ExecutiveComponentConfig[] = [
         group: 'MODULE',
     },
     {
+        field: 'nala',
+        key: 'NALA',
+        label: 'Nala Cleaning',
+        shortLabel: 'Nala',
+        group: 'MODULE',
+    },
+    {
         field: 'toilet',
         key: 'TOILET',
         label: 'Toilet',
@@ -135,6 +143,7 @@ const COMPONENT_ICONS: Record<
     typeof ShieldCheck
 > = {
     BEAT: Route,
+    NALA: Waves,
     TOILET: Droplets,
     LITTERBIN: Trash2,
     WORKFORCE: Users,
@@ -400,6 +409,7 @@ function exceptionAreaName(moduleValue: unknown) {
     const moduleName = String(moduleValue || 'OTHER').toUpperCase();
 
     if (moduleName === 'BEAT') return 'Beat';
+    if (moduleName === 'NALA') return 'Nala';
     if (moduleName === 'TOILET') return 'Toilet';
     if (moduleName === 'LITTERBIN' || moduleName === 'LITTER_BIN') return 'Litter Bin';
     if (moduleName === 'WORKFORCE') return 'Workforce';
@@ -1947,7 +1957,7 @@ function WardFocusCard({
                         </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                    <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
                         {EXECUTIVE_COMPONENTS.map((component) => {
                             const componentScore = ward.components?.[component.field] as any;
                             const value = percentageLabel(componentScore);

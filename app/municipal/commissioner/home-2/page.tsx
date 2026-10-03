@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Trash2,
   UsersRound,
+  Waves,
 } from 'lucide-react';
 
 import { apiFetch } from '@lib/apiClient';
@@ -60,7 +61,8 @@ type ModuleFilter =
   | 'ALL'
   | 'SWEEPING'
   | 'LITTERBIN'
-  | 'TOILET';
+  | 'TOILET'
+  | 'NALA';
 
 type StatusFilter =
   | 'ALL'
@@ -232,6 +234,7 @@ export default function CommissionerHome2Page() {
       beats: true,
       toilets: true,
       bins: true,
+      nalas: true,
     });
 
   const [
@@ -374,7 +377,9 @@ export default function CommissionerHome2Page() {
       moduleFilter ===
         'TOILET' ||
         moduleFilter ===
-        'LITTERBIN'
+        'LITTERBIN' ||
+        moduleFilter ===
+        'NALA'
         ? []
         : (
           data?.beats || []
@@ -399,7 +404,9 @@ export default function CommissionerHome2Page() {
         moduleFilter ===
           'SWEEPING' ||
           moduleFilter ===
-          'LITTERBIN'
+          'LITTERBIN' ||
+          moduleFilter ===
+          'NALA'
           ? []
           : (
             data?.toilets ||
@@ -423,10 +430,34 @@ export default function CommissionerHome2Page() {
     () =>
       moduleFilter ===
         'SWEEPING' ||
-        moduleFilter === 'TOILET'
+        moduleFilter === 'TOILET' ||
+        moduleFilter === 'NALA'
         ? []
         : (
           data?.bins || []
+        ).filter((item) =>
+          matchesActorFilter(
+            item.actors,
+            roleFilter,
+            userId,
+          ),
+        ),
+    [
+      data,
+      moduleFilter,
+      roleFilter,
+      userId,
+    ],
+  );
+
+  // One marker per NalaPoint.
+  const scopedNalas = useMemo(
+    () =>
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'NALA'
+        ? []
+        : (
+          data?.nalas || []
         ).filter((item) =>
           matchesActorFilter(
             item.actors,
@@ -458,11 +489,16 @@ export default function CommissionerHome2Page() {
             (item) =>
               item.state,
           ),
+          ...scopedNalas.map(
+            (item) =>
+              item.state,
+          ),
         ]),
       [
         scopedBeats,
         scopedToilets,
         scopedBins,
+        scopedNalas,
       ],
     );
 
@@ -517,10 +553,23 @@ export default function CommissionerHome2Page() {
       ],
     );
 
+  const filteredNalas =
+    useMemo(
+      () =>
+        filterByStatus(
+          scopedNalas,
+        ),
+      [
+        scopedNalas,
+        statusFilter,
+      ],
+    );
+
   const displayedTotal =
     filteredBeats.length +
     filteredToilets.length +
-    filteredBins.length;
+    filteredBins.length +
+    filteredNalas.length;
 
   const reported =
     scopeSummary.total -
@@ -730,8 +779,8 @@ return (
                 assets by status,
                 module, role and user
                 across Sweeping,
-                Litter Bin and Toilet
-                inspections.
+                Litter Bin, Toilet and
+                Nala inspections.
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -997,6 +1046,10 @@ return (
                 <option value="TOILET">
                   Toilet
                 </option>
+
+                <option value="NALA">
+                  Nala
+                </option>
               </FilterSelect>
             </FilterField>
 
@@ -1183,6 +1236,7 @@ return (
               filteredToilets
             }
             bins={filteredBins}
+            nalas={filteredNalas}
             visible={visible}
             focusLevel={
               mapFocusLevel
@@ -1255,6 +1309,19 @@ return (
                   'text-cyan-600',
                 countClass:
                   'bg-cyan-100 text-cyan-700',
+              },
+              {
+                key: 'nalas' as const,
+                label: 'Nala',
+                icon: Waves,
+                count:
+                  filteredNalas.length,
+                activeClass:
+                  'bg-sky-50 text-sky-900 ring-1 ring-inset ring-sky-100',
+                iconClass:
+                  'text-sky-600',
+                countClass:
+                  'bg-sky-100 text-sky-700',
               },
             ].map((layer) => {
               const Icon =

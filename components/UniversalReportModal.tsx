@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { normalizeInspectionAnswers, NormalizedAnswer } from '@lib/reportAnswers';
 import { resolveMediaUrl } from '@lib/mediaUrl';
 import { useAuth } from '@hooks/useAuth';
+import { StorageApi } from '@lib/apiClient';
 
 export type UniversalReportModalProps = {
     moduleTitle: string;
@@ -14,7 +15,7 @@ export type UniversalReportModalProps = {
     onApprove?: (record: any, remarks?: string) => Promise<void>;
     onReject?: (record: any, remarks?: string) => Promise<void>;
     onActionRequired?: (record: any, remarks?: string) => Promise<void>;
-    onActionTaken?: (record: any, actionDescription: string, remarks?: string, photoUrl?: string) => Promise<void>;
+    onActionTaken?: (record: any, actionDescription: string, remarks?: string, photoUrl?: string, photoUrls?: string[]) => Promise<void>;
     isAO?: boolean;
     userRoles?: string[];
 };
@@ -69,6 +70,8 @@ export default function UniversalReportModal({
     const { user } = useAuth();
     const [remarks, setRemarks] = useState('');
     const [actionTakenText, setActionTakenText] = useState('');
+    const [aoPhotoUrls, setAoPhotoUrls] = useState<string[]>([]);
+    const [aoPhotoUploading, setAoPhotoUploading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
 
@@ -98,7 +101,11 @@ export default function UniversalReportModal({
     if (!record) return null;
 
     // Asset name
-    const assetName = record.toilet?.name || record.beatName || record.areaName
+    const nalaAssetName = record.nalaName
+        ? [record.nalaName, record.nalaPointName].filter(Boolean).join(' - ')
+        : null;
+
+    const assetName = record.toilet?.name || nalaAssetName || record.beatName || record.areaName
         || record.locationName || record.feederPointName || record.locationDescription
         || record.name || 'Inspection Report';
 
@@ -191,6 +198,10 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
 
     const titleLower = (moduleTitle || '').toLowerCase();
     const isSweepingModule = titleLower.includes('sweeping') || titleLower.includes('beat');
+    const isNalaModule = titleLower.includes('nala');
+
+    // Sweeping segments and NalaPoints both store P1-P5 photo evidence in payload.points.
+    const isPointEvidenceModule = isSweepingModule || isNalaModule;
 
 
 
@@ -199,7 +210,9 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
 
     const assetLabel = isSweepingModule
         ? 'Beat Name'
-        : isLitterbinModule
+        : isNalaModule
+            ? 'Nala Point'
+            : isLitterbinModule
             ? 'Litter Bin Name'
             : isToiletModule
                 ? 'Toilet Name'
@@ -397,8 +410,12 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
     const handleActionReq = wrap(async () => { if (onActionRequired) await onActionRequired(record, remarks); });
     const handleActionTaken = wrap(async () => {
         if (!actionTakenText.trim()) throw new Error('Please describe the action taken.');
+        // Sweeping and Nala closures are rejected by the backend without photo evidence.
+        if (isPointEvidenceModule && aoPhotoUrls.length === 0) {
+            throw new Error('Please upload at least one photo of the action taken.');
+        }
         if (onActionTaken) {
-            await onActionTaken(record, actionTakenText, remarks);
+            await onActionTaken(record, actionTakenText, remarks, aoPhotoUrls[0], aoPhotoUrls);
         } else if (onApprove) {
             await onApprove(record, actionTakenText || remarks);
         } else if (onReject) {
@@ -563,16 +580,34 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
     };
 
     const sweepingEvidencePoints = (() => {
-        if (!isSweepingModule) {
+        if (!isPointEvidenceModule) {
             return [];
         }
 
-        const payloadPoints =
+        const rawPayloadPoints =
             Array.isArray(
                 record.payload?.points
             )
                 ? record.payload.points
                 : [];
+
+        /*
+         * Nala photos can be submitted out of order (P1, P3, P5),
+         * so place each one in its own pointIndex slot.
+         */
+        const payloadPoints =
+            isNalaModule
+                ? rawPayloadPoints.reduce(
+                    (slots: any[], point: any, position: number) => {
+                        const slot = Number.isInteger(point?.pointIndex)
+                            ? point.pointIndex
+                            : position;
+                        slots[slot] = point;
+                        return slots;
+                    },
+                    []
+                )
+                : rawPayloadPoints;
 
         const directPoints =
             Array.isArray(
@@ -582,7 +617,9 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                 : [];
 
         const configuredPoints =
-            Array.isArray(
+            isNalaModule
+                ? (Array.isArray(record.photoSlots) ? record.photoSlots : [])
+                : Array.isArray(
                 record.beat?.points
             )
                 ? record.beat.points
@@ -946,7 +983,7 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
         );
 
     const ulbRemarks =
-        isSweepingModule
+        isPointEvidenceModule
             ? safeText(
                 record.payload?.ulbRemark,
                 record.ulbRemark,
@@ -2052,7 +2089,7 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
 
                                 {resolvedAnswers.length ===
                                 0 ? (
-                                    isSweepingModule &&
+                                    isPointEvidenceModule &&
                                     sweepingEvidencePoints.length > 0 ? (
                                         <div
                                             style={{
@@ -2275,7 +2312,7 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                                                                     photo
                                                                                 }
                                                                                 alt={
-                                                                                    `Sweeping point ${index + 1} evidence`
+                                                                                    `${isNalaModule ? 'Nala' : 'Sweeping'} point ${index + 1} evidence`
                                                                                 }
                                                                                 style={{
                                                                                     width:
@@ -2996,6 +3033,13 @@ return createPortal(
                                         <MetaRow label="Zone" value={zoneName} />
                                         <MetaRow label="Ward" value={wardName} />
                                         {beatName && <MetaRow label="Beat" value={beatName} />}
+                                        {record.nalaName && <MetaRow label="Nala" value={record.nalaName} />}
+                                        {record.nalaPointName && (
+                                            <MetaRow
+                                                label="Nala Point"
+                                                value={[record.nalaPointCode, record.nalaPointName].filter(Boolean).join(' - ')}
+                                            />
+                                        )}
 
                                 {isSweepingModule &&
                                   sweepingEmployeeName && (
@@ -3591,9 +3635,60 @@ return createPortal(
                                         />
                                     </div>
 
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
+                                            Action Photos {isPointEvidenceModule ? '(required)' : '(optional)'}
+                                        </label>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            disabled={aoPhotoUploading || submitting || aoPhotoUrls.length >= 5}
+                                            onChange={async (e) => {
+                                                const files = Array.from(e.target.files || []).slice(0, 5 - aoPhotoUrls.length);
+                                                e.target.value = '';
+                                                if (!files.length) return;
+                                                try {
+                                                    setAoPhotoUploading(true);
+                                                    const uploadModule = isNalaModule ? 'nala' : isSweepingModule ? 'sweeping' : 'general';
+                                                    const uploaded: string[] = [];
+                                                    for (const file of files) {
+                                                        const res = await StorageApi.upload(file, uploadModule);
+                                                        if (res?.url) uploaded.push(res.url);
+                                                    }
+                                                    setAoPhotoUrls(prev => [...prev, ...uploaded]);
+                                                } catch (err: any) {
+                                                    alert(err?.message || 'Photo upload failed');
+                                                } finally {
+                                                    setAoPhotoUploading(false);
+                                                }
+                                            }}
+                                            style={{ fontSize: '12px' }}
+                                        />
+                                        {aoPhotoUploading && (
+                                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: 4 }}>Uploading...</div>
+                                        )}
+                                        {aoPhotoUrls.length > 0 && (
+                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                                                {aoPhotoUrls.map((url, idx) => (
+                                                    <div key={url} style={{ position: 'relative', width: 56, height: 56 }}>
+                                                        <img src={resolveUrl(url) || url} alt={`Action photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setAoPhotoUrls(prev => prev.filter(item => item !== url))}
+                                                            style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: '50%', border: 'none', background: '#dc2626', color: '#ffffff', fontSize: 11, lineHeight: '18px', cursor: 'pointer', padding: 0 }}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <button
                                         onClick={handleActionTaken}
-                                        disabled={submitting}
+                                        disabled={submitting || aoPhotoUploading}
                                         style={{ padding: '10px', borderRadius: '8px', border: 'none', background: '#2563eb', color: '#ffffff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
                                     >
                                         {submitting ? 'Submitting...' : 'Mark Action Taken'}
