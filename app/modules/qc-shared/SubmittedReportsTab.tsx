@@ -6,7 +6,7 @@ import { useAuth } from '@hooks/useAuth';
 import { isReportVisibleToAO } from '@lib/aoScope';
 
 interface SubmittedReportsTabProps {
-    moduleKey: 'TOILET' | 'SWEEPING' | 'LITTERBINS' | 'NALA';
+    moduleKey: 'TOILET' | 'SWEEPING' | 'LITTERBINS' | 'NALA' | 'TASKFORCE';
     assetLabel: string;
     cityId?: string;
     initialStatus?: string;
@@ -230,7 +230,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
 
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                const name = (rec.toiletName || rec.beatName || rec.nalaName || rec.nala?.name || rec.locationName || rec.areaName || '').toLowerCase();
+                const name = (rec.toiletName || rec.beatName || rec.nalaName || rec.nala?.name || rec.feederPointName || rec.locationName || rec.areaName || '').toLowerCase();
                 const staff = getStaffName(rec.createdBy || rec.supervisor || rec.submittedBy).toLowerCase();
                 if (!name.includes(q) && !staff.includes(q)) return false;
             }
@@ -251,6 +251,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
     const formatTypeDisplay = (rawType: any): string => {
         if (!rawType || typeof rawType !== 'string') return moduleKey === 'NALA' ? 'Nala' : 'Street Beat';
         const t = rawType.trim().toUpperCase();
+        if (t === 'FEEDER_REPORT') return 'GVP Inspection';
         if (t === 'SWEEPING_ASSESSMENT' || t === 'BEAT_INSPECTION' || t === 'SWEEPING') return 'Street Beat';
         if (t === 'NALA_ASSESSMENT' || t === 'NALA') return 'Nala';
         if (t === 'MAIN_ROAD') return 'Main Road Sweeping';

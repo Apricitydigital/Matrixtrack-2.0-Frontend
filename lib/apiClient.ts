@@ -1244,10 +1244,24 @@ export const TaskforceApi = {
     apiFetch<{ feederPoints: any[] }>(
       `/modules/taskforce/feeder-points/approved${assigned ? "?assigned=true" : ""}`
     ),
-  assignFeederPoint: (id: string, employeeId: string) =>
+  // The backend reads `supervisorId` (the assigned daroga).
+  assignFeederPoint: (id: string, supervisorId: string) =>
     apiFetch<{ feederPoint: any }>(`/modules/taskforce/feeder-points/${id}/assign`, {
       method: "POST",
-      body: JSON.stringify({ employeeId })
+      body: JSON.stringify({ supervisorId })
+    }),
+  // Approved GVPs in the viewer's QC / ULB / IEC scope (all GVPs for admins).
+  workspaceAssets: () =>
+    apiFetch<{ feederPoints: any[] }>("/modules/taskforce/feeder-points/workspace-assets"),
+  // Darogas (supervisors) of the GVP module inside the viewer's scope.
+  workspaceStaff: () => apiFetch<{ staff: any[] }>("/modules/TASKFORCE/workspace/staff"),
+  // GVPs a daroga reported as eliminated, awaiting SI verification.
+  pendingEliminations: () =>
+    apiFetch<{ feederPoints: any[] }>("/modules/taskforce/feeder-points/eliminations/pending"),
+  reviewElimination: (id: string, decision: "approve" | "reject", remark?: string) =>
+    apiFetch<{ feederPoint: any }>(`/modules/taskforce/feeder-points/${id}/elimination/${decision}`, {
+      method: "POST",
+      body: JSON.stringify(remark ? { remark } : {})
     }),
   pendingReports: () => apiFetch<{ reports: any[] }>("/modules/taskforce/reports/pending"),
   approveReport: (id: string) => apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/approve`, { method: "POST" }),
@@ -1255,10 +1269,12 @@ export const TaskforceApi = {
   actionRequiredReport: (id: string) =>
     apiFetch<{ report: any }>(`/modules/taskforce/reports/${id}/action-required`, { method: "POST" }),
   actionOfficerPending: () => apiFetch<{ reports: any[] }>("/modules/taskforce/action-officer/pending"),
-  actionOfficerSubmit: (id: string, body?: { actionNote?: string }) =>
+  actionOfficerHistory: () => apiFetch<{ reports: any[] }>("/modules/taskforce/action-officer/history"),
+  // Corrective action needs 1-5 proof photos (same rule as Litter Bin).
+  actionOfficerSubmit: (id: string, body: { actionNote?: string; actionPhotoUrls: string[] }) =>
     apiFetch<{ report: any }>(`/modules/taskforce/action-officer/${id}/submit`, {
       method: "POST",
-      body: JSON.stringify(body || {})
+      body: JSON.stringify(body)
     }),
   getRecords: (filters?: { page?: number; limit?: number; tab?: string; cityId?: string }) => {
     const params = new URLSearchParams();

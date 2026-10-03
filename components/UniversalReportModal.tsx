@@ -199,9 +199,11 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
     const titleLower = (moduleTitle || '').toLowerCase();
     const isSweepingModule = titleLower.includes('sweeping') || titleLower.includes('beat');
     const isNalaModule = titleLower.includes('nala');
+    const isGvpModule = titleLower.includes('gvp');
 
-    // Sweeping segments and NalaPoints both store P1-P5 photo evidence in payload.points.
-    const isPointEvidenceModule = isSweepingModule || isNalaModule;
+    // Sweeping segments and NalaPoints store P1-P5 photo evidence in payload.points;
+    // a GVP inspection stores its two photos (P1, P2) the same way.
+    const isPointEvidenceModule = isSweepingModule || isNalaModule || isGvpModule;
 
 
 
@@ -212,6 +214,8 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
         ? 'Beat Name'
         : isNalaModule
             ? 'Nala Point'
+            : isGvpModule
+            ? 'GVP Name'
             : isLitterbinModule
             ? 'Litter Bin Name'
             : isToiletModule
@@ -3650,7 +3654,7 @@ return createPortal(
                                                 if (!files.length) return;
                                                 try {
                                                     setAoPhotoUploading(true);
-                                                    const uploadModule = isNalaModule ? 'nala' : isSweepingModule ? 'sweeping' : 'general';
+                                                    const uploadModule = isNalaModule ? 'nala' : isSweepingModule ? 'sweeping' : isGvpModule ? 'taskforce' : 'general';
                                                     const uploaded: string[] = [];
                                                     for (const file of files) {
                                                         const res = await StorageApi.upload(file, uploadModule);

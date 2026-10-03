@@ -108,7 +108,8 @@ type ModuleKey =
     | 'TOILET'
     | 'SWEEPING'
     | 'LITTERBINS'
-    | 'NALA';
+    | 'NALA'
+    | 'TASKFORCE';
 
 
 type DashboardRecord = any;
@@ -156,6 +157,12 @@ const MODULES: Array<{
             key: 'NALA',
             label: 'Nala Cleaning',
             shortLabel: 'Nala',
+        },
+
+        {
+            key: 'TASKFORCE',
+            label: 'GVP Transformation',
+            shortLabel: 'GVP',
         },
     ];
 
@@ -351,6 +358,18 @@ function recordTitle(
                 .filter(Boolean)
                 .join(' - ') ||
             'Nala Report'
+        );
+    }
+
+
+    if (
+        moduleKey === 'TASKFORCE'
+    ) {
+        return (
+            item?.feederPointName ||
+            item?.feederPoint?.feederPointName ||
+            item?.areaName ||
+            'GVP Report'
         );
     }
 
@@ -721,12 +740,14 @@ function getActionTakenRemark(
 
 
     /*
-     * LITTER BIN DAILY
+     * LITTER BIN DAILY / GVP
      * Action Taken = actionOfficerRemark
      */
     if (
         moduleKey ===
-        'LITTERBINS'
+        'LITTERBINS' ||
+        moduleKey ===
+        'TASKFORCE'
     ) {
         return (
             item?.actionOfficerRemark ||
@@ -1591,6 +1612,7 @@ function buildReportsTrend(
             SWEEPING: number;
             LITTERBINS: number;
             NALA: number;
+            TASKFORCE: number;
         }
     >();
 
@@ -1613,6 +1635,7 @@ function buildReportsTrend(
             SWEEPING: 0,
             LITTERBINS: 0,
             NALA: 0,
+            TASKFORCE: 0,
         });
     }
 
@@ -1631,6 +1654,7 @@ function buildReportsTrend(
         else if (moduleKey === 'SWEEPING') bucket.SWEEPING += 1;
         else if (moduleKey === 'LITTERBINS') bucket.LITTERBINS += 1;
         else if (moduleKey === 'NALA') bucket.NALA += 1;
+        else if (moduleKey === 'TASKFORCE') bucket.TASKFORCE += 1;
 
         const status = effectiveStatus(item);
 
@@ -1914,10 +1938,11 @@ export default function UlbOperationsWorkspace({
                                     );
 
                             const response =
-                                module.key === 'NALA'
+                                module.key === 'NALA' ||
+                                module.key === 'TASKFORCE'
                                     ? await request.catch(
                                         (err) => {
-                                            console.warn('Nala reports unavailable', err);
+                                            console.warn(`${module.label} reports unavailable`, err);
                                             return { data: [] } as any;
                                         }
                                     )
@@ -1927,7 +1952,13 @@ export default function UlbOperationsWorkspace({
                             return (
                                 response.data ||
                                 []
-                            ).map(
+                            )
+                                // GVP history also lists registrations; ULB only acts on reports.
+                                .filter(
+                                    (record: any) =>
+                                        record?.type !== 'FEEDER_POINT'
+                                )
+                                .map(
                                 (
                                     record: any
                                 ) => ({
@@ -3428,7 +3459,9 @@ export default function UlbOperationsWorkspace({
                 moduleKey ===
                 'SWEEPING' ||
                 moduleKey ===
-                'NALA'
+                'NALA' ||
+                moduleKey ===
+                'TASKFORCE'
             ) {
                 await ModuleRecordsApi
                     .updateRecordStatus(
@@ -9501,6 +9534,7 @@ function ReportsTrendChart({
                         <Line type="monotone" dataKey="SWEEPING" name="Sweeping" stroke="#7c3aed" strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="LITTERBINS" name="Litter Bins" stroke="#d97706" strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="NALA" name="Nala Cleaning" stroke="#0284c7" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="TASKFORCE" name="GVP Transformation" stroke="#e11d48" strokeWidth={2} dot={false} />
                     </ComposedChart>
                 </ResponsiveContainer>
             </div>
