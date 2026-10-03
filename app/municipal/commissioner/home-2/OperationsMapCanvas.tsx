@@ -736,13 +736,30 @@ function geometryToFeature(geometry: any) {
 }
 
 function markerIcon(
-  kind: 'toilet' | 'bin' | 'nala',
+  kind: 'toilet' | 'bin' | 'nala' | 'gvp',
   state: WorkState,
 ) {
   const statusColor = STATE_COLORS[state];
 
   const glyph =
-    kind === 'nala'
+    kind === 'gvp'
+      ? `
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 22V4"/>
+          <path d="M4 4h12l-2 4 2 4H4"/>
+        </svg>
+      `
+      : kind === 'nala'
       ? `
         <svg
           width="16"
@@ -856,12 +873,14 @@ function FitAssets({
   toilets,
   bins,
   nalas = [],
+  gvps = [],
   focusLevel,
 }: {
   beats: BeatMapItem[];
   toilets: PointMapItem[];
   bins: PointMapItem[];
   nalas?: PointMapItem[];
+  gvps?: PointMapItem[];
   focusLevel: MapFocusLevel;
 }) {
   const map = useMap();
@@ -930,7 +949,7 @@ function FitAssets({
       }
     });
 
-    [...toilets, ...bins, ...nalas].forEach(
+    [...toilets, ...bins, ...nalas, ...gvps].forEach(
       (item) => {
         const latitude = Number(
           item.latitude,
@@ -1070,6 +1089,8 @@ function FitAssets({
     beats,
     toilets,
     bins,
+    nalas,
+    gvps,
     focusLevel,
   ]);
 
@@ -1187,6 +1208,7 @@ export default function OperationsMapCanvas({
   toilets,
   bins,
   nalas = [],
+  gvps = [],
   visible,
   focusLevel,
 }: {
@@ -1194,6 +1216,7 @@ export default function OperationsMapCanvas({
   toilets: PointMapItem[];
   bins: PointMapItem[];
   nalas?: PointMapItem[];
+  gvps?: PointMapItem[];
 
   focusLevel: MapFocusLevel;
 
@@ -1202,6 +1225,7 @@ export default function OperationsMapCanvas({
     toilets: boolean;
     bins: boolean;
     nalas?: boolean;
+    gvps?: boolean;
   };
 }) {
   const fallbackCenter =
@@ -1248,6 +1272,9 @@ export default function OperationsMapCanvas({
         }
         nalas={
           visible.nalas ? nalas : []
+        }
+        gvps={
+          visible.gvps ? gvps : []
         }
         focusLevel={focusLevel}
       />
@@ -1557,6 +1584,84 @@ export default function OperationsMapCanvas({
                   {point.zoneName} ·{' '}
                   {point.wardName}
                 </div>
+
+                <div className="mt-3">
+                  <StatusBadge
+                    state={point.state}
+                  />
+                </div>
+
+                <ResponsibilitySummary
+                  state={point.state}
+                  actors={point.actors}
+                />
+
+                <WorkflowTimeline
+                  state={point.state}
+                  actors={point.actors}
+                  workflowTimes={
+                    point.workflowTimes
+                  }
+                />
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+      {visible.gvps &&
+        gvps
+          .filter(
+            (point) =>
+              Number.isFinite(Number(point.latitude)) &&
+              Number.isFinite(Number(point.longitude)),
+          )
+          .map((point) => (
+          <Marker
+            key={`${point.id}-${point.state}`}
+            position={[
+              point.latitude,
+              point.longitude,
+            ]}
+            icon={markerIcon(
+              'gvp',
+              point.state,
+            )}
+          >
+            <Tooltip
+              direction="top"
+              offset={[0, -10]}
+              opacity={1}
+            >
+              <QuickAssetPreview
+                moduleLabel="GVP"
+                name={point.name}
+                state={point.state}
+                zoneName={point.zoneName}
+                wardName={point.wardName}
+                actors={point.actors}
+              />
+            </Tooltip>
+
+            <Popup>
+              <div className="w-[320px] max-w-[calc(100vw-80px)] max-h-[440px] overflow-y-auto overflow-x-hidden pr-1 font-sans">
+                <div className="text-[10px] font-bold uppercase tracking-[.18em] text-rose-600">
+                  GVP
+                </div>
+
+                <div className="mt-1 text-base font-black text-slate-900">
+                  {point.name}
+                </div>
+
+                <div className="mt-1 text-xs font-semibold text-slate-500">
+                  {point.zoneName} ·{' '}
+                  {point.wardName}
+                </div>
+
+                {point.areaName ? (
+                  <div className="mt-1 text-xs font-medium text-slate-500">
+                    {point.areaName}
+                  </div>
+                ) : null}
 
                 <div className="mt-3">
                   <StatusBadge

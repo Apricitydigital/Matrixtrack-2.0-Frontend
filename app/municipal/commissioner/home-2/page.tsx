@@ -27,6 +27,7 @@ import {
   Trash2,
   UsersRound,
   Waves,
+  Flag,
 } from 'lucide-react';
 
 import { apiFetch } from '@lib/apiClient';
@@ -62,7 +63,8 @@ type ModuleFilter =
   | 'SWEEPING'
   | 'LITTERBIN'
   | 'TOILET'
-  | 'NALA';
+  | 'NALA'
+  | 'GVP';
 
 type StatusFilter =
   | 'ALL'
@@ -235,6 +237,7 @@ export default function CommissionerHome2Page() {
       toilets: true,
       bins: true,
       nalas: true,
+      gvps: true,
     });
 
   const [
@@ -374,12 +377,8 @@ export default function CommissionerHome2Page() {
 
   const scopedBeats = useMemo(
     () =>
-      moduleFilter ===
-        'TOILET' ||
-        moduleFilter ===
-        'LITTERBIN' ||
-        moduleFilter ===
-        'NALA'
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'SWEEPING'
         ? []
         : (
           data?.beats || []
@@ -401,12 +400,8 @@ export default function CommissionerHome2Page() {
   const scopedToilets =
     useMemo(
       () =>
-        moduleFilter ===
-          'SWEEPING' ||
-          moduleFilter ===
-          'LITTERBIN' ||
-          moduleFilter ===
-          'NALA'
+        moduleFilter !== 'ALL' &&
+          moduleFilter !== 'TOILET'
           ? []
           : (
             data?.toilets ||
@@ -428,10 +423,8 @@ export default function CommissionerHome2Page() {
 
   const scopedBins = useMemo(
     () =>
-      moduleFilter ===
-        'SWEEPING' ||
-        moduleFilter === 'TOILET' ||
-        moduleFilter === 'NALA'
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'LITTERBIN'
         ? []
         : (
           data?.bins || []
@@ -473,6 +466,29 @@ export default function CommissionerHome2Page() {
     ],
   );
 
+  // One marker per active GVP.
+  const scopedGvps = useMemo(
+    () =>
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'GVP'
+        ? []
+        : (
+          data?.gvps || []
+        ).filter((item) =>
+          matchesActorFilter(
+            item.actors,
+            roleFilter,
+            userId,
+          ),
+        ),
+    [
+      data,
+      moduleFilter,
+      roleFilter,
+      userId,
+    ],
+  );
+
   const scopeSummary =
     useMemo(
       () =>
@@ -493,12 +509,17 @@ export default function CommissionerHome2Page() {
             (item) =>
               item.state,
           ),
+          ...scopedGvps.map(
+            (item) =>
+              item.state,
+          ),
         ]),
       [
         scopedBeats,
         scopedToilets,
         scopedBins,
         scopedNalas,
+        scopedGvps,
       ],
     );
 
@@ -565,11 +586,24 @@ export default function CommissionerHome2Page() {
       ],
     );
 
+  const filteredGvps =
+    useMemo(
+      () =>
+        filterByStatus(
+          scopedGvps,
+        ),
+      [
+        scopedGvps,
+        statusFilter,
+      ],
+    );
+
   const displayedTotal =
     filteredBeats.length +
     filteredToilets.length +
     filteredBins.length +
-    filteredNalas.length;
+    filteredNalas.length +
+    filteredGvps.length;
 
   const reported =
     scopeSummary.total -
@@ -779,8 +813,8 @@ return (
                 assets by status,
                 module, role and user
                 across Sweeping,
-                Litter Bin, Toilet and
-                Nala inspections.
+                Litter Bin, Toilet, Nala
+                and GVP inspections.
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1050,6 +1084,10 @@ return (
                 <option value="NALA">
                   Nala
                 </option>
+
+                <option value="GVP">
+                  GVP
+                </option>
               </FilterSelect>
             </FilterField>
 
@@ -1237,6 +1275,7 @@ return (
             }
             bins={filteredBins}
             nalas={filteredNalas}
+            gvps={filteredGvps}
             visible={visible}
             focusLevel={
               mapFocusLevel
@@ -1322,6 +1361,19 @@ return (
                   'text-sky-600',
                 countClass:
                   'bg-sky-100 text-sky-700',
+              },
+              {
+                key: 'gvps' as const,
+                label: 'GVP',
+                icon: Flag,
+                count:
+                  filteredGvps.length,
+                activeClass:
+                  'bg-rose-50 text-rose-900 ring-1 ring-inset ring-rose-100',
+                iconClass:
+                  'text-rose-600',
+                countClass:
+                  'bg-rose-100 text-rose-700',
               },
             ].map((layer) => {
               const Icon =

@@ -137,6 +137,7 @@ export type OperationsMapData = {
     OperationsSummary
   > & {
     nalas?: OperationsSummary;
+    gvps?: OperationsSummary;
   };
 
   beats: BeatMapItem[];
@@ -145,4 +146,7 @@ export type OperationsMapData = {
 
   // One marker per NalaPoint; absent on older backends.
   nalas?: PointMapItem[];
+
+  // One marker per active GVP (garbage vulnerable point); absent on older backends.
+  gvps?: PointMapItem[];
 };
