@@ -62,7 +62,7 @@ import {
    TYPES
 ========================================================= */
 
-type InspectionModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA';
+type InspectionModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA' | 'TASKFORCE';
 
 type UserRoleKey = 'SUPERVISOR' | 'QC' | 'ULB_OFFICER' | 'ACTION_OFFICER' | 'EMPLOYEE';
 
@@ -133,6 +133,7 @@ const INSPECTION_MODULES: Array<{ key: InspectionModuleKey; label: string }> = [
   { key: 'LITTERBINS', label: 'Litter Bins' },
   { key: 'SWEEPING', label: 'Sweeping' },
   { key: 'NALA', label: 'Nala Cleaning' },
+  { key: 'TASKFORCE', label: 'GVP Transformation' },
 ];
 
 const PAGE_SIZE = 10;
@@ -469,6 +470,9 @@ function getRecordTitle(item: DashboardRecord) {
   if (item.dashboardModule === 'NALA') {
     return [item?.nalaName || item?.nala?.nalaName, item?.nalaPointName].filter(Boolean).join(' - ') || 'Nala Cleaning';
   }
+  if (item.dashboardModule === 'TASKFORCE') {
+    return item?.feederPointName || item?.feederPoint?.feederPointName || item?.areaName || 'GVP';
+  }
   return item?.locationName || item?.bin?.locationName || item?.areaName || item?.bin?.areaName || 'Litter Bins';
 }
 
@@ -480,6 +484,7 @@ function getRecordAssetId(item: any) {
     item?.bin?.id ||
     item?.beatId ||
     item?.beat?.id ||
+    item?.feederPointId ||
     null
   );
 }
@@ -593,6 +598,20 @@ function inspectionStats(records: DashboardRecord[]) {
 }
 
 async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: string, to?: string): Promise<any[]> {
+  if (moduleKey === 'TASKFORCE') {
+    return loadAllModuleRecordsStrict(moduleKey, from, to)
+      .then((rows) =>
+        rows
+          // GVP history also lists registrations; only inspection reports count here.
+          .filter((row: any) => row.type !== 'FEEDER_POINT')
+          // GVP reports carry the SI reviewer as reviewedByQc.
+          .map((row: any) => (row.reviewedBy || !row.reviewedByQc ? row : { ...row, reviewedBy: row.reviewedByQc }))
+      )
+      .catch((err) => {
+        console.warn('GVP reports unavailable', err);
+        return [];
+      });
+  }
   if (moduleKey === 'NALA') {
     return loadAllModuleRecordsStrict(moduleKey, from, to).catch((err) => {
       console.warn('Nala reports unavailable', err);
@@ -992,9 +1011,9 @@ function UserDetailDrawer({
       if (Number.isNaN(parsed.getTime())) return;
 
       const key = toDateInput(parsed);
-      const entry = map.get(key) || { TOILET: 0, LITTERBINS: 0, SWEEPING: 0, NALA: 0, total: 0 };
+      const entry = map.get(key) || { TOILET: 0, LITTERBINS: 0, SWEEPING: 0, NALA: 0, TASKFORCE: 0, total: 0 };
       const moduleKey = record.dashboardModule as InspectionModuleKey;
-      if (moduleKey === 'TOILET' || moduleKey === 'LITTERBINS' || moduleKey === 'SWEEPING' || moduleKey === 'NALA') {
+      if (INSPECTION_MODULES.some((module) => module.key === moduleKey)) {
         entry[moduleKey] += 1;
       }
       entry.total += 1;
@@ -1497,10 +1516,16 @@ function UserDetailDrawer({
                         'NalaPoints assigned to this Daroga',
                       ],
                       [
+                        'Assigned GVPs',
+                        coverage?.modules.TASKFORCE?.assigned ?? (coverage ? 0 : undefined),
+                        'border-rose-200 bg-rose-50 text-rose-700',
+                        'Active GVPs (garbage vulnerable points) assigned to this Daroga',
+                      ],
+                      [
                         'Required Inspection',
                         coverage?.required,
                         'border-indigo-200 bg-indigo-50 text-indigo-700',
-                        'Assigned beats, nala points, toilets and litter bins x days in the selected range',
+                        'Assigned beats, nala points, toilets, litter bins and GVPs x days in the selected range',
                       ],
                       [
                         'Completed Inspection',
@@ -1596,6 +1621,7 @@ function UserDetailDrawer({
                         ['Total Litter Bins', si?.assets.litterBins, 'border-emerald-200 bg-emerald-50 text-emerald-700', 'Approved litter bins in this SI\'s scope'],
                         ['Total Beats', si?.assets.beats, 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700', 'Sweeping beats in this SI\'s scope'],
                         ['Total Nala Points', si?.assets.nalaPoints ?? 0, 'border-cyan-200 bg-cyan-50 text-cyan-700', 'Approved NalaPoints in this SI\'s scope'],
+                        ['Total GVPs', si?.assets.gvps ?? 0, 'border-rose-200 bg-rose-50 text-rose-700', 'Active GVPs in this SI\'s scope'],
                       ] as Array<[string, number | undefined, string, string]>
                     ).map(([label, value, tone, hint]) => (
                       <div key={label} className={`rounded-xl border px-3 py-2 text-left ${tone}`} title={hint}>
@@ -1996,6 +2022,7 @@ function UserDetailDrawer({
                           ['LITTERBINS', 'Litter Bin', entry.LITTERBINS],
                           ['SWEEPING', 'Beat (Sweeping)', entry.SWEEPING],
                           ['NALA', 'Nala Point', entry.NALA],
+                          ['TASKFORCE', 'GVP', entry.TASKFORCE],
                         ] as Array<[InspectionModuleKey, string, number]>
                       ).map(([moduleKey, label, count]) => (
                         <button

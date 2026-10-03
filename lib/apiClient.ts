@@ -1077,9 +1077,9 @@ export type SiReportBuckets = {
 
 export type SiPerformance = {
   darogas: number;
-  assets: { toilets: number; litterBins: number; beats: number; nalaPoints?: number };
-  // NALA is absent on backends that predate the Nala module.
-  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", SiReportBuckets> & { NALA?: SiReportBuckets };
+  assets: { toilets: number; litterBins: number; beats: number; nalaPoints?: number; gvps?: number };
+  // NALA / TASKFORCE (GVP) are absent on backends that predate those modules.
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", SiReportBuckets> & { NALA?: SiReportBuckets; TASKFORCE?: SiReportBuckets };
 };
 
 /** Daroga required vs completed inspections (asset-days) in a date range. */
@@ -1088,6 +1088,7 @@ export type DarogaPerformance = {
   days: number | null;
   modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", { assigned: number; required: number | null; completed: number }> & {
     NALA?: { assigned: number; required: number | null; completed: number };
+    TASKFORCE?: { assigned: number; required: number | null; completed: number };
   };
   required: number | null;
   completed: number;
@@ -1105,7 +1106,7 @@ export type IecReportBuckets = {
 
 export type IecPerformance = {
   darogas: number;
-  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", IecReportBuckets> & { NALA?: IecReportBuckets };
+  modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", IecReportBuckets> & { NALA?: IecReportBuckets; TASKFORCE?: IecReportBuckets };
   /** Resolver user id per resolved report, keyed "MODULE:reportId" (null = not recorded). */
   resolvers: Record<string, string | null>;
   resolverNames: Record<string, string>;

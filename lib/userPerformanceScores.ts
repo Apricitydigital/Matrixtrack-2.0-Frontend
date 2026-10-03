@@ -9,10 +9,10 @@
  */
 import type { DarogaPerformance, IecPerformance, SiPerformance } from './apiClient';
 
-export type ScoreModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA';
+export type ScoreModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA' | 'TASKFORCE';
 export type ScoreModuleFilter = 'ALL' | ScoreModuleKey;
 
-const SCORE_MODULES: ScoreModuleKey[] = ['TOILET', 'LITTERBINS', 'SWEEPING', 'NALA'];
+const SCORE_MODULES: ScoreModuleKey[] = ['TOILET', 'LITTERBINS', 'SWEEPING', 'NALA', 'TASKFORCE'];
 
 /** A dashboard module filter mapped to one of the scored modules ('ALL' otherwise). */
 export function scoreModuleFilter(value: string | null | undefined): ScoreModuleFilter {
@@ -64,6 +64,7 @@ export function restrictSiModules(data: SiPerformance, module: ScoreModuleFilter
       LITTERBINS: module === 'LITTERBINS' ? data.modules.LITTERBINS : empty,
       SWEEPING: module === 'SWEEPING' ? data.modules.SWEEPING : empty,
       NALA: module === 'NALA' ? data.modules.NALA || empty : empty,
+      TASKFORCE: module === 'TASKFORCE' ? data.modules.TASKFORCE || empty : empty,
     },
   };
 }
@@ -93,6 +94,7 @@ export function restrictIecModules(data: IecPerformance, module: ScoreModuleFilt
       LITTERBINS: module === 'LITTERBINS' ? data.modules.LITTERBINS : empty,
       SWEEPING: module === 'SWEEPING' ? data.modules.SWEEPING : empty,
       NALA: module === 'NALA' ? data.modules.NALA || empty : empty,
+      TASKFORCE: module === 'TASKFORCE' ? data.modules.TASKFORCE || empty : empty,
     },
   };
 }
