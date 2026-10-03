@@ -135,9 +135,18 @@ export type OperationsMapData = {
   summary: Record<
     'overall' | 'beats' | 'toilets' | 'bins',
     OperationsSummary
-  >;
+  > & {
+    nalas?: OperationsSummary;
+    gvps?: OperationsSummary;
+  };
 
   beats: BeatMapItem[];
   toilets: PointMapItem[];
   bins: PointMapItem[];
+
+  // One marker per NalaPoint; absent on older backends.
+  nalas?: PointMapItem[];
+
+  // One marker per active GVP (garbage vulnerable point); absent on older backends.
+  gvps?: PointMapItem[];
 };

@@ -9,10 +9,10 @@
  */
 import type { DarogaPerformance, IecPerformance, SiPerformance } from './apiClient';
 
-export type ScoreModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING';
+export type ScoreModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA' | 'TASKFORCE';
 export type ScoreModuleFilter = 'ALL' | ScoreModuleKey;
 
-const SCORE_MODULES: ScoreModuleKey[] = ['TOILET', 'LITTERBINS', 'SWEEPING'];
+const SCORE_MODULES: ScoreModuleKey[] = ['TOILET', 'LITTERBINS', 'SWEEPING', 'NALA', 'TASKFORCE'];
 
 /** A dashboard module filter mapped to one of the scored modules ('ALL' otherwise). */
 export function scoreModuleFilter(value: string | null | undefined): ScoreModuleFilter {
@@ -32,11 +32,11 @@ export function performanceRangeParams(from?: string, to?: string) {
 
 export function restrictDarogaModules(data: DarogaPerformance, module: ScoreModuleFilter): DarogaPerformance {
   if (module === 'ALL') return data;
-  const kept = data.modules[module];
+  const kept = data.modules[module] || { assigned: 0, required: data.days === null ? null : 0, completed: 0 };
   const modules = Object.fromEntries(
-    SCORE_MODULES.map((key) => [
+    SCORE_MODULES.filter((key) => data.modules[key]).map((key) => [
       key,
-      key === module ? kept : { assigned: data.modules[key].assigned, required: data.days === null ? null : 0, completed: 0 },
+      key === module ? kept : { assigned: data.modules[key]!.assigned, required: data.days === null ? null : 0, completed: 0 },
     ])
   ) as DarogaPerformance['modules'];
   return {
@@ -63,6 +63,8 @@ export function restrictSiModules(data: SiPerformance, module: ScoreModuleFilter
       TOILET: module === 'TOILET' ? data.modules.TOILET : empty,
       LITTERBINS: module === 'LITTERBINS' ? data.modules.LITTERBINS : empty,
       SWEEPING: module === 'SWEEPING' ? data.modules.SWEEPING : empty,
+      NALA: module === 'NALA' ? data.modules.NALA || empty : empty,
+      TASKFORCE: module === 'TASKFORCE' ? data.modules.TASKFORCE || empty : empty,
     },
   };
 }
@@ -72,8 +74,10 @@ export function siScore(data: SiPerformance | null | undefined): number | null {
   let reviewed = 0;
   let pending = 0;
   SCORE_MODULES.forEach((module) => {
-    reviewed += data.modules[module].cleaned.length + data.modules[module].notCleaned.length;
-    pending += data.modules[module].pendingReview.length;
+    const buckets = data.modules[module];
+    if (!buckets) return;
+    reviewed += buckets.cleaned.length + buckets.notCleaned.length;
+    pending += buckets.pendingReview.length;
   });
   return reviewed + pending > 0 ? (reviewed / (reviewed + pending)) * 100 : null;
 }
@@ -89,6 +93,8 @@ export function restrictIecModules(data: IecPerformance, module: ScoreModuleFilt
       TOILET: module === 'TOILET' ? data.modules.TOILET : empty,
       LITTERBINS: module === 'LITTERBINS' ? data.modules.LITTERBINS : empty,
       SWEEPING: module === 'SWEEPING' ? data.modules.SWEEPING : empty,
+      NALA: module === 'NALA' ? data.modules.NALA || empty : empty,
+      TASKFORCE: module === 'TASKFORCE' ? data.modules.TASKFORCE || empty : empty,
     },
   };
 }
@@ -98,8 +104,10 @@ export function iecScore(data: IecPerformance | null | undefined): number | null
   let attention = 0;
   let resolved = 0;
   SCORE_MODULES.forEach((module) => {
-    attention += data.modules[module].attentionRequired.length;
-    resolved += data.modules[module].resolved.length;
+    const buckets = data.modules[module];
+    if (!buckets) return;
+    attention += buckets.attentionRequired.length;
+    resolved += buckets.resolved.length;
   });
   return attention > 0 ? (resolved / attention) * 100 : null;
 }

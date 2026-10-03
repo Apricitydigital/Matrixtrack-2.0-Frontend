@@ -1,6 +1,5 @@
-import TaskforceTasksPage from "../tasks/page";
+import GvpModulePage from "../components/GvpModulePage";
 
 export default function TaskforceAdminPage() {
-    return <TaskforceTasksPage />;
+  return <GvpModulePage />;
 }
-

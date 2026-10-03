@@ -8,6 +8,7 @@ import {
   apiFetch,
   AreaBeatApi,
   CityUserApi,
+  NalaApi,
   RegistrationApi,
   SupervisorAssignmentApi,
   type SupervisorAssignmentStatus,
@@ -68,7 +69,7 @@ import {
 } from "recharts";
 import UserPerformanceModal from "@components/ui/UserPerformanceModal";
 
-type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "TASKFORCE";
+type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "TASKFORCE" | "NALA";
 type GeoLevel = "zone" | "ward" | "area";
 
 type GeoNode = {
@@ -85,6 +86,7 @@ type RequestStats = {
   toiletRequests: number;
   litterBinRequests: number;
   gvpRequests: number;
+  nalaRequests: number;
 };
 
 type NotificationItem = {
@@ -283,9 +285,27 @@ const ALL_MODULES: Record<
     soft: "#f5f3ff",
     matchKeys: ["TASKFORCE", "GVP", "TASKFORCE_20", "TASKFORCE_FEEDER", "CTU"],
   },
+  NALA: {
+    name: "Nala Cleaning",
+    short: "Nala",
+    color: "#0284c7",
+    soft: "#f0f9ff",
+    matchKeys: ["NALA", "NALA_ASSESSMENT"],
+  },
 };
 
 const MODULES = ALL_MODULES;
+
+// Nala is listed only when the backend reports it (older backends do not).
+function assignmentModuleRows(status: SupervisorAssignmentStatus) {
+  const rows: Array<["SWEEPING" | "TOILET" | "LITTERBINS" | "NALA", string]> = [
+    ["SWEEPING", "Sweeping"],
+    ["TOILET", "Toilet"],
+    ["LITTERBINS", "Litter Bin"],
+  ];
+  if (status.modules.NALA) rows.push(["NALA", "Nala"]);
+  return rows;
+}
 const ALL_KEYS = Object.keys(ALL_MODULES) as ModuleKey[];
 const LIVE_REFRESH_MS = 60_000;
 const HEAT_PAGE_SIZE = 5;
@@ -446,7 +466,7 @@ export default function CityAdminDashboard({
       // If user has specific assigned modules, check user authorization
       if (!isSuperAdmin && rawUserTokens.length > 0) {
         const hasExplicitModules = rawUserTokens.some((r) =>
-          ["SWEEPING", "SWEEP", "TOILET", "TOILETS", "TWINBIN", "LITTER", "LITTERBINS", "TASKFORCE", "GVP", "CTU"].some((m) =>
+          ["SWEEPING", "SWEEP", "TOILET", "TOILETS", "TWINBIN", "LITTER", "LITTERBINS", "TASKFORCE", "GVP", "CTU", "NALA"].some((m) =>
             r.includes(m)
           )
         );
@@ -514,6 +534,7 @@ export default function CityAdminDashboard({
     toiletRequests: 0,
     litterBinRequests: 0,
     gvpRequests: 0,
+    nalaRequests: 0,
   });
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationUpdatedAt, setNotificationUpdatedAt] = useState<Date | null>(null);
@@ -651,6 +672,7 @@ export default function CityAdminDashboard({
       toiletRequestResponse,
       litterBinRequestResponse,
       gvpRequestResponse,
+      nalaRequestResponse,
     ] = await Promise.all([
       RegistrationApi.listRequests().catch(() => ({ requests: [] })),
       AreaBeatApi.listPendingRequests().catch(() => ({ pendingBeats: [] })),
@@ -659,6 +681,7 @@ export default function CityAdminDashboard({
       apiFetch<any>("/modules/taskforce/feeder-points/pending").catch(() => ({
         feederPoints: [],
       })),
+      NalaApi.listPendingRequests("PENDING_QC").catch(() => ({ pendingNalas: [] as any[] })),
     ]);
 
     const userRegistrations = (userRegistrationResponse?.requests || []).filter(
@@ -693,12 +716,15 @@ const beatRequests = (
       []
     ).length;
 
+    const nalaRequests = (nalaRequestResponse?.pendingNalas || []).length;
+
     setRequestStats({
       userRegistrations,
       beatRequests,
       toiletRequests,
       litterBinRequests,
       gvpRequests,
+      nalaRequests,
     });
 
     setNotificationUpdatedAt(new Date());
@@ -1065,6 +1091,7 @@ const beatRequests = (
   const moduleRouteForRecord = (record: any) => {
     const key = up(record?.__module);
     if (key === "SWEEPING") return "/modules/sweeping";
+    if (key === "NALA") return "/modules/nala";
     if (key === "TOILET") return "/modules/toilet/inspection";
     if (key === "TWINBIN") return "/modules/litterbins/admin";
     if (key === "TASKFORCE") return "/modules/taskforce/admin";
@@ -1366,7 +1393,7 @@ const beatRequests = (
         rejected: 0,
         actionRequired: 0,
         exceptions: 0,
-        modules: { SWEEPING: 0, TOILET: 0, TWINBIN: 0, TASKFORCE: 0 },
+        modules: { SWEEPING: 0, TOILET: 0, TWINBIN: 0, TASKFORCE: 0, NALA: 0 },
       };
     });
 
@@ -1390,6 +1417,7 @@ const beatRequests = (
             TOILET: 0,
             TWINBIN: 0,
             TASKFORCE: 0,
+            NALA: 0,
           },
         };
       }
@@ -1679,6 +1707,14 @@ const beatRequests = (
         route: "/modules/taskforce/admin",
         color: "#7c3aed", soft: "#f5f3ff", border: "#ddd6fe", icon: <Truck size={16} />,
       },
+      {
+        id: "nala-registration",
+        title: "Nala Requests",
+        message: "New Nala requests from Darogas are waiting for approval.",
+        count: requestStats.nalaRequests,
+        route: "/modules/nala",
+        color: "#0284c7", soft: "#f0f9ff", border: "#bae6fd", icon: <MapPin size={16} />,
+      },
     ];
 
     const reviewRoutes: Record<ModuleKey, string> = {
@@ -1686,6 +1722,7 @@ const beatRequests = (
       TOILET: "/modules/toilet/inspection",
       TWINBIN: "/modules/litterbins/admin",
       TASKFORCE: "/modules/taskforce/admin",
+      NALA: "/modules/nala",
     };
 
     KEYS.forEach((key) => {
@@ -2012,6 +2049,7 @@ const beatRequests = (
       TOILET: 0,
       TWINBIN: 0,
       TASKFORCE: 0,
+      NALA: 0,
     };
 
     overall30DayRecords.forEach((record) => {
@@ -3275,7 +3313,7 @@ const beatRequests = (
                 <div>
                   <h4 className="text-[11px] font-black text-slate-800">Daroga Assignment Audit</h4>
                   <p className="mt-0.5 text-[9px] font-semibold text-slate-500">
-                    Live assignment status across Sweeping, Toilet, and Litter Bin
+                    Live assignment status across Sweeping, Toilet, Litter Bin and Nala
                   </p>
                 </div>
                 <button
@@ -3287,13 +3325,9 @@ const beatRequests = (
                 </button>
               </div>
 
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {([
-                  ["SWEEPING", "Sweeping"],
-                  ["TOILET", "Toilet"],
-                  ["LITTERBINS", "Litter Bin"],
-                ] as const).map(([key, label]) => {
-                  const module = assignmentStatus.modules[key];
+              <div className={`mt-3 grid grid-cols-1 gap-2 ${assignmentStatus.modules.NALA ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+                {assignmentModuleRows(assignmentStatus).map(([key, label]) => {
+                  const module = assignmentStatus.modules[key]!;
                   return (
                     <div key={key} className="rounded-xl border border-slate-200 bg-white p-3">
                       <div className="text-[9px] font-black uppercase text-slate-500">{label}</div>
@@ -3323,7 +3357,7 @@ const beatRequests = (
                           </div>
                           <div className="mt-1 text-[8px] font-semibold text-amber-700">{supervisor.reason}</div>
                           <div className="mt-1 text-[8px] font-semibold text-slate-500">
-                            Modules: {supervisor.moduleKeys.length ? supervisor.moduleKeys.map((key) => key === "LITTERBINS" ? "Litter Bin" : key === "TOILET" ? "Toilet" : "Sweeping").join(", ") : "None"}
+                            Modules: {supervisor.moduleKeys.length ? supervisor.moduleKeys.map((key) => key === "LITTERBINS" ? "Litter Bin" : key === "TOILET" ? "Toilet" : key === "NALA" ? "Nala" : "Sweeping").join(", ") : "None"}
                             {` • ${supervisor.zoneIds.length} zone(s) • ${supervisor.wardIds.length} ward(s)`}
                           </div>
                         </div>
@@ -3339,12 +3373,8 @@ const beatRequests = (
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <div className="text-[10px] font-black text-slate-800">Unassigned Assets</div>
                   <div className="mt-2 max-h-72 space-y-2 overflow-y-auto pr-1">
-                    {([
-                      ["SWEEPING", "Sweeping"],
-                      ["TOILET", "Toilet"],
-                      ["LITTERBINS", "Litter Bin"],
-                    ] as const).flatMap(([key, label]) =>
-                      assignmentStatus.modules[key].unassignedItems.map((asset) => ({
+                    {assignmentModuleRows(assignmentStatus).flatMap(([key, label]) =>
+                      assignmentStatus.modules[key]!.unassignedItems.map((asset) => ({
                         ...asset,
                         moduleLabel: label,
                       }))
@@ -3360,9 +3390,9 @@ const beatRequests = (
                         </div>
                       </div>
                     ))}
-                    {Object.values(assignmentStatus.modules).every((module) => module.unassignedAssets === 0) && (
+                    {Object.values(assignmentStatus.modules).every((module) => !module || module.unassignedAssets === 0) && (
                       <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
-                        Every approved Sweeping, Toilet, and Litter Bin asset has a Daroga.
+                        Every approved Sweeping, Toilet, Litter Bin and Nala asset has a Daroga.
                       </div>
                     )}
                   </div>
@@ -4628,6 +4658,7 @@ function prettyModuleName(value: string): string {
     TASKFORCE: "Inspection & Performance",
     INSPECTION_AND_PERFORMANCE: "Inspection & Performance",
     SWEEPING: "Sweeping",
+    NALA: "Nala Cleaning",
     TOILET: "Cleanliness of Toilets",
     CLEANLINESS_OF_TOILET: "Cleanliness of Toilets",
     TWINBIN: "Litter Bins",

@@ -1,8 +1,7 @@
 'use client';
 
-import { ModuleGuard, Protected } from "@components/Guards";
 import { useAuth } from "@hooks/useAuth";
-import TaskforceQCDashboard from "../components/QCDashboard";
+import GvpModulePage from "../components/GvpModulePage";
 
 export default function TaskforceQcHomePage() {
   const { user, loading } = useAuth();
@@ -20,12 +19,5 @@ export default function TaskforceQcHomePage() {
     );
   }
 
-  return (
-    <Protected>
-      <ModuleGuard module="TASKFORCE" roles={["QC", "CITY_ADMIN", "ULB_OFFICER", "COMMISSIONER"]}>
-        <TaskforceQCDashboard />
-      </ModuleGuard>
-    </Protected>
-  );
+  return <GvpModulePage />;
 }
-

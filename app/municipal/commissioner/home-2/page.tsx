@@ -26,6 +26,8 @@ import {
   ShieldCheck,
   Trash2,
   UsersRound,
+  Waves,
+  Flag,
 } from 'lucide-react';
 
 import { apiFetch } from '@lib/apiClient';
@@ -60,7 +62,9 @@ type ModuleFilter =
   | 'ALL'
   | 'SWEEPING'
   | 'LITTERBIN'
-  | 'TOILET';
+  | 'TOILET'
+  | 'NALA'
+  | 'GVP';
 
 type StatusFilter =
   | 'ALL'
@@ -232,6 +236,8 @@ export default function CommissionerHome2Page() {
       beats: true,
       toilets: true,
       bins: true,
+      nalas: true,
+      gvps: true,
     });
 
   const [
@@ -371,10 +377,8 @@ export default function CommissionerHome2Page() {
 
   const scopedBeats = useMemo(
     () =>
-      moduleFilter ===
-        'TOILET' ||
-        moduleFilter ===
-        'LITTERBIN'
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'SWEEPING'
         ? []
         : (
           data?.beats || []
@@ -396,10 +400,8 @@ export default function CommissionerHome2Page() {
   const scopedToilets =
     useMemo(
       () =>
-        moduleFilter ===
-          'SWEEPING' ||
-          moduleFilter ===
-          'LITTERBIN'
+        moduleFilter !== 'ALL' &&
+          moduleFilter !== 'TOILET'
           ? []
           : (
             data?.toilets ||
@@ -421,12 +423,57 @@ export default function CommissionerHome2Page() {
 
   const scopedBins = useMemo(
     () =>
-      moduleFilter ===
-        'SWEEPING' ||
-        moduleFilter === 'TOILET'
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'LITTERBIN'
         ? []
         : (
           data?.bins || []
+        ).filter((item) =>
+          matchesActorFilter(
+            item.actors,
+            roleFilter,
+            userId,
+          ),
+        ),
+    [
+      data,
+      moduleFilter,
+      roleFilter,
+      userId,
+    ],
+  );
+
+  // One marker per NalaPoint.
+  const scopedNalas = useMemo(
+    () =>
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'NALA'
+        ? []
+        : (
+          data?.nalas || []
+        ).filter((item) =>
+          matchesActorFilter(
+            item.actors,
+            roleFilter,
+            userId,
+          ),
+        ),
+    [
+      data,
+      moduleFilter,
+      roleFilter,
+      userId,
+    ],
+  );
+
+  // One marker per active GVP.
+  const scopedGvps = useMemo(
+    () =>
+      moduleFilter !== 'ALL' &&
+        moduleFilter !== 'GVP'
+        ? []
+        : (
+          data?.gvps || []
         ).filter((item) =>
           matchesActorFilter(
             item.actors,
@@ -458,11 +505,21 @@ export default function CommissionerHome2Page() {
             (item) =>
               item.state,
           ),
+          ...scopedNalas.map(
+            (item) =>
+              item.state,
+          ),
+          ...scopedGvps.map(
+            (item) =>
+              item.state,
+          ),
         ]),
       [
         scopedBeats,
         scopedToilets,
         scopedBins,
+        scopedNalas,
+        scopedGvps,
       ],
     );
 
@@ -517,10 +574,36 @@ export default function CommissionerHome2Page() {
       ],
     );
 
+  const filteredNalas =
+    useMemo(
+      () =>
+        filterByStatus(
+          scopedNalas,
+        ),
+      [
+        scopedNalas,
+        statusFilter,
+      ],
+    );
+
+  const filteredGvps =
+    useMemo(
+      () =>
+        filterByStatus(
+          scopedGvps,
+        ),
+      [
+        scopedGvps,
+        statusFilter,
+      ],
+    );
+
   const displayedTotal =
     filteredBeats.length +
     filteredToilets.length +
-    filteredBins.length;
+    filteredBins.length +
+    filteredNalas.length +
+    filteredGvps.length;
 
   const reported =
     scopeSummary.total -
@@ -730,8 +813,8 @@ return (
                 assets by status,
                 module, role and user
                 across Sweeping,
-                Litter Bin and Toilet
-                inspections.
+                Litter Bin, Toilet, Nala
+                and GVP inspections.
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -997,6 +1080,14 @@ return (
                 <option value="TOILET">
                   Toilet
                 </option>
+
+                <option value="NALA">
+                  Nala
+                </option>
+
+                <option value="GVP">
+                  GVP
+                </option>
               </FilterSelect>
             </FilterField>
 
@@ -1183,6 +1274,8 @@ return (
               filteredToilets
             }
             bins={filteredBins}
+            nalas={filteredNalas}
+            gvps={filteredGvps}
             visible={visible}
             focusLevel={
               mapFocusLevel
@@ -1255,6 +1348,32 @@ return (
                   'text-cyan-600',
                 countClass:
                   'bg-cyan-100 text-cyan-700',
+              },
+              {
+                key: 'nalas' as const,
+                label: 'Nala',
+                icon: Waves,
+                count:
+                  filteredNalas.length,
+                activeClass:
+                  'bg-sky-50 text-sky-900 ring-1 ring-inset ring-sky-100',
+                iconClass:
+                  'text-sky-600',
+                countClass:
+                  'bg-sky-100 text-sky-700',
+              },
+              {
+                key: 'gvps' as const,
+                label: 'GVP',
+                icon: Flag,
+                count:
+                  filteredGvps.length,
+                activeClass:
+                  'bg-rose-50 text-rose-900 ring-1 ring-inset ring-rose-100',
+                iconClass:
+                  'text-rose-600',
+                countClass:
+                  'bg-rose-100 text-rose-700',
               },
             ].map((layer) => {
               const Icon =

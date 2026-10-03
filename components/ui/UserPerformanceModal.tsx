@@ -182,6 +182,7 @@ export default function UserPerformanceModal({
     if (up === "TWINBIN" || up === "LITTERBIN") return "Litterbin";
     if (up === "CLEANLINESS_OF_TOILET" || up === "TOILET") return "Toilet";
     if (up === "SWEEPING") return "Sweeping";
+    if (up === "NALA") return "Nala";
     if (up === "TASKFORCE") return "Taskforce";
     return up.replace(/_/g, " ");
   };

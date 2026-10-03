@@ -24,11 +24,12 @@ export default function AssessmentReviewModal({ record, onClose, onRefresh }: { 
         onRefresh();
     };
 
-    const handleActionTaken = async (rec: any, actionDescription: string, remarks?: string, photoUrl?: string) => {
+    const handleActionTaken = async (rec: any, actionDescription: string, remarks?: string, photoUrl?: string, photoUrls?: string[]) => {
         await ModuleRecordsApi.updateRecordStatus("SWEEPING", rec.id, "ACTION_TAKEN", remarks, {
             actionTaken: actionDescription,
             aoRemark: remarks,
-            aoPhoto: photoUrl
+            aoPhoto: photoUrl,
+            aoPhotos: photoUrls?.length ? photoUrls : photoUrl ? [photoUrl] : []
         });
         onRefresh();
     };

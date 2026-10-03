@@ -10,11 +10,13 @@ import {
   Target,
   Toilet,
   Trash2,
+  Waves,
+  Flag,
 } from "lucide-react";
 import { apiFetch } from "@lib/apiClient";
 import ModalPortal from "@components/ui/ModalPortal";
 
-type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN";
+type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "NALA" | "TASKFORCE";
 
 type SupervisorTargetRow = {
   supervisorId: string | null;
@@ -40,7 +42,7 @@ type ModuleTargetSummary = {
 type DailyTargetResponse = {
   date: string;
   overall: ModuleTargetSummary;
-  modules: Record<ModuleKey, ModuleTargetSummary>;
+  modules: Partial<Record<ModuleKey, ModuleTargetSummary>>;
   supervisors: SupervisorTargetRow[];
 };
 
@@ -76,6 +78,22 @@ const MODULES = [
     color: "#d98112",
     soft: "#fff7e9",
     border: "#f4dfb8",
+  },
+  {
+    key: "NALA" as const,
+    name: "Nala Cleaning",
+    Icon: Waves,
+    color: "#0284c7",
+    soft: "#f0f9ff",
+    border: "#cdeafe",
+  },
+  {
+    key: "TASKFORCE" as const,
+    name: "GVP Transformation",
+    Icon: Flag,
+    color: "#e11d48",
+    soft: "#fff1f2",
+    border: "#fecdd3",
   },
 ];
 
@@ -170,7 +188,12 @@ export default function TargetStatus({
       MODULES.map((module) => ({
         ...module,
         ...(data?.modules?.[module.key] || EMPTY_SUMMARY),
-      })),
+      }))
+        // Show Nala / GVP only for cities that have targets in those modules.
+        .filter(
+          (module) =>
+            (module.key !== "NALA" && module.key !== "TASKFORCE") || module.target > 0 || module.submitted > 0
+        ),
     [data]
   );
 
@@ -334,7 +357,7 @@ export default function TargetStatus({
             Live target data could not be loaded. Use Refresh to try again.
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-[14px] px-[22px] py-[18px] pb-[22px] max-xl:grid-cols-1 max-sm:px-3.5">
+          <div className={`grid ${moduleData.length > 3 ? "grid-cols-4" : "grid-cols-3"} gap-[14px] px-[22px] py-[18px] pb-[22px] max-xl:grid-cols-1 max-sm:px-3.5`}>
             {moduleData.map((module) => (
               <article
                 key={module.key}

@@ -62,7 +62,7 @@ import {
    TYPES
 ========================================================= */
 
-type InspectionModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING';
+type InspectionModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA' | 'TASKFORCE';
 
 type UserRoleKey = 'SUPERVISOR' | 'QC' | 'ULB_OFFICER' | 'ACTION_OFFICER' | 'EMPLOYEE';
 
@@ -132,6 +132,8 @@ const INSPECTION_MODULES: Array<{ key: InspectionModuleKey; label: string }> = [
   { key: 'TOILET', label: 'Cleanliness of Toilets' },
   { key: 'LITTERBINS', label: 'Litter Bins' },
   { key: 'SWEEPING', label: 'Sweeping' },
+  { key: 'NALA', label: 'Nala Cleaning' },
+  { key: 'TASKFORCE', label: 'GVP Transformation' },
 ];
 
 const PAGE_SIZE = 10;
@@ -366,7 +368,7 @@ function siBucketKeys(si: SiPerformance | null | undefined) {
   if (!si) return keys;
   INSPECTION_MODULES.forEach(({ key: module }) => {
     (Object.keys(keys) as SiBucketKey[]).forEach((bucket) =>
-      si.modules[module][bucket].forEach((id) => keys[bucket].add(`${module}:${id}`))
+      (si.modules[module]?.[bucket] || []).forEach((id) => keys[bucket].add(`${module}:${id}`))
     );
   });
   return keys;
@@ -392,7 +394,7 @@ function iecBucketKeys(iec: IecPerformance | null | undefined) {
   if (!iec) return keys;
   INSPECTION_MODULES.forEach(({ key: module }) => {
     (Object.keys(keys) as IecBucketKey[]).forEach((bucket) =>
-      iec.modules[module][bucket].forEach((id) => keys[bucket].add(`${module}:${id}`))
+      (iec.modules[module]?.[bucket] || []).forEach((id) => keys[bucket].add(`${module}:${id}`))
     );
   });
   return keys;
@@ -465,6 +467,12 @@ function getRecordTitle(item: DashboardRecord) {
   if (item.dashboardModule === 'SWEEPING') {
     return item?.beatName || item?.beat?.beatName || item?.areaName || 'Sweeping';
   }
+  if (item.dashboardModule === 'NALA') {
+    return [item?.nalaName || item?.nala?.nalaName, item?.nalaPointName].filter(Boolean).join(' - ') || 'Nala Cleaning';
+  }
+  if (item.dashboardModule === 'TASKFORCE') {
+    return item?.feederPointName || item?.feederPoint?.feederPointName || item?.areaName || 'GVP';
+  }
   return item?.locationName || item?.bin?.locationName || item?.areaName || item?.bin?.areaName || 'Litter Bins';
 }
 
@@ -476,6 +484,7 @@ function getRecordAssetId(item: any) {
     item?.bin?.id ||
     item?.beatId ||
     item?.beat?.id ||
+    item?.feederPointId ||
     null
   );
 }
@@ -588,7 +597,31 @@ function inspectionStats(records: DashboardRecord[]) {
   return { total, approved, rejected, actionRequired, actionTaken, pending, performance };
 }
 
-async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: string, to?: string) {
+async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: string, to?: string): Promise<any[]> {
+  if (moduleKey === 'TASKFORCE') {
+    return loadAllModuleRecordsStrict(moduleKey, from, to)
+      .then((rows) =>
+        rows
+          // GVP history also lists registrations; only inspection reports count here.
+          .filter((row: any) => row.type !== 'FEEDER_POINT')
+          // GVP reports carry the SI reviewer as reviewedByQc.
+          .map((row: any) => (row.reviewedBy || !row.reviewedByQc ? row : { ...row, reviewedBy: row.reviewedByQc }))
+      )
+      .catch((err) => {
+        console.warn('GVP reports unavailable', err);
+        return [];
+      });
+  }
+  if (moduleKey === 'NALA') {
+    return loadAllModuleRecordsStrict(moduleKey, from, to).catch((err) => {
+      console.warn('Nala reports unavailable', err);
+      return [];
+    });
+  }
+  return loadAllModuleRecordsStrict(moduleKey, from, to);
+}
+
+async function loadAllModuleRecordsStrict(moduleKey: InspectionModuleKey, from?: string, to?: string) {
   const limit = 1000;
 
   const first = await ModuleRecordsApi.getRecords(moduleKey, {
@@ -978,9 +1011,9 @@ function UserDetailDrawer({
       if (Number.isNaN(parsed.getTime())) return;
 
       const key = toDateInput(parsed);
-      const entry = map.get(key) || { TOILET: 0, LITTERBINS: 0, SWEEPING: 0, total: 0 };
+      const entry = map.get(key) || { TOILET: 0, LITTERBINS: 0, SWEEPING: 0, NALA: 0, TASKFORCE: 0, total: 0 };
       const moduleKey = record.dashboardModule as InspectionModuleKey;
-      if (moduleKey === 'TOILET' || moduleKey === 'LITTERBINS' || moduleKey === 'SWEEPING') {
+      if (INSPECTION_MODULES.some((module) => module.key === moduleKey)) {
         entry[moduleKey] += 1;
       }
       entry.total += 1;
@@ -1102,12 +1135,12 @@ function UserDetailDrawer({
         const count = (key: WorkflowKey) => records.filter((record) => matchesWorkflow(record, key)).length;
 
         // Only a Daroga has assigned assets, so only a Daroga has a requirement.
-        const moduleCoverage = coverage ? coverage.modules[module.key] : null;
+        const moduleCoverage = coverage ? coverage.modules[module.key] || null : null;
         const required = moduleCoverage ? moduleCoverage.required : null;
         const completed = moduleCoverage ? moduleCoverage.completed : records.length;
 
         if (iec) {
-          const buckets = iec.modules[module.key];
+          const buckets = iec.modules[module.key] || { attentionRequired: [], resolved: [], resolutionPending: [], carriedOverPending: [] };
           const attention = buckets.attentionRequired.length;
           return {
             ...module,
@@ -1125,7 +1158,7 @@ function UserDetailDrawer({
         }
 
         if (si) {
-          const buckets = si.modules[module.key];
+          const buckets = si.modules[module.key] || { reports: [], cleaned: [], notCleaned: [], pendingReview: [], carriedOverPending: [] };
           const reviewed = buckets.cleaned.length + buckets.notCleaned.length;
           const workload = reviewed + buckets.pendingReview.length;
           return {
@@ -1477,10 +1510,22 @@ function UserDetailDrawer({
                         'Sweeping beats assigned to this Daroga',
                       ],
                       [
+                        'Assigned Nala Points',
+                        coverage?.modules.NALA?.assigned ?? (coverage ? 0 : undefined),
+                        'border-cyan-200 bg-cyan-50 text-cyan-700',
+                        'NalaPoints assigned to this Daroga',
+                      ],
+                      [
+                        'Assigned GVPs',
+                        coverage?.modules.TASKFORCE?.assigned ?? (coverage ? 0 : undefined),
+                        'border-rose-200 bg-rose-50 text-rose-700',
+                        'Active GVPs (garbage vulnerable points) assigned to this Daroga',
+                      ],
+                      [
                         'Required Inspection',
                         coverage?.required,
                         'border-indigo-200 bg-indigo-50 text-indigo-700',
-                        'Assigned beats, toilets and litter bins x days in the selected range',
+                        'Assigned beats, nala points, toilets, litter bins and GVPs x days in the selected range',
                       ],
                       [
                         'Completed Inspection',
@@ -1575,6 +1620,8 @@ function UserDetailDrawer({
                         ['Total Toilets', si?.assets.toilets, 'border-sky-200 bg-sky-50 text-sky-700', 'Approved toilets in this SI\'s scope'],
                         ['Total Litter Bins', si?.assets.litterBins, 'border-emerald-200 bg-emerald-50 text-emerald-700', 'Approved litter bins in this SI\'s scope'],
                         ['Total Beats', si?.assets.beats, 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700', 'Sweeping beats in this SI\'s scope'],
+                        ['Total Nala Points', si?.assets.nalaPoints ?? 0, 'border-cyan-200 bg-cyan-50 text-cyan-700', 'Approved NalaPoints in this SI\'s scope'],
+                        ['Total GVPs', si?.assets.gvps ?? 0, 'border-rose-200 bg-rose-50 text-rose-700', 'Active GVPs in this SI\'s scope'],
                       ] as Array<[string, number | undefined, string, string]>
                     ).map(([label, value, tone, hint]) => (
                       <div key={label} className={`rounded-xl border px-3 py-2 text-left ${tone}`} title={hint}>
@@ -1974,6 +2021,8 @@ function UserDetailDrawer({
                           ['TOILET', 'Toilet', entry.TOILET],
                           ['LITTERBINS', 'Litter Bin', entry.LITTERBINS],
                           ['SWEEPING', 'Beat (Sweeping)', entry.SWEEPING],
+                          ['NALA', 'Nala Point', entry.NALA],
+                          ['TASKFORCE', 'GVP', entry.TASKFORCE],
                         ] as Array<[InspectionModuleKey, string, number]>
                       ).map(([moduleKey, label, count]) => (
                         <button
