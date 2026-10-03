@@ -3398,7 +3398,15 @@ function DrilldownDrawer({
                 : 'Assigned',
       value:
         initialInspectionModule === 'ALL'
-          ? 0
+          ? (['TOILET', 'LITTERBINS', 'SWEEPING', 'NALA'] as const).reduce(
+              (sum, moduleKey) =>
+                sum +
+                Number(
+                  (data.inspectionModuleCompletion as any)?.[moduleKey]
+                    ?.assigned || 0
+                ),
+              0
+            )
           : (
               data.inspectionModuleCompletion?.[
                 initialInspectionModule
