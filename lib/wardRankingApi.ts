@@ -9,7 +9,8 @@ export type WardRankingModule =
   | 'SWEEPING'
   | 'NALA'
   | 'TOILET'
-  | 'LITTERBINS';
+  | 'LITTERBINS'
+  | 'TASKFORCE';
 
 export type WardRankingComponent =
   | 'WORKFORCE'
@@ -17,6 +18,7 @@ export type WardRankingComponent =
   | 'NALA'
   | 'TOILET'
   | 'LITTERBIN'
+  | 'GVP'
   | 'SUPERVISOR'
   | 'QC'
   | 'ACTION_OFFICER';
@@ -96,6 +98,8 @@ export type WardRankingRow = {
     nala?: WardComponentScore;
     toilet: WardComponentScore;
     litterBin: WardComponentScore;
+    // Absent on snapshots saved before the GVP component existed.
+    gvp?: WardComponentScore;
     supervisor: WardComponentScore;
     qc: WardComponentScore;
     actionOfficer: WardComponentScore;

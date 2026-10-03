@@ -26,6 +26,7 @@ import {
     UserCheck,
     Users,
     Waves,
+    Flag,
 } from 'lucide-react';
 
 import {
@@ -108,6 +109,13 @@ const EXECUTIVE_COMPONENTS: ExecutiveComponentConfig[] = [
         group: 'MODULE',
     },
     {
+        field: 'gvp',
+        key: 'GVP',
+        label: 'GVP Transformation',
+        shortLabel: 'GVP',
+        group: 'MODULE',
+    },
+    {
         field: 'workforce',
         key: 'WORKFORCE',
         label: 'Workforce',
@@ -146,6 +154,7 @@ const COMPONENT_ICONS: Record<
     NALA: Waves,
     TOILET: Droplets,
     LITTERBIN: Trash2,
+    GVP: Flag,
     WORKFORCE: Users,
     SUPERVISOR: UserCheck,
     QC: ClipboardCheck,
@@ -412,6 +421,7 @@ function exceptionAreaName(moduleValue: unknown) {
     if (moduleName === 'NALA') return 'Nala';
     if (moduleName === 'TOILET') return 'Toilet';
     if (moduleName === 'LITTERBIN' || moduleName === 'LITTER_BIN') return 'Litter Bin';
+    if (moduleName === 'GVP' || moduleName === 'TASKFORCE') return 'GVP';
     if (moduleName === 'WORKFORCE') return 'Workforce';
     if (moduleName === 'SUPERVISOR') return 'Daroga';
     if (moduleName === 'QC') return 'Sanitary Inspector';

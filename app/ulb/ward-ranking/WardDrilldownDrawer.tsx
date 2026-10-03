@@ -92,6 +92,11 @@ const COMPONENTS: Array<{
       label: 'Litter Bin',
     },
     {
+      key: 'GVP',
+      field: 'gvp',
+      label: 'GVP',
+    },
+    {
       key: 'SUPERVISOR',
       field: 'supervisor',
       label: 'Daroga',
@@ -142,6 +147,14 @@ const STATUS_OPTIONS: Partial<
   ],
 
   LITTERBIN: [
+    'CHECKED',
+    'NOT_CHECKED',
+    'PENDING_QC',
+    'APPROVED',
+    'REJECTED',
+  ],
+
+  GVP: [
     'CHECKED',
     'NOT_CHECKED',
     'PENDING_QC',
@@ -230,7 +243,8 @@ function operationalStatusLabel(
     component === 'BEAT' ||
     component === 'NALA' ||
     component === 'TOILET' ||
-    component === 'LITTERBIN'
+    component === 'LITTERBIN' ||
+    component === 'GVP'
   ) {
     const labels: Partial<
       Record<WardOperationalStatus, string>
@@ -674,6 +688,8 @@ function recordTitle(
     item?.segment?.beat?.beatName ||
     item?.beat?.beatName ||
     item?.beatName ||
+    item?.feederPoint?.feederPointName ||
+    item?.feederPointName ||
     item?.locationName ||
     item?.assetName ||
     item?.employee?.name ||
@@ -750,7 +766,8 @@ type ReportModule =
   | 'TOILET'
   | 'LITTERBINS'
   | 'SWEEPING'
-  | 'NALA';
+  | 'NALA'
+  | 'TASKFORCE';
 
 
 function reportModuleForRecord(
@@ -804,6 +821,13 @@ function reportModuleForRecord(
     }
 
 
+    if (
+      moduleKey === 'TASKFORCE'
+    ) {
+      return 'TASKFORCE';
+    }
+
+
     return null;
   }
 
@@ -850,6 +874,15 @@ function reportModuleForRecord(
   }
 
 
+  if (
+    section.includes(
+      'GVP'
+    )
+  ) {
+    return 'TASKFORCE';
+  }
+
+
   return null;
 }
 
@@ -873,6 +906,12 @@ function reportModuleLabel(
     moduleKey === 'NALA'
   ) {
     return 'Nala Cleaning';
+  }
+
+  if (
+    moduleKey === 'TASKFORCE'
+  ) {
+    return 'GVP Transformation';
   }
 
   return 'Sweeping';
@@ -903,6 +942,47 @@ function flattenRecords(
         (item: any) => ({
           section:
             'Nala Report',
+          item,
+        })
+      ),
+    ];
+  }
+
+
+  if (
+    component === 'GVP'
+  ) {
+    const reports =
+      Array.isArray(data.reports)
+        ? data.reports
+        : [];
+
+    // Keep only the GVP-days with no submitted report.
+    const submittedDays =
+      new Set(
+        (data.obligations || [])
+          .filter((item: any) => item?.checked)
+          .map((item: any) => `${item.assetId}:${item.operationalDate}`)
+      );
+
+    return [
+      ...(data.obligations || [])
+        .filter(
+          (item: any) =>
+            !submittedDays.has(`${item.assetId}:${item.operationalDate}`)
+        )
+        .map(
+          (item: any) => ({
+            section:
+              'GVP Obligation',
+            item,
+          })
+        ),
+
+      ...reports.map(
+        (item: any) => ({
+          section:
+            'GVP Report',
           item,
         })
       ),
@@ -1181,6 +1261,18 @@ function flattenRecords(
           item,
         })
       ),
+
+      ...(
+        data.submittedReports
+          ?.gvp ||
+        []
+      ).map(
+        (item: any) => ({
+          section:
+            'GVP Report',
+          item,
+        })
+      ),
     ];
   }
 
@@ -1217,6 +1309,14 @@ function flattenRecords(
         (item: any) => ({
           section:
             'Litter Bin QC',
+          item,
+        })
+      ),
+
+      ...(data.gvp || []).map(
+        (item: any) => ({
+          section:
+            'GVP QC',
           item,
         })
       ),
@@ -1291,6 +1391,105 @@ function NalaPointBreakdown({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+
+/*
+ * GVP score = inspection coverage + SI approval + elimination progress.
+ */
+function GvpScoringGuide({
+  score,
+}: {
+  score: any;
+}) {
+  const metrics: any =
+    score?.metrics || {};
+
+  const rows: Array<{
+    key: string;
+    label: string;
+    formula: string;
+    detail: string;
+    percent: number;
+  }> = [
+      {
+        key: 'inspectionCoverage',
+        label: 'Inspection Coverage',
+        formula: 'Submitted ÷ Due (active GVP x day)',
+        detail: `${Number(metrics.pointsChecked || 0)} of ${Number(metrics.pointsDue || 0)} submitted`,
+        percent: Number(metrics.coveragePercent || 0),
+      },
+      {
+        key: 'qcApproval',
+        label: 'SI Approval',
+        formula: 'Approved ÷ SI reviewed',
+        detail: `${Number(metrics.qcApproved || 0)} approved, ${Number(metrics.qcRejected || 0)} rejected, ${Number(metrics.pendingQc || 0)} pending`,
+        percent: Number(metrics.approvalPercent || 0),
+      },
+      {
+        key: 'eliminationProgress',
+        label: 'Elimination Progress',
+        formula: 'Eliminated ÷ registered GVPs',
+        detail: `${Number(metrics.eliminatedPoints || 0)} of ${Number(metrics.totalPoints || 0)} eliminated${metrics.eliminationPendingQc ? `, ${metrics.eliminationPendingQc} awaiting SI` : ''}`,
+        percent: Number(metrics.eliminationPercent || 0),
+      },
+    ];
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-4 border-b border-slate-100 bg-rose-50/50 px-4 py-3">
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.14em] text-rose-600">
+            GVP Scoring Logic
+          </div>
+          <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
+            Coverage + SI Approval + Elimination Progress
+          </div>
+        </div>
+        <div className="rounded-lg border border-rose-100 bg-white px-3 py-1.5 text-right">
+          <div className="text-[8px] font-black uppercase text-slate-400">
+            Maximum
+          </div>
+          <div className="text-sm font-black text-rose-700">
+            {Number(score?.maxScore || 0).toFixed(1)} marks
+          </div>
+        </div>
+      </div>
+
+      {rows.map((row) => {
+        const part = score?.components?.[row.key];
+        return (
+          <div
+            key={row.key}
+            className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-100 px-4 py-3 last:border-b-0"
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div className="text-xs font-black text-slate-800">{row.label}</div>
+                <div className="text-[9px] font-semibold text-slate-400">{row.formula}</div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                  {row.detail}
+                </span>
+                <span className="text-xs font-black text-rose-700">
+                  {part?.applicable === false ? 'N/A' : `${row.percent.toFixed(1)}%`}
+                </span>
+              </div>
+            </div>
+            <div className="flex min-w-[78px] items-center justify-end text-right">
+              <div>
+                <div className="text-base font-black text-rose-700">{scoreText(part)}</div>
+                <div className="text-[8px] font-bold text-slate-400">
+                  Maximum {Number(part?.maxScore || 0).toFixed(1)} marks
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2824,7 +3023,8 @@ export default function WardDrilldownDrawer({
                */
               tab:
                 moduleKey === 'SWEEPING' ||
-                  moduleKey === 'NALA'
+                  moduleKey === 'NALA' ||
+                  moduleKey === 'TASKFORCE'
                   ? 'ALL'
                   : 'HISTORY',
             }
@@ -3086,6 +3286,7 @@ export default function WardDrilldownDrawer({
                     selectedComponent === 'NALA' ||
                     selectedComponent === 'TOILET' ||
                     selectedComponent === 'LITTERBIN' ||
+                    selectedComponent === 'GVP' ||
                     selectedComponent === 'SUPERVISOR' ||
                     selectedComponent === 'QC' ||
                     selectedComponent === 'ACTION_OFFICER'
@@ -3149,6 +3350,7 @@ export default function WardDrilldownDrawer({
                               selectedComponent === 'NALA' ||
                               selectedComponent === 'TOILET' ||
                               selectedComponent === 'LITTERBIN' ||
+                              selectedComponent === 'GVP' ||
                               selectedComponent === 'QC'
                               ? 'All Reports'
 
@@ -5362,6 +5564,12 @@ export default function WardDrilldownDrawer({
                     </div>
                   );
                 })()}
+              {selectedComponent === 'GVP' &&
+                selectedScore &&
+                detailView === 'GUIDE' && (
+                  <GvpScoringGuide score={selectedScore} />
+                )}
+
               {isInspectionComponent &&
                 selectedScore &&
                 detailView === 'GUIDE' && (
@@ -5726,6 +5934,15 @@ export default function WardDrilldownDrawer({
                         payload?.data?.litterBin
                       )
                         ? payload!.data.litterBin
+                        : [],
+                    },
+
+                    {
+                      label: 'GVP',
+                      rows: Array.isArray(
+                        payload?.data?.gvp
+                      )
+                        ? payload!.data.gvp
                         : [],
                     },
                   ];
@@ -7038,6 +7255,18 @@ export default function WardDrilldownDrawer({
                                         )}
                                       </strong>
                                     </span>
+
+
+                                    {Number(row.modules?.gvp?.totalReports || 0) > 0 && (
+                                      <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[9px] font-bold text-slate-600">
+                                        GVP{' '}
+                                        <strong className="text-slate-900">
+                                          {Number(row.modules?.gvp?.submittedReports || 0)}
+                                          /
+                                          {Number(row.modules?.gvp?.totalReports || 0)}
+                                        </strong>
+                                      </span>
+                                    )}
 
                                   </div>
 

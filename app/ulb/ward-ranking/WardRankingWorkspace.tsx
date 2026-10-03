@@ -96,6 +96,7 @@ const COMPONENT_DRILLDOWN_KEYS:
     'NALA',
     'TOILET',
     'LITTERBIN',
+    'GVP',
     'SUPERVISOR',
     'QC',
     'ACTION_OFFICER',
@@ -121,6 +122,9 @@ const COMPONENT_FIELD_BY_KEY:
 
   LITTERBIN:
     'litterBin',
+
+  GVP:
+    'gvp',
 
   SUPERVISOR:
     'supervisor',
@@ -184,6 +188,10 @@ const MODULE_OPTIONS: Array<{
     {
       key: 'NALA',
       label: 'Nala',
+    },
+    {
+      key: 'TASKFORCE',
+      label: 'GVP',
     },
   ];
 
@@ -2678,6 +2686,7 @@ export default function WardRankingWorkspace() {
                       'Nala',
                       'Toilet',
                       'Litter Bin',
+                      'GVP',
                       'Daroga',
                       'SI',
                       'IEC',
@@ -2796,6 +2805,8 @@ export default function WardRankingWorkspace() {
                             ?.toilet,
                           item.components
                             ?.litterBin,
+                          item.components
+                            ?.gvp,
                           item.components
                             ?.supervisor,
                           item.components
@@ -2998,6 +3009,11 @@ export default function WardRankingWorkspace() {
                           'Litter Bin',
                           item.components
                             ?.litterBin,
+                        ],
+                        [
+                          'GVP',
+                          item.components
+                            ?.gvp,
                         ],
                         [
                           'Daroga',
