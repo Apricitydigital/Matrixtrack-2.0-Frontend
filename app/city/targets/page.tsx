@@ -216,6 +216,9 @@ function moduleLabel(
     case "NALA":
       return "Nala";
 
+    case "TASKFORCE":
+      return "GVP";
+
     case "TOILET":
       return "Toilet";
 

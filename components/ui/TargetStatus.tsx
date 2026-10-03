@@ -11,11 +11,12 @@ import {
   Toilet,
   Trash2,
   Waves,
+  Flag,
 } from "lucide-react";
 import { apiFetch } from "@lib/apiClient";
 import ModalPortal from "@components/ui/ModalPortal";
 
-type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "NALA";
+type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "NALA" | "TASKFORCE";
 
 type SupervisorTargetRow = {
   supervisorId: string | null;
@@ -85,6 +86,14 @@ const MODULES = [
     color: "#0284c7",
     soft: "#f0f9ff",
     border: "#cdeafe",
+  },
+  {
+    key: "TASKFORCE" as const,
+    name: "GVP Transformation",
+    Icon: Flag,
+    color: "#e11d48",
+    soft: "#fff1f2",
+    border: "#fecdd3",
   },
 ];
 
@@ -180,8 +189,11 @@ export default function TargetStatus({
         ...module,
         ...(data?.modules?.[module.key] || EMPTY_SUMMARY),
       }))
-        // Show Nala only for cities that have Nala targets.
-        .filter((module) => module.key !== "NALA" || module.target > 0 || module.submitted > 0),
+        // Show Nala / GVP only for cities that have targets in those modules.
+        .filter(
+          (module) =>
+            (module.key !== "NALA" && module.key !== "TASKFORCE") || module.target > 0 || module.submitted > 0
+        ),
     [data]
   );
 

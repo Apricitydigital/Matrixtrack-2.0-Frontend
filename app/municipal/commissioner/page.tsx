@@ -43,6 +43,7 @@ import {
   Waves,
   X,
   XCircle,
+  Flag,
 } from 'lucide-react';
 
 import dynamic from 'next/dynamic';
@@ -85,6 +86,7 @@ import {
   type DarogaPerformance,
   type IecPerformance,
   type SiPerformance,
+  TaskforceApi,
 } from '@lib/apiClient';
 import {
   darogaScore,
@@ -119,7 +121,8 @@ type InspectionModuleKey =
   | 'TOILET'
   | 'LITTERBINS'
   | 'SWEEPING'
-  | 'NALA';
+  | 'NALA'
+  | 'TASKFORCE';
 
 type DashboardModuleKey =
   | 'ALL'
@@ -200,6 +203,7 @@ type RolePerformanceRow = {
     LITTERBINS: number;
     SWEEPING: number;
     NALA?: number;
+    TASKFORCE?: number;
   };
 
   attendance?: number | null;
@@ -278,6 +282,10 @@ const INSPECTION_MODULES: Array<{
       key: 'NALA',
       label: 'Nala',
     },
+    {
+      key: 'TASKFORCE',
+      label: 'GVP',
+    },
   ];
 
 const DASHBOARD_MODULES: Array<{
@@ -303,6 +311,10 @@ const DASHBOARD_MODULES: Array<{
     {
       key: 'NALA',
       label: 'Nala',
+    },
+    {
+      key: 'TASKFORCE',
+      label: 'GVP',
     },
     {
       key: 'ATTENDANCE',
@@ -357,6 +369,15 @@ const MODULE_VISUALS: Record<
     ),
     color: '#0284c7',
     soft: '#f0f9ff',
+  },
+  TASKFORCE: {
+    icon: (
+      <Flag
+        size={14}
+      />
+    ),
+    color: '#e11d48',
+    soft: '#fff1f2',
   },
   ATTENDANCE: {
     icon: (
@@ -415,6 +436,12 @@ const ZONE_MODULE_BAR_TONES: Record<
     medium: '#7dd3fc',
     full: '#0284c7',
     deep: '#075985',
+  },
+  TASKFORCE: {
+    light: '#ffe4e6',
+    medium: '#fda4af',
+    full: '#e11d48',
+    deep: '#9f1239',
   },
   ATTENDANCE: {
     light: '#e0f2fe',
@@ -852,6 +879,9 @@ function inspectionModuleDisplayName(
 
     case 'NALA':
       return 'Nala';
+
+    case 'TASKFORCE':
+      return 'GVP';
 
     case 'LITTERBINS':
       return 'Litter Bin';
@@ -1317,6 +1347,18 @@ function getRecordTitle(
         .filter(Boolean)
         .join(' - ') ||
       'Nala'
+    );
+  }
+
+  if (
+    item.dashboardModule ===
+    'TASKFORCE'
+  ) {
+    return (
+      item?.feederPointName ||
+      item?.feederPoint?.feederPointName ||
+      item?.areaName ||
+      'GVP'
     );
   }
 
@@ -1864,6 +1906,18 @@ function completedInspectionCount(
   }
 
   if (
+    module === 'TASKFORCE'
+  ) {
+    return nonDraftInspectionCount(
+      records.filter(
+        (item) =>
+          item.dashboardModule ===
+          'TASKFORCE'
+      )
+    );
+  }
+
+  if (
     module === 'ALL'
   ) {
     const nonSweeping =
@@ -1926,6 +1980,29 @@ async function loadAllModuleRecords(
       console.warn('Nala reports unavailable', err);
       return [];
     });
+  }
+
+  if (moduleKey === 'TASKFORCE') {
+    return loadAllModuleRecordsStrict(
+      moduleKey,
+      from,
+      to
+    )
+      .then((rows) =>
+        rows
+          // GVP history also lists registrations; only inspection reports count.
+          .filter((row: any) => row?.type !== 'FEEDER_POINT')
+          // GVP reports carry the SI reviewer as reviewedByQc.
+          .map((row: any) =>
+            row.reviewedBy || !row.reviewedByQc
+              ? row
+              : { ...row, reviewedBy: row.reviewedByQc }
+          )
+      )
+      .catch((err) => {
+        console.warn('GVP reports unavailable', err);
+        return [];
+      });
   }
 
   return loadAllModuleRecordsStrict(
@@ -2843,6 +2920,10 @@ function DrilldownDrawer({
       )
         ? 'NALA'
         : data.title.endsWith(
+        'GVP'
+      )
+        ? 'TASKFORCE'
+        : data.title.endsWith(
         'Litter Bin'
       )
         ? 'LITTERBINS'
@@ -3372,6 +3453,10 @@ function DrilldownDrawer({
     initialInspectionModule ===
     'NALA';
 
+  const isGvpDrawer =
+    initialInspectionModule ===
+    'TASKFORCE';
+
   const inspectionUnitLabel =
     isSweepingDrawer
       ? 'Beats'
@@ -3381,7 +3466,9 @@ function DrilldownDrawer({
           ? 'Toilets'
           : isNalaDrawer
             ? 'Nala Points'
-            : '';
+            : isGvpDrawer
+              ? 'GVPs'
+              : '';
 
   const inspectionWorkflowCards = [
     {
@@ -3395,10 +3482,12 @@ function DrilldownDrawer({
               ? 'Assigned Toilets'
               : isNalaDrawer
                 ? 'Assigned Nala Points'
-                : 'Assigned',
+                : isGvpDrawer
+                  ? 'Assigned GVPs'
+                  : 'Assigned',
       value:
         initialInspectionModule === 'ALL'
-          ? (['TOILET', 'LITTERBINS', 'SWEEPING', 'NALA'] as const).reduce(
+          ? (['TOILET', 'LITTERBINS', 'SWEEPING', 'NALA', 'TASKFORCE'] as const).reduce(
               (sum, moduleKey) =>
                 sum +
                 Number(
@@ -3883,6 +3972,8 @@ function DrilldownDrawer({
                             ? 'Assigned Beats'
                             : module.key === 'NALA'
                               ? 'Assigned Nala Points'
+                              : module.key === 'TASKFORCE'
+                                ? 'Assigned GVPs'
                               : module.key === 'LITTERBINS'
                                 ? 'Assigned Litter Bins'
                                 : 'Assigned Toilets'}
@@ -6841,6 +6932,7 @@ export default function CommissionerDashboard() {
     litterBins: any[];
     beats: any[];
     nalaPoints: any[];
+    gvpPoints: any[];
   }>({
     ready: false,
     approvedToilets: 0,
@@ -6849,6 +6941,7 @@ export default function CommissionerDashboard() {
     litterBins: [],
     beats: [],
     nalaPoints: [],
+    gvpPoints: [],
   });
 
 
@@ -6861,6 +6954,7 @@ export default function CommissionerDashboard() {
         litterBinResult,
         beatsResult,
         nalaResult,
+        gvpResult,
       ] = await Promise.allSettled([
         apiFetch<any>(
           `/modules/toilet/stats${cityId ? `?cityId=${encodeURIComponent(cityId)}` : ''}`
@@ -6870,6 +6964,7 @@ export default function CommissionerDashboard() {
         ),
         AreaBeatApi.list(),
         NalaApi.list(),
+        TaskforceApi.workspaceAssets(),
       ]);
 
       if (!active) return;
@@ -6947,6 +7042,18 @@ export default function CommissionerDashboard() {
           nalaResult.status === 'fulfilled'
             ? flattenNalaTargetPoints(
               nalaResult.value?.nalas || []
+            )
+            : [],
+
+        // Cities without GVPs (or the module) simply have none due.
+        gvpPoints:
+          gvpResult.status === 'fulfilled'
+            ? (
+              gvpResult.value?.feederPoints ||
+              []
+            ).filter(
+              (point: any) =>
+                !point?.eliminatedAt
             )
             : [],
       });
@@ -7138,6 +7245,13 @@ export default function CommissionerDashboard() {
             .length;
 
 
+        const gvpDaily =
+          inspectionTargets
+            .gvpPoints
+            .filter(matchesGeo)
+            .length;
+
+
         let dailyRequired = 0;
 
         if (
@@ -7161,13 +7275,19 @@ export default function CommissionerDashboard() {
           dailyRequired =
             nalaDaily;
         } else if (
+          module === 'TASKFORCE'
+        ) {
+          dailyRequired =
+            gvpDaily;
+        } else if (
           module === 'ALL'
         ) {
           dailyRequired =
             toiletDaily +
             litterBinDaily +
             sweepingDaily +
-            nalaDaily;
+            nalaDaily +
+            gvpDaily;
         }
 
         return (
@@ -9963,6 +10083,23 @@ const [
     inspectionTargets.nalaPoints.length > 0 ||
     nalaInspection.records.length > 0;
 
+  const gvpInspection =
+    commissionerModuleInspection(
+      'TASKFORCE'
+    );
+
+  const gvpCleanlinessPerformance =
+    cleanlinessPerformancePercent(
+      gvpInspection.statusBreakdown.clean,
+      gvpInspection.statusBreakdown.notClean,
+      gvpInspection.statusBreakdown.pendingReview
+    );
+
+  // Show GVP only for cities that actually have GVPs or GVP reports.
+  const showGvpModule =
+    inspectionTargets.gvpPoints.length > 0 ||
+    gvpInspection.records.length > 0;
+
 
   /* =========================================================
          GEO PERFORMANCE
@@ -11334,11 +11471,7 @@ const [
           : recordZoneNames;
 
       const requiredForModule = (
-        module:
-          | 'TOILET'
-          | 'LITTERBINS'
-          | 'SWEEPING'
-          | 'NALA'
+        module: InspectionModuleKey
       ) => {
         if (scopedWardNames.length > 0) {
           return scopedWardNames.reduce(
@@ -11403,13 +11536,19 @@ const [
           requiredForModule(
             'NALA'
           ),
+
+        TASKFORCE:
+          requiredForModule(
+            'TASKFORCE'
+          ),
       };
 
       const roleRequiredInspections =
         roleRequiredByModule.TOILET +
         roleRequiredByModule.LITTERBINS +
         roleRequiredByModule.SWEEPING +
-        roleRequiredByModule.NALA;
+        roleRequiredByModule.NALA +
+        roleRequiredByModule.TASKFORCE;
 
       /*
        * Same score as the User Performance page (backend + shared formula):
@@ -13799,7 +13938,7 @@ setDrilldown({
             </p>
           </div>
 
-          <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${showNalaModule ? '2xl:grid-cols-6' : '2xl:grid-cols-5'}`}>
+          <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 ${({ 5: '2xl:grid-cols-5', 6: '2xl:grid-cols-6', 7: '2xl:grid-cols-7' } as Record<number, string>)[5 + (showNalaModule ? 1 : 0) + (showGvpModule ? 1 : 0)]}`}>
             <KpiCard
               label="Attendance Rate"
               value={
@@ -14279,6 +14418,71 @@ setDrilldown({
                     )
                     ,
                     'NALA'
+                  )
+                }
+              />
+            )}
+
+            {showGvpModule && (
+              <KpiCard
+                label="GVP"
+                value={
+                  loading
+                    ? '—'
+                    : percentText(
+                      gvpInspection.performance
+                    )
+                }
+                cardTint="bg-gradient-to-br from-rose-50 via-pink-50 to-white"
+                iconGradient="from-rose-500 to-pink-600"
+                icon={
+                  <Flag
+                    size={25}
+                    strokeWidth={2.2}
+                  />
+                }
+                tooltip={[
+                  {
+                    label: 'Required Inspections',
+                    value: gvpInspection.required.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Completed GVP Inspections',
+                    value: gvpInspection.completed.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Clean GVPs',
+                    value: gvpInspection.statusBreakdown.clean.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Not Clean GVPs',
+                    value: gvpInspection.statusBreakdown.notClean.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Pending Review GVPs',
+                    value: gvpInspection.statusBreakdown.pendingReview.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Attention Required',
+                    value: gvpInspection.statusBreakdown.attentionRequired.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Resolution Pending',
+                    value: gvpInspection.statusBreakdown.resolutionPending.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Resolved',
+                    value: gvpInspection.statusBreakdown.resolved.toLocaleString('en-IN'),
+                  },
+                ]}
+                onClick={() =>
+                  openInspectionMetric(
+                    'GVP',
+                    gvpInspection.records,
+                    percentText(
+                      gvpInspection.performance
+                    ),
+                    'TASKFORCE'
                   )
                 }
               />
@@ -14850,6 +15054,65 @@ setDrilldown({
                     },
                   ]
                   : []),
+                ...(showGvpModule
+                  ? [
+                    {
+                      key: 'TASKFORCE',
+                      title: 'GVP',
+                      icon: (
+                        <Flag
+                          size={18}
+                          strokeWidth={2.4}
+                        />
+                      ),
+                      theme:
+                        'border-rose-100 bg-gradient-to-r from-rose-50/80 via-pink-50/45 to-white',
+                      iconTheme:
+                        'bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-rose-200',
+                      accent:
+                        'text-rose-700',
+                      requiredLabel:
+                        'Required GVP Inspections',
+                      assignedLabel:
+                        'Active GVPs',
+                      assigned:
+                        Math.round(
+                          gvpInspection.required /
+                          inspectionRangeDayCount
+                        ),
+                      completedLabel:
+                        'Inspected GVPs',
+                      cleanLabel:
+                        'Clean GVPs',
+                      notCleanLabel:
+                        'Not Clean GVPs',
+                      pendingLabel:
+                        'Pending Review GVPs',
+                      unitLabel:
+                        'GVPs',
+                      required:
+                        gvpInspection.required,
+                      completed:
+                        gvpInspection.completed,
+                      clean:
+                        gvpInspection.statusBreakdown.clean,
+                      notClean:
+                        gvpInspection.statusBreakdown.notClean,
+                      pending:
+                        gvpInspection.statusBreakdown.pendingReview,
+                      attention:
+                        gvpInspection.statusBreakdown.attentionRequired,
+                      resolutionPending:
+                        gvpInspection.statusBreakdown.resolutionPending,
+                      resolved:
+                        gvpInspection.statusBreakdown.resolved,
+                      performance:
+                        gvpInspection.performance,
+                      cleanlinessPerformance:
+                        gvpCleanlinessPerformance,
+                    },
+                  ]
+                  : []),
               ].map((module) => (
                 <div
                   key={module.key}
@@ -14895,6 +15158,8 @@ setDrilldown({
                             ? 'Assigned Beats'
                             : module.key === 'NALA'
                               ? 'Assigned Nala Points'
+                              : module.key === 'TASKFORCE'
+                                ? 'Assigned GVPs'
                               : module.key === 'LITTERBINS'
                                 ? 'Assigned Litter Bins'
                                 : 'Assigned Toilets'}
