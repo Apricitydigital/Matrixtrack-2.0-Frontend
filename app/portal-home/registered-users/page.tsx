@@ -305,6 +305,18 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose, on
 
 
                 />
+                <DrilldownChipSection
+                  title="Assigned GVPs"
+                  onAssign={data?.canManageAssignments && !loading ? () => setAssignmentType("GVP") : undefined}
+                  icon={<Trash2 size={15} className="text-orange-600" />}
+                  colorClass="border-orange-100 bg-orange-50/40"
+                  items={(data?.assignments.gvps || []).map((g) => ({
+                    key: g.id,
+                    primary: g.name,
+                    secondary: [g.zoneName, g.wardName].filter(Boolean).join(" / ") || undefined,
+                  }))}
+                  emptyLabel="No GVPs assigned"
+                />
                 <div className="sm:col-span-2">
                   <DrilldownChipSection
                     title="Assigned Toilets"
@@ -343,6 +355,7 @@ function UserWorkDrilldownDrawer({ open, user, data, loading, error, onClose, on
                         { label: 'Sweeping', counts: data?.workSummary.sweeping },
                         { label: 'Toilets', counts: data?.workSummary.toilet },
                         { label: 'Litter Bins', counts: data?.workSummary.litterBin },
+                        { label: 'GVP', counts: data?.workSummary.gvp },
                       ].map((row) => (
                         <tr key={row.label} className="border-b border-slate-100 odd:bg-white even:bg-slate-50/35 last:border-b-0">
                           <td className="px-4 py-3 text-xs font-bold text-slate-700">{row.label}</td>

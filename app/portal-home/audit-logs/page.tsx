@@ -425,6 +425,7 @@ export default function AuditLogsPage() {
                 <option value="TOILETS">TOILETS</option>
                 <option value="SWEEPING">SWEEPING</option>
                 <option value="LITTERBIN">LITTERBIN</option>
+                <option value="TASKFORCE">GVP</option>
                 <option value="WARD_RANKING">WARD RANKING</option>
               </select>
 

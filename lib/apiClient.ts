@@ -512,12 +512,12 @@ export const CityApi = {
       };
     }>(`/city/stats${query}`);
   },
-  autoAssignSupervisors: (modules: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA">) =>
+  autoAssignSupervisors: (modules: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA" | "TASKFORCE">) =>
     apiFetch<{
       success: boolean;
       summary: {
         cityId: string;
-        selectedModules: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA">;
+        selectedModules: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA" | "TASKFORCE">;
         beats: {
           eligibleSupervisors: number;
           supervisorsWithoutScope: number;
@@ -540,6 +540,13 @@ export const CityApi = {
           unmatchedAssets: number;
         };
         nalas?: {
+          eligibleSupervisors: number;
+          supervisorsWithoutScope: number;
+          totalAssets: number;
+          assignedAssets: number;
+          unmatchedAssets: number;
+        };
+        gvps?: {
           eligibleSupervisors: number;
           supervisorsWithoutScope: number;
           totalAssets: number;
@@ -1058,7 +1065,7 @@ export const CityUserApi = {
     apiFetch<{ success: boolean }>(`/city/users/${encodeURIComponent(id)}/assignments/add`, { method: "POST", body: JSON.stringify(body) })
 };
 
-export type UserAssignmentType = "ZONE" | "WARD" | "BEAT" | "BIN" | "TOILET";
+export type UserAssignmentType = "ZONE" | "WARD" | "BEAT" | "BIN" | "TOILET" | "GVP";
 export type UserAssignmentOption = {
   id: string; label: string; sublabel?: string;
   requiresScopeExtension?: boolean; requiresModuleAccess?: boolean; requiresReassignment?: boolean;
@@ -1133,12 +1140,14 @@ export type UserWorkSummaryResponse = {
     beats: { id: string; name: string; code?: string | null; zoneName: string | null; wardName: string | null }[];
     litterBins: { id: string; name: string; areaName?: string | null; zoneName: string | null; wardName: string | null; assignedEmployeeIds?: string[] }[];
     toilets: { id: string; name: string; type?: string | null; zoneName: string | null; wardName: string | null }[];
+    gvps?: { id: string; name: string; areaName?: string | null; eliminated?: boolean; zoneName: string | null; wardName: string | null; assignedEmployeeIds?: string[] }[];
   };
   workSummary: {
     overall: UserWorkSummaryCounts;
     sweeping: UserWorkSummaryCounts;
     toilet: UserWorkSummaryCounts;
     litterBin: UserWorkSummaryCounts;
+    gvp?: UserWorkSummaryCounts;
   };
 };
 
@@ -1157,7 +1166,7 @@ export type SupervisorAssignmentStatus = {
       id: string;
       name: string;
       phone: string | null;
-      moduleKeys: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA">;
+      moduleKeys: Array<"SWEEPING" | "TOILET" | "LITTERBINS" | "NALA" | "TASKFORCE">;
       zoneIds: string[];
       wardIds: string[];
       reason: string;
@@ -1288,6 +1297,11 @@ export const TaskforceApi = {
       stats: { pending: number; approved: number; rejected: number; actionRequired: number; total: number };
     }>(`/modules/taskforce/records?${params.toString()}`);
   },
+  // Admin registry tools (same as Litter Bin).
+  deleteFeederPoint: (id: string) =>
+    apiFetch<{ success: boolean }>(`/modules/taskforce/feeder-points/${id}`, { method: "DELETE" }),
+  bulkImport: (csvText: string) =>
+    apiFetch<{ count: number }>("/modules/taskforce/bulk-import", { method: "POST", body: JSON.stringify({ csvText }) }),
   myTasks: () => apiFetch<{ feederPoints: any[] }>("/modules/taskforce/feeder-points/assigned")
 };
 
