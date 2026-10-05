@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CityApi } from "@lib/apiClient";
 import ModalPortal from "@components/ui/ModalPortal";
 
-type AutoAssignModule = "SWEEPING" | "LITTERBINS" | "TOILET" | "NALA";
+type AutoAssignModule = "SWEEPING" | "LITTERBINS" | "TOILET" | "NALA" | "TASKFORCE";
 type ModuleSummary = {
   eligibleSupervisors: number;
   supervisorsWithoutScope: number;
@@ -19,6 +19,7 @@ type AutoAssignSummary = {
   toilets: ModuleSummary;
   litterbins: ModuleSummary;
   nalas?: ModuleSummary;
+  gvps?: ModuleSummary;
 };
 
 const MODULE_OPTIONS: Array<{
@@ -30,6 +31,7 @@ const MODULE_OPTIONS: Array<{
   { key: "LITTERBINS", label: "Litter Bin", description: "Assign approved litter bins" },
   { key: "TOILET", label: "Toilet", description: "Assign approved toilets" },
   { key: "NALA", label: "Nala", description: "Assign approved nala points" },
+  { key: "TASKFORCE", label: "GVP", description: "Assign approved GVPs" },
 ];
 
 function formatSummary(summary: AutoAssignSummary) {
@@ -45,6 +47,9 @@ function formatSummary(summary: AutoAssignSummary) {
   }
   if (summary.selectedModules.includes("NALA") && summary.nalas) {
     rows.push(`Nala: ${summary.nalas.assignedAssets}/${summary.nalas.totalAssets} matched, ${summary.nalas.unmatchedAssets} unmatched`);
+  }
+  if (summary.selectedModules.includes("TASKFORCE") && summary.gvps) {
+    rows.push(`GVP: ${summary.gvps.assignedAssets}/${summary.gvps.totalAssets} matched, ${summary.gvps.unmatchedAssets} unmatched`);
   }
   return rows.join("\n");
 }

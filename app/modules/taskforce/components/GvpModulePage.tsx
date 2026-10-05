@@ -43,6 +43,7 @@ export default function GvpModulePage() {
 
   // GVP registration / elimination review and daroga assignment are SI-only on the backend.
   const isQc = roleValues.includes("QC");
+  const isAdmin = roleValues.includes("CITY_ADMIN") || roleValues.includes("HMS_SUPER_ADMIN");
 
   const loadPoints = useCallback(async () => {
     try {
@@ -139,7 +140,7 @@ export default function GvpModulePage() {
           ) : activeTab === "submitted_reports" ? (
             <SubmittedReportsTab moduleKey="TASKFORCE" assetLabel="GVP" onViewReport={(record) => setReviewingRecord(record)} />
           ) : activeTab === "gvps" ? (
-            <GvpRegistryTab points={points} canAssign={isQc} onRefresh={loadPoints} />
+            <GvpRegistryTab points={points} canAssign={isQc} canDelete={isAdmin} onRefresh={loadPoints} />
           ) : activeTab === "requests" && isQc ? (
             <GvpRequestsTab onChanged={refreshAll} />
           ) : (

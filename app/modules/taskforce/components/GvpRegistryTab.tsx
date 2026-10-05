@@ -24,10 +24,12 @@ const STATE_META: Record<Exclude<StateFilter, "ALL">, { label: string; bg: strin
 export default function GvpRegistryTab({
   points,
   canAssign,
+  canDelete = false,
   onRefresh
 }: {
   points: any[];
   canAssign: boolean;
+  canDelete?: boolean;
   onRefresh: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -35,6 +37,8 @@ export default function GvpRegistryTab({
   const [staff, setStaff] = useState<any[]>([]);
   const [assigning, setAssigning] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!canAssign) return;
@@ -76,6 +80,24 @@ export default function GvpRegistryTab({
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await TaskforceApi.deleteFeederPoint(deleteTarget.id);
+      setDeleteTarget(null);
+      onRefresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to delete GVP");
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const columns = ["GVP", "Zone / Ward", "Area Type", "Assigned Daroga", "State", "Registered", ...(canDelete ? ["Action"] : [])];
+
   return (
     <div style={card}>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
@@ -114,7 +136,7 @@ export default function GvpRegistryTab({
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
-              {["GVP", "Zone / Ward", "Area Type", "Assigned Daroga", "State", "Registered"].map((label) => (
+              {columns.map((label) => (
                 <th key={label} style={th}>{label}</th>
               ))}
             </tr>
@@ -122,7 +144,7 @@ export default function GvpRegistryTab({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                <td colSpan={columns.length} style={{ padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
                   No GVPs match the filters.
                 </td>
               </tr>
@@ -175,6 +197,17 @@ export default function GvpRegistryTab({
                       )}
                     </td>
                     <td style={td}>{point.createdAt ? new Date(point.createdAt).toLocaleDateString() : "-"}</td>
+                    {canDelete && (
+                      <td style={td}>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(point)}
+                          style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 800, cursor: "pointer" }}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })
@@ -182,6 +215,25 @@ export default function GvpRegistryTab({
           </tbody>
         </table>
       </div>
+
+      {deleteTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div style={{ background: "#ffffff", borderRadius: 18, padding: 24, maxWidth: 420, width: "100%" }}>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: "#0f172a", textAlign: "center" }}>Delete GVP?</h3>
+            <p style={{ fontSize: 13, color: "#64748b", textAlign: "center", margin: "10px 0 18px" }}>
+              Delete <strong style={{ color: "#0f172a" }}>{deleteTarget.feederPointName || deleteTarget.areaName}</strong> and all of its inspection reports. This cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" onClick={() => setDeleteTarget(null)} style={{ flex: 1, padding: 10, borderRadius: 10, border: "1px solid #e2e8f0", background: "#ffffff", fontWeight: 800, cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button type="button" disabled={deleting} onClick={confirmDelete} style={{ flex: 1, padding: 10, borderRadius: 10, border: "none", background: "#dc2626", color: "#ffffff", fontWeight: 800, cursor: "pointer" }}>
+                {deleting ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

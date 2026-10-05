@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { CityUserApi, type UserAssignmentType, type UserAssignmentOption } from "@lib/apiClient";
 
-const titles: Record<UserAssignmentType, string> = { ZONE: "zone", WARD: "ward", BEAT: "beat", BIN: "litter bin", TOILET: "toilet" };
+const titles: Record<UserAssignmentType, string> = { ZONE: "zone", WARD: "ward", BEAT: "beat", BIN: "litter bin", TOILET: "toilet", GVP: "GVP" };
 
 export function UserAssignmentPicker({ userId, userName, type, roles, initialRole, onCancel, onAssigned, onBusyChange }: {
   userId: string; userName: string; type: UserAssignmentType; roles: string[]; initialRole: string;

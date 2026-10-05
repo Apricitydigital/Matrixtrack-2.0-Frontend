@@ -238,6 +238,7 @@ export const AuditLogsModal: React.FC<AuditLogsModalProps> = ({
                   <option value="TOILETS">TOILETS</option>
                   <option value="SWEEPING">SWEEPING</option>
                   <option value="TWINBIN">TWINBIN</option>
+                  <option value="TASKFORCE">GVP</option>
                   <option value="WARD_RANKING">WARD RANKING</option>
                 </select>
               </div>
