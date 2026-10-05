@@ -61,6 +61,7 @@ export type AttendanceEmployeeSummary = {
   completedPunches: number;
   avgWorkMinutes: number | null;
   lastAttendanceDate: string;
+  matchType?: "aadhaar" | "employeeId" | null;
 };
 
 export type AttendanceDashboardResponse = {
@@ -136,6 +137,9 @@ export type AttendanceDashboardResponse = {
 export type RegisteredEmployee = {
   userId: string;
   name: string;
+  employeeId?: string;
+  matchSuffix?: string;
+  matchType?: "aadhaar" | "employeeId" | null;
   aadhaarSuffix: string;
   rawAadhaar: string;
   zones: string[];
