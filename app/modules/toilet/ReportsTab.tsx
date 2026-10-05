@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { ApiError, ToiletApi, GeoApi } from '@lib/apiClient';
 import Link from 'next/link';
 import { FilterTabs } from "../qc-shared";
+import ModuleOverviewCards from "../qc-shared/ModuleOverviewCards";
 import UniversalReportModal from '@components/UniversalReportModal';
 import { useAuth } from '@hooks/useAuth';
 import { isReportVisibleToAO } from '@lib/aoScope';
@@ -240,34 +241,12 @@ export default function ReportsTab({ cityId }: { cityId?: string }) {
                 </div>
 
                 {/* 7 STAT CARDS IN A GRID */}
-                {(() => {
-                    const handleStatClick = (statusKey: string) => {
-                        if (statusKey === 'TOTAL') {
-                            setSelectedStatus('');
-                        } else if (selectedStatus === statusKey) {
-                            setSelectedStatus('');
-                        } else {
-                            setSelectedStatus(statusKey);
-                        }
-                        setTimeout(() => {
-                            tableSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }, 80);
-                    };
-
-                    const pendingVal = (activeStats?.submitted || 0) - (activeStats?.approved || 0) - (activeStats?.rejected || 0);
-
-                    return (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">
-                            <StatCard label="TOTAL TOILETS" value={totalToiletsCount} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatus === ''} />
-                            <StatCard label="SUBMITTED REPORTS" value={activeStats?.submitted || 0} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
-                            <StatCard label="PENDING REPORTS" value={pendingVal > 0 ? pendingVal : 0} sub="Pending Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
-                            <StatCard label="APPROVED REPORTS" value={activeStats?.approved || 0} sub="Approved by SI" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatus === 'APPROVED'} />
-                            <StatCard label="REJECTED REPORTS" value={activeStats?.rejected || 0} sub="Rejected by SI" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatus === 'REJECTED'} />
-                            <StatCard label="ACTION REQUIRED" value={activeStats?.actionRequired || 0} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatus === 'ACTION_REQUIRED'} />
-                            <StatCard label="ACTION TAKEN REPORTS" value={activeStats?.actionTaken || 0} sub="Action Completed" color="#06b6d4" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={selectedStatus === 'ACTION_TAKEN'} />
-                        </div>
-                    );
-                })()}
+                <ModuleOverviewCards
+                    moduleKey="TOILET"
+                    assetLabel="Toilet"
+                    cityId={cityId}
+                    onViewReport={(rec) => setSelectedReport(rec)}
+                />
             </div>
 
             {loading && <div className="loading-state" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}><p>Syncing dashboard...</p></div>}

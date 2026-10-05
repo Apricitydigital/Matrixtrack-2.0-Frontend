@@ -5,6 +5,7 @@ import { Protected, ModuleGuard } from "@components/Guards";
 import { ModuleRecordsApi, TaskforceApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import SubmittedReportsTab from "../../qc-shared/SubmittedReportsTab";
+import ModuleOverviewCards from "../../qc-shared/ModuleOverviewCards";
 import GvpReviewModal from "./GvpReviewModal";
 import GvpRequestsTab from "./GvpRequestsTab";
 import GvpRegistryTab from "./GvpRegistryTab";
@@ -145,20 +146,12 @@ export default function GvpModulePage() {
             <GvpRequestsTab onChanged={refreshAll} />
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3" style={{ marginBottom: 16 }}>
-                <StatCard label="REGISTERED GVPS" value={points.length} sub="Approved points" color="#2563eb" />
-                <StatCard label="ACTIVE GVPS" value={active.length} sub={`${assigned} assigned to a daroga`} color="#0891b2" />
-                <StatCard label="ELIMINATED" value={eliminated} sub="Verified by SI" color="#16a34a" />
-                <StatCard label="ELIMINATION PENDING" value={eliminationPending} sub="Awaiting SI verification" color="#d97706" />
-                <StatCard label="SUBMITTED REPORTS" value={stats.total} sub="Inspection reports" color="#6366f1" />
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                <StatCard label="PENDING REVIEW" value={stats.pending} sub="Awaiting SI" color="#f59e0b" />
-                <StatCard label="APPROVED" value={stats.approved} sub="SI approved" color="#16a34a" />
-                <StatCard label="REJECTED" value={stats.rejected} sub="SI rejected" color="#e11d48" />
-                <StatCard label="ACTION REQUIRED" value={stats.actionRequired} sub="With IEC member" color="#f97316" />
-                <StatCard label="ACTION TAKEN" value={stats.actionTaken} sub="Awaiting ULB closure" color="#0d9488" />
-              </div>
+              <ModuleOverviewCards
+                moduleKey="TASKFORCE"
+                assetLabel="GVP"
+                refreshKey={points.length}
+                onViewReport={(record) => setReviewingRecord(record)}
+              />
             </>
           )}
         </div>

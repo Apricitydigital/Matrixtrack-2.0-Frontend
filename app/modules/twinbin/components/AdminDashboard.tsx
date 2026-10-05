@@ -6,6 +6,7 @@ import { ModuleRecordsApi, TwinbinApi, ApiError, EmployeesApi, GeoApi, CityApi, 
 import LitterBinReviewModal from "./LitterBinReviewModal";
 import TwinbinStaffAssignmentsTab from "./TwinbinStaffAssignmentsTab";
 import SubmittedReportsTab from "../../qc-shared/SubmittedReportsTab";
+import ModuleOverviewCards from "../../qc-shared/ModuleOverviewCards";
 import { useAuth } from "@hooks/useAuth";
 
 export default function AdminDashboard() {
@@ -556,62 +557,13 @@ return true;
                         </div>
                     </div>
 
-                    {/* 7 STAT CARDS GRID */}
-                    {(() => {
-                        const handleStatClick = (statusKey: string) => {
-                            if (statusKey === 'TOTAL') {
-                                setStatusFilter('ALL');
-                            } else if (statusFilter === statusKey) {
-                                setStatusFilter('ALL');
-                            } else {
-                                setStatusFilter(statusKey);
-                            }
-                            setTimeout(() => {
-                                tableSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }, 80);
-                        };
-
-                        const inspectionReports = records.filter(
-                            r =>
-                                r.type === 'DAILY_REPORT' ||
-                                r.type === 'VISIT_REPORT' ||
-                                r.type === 'CITIZEN_REPORT'
-                        );
-
-                        const totalSubmitted = inspectionReports.length;
-
-                        const pendingCount = inspectionReports.filter(
-                            r => r.status === 'PENDING_QC' || r.status === 'SUBMITTED'
-                        ).length;
-
-                        const approvedCount = inspectionReports.filter(
-                            r => r.status === 'APPROVED'
-                        ).length;
-
-                        const rejectedCount = inspectionReports.filter(
-                            r => r.status === 'REJECTED'
-                        ).length;
-
-                        const actionReqCount = inspectionReports.filter(
-                            r => r.status === 'ACTION_REQUIRED'
-                        ).length;
-
-                        const actionTakenCount = inspectionReports.filter(
-                            r => r.status === 'ACTION_TAKEN'
-                        ).length;
-
-                        return (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">
-                                <StatCard label="TOTAL REGISTERED LITTERBINS" value={registeredBins.length || combinedBins.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={statusFilter === 'ALL'} />
-                                <StatCard label="SUBMITTED REPORTS" value={totalSubmitted} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
-                                <StatCard label="PENDING REVIEW REPORTS" value={pendingCount} sub="Awaiting SI Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={statusFilter === 'SUBMITTED'} />
-                                <StatCard label="APPROVED REPORTS" value={approvedCount} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={statusFilter === 'APPROVED'} />
-                                <StatCard label="REJECTED REPORTS" value={rejectedCount} sub="Non-Compliant" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={statusFilter === 'REJECTED'} />
-                                <StatCard label="ACTION REQUIRED REPORTS" value={actionReqCount} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={statusFilter === 'ACTION_REQUIRED'} />
-                                <StatCard label="ACTION TAKEN REPORTS" value={actionTakenCount} sub="Action Completed" color="#06b6d4" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={statusFilter === 'ACTION_TAKEN'} />
-                            </div>
-                        );
-                    })()}
+                    {/* MODULE STAT CARDS (click a card to open its list) */}
+                    <ModuleOverviewCards
+                        moduleKey="LITTERBINS"
+                        assetLabel="Litterbin"
+                        cityId={selectedCity}
+                        onViewReport={(rec) => setViewRecord(rec)}
+                    />
 
                     {/* DAILY INSPECTION REPORTS STREAM */}
                     <div ref={tableSectionRef} style={{ background: 'white', borderRadius: 20, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
@@ -969,22 +921,6 @@ return true;
                     onAssign={(rec) => openAssignModal(rec)}
                 />
             )}
-        </div>
-    );
-}
-
-function StatCard({ label, value, sub, color, onClick }: any) {
-    return (
-        <div
-            onClick={onClick}
-            className="bg-white rounded-2xl p-4 sm:p-4.5 border border-slate-200 shadow-xs hover:shadow-md transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between"
-            style={{
-                borderLeft: `5px solid ${color}`,
-            }}
-        >
-            <div className="text-[9.5px] font-black text-slate-400 tracking-wider uppercase truncate" title={label}>{label}</div>
-            <div className="my-1.5 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">{value}</div>
-            <div className="text-xs text-slate-500 font-semibold truncate">{sub}</div>
         </div>
     );
 }

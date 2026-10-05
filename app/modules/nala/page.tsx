@@ -5,6 +5,7 @@ import { Protected, ModuleGuard } from "@components/Guards";
 import { ModuleRecordsApi, NalaApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
 import SubmittedReportsTab from "../qc-shared/SubmittedReportsTab";
+import ModuleOverviewCards from "../qc-shared/ModuleOverviewCards";
 import NalaStaffAssignmentsTab from "./components/NalaStaffAssignmentsTab";
 import NalaMasterTab from "./components/NalaMasterTab";
 import NalaReviewModal from "./components/NalaReviewModal";
@@ -366,52 +367,11 @@ export default function NalaModulePage() {
             <NalaStaffAssignmentsTab />
           ) : (
             <>
-              <div
-                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3"
-                style={{ marginBottom: 24 }}
-              >
-                <StatCard
-                  label="REGISTERED NALAS"
-                  value={stats.totalNalas}
-                  sub="Nala Assets"
-                />
-
-                <StatCard
-                  label="NALA POINTS"
-                  value={stats.totalPoints}
-                  sub="Configured Points"
-                />
-
-                <StatCard
-                  label="SUBMITTED REPORTS"
-                  value={stats.submitted}
-                  sub="Inspection Reports"
-                />
-
-                <StatCard
-                  label="PENDING REPORTS"
-                  value={stats.pending}
-                  sub="Awaiting Review"
-                />
-
-                <StatCard
-                  label="APPROVED REPORTS"
-                  value={stats.approved}
-                  sub="Approved"
-                />
-
-                <StatCard
-                  label="REJECTED REPORTS"
-                  value={stats.rejected}
-                  sub="Rejected"
-                />
-
-                <StatCard
-                  label="ACTION REQUIRED"
-                  value={stats.actionRequired}
-                  sub="Needs Resolution"
-                />
-              </div>
+              <ModuleOverviewCards
+                moduleKey="NALA"
+                assetLabel="Nala"
+                onViewReport={(rec) => setReviewingRecord(rec)}
+              />
 
               <TodayPointStatus
                 overview={overview}
