@@ -266,7 +266,7 @@ function formatDate(
   value: any
 ) {
   if (!value) {
-    return '—';
+    return '-';
   }
 
   const date =
@@ -277,7 +277,7 @@ function formatDate(
       date.getTime()
     )
   ) {
-    return '—';
+    return '-';
   }
 
   return date.toLocaleString(
@@ -1417,21 +1417,21 @@ function GvpScoringGuide({
       {
         key: 'inspectionCoverage',
         label: 'Inspection Coverage',
-        formula: 'Submitted ÷ Due (active GVP x day)',
+        formula: 'Submitted / Due (active GVP x day)',
         detail: `${Number(metrics.pointsChecked || 0)} of ${Number(metrics.pointsDue || 0)} submitted`,
         percent: Number(metrics.coveragePercent || 0),
       },
       {
         key: 'qcApproval',
         label: 'SI Approval',
-        formula: 'Approved ÷ SI reviewed',
+        formula: 'Approved / SI reviewed',
         detail: `${Number(metrics.qcApproved || 0)} approved, ${Number(metrics.qcRejected || 0)} rejected, ${Number(metrics.pendingQc || 0)} pending`,
         percent: Number(metrics.approvalPercent || 0),
       },
       {
         key: 'eliminationProgress',
         label: 'Elimination Progress',
-        formula: 'Eliminated ÷ registered GVPs',
+        formula: 'Eliminated / registered GVPs',
         detail: `${Number(metrics.eliminatedPoints || 0)} of ${Number(metrics.totalPoints || 0)} eliminated${metrics.eliminationPendingQc ? `, ${metrics.eliminationPendingQc} awaiting SI` : ''}`,
         percent: Number(metrics.eliminationPercent || 0),
       },
@@ -1717,7 +1717,7 @@ function RecordCard({
       {!!remarks.length && (
         <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-600">
           {remarks.join(
-            ' · '
+            ' | '
           )}
         </div>
       )}
@@ -1818,7 +1818,7 @@ function RecordCard({
             Open Report
 
             <span>
-              →
+              {'->'}
             </span>
           </button>
         </div>
@@ -3110,7 +3110,7 @@ export default function WardDrilldownDrawer({
 
                 {ward.rankable ? (
                   <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-blue-700">
-                    City Rank #{ward.cityRank || '—'}
+                    City Rank #{ward.cityRank || '-'}
                   </span>
                 ) : (
                   <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
@@ -3130,7 +3130,7 @@ export default function WardDrilldownDrawer({
                 </span>
 
                 <span>
-                  {from} — {to}
+                  {from} - {to}
                 </span>
 
                 {ward.rankable && (
@@ -3268,7 +3268,7 @@ export default function WardDrilldownDrawer({
 
                       {selectedScore?.applicable && (
                         <>
-                          {' · '}
+                          {' | '}
                           {Number(
                             selectedScore.percentage ||
                             0
@@ -4661,7 +4661,7 @@ export default function WardDrilldownDrawer({
 
                                       <div className="text-[10px] font-black text-slate-700">
                                         {employee.employeeId ||
-                                          '—'}
+                                          '-'}
                                       </div>
                                     </div>
 
@@ -4691,7 +4691,7 @@ export default function WardDrilldownDrawer({
                                           )
                                         ) : (
                                           <span className="text-[9px] font-bold text-slate-300">
-                                            —
+                                            '-'
                                           </span>
                                         )}
 
@@ -4742,7 +4742,7 @@ export default function WardDrilldownDrawer({
                                       <div className="text-[9px] font-bold text-slate-600">
                                         {latestAttendance
                                           ?.inTime ||
-                                          '—'}
+                                          '-'}
                                       </div>
                                     </div>
 
@@ -4756,7 +4756,7 @@ export default function WardDrilldownDrawer({
                                       <div className="text-[9px] font-bold text-slate-600">
                                         {latestAttendance
                                           ?.outTime ||
-                                          '—'}
+                                          '-'}
                                       </div>
                                     </div>
 
@@ -4985,7 +4985,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Assigned & Present ÷ Attendance Expected
+                            Assigned & Present / Attendance Expected
                           </div>
 
                         </div>
@@ -5022,7 +5022,7 @@ export default function WardDrilldownDrawer({
                         ) : (
 
                           <div className="mt-2 text-[10px] font-bold text-slate-400">
-                            No employee attendance obligation — this factor is N/A
+                            No employee attendance obligation - this factor is N/A
                           </div>
 
                         )}
@@ -5065,7 +5065,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Present Darogas ÷ Expected Darogas
+                            Present Darogas / Expected Darogas
                           </div>
 
                         </div>
@@ -5107,7 +5107,7 @@ export default function WardDrilldownDrawer({
                         ) : (
 
                           <div className="mt-2 text-[10px] font-bold text-slate-400">
-                            No Daroga obligation — this factor is N/A
+                            No Daroga obligation - this factor is N/A
                           </div>
 
                         )}
@@ -5150,7 +5150,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Manned Beat opportunities ÷ Total Beat opportunities
+                            Manned Beat opportunities / Total Beat opportunities
                           </div>
 
                         </div>
@@ -5189,7 +5189,7 @@ export default function WardDrilldownDrawer({
                         ) : (
 
                           <div className="mt-2 text-[10px] font-bold text-slate-400">
-                            No Beat manpower obligation — this factor is N/A
+                            No Beat manpower obligation - this factor is N/A
                           </div>
 
                         )}
@@ -5328,7 +5328,7 @@ export default function WardDrilldownDrawer({
                             </div>
 
                             <div className="text-[9px] font-semibold text-slate-400">
-                              Submitted Beat reports ÷ Reports due
+                              Submitted Beat reports / Reports due
                             </div>
 
                           </div>
@@ -5393,7 +5393,7 @@ export default function WardDrilldownDrawer({
                             </div>
 
                             <div className="text-[9px] font-semibold text-slate-400">
-                              SI Approved ÷ SI Reviewed
+                              SI Approved / SI Reviewed
                             </div>
 
                           </div>
@@ -5422,7 +5422,7 @@ export default function WardDrilldownDrawer({
                           ) : (
 
                             <div className="mt-2 text-[10px] font-bold text-slate-400">
-                              No Beat report has been reviewed by SI — this factor is N/A
+                              No Beat report has been reviewed by SI - this factor is N/A
                             </div>
 
                           )}
@@ -5464,7 +5464,7 @@ export default function WardDrilldownDrawer({
                             </div>
 
                             <div className="text-[9px] font-semibold text-slate-400">
-                              Reports with all Beat points completed ÷ Reports due
+                              Reports with all Beat points completed / Reports due
                             </div>
 
                           </div>
@@ -5621,7 +5621,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Submitted ÷ Expected
+                            Submitted / Expected
                           </div>
 
                         </div>
@@ -5687,7 +5687,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Approved ÷ SI Reviewed
+                            Approved / SI Reviewed
                           </div>
 
                         </div>
@@ -6428,7 +6428,7 @@ export default function WardDrilldownDrawer({
                                       {Number(
                                         row.progressPercent || 0
                                       ).toFixed(1)}
-                                      % · 1 image per point
+                                      % | 1 image per point
                                     </div>
 
                                   </div>
@@ -6484,7 +6484,7 @@ export default function WardDrilldownDrawer({
                                     ) : (
 
                                       <span className="text-[9px] font-bold text-slate-300">
-                                        —
+                                        -
                                       </span>
 
                                     )}
@@ -6592,7 +6592,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Reviewed reports ÷ Total reports requiring SI
+                            Reviewed reports / Total reports requiring SI
                           </div>
 
                         </div>
@@ -6731,7 +6731,7 @@ export default function WardDrilldownDrawer({
                       </div>
 
                       <div className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                        Action Taken ÷ Action Required determines the current IEC Member Ward Ranking score.
+                        Action Taken / Action Required determines the current IEC Member Ward Ranking score.
                       </div>
 
                       <div className="mt-2 inline-flex rounded-lg border border-blue-100 bg-white px-2.5 py-1 text-[9px] font-black text-blue-700">
@@ -6840,7 +6840,7 @@ export default function WardDrilldownDrawer({
                         </div>
 
                         <div className="mt-0.5 text-[9px] font-semibold text-slate-400">
-                          Action Taken ÷ Action Required
+                          Action Taken / Action Required
                         </div>
 
                       </div>
@@ -6923,7 +6923,7 @@ export default function WardDrilldownDrawer({
                           </div>
 
                           <div className="text-[9px] font-semibold text-slate-400">
-                            Submitted reports ÷ Reports due
+                            Submitted reports / Reports due
                           </div>
 
                         </div>
@@ -7287,7 +7287,7 @@ export default function WardDrilldownDrawer({
                                     >
                                       View Reports
                                       <span>
-                                        →
+                                        {'->'}
                                       </span>
                                     </button>
                                   )}
@@ -7373,7 +7373,7 @@ export default function WardDrilldownDrawer({
                         <div className="text-xs font-black text-slate-700">
                           {selectedComponent === 'SUPERVISOR' &&
                             selectedSupervisor
-                            ? `${selectedSupervisor.supervisorName} — Reports`
+                            ? `${selectedSupervisor.supervisorName} - Reports`
                             : 'Operational Records'}
                         </div>
 
@@ -7463,46 +7463,30 @@ export default function WardDrilldownDrawer({
       )}
 
 
-      {
-        reportImagePreview && (
+      {reportImagePreview &&
+        typeof document !== 'undefined' &&
+        createPortal(
           <div
-            className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/90 p-4"
-            onClick={() =>
-              setReportImagePreview(
-                null
-              )
-            }
+            className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4"
+            onClick={() => setReportImagePreview(null)}
           >
             <button
               type="button"
-              onClick={() =>
-                setReportImagePreview(
-                  null
-                )
-              }
-              className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+              onClick={() => setReportImagePreview(null)}
+              className="fixed right-5 top-5 z-[1000000] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
             >
-              <X
-                size={20}
-              />
+              <X size={20} />
             </button>
 
             <img
-              src={
-                reportImagePreview
-              }
+              src={reportImagePreview}
               alt="Inspection evidence"
-              className="max-h-full max-w-full rounded-xl object-contain"
-              onClick={(
-                event
-              ) =>
-                event
-                  .stopPropagation()
-              }
+              className="max-h-[92vh] max-w-[94vw] rounded-xl object-contain shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
             />
-          </div>
-        )
-      }
+          </div>,
+          document.body
+        )}
     </div >,
     document.body
   );
