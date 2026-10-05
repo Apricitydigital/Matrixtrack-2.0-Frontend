@@ -1136,7 +1136,6 @@ export default function EmployeesPage() {
 
             const existingEmployeesByAadhaar = new Map<string, EmployeeRow>();
             const existingEmployeesByEmployeeId = new Map<string, EmployeeRow>();
-            const existingEmployeesByName = new Map<string, EmployeeRow[]>();
 
             employees.forEach((emp) => {
                 if (emp.aadhaar) existingEmployeesByAadhaar.set(emp.aadhaar, emp);
@@ -1147,10 +1146,6 @@ export default function EmployeesPage() {
                     );
                 }
 
-                const normName = normalizeEmployeeImportValue(emp.name);
-                const arr = existingEmployeesByName.get(normName) || [];
-                arr.push(emp);
-                existingEmployeesByName.set(normName, arr);
             });
 
 
@@ -1241,6 +1236,7 @@ export default function EmployeesPage() {
                         ) {
                             parsedRows.push({
                                 rowNumber,
+                                employeeId,
                                 employeeName,
                                 mobileNumber,
                                 aadhaarNumber,
@@ -1291,6 +1287,7 @@ export default function EmployeesPage() {
                         ) {
                             parsedRows.push({
                                 rowNumber,
+                                employeeId,
                                 employeeName,
                                 mobileNumber,
                                 aadhaarNumber,
@@ -1330,6 +1327,7 @@ export default function EmployeesPage() {
                         ) {
                             parsedRows.push({
                                 rowNumber,
+                                employeeId,
                                 employeeName,
                                 mobileNumber,
                                 aadhaarNumber,
@@ -1366,17 +1364,12 @@ export default function EmployeesPage() {
                             isAlreadyExists = true;
                         } else if (aadhaarNumber && existingEmployeesByAadhaar.has(aadhaarNumber)) {
                             isAlreadyExists = true;
-                        } else if (!mobileNumber && !aadhaarNumber) {
-                            // If they provide NO phone and NO aadhaar, and the name already exists, 
-                            // we flag it to prevent accidental identical named duplicates without identifiers.
-                            if (existingEmployeesByName.has(normalizedName)) {
-                                isAlreadyExists = true;
-                            }
                         }
 
                         if (isAlreadyExists) {
                             parsedRows.push({
                                 rowNumber,
+                                employeeId,
                                 employeeName,
                                 mobileNumber,
                                 aadhaarNumber,
@@ -1401,17 +1394,18 @@ export default function EmployeesPage() {
 
                         /*
                          * Duplicate inside same uploaded file.
-                         * Use Name + Mobile + Aadhaar + Zone + Ward to be safe for exact duplicates.
+                         * Include Employee ID so different employees can share a name and location.
                          */
 
                         const employeeKey =
-                            `${normalizedName}::${mobileNumber || ""}::${aadhaarNumber || ""}::${zone.id}::${ward.id}`;
+                            `${employeeId}::${normalizedName}::${mobileNumber || ""}::${aadhaarNumber || ""}::${zone.id}::${ward.id}`;
 
                         if (
                             uploadedEmployeeKeys.has(employeeKey)
                         ) {
                             parsedRows.push({
                                 rowNumber,
+                                employeeId,
                                 employeeName,
                                 mobileNumber,
                                 aadhaarNumber,
