@@ -298,12 +298,22 @@ const MODULES = ALL_MODULES;
 
 // Nala is listed only when the backend reports it (older backends do not).
 function assignmentModuleRows(status: SupervisorAssignmentStatus) {
-  const rows: Array<["SWEEPING" | "TOILET" | "LITTERBINS" | "NALA", string]> = [
+  const rows: Array<
+    ["SWEEPING" | "TOILET" | "LITTERBINS" | "NALA" | "TASKFORCE", string]
+  > = [
     ["SWEEPING", "Sweeping"],
     ["TOILET", "Toilet"],
     ["LITTERBINS", "Litter Bin"],
   ];
-  if (status.modules.NALA) rows.push(["NALA", "Nala"]);
+
+  if (status.modules.NALA) {
+    rows.push(["NALA", "Nala"]);
+  }
+
+  if (status.modules.TASKFORCE) {
+    rows.push(["TASKFORCE", "GVP"]);
+  }
+
   return rows;
 }
 const ALL_KEYS = Object.keys(ALL_MODULES) as ModuleKey[];
@@ -3313,7 +3323,7 @@ const beatRequests = (
                 <div>
                   <h4 className="text-[11px] font-black text-slate-800">Daroga Assignment Audit</h4>
                   <p className="mt-0.5 text-[9px] font-semibold text-slate-500">
-                    Live assignment status across Sweeping, Toilet, Litter Bin and Nala
+                    Live assignment status across Sweeping, Toilet, Litter Bin, Nala and GVP
                   </p>
                 </div>
                 <button
@@ -3357,7 +3367,7 @@ const beatRequests = (
                           </div>
                           <div className="mt-1 text-[8px] font-semibold text-amber-700">{supervisor.reason}</div>
                           <div className="mt-1 text-[8px] font-semibold text-slate-500">
-                            Modules: {supervisor.moduleKeys.length ? supervisor.moduleKeys.map((key) => key === "LITTERBINS" ? "Litter Bin" : key === "TOILET" ? "Toilet" : key === "NALA" ? "Nala" : "Sweeping").join(", ") : "None"}
+                            Modules: {supervisor.moduleKeys.length ? supervisor.moduleKeys.map((key) => key === "LITTERBINS" ? "Litter Bin" : key === "TOILET" ? "Toilet" : key === "NALA" ? "Nala" : key === "TASKFORCE" ? "GVP" : "Sweeping").join(", ") : "None"}
                             {` • ${supervisor.zoneIds.length} zone(s) • ${supervisor.wardIds.length} ward(s)`}
                           </div>
                         </div>
@@ -3392,7 +3402,7 @@ const beatRequests = (
                     ))}
                     {Object.values(assignmentStatus.modules).every((module) => !module || module.unassignedAssets === 0) && (
                       <div className="rounded-lg bg-emerald-50 p-3 text-[9px] font-bold text-emerald-700">
-                        Every approved Sweeping, Toilet, Litter Bin and Nala asset has a Daroga.
+                        Every approved Sweeping, Toilet, Litter Bin, Nala and GVP asset has a Daroga.
                       </div>
                     )}
                   </div>
