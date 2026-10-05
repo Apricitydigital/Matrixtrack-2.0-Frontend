@@ -65,6 +65,10 @@ import {
 
 const numberFormatter = new Intl.NumberFormat("en-IN");
 
+function isEmployeeMatched(employee: AttendanceEmployeeSummary) {
+  return employee.isMatched ?? Boolean(employee.matrixTrackUserId?.trim());
+}
+
 function formatAverageValue(value: number) {
   if (!Number.isFinite(value) || value <= 0) return "0";
   if (value >= 100 || Number.isInteger(value)) return numberFormatter.format(Math.round(value));
@@ -1977,8 +1981,10 @@ function AttendanceDashboard() {
       { header: "S.No.", key: "sno", width: 8 },
       { header: "User ID", key: "userId", width: 25 },
       { header: "Employee Name", key: "name", width: 28 },
+      { header: "Employee ID", key: "employeeId", width: 20 },
       { header: "Registered Aadhaar", key: "rawAadhaar", width: 20 },
-      { header: "Aadhaar Suffix (Last 8)", key: "aadhaarSuffix", width: 22 },
+      { header: "Match Key (Last 8)", key: "matchSuffix", width: 22 },
+      { header: "Match Type", key: "matchType", width: 18 },
       { header: "Attendance ID (Matched)", key: "attendanceId", width: 24 },
       { header: "Attendance Status", key: "status", width: 18 },
       { header: "Present Days", key: "presentDays", width: 14 },
@@ -2005,22 +2011,26 @@ function AttendanceDashboard() {
     headerRow.alignment = { vertical: "middle", horizontal: "left" };
 
     list.forEach((e, idx) => {
-      const hasAadhaar = Boolean(e.aadhaarSuffix);
+      const matchSuffix = e.matchSuffix || e.aadhaarSuffix;
+      const hasKey = Boolean(matchSuffix);
+      const matchTypeLabel = e.matchType === "employeeId" ? "Employee ID" : e.matchType === "aadhaar" ? "Aadhaar" : "None";
       let reason = "";
       if (!e.isMatched) {
-        reason = hasAadhaar
-          ? `Aadhaar suffix (${e.aadhaarSuffix}) not present in attendance report CSV`
-          : "Aadhaar card number missing or invalid on user profile";
+        reason = hasKey
+          ? `Match key (${matchSuffix}) not present in attendance report CSV`
+          : "Aadhaar is invalid, or Aadhaar is missing and Employee ID is missing or invalid";
       } else {
-        reason = `Matched to Attendance ID ${e.attendanceId || e.aadhaarSuffix}`;
+        reason = `Matched to Attendance ID ${e.attendanceId || matchSuffix} via ${matchTypeLabel}`;
       }
 
       worksheet.addRow({
         sno: idx + 1,
         userId: e.userId,
         name: e.name,
+        employeeId: e.employeeId || "Not Provided",
         rawAadhaar: e.rawAadhaar || "Not Provided",
-        aadhaarSuffix: e.aadhaarSuffix || "N/A",
+        matchSuffix: matchSuffix || "N/A",
+        matchType: e.isMatched ? matchTypeLabel : "Unmatched",
         attendanceId: e.attendanceId || "Not Matched",
         status: e.status || (e.isMatched ? "P" : "No Record"),
         presentDays: e.presentDays,
@@ -2478,13 +2488,13 @@ function AttendanceDashboard() {
 
     const matchedEmployeesCount = useMemo(() => {
       return employees.filter(
-        (e) => (e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0)
+        isEmployeeMatched
       ).length;
     }, [employees]);
 
     const filteredEmployees = useMemo(() => {
       return employees.filter((e) => {
-        const isMatched = Boolean((e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0));
+        const isMatched = isEmployeeMatched(e);
 
         if (matchFilter === "MATCHED" && !isMatched) return false;
         if (matchFilter === "UNMATCHED" && isMatched) return false;
@@ -2557,7 +2567,7 @@ function AttendanceDashboard() {
 
     const avgMatchedRate = useMemo(() => {
       const matched = employees.filter(
-        (e) => (e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0)
+        isEmployeeMatched
       );
       if (!matched.length) return "0.0";
       const sum = matched.reduce((acc, curr) => acc + curr.attendanceRate, 0);
@@ -2580,7 +2590,7 @@ function AttendanceDashboard() {
                 </span>
               </div>
               <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                Matched against registered employee profiles via Aadhaar (last 8 digits) with Zone & Ward location sorting
+                Matched via Aadhaar last 8 digits, or Employee ID last 8 digits when Aadhaar is missing, with Zone & Ward location sorting
               </p>
             </div>
           </div>
@@ -2716,7 +2726,7 @@ function AttendanceDashboard() {
               <tr className="bg-slate-50/95 text-left backdrop-blur">
                 {[
                   "Employee Name",
-                  "Attendance ID (Aadhaar)",
+                  "Attendance ID",
                   "Match Status",
                   "Designation",
                   "Zone",
@@ -2738,11 +2748,7 @@ function AttendanceDashboard() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedEmployees.map((employee) => {
-                const isMatched = Boolean(
-                  (employee.matrixTrackUserId && employee.matrixTrackUserId.trim() !== "") ||
-                  (employee.zones && employee.zones.length > 0) ||
-                  (employee.wards && employee.wards.length > 0)
-                );
+                const isMatched = isEmployeeMatched(employee);
 
                 return (
                   <tr
@@ -2781,9 +2787,15 @@ function AttendanceDashboard() {
                     {/* Match Status */}
                     <td className="px-4 py-3.5">
                       {isMatched ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-200">
-                          <CheckCircle2 size={11} /> Matched (Aadhaar)
-                        </span>
+                        employee.matchType === "employeeId" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-black text-sky-700 ring-1 ring-sky-200">
+                            <CheckCircle2 size={11} /> Matched (Emp ID)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-200">
+                            <CheckCircle2 size={11} /> Matched (Aadhaar)
+                          </span>
+                        )
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-400 ring-1 ring-slate-200">
                           Unmatched
@@ -3357,7 +3369,7 @@ function AttendanceDashboard() {
                     <div>
                       <p className="text-sm font-black text-slate-900">Registered Health Workers (Employee Roster)</p>
                       <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                        Matched via Aadhaar last 8 digits against attendance ID · {registeredEmpData.totalWithAadhaar} of {registeredEmpData.totalRegistered} have Aadhaar on file
+                        Matched via Aadhaar last 8 digits, or Employee ID when Aadhaar is missing · {registeredEmpData.totalWithAadhaar} of {registeredEmpData.totalRegistered} have Aadhaar on file
                       </p>
                     </div>
                   </div>
@@ -4114,7 +4126,7 @@ function AttendanceDashboard() {
             {employeeGroup === "HEALTH_WORKERS" && registeredEmpData ? (
               <EmployeeMatchedSection
                 employees={(!isCityAdminOnly ? registeredEmpData.employees.filter((re) => re.isMatched) : registeredEmpData.employees).map((re) => ({
-                  attendanceId: re.attendanceId || re.aadhaarSuffix || "No Aadhaar",
+                  attendanceId: re.attendanceId || re.matchSuffix || re.aadhaarSuffix || "No ID",
                   employeeName: re.name,
                   designation: null,
                   officeLocation: null,
@@ -4128,6 +4140,8 @@ function AttendanceDashboard() {
                   completedPunches: 0,
                   avgWorkMinutes: null,
                   lastAttendanceDate: "",
+                  matchType: re.matchType,
+                  isMatched: re.isMatched,
                 }))}
                 openEmployeeDrilldown={openEmployeeDrilldown}
               />

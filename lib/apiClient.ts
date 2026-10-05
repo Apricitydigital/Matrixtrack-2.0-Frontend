@@ -1198,6 +1198,17 @@ export type SupervisorAssignmentStatus = {
         wardId: string | null;
       }>;
     };
+    TASKFORCE?: {
+      totalAssets: number;
+      assignedAssets: number;
+      unassignedAssets: number;
+      unassignedItems: Array<{
+        id: string;
+        name: string;
+        zoneId: string | null;
+        wardId: string | null;
+      }>;
+    };
   };
 };
 
