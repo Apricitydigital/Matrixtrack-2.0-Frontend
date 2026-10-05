@@ -13,6 +13,7 @@ import { useAuth } from "@hooks/useAuth";
 import AssessmentReviewModal from "./components/AssessmentReviewModal";
 import BeatStaffAssignmentsTab from "./components/BeatStaffAssignmentsTab";
 import SubmittedReportsTab from "../qc-shared/SubmittedReportsTab";
+import ModuleOverviewCards from "../qc-shared/ModuleOverviewCards";
 
 const BeatMapView = dynamic(() => import("../../city/areas/components/BeatMapView"), { ssr: false });
 const GlobalBeatMapView = dynamic(() => import("../../city/areas/components/GlobalBeatMapView"), { ssr: false });
@@ -419,34 +420,12 @@ export default function SweepingModulePage() {
                                 </div>
                             </div>
 
-                            {/* 7 STAT CARDS GRID */}
-                            {(() => {
-                                const handleStatClick = (statusKey: string) => {
-                                    if (statusKey === 'TOTAL') {
-                                        setSelectedStatus('');
-                                    } else if (selectedStatus === statusKey) {
-                                        setSelectedStatus('');
-                                    } else {
-                                        setSelectedStatus(statusKey);
-                                        setActiveTab('submitted_reports');
-                                    }
-                                    setTimeout(() => {
-                                        mainSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                    }, 80);
-                                };
-
-                                return (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-3.5 mb-6">
-                                        <StatCard label="TOTAL REGISTERED BEATS" value={beats.length || 0} sub="Registered Assets" color="#0f172a" onClick={() => handleStatClick('TOTAL')} isActive={selectedStatus === ''} />
-                                        <StatCard label="SUBMITTED REPORTS" value={stats.total || 0} sub="Total Submitted" color="#2563eb" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
-                                        <StatCard label="PENDING REPORTS" value={stats.pending || 0} sub="Awaiting SI Review" color="#f59e0b" onClick={() => handleStatClick('SUBMITTED')} isActive={selectedStatus === 'SUBMITTED'} />
-                                        <StatCard label="APPROVED REPORTS" value={stats.approved || 0} sub="Verified Clean" color="#10b981" onClick={() => handleStatClick('APPROVED')} isActive={selectedStatus === 'APPROVED'} />
-                                        <StatCard label="REJECTED REPORTS" value={stats.actionRequired || 0} sub="Non-Compliant" color="#ef4444" onClick={() => handleStatClick('REJECTED')} isActive={selectedStatus === 'REJECTED'} />
-                                        <StatCard label="ACTION REQUIRED REPORTS" value={stats.actionRequired || 0} sub="Needs Resolution" color="#ea580c" onClick={() => handleStatClick('ACTION_REQUIRED')} isActive={selectedStatus === 'ACTION_REQUIRED'} />
-                                        <StatCard label="ACTION TAKEN REPORTS" value={stats.actionTaken || 0} sub="Action Completed" color="#06b6d4" onClick={() => handleStatClick('ACTION_TAKEN')} isActive={selectedStatus === 'ACTION_TAKEN'} />
-                                    </div>
-                                );
-                            })()}
+                            <ModuleOverviewCards
+                                moduleKey="SWEEPING"
+                                assetLabel="Beat"
+                                cityId={selectedCity}
+                                onViewReport={(rec) => setInspectingBeat({ ...rec, isAssessmentReview: true })}
+                            />
                         </div>
                     )}
 
