@@ -8,12 +8,27 @@ import SubmittedReportsTab from "../qc-shared/SubmittedReportsTab";
 import NalaStaffAssignmentsTab from "./components/NalaStaffAssignmentsTab";
 import NalaMasterTab from "./components/NalaMasterTab";
 import NalaReviewModal from "./components/NalaReviewModal";
+import NalaRequestsTab from "./components/NalaRequestsTab";
+import dynamic from "next/dynamic";
+
+// Leaflet needs the browser (Sweeping: GlobalBeatMapView).
+const NalaMapView = dynamic(() => import("./components/NalaMapView"), { ssr: false });
 
 type NalaTab =
   | "dashboard"
   | "submitted_reports"
   | "nalas"
+  | "requests"
   | "assignments";
+
+type PointOverview = {
+  total: number;
+  completed: number;
+  inProgress: number;
+  notDone: number;
+  totalPoints: number;
+  completedPoints: number;
+};
 
 type NalaStats = {
   totalNalas: number;
@@ -48,6 +63,18 @@ export default function NalaModulePage() {
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(true);
   const [stats, setStats] = useState<NalaStats>(EMPTY_STATS);
+  const [overview, setOverview] = useState<PointOverview | null>(null);
+  const [overviewNalas, setOverviewNalas] = useState<any[]>([]);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+  const [nalaViewMode, setNalaViewMode] = useState<"table" | "map">("table");
+
+  const roleValues = [user?.role, ...(user?.roles || [])]
+    .filter(Boolean)
+    .map((value) => String(value).toUpperCase());
+
+  // GET /city/nalas/pending-requests is QC / City Admin only.
+  const canReviewRequests =
+    roleValues.includes("CITY_ADMIN") || roleValues.includes("QC");
 
   const loadNalas = useCallback(async () => {
     try {
@@ -139,10 +166,38 @@ export default function NalaModulePage() {
     }
   }, []);
 
+  // Today's operational-day progress: a NalaPoint is complete at 3+ photos.
+  const loadOverview = useCallback(async () => {
+    try {
+      const response = await NalaApi.statusOverview();
+      setOverview(response.summary || null);
+      setOverviewNalas(response.nalas || []);
+    } catch (error) {
+      console.error("Failed to load NALA status overview", error);
+      setOverview(null);
+      setOverviewNalas([]);
+    }
+  }, []);
+
+  const loadPendingRequestCount = useCallback(async () => {
+    if (!canReviewRequests) return;
+
+    try {
+      const response = await NalaApi.listPendingRequests("PENDING_QC");
+      setPendingRequestCount(
+        response.counts?.pending ?? response.pendingNalas?.length ?? 0
+      );
+    } catch (error) {
+      console.error("Failed to load NALA requests", error);
+    }
+  }, [canReviewRequests]);
+
   useEffect(() => {
     loadNalas();
     loadReportStats();
-  }, [loadNalas, loadReportStats]);
+    loadOverview();
+    loadPendingRequestCount();
+  }, [loadNalas, loadReportStats, loadOverview, loadPendingRequestCount]);
 
   const busy = loading || reportLoading;
 
@@ -237,6 +292,15 @@ export default function NalaModulePage() {
                 onClick={() => setActiveTab("nalas")}
               />
 
+              {canReviewRequests && (
+                <TabButton
+                  label="Nala Requests"
+                  active={activeTab === "requests"}
+                  badge={pendingRequestCount}
+                  onClick={() => setActiveTab("requests")}
+                />
+              )}
+
               <TabButton
                 label="Nala Assignment"
                 active={activeTab === "assignments"}
@@ -258,9 +322,45 @@ export default function NalaModulePage() {
               }
             />
           ) : activeTab === "nalas" ? (
-            <NalaMasterTab
-              nalas={nalas}
-              onRefresh={loadNalas}
+            <div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                <div style={{ display: "flex", background: "#f1f5f9", padding: 3, borderRadius: 10 }}>
+                  {(["table", "map"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setNalaViewMode(mode)}
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 8,
+                        border: "none",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        background: nalaViewMode === mode ? "#ffffff" : "transparent",
+                        color: nalaViewMode === mode ? "#2563eb" : "#64748b"
+                      }}
+                    >
+                      {mode === "table" ? "Table View" : "Map View"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {nalaViewMode === "table" ? (
+                <NalaMasterTab
+                  nalas={nalas}
+                  onRefresh={loadNalas}
+                />
+              ) : (
+                <NalaMapView nalas={nalas} />
+              )}
+            </div>
+          ) : activeTab === "requests" ? (
+            <NalaRequestsTab
+              onChanged={async () => {
+                await Promise.all([loadNalas(), loadPendingRequestCount()]);
+              }}
             />
           ) : activeTab === "assignments" ? (
             <NalaStaffAssignmentsTab />
@@ -313,36 +413,10 @@ export default function NalaModulePage() {
                 />
               </div>
 
-              <div
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 18,
-                  padding: 22
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 17,
-                    fontWeight: 900,
-                    color: "#0f172a"
-                  }}
-                >
-                  NALA Operations
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 5,
-                    fontSize: 12,
-                    color: "#64748b"
-                  }}
-                >
-                  Inspection monitoring is based on
-                  configured NalaPoints and submitted
-                  geo-tagged photo reports.
-                </div>
-              </div>
+              <TodayPointStatus
+                overview={overview}
+                nalas={overviewNalas}
+              />
             </>
           )}
         </div>
@@ -442,6 +516,160 @@ function StatCard({
     </div>
   );
 }
+
+function TodayPointStatus({
+  overview,
+  nalas
+}: {
+  overview: PointOverview | null;
+  nalas: any[];
+}) {
+  const statusStyle: Record<string, { label: string; color: string; bg: string }> = {
+    COMPLETED: { label: "COMPLETED", color: "#047857", bg: "#ecfdf5" },
+    IN_PROGRESS: { label: "IN PROGRESS", color: "#b45309", bg: "#fffbeb" },
+    NOT_DONE: { label: "NOT DONE", color: "#b91c1c", bg: "#fef2f2" }
+  };
+
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 18,
+        overflow: "hidden"
+      }}
+    >
+      <div style={{ padding: "18px 22px", borderBottom: "1px solid #f1f5f9" }}>
+        <div style={{ fontSize: 17, fontWeight: 900, color: "#0f172a" }}>
+          Today&apos;s NalaPoint Status
+        </div>
+        <div style={{ marginTop: 5, fontSize: 12, color: "#64748b" }}>
+          Each NalaPoint needs 3-5 geo-tagged photos per day. At 3 photos the
+          report goes to QC.
+        </div>
+
+        {overview && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <SummaryChip label="Points done" value={`${overview.completedPoints} / ${overview.totalPoints}`} color="#2563eb" />
+            <SummaryChip label="Nalas completed" value={overview.completed} color="#047857" />
+            <SummaryChip label="In progress" value={overview.inProgress} color="#b45309" />
+            <SummaryChip label="Not started" value={overview.notDone} color="#b91c1c" />
+          </div>
+        )}
+      </div>
+
+      {nalas.length === 0 ? (
+        <div style={{ padding: 28, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+          No approved Nalas yet.
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", color: "#475569", fontSize: 11, textAlign: "left" }}>
+                <th style={thStyle}>Nala</th>
+                <th style={thStyle}>Ward</th>
+                <th style={thStyle}>Points Done</th>
+                <th style={thStyle}>Point Photos</th>
+                <th style={thStyle}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nalas.map((nala) => {
+                const status = statusStyle[nala.nalaCompletionStatus] || statusStyle.NOT_DONE;
+
+                return (
+                  <tr key={nala.id} style={{ borderTop: "1px solid #e2e8f0" }}>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 800, color: "#0f172a" }}>{nala.nalaName}</div>
+                      {nala.nalaCode && (
+                        <div style={{ marginTop: 2, fontSize: 11, color: "#64748b" }}>{nala.nalaCode}</div>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      {[nala.wardName, nala.zoneName].filter(Boolean).join(" · ") || "-"}
+                    </td>
+                    <td style={tdStyle}>
+                      {nala.completedPointsCount} / {nala.totalPoints}
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {(nala.nalaPoints || []).map((point: any) => (
+                          <span
+                            key={point.id}
+                            title={`${point.pointName}: ${point.submittedPhotoCount}/5 photos`}
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: "2px 6px",
+                              borderRadius: 6,
+                              background: point.minimumRequirementMet
+                                ? "#ecfdf5"
+                                : point.submittedPhotoCount > 0
+                                  ? "#fffbeb"
+                                  : "#f1f5f9",
+                              color: point.minimumRequirementMet
+                                ? "#047857"
+                                : point.submittedPhotoCount > 0
+                                  ? "#b45309"
+                                  : "#64748b"
+                            }}
+                          >
+                            {point.pointCode} {point.submittedPhotoCount}/5
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 900,
+                          padding: "3px 9px",
+                          borderRadius: 999,
+                          color: status.color,
+                          background: status.bg
+                        }}
+                      >
+                        {status.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SummaryChip({
+  label,
+  value,
+  color
+}: {
+  label: string;
+  value: number | string;
+  color: string;
+}) {
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 800,
+        padding: "5px 10px",
+        borderRadius: 999,
+        border: "1px solid #e2e8f0",
+        color
+      }}
+    >
+      {label}: {value}
+    </span>
+  );
+}
+
 
 function NalaList({
   nalas

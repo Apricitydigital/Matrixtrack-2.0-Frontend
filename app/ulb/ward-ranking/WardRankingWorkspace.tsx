@@ -93,8 +93,10 @@ const COMPONENT_DRILLDOWN_KEYS:
   WardRankingComponent[] = [
     'WORKFORCE',
     'BEAT',
+    'NALA',
     'TOILET',
     'LITTERBIN',
+    'GVP',
     'SUPERVISOR',
     'QC',
     'ACTION_OFFICER',
@@ -112,11 +114,17 @@ const COMPONENT_FIELD_BY_KEY:
   BEAT:
     'beat',
 
+  NALA:
+    'nala',
+
   TOILET:
     'toilet',
 
   LITTERBIN:
     'litterBin',
+
+  GVP:
+    'gvp',
 
   SUPERVISOR:
     'supervisor',
@@ -176,6 +184,14 @@ const MODULE_OPTIONS: Array<{
     {
       key: 'SWEEPING',
       label: 'Sweeping',
+    },
+    {
+      key: 'NALA',
+      label: 'Nala',
+    },
+    {
+      key: 'TASKFORCE',
+      label: 'GVP',
     },
   ];
 
@@ -2656,7 +2672,7 @@ export default function WardRankingWorkspace() {
             {/* DESKTOP TABLE */}
 
             <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-[1540px] w-full border-collapse">
+              <table className="min-w-[1640px] w-full border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/80 text-left">
                     {[
@@ -2667,8 +2683,10 @@ export default function WardRankingWorkspace() {
                       'Status',
                       'Workforce',
                       'Beat',
+                      'Nala',
                       'Toilet',
                       'Litter Bin',
+                      'GVP',
                       'Daroga',
                       'SI',
                       'IEC',
@@ -2782,9 +2800,13 @@ export default function WardRankingWorkspace() {
                           item.components
                             ?.beat,
                           item.components
+                            ?.nala,
+                          item.components
                             ?.toilet,
                           item.components
                             ?.litterBin,
+                          item.components
+                            ?.gvp,
                           item.components
                             ?.supervisor,
                           item.components
@@ -2974,6 +2996,11 @@ export default function WardRankingWorkspace() {
                             ?.beat,
                         ],
                         [
+                          'Nala',
+                          item.components
+                            ?.nala,
+                        ],
+                        [
                           'Toilet',
                           item.components
                             ?.toilet,
@@ -2982,6 +3009,11 @@ export default function WardRankingWorkspace() {
                           'Litter Bin',
                           item.components
                             ?.litterBin,
+                        ],
+                        [
+                          'GVP',
+                          item.components
+                            ?.gvp,
                         ],
                         [
                           'Daroga',

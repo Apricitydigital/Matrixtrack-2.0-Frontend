@@ -107,7 +107,9 @@ export type UlbView =
 type ModuleKey =
     | 'TOILET'
     | 'SWEEPING'
-    | 'LITTERBINS';
+    | 'LITTERBINS'
+    | 'NALA'
+    | 'TASKFORCE';
 
 
 type DashboardRecord = any;
@@ -149,6 +151,18 @@ const MODULES: Array<{
             key: 'LITTERBINS',
             label: 'Litter Bins',
             shortLabel: 'Litter Bins',
+        },
+
+        {
+            key: 'NALA',
+            label: 'Nala Cleaning',
+            shortLabel: 'Nala',
+        },
+
+        {
+            key: 'TASKFORCE',
+            label: 'GVP Transformation',
+            shortLabel: 'GVP',
         },
     ];
 
@@ -328,6 +342,34 @@ function recordTitle(
             item?.beat?.beatName ||
             item?.areaName ||
             'Sweeping Report'
+        );
+    }
+
+
+    if (
+        moduleKey === 'NALA'
+    ) {
+        return (
+            [
+                item?.nalaName ||
+                item?.nala?.nalaName,
+                item?.nalaPointName,
+            ]
+                .filter(Boolean)
+                .join(' - ') ||
+            'Nala Report'
+        );
+    }
+
+
+    if (
+        moduleKey === 'TASKFORCE'
+    ) {
+        return (
+            item?.feederPointName ||
+            item?.feederPoint?.feederPointName ||
+            item?.areaName ||
+            'GVP Report'
         );
     }
 
@@ -610,12 +652,14 @@ function getActionRequiredRemark(
     moduleKey: ModuleKey
 ) {
     /*
-     * SWEEPING
+     * SWEEPING / NALA
      * Action Required = payload.ulbRemark
      */
     if (
         moduleKey ===
-        'SWEEPING'
+        'SWEEPING' ||
+        moduleKey ===
+        'NALA'
     ) {
         return (
             item?.payload
@@ -661,12 +705,14 @@ function getActionTakenRemark(
     moduleKey: ModuleKey
 ) {
     /*
-     * SWEEPING
+     * SWEEPING / NALA
      * Action Taken = payload.aoRemark
      */
     if (
         moduleKey ===
-        'SWEEPING'
+        'SWEEPING' ||
+        moduleKey ===
+        'NALA'
     ) {
         return (
             item?.payload
@@ -694,12 +740,14 @@ function getActionTakenRemark(
 
 
     /*
-     * LITTER BIN DAILY
+     * LITTER BIN DAILY / GVP
      * Action Taken = actionOfficerRemark
      */
     if (
         moduleKey ===
-        'LITTERBINS'
+        'LITTERBINS' ||
+        moduleKey ===
+        'TASKFORCE'
     ) {
         return (
             item?.actionOfficerRemark ||
@@ -863,6 +911,42 @@ function extractAnswers(
         }
     }
 
+
+    if (
+        !source &&
+        Array.isArray(
+            item?.payload?.points
+        ) &&
+        item.payload.points.length
+    ) {
+        return item.payload.points.map(
+            (
+                point: any,
+                index: number
+            ): AnswerRow => ({
+                question:
+                    [
+                        point?.pointCode ||
+                        `P${index + 1}`,
+                        point?.pointName,
+                    ]
+                        .filter(Boolean)
+                        .join(' - '),
+                answer:
+                    point?.submittedAt
+                        ? `Photo submitted ${new Date(point.submittedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                        : 'Photo submitted',
+                photos:
+                    normalizeImages([
+                        point?.photo,
+                        point?.photoUrl,
+                        point?.photos,
+                    ]),
+                section:
+                    'Point Photos',
+            })
+        );
+    }
 
     if (!source) {
         return [];
@@ -1527,6 +1611,8 @@ function buildReportsTrend(
             TOILET: number;
             SWEEPING: number;
             LITTERBINS: number;
+            NALA: number;
+            TASKFORCE: number;
         }
     >();
 
@@ -1548,6 +1634,8 @@ function buildReportsTrend(
             TOILET: 0,
             SWEEPING: 0,
             LITTERBINS: 0,
+            NALA: 0,
+            TASKFORCE: 0,
         });
     }
 
@@ -1565,6 +1653,8 @@ function buildReportsTrend(
         if (moduleKey === 'TOILET') bucket.TOILET += 1;
         else if (moduleKey === 'SWEEPING') bucket.SWEEPING += 1;
         else if (moduleKey === 'LITTERBINS') bucket.LITTERBINS += 1;
+        else if (moduleKey === 'NALA') bucket.NALA += 1;
+        else if (moduleKey === 'TASKFORCE') bucket.TASKFORCE += 1;
 
         const status = effectiveStatus(item);
 
@@ -1829,8 +1919,8 @@ export default function UlbOperationsWorkspace({
                             module
                         ) => {
 
-                            const response =
-                                await ModuleRecordsApi
+                            const request =
+                                ModuleRecordsApi
                                     .getRecords(
                                         module.key,
                                         {
@@ -1847,11 +1937,28 @@ export default function UlbOperationsWorkspace({
                                         }
                                     );
 
+                            const response =
+                                module.key === 'NALA' ||
+                                module.key === 'TASKFORCE'
+                                    ? await request.catch(
+                                        (err) => {
+                                            console.warn(`${module.label} reports unavailable`, err);
+                                            return { data: [] } as any;
+                                        }
+                                    )
+                                    : await request;
+
 
                             return (
                                 response.data ||
                                 []
-                            ).map(
+                            )
+                                // GVP history also lists registrations; ULB only acts on reports.
+                                .filter(
+                                    (record: any) =>
+                                        record?.type !== 'FEEDER_POINT'
+                                )
+                                .map(
                                 (
                                     record: any
                                 ) => ({
@@ -3350,11 +3457,15 @@ export default function UlbOperationsWorkspace({
 
             else if (
                 moduleKey ===
-                'SWEEPING'
+                'SWEEPING' ||
+                moduleKey ===
+                'NALA' ||
+                moduleKey ===
+                'TASKFORCE'
             ) {
                 await ModuleRecordsApi
                     .updateRecordStatus(
-                        'SWEEPING',
+                        moduleKey,
 
                         actionTarget.id,
 
@@ -9422,6 +9533,8 @@ function ReportsTrendChart({
                         <Line type="monotone" dataKey="TOILET" name="Cleanliness of Toilets" stroke="#0f766e" strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="SWEEPING" name="Sweeping" stroke="#7c3aed" strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey="LITTERBINS" name="Litter Bins" stroke="#d97706" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="NALA" name="Nala Cleaning" stroke="#0284c7" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="TASKFORCE" name="GVP Transformation" stroke="#e11d48" strokeWidth={2} dot={false} />
                     </ComposedChart>
                 </ResponsiveContainer>
             </div>

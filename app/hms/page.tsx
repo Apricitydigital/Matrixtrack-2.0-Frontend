@@ -233,7 +233,7 @@ export default function HmsDashboardPage() {
         for (const mod of sysModules) {
           const modName = mod.name.toUpperCase();
           let isEnabled = true;
-          if (["TASKFORCE", "TOILET", "SWEEPING", "LITTERBINS"].includes(modName)) {
+          if (["TASKFORCE", "TOILET", "SWEEPING", "LITTERBINS", "NALA"].includes(modName)) {
             isEnabled = cityModules.taskforce;
           } else if (modName === "SWACHH_RANKING" || modName === "SWACHH") {
             isEnabled = cityModules.swachh;
@@ -2490,6 +2490,7 @@ function EditCityModal({
     if (upper === "TASKFORCE") return { label: "CTU / GVP Spot Transformation", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
     if (upper === "LITTERBINS") return { label: "Litter Bins Collection", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
     if (upper === "SWEEPING") return { label: "Beat Sweeping & Sanitation", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
+    if (upper === "NALA") return { label: "Nala Cleaning", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
     if (upper === "TOILET") return { label: "Cleanliness of Toilets (CT/PT)", suite: "TASKFORCE_20", activeClass: "bg-white border-blue-400 font-bold text-blue-800", checkClass: "accent-blue-600" };
     if (upper === "SWACHH_RANKING" || upper === "SWACHH") return { label: "Ward Ranking System", suite: "PLATFORM", activeClass: "bg-white border-emerald-400 font-bold text-emerald-800", checkClass: "accent-emerald-600" };
     if (upper === "WORKFORCE_MONITORING" || upper === "WORKFORCE") return { label: "Workforce Monitoring (Matrix Track)", suite: "PLATFORM", activeClass: "bg-white border-purple-400 font-bold text-purple-800", checkClass: "accent-purple-600" };

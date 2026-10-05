@@ -14,11 +14,15 @@ import {
 
 import { useAuth } from "@hooks/useAuth";
 import ModalPortal from "@components/ui/ModalPortal";
+import NalaImportModal from "./NalaImportModal";
 
 type Props = {
   nalas: any[];
   onRefresh: () => void | Promise<void>;
 };
+
+// Matches NALA_MAX_POINTS in the backend nala router.
+const NALA_MAX_POINTS = 50;
 
 type EditorMode =
   | "create"
@@ -66,6 +70,9 @@ export default function NalaMasterTab({
 
   const [deleteTarget, setDeleteTarget] =
     useState<any | null>(null);
+
+  const [importOpen, setImportOpen] =
+    useState(false);
 
   const roleValues = [
     user?.role,
@@ -333,19 +340,40 @@ export default function NalaMasterTab({
         </div>
 
         {canManage && (
-          <button
-            type="button"
-            onClick={() =>
-              setEditor({
-                mode: "create"
-              })
-            }
-            style={primaryButtonStyle}
-          >
-            + Add Nala
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() =>
+                setImportOpen(true)
+              }
+              style={secondaryButtonStyle}
+            >
+              Import KML / KMZ
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setEditor({
+                  mode: "create"
+                })
+              }
+              style={primaryButtonStyle}
+            >
+              + Add Nala
+            </button>
+          </div>
         )}
       </div>
+
+      {importOpen && (
+        <NalaImportModal
+          onClose={() =>
+            setImportOpen(false)
+          }
+          onSuccess={onRefresh}
+        />
+      )}
 
       {filteredNalas.length ===
       0 ? (
@@ -782,7 +810,7 @@ function NalaEditorModal({
 
   const addPoint = () => {
     if (
-      points.length >= 5
+      points.length >= NALA_MAX_POINTS
     ) {
       return;
     }
@@ -860,9 +888,9 @@ function NalaEditorModal({
 
     if (
       points.length < 1 ||
-      points.length > 5
+      points.length > NALA_MAX_POINTS
     ) {
-      return "Nala must contain between 1 and 5 NalaPoints.";
+      return `Nala must contain between 1 and ${NALA_MAX_POINTS} NalaPoints.`;
     }
 
     for (
@@ -1187,7 +1215,7 @@ function NalaEditorModal({
                         color: "#64748b"
                       }}
                     >
-                      Configure 1�5 GPS points.
+                      Configure 1-{NALA_MAX_POINTS} GPS points. Each point needs 3-5 photos per day.
                     </div>
                   </div>
 
@@ -1195,7 +1223,7 @@ function NalaEditorModal({
                     type="button"
                     onClick={addPoint}
                     disabled={
-                      points.length >= 5
+                      points.length >= NALA_MAX_POINTS
                     }
                     style={
                       secondaryButtonStyle

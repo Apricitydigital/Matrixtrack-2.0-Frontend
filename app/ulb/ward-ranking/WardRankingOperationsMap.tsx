@@ -18,6 +18,8 @@ import {
   RefreshCw,
   Trash2,
   UsersRound,
+  Waves,
+  Flag,
 } from 'lucide-react';
 
 import { apiFetch } from '@lib/apiClient';
@@ -81,7 +83,7 @@ const STATUS_LEGEND: Array<{
     color: '#2563eb',
   },
 ];
-type LayerKey = 'beats' | 'toilets' | 'bins';
+type LayerKey = 'beats' | 'toilets' | 'bins' | 'nalas' | 'gvps';
 
 export default function WardRankingOperationsMap({
   date,
@@ -108,6 +110,8 @@ export default function WardRankingOperationsMap({
     beats: true,
     toilets: true,
     bins: true,
+    nalas: true,
+    gvps: true,
   });
 
   const mapSectionRef =
@@ -124,6 +128,12 @@ export default function WardRankingOperationsMap({
       bins:
         !module ||
         module === 'LITTERBINS',
+      nalas:
+        !module ||
+        module === 'NALA',
+      gvps:
+        !module ||
+        module === 'TASKFORCE',
     });
   }, [module]);
 
@@ -219,6 +229,22 @@ export default function WardRankingOperationsMap({
               allowedWardIds.has(item.wardId),
             ),
         ),
+      nalas:
+        (data?.nalas || []).filter(
+          (item) =>
+            Boolean(
+              item.wardId &&
+              allowedWardIds.has(item.wardId),
+            ),
+        ),
+      gvps:
+        (data?.gvps || []).filter(
+          (item) =>
+            Boolean(
+              item.wardId &&
+              allowedWardIds.has(item.wardId),
+            ),
+        ),
     };
   }, [data, rankingWardIds]);
 
@@ -266,6 +292,24 @@ export default function WardRankingOperationsMap({
         'bg-cyan-50 text-cyan-900 ring-cyan-100',
       iconClass: 'text-cyan-600',
     },
+    {
+      key: 'nalas' as const,
+      label: 'Nala points',
+      icon: Waves,
+      count: visibleData.nalas.length,
+      activeClass:
+        'bg-sky-50 text-sky-900 ring-sky-100',
+      iconClass: 'text-sky-600',
+    },
+    {
+      key: 'gvps' as const,
+      label: 'GVPs',
+      icon: Flag,
+      count: visibleData.gvps.length,
+      activeClass:
+        'bg-rose-50 text-rose-900 ring-rose-100',
+      iconClass: 'text-rose-600',
+    },
   ];
 
   return (
@@ -298,6 +342,8 @@ export default function WardRankingOperationsMap({
           beats={visibleData.beats}
           toilets={visibleData.toilets}
           bins={visibleData.bins}
+          nalas={visibleData.nalas}
+          gvps={visibleData.gvps}
           visible={visible}
           focusLevel={focusLevel}
         />

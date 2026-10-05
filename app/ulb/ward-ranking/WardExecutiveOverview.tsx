@@ -25,6 +25,8 @@ import {
     Trash2,
     UserCheck,
     Users,
+    Waves,
+    Flag,
 } from 'lucide-react';
 
 import {
@@ -86,6 +88,13 @@ const EXECUTIVE_COMPONENTS: ExecutiveComponentConfig[] = [
         group: 'MODULE',
     },
     {
+        field: 'nala',
+        key: 'NALA',
+        label: 'Nala Cleaning',
+        shortLabel: 'Nala',
+        group: 'MODULE',
+    },
+    {
         field: 'toilet',
         key: 'TOILET',
         label: 'Toilet',
@@ -97,6 +106,13 @@ const EXECUTIVE_COMPONENTS: ExecutiveComponentConfig[] = [
         key: 'LITTERBIN',
         label: 'Litter Bin',
         shortLabel: 'Litter Bin',
+        group: 'MODULE',
+    },
+    {
+        field: 'gvp',
+        key: 'GVP',
+        label: 'GVP Transformation',
+        shortLabel: 'GVP',
         group: 'MODULE',
     },
     {
@@ -135,8 +151,10 @@ const COMPONENT_ICONS: Record<
     typeof ShieldCheck
 > = {
     BEAT: Route,
+    NALA: Waves,
     TOILET: Droplets,
     LITTERBIN: Trash2,
+    GVP: Flag,
     WORKFORCE: Users,
     SUPERVISOR: UserCheck,
     QC: ClipboardCheck,
@@ -400,8 +418,10 @@ function exceptionAreaName(moduleValue: unknown) {
     const moduleName = String(moduleValue || 'OTHER').toUpperCase();
 
     if (moduleName === 'BEAT') return 'Beat';
+    if (moduleName === 'NALA') return 'Nala';
     if (moduleName === 'TOILET') return 'Toilet';
     if (moduleName === 'LITTERBIN' || moduleName === 'LITTER_BIN') return 'Litter Bin';
+    if (moduleName === 'GVP' || moduleName === 'TASKFORCE') return 'GVP';
     if (moduleName === 'WORKFORCE') return 'Workforce';
     if (moduleName === 'SUPERVISOR') return 'Daroga';
     if (moduleName === 'QC') return 'Sanitary Inspector';
@@ -1947,7 +1967,7 @@ function WardFocusCard({
                         </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                    <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
                         {EXECUTIVE_COMPONENTS.map((component) => {
                             const componentScore = ward.components?.[component.field] as any;
                             const value = percentageLabel(componentScore);

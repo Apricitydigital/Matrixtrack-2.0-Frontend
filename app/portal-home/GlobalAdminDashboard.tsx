@@ -18,7 +18,7 @@ const COLORS = ['#10b981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6'];
 export default function GlobalAdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [taskforceRecords, setTaskforceRecords] = useState({ sweeping: [] as any[], toilet: [] as any[], twinbin: [] as any[] });
+  const [taskforceRecords, setTaskforceRecords] = useState({ sweeping: [] as any[], toilet: [] as any[], twinbin: [] as any[], nala: [] as any[] });
   const [swachhStats, setSwachhStats] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,18 +34,20 @@ export default function GlobalAdminDashboard() {
     try {
       const filters = { fromDate, toDate, limit: 1000 };
       
-      const [sweepingRes, toiletRes, twinbinRes, usersRes, swachhRes] = await Promise.all([
+      const [sweepingRes, toiletRes, twinbinRes, usersRes, swachhRes, nalaRes] = await Promise.all([
         ModuleRecordsApi.getRecords('SWEEPING', filters).catch(() => ({ data: [] as any[] })),
         ModuleRecordsApi.getRecords('TOILET', filters).catch(() => ({ data: [] as any[] })),
         ModuleRecordsApi.getRecords('TWINBIN', filters).catch(() => ({ data: [] as any[] })),
         CityUserApi.list().catch(() => ({ users: [] })),
-        swachhApi.get('/admin/stats').catch(() => ({ data: null }))
+        swachhApi.get('/admin/stats').catch(() => ({ data: null })),
+        ModuleRecordsApi.getRecords('NALA', filters).catch(() => ({ data: [] as any[] }))
       ]);
       
       setTaskforceRecords({
         sweeping: sweepingRes.data || [],
         toilet: toiletRes.data || [],
-        twinbin: twinbinRes.data || []
+        twinbin: twinbinRes.data || [],
+        nala: nalaRes.data || []
       });
       setUsers(usersRes.users || []);
       
@@ -69,7 +71,7 @@ export default function GlobalAdminDashboard() {
   }, [fromDate, toDate]);
 
   // --- Aggregations ---
-  const allTaskforce = [...taskforceRecords.sweeping, ...taskforceRecords.toilet, ...taskforceRecords.twinbin];
+  const allTaskforce = [...taskforceRecords.sweeping, ...taskforceRecords.toilet, ...taskforceRecords.twinbin, ...taskforceRecords.nala];
   const acceptedCount = allTaskforce.filter(r => r.status === 'APPROVED' || r.status === 'RESOLVED' || r.status === 'ACTION_TAKEN').length;
   const rejectedCount = allTaskforce.filter(r => r.status === 'REJECTED').length;
   const actionRequiredCount = allTaskforce.filter(r => r.status === 'ACTION_REQUIRED').length;

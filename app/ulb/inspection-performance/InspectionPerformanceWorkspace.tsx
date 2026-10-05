@@ -39,8 +39,16 @@ import {
 } from '@lib/apiClient';
 import { resolveMediaUrl, resolveMediaUrls } from '@lib/mediaUrl';
 
-type ModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING';
+type ModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA';
 type ModuleFilter = 'ALL' | ModuleKey;
+
+/*
+ * Sweeping (one Beat segment) and Nala (one NalaPoint) reports
+ * share the same P1-P5 photo evidence in payload.points.
+ */
+function isPointModule(moduleKey: any) {
+  return moduleKey === 'SWEEPING' || moduleKey === 'NALA';
+}
 type StatusKey =
   | 'TOTAL'
   | 'DRAFT'
@@ -75,6 +83,7 @@ const MODULES: Array<{
     { key: 'TOILET', label: 'Cleanliness of Toilets', shortLabel: 'Toilet' },
     { key: 'LITTERBINS', label: 'Litter Bins', shortLabel: 'Litter Bin' },
     { key: 'SWEEPING', label: 'Sweeping', shortLabel: 'Sweeping' },
+    { key: 'NALA', label: 'Nala Cleaning', shortLabel: 'Nala' },
   ];
 
 const DATE_PRESETS: Array<{ key: DatePreset; label: string }> = [
@@ -297,6 +306,14 @@ function moduleShortLabel(moduleKey: ModuleKey) {
 function reportTitle(item: any, moduleKey: ModuleKey) {
   if (moduleKey === 'TOILET') {
     return item?.toilet?.name || item?.toiletName || item?.name || 'Toilet Inspection';
+  }
+
+  if (moduleKey === 'NALA') {
+    return (
+      [item?.nalaName || item?.nala?.nalaName, item?.nalaPointName]
+        .filter(Boolean)
+        .join(' - ') || 'Nala Report'
+    );
   }
 
   if (moduleKey === 'SWEEPING') {
@@ -898,7 +915,7 @@ function collectTopLevelImages(item: any) {
 }
 
 function getActionTakenPhotos(item: any, moduleKey: ModuleKey) {
-  if (moduleKey === 'SWEEPING') {
+  if (isPointModule(moduleKey)) {
     return normalizeImages([
       item?.payload?.aoPhotos,
       item?.payload?.aoPhoto,
@@ -921,8 +938,9 @@ function totalImageCount(
   item: any
 ) {
   if (
-    item?.dashboardModule ===
-    'SWEEPING'
+    isPointModule(
+      item?.dashboardModule
+    )
   ) {
     const pointImages =
       getSweepingSubmittedPoints(
@@ -943,7 +961,7 @@ function totalImageCount(
 
     return new Set([
       ...pointImages,
-      ...getActionTakenPhotos(item, 'SWEEPING'),
+      ...getActionTakenPhotos(item, item.dashboardModule),
     ]).size;
   }
 
@@ -1022,7 +1040,7 @@ function formatAiConfidence(value: any) {
 }
 
 function getActionRequiredRemark(item: any, moduleKey: ModuleKey) {
-  if (moduleKey === 'SWEEPING') return item?.payload?.ulbRemark || null;
+  if (isPointModule(moduleKey)) return item?.payload?.ulbRemark || null;
   if (moduleKey === 'LITTERBINS' && item?.type === 'VISIT_REPORT') {
     return item?.qcRemark || null;
   }
@@ -1030,7 +1048,7 @@ function getActionRequiredRemark(item: any, moduleKey: ModuleKey) {
 }
 
 function getActionTakenRemark(item: any, moduleKey: ModuleKey) {
-  if (moduleKey === 'SWEEPING') return item?.payload?.aoRemark || null;
+  if (isPointModule(moduleKey)) return item?.payload?.aoRemark || null;
   if (moduleKey === 'LITTERBINS' && item?.type === 'VISIT_REPORT') {
     return item?.actionRemark || null;
   }
@@ -1167,11 +1185,19 @@ export default function InspectionPerformanceWorkspace() {
     try {
       const responses = await Promise.all(
         MODULES.map(async (module) => {
-          const response = await ModuleRecordsApi.getRecords(module.key, {
+          const request = ModuleRecordsApi.getRecords(module.key, {
             page: 1,
             limit: 500,
             tab: 'HISTORY',
           });
+
+          const response =
+            module.key === 'NALA'
+              ? await request.catch((err) => {
+                console.warn('Nala reports unavailable', err);
+                return { data: [] } as any;
+              })
+              : await request;
 
           return (response.data || []).map((record: any) => ({
             ...record,
@@ -1370,6 +1396,7 @@ export default function InspectionPerformanceWorkspace() {
       TOILET: base.filter((item) => item.dashboardModule === 'TOILET').length,
       LITTERBINS: base.filter((item) => item.dashboardModule === 'LITTERBINS').length,
       SWEEPING: base.filter((item) => item.dashboardModule === 'SWEEPING').length,
+      NALA: base.filter((item) => item.dashboardModule === 'NALA').length,
     };
   }, [canonicalLocationRecords]);
 
@@ -1531,8 +1558,9 @@ export default function InspectionPerformanceWorkspace() {
  * =====================================================
  */
       if (
-        item.dashboardModule ===
-        'SWEEPING'
+        isPointModule(
+          item.dashboardModule
+        )
       ) {
         const response =
           await apiFetch<{
@@ -1540,7 +1568,7 @@ export default function InspectionPerformanceWorkspace() {
             actionAiResult?: any;
             generated?: boolean;
           }>(
-            `/modules/SWEEPING/records/${item.id}/action-ai`,
+            `/modules/${item.dashboardModule}/records/${item.id}/action-ai`,
             {
               method: 'POST',
             }
@@ -1613,7 +1641,7 @@ export default function InspectionPerformanceWorkspace() {
           current.map((record) =>
             record.id === item.id &&
               record.dashboardModule ===
-              'SWEEPING'
+              item.dashboardModule
               ? {
                 ...record,
                 ...hydratedReport,
@@ -1758,9 +1786,9 @@ export default function InspectionPerformanceWorkspace() {
           status: 'ACTION_REQUIRED',
           comment: remark,
         });
-      } else if (moduleKey === 'SWEEPING') {
+      } else if (isPointModule(moduleKey)) {
         await ModuleRecordsApi.updateRecordStatus(
-          'SWEEPING',
+          moduleKey,
           actionTarget.id,
           'ACTION_REQUIRED',
           remark
@@ -1848,7 +1876,7 @@ export default function InspectionPerformanceWorkspace() {
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {(['ALL', 'TOILET', 'LITTERBINS', 'SWEEPING'] as ModuleFilter[]).map((moduleKey) => {
+              {(['ALL', 'TOILET', 'LITTERBINS', 'SWEEPING', 'NALA'] as ModuleFilter[]).map((moduleKey) => {
                 const active = moduleFilter === moduleKey;
                 const label =
                   moduleKey === 'ALL'
@@ -1857,7 +1885,9 @@ export default function InspectionPerformanceWorkspace() {
                       ? 'Toilet'
                       : moduleKey === 'LITTERBINS'
                         ? 'Litter Bin'
-                        : 'Sweeping';
+                        : moduleKey === 'NALA'
+                          ? 'Nala'
+                          : 'Sweeping';
 
                 return (
                   <button
@@ -2005,6 +2035,7 @@ export default function InspectionPerformanceWorkspace() {
               <span className="text-blue-600">T: {moduleSplit.TOILET}</span>
               <span className="text-emerald-600">L: {moduleSplit.LITTERBINS}</span>
               <span className="text-violet-600">S: {moduleSplit.SWEEPING}</span>
+              <span className="text-sky-600">N: {moduleSplit.NALA}</span>
             </div>
           </div>
         </div>
@@ -2186,8 +2217,9 @@ function ReportCard({
     'ACTION_REQUIRED';
 
   const isSweeping =
-    report.dashboardModule ===
-    'SWEEPING';
+    isPointModule(
+      report.dashboardModule
+    );
 
   const sweepingSummary =
     isSweeping
@@ -2408,8 +2440,9 @@ export function DetailModal({
   const actionTakenRemark = getActionTakenRemark(report, report.dashboardModule);
   const actionTakenPhotos = getActionTakenPhotos(report, report.dashboardModule);
   const isSweeping =
-    report.dashboardModule ===
-    'SWEEPING';
+    isPointModule(
+      report.dashboardModule
+    );
 
   const sweepingSummary =
     isSweeping
@@ -3170,8 +3203,19 @@ function SweepingPointEvidenceSection({
     report
   );
 
+  const isNala =
+    report?.dashboardModule ===
+    'NALA';
+
+  // Nala: the five photo slots of one NalaPoint (no route types).
   const beatPoints =
-    Array.isArray(
+    isNala &&
+      Array.isArray(
+        report?.photoSlots
+      ) &&
+      report.photoSlots.length > 0
+      ? report.photoSlots
+      : Array.isArray(
       report?.beatPoints
     ) &&
       report.beatPoints.length > 0
@@ -3213,7 +3257,7 @@ function SweepingPointEvidenceSection({
     <section className="mt-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-          Beat Point Evidence
+          {isNala ? 'Nala Point Photos' : 'Beat Point Evidence'}
         </h3>
 
         <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-black text-violet-700">

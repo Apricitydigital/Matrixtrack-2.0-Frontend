@@ -22,6 +22,7 @@ function statusStyle(status: unknown) {
 
 const MODULE_BADGE: Record<string, string> = {
   SWEEPING: 'SWEEPING ASSESSMENT',
+  NALA: 'NALA CLEANING REPORT',
   TOILET: 'HMS TOILET AUDIT',
   TWINBIN: 'LITTER BIN REPORT',
   TASKFORCE: 'CTU / GVP REPORT',
