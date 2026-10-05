@@ -65,6 +65,10 @@ import {
 
 const numberFormatter = new Intl.NumberFormat("en-IN");
 
+function isEmployeeMatched(employee: AttendanceEmployeeSummary) {
+  return employee.isMatched ?? Boolean(employee.matrixTrackUserId?.trim());
+}
+
 function formatAverageValue(value: number) {
   if (!Number.isFinite(value) || value <= 0) return "0";
   if (value >= 100 || Number.isInteger(value)) return numberFormatter.format(Math.round(value));
@@ -2014,7 +2018,7 @@ function AttendanceDashboard() {
       if (!e.isMatched) {
         reason = hasKey
           ? `Match key (${matchSuffix}) not present in attendance report CSV`
-          : "Aadhaar number and Employee ID both missing or invalid on user profile";
+          : "Aadhaar is invalid, or Aadhaar is missing and Employee ID is missing or invalid";
       } else {
         reason = `Matched to Attendance ID ${e.attendanceId || matchSuffix} via ${matchTypeLabel}`;
       }
@@ -2484,13 +2488,13 @@ function AttendanceDashboard() {
 
     const matchedEmployeesCount = useMemo(() => {
       return employees.filter(
-        (e) => (e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0)
+        isEmployeeMatched
       ).length;
     }, [employees]);
 
     const filteredEmployees = useMemo(() => {
       return employees.filter((e) => {
-        const isMatched = Boolean((e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0));
+        const isMatched = isEmployeeMatched(e);
 
         if (matchFilter === "MATCHED" && !isMatched) return false;
         if (matchFilter === "UNMATCHED" && isMatched) return false;
@@ -2563,7 +2567,7 @@ function AttendanceDashboard() {
 
     const avgMatchedRate = useMemo(() => {
       const matched = employees.filter(
-        (e) => (e.matrixTrackUserId && e.matrixTrackUserId.trim() !== "") || (e.zones && e.zones.length > 0) || (e.wards && e.wards.length > 0)
+        isEmployeeMatched
       );
       if (!matched.length) return "0.0";
       const sum = matched.reduce((acc, curr) => acc + curr.attendanceRate, 0);
@@ -2586,7 +2590,7 @@ function AttendanceDashboard() {
                 </span>
               </div>
               <p className="mt-0.5 text-xs font-semibold text-slate-500">
-                Matched against registered employee profiles via Aadhaar or Employee ID (last 8 digits) with Zone & Ward location sorting
+                Matched via Aadhaar last 8 digits, or Employee ID last 8 digits when Aadhaar is missing, with Zone & Ward location sorting
               </p>
             </div>
           </div>
@@ -2744,11 +2748,7 @@ function AttendanceDashboard() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedEmployees.map((employee) => {
-                const isMatched = Boolean(
-                  (employee.matrixTrackUserId && employee.matrixTrackUserId.trim() !== "") ||
-                  (employee.zones && employee.zones.length > 0) ||
-                  (employee.wards && employee.wards.length > 0)
-                );
+                const isMatched = isEmployeeMatched(employee);
 
                 return (
                   <tr
@@ -3369,7 +3369,7 @@ function AttendanceDashboard() {
                     <div>
                       <p className="text-sm font-black text-slate-900">Registered Health Workers (Employee Roster)</p>
                       <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                        Matched via Aadhaar last 8 digits against attendance ID · {registeredEmpData.totalWithAadhaar} of {registeredEmpData.totalRegistered} have Aadhaar on file
+                        Matched via Aadhaar last 8 digits, or Employee ID when Aadhaar is missing · {registeredEmpData.totalWithAadhaar} of {registeredEmpData.totalRegistered} have Aadhaar on file
                       </p>
                     </div>
                   </div>
@@ -4141,6 +4141,7 @@ function AttendanceDashboard() {
                   avgWorkMinutes: null,
                   lastAttendanceDate: "",
                   matchType: re.matchType,
+                  isMatched: re.isMatched,
                 }))}
                 openEmployeeDrilldown={openEmployeeDrilldown}
               />
