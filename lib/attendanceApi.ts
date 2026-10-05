@@ -61,6 +61,7 @@ export type AttendanceEmployeeSummary = {
   completedPunches: number;
   avgWorkMinutes: number | null;
   lastAttendanceDate: string;
+  isMatched?: boolean;
   matchType?: "aadhaar" | "employeeId" | null;
 };
 
