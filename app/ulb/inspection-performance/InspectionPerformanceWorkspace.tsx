@@ -347,7 +347,7 @@ function submittedByName(item: any) {
     item?.createdBy ||
     item?.supervisor?.name ||
     item?.employee?.name ||
-    '—'
+    'â€”'
   );
 }
 
@@ -373,6 +373,183 @@ function qcReviewerName(item: any) {
   );
 }
 
+function inspectionRecordDateKey(item: any) {
+  const raw =
+    item?.operationalDate ||
+    item?.inspectionDate ||
+    item?.reportDate ||
+    item?.submittedAt ||
+    item?.visitedAt ||
+    item?.createdAt;
+
+  if (!raw) return '';
+
+  const date = new Date(raw);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return toLocalISO(date);
+}
+
+function sweepingBeatKey(item: any) {
+  const directId =
+    item?.segmentId ||
+    item?.beat?.id ||
+    item?.beatId ||
+    item?.payload?.beatId ||
+    item?.area?.id ||
+    item?.areaId ||
+    '';
+
+  if (directId) {
+    return String(directId);
+  }
+
+  return [
+    rawZoneName(item),
+    rawWardName(item),
+    item?.beatName ||
+      item?.beat?.beatName ||
+      item?.areaName ||
+      reportTitle(item, 'SWEEPING'),
+  ]
+    .filter(Boolean)
+    .join('::');
+}
+
+function sweepingSubmittedPointIndexes(item: any) {
+  const points = new Set<number>();
+
+  const aggregatePoints =
+    Array.isArray(item?.payload?.points)
+      ? item.payload.points
+      : [];
+
+  aggregatePoints.forEach((point: any) => {
+    const index = Number(point?.pointIndex);
+
+    if (
+      Number.isInteger(index) &&
+      index >= 0
+    ) {
+      points.add(index);
+    }
+  });
+
+  const directIndex =
+    Number(item?.payload?.pointIndex);
+
+  if (
+    Number.isInteger(directIndex) &&
+    directIndex >= 0
+  ) {
+    points.add(directIndex);
+  }
+
+  return points;
+}
+
+function canonicalizeInspectionRecords(
+  items: DashboardRecord[]
+) {
+  const nonDraft =
+    items.filter(
+      (item) =>
+        normalizedStatus(item) !== 'DRAFT'
+    );
+
+  const normalRecords =
+    nonDraft.filter(
+      (item) =>
+        item.dashboardModule !== 'SWEEPING'
+    );
+
+  const groups =
+    new Map<
+      string,
+      {
+        records: DashboardRecord[];
+        points: Set<number>;
+      }
+    >();
+
+  nonDraft
+    .filter(
+      (item) =>
+        item.dashboardModule === 'SWEEPING'
+    )
+    .forEach((item) => {
+      const beatKey =
+        sweepingBeatKey(item);
+
+      const dateKey =
+        inspectionRecordDateKey(item);
+
+      if (!beatKey || !dateKey) {
+        return;
+      }
+
+      const key =
+        `${beatKey}::${dateKey}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          records: [],
+          points: new Set<number>(),
+        });
+      }
+
+      const group = groups.get(key)!;
+
+      group.records.push(item);
+
+      sweepingSubmittedPointIndexes(item)
+        .forEach((pointIndex) => {
+          group.points.add(pointIndex);
+        });
+    });
+
+  const sweepingRecords: DashboardRecord[] = [];
+
+  groups.forEach((group) => {
+    if (group.points.size < 3) {
+      return;
+    }
+
+    const canonical =
+      [...group.records]
+        .sort((a, b) => {
+          const aTime =
+            new Date(
+              a?.createdAt ||
+              a?.submittedAt ||
+              a?.visitedAt ||
+              0
+            ).getTime();
+
+          const bTime =
+            new Date(
+              b?.createdAt ||
+              b?.submittedAt ||
+              b?.visitedAt ||
+              0
+            ).getTime();
+
+          return aTime - bTime;
+        })[0];
+
+    if (canonical) {
+      sweepingRecords.push(canonical);
+    }
+  });
+
+  return [
+    ...normalRecords,
+    ...sweepingRecords,
+  ];
+}
 function reportTimestamp(item: any) {
   /*
    * createdAt is the original submission date and never moves, so
@@ -400,7 +577,7 @@ function reportTimestamp(item: any) {
 
 function formatShortDate(item: any) {
   const time = reportTimestamp(item);
-  if (!time) return '—';
+  if (!time) return 'â€”';
 
   return new Date(time).toLocaleString('en-IN', {
     day: '2-digit',
@@ -411,20 +588,26 @@ function formatShortDate(item: any) {
 }
 
 function formatFullDate(value: any) {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return 'â€”';
   return date.toLocaleString('en-IN');
 }
 
 function isWithinRange(item: any, start: string, end: string) {
   if (start === '2000-01-01') return true;
 
-  const time = reportTimestamp(item);
-  if (!time) return false;
+  const localDate =
+    inspectionRecordDateKey(item);
 
-  const localDate = toLocalISO(new Date(time));
-  return localDate >= start && localDate <= end;
+  if (!localDate) {
+    return false;
+  }
+
+  return (
+    localDate >= start &&
+    localDate <= end
+  );
 }
 
 function isRenderableImage(value: any) {
@@ -435,7 +618,7 @@ function normalizeImages(values: any[]) {
   return resolveMediaUrls(values);
 }
 
-function displayAnswer(value: any, emptyText = '—') {
+function displayAnswer(value: any, emptyText = 'â€”') {
   if (value === null || value === undefined || value === '') return emptyText;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -506,7 +689,7 @@ function extractAnswers(item: any): AnswerRow[] {
           String(raw.section || '').toLowerCase() === 'remarks' ||
           String(question || '').toLowerCase().includes('remark')
             ? 'No remarks provided'
-            : '—'
+            : 'â€”'
         ),
         photos,
         section: raw.section || raw.category || raw.group || undefined,
@@ -832,7 +1015,7 @@ function formatAiConfidence(value: any) {
   const confidence = Number(value);
 
   if (!Number.isFinite(confidence)) {
-    return '—';
+    return 'â€”';
   }
 
   return `${Math.round(confidence * 100)}%`;
@@ -1089,12 +1272,20 @@ export default function InspectionPerformanceWorkspace() {
     });
   }, [rangeRecords, selectedZone, selectedWard, zones, allWards]);
 
+  const canonicalLocationRecords =
+    useMemo(
+      () =>
+        canonicalizeInspectionRecords(
+          locationRecords
+        ),
+      [locationRecords]
+    );
   const moduleRecords = useMemo(
     () =>
       moduleFilter === 'ALL'
-        ? locationRecords
-        : locationRecords.filter((item) => item.dashboardModule === moduleFilter),
-    [locationRecords, moduleFilter]
+        ? canonicalLocationRecords
+        : canonicalLocationRecords.filter((item) => item.dashboardModule === moduleFilter),
+    [canonicalLocationRecords, moduleFilter]
   );
 
   const searchableRecords = useMemo(() => {
@@ -1174,13 +1365,13 @@ export default function InspectionPerformanceWorkspace() {
   );
 
   const moduleSplit = useMemo(() => {
-    const base = locationRecords;
+    const base = canonicalLocationRecords;
     return {
       TOILET: base.filter((item) => item.dashboardModule === 'TOILET').length,
       LITTERBINS: base.filter((item) => item.dashboardModule === 'LITTERBINS').length,
       SWEEPING: base.filter((item) => item.dashboardModule === 'SWEEPING').length,
     };
-  }, [locationRecords]);
+  }, [canonicalLocationRecords]);
 
   const suggestions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1199,7 +1390,7 @@ export default function InspectionPerformanceWorkspace() {
 
       candidates.forEach((candidate) => {
         const label = String(candidate.label || '').trim();
-        if (!label || label === '—' || !label.toLowerCase().includes(query)) return;
+        if (!label || label === 'â€”' || !label.toLowerCase().includes(query)) return;
         const key = `${candidate.type}:${label}`;
         if (!values.has(key)) values.set(key, { label, type: candidate.type });
       });
@@ -2043,8 +2234,8 @@ function ReportCard({
 
           {(report?.zoneName || report?.wardName || report?.bin?.zoneName || report?.bin?.wardName) && (
             <div className="flex flex-wrap gap-x-2 gap-y-1 pl-5 text-[10px] text-slate-400">
-              <span>Zone: {report?.zoneName || report?.bin?.zoneName || '—'}</span>
-              <span>Ward: {report?.wardName || report?.bin?.wardName || '—'}</span>
+              <span>Zone: {report?.zoneName || report?.bin?.zoneName || 'â€”'}</span>
+              <span>Ward: {report?.wardName || report?.bin?.wardName || 'â€”'}</span>
             </div>
           )}
 
@@ -2313,8 +2504,8 @@ export function DetailModal({
             <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs font-medium text-slate-600 sm:grid-cols-2">
               <DetailRow icon={User} label="Submitted by" value={submittedByName(report)} />
               <DetailRow icon={Clock3} label="Submitted at" value={formatFullDate(report?.createdAt || report?.submittedAt || report?.visitedAt)} />
-              <DetailRow icon={MapPin} label="Zone" value={report?.zoneName || report?.bin?.zoneName || '—'} />
-              <DetailRow icon={MapPin} label="Ward" value={report?.wardName || report?.bin?.wardName || '—'} />
+              <DetailRow icon={MapPin} label="Zone" value={report?.zoneName || report?.bin?.zoneName || 'â€”'} />
+              <DetailRow icon={MapPin} label="Ward" value={report?.wardName || report?.bin?.wardName || 'â€”'} />
             </div>
           </section>
           <ReportJourneySection report={report} />
@@ -2412,7 +2603,7 @@ export function DetailModal({
 
                         <div>
                           <div className="text-sm font-black text-slate-700">
-                            {qcReviewer?.name || '—'}
+                            {qcReviewer?.name || 'â€”'}
                           </div>
 
                           <div className="text-[9px] font-bold text-slate-400">
@@ -2635,7 +2826,7 @@ function ReportJourneySection({
       title: 'SI Review',
       time: formatFullDate(report?.qcReviewedAt || report?.reviewedAt),
       description: qcReviewerName(report)
-        ? `${qcReviewerName(report)} • ${
+        ? `${qcReviewerName(report)} â€¢ ${
             qcDecision === 'REJECTED' ? 'Rejected' : 'Approved'
           }`
         : qcDecision === 'REJECTED'
@@ -2680,7 +2871,7 @@ function ReportJourneySection({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-black text-slate-800">{step.title}</div>
 
-                {step.time !== '—' && (
+                {step.time !== 'â€”' && (
                   <div className="text-[10px] font-semibold text-slate-400">{step.time}</div>
                 )}
               </div>
@@ -2813,7 +3004,7 @@ function AiInsightsSection({
                   <div className="mt-1 text-sm font-black text-slate-800">
                     {String(
                       actionAi.sourceQcDecision ||
-                      '—'
+                      'â€”'
                     ).replace(/_/g, ' ')}
                   </div>
                 </div>
@@ -3099,7 +3290,7 @@ function SweepingPointEvidenceSection({
                       {pointCode}
 
                       {beatPoint?.type
-                        ? ` · ${beatPoint.type}`
+                        ? ` Â· ${beatPoint.type}`
                         : ''}
                     </div>
                   </div>
@@ -3174,7 +3365,7 @@ function SweepingPointEvidenceSection({
                               ).toFixed(
                                 1
                               )} m`
-                              : '—'}
+                              : 'â€”'}
                           </div>
                         </div>
 
@@ -3187,7 +3378,7 @@ function SweepingPointEvidenceSection({
                             {String(
                               finding
                                 ?.result ||
-                              '—'
+                              'â€”'
                             ).replace(
                               /_/g,
                               ' '
@@ -3303,7 +3494,7 @@ function ActionRequiredModal({
               {reportTitle(report, report.dashboardModule)}
             </div>
             <div className="mt-1 text-xs font-medium text-slate-500">
-              {moduleLabel(report.dashboardModule)} · {submittedByName(report)}
+              {moduleLabel(report.dashboardModule)} Â· {submittedByName(report)}
             </div>
           </div>
 
