@@ -24,6 +24,9 @@ type Props = {
 // Matches NALA_MAX_POINTS in the backend nala router.
 const NALA_MAX_POINTS = 50;
 
+// Same as a Beat: at least 5 geo-points to register a Nala.
+const NALA_MIN_POINTS = 5;
+
 type EditorMode =
   | "create"
   | "edit"
@@ -495,7 +498,7 @@ export default function NalaMasterTab({
                       >
                         {nala.wardName ||
                           "-"}
-                        {" � "}
+                        {" ï¿½ "}
                         {nala.zoneName ||
                           "-"}
                       </div>
@@ -518,7 +521,7 @@ export default function NalaMasterTab({
                           nala.nalaPoints
                             ?.length ??
                           0}{" "}
-                        NalaPoints
+                        Segments
                       </span>
                     </td>
 
@@ -565,7 +568,7 @@ export default function NalaMasterTab({
                               secondaryButtonStyle
                             }
                           >
-                            NalaPoints
+                            Segments
                           </button>
 
                           <button
@@ -686,8 +689,11 @@ function NalaEditorModal({
 
   const [points, setPoints] =
     useState<PointDraft[]>(() => {
+      // Route points (like a Beat). Older Nalas fall back to NalaPoint rows.
       const existing =
-        nala?.nalaPoints || [];
+        Array.isArray(nala?.points) && nala.points.length
+          ? nala.points
+          : nala?.nalaPoints || [];
 
       if (existing.length) {
         return existing.map(
@@ -725,9 +731,10 @@ function NalaEditorModal({
         );
       }
 
-      return [
-        emptyPoint(0)
-      ];
+      return Array.from(
+        { length: NALA_MIN_POINTS },
+        (_, index) => emptyPoint(index)
+      );
     });
 
   const [saving, setSaving] =
@@ -827,7 +834,7 @@ function NalaEditorModal({
     index: number
   ) => {
     if (
-      points.length <= 1
+      points.length <= NALA_MIN_POINTS
     ) {
       return;
     }
@@ -887,10 +894,10 @@ function NalaEditorModal({
     }
 
     if (
-      points.length < 1 ||
+      points.length < NALA_MIN_POINTS ||
       points.length > NALA_MAX_POINTS
     ) {
-      return `Nala must contain between 1 and ${NALA_MAX_POINTS} NalaPoints.`;
+      return `Nala must contain between ${NALA_MIN_POINTS} and ${NALA_MAX_POINTS} route points.`;
     }
 
     for (
@@ -1045,7 +1052,7 @@ function NalaEditorModal({
               onClick={onClose}
               style={closeButtonStyle}
             >
-              �
+              ï¿½
             </button>
           </div>
 
@@ -1205,7 +1212,7 @@ function NalaEditorModal({
                         color: "#0f172a"
                       }}
                     >
-                      NalaPoints
+                      Segments
                     </div>
 
                     <div
@@ -1215,7 +1222,7 @@ function NalaEditorModal({
                         color: "#64748b"
                       }}
                     >
-                      Configure 1-{NALA_MAX_POINTS} GPS points. Each point needs 3-5 photos per day.
+                      Give {NALA_MIN_POINTS}-{NALA_MAX_POINTS} GPS points in route order. Segments are created between consecutive points; photos P1-P5 are taken at the first five points (3-5 photos per day).
                     </div>
                   </div>
 
@@ -1277,7 +1284,7 @@ function NalaEditorModal({
                           </strong>
 
                           {points.length >
-                            1 && (
+                            NALA_MIN_POINTS && (
                             <button
                               type="button"
                               onClick={() =>
@@ -1533,7 +1540,7 @@ function DeleteNalaModal({
               onClick={onClose}
               style={closeButtonStyle}
             >
-              �
+              ï¿½
             </button>
           </div>
 
