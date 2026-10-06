@@ -14,7 +14,7 @@ type RequestRow = {
   requestedAt?: string;
 };
 
-export default function GvpRequestsTab({ onChanged }: { onChanged?: () => void }) {
+export default function GvpRequestsTab({ onChanged, hideWhenEmpty = false }: { onChanged?: () => void; hideWhenEmpty?: boolean }) {
   const [rows, setRows] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -85,6 +85,8 @@ export default function GvpRequestsTab({ onChanged }: { onChanged?: () => void }
       setBusyId(null);
     }
   };
+
+  if (hideWhenEmpty && !loading && !error && rows.length === 0) return null;
 
   return (
     <div style={card}>

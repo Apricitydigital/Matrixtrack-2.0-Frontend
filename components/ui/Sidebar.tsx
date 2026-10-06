@@ -347,6 +347,11 @@ export default function Sidebar() {
           href: "/municipal/commissioner/user-performance",
           icon: <Users size={18} />,
         },
+        {
+          label: "Employees",
+          href: "/municipal/commissioner/employees",
+          icon: <Users size={18} />,
+        },
       );
     } else if (isCityAdmin) {
       links.push({

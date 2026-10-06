@@ -10,10 +10,11 @@ import GvpReviewModal from "./GvpReviewModal";
 import GvpRequestsTab from "./GvpRequestsTab";
 import GvpRegistryTab from "./GvpRegistryTab";
 
-type GvpTab = "dashboard" | "submitted_reports" | "gvps" | "requests";
+type GvpTab = "dashboard" | "submitted_reports" | "gvps";
 
 type GvpStats = {
   pending: number;
+  pendingReports: number;
   approved: number;
   rejected: number;
   actionRequired: number;
@@ -21,7 +22,7 @@ type GvpStats = {
   total: number;
 };
 
-const EMPTY_STATS: GvpStats = { pending: 0, approved: 0, rejected: 0, actionRequired: 0, actionTaken: 0, total: 0 };
+const EMPTY_STATS: GvpStats = { pending: 0, pendingReports: 0, approved: 0, rejected: 0, actionRequired: 0, actionTaken: 0, total: 0 };
 
 /*
  * GVP (CTU / GVP Transformation) management, same layout as Nala:
@@ -45,6 +46,8 @@ export default function GvpModulePage() {
   // GVP registration / elimination review and daroga assignment are SI-only on the backend.
   const isQc = roleValues.includes("QC");
   const isAdmin = roleValues.includes("CITY_ADMIN") || roleValues.includes("HMS_SUPER_ADMIN");
+  // City admins can also approve / reject GVP registrations and eliminations.
+  const canReviewRequests = isQc || roleValues.includes("CITY_ADMIN");
 
   const loadPoints = useCallback(async () => {
     try {
@@ -63,6 +66,8 @@ export default function GvpModulePage() {
       const s = res?.stats || {};
       setStats({
         pending: Number(s.pending) || 0,
+        // Registrations are not inspection reports, so they must not badge this tab.
+        pendingReports: Number(s.pendingReports) || 0,
         approved: Number(s.approved) || 0,
         rejected: Number(s.rejected) || 0,
         actionRequired: Number(s.actionRequired) || 0,
@@ -75,7 +80,7 @@ export default function GvpModulePage() {
   }, []);
 
   const loadRequestCount = useCallback(async () => {
-    if (!isQc) return;
+    if (!canReviewRequests) return;
     try {
       const [registrations, eliminations] = await Promise.all([
         TaskforceApi.pendingFeederPoints(),
@@ -85,7 +90,7 @@ export default function GvpModulePage() {
     } catch (error) {
       console.error("Failed to load GVP requests", error);
     }
-  }, [isQc]);
+  }, [canReviewRequests]);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([loadPoints(), loadStats(), loadRequestCount()]);
@@ -119,18 +124,10 @@ export default function GvpModulePage() {
               <TabButton
                 label="Inspection Reports"
                 active={activeTab === "submitted_reports"}
-                badge={stats.pending}
+                badge={stats.pendingReports}
                 onClick={() => setActiveTab("submitted_reports")}
               />
-              <TabButton label={`Registered GVPs (${points.length})`} active={activeTab === "gvps"} onClick={() => setActiveTab("gvps")} />
-              {isQc && (
-                <TabButton
-                  label="GVP Requests"
-                  active={activeTab === "requests"}
-                  badge={pendingRequests}
-                  onClick={() => setActiveTab("requests")}
-                />
-              )}
+              <TabButton label={`Registered GVPs (${points.length})`} active={activeTab === "gvps"} badge={pendingRequests} onClick={() => setActiveTab("gvps")} />
             </div>
           </div>
 
@@ -141,9 +138,10 @@ export default function GvpModulePage() {
           ) : activeTab === "submitted_reports" ? (
             <SubmittedReportsTab moduleKey="TASKFORCE" assetLabel="GVP" onViewReport={(record) => setReviewingRecord(record)} />
           ) : activeTab === "gvps" ? (
-            <GvpRegistryTab points={points} canAssign={isQc} canDelete={isAdmin} onRefresh={loadPoints} />
-          ) : activeTab === "requests" && isQc ? (
-            <GvpRequestsTab onChanged={refreshAll} />
+            <div style={{ display: "grid", gap: 16 }}>
+              {canReviewRequests && <GvpRequestsTab hideWhenEmpty onChanged={refreshAll} />}
+              <GvpRegistryTab points={points} canAssign={isQc} canDelete={isAdmin} onRefresh={loadPoints} />
+            </div>
           ) : (
             <>
               <ModuleOverviewCards
