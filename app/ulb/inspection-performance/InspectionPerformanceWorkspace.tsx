@@ -2895,7 +2895,7 @@ function ReportJourneySection({
       title: 'SI Review',
       time: formatFullDate(report?.qcReviewedAt || report?.reviewedAt),
       description: qcReviewerName(report)
-        ? `${qcReviewerName(report)} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${
+        ? `${qcReviewerName(report)} - ${
             qcDecision === 'REJECTED' ? 'Rejected' : 'Approved'
           }`
         : qcDecision === 'REJECTED'
@@ -3370,7 +3370,7 @@ function SweepingPointEvidenceSection({
                       {pointCode}
 
                       {beatPoint?.type
-                        ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${beatPoint.type}`
+                        ? ` - ${beatPoint.type}`
                         : ''}
                     </div>
                   </div>
