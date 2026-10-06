@@ -36,6 +36,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
     const { user } = useAuth();
     const [reports, setReports] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
 
     // Filters
     const [dateFilter, setDateFilter] = useState<'current_month' | 'today' | 'week' | 'all' | 'custom'>('current_month');
@@ -152,6 +153,7 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
     const loadReports = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError('');
             let startDate: string | undefined;
             let endDate: string | undefined;
             const now = new Date();
@@ -196,6 +198,8 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
             setReports(inspectionOnly);
         } catch (err) {
             console.error('Failed to load submitted reports', err);
+            setReports([]);
+            setLoadError((err as any)?.message || 'Failed to load reports');
         } finally {
             setLoading(false);
         }
@@ -442,8 +446,8 @@ export default function SubmittedReportsTab({ moduleKey, assetLabel, cityId, onV
             ) : filteredReports.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0', color: '#94a3b8' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#334155' }}>No inspection reports found</h4>
-                    <p style={{ fontSize: 12, margin: '4px 0 0' }}>Try adjusting your date range or filters above.</p>
+                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: loadError ? '#dc2626' : '#334155' }}>{loadError ? 'Could not load reports' : 'No inspection reports found'}</h4>
+                    <p style={{ fontSize: 12, margin: '4px 0 0' }}>{loadError || 'Try adjusting your date range or filters above.'}</p>
                 </div>
             ) : (
                 <div style={{ background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
