@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, AlertTriangle, Clock3, Factory, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, Clock3, Factory, Loader2, RefreshCw } from 'lucide-react';
 import ProcessingPlantFilters from './ProcessingPlantFilters';
 import ProcessingPlantKpiCards from './ProcessingPlantKpiCards';
 import WasteProcessingFlow from './WasteProcessingFlow';
 import ProcessingTrendChart from './ProcessingTrendChart';
 import PlantPerformanceChart from './PlantPerformanceChart';
-import ProcessingAttentionPanel from './ProcessingAttentionPanel';
 import PlantPerformanceTable from './PlantPerformanceTable';
 import PlantDetailDrawer from './PlantDetailDrawer';
+import MetricDrillDownDrawer from './MetricDrillDownDrawer';
+import ProcessingPlantExcelUpload from './ProcessingPlantExcelUpload';
 import { getProcessingPlantDashboard, getProcessingPlants } from '../../services/processingPlantService';
-import type { ProcessingPlant, ProcessingPlantDashboardData, ProcessingPlantFiltersState, ProcessingPlantPerformanceRow } from '../../types/processingPlant';
+import type { ProcessingMetricKey, ProcessingPlant, ProcessingPlantDashboardData, ProcessingPlantFiltersState, ProcessingPlantPerformanceRow } from '../../types/processingPlant';
 import { formatMetric, lastNDaysRange, normalizeDashboardPayload } from '../../utils/processingPlantAnalytics';
 
 function timeAgo(date: Date | null) {
@@ -31,6 +32,7 @@ export default function ProcessingPlantDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPlant, setSelectedPlant] = useState<ProcessingPlantPerformanceRow | null>(null);
+  const [metric, setMetric] = useState<ProcessingMetricKey | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const loadPlants = async () => {
@@ -56,12 +58,30 @@ export default function ProcessingPlantDashboard() {
     }
   };
 
+  // After an Excel upload, show the uploaded period for all plants so the new data (and anything missing) is visible at once.
+  const handleUploaded = (uploaded: { from: string; to: string } | null) => {
+    let range = uploaded;
+    // the dashboard API accepts at most 366 days - keep the most recent part
+    if (range) {
+      const spanDays = (Date.parse(range.to) - Date.parse(range.from)) / 86400000;
+      if (spanDays > 365) {
+        const start = new Date(Date.parse(range.to) - 365 * 86400000);
+        range = { from: start.toISOString().slice(0, 10), to: range.to };
+      }
+    }
+    if (!range || (range.from === filters.from && range.to === filters.to && !filters.plantType && !filters.plantId)) {
+      loadDashboard();
+    } else {
+      setFilters({ from: range.from, to: range.to, plantType: '', plantId: '' });
+    }
+    loadPlants();
+  };
+
   useEffect(() => { loadPlants(); }, []);
   useEffect(() => { loadDashboard(); }, [filters.from, filters.to, filters.plantType, filters.plantId]);
 
   const recoveryTotal = useMemo(() => data.materialRecovery.reduce((sum, item) => sum + item.quantity, 0), [data.materialRecovery]);
   const materialRows = useMemo(() => [...data.materialRecovery].sort((a, b) => b.quantity - a.quantity).slice(0, 7), [data.materialRecovery]);
-  const coveragePct = data.totalPlants > 0 ? Math.min(((data.reportingPlants || data.activePlants || 0) / data.totalPlants) * 100, 100) : 0;
 
   return (
     <div className="space-y-5 pb-8">
@@ -85,6 +105,7 @@ export default function ProcessingPlantDashboard() {
               </span>
               <Clock3 size={13} />{timeAgo(lastUpdated)}
             </div>
+            <ProcessingPlantExcelUpload onUploaded={handleUploaded} />
             <button
               onClick={loadDashboard}
               disabled={loading}
@@ -119,12 +140,9 @@ export default function ProcessingPlantDashboard() {
         </div>
       ) : (
         <>
-          <ProcessingPlantKpiCards data={data} />
+          <ProcessingPlantKpiCards data={data} onSelect={setMetric} />
 
-          <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[1.65fr_0.85fr]">
-            <WasteProcessingFlow data={data} />
-            <ProcessingAttentionPanel data={data} />
-          </div>
+          <WasteProcessingFlow data={data} onSelect={setMetric} />
 
           <ProcessingTrendChart trend={data.trend} />
 
@@ -149,27 +167,20 @@ export default function ProcessingPlantDashboard() {
             </section>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-            <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-              <div className="flex items-center justify-between"><div><div className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Reporting Health</div><h2 className="mt-1 text-lg font-black text-slate-900">Submission Status</h2></div><Activity size={18} className="text-slate-400" /></div>
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[['RECEIVED', data.receivedEntries || 0], ['PROCESSED', data.processedEntries || 0], ['FAILED', data.failedEntries || 0], ['REPORTING PLANTS', data.reportingPlants || data.activePlants || 0]].map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</div><div className="mt-1 text-2xl font-black text-slate-900">{value}</div></div>)}
-              </div>
-            </section>
-
-            <section className="relative overflow-hidden rounded-[26px] border border-white/10 bg-slate-950 p-5 text-white shadow-sm">
-              <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-blue-500/15 blur-3xl" />
-              <div className="relative flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-blue-300"><Sparkles size={12} /> Coverage</div>
-              <h2 className="relative mt-1 text-lg font-black">Reporting Coverage</h2>
-              <div className="relative mt-6 text-4xl font-black">{data.totalPlants > 0 ? `${coveragePct.toFixed(0)}%` : '—'}</div>
-              <div className="relative mt-2 text-xs font-medium text-slate-400">{data.reportingPlants || data.activePlants || 0} of {data.totalPlants || 0} configured plants reporting in the selected period.</div>
-              <div className="relative mt-5 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700" style={{ width: `${coveragePct}%` }} /></div>
-            </section>
-          </div>
-
           <PlantPerformanceTable rows={data.plantPerformance} onSelect={setSelectedPlant} />
         </>
       )}
+
+      <MetricDrillDownDrawer
+        metric={metric}
+        data={data}
+        filters={filters}
+        onClose={() => setMetric(null)}
+        onSelectPlant={(row) => {
+          setMetric(null);
+          setSelectedPlant(row);
+        }}
+      />
 
       <PlantDetailDrawer row={selectedPlant} filters={filters} onClose={() => setSelectedPlant(null)} />
     </div>

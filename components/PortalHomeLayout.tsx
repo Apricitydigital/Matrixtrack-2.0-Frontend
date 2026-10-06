@@ -2691,7 +2691,7 @@ function PortalHomeLayoutContent({
                   </span>
                 </Link>
 
-                {isCommissioner && hasProcessingPlantModule && (
+                {hasProcessingPlantModule && (
                   <Link
                     href="/city/processing-plant"
                     title="Plant & Processing"

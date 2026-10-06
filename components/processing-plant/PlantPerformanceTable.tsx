@@ -57,13 +57,13 @@ export default function PlantPerformanceTable({ rows, onSelect }: { rows: Proces
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.received)}</td>
-                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.processed)}</td>
-                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.recovered)}</td>
-                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.reject)}</td>
+                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.received, ` ${row.unit || 'MT'}`)}</td>
+                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.processed, ` ${row.unit || 'MT'}`)}</td>
+                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.recovered, ` ${row.unit || 'MT'}`)}</td>
+                <td className="px-4 py-4 text-xs font-bold text-slate-700">{formatMetric(row.reject, ` ${row.unit || 'MT'}`)}</td>
                 <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-black ${efficiencyPill(row.efficiency)}`}>{formatPercent(row.efficiency)}</span></td>
                 <td className="px-4 py-4 text-xs font-bold text-slate-700">{row.utilization == null ? '—' : formatPercent(row.utilization)}</td>
-                <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusPill(row.reportingStatus)}`}>{row.reportingStatus || '—'}</span></td>
+                <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusPill(row.reportingStatus)}`}>{row.reportingStatus ? row.reportingStatus.replace(/_/g, ' ') : '—'}</span>{row.daysReported !== undefined && row.daysInRange ? <div className="mt-1 text-[10px] font-bold text-slate-400">{row.daysReported}/{row.daysInRange} days</div> : null}</td>
                 <td className="px-4 py-4 text-slate-300"><ChevronRight size={16} /></td>
               </tr>
             ))}

@@ -93,7 +93,7 @@ export default function PlantDetailDrawer({ row, filters, onClose }: Props) {
           <div className="space-y-5 p-5">
             <div className="grid grid-cols-2 gap-3">
               {[
-                ['Received', formatMetric(row.received)], ['Processed', formatMetric(row.processed)], ['Recovered', formatMetric(row.recovered)], ['Reject', formatMetric(row.reject)], ['Efficiency', formatPercent(row.efficiency)], ['Utilization', row.utilization == null ? '—' : formatPercent(row.utilization)],
+                ['Received', formatMetric(row.received, ` ${row.unit || 'MT'}`)], ['Processed', formatMetric(row.processed, ` ${row.unit || 'MT'}`)], ['Recovered', formatMetric(row.recovered, ` ${row.unit || 'MT'}`)], ['Reject', formatMetric(row.reject, ` ${row.unit || 'MT'}`)], ['Efficiency', formatPercent(row.efficiency)], ['Utilization', row.utilization == null ? '—' : formatPercent(row.utilization)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</div><div className="mt-1 text-lg font-black text-slate-900">{value}</div></div>
               ))}

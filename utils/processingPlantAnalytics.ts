@@ -63,10 +63,18 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
           efficiency: n(pick(row, ['efficiency', 'processingEfficiency'])) || (received > 0 ? (processed / received) * 100 : 0),
           capacity: capacity === null ? null : n(capacity),
           utilization:
-            n(pick(row, ['utilization', 'capacityUtilization'])) ||
-            (capacity && n(capacity) > 0 ? (received / n(capacity)) * 100 : null),
+            'utilization' in row || 'capacityUtilization' in row
+              ? (() => {
+                  const value = pick<number | null>(row, ['utilization', 'capacityUtilization'], null);
+                  return value === null ? null : n(value);
+                })()
+              : n(pick(row, ['utilization', 'capacityUtilization'])) ||
+                (capacity && n(capacity) > 0 ? (received / n(capacity)) * 100 : null),
           reportingStatus: String(pick(row, ['reportingStatus', 'status'], '')),
           lastSubmissionAt: pick(row, ['lastSubmissionAt', 'lastReportedAt', 'updatedAt'], null) as string | null,
+          unit: row?.unit ? String(row.unit) : undefined,
+          daysReported: row?.daysReported !== undefined ? n(row.daysReported) : undefined,
+          daysInRange: row?.daysInRange !== undefined ? n(row.daysInRange) : undefined,
         };
       })
     : [];

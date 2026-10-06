@@ -1,8 +1,10 @@
+import { apiFetch } from '../lib/apiClient';
 import type {
   ProcessingPlant,
   ProcessingPlantDashboardData,
   ProcessingPlantEntriesResponse,
   ProcessingPlantFiltersState,
+  ProcessingPlantUploadResult,
 } from '../types/processingPlant';
 
 const API_BASE_URL =
@@ -78,9 +80,25 @@ export async function getProcessingPlantEntries(
   return apiGet(`/modules/processing-plant/entries${toQuery(filters)}`);
 }
 
+/**
+ * Alternative to the Google Form: upload the plant-wise Excel file
+ * ("All Plants Data Format.xlsx"). Missing data is not rejected; the
+ * response lists what was imported and what is missing.
+ */
+export async function uploadProcessingPlantExcel(file: File): Promise<ProcessingPlantUploadResult> {
+  const body = new FormData();
+  body.append('file', file);
+  const json = await apiFetch<{ success: boolean; data: ProcessingPlantUploadResult }>(
+    '/modules/processing-plant/upload',
+    { method: 'POST', body },
+  );
+  return json.data;
+}
+
 export const processingPlantService = {
   getPlants: getProcessingPlants,
   getDashboard: getProcessingPlantDashboard,
   getPlantDashboard: getProcessingPlantDetail,
   getEntries: getProcessingPlantEntries,
+  uploadExcel: uploadProcessingPlantExcel,
 };
