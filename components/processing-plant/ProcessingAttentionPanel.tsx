@@ -12,6 +12,7 @@ export default function ProcessingAttentionPanel({ data }: { data: ProcessingPla
     if (row.efficiency > 0 && row.efficiency < 70) alerts.push({ title: `${row.plantName}: low processing efficiency`, detail: `${formatPercent(row.efficiency)} in selected period`, tone: 'bad' });
     const rejectRate = row.received > 0 ? (row.reject / row.received) * 100 : 0;
     if (rejectRate >= 25) alerts.push({ title: `${row.plantName}: high reject share`, detail: `${formatPercent(rejectRate)} of received quantity`, tone: 'warn' });
+    if (row.reportingStatus?.toUpperCase() === 'PARTIAL' && row.daysInRange) alerts.push({ title: `${row.plantName}: data missing for some days`, detail: `${row.daysReported ?? 0} of ${row.daysInRange} days reported`, tone: 'warn' });
     if (row.reportingStatus && ['MISSING', 'NOT_REPORTED', 'INACTIVE'].includes(row.reportingStatus.toUpperCase())) alerts.push({ title: `${row.plantName}: reporting attention`, detail: row.reportingStatus, tone: 'warn' });
   });
 

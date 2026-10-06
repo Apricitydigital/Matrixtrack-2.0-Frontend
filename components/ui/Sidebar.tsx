@@ -370,6 +370,13 @@ export default function Sidebar() {
           href: "/ulb/ward-ranking",
           icon: <Award size={18} />,
         });
+        if (hasProcessingPlantModule) {
+          links.push({
+            label: "Plant & Processing",
+            href: "/city/processing-plant",
+            icon: <Factory size={18} />,
+          });
+        }
       }
       links.push({
         label: "Employees",
