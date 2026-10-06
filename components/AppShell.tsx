@@ -25,7 +25,6 @@ const STANDALONE_PATHS = [
   "/employees",
   "/modules",
   "/ulb/dashboard",
-  "/ulb/field-issues",
   "/ulb/attendance",
   "/ulb/inspection-performance",
   "/ulb/ward-ranking",
