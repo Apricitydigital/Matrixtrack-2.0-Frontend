@@ -356,6 +356,42 @@ function reportArea(item: any) {
   );
 }
 
+function reportZoneName(item: any) {
+  return (
+    item?.zoneName ||
+    item?.zone?.name ||
+    item?.toilet?.zoneName ||
+    item?.toilet?.zone?.name ||
+    item?.bin?.zoneName ||
+    item?.bin?.zone?.name ||
+    item?.beat?.zoneName ||
+    item?.beat?.zone?.name ||
+    item?.area?.zoneName ||
+    item?.area?.zone?.name ||
+    item?.payload?.zoneName ||
+    item?.payload?.zone?.name ||
+    "-"
+  );
+}
+
+function reportWardName(item: any) {
+  return (
+    item?.wardName ||
+    item?.ward?.name ||
+    item?.toilet?.wardName ||
+    item?.toilet?.ward?.name ||
+    item?.bin?.wardName ||
+    item?.bin?.ward?.name ||
+    item?.beat?.wardName ||
+    item?.beat?.ward?.name ||
+    item?.area?.wardName ||
+    item?.area?.ward?.name ||
+    item?.payload?.wardName ||
+    item?.payload?.ward?.name ||
+    "-"
+  );
+}
+
 function submittedByName(item: any) {
   return (
     item?.submittedBy?.name ||
@@ -364,7 +400,7 @@ function submittedByName(item: any) {
     item?.createdBy ||
     item?.supervisor?.name ||
     item?.employee?.name ||
-    'â€”'
+    '—'
   );
 }
 
@@ -594,7 +630,7 @@ function reportTimestamp(item: any) {
 
 function formatShortDate(item: any) {
   const time = reportTimestamp(item);
-  if (!time) return 'â€”';
+  if (!time) return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
 
   return new Date(time).toLocaleString('en-IN', {
     day: '2-digit',
@@ -605,9 +641,9 @@ function formatShortDate(item: any) {
 }
 
 function formatFullDate(value: any) {
-  if (!value) return 'â€”';
+  if (!value) return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'â€”';
+  if (Number.isNaN(date.getTime())) return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
   return date.toLocaleString('en-IN');
 }
 
@@ -635,7 +671,7 @@ function normalizeImages(values: any[]) {
   return resolveMediaUrls(values);
 }
 
-function displayAnswer(value: any, emptyText = 'â€”') {
+function displayAnswer(value: any, emptyText = 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â') {
   if (value === null || value === undefined || value === '') return emptyText;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -706,7 +742,7 @@ function extractAnswers(item: any): AnswerRow[] {
           String(raw.section || '').toLowerCase() === 'remarks' ||
           String(question || '').toLowerCase().includes('remark')
             ? 'No remarks provided'
-            : 'â€”'
+            : 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'
         ),
         photos,
         section: raw.section || raw.category || raw.group || undefined,
@@ -1033,7 +1069,7 @@ function formatAiConfidence(value: any) {
   const confidence = Number(value);
 
   if (!Number.isFinite(confidence)) {
-    return 'â€”';
+    return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
   }
 
   return `${Math.round(confidence * 100)}%`;
@@ -1417,7 +1453,7 @@ export default function InspectionPerformanceWorkspace() {
 
       candidates.forEach((candidate) => {
         const label = String(candidate.label || '').trim();
-        if (!label || label === 'â€”' || !label.toLowerCase().includes(query)) return;
+        if (!label || label === 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â' || !label.toLowerCase().includes(query)) return;
         const key = `${candidate.type}:${label}`;
         if (!values.has(key)) values.set(key, { label, type: candidate.type });
       });
@@ -2166,13 +2202,13 @@ export default function InspectionPerformanceWorkspace() {
 
       {imagePreview && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[20000] flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setImagePreview(null)}
         >
           <button
             type="button"
             onClick={() => setImagePreview(null)}
-            className="fixed right-5 top-5 z-[20001] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
+            className="fixed right-5 top-5 z-[1000000] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
           >
             <X className="h-5 w-5" />
           </button>
@@ -2264,12 +2300,12 @@ function ReportCard({
             <span className="truncate">{reportArea(report)}</span>
           </div>
 
-          {(report?.zoneName || report?.wardName || report?.bin?.zoneName || report?.bin?.wardName) && (
-            <div className="flex flex-wrap gap-x-2 gap-y-1 pl-5 text-[10px] text-slate-400">
-              <span>Zone: {report?.zoneName || report?.bin?.zoneName || 'â€”'}</span>
-              <span>Ward: {report?.wardName || report?.bin?.wardName || 'â€”'}</span>
-            </div>
-          )}
+          {(reportZoneName(report) !== "-" || reportWardName(report) !== "-") && (
+  <div className="flex flex-wrap gap-x-2 gap-y-1 pl-5 text-[10px] text-slate-400">
+    <span>Zone: {reportZoneName(report)}</span>
+    <span>Ward: {reportWardName(report)}</span>
+  </div>
+)}
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="flex items-center gap-1">
@@ -2537,8 +2573,8 @@ export function DetailModal({
             <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs font-medium text-slate-600 sm:grid-cols-2">
               <DetailRow icon={User} label="Submitted by" value={submittedByName(report)} />
               <DetailRow icon={Clock3} label="Submitted at" value={formatFullDate(report?.createdAt || report?.submittedAt || report?.visitedAt)} />
-              <DetailRow icon={MapPin} label="Zone" value={report?.zoneName || report?.bin?.zoneName || 'â€”'} />
-              <DetailRow icon={MapPin} label="Ward" value={report?.wardName || report?.bin?.wardName || 'â€”'} />
+              <DetailRow icon={MapPin} label="Zone" value={reportZoneName(report)} />
+              <DetailRow icon={MapPin} label="Ward" value={reportWardName(report)} />
             </div>
           </section>
           <ReportJourneySection report={report} />
@@ -2636,7 +2672,7 @@ export function DetailModal({
 
                         <div>
                           <div className="text-sm font-black text-slate-700">
-                            {qcReviewer?.name || 'â€”'}
+                            {qcReviewer?.name || 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'}
                           </div>
 
                           <div className="text-[9px] font-bold text-slate-400">
@@ -2859,7 +2895,7 @@ function ReportJourneySection({
       title: 'SI Review',
       time: formatFullDate(report?.qcReviewedAt || report?.reviewedAt),
       description: qcReviewerName(report)
-        ? `${qcReviewerName(report)} â€¢ ${
+        ? `${qcReviewerName(report)} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ ${
             qcDecision === 'REJECTED' ? 'Rejected' : 'Approved'
           }`
         : qcDecision === 'REJECTED'
@@ -2904,7 +2940,7 @@ function ReportJourneySection({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-black text-slate-800">{step.title}</div>
 
-                {step.time !== 'â€”' && (
+                {step.time !== 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â' && (
                   <div className="text-[10px] font-semibold text-slate-400">{step.time}</div>
                 )}
               </div>
@@ -3037,7 +3073,7 @@ function AiInsightsSection({
                   <div className="mt-1 text-sm font-black text-slate-800">
                     {String(
                       actionAi.sourceQcDecision ||
-                      'â€”'
+                      'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'
                     ).replace(/_/g, ' ')}
                   </div>
                 </div>
@@ -3334,7 +3370,7 @@ function SweepingPointEvidenceSection({
                       {pointCode}
 
                       {beatPoint?.type
-                        ? ` Â· ${beatPoint.type}`
+                        ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${beatPoint.type}`
                         : ''}
                     </div>
                   </div>
@@ -3409,7 +3445,7 @@ function SweepingPointEvidenceSection({
                               ).toFixed(
                                 1
                               )} m`
-                              : 'â€”'}
+                              : 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'}
                           </div>
                         </div>
 
@@ -3422,7 +3458,7 @@ function SweepingPointEvidenceSection({
                             {String(
                               finding
                                 ?.result ||
-                              'â€”'
+                              'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'
                             ).replace(
                               /_/g,
                               ' '
@@ -3469,8 +3505,14 @@ function ImageTile({
   return (
     <button
       type="button"
-      onClick={() => onOpen(url)}
-      className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onOpen(url);
+      }}
+      aria-label="Open inspection image"
+      title="Click to enlarge"
+      className="group relative aspect-square cursor-zoom-in overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
     >
       <img src={url} alt="Inspection evidence" className="h-full w-full object-cover" />
       <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
@@ -3538,7 +3580,7 @@ function ActionRequiredModal({
               {reportTitle(report, report.dashboardModule)}
             </div>
             <div className="mt-1 text-xs font-medium text-slate-500">
-              {moduleLabel(report.dashboardModule)} Â· {submittedByName(report)}
+              {moduleLabel(report.dashboardModule)} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {submittedByName(report)}
             </div>
           </div>
 

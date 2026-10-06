@@ -498,7 +498,7 @@ export default function NalaMasterTab({
                       >
                         {nala.wardName ||
                           "-"}
-                        {" � "}
+                        {" ï¿½ "}
                         {nala.zoneName ||
                           "-"}
                       </div>
@@ -1052,7 +1052,7 @@ function NalaEditorModal({
               onClick={onClose}
               style={closeButtonStyle}
             >
-              �
+              ï¿½
             </button>
           </div>
 
@@ -1540,7 +1540,7 @@ function DeleteNalaModal({
               onClick={onClose}
               style={closeButtonStyle}
             >
-              �
+              ï¿½
             </button>
           </div>
 
