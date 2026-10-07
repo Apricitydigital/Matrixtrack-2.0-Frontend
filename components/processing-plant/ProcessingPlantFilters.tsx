@@ -9,9 +9,11 @@ type Props = {
   filters: ProcessingPlantFiltersState;
   plants: ProcessingPlant[];
   onChange: (next: ProcessingPlantFiltersState) => void;
+  /** Rendered at the right of the filters, before Reset (e.g. the Excel upload button). */
+  actions?: React.ReactNode;
 };
 
-export default function ProcessingPlantFilters({ filters, plants, onChange }: Props) {
+export default function ProcessingPlantFilters({ filters, plants, onChange, actions }: Props) {
   const types = Array.from(
     new Set(
       plants
@@ -28,11 +30,6 @@ export default function ProcessingPlantFilters({ filters, plants, onChange }: Pr
       if (selected && value && selectedType !== value) next.plantId = '';
     }
     onChange(next);
-  };
-
-  const quickRange = (days: number) => {
-    const range = lastNDaysRange(days);
-    onChange({ ...filters, ...range });
   };
 
   const filteredPlants = filters.plantType
@@ -103,27 +100,7 @@ export default function ProcessingPlantFilters({ filters, plants, onChange }: Pr
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {[
-            [1, 'Today'],
-            [7, '7 Days'],
-            [30, '30 Days'],
-          ].map(([days, label]) => {
-            const range = lastNDaysRange(days as number);
-            const active = filters.from === range.from && filters.to === range.to;
-            return (
-              <button
-                key={label as string}
-                onClick={() => quickRange(days as number)}
-                className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
-                  active
-                    ? 'border-blue-200 bg-blue-50 text-blue-700'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
+          {actions}
           <button
             onClick={() => onChange({ ...lastNDaysRange(30), plantType: '', plantId: '' })}
             className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white transition hover:bg-slate-800"

@@ -17,7 +17,10 @@ function tierColor(efficiency: number) {
 }
 
 export default function PlantPerformanceChart({ rows, onSelect }: { rows: ProcessingPlantPerformanceRow[]; onSelect: (row: ProcessingPlantPerformanceRow) => void }) {
-  const sorted = useMemo(() => [...rows].sort((a, b) => b.efficiency - a.efficiency), [rows]);
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => Number(b.efficiencyAvailable !== false) - Number(a.efficiencyAvailable !== false) || b.efficiency - a.efficiency),
+    [rows],
+  );
   const [page, setPage] = useState(1);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
@@ -66,12 +69,12 @@ export default function PlantPerformanceChart({ rows, onSelect }: { rows: Proces
                     <div className="truncate text-xs font-black text-slate-800 group-hover:text-blue-600">{row.plantName}</div>
                     {row.plantType && <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{row.plantType}</div>}
                   </div>
-                  <div className="text-sm font-black text-slate-900">{formatPercent(row.efficiency)}</div>
+                  <div className="text-sm font-black text-slate-900">{row.efficiencyAvailable === false ? 'n/a' : formatPercent(row.efficiency)}</div>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                   <div
                     className={`h-full rounded-full bg-gradient-to-r ${tierColor(row.efficiency)} transition-all duration-700`}
-                    style={{ width: `${Math.min(Math.max(row.efficiency, 0), 100)}%` }}
+                    style={{ width: `${row.efficiencyAvailable === false ? 0 : Math.min(Math.max(row.efficiency, 0), 100)}%` }}
                   />
                 </div>
               </div>

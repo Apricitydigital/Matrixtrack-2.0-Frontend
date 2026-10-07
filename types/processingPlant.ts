@@ -19,8 +19,19 @@ export interface ProcessingPlant {
   [key: string]: unknown;
 }
 
+/** Quantities of one unit family (MT / KL / ML). */
+export interface ProcessingPlantUnitQuantities {
+  received: number;
+  processed: number;
+  recovered: number;
+  reject: number;
+  processLoss: number;
+}
+
 export interface ProcessingPlantTrendPoint {
   date: string;
+  /** The same day split by unit family, so liquid plants get their own trend. */
+  units?: Record<string, ProcessingPlantUnitQuantities>;
   received: number;
   processed: number;
   recovered?: number;
@@ -34,6 +45,18 @@ export interface ProcessingPlantMaterialPoint {
   percentage?: number;
 }
 
+export interface ProcessingPlantMonthlyFigures {
+  /** YYYY-MM */
+  month: string;
+  /** days of this month inside the selected period */
+  days: number;
+  received: number;
+  processed: number;
+  recovered: number;
+  reject: number;
+  processLoss: number;
+}
+
 export interface ProcessingPlantPerformanceRow {
   plantId: string;
   plantName: string;
@@ -42,7 +65,15 @@ export interface ProcessingPlantPerformanceRow {
   processed: number;
   recovered: number;
   reject: number;
+  /** Process Loss / Moisture reported by the plant (same unit as received). */
+  processLoss: number;
   efficiency: number;
+  /** false when the plant's output is not a quantity comparable with its input (e.g. electricity in kWh). */
+  efficiencyAvailable?: boolean;
+  /** MONTHLY when the plant only reports one total per month (its daily values are that total spread over the month). */
+  reportingGranularity?: 'DAILY' | 'MONTHLY';
+  /** Month-by-month figures of a monthly-reporting plant. */
+  monthly?: ProcessingPlantMonthlyFigures[];
   capacity?: number | null;
   utilization?: number | null;
   reportingStatus?: string;
@@ -58,6 +89,7 @@ export interface ProcessingPlantDashboardData {
   totalProcessed: number;
   totalRecovered: number;
   totalReject: number;
+  totalProcessLoss: number;
   efficiency: number;
   activePlants: number;
   totalPlants: number;
@@ -68,6 +100,10 @@ export interface ProcessingPlantDashboardData {
   lastSubmissionAt?: string | null;
   trend: ProcessingPlantTrendPoint[];
   materialRecovery: ProcessingPlantMaterialPoint[];
+  /** Recovery mix per unit family (MT / KL / ML). */
+  materialRecoveryByUnit: Record<string, ProcessingPlantMaterialPoint[]>;
+  /** Outputs that are not a waste quantity (e.g. electricity in kWh). */
+  otherOutputs: { name: string; unit: string; quantity: number }[];
   plantPerformance: ProcessingPlantPerformanceRow[];
   raw?: unknown;
 }
@@ -148,5 +184,20 @@ export type ProcessingMetricKey =
   | 'processed'
   | 'recovered'
   | 'reject'
+  | 'loss'
   | 'efficiency'
   | 'reporting';
+
+/** Totals of the plants in one unit family - the numbers behind the stat cards and the flow graph. */
+export interface ProcessingUnitTotals {
+  unit: string;
+  received: number;
+  processed: number;
+  recovered: number;
+  reject: number;
+  processLoss: number;
+  /** Recovered / received over the plants whose output can be compared with their input. */
+  efficiency: number;
+  hasEfficiency: boolean;
+  plants: number;
+}

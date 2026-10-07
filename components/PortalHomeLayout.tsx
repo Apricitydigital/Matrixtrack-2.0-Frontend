@@ -645,7 +645,7 @@ function PortalHomeLayoutContent({
   }
 
   if (pathname.startsWith('/city/processing-plant')) {
-    pageTitle = 'Plant & Processing';
+    pageTitle = 'Plant & Processing Dashboard';
   }
 
 
@@ -656,6 +656,10 @@ function PortalHomeLayoutContent({
 
   if (pathname.startsWith('/city/targets')) {
     pageTitle = 'Target Assignment';
+  }
+
+  else if (pathname.startsWith('/city/processing-plant')) {
+    pageTitle = 'Plant & Processing Dashboard';
   }
 
   else if (isTaskforceActive) {
@@ -3439,8 +3443,7 @@ function PortalHomeLayoutContent({
 
               {user && (
 
-                <div className="flex items-center gap-5 z-10">
-
+                <div className="flex flex-wrap items-center justify-end gap-3 sm:gap-5 z-10">
 
                   {/* LIVE CLOCK */}
 

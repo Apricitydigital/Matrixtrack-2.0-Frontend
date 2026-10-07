@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, CircleAlert, FileSpreadsheet, Loader2, Upload, X } from 'lucide-react';
+import ModalPortal from '@components/ui/ModalPortal';
 import { uploadProcessingPlantExcel } from '../../services/processingPlantService';
 import type { ProcessingPlantUploadResult, ProcessingPlantUploadSheetStatus } from '../../types/processingPlant';
 
@@ -72,11 +73,13 @@ export default function ProcessingPlantExcelUpload({ onUploaded }: Props) {
       </button>
 
       {error && (
-        <div className="flex w-full items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
-          <CircleAlert size={14} className="mt-0.5 shrink-0" />
-          <span className="whitespace-pre-wrap break-words">{error}</span>
-          <button onClick={() => setError('')} className="ml-auto shrink-0" aria-label="Dismiss"><X size={14} /></button>
-        </div>
+        <ModalPortal>
+          <div role="alert" className="fixed right-4 top-24 z-[90] flex w-[min(24rem,calc(100vw-2rem))] items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700 shadow-xl">
+            <CircleAlert size={14} className="mt-0.5 shrink-0" />
+            <span className="whitespace-pre-wrap break-words">{error}</span>
+            <button onClick={() => setError('')} className="ml-auto shrink-0" aria-label="Dismiss"><X size={14} /></button>
+          </div>
+        </ModalPortal>
       )}
 
       {result && <UploadResultDialog result={result} onClose={() => setResult(null)} />}
@@ -96,8 +99,9 @@ function UploadResultDialog({ result, onClose }: { result: ProcessingPlantUpload
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Excel upload result">
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Excel upload result" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-5">
           <div className="flex items-start gap-3">
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${nothingImported ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -203,5 +207,6 @@ function UploadResultDialog({ result, onClose }: { result: ProcessingPlantUpload
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

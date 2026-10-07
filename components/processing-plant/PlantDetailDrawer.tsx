@@ -1,64 +1,22 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Code2, Factory, Gauge, Loader2, X } from 'lucide-react';
-import type { ProcessingPlantFiltersState, ProcessingPlantPerformanceRow } from '../../types/processingPlant';
-import { getProcessingPlantDetail } from '../../services/processingPlantService';
+import React from 'react';
+import { Factory, Gauge, X } from 'lucide-react';
+import type { ProcessingPlantPerformanceRow } from '../../types/processingPlant';
 import { formatMetric, formatPercent } from '../../utils/processingPlantAnalytics';
 import ModalPortal from "@components/ui/ModalPortal";
 
 type Props = {
   row: ProcessingPlantPerformanceRow | null;
-  filters: ProcessingPlantFiltersState;
   onClose: () => void;
 };
 
-function humanize(key: string) {
-  return key
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^./, (c) => c.toUpperCase());
-}
-
-function formatValue(value: unknown) {
-  if (value === null || value === undefined || value === '') return '—';
-  if (typeof value === 'number') return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(value);
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  }
-  return String(value);
-}
-
-export default function PlantDetailDrawer({ row, filters, onClose }: Props) {
-  const [detail, setDetail] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showRaw, setShowRaw] = useState(false);
-
-  useEffect(() => {
-    if (!row?.plantId) return;
-    let active = true;
-    setLoading(true); setError(''); setDetail(null); setShowRaw(false);
-    getProcessingPlantDetail(row.plantId, { from: filters.from, to: filters.to })
-      .then((data) => active && setDetail(data))
-      .catch((e) => active && setError(e instanceof Error ? e.message : 'Unable to load plant details'))
-      .finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, [row?.plantId, filters.from, filters.to]);
-
+export default function PlantDetailDrawer({ row, onClose }: Props) {
   if (!row) return null;
-  const src = detail?.data ?? detail ?? {};
-  const summary = src.summary ?? src.kpis ?? src.overview ?? src;
 
-  const flatEntries = Object.entries(summary ?? {}).filter(
-    ([, value]) => value === null || ['string', 'number', 'boolean'].includes(typeof value),
-  );
-
-  const efficiencyTone = row.efficiency >= 85 ? 'text-emerald-300' : row.efficiency >= 70 ? 'text-amber-300' : 'text-rose-300';
+  const suffix = ` ${row.unit || 'MT'}`;
+  const efficiencyKnown = row.efficiencyAvailable !== false;
+  const efficiencyTone = !efficiencyKnown ? 'text-slate-300' : row.efficiency >= 85 ? 'text-emerald-300' : row.efficiency >= 70 ? 'text-amber-300' : 'text-rose-300';
 
   return (
     <ModalPortal>
@@ -85,52 +43,25 @@ export default function PlantDetailDrawer({ row, filters, onClose }: Props) {
               <Gauge size={22} className={efficiencyTone} />
               <div>
                 <div className="text-[9px] font-black uppercase tracking-wider text-white/55">Processing Efficiency</div>
-                <div className={`text-2xl font-black ${efficiencyTone}`}>{formatPercent(row.efficiency)}</div>
+                <div className={`text-2xl font-black ${efficiencyTone}`}>{efficiencyKnown ? formatPercent(row.efficiency) : 'n/a'}</div>
               </div>
             </div>
           </div>
 
-          <div className="space-y-5 p-5">
+          <div className="p-5">
             <div className="grid grid-cols-2 gap-3">
               {[
-                ['Received', formatMetric(row.received, ` ${row.unit || 'MT'}`)], ['Processed', formatMetric(row.processed, ` ${row.unit || 'MT'}`)], ['Recovered', formatMetric(row.recovered, ` ${row.unit || 'MT'}`)], ['Reject', formatMetric(row.reject, ` ${row.unit || 'MT'}`)], ['Efficiency', formatPercent(row.efficiency)], ['Utilization', row.utilization == null ? '—' : formatPercent(row.utilization)],
+                ['Received', formatMetric(row.received, suffix)],
+                ['Processed', formatMetric(row.processed, suffix)],
+                ['Recovered', formatMetric(row.recovered, suffix)],
+                ['Reject', formatMetric(row.reject, suffix)],
+                ['Process loss', formatMetric(row.processLoss, suffix)],
+                ['Efficiency', row.efficiencyAvailable === false ? 'n/a' : formatPercent(row.efficiency)],
+                ['Utilization', row.utilization == null ? '—' : formatPercent(row.utilization)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</div><div className="mt-1 text-lg font-black text-slate-900">{value}</div></div>
               ))}
             </div>
-
-            {loading && <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 p-10 text-sm font-bold text-slate-500"><Loader2 className="animate-spin" size={18} /> Loading plant analytics...</div>}
-            {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">{error}</div>}
-
-            {!loading && !error && detail && (
-              <section className="rounded-2xl border border-slate-200 p-4">
-                <h3 className="text-sm font-black text-slate-900">Reporting Snapshot</h3>
-
-                {flatEntries.length > 0 ? (
-                  <div className="mt-3 grid grid-cols-2 gap-2.5">
-                    {flatEntries.map(([key, value]) => (
-                      <div key={key} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-                        <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">{humanize(key)}</div>
-                        <div className="mt-0.5 truncate text-xs font-black text-slate-800">{formatValue(value)}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-2 text-xs font-medium text-slate-400">No additional flat reporting fields available for this response.</p>
-                )}
-
-                <button
-                  onClick={() => setShowRaw((v) => !v)}
-                  className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700"
-                >
-                  <Code2 size={13} /> {showRaw ? 'Hide raw response' : 'View raw response'}
-                </button>
-
-                {showRaw && (
-                  <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-3 text-[11px] leading-relaxed text-slate-300">{JSON.stringify(summary, null, 2)}</pre>
-                )}
-              </section>
-            )}
           </div>
         </aside>
       </div>

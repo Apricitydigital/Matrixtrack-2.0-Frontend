@@ -6,7 +6,7 @@ import { TrendingUp } from 'lucide-react';
 import type { ProcessingPlantTrendPoint } from '../../types/processingPlant';
 import { formatMetric } from '../../utils/processingPlantAnalytics';
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label, unit }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-[14px] border border-slate-200 bg-white/95 p-3 text-xs shadow-[0_12px_30px_rgba(15,23,42,.10)] backdrop-blur">
@@ -17,14 +17,14 @@ function CustomTooltip({ active, payload, label }: any) {
             <i className="h-2 w-2 rounded-full" style={{ background: entry.color }} />
             {entry.dataKey === 'received' ? 'Received' : 'Processed'}
           </span>
-          <span className="font-black text-slate-900">{formatMetric(entry.value)}</span>
+          <span className="font-black text-slate-900">{formatMetric(entry.value, ` ${unit || 'MT'}`)}</span>
         </div>
       ))}
     </div>
   );
 }
 
-export default function ProcessingTrendChart({ trend }: { trend: ProcessingPlantTrendPoint[] }) {
+export default function ProcessingTrendChart({ trend, unit = 'MT' }: { trend: ProcessingPlantTrendPoint[]; unit?: string }) {
   return (
     <section className="relative overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-blue-100/40 blur-3xl" />
@@ -74,7 +74,7 @@ export default function ProcessingTrendChart({ trend }: { trend: ProcessingPlant
 
               <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={44} />
 
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip unit={unit} />} />
 
               <Area
                 type="monotone"

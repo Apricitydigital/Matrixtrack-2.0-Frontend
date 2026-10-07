@@ -1,4 +1,5 @@
 import type {
+  ProcessingUnitTotals,
   ProcessingPlantDashboardData,
   ProcessingPlantPerformanceRow,
   ProcessingPlantTrendPoint,
@@ -30,9 +31,13 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
   const totalProcessed = n(pick(summary, ['totalProcessed', 'processed', 'processedQuantity', 'totalProcessedQuantity']));
   const totalRecovered = n(pick(summary, ['totalRecovered', 'recovered', 'recoveredQuantity', 'materialRecovered']));
   const totalReject = n(pick(summary, ['totalReject', 'reject', 'rejectQuantity', 'residual', 'residualQuantity']));
+  const totalProcessLoss = n(pick(summary, ['totalProcessLoss', 'processLoss']));
 
   const efficiencyFromApi = n(pick(summary, ['efficiency', 'processingEfficiency', 'processingRate']));
-  const efficiency = efficiencyFromApi || (totalReceived > 0 ? (totalProcessed / totalReceived) * 100 : 0);
+  // the API value is authoritative (0 is a real value); only guess when it is absent
+  const efficiency = summary?.efficiency !== undefined || summary?.processingEfficiency !== undefined
+    ? efficiencyFromApi
+    : (totalReceived > 0 ? (totalRecovered / totalReceived) * 100 : 0);
 
   const trendRaw = source.trend ?? source.dailyTrend ?? source.series ?? source.timeline ?? [];
   const trend: ProcessingPlantTrendPoint[] = Array.isArray(trendRaw)
@@ -43,6 +48,20 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
         recovered: n(pick(row, ['recovered', 'totalRecovered'])),
         reject: n(pick(row, ['reject', 'totalReject', 'residual'])),
         efficiency: n(pick(row, ['efficiency', 'processingEfficiency'])),
+        units: row?.units && typeof row.units === 'object'
+          ? Object.fromEntries(
+              Object.entries(row.units as Record<string, any>).map(([unit, q]) => [
+                unit,
+                {
+                  received: n(q?.received),
+                  processed: n(q?.processed),
+                  recovered: n(q?.recovered),
+                  reject: n(q?.reject),
+                  processLoss: n(q?.processLoss),
+                },
+              ]),
+            )
+          : undefined,
       }))
     : [];
 
@@ -60,7 +79,23 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
           processed,
           recovered: n(pick(row, ['recovered', 'totalRecovered'])),
           reject: n(pick(row, ['reject', 'totalReject', 'residual'])),
-          efficiency: n(pick(row, ['efficiency', 'processingEfficiency'])) || (received > 0 ? (processed / received) * 100 : 0),
+          processLoss: n(pick(row, ['processLoss'])),
+          efficiency: row?.efficiency !== undefined || row?.processingEfficiency !== undefined
+            ? n(pick(row, ['efficiency', 'processingEfficiency']))
+            : (received > 0 ? (n(pick(row, ['recovered', 'totalRecovered'])) / received) * 100 : 0),
+          efficiencyAvailable: row?.efficiencyAvailable !== false,
+          reportingGranularity: row?.reportingGranularity === 'MONTHLY' ? 'MONTHLY' : 'DAILY',
+          monthly: Array.isArray(row?.monthly)
+            ? row.monthly.map((m: any) => ({
+                month: String(m?.month ?? ''),
+                days: n(m?.days),
+                received: n(m?.received),
+                processed: n(m?.processed),
+                recovered: n(m?.recovered),
+                reject: n(m?.reject),
+                processLoss: n(m?.processLoss),
+              }))
+            : undefined,
           capacity: capacity === null ? null : n(capacity),
           utilization:
             'utilization' in row || 'capacityUtilization' in row
@@ -88,11 +123,35 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
       }))
     : [];
 
+  const byUnitRaw = source.materialRecoveryByUnit && typeof source.materialRecoveryByUnit === 'object' ? source.materialRecoveryByUnit : {};
+  const materialRecoveryByUnit = Object.fromEntries(
+    Object.entries(byUnitRaw as Record<string, any>).map(([unit, list]) => [
+      unit,
+      Array.isArray(list)
+        ? list.map((row: any) => ({
+            name: String(pick(row, ['name', 'material', 'label'], 'Other')),
+            quantity: n(pick(row, ['quantity', 'value'])),
+            percentage: n(pick(row, ['percentage', 'share'])),
+          }))
+        : [],
+    ]),
+  );
+
+  const otherOutputsRaw = source.otherOutputs ?? [];
+  const otherOutputs = Array.isArray(otherOutputsRaw)
+    ? otherOutputsRaw.map((row: any) => ({
+        name: String(pick(row, ['name', 'label'], 'Other output')),
+        unit: String(pick(row, ['unit'], '')),
+        quantity: n(pick(row, ['quantity', 'value'])),
+      }))
+    : [];
+
   return {
     totalReceived,
     totalProcessed,
     totalRecovered,
     totalReject,
+    totalProcessLoss,
     efficiency,
     activePlants: n(pick(summary, ['activePlants', 'reportingPlants', 'plantsReporting'])),
     totalPlants: n(pick(summary, ['totalPlants', 'plantCount'])),
@@ -103,6 +162,8 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
     lastSubmissionAt: pick(summary, ['lastSubmissionAt', 'lastReportedAt'], null) as string | null,
     trend,
     materialRecovery,
+    materialRecoveryByUnit,
+    otherOutputs,
     plantPerformance,
     raw: payload,
   };
@@ -130,3 +191,52 @@ export function lastNDaysRange(days: number) {
   return { from: dateInputValue(from), to: dateInputValue(to) };
 }
 
+
+/**
+ * Totals per unit family (MT for solid waste, KL / ML for liquid plants), built from the
+ * plant rows. Quantities in different units cannot be added, so every family is separate.
+ * Only families that have some data are returned, MT first.
+ */
+export function computeUnitTotals(rows: ProcessingPlantPerformanceRow[]): ProcessingUnitTotals[] {
+  const map = new Map<string, ProcessingUnitTotals & { comparableReceived: number; comparableRecovered: number }>();
+
+  for (const row of rows) {
+    const unit = row.unit || 'MT';
+    const current = map.get(unit) ?? {
+      unit,
+      received: 0,
+      processed: 0,
+      recovered: 0,
+      reject: 0,
+      processLoss: 0,
+      efficiency: 0,
+      hasEfficiency: false,
+      plants: 0,
+      comparableReceived: 0,
+      comparableRecovered: 0,
+    };
+
+    current.received += row.received;
+    current.processed += row.processed;
+    current.recovered += row.recovered;
+    current.reject += row.reject;
+    current.processLoss += row.processLoss || 0;
+    if (row.received > 0 || row.recovered > 0 || row.reject > 0 || (row.processLoss || 0) > 0) current.plants += 1;
+
+    if (row.efficiencyAvailable !== false && row.received > 0) {
+      current.comparableReceived += row.received;
+      current.comparableRecovered += row.recovered;
+    }
+
+    map.set(unit, current);
+  }
+
+  return Array.from(map.values())
+    .filter((totals) => totals.plants > 0)
+    .map(({ comparableReceived, comparableRecovered, ...totals }) => ({
+      ...totals,
+      efficiency: comparableReceived > 0 ? (comparableRecovered / comparableReceived) * 100 : 0,
+      hasEfficiency: comparableReceived > 0,
+    }))
+    .sort((a, b) => (a.unit === 'MT' ? -1 : b.unit === 'MT' ? 1 : a.unit.localeCompare(b.unit)));
+}
