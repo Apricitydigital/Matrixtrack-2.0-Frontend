@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { AreaBeatApi } from "@lib/apiClient";
+import { AreaBeatApi, GeoApi } from "@lib/apiClient";
 import { X, Upload, Loader2, AlertCircle } from "lucide-react";
 
 interface EditBeatModalProps {
@@ -13,12 +13,66 @@ interface EditBeatModalProps {
 
 export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModalProps) {
     const [beatName, setBeatName] = useState(beat.beatName);
+    const [zoneId, setZoneId] = useState(beat.zoneId || "");
+    const [wardId, setWardId] = useState(beat.wardId || "");
+    const [areaId, setAreaId] = useState(beat.areaId || "");
+    const [zones, setZones] = useState<any[]>([]);
+    const [wards, setWards] = useState<any[]>([]);
+    const [areas, setAreas] = useState<any[]>([]);
+    const [geoLoading, setGeoLoading] = useState(true);
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [mounted, setMounted] = useState(false);
 
-    useEffect(() => setMounted(true), []);
+    useEffect(() => {
+        setMounted(true);
+
+        let cancelled = false;
+
+        const loadGeo = async () => {
+            try {
+                setGeoLoading(true);
+
+                const [zoneRes, wardRes, areaRes] = await Promise.all([
+                    GeoApi.list("ZONE"),
+                    GeoApi.list("WARD"),
+                    GeoApi.list("AREA")
+                ]);
+
+                if (cancelled) return;
+
+                setZones(zoneRes.nodes || []);
+                setWards(wardRes.nodes || []);
+                setAreas(areaRes.nodes || []);
+            } catch (err: any) {
+                if (!cancelled) {
+                    setError(
+                        err?.message ||
+                        "Failed to load Zone, Ward and Area"
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setGeoLoading(false);
+                }
+            }
+        };
+
+        void loadGeo();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const filteredWards = wards.filter(
+        (ward: any) => ward.parentId === zoneId
+    );
+
+    const filteredAreas = areas.filter(
+        (area: any) => area.parentId === wardId
+    );
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -39,12 +93,29 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+        e.preventDefault();        if (!zoneId) {
+            setError("Please select a Zone");
+            return;
+        }
+
+        if (!wardId) {
+            setError("Please select a Ward");
+            return;
+        }
+
+        if (!areaId) {
+            setError("Please select an Area");
+            return;
+        }
+
         setLoading(true);
         setError("");
 
         const formData = new FormData();
-        formData.append("beatName", beatName);
+        formData.append("beatName", beatName.trim());
+        formData.append("zoneId", zoneId);
+        formData.append("wardId", wardId);
+        formData.append("areaId", areaId);
         if (file) {
             formData.append("kmlFile", file);
         }
@@ -91,6 +162,78 @@ export default function EditBeatModal({ beat, onClose, onSuccess }: EditBeatModa
                             style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db" }}
                         />
                     </div>
+                    <div>
+                        <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Zone</label>
+                        <select
+                            value={zoneId}
+                            onChange={(e) => {
+                                setZoneId(e.target.value);
+                                setWardId("");
+                                setAreaId("");
+                                setError("");
+                            }}
+                            disabled={geoLoading || loading}
+                            required
+                            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", backgroundColor: "white" }}
+                        >
+                            <option value="">{geoLoading ? "Loading Zones..." : "Select Zone"}</option>
+                            {zones.map((zone: any) => (
+                                <option key={zone.id} value={zone.id}>
+                                    {zone.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Ward</label>
+                        <select
+                            value={wardId}
+                            onChange={(e) => {
+                                setWardId(e.target.value);
+                                setAreaId("");
+                                setError("");
+                            }}
+                            disabled={!zoneId || geoLoading || loading}
+                            required
+                            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", backgroundColor: "white" }}
+                        >
+                            <option value="">
+                                {!zoneId ? "Select Zone first" : "Select Ward"}
+                            </option>
+
+                            {filteredWards.map((ward: any) => (
+                                <option key={ward.id} value={ward.id}>
+                                    {ward.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Area</label>
+                        <select
+                            value={areaId}
+                            onChange={(e) => {
+                                setAreaId(e.target.value);
+                                setError("");
+                            }}
+                            disabled={!wardId || geoLoading || loading}
+                            required
+                            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", backgroundColor: "white" }}
+                        >
+                            <option value="">
+                                {!wardId ? "Select Ward first" : "Select Area"}
+                            </option>
+
+                            {filteredAreas.map((area: any) => (
+                                <option key={area.id} value={area.id}>
+                                    {area.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
 
                     <div>
                         <label style={{ display: "block", marginBottom: "8px", fontWeight: 500, fontSize: "0.875rem" }}>Replace KML / KMZ File (Optional)</label>
