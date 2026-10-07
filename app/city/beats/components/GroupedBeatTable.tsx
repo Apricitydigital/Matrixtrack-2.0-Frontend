@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, Edit2, Eye, MapPinned, MapPin, Trash2, UserPlus, Users } from "lucide-react";
 import dynamic from "next/dynamic";
 import { AreaBeatApi } from "@lib/apiClient";
+import BulkBeatLocationModal from "./BulkBeatLocationModal";
 
 const GroupBeatMappingModal = dynamic(
     () => import("./GroupBeatMappingModal"),
@@ -68,6 +69,7 @@ export default function GroupedBeatTable({ beats, onRefresh, onView, onEdit, onA
     const [expanded, setExpanded] = useState<string[]>([]);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [viewingGroup, setViewingGroup] = useState<BeatGroup | null>(null);
+    const [editingLocationGroup, setEditingLocationGroup] = useState<BeatGroup | null>(null);
     const [page, setPage] = useState(1);
     const pageSize = 10;
 
@@ -214,6 +216,12 @@ export default function GroupedBeatTable({ beats, onRefresh, onView, onEdit, onA
                                     </button>
                                     <button onClick={() => onAssignGroup(group, "SUPERVISOR")}><Users size={15} /> Assign Daroga to all</button>
                                     <button onClick={() => onAssignGroup(group, "EMPLOYEE")}><UserPlus size={15} /> Assign Employee to all</button>
+                                    <button
+                                        onClick={() => setEditingLocationGroup(group)}
+                                        title="Change Zone, Ward and Area for all Beats in this group"
+                                    >
+                                        <Edit2 size={15} /> Edit Location for all
+                                    </button>
                                 </>
                             )}
                         </div>
@@ -268,6 +276,17 @@ export default function GroupedBeatTable({ beats, onRefresh, onView, onEdit, onA
                 </section>;
             })}
 
+                        {editingLocationGroup && (
+                <BulkBeatLocationModal
+                    beatIds={editingLocationGroup.beats.map((beat: any) => beat.id)}
+                    groupTitle={editingLocationGroup.title}
+                    onClose={() => setEditingLocationGroup(null)}
+                    onSuccess={() => {
+                        setEditingLocationGroup(null);
+                        onRefresh();
+                    }}
+                />
+            )}
             {viewingGroup && (
                 <GroupBeatMappingModal
                     group={viewingGroup}

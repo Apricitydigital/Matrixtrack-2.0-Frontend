@@ -656,6 +656,24 @@ export const AreaBeatApi = {
       body: formData,
       headers: {}
     }),
+  bulkUpdateLocation: (
+    beatIds: string[],
+    zoneId: string,
+    wardId: string,
+    areaId: string
+  ) =>
+    apiFetch<{ success: boolean; updatedCount: number }>(
+      "/city/areas/bulk-location",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          beatIds,
+          zoneId,
+          wardId,
+          areaId
+        })
+      }
+    ),
   remove: (id: string) => apiFetch<{ success: boolean }>(`/city/areas/${id}`, { method: "DELETE" }),
   listPotentialAssignees: (id: string, role?: string) =>
     apiFetch<any[]>(`/city/areas/${id}/potential-assignees${role ? `?role=${role}` : ""}`),
