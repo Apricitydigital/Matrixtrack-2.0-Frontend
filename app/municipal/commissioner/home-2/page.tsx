@@ -30,7 +30,7 @@ import {
   Flag,
 } from 'lucide-react';
 
-import { apiFetch } from '@lib/apiClient';
+import { apiFetch, CityModulesApi } from '@lib/apiClient';
 
 import type {
   MapActor,
@@ -65,6 +65,32 @@ type ModuleFilter =
   | 'TOILET'
   | 'NALA'
   | 'GVP';
+
+type ModuleId = Exclude<ModuleFilter, 'ALL'>;
+
+const moduleIdFromKey = (
+  value: string,
+): ModuleId | null => {
+  const text = value.toUpperCase();
+
+  if (text.includes('SWEEP')) return 'SWEEPING';
+  if (text.includes('TOILET')) return 'TOILET';
+  if (text.includes('NALA')) return 'NALA';
+  if (
+    text.includes('LITTER') ||
+    text.includes('TWINBIN')
+  ) {
+    return 'LITTERBIN';
+  }
+  if (
+    text.includes('GVP') ||
+    text.includes('TASKFORCE')
+  ) {
+    return 'GVP';
+  }
+
+  return null;
+};
 
 type StatusFilter =
   | 'ALL'
@@ -267,6 +293,55 @@ export default function CommissionerHome2Page() {
       );
   }, []);
 
+  // null = not loaded (or failed) -> do not hide anything.
+  const [
+    enabledModules,
+    setEnabledModules,
+  ] = useState<Set<ModuleId> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    CityModulesApi.list()
+      .then((modules) => {
+        const ids = new Set<ModuleId>();
+
+        (Array.isArray(modules)
+          ? modules
+          : []
+        ).forEach((module) => {
+          if (!module.enabled) return;
+
+          const id = moduleIdFromKey(
+            `${module.key || ''} ${module.name || ''}`,
+          );
+
+          if (id) ids.add(id);
+        });
+
+        setEnabledModules(ids);
+      })
+      .catch(() =>
+        setEnabledModules(null),
+      );
+  }, []);
+
+  const isModuleOn = useCallback(
+    (id: ModuleId) =>
+      !enabledModules ||
+      enabledModules.has(id),
+    [enabledModules],
+  );
+
+  useEffect(() => {
+    if (
+      moduleFilter !== 'ALL' &&
+      !isModuleOn(moduleFilter)
+    ) {
+      setModuleFilter('ALL');
+    }
+  }, [moduleFilter, isModuleOn]);
+
   const loadMap =
     useCallback(async () => {
       setLoading(true);
@@ -377,8 +452,9 @@ export default function CommissionerHome2Page() {
 
   const scopedBeats = useMemo(
     () =>
-      moduleFilter !== 'ALL' &&
-        moduleFilter !== 'SWEEPING'
+      !isModuleOn('SWEEPING') ||
+        (moduleFilter !== 'ALL' &&
+        moduleFilter !== 'SWEEPING')
         ? []
         : (
           data?.beats || []
@@ -392,6 +468,7 @@ export default function CommissionerHome2Page() {
     [
       data,
       moduleFilter,
+      isModuleOn,
       roleFilter,
       userId,
     ],
@@ -400,9 +477,10 @@ export default function CommissionerHome2Page() {
   const scopedToilets =
     useMemo(
       () =>
-        moduleFilter !== 'ALL' &&
-          moduleFilter !== 'TOILET'
-          ? []
+        !isModuleOn('TOILET') ||
+        (moduleFilter !== 'ALL' &&
+          moduleFilter !== 'TOILET')
+        ? []
           : (
             data?.toilets ||
             []
@@ -416,6 +494,7 @@ export default function CommissionerHome2Page() {
       [
         data,
         moduleFilter,
+        isModuleOn,
         roleFilter,
         userId,
       ],
@@ -423,8 +502,9 @@ export default function CommissionerHome2Page() {
 
   const scopedBins = useMemo(
     () =>
-      moduleFilter !== 'ALL' &&
-        moduleFilter !== 'LITTERBIN'
+      !isModuleOn('LITTERBIN') ||
+        (moduleFilter !== 'ALL' &&
+        moduleFilter !== 'LITTERBIN')
         ? []
         : (
           data?.bins || []
@@ -438,6 +518,7 @@ export default function CommissionerHome2Page() {
     [
       data,
       moduleFilter,
+      isModuleOn,
       roleFilter,
       userId,
     ],
@@ -446,8 +527,9 @@ export default function CommissionerHome2Page() {
   // One marker per NalaPoint.
   const scopedNalas = useMemo(
     () =>
-      moduleFilter !== 'ALL' &&
-        moduleFilter !== 'NALA'
+      !isModuleOn('NALA') ||
+        (moduleFilter !== 'ALL' &&
+        moduleFilter !== 'NALA')
         ? []
         : (
           data?.nalas || []
@@ -461,6 +543,7 @@ export default function CommissionerHome2Page() {
     [
       data,
       moduleFilter,
+      isModuleOn,
       roleFilter,
       userId,
     ],
@@ -469,8 +552,9 @@ export default function CommissionerHome2Page() {
   // One marker per active GVP.
   const scopedGvps = useMemo(
     () =>
-      moduleFilter !== 'ALL' &&
-        moduleFilter !== 'GVP'
+      !isModuleOn('GVP') ||
+        (moduleFilter !== 'ALL' &&
+        moduleFilter !== 'GVP')
         ? []
         : (
           data?.gvps || []
@@ -484,6 +568,7 @@ export default function CommissionerHome2Page() {
     [
       data,
       moduleFilter,
+      isModuleOn,
       roleFilter,
       userId,
     ],
@@ -780,7 +865,19 @@ export default function CommissionerHome2Page() {
       ? reported
       : displayedTotal;
 
-return (
+const moduleLabels = (
+    [
+      ['SWEEPING', 'Sweeping'],
+      ['LITTERBIN', 'Litter Bin'],
+      ['TOILET', 'Toilet'],
+      ['NALA', 'Nala'],
+      ['GVP', 'GVP'],
+    ] as const
+  )
+    .filter(([id]) => isModuleOn(id))
+    .map(([, label]) => label);
+
+  return (
     <main className="min-h-full bg-[#f6f8fc] pb-10">
       <div className="mx-auto max-w-[1800px] space-y-5">
         <section className="relative overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-6 py-6 text-white shadow-[0_24px_70px_-32px_rgba(15,23,42,0.9)] sm:px-8 lg:px-9">
@@ -812,9 +909,10 @@ return (
                 Track operational
                 assets by status,
                 module, role and user
-                across Sweeping,
-                Litter Bin, Toilet, Nala
-                and GVP inspections.
+                across{' '}
+                {moduleLabels.join(', ') ||
+                  'assigned'}{' '}
+                inspections.
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1069,25 +1167,25 @@ return (
                   All modules
                 </option>
 
-                <option value="SWEEPING">
-                  Sweeping
-                </option>
+                {isModuleOn('SWEEPING') && (
+<option value="SWEEPING">Sweeping</option>
+)}
 
-                <option value="LITTERBIN">
-                  Litter Bin
-                </option>
+                {isModuleOn('LITTERBIN') && (
+<option value="LITTERBIN">Litter Bin</option>
+)}
 
-                <option value="TOILET">
-                  Toilet
-                </option>
+                {isModuleOn('TOILET') && (
+<option value="TOILET">Toilet</option>
+)}
 
-                <option value="NALA">
-                  Nala
-                </option>
+                {isModuleOn('NALA') && (
+<option value="NALA">Nala</option>
+)}
 
-                <option value="GVP">
-                  GVP
-                </option>
+                {isModuleOn('GVP') && (
+<option value="GVP">GVP</option>
+)}
               </FilterSelect>
             </FilterField>
 
@@ -1375,7 +1473,21 @@ return (
                 countClass:
                   'bg-rose-100 text-rose-700',
               },
-            ].map((layer) => {
+            ]
+              .filter((layer) =>
+                isModuleOn(
+                  (
+                    {
+                      beats: 'SWEEPING',
+                      bins: 'LITTERBIN',
+                      toilets: 'TOILET',
+                      nalas: 'NALA',
+                      gvps: 'GVP',
+                    } as const
+                  )[layer.key],
+                ),
+              )
+              .map((layer) => {
               const Icon =
                 layer.icon;
 
