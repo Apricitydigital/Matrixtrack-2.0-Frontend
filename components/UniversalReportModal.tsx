@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { normalizeInspectionAnswers, NormalizedAnswer } from '@lib/reportAnswers';
 import { resolveMediaUrl } from '@lib/mediaUrl';
 import { useAuth } from '@hooks/useAuth';
-import { StorageApi } from '@lib/apiClient';
+import { StorageApi, CityUserApi, GeoApi } from '@lib/apiClient';
 
 export type UniversalReportModalProps = {
     moduleTitle: string;
@@ -1450,7 +1450,8 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
         aiSuggestion: stageAiSuggestion,
         showAiSection = false,
         photos,
-        pending = false
+        pending = false,
+        pendingContacts
     }: {
         title: string;
         person?: string | null;
@@ -1461,6 +1462,7 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
         showAiSection?: boolean;
         photos?: string[];
         pending?: boolean;
+        pendingContacts?: { name: string; phone: string }[];
     }) => {
         const tone =
             auditStatusTone(
@@ -1579,6 +1581,22 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                             : 'Time not recorded'
                                     )}
                             </div>
+
+                            {pending && pendingContacts && pendingContacts.length > 0 && (
+                                <div style={{ marginTop: 6, fontSize: 10.5, color: '#334155' }}>
+                                    <div style={{ fontSize: 9, fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        Pending with
+                                    </div>
+                                    {pendingContacts.map((c, i) => (
+                                        <div key={`${c.name}-${i}`} style={{ marginTop: 2, fontWeight: 700 }}>
+                                            {c.name}
+                                            <span style={{ fontWeight: 600, color: '#64748b' }}>
+                                                {' · '}{c.phone || 'No contact'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {statusValue && (
@@ -1741,6 +1759,41 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
     React.useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Roster used to show who a pending workflow stage is waiting on.
+    const [rosterUsers, setRosterUsers] = React.useState<any[]>([]);
+    const [rosterGeoNames, setRosterGeoNames] = React.useState<Map<string, string>>(new Map());
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const [usersRes, wardsRes] = await Promise.allSettled([
+                CityUserApi.list(),
+                GeoApi.list('WARD')
+            ]);
+            if (cancelled) return;
+            if (usersRes.status === 'fulfilled') setRosterUsers(usersRes.value.users || []);
+            if (wardsRes.status === 'fulfilled') {
+                const m = new Map<string, string>();
+                (wardsRes.value.nodes || []).forEach((n: any) => m.set(String(n.id), String(n.name || '')));
+                setRosterGeoNames(m);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    const wardContacts = (role: string) => {
+        const target = String(wardName || '').trim().toLowerCase();
+        if (!target) return [];
+        return rosterUsers
+            .filter((u) => u.role === role)
+            .filter((u) =>
+                (u.wardIds || []).some(
+                    (id: string) =>
+                        String(rosterGeoNames.get(String(id)) || '').trim().toLowerCase() === target
+                )
+            )
+            .map((u) => ({ name: String(u.name || ''), phone: u.phone ? String(u.phone) : '' }));
+    };
 
     if (!mounted || typeof document === 'undefined') return null;
 
@@ -2771,6 +2824,11 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                     pending={
                                         !hasSiStage
                                     }
+                                    pendingContacts={
+                                        !hasSiStage
+                                            ? wardContacts('QC')
+                                            : undefined
+                                    }
                                 />
 
                                 {(hasUlbStage ||
@@ -2807,9 +2865,7 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                     />
                                 )}
 
-                                {(hasAoStage ||
-                                    currentAuditStatus ===
-                                        'ACTION_REQUIRED') && (
+                                {(
                                     <TimelineStage
                                         title="IEC Action"
                                         person={
@@ -2834,9 +2890,16 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                             aoEvidencePhotos
                                         }
                                         pending={
-                                            currentAuditStatus ===
-                                            'ACTION_REQUIRED' &&
+                                            currentAuditStatus !==
+                                                'ACTION_TAKEN' &&
                                             !aoActionAt
+                                        }
+                                        pendingContacts={
+                                            currentAuditStatus !==
+                                                'ACTION_TAKEN' &&
+                                            !aoActionAt
+                                                ? wardContacts('ACTION_OFFICER')
+                                                : undefined
                                         }
                                     />
                                 )}

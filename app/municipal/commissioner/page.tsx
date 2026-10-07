@@ -156,6 +156,7 @@ type CityUserSummary = {
   id: string;
   name: string;
   role: string;
+  phone?: string | null;
   zoneIds?: string[];
   wardIds?: string[];
 };
@@ -2839,6 +2840,7 @@ function DrilldownDrawer({
   onEmployee,
   onWard,
   siUsers,
+  geoNameById,
 }: {
   data: DrilldownState;
   onClose: () => void;
@@ -2852,6 +2854,7 @@ function DrilldownDrawer({
     item: WardRankingRow
   ) => void;
   siUsers: CityUserSummary[];
+  geoNameById?: Map<string, string>;
 }) {
   type Tab =
     | 'INSPECTION'
@@ -3475,16 +3478,16 @@ function DrilldownDrawer({
       key: 'ASSIGNED',
       label:
         isSweepingDrawer
-          ? 'Assigned Beats'
+          ? 'Total Assigned Beats'
           : isLitterBinDrawer
-            ? 'Assigned Litter Bins'
+            ? 'Total Assigned Litter Bins'
             : isToiletDrawer
-              ? 'Assigned Toilets'
+              ? 'Total Assigned Toilets'
               : isNalaDrawer
-                ? 'Assigned Nala Points'
+                ? 'Total Assigned Nala Points'
                 : isGvpDrawer
-                  ? 'Assigned GVPs'
-                  : 'Assigned',
+                  ? 'Total Assigned GVPs'
+                  : 'Total Assigned',
       value:
         initialInspectionModule === 'ALL'
           ? (['TOILET', 'LITTERBINS', 'SWEEPING', 'NALA', 'TASKFORCE'] as const).reduce(
@@ -3511,8 +3514,8 @@ function DrilldownDrawer({
       key: 'REQUIRED',
       label:
         isSweepingDrawer
-          ? 'Inspections Required'
-          : 'Required Inspections',
+          ? 'Total Inspections Required'
+          : 'Total Required Inspections',
       value:
         totalRequiredInspection,
       tone:
@@ -3524,8 +3527,8 @@ function DrilldownDrawer({
       key: 'ALL',
       label:
         isSweepingDrawer
-          ? 'Completed Beats'
-          : 'Completed Inspections',
+          ? 'Inspection Completed Beats'
+          : 'Inspection Completed',
       value:
         inspectionOverviewStats.total,
       tone:
@@ -3673,6 +3676,40 @@ function DrilldownDrawer({
 
       return map;
     }, [siUsers]);
+
+  /*
+   * Sanitary Inspectors responsible for the asset: the reviewer if
+   * known, otherwise the SIs assigned to the same ward.
+   */
+  function getAssetSanitaryInspectors(
+    item: DashboardRecord
+  ): CityUserSummary[] {
+    const norm = (v: unknown) =>
+      String(v || '').trim().toLowerCase();
+
+    const reviewerId = getSiId(item);
+    if (reviewerId) {
+      const reviewer = siUsers.find(
+        (u) => String(u.id) === String(reviewerId)
+      );
+      if (reviewer) return [reviewer];
+    }
+
+    const namesOf = (ids?: string[]) =>
+      (ids || []).map((id) =>
+        norm(geoNameById?.get(String(id)))
+      );
+
+    const ward = norm(getRecordWard(item));
+    if (ward) {
+      const byWard = siUsers.filter((u) =>
+        namesOf(u.wardIds).includes(ward)
+      );
+      if (byWard.length) return byWard;
+    }
+
+    return [];
+  }
 
   function getInspectionSiDisplayName(
     item: DashboardRecord
@@ -4328,7 +4365,7 @@ function DrilldownDrawer({
                               Daroga
                             </th>
                             <th className="px-4 py-3">
-                              Sanitary Inspector
+                              Sanitary Inspector (Contact)
                             </th>
                             <th className="px-4 py-3">SI Decision</th>
                             <th className="px-4 py-3">
@@ -4419,15 +4456,34 @@ function DrilldownDrawer({
                                     </td>
 
                                     <td className="px-4 py-3 text-xs font-semibold text-slate-700">
-                                      {isValidInspectionPersonName(
-                                        getInspectionSiDisplayName(
-                                          item
+                                      {(() => {
+                                        const sis =
+                                          getAssetSanitaryInspectors(
+                                            item
+                                          );
+
+                                        if (sis.length) {
+                                          return sis.map((si) => (
+                                            <div key={si.id} className="mb-1 last:mb-0">
+                                              <div>{si.name}</div>
+                                              <div className="text-[10px] font-medium text-slate-500">
+                                                {si.phone || '-'}
+                                              </div>
+                                            </div>
+                                          ));
+                                        }
+
+                                        const fallback =
+                                          getInspectionSiDisplayName(
+                                            item
+                                          );
+
+                                        return isValidInspectionPersonName(
+                                          fallback
                                         )
-                                      )
-                                        ? getInspectionSiDisplayName(
-                                          item
-                                        )
-                                        : '-'}
+                                          ? fallback
+                                          : '-';
+                                      })()}
                                     </td>
 
                                     <td className="px-4 py-3">
@@ -16363,6 +16419,9 @@ setDrilldown({
               cityUsersByRole.get(
                 'QC'
               ) || []
+            }
+            geoNameById={
+              geoNameById
             }
           />
         )}
