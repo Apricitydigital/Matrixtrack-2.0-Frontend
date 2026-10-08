@@ -49,6 +49,13 @@ export type EmployeeTarget = {
 
   isActive: boolean;
 
+  /** Ward-wise Daroga target. null = legacy per-user target. */
+  wardId?: string | null;
+  zoneId?: string | null;
+
+  /** false = rotation: inspected assets stay locked until all are inspected. */
+  allowRepeat?: boolean;
+
   createdById: string;
   updatedById: string | null;
 
@@ -72,6 +79,16 @@ export type EmployeeTarget = {
 
 export type EmployeeTargetPerformance =
   EmployeeTarget & {
+    ward?: { id: string; name: string } | null;
+    /** Ward-wise Daroga target that stays until the admin changes it. */
+    isStanding?: boolean;
+    effectiveFrom?: string | null;
+    /** Assets of this module assigned to the Daroga in the ward (per day). */
+    assignedAssets?: number | null;
+    /** Most allowed for this target's whole period. */
+    maxAllowed?: number | null;
+    /** Assets were reassigned after the target was set. */
+    aboveAssignedAssets?: boolean;
     achieved: number;
     remaining: number;
     progress: number;
@@ -95,6 +112,38 @@ export type CreateTargetPayload = {
   periodType: TargetPeriodType;
   startDate: string;
   targetValue: number;
+  wardId?: string;
+  allowRepeat?: boolean;
+};
+
+export type AssignmentRow = {
+  userId: string;
+  userName: string;
+  employeeId: string | null;
+  wardId: string;
+  wardName: string;
+  zoneId: string | null;
+  moduleId: string;
+  moduleName: string;
+  /** Assets assigned = most allowed per day. */
+  assigned: number;
+};
+
+export type AssignmentsResponse = {
+  total: number;
+  rows: AssignmentRow[];
+};
+
+export type BulkTargetPayload = {
+  periodType: TargetPeriodType;
+  startDate: string;
+  items: Array<{
+    userId: string;
+    moduleId: string;
+    wardId: string;
+    targetValue: number;
+    allowRepeat?: boolean;
+  }>;
 };
 
 export type CreateTargetResponse = {
@@ -103,6 +152,7 @@ export type CreateTargetResponse = {
 
 export type UpdateTargetPayload = {
   targetValue: number;
+  allowRepeat?: boolean;
 };
 
 export type UpdateTargetResponse = {
@@ -159,6 +209,24 @@ export const TargetsApi = {
   ) {
     return apiFetch<CreateTargetResponse>(
       "/city/targets",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  assignments() {
+    return apiFetch<AssignmentsResponse>(
+      "/city/targets/assignments"
+    );
+  },
+
+  createBulk(
+    payload: BulkTargetPayload
+  ) {
+    return apiFetch<{ created: number }>(
+      "/city/targets/bulk",
       {
         method: "POST",
         body: JSON.stringify(payload),
