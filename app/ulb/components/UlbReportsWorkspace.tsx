@@ -91,6 +91,7 @@ import {
     type WardRankingSummaryResponse,
 } from '@lib/wardRankingApi';
 import { createPortal } from 'react-dom';
+import ToiletComponentCollage from '../../../components/ToiletComponentCollage';
 
 /* =========================================================
    TYPES
@@ -10957,6 +10958,16 @@ function ReportDetailModal({
 
                             )
                     }
+
+
+                    {moduleKey === 'TOILET' && (
+                        <section className="mt-6">
+                            <ToiletComponentCollage
+                                record={item}
+                                onPreview={onImagePreview}
+                            />
+                        </section>
+                    )}
 
 
                     {/* =========================================

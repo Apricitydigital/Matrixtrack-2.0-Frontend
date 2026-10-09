@@ -1,5 +1,6 @@
 'use client';
 
+import ToiletComponentCollage from './ToiletComponentCollage';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { normalizeInspectionAnswers, NormalizedAnswer } from '@lib/reportAnswers';
@@ -2662,6 +2663,12 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                     </div>
                                 )}
 
+                                {isToiletModule && (
+                                    <div style={{ marginTop: 18 }}>
+                                        <ToiletComponentCollage record={record} onPreview={setPreviewPhoto} />
+                                    </div>
+                                )}
+
                                 {allEvidencePhotos.length >
                                     0 && (
                                     <div
@@ -3132,6 +3139,10 @@ return createPortal(
                                     </div>
                                 </div>
                             </div>
+
+                            {isToiletModule && (
+                                <ToiletComponentCollage record={record} onPreview={setPreviewPhoto} />
+                            )}
 
                             {/* Evidence Photos (Small Thumbnails Box) */}
                             {allEvidencePhotos.length > 0 && (
