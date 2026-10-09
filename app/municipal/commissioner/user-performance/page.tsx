@@ -7,21 +7,30 @@ import {
   Activity,
   ArrowLeft,
   BarChart3,
+  Brush,
   CalendarDays,
   CheckCircle2,
+  ClipboardList,
+  Clock,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Droplet,
   Filter,
   MapPin,
+  Recycle,
   RefreshCw,
   Search,
   ShieldCheck,
+  Sparkles,
   Table2,
+  Target,
   Trash2,
+  TriangleAlert,
   Trophy,
   Users,
   UsersRound,
+  Waves,
   X,
   XCircle,
 } from 'lucide-react';
@@ -48,7 +57,10 @@ import {
 } from '@lib/attendanceApi';
 import ModalPortal from "@components/ui/ModalPortal";
 import {
+  darogaAnalytics,
   darogaScore,
+  siAnalytics,
+  darogaTier,
   iecScore,
   performanceRangeParams,
   restrictDarogaModules,
@@ -721,6 +733,77 @@ function StatTile({
   );
 }
 
+type ProcessStep = {
+  label: string;
+  value: React.ReactNode;
+  icon: React.ReactNode;
+  ring: string;
+  bar: string;
+  text: string;
+  onClick?: () => void;
+  hint: string;
+};
+
+/** "Inspection Workflow" header + the step-by-step process status card. */
+function ProcessStatus({ steps, subtitle, note }: { steps: ProcessStep[]; subtitle: string; note?: React.ReactNode }) {
+  return (
+    <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+          <ShieldCheck size={22} />
+        </span>
+        <div>
+          <div className="text-lg font-black leading-tight text-slate-950">Inspection Workflow</div>
+          <div className="text-[11px] font-bold text-slate-400">{subtitle}</div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center gap-2 text-sm font-black text-slate-900">
+          <Activity size={15} className="text-indigo-600" />
+          Overall Process Status
+        </div>
+        <div className="text-[10px] font-bold text-slate-400">{subtitle}</div>
+
+        <div className="mt-4 grid grid-cols-3 gap-y-5 sm:grid-cols-6">
+          {steps.map((step, index) => {
+            const content = (
+              <>
+                <span className={`flex h-14 w-14 items-center justify-center rounded-full ring-4 ${step.ring}`}>{step.icon}</span>
+                <span className="mt-2 text-[11px] font-black text-slate-800">{step.label}</span>
+                <span className={`mt-0.5 text-2xl font-black leading-none ${step.text}`}>{step.value}</span>
+                <span className={`mt-1.5 h-1 w-14 rounded-full ${step.bar}`} />
+              </>
+            );
+            return (
+              <div key={step.label} className="relative flex items-start justify-center">
+                {step.onClick ? (
+                  <button
+                    type="button"
+                    title={step.hint}
+                    onClick={step.onClick}
+                    className="flex flex-col items-center rounded-xl px-1 transition hover:-translate-y-0.5"
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <div title={step.hint} className="flex flex-col items-center px-1">
+                    {content}
+                  </div>
+                )}
+                {index < steps.length - 1 && (
+                  <ChevronRight size={16} className="absolute -right-2 top-5 hidden text-slate-300 sm:block" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {note ? <div className="mt-3 text-[9px] font-semibold text-slate-400">{note}</div> : null}
+      </div>
+    </section>
+  );
+}
+
 function UserDetailDrawer({
   row: baseRow,
   roleLabel,
@@ -814,6 +897,10 @@ function UserDetailDrawer({
             zones: [],
             wards: [],
             modules: [],
+            // Don't keep the previous range's numbers while the new range loads.
+            coverage: null,
+            si: null,
+            iec: null,
           },
     [usingPageRange, baseRow, rangeRow]
   );
@@ -851,6 +938,7 @@ function UserDetailDrawer({
   const closeTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const TOOLTIP_WIDTH = 176;
+  const DAROGA_TOOLTIP_WIDTH = 264;
   const TOOLTIP_HEIGHT_ESTIMATE = 130;
   const VIEWPORT_MARGIN = 12;
 
@@ -865,10 +953,16 @@ function UserDetailDrawer({
     clearCloseTimer();
     const rect = target.getBoundingClientRect();
 
-    let left = rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2;
-    left = Math.min(Math.max(left, VIEWPORT_MARGIN), window.innerWidth - TOOLTIP_WIDTH - VIEWPORT_MARGIN);
+    // A Daroga tooltip is wider and taller (one row per module with a bar).
+    const darogaDay = roleKey === 'SUPERVISOR' ? darogaDays.get(dateStr) : isTimedRole ? siDays.get(dateStr) : undefined;
+    const width = darogaDay ? DAROGA_TOOLTIP_WIDTH : TOOLTIP_WIDTH;
+    const height = darogaDay ? 150 + 38 * Object.keys(darogaDay.modules).length : TOOLTIP_HEIGHT_ESTIMATE;
 
-    const openUpward = rect.bottom + TOOLTIP_HEIGHT_ESTIMATE + VIEWPORT_MARGIN > window.innerHeight;
+    let left = rect.left + rect.width / 2 - width / 2;
+    left = Math.min(Math.max(left, VIEWPORT_MARGIN), window.innerWidth - width - VIEWPORT_MARGIN);
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < height + VIEWPORT_MARGIN * 2 && rect.top > spaceBelow;
     const top = openUpward ? rect.top - VIEWPORT_MARGIN : rect.bottom + VIEWPORT_MARGIN;
 
     setTooltipPos({ top, left, openUpward });
@@ -946,6 +1040,12 @@ function UserDetailDrawer({
   const litterBinsCount = workSummary?.assignments.litterBins.length ?? null;
 
   const coverage = roleKey === 'SUPERVISOR' ? row.coverage ?? null : null;
+  const darogaDays = useMemo(
+    () => new Map((coverage?.daily || []).map((day) => [day.date, day])),
+    [coverage]
+  );
+  const darogaStats = useMemo(() => darogaAnalytics(coverage?.daily), [coverage]);
+  const darogaTierInfo = darogaTier(row.performance);
 
   const assignmentText = (count: number | null) =>
     workSummaryLoading ? '…' : workSummaryError ? '—' : (count ?? 0).toLocaleString('en-IN');
@@ -1061,6 +1161,16 @@ function UserDetailDrawer({
   const siKeys = useMemo(() => siBucketKeys(si), [si]);
   const iec = roleKey === 'ACTION_OFFICER' ? row.iec ?? null : null;
   const iecKeys = useMemo(() => iecBucketKeys(iec), [iec]);
+
+  // SI and IEC share the same on-time (deadline) model: calendar, module table and analytics.
+  const timed = si ?? iec;
+  const isTimedRole = roleKey === 'QC' || roleKey === 'ACTION_OFFICER';
+  const timedVerb = roleKey === 'QC' ? 'reviewed' : 'resolved';
+  const timedArrivedLabel = roleKey === 'QC' ? 'Arrived' : 'Sent to action';
+  const timedAvgHours = si ? si.avgTurnaroundHours : iec ? iec.avgResolutionHours : null;
+  const siDays = useMemo(() => new Map((timed?.daily || []).map((day) => [day.date, day])), [timed]);
+  const siStats = useMemo(() => siAnalytics(timed?.daily), [timed]);
+  const timedCountText = (value: number | null | undefined) => (roleKey === 'QC' ? siCountText(value) : iecCountText(value));
   const iecCountText = (value: number | null | undefined) =>
     iecStatus === 'loading' ? '…' : value === null || value === undefined ? '—' : value.toLocaleString('en-IN');
 
@@ -1141,38 +1251,45 @@ function UserDetailDrawer({
 
         if (iec) {
           const buckets = iec.modules[module.key] || { attentionRequired: [], resolved: [], resolutionPending: [], carriedOverPending: [] };
-          const attention = buckets.attentionRequired.length;
+          const stats = iec.moduleStats?.[module.key];
+          const due = stats ? stats.onTime + stats.late + stats.overdue : 0;
           return {
             ...module,
             assigned: null,
             required: null,
-            completed: buckets.resolved.length,
-            performance: attention ? (buckets.resolved.length / attention) * 100 : null,
-            workload: null,
+            // Resolved = reports an IEC member has resolved (on time or late).
+            completed: stats ? stats.onTime + stats.late : buckets.resolved.length,
+            performance: stats && due ? (stats.onTime / due) * 100 : null,
+            workload: due,
             pendingInspection: null,
-            reports: attention,
+            reports: stats ? stats.arrived : buckets.attentionRequired.length,
             approved: 0,
             rejected: 0,
             pending: buckets.resolutionPending.length,
+            onTime: stats?.onTime ?? 0,
+            overdue: stats?.overdue ?? 0,
           };
         }
 
         if (si) {
           const buckets = si.modules[module.key] || { reports: [], cleaned: [], notCleaned: [], pendingReview: [], carriedOverPending: [] };
-          const reviewed = buckets.cleaned.length + buckets.notCleaned.length;
-          const workload = reviewed + buckets.pendingReview.length;
+          const stats = si.moduleStats?.[module.key];
+          const due = stats ? stats.onTime + stats.late + stats.overdue : 0;
           return {
             ...module,
             assigned: null,
             required: null,
-            completed: reviewed,
-            performance: workload ? (reviewed / workload) * 100 : null,
-            workload,
+            // Reviewed = decisions this SI recorded (on time or late).
+            completed: stats ? stats.onTime + stats.late : buckets.cleaned.length + buckets.notCleaned.length,
+            performance: stats && due ? (stats.onTime / due) * 100 : null,
+            workload: due,
             pendingInspection: null,
-            reports: buckets.reports.length,
+            reports: stats ? stats.arrived : buckets.reports.length,
             approved: buckets.cleaned.length,
             rejected: buckets.notCleaned.length,
             pending: buckets.pendingReview.length,
+            onTime: stats?.onTime ?? 0,
+            overdue: stats?.overdue ?? 0,
           };
         }
 
@@ -1188,6 +1305,8 @@ function UserDetailDrawer({
           approved: count('APPROVED'),
           rejected: count('REJECTED'),
           pending: count('PENDING'),
+          onTime: 0,
+          overdue: 0,
         };
       }),
     [row.records, coverage, si, iec]
@@ -1215,11 +1334,13 @@ function UserDetailDrawer({
 
   const donutTitle =
     roleKey === 'SUPERVISOR'
-      ? 'Inspection Coverage'
+      ? 'Target Achievement'
       : roleKey === 'ULB_OFFICER'
       ? 'Action Cycle · Raised vs Resolved'
       : roleKey === 'ACTION_OFFICER'
-      ? 'Action Cycle · Resolved vs Pending'
+      ? 'On-Time Resolution'
+      : roleKey === 'QC'
+      ? 'On-Time Review'
       : isEmployee
       ? 'Attendance'
       : 'Status Distribution';
@@ -1233,6 +1354,14 @@ function UserDetailDrawer({
     }
 
     if (roleKey === 'ACTION_OFFICER') {
+      if (iec) {
+        return [
+          { label: 'Resolved On Time', value: iec.onTime, color: '#10b981' },
+          { label: 'Resolved Late', value: iec.late, color: '#f59e0b' },
+          { label: 'Overdue', value: iec.overdue, color: '#f43f5e' },
+          { label: 'In Progress', value: iec.inProgress, color: '#94a3b8' },
+        ];
+      }
       return [
         { label: 'Resolved', value: row.actionTaken, color: STATUS_COLORS.Resolved },
         { label: 'Resolution Pending', value: row.actionRequired, color: STATUS_COLORS['Attention Required'] },
@@ -1250,8 +1379,17 @@ function UserDetailDrawer({
       const completed = coverage?.completed ?? 0;
       const pending = Math.max((coverage?.required ?? 0) - completed, 0);
       return [
-        { label: 'Completed Inspection', value: completed, color: STATUS_COLORS.Approved },
-        { label: 'Pending Inspection', value: pending, color: STATUS_COLORS.Pending },
+        { label: 'Target Achieved', value: Math.round(completed), color: STATUS_COLORS.Approved },
+        { label: 'Target Missed', value: Math.round(pending), color: STATUS_COLORS.Pending },
+      ];
+    }
+
+    if (roleKey === 'QC' && si) {
+      return [
+        { label: 'Reviewed On Time', value: si.onTime, color: '#10b981' },
+        { label: 'Reviewed Late', value: si.late, color: '#f59e0b' },
+        { label: 'Overdue', value: si.overdue, color: '#f43f5e' },
+        { label: 'In Progress', value: si.inProgress, color: '#94a3b8' },
       ];
     }
 
@@ -1260,7 +1398,7 @@ function UserDetailDrawer({
       { label: rejectedLabel, value: row.rejected, color: STATUS_COLORS[rejectedLabel] },
       { label: pendingLabel, value: row.pending, color: STATUS_COLORS.Pending },
     ];
-  }, [isEmployee, roleKey, row, approvedLabel, rejectedLabel, pendingLabel, coverage]);
+  }, [isEmployee, roleKey, row, approvedLabel, rejectedLabel, pendingLabel, coverage, si, iec]);
 
   const assetCleanlinessSegments = useMemo(
     () => [
@@ -1303,9 +1441,31 @@ function UserDetailDrawer({
               <div className="mt-0.5 text-lg font-black tracking-tight text-slate-950">
                 {row.label || 'Unnamed User'}
               </div>
-              <div className="mt-1 text-2xl font-black tracking-tight text-indigo-700">
-                {percentText(row.performance)}
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-2xl font-black tracking-tight text-indigo-700">{percentText(row.performance)}</span>
+                {roleKey === 'SUPERVISOR' && (
+                  <span className={`rounded-md border px-2 py-0.5 text-[9px] font-black ${darogaTierInfo.tone}`}>
+                    {darogaTierInfo.label}
+                  </span>
+                )}
               </div>
+              {roleKey === 'SUPERVISOR' && (
+                <div className="mt-0.5 text-[10px] font-bold text-slate-400">
+                  Target achievement: credit up to each day&apos;s target / target. Cleaned / Not Cleaned is not part of this score.
+                </div>
+              )}
+              {roleKey === 'ACTION_OFFICER' && (
+                <div className="mt-0.5 text-[10px] font-bold text-slate-400">
+                  On-time resolution: reports resolved by the end of the day after they were sent to action / reports whose deadline has
+                  passed.
+                </div>
+              )}
+              {roleKey === 'QC' && (
+                <div className="mt-0.5 text-[10px] font-bold text-slate-400">
+                  On-time review: reports reviewed by the end of the day after they arrived / reports whose deadline has passed.
+                  Cleaned / Not Cleaned does not change this score.
+                </div>
+              )}
             </div>
 
             <button
@@ -1472,349 +1632,423 @@ function UserDetailDrawer({
               </div>
             </section>
 
-            {/* INSPECTION WORKFLOW */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="text-sm font-black text-slate-950">Inspection Workflow</div>
-                <div className="text-[9px] font-bold text-slate-400">Click to filter</div>
-              </div>
+            {/* INSPECTION WORKFLOW (Daroga) */}
+            {roleKey === 'SUPERVISOR' && (() => {
+              const assignedTotal = coverage
+                ? Object.values(coverage.modules).reduce((sum, entry) => sum + (entry?.assigned ?? 0), 0)
+                : null;
+              const roundOrNull = (value: number | null | undefined) =>
+                value === null || value === undefined ? value : Math.round(value);
 
-              <div
-                className={`grid grid-cols-2 gap-2 ${
-                  roleKey === 'SUPERVISOR'
-                    ? 'sm:grid-cols-3 lg:grid-cols-6'
-                    : roleKey === 'ACTION_OFFICER'
-                    ? 'sm:grid-cols-3 lg:grid-cols-6'
-                    : 'sm:grid-cols-4 lg:grid-cols-8'
-                }`}
-              >
-                {roleKey === 'SUPERVISOR' &&
-                  (
-                    [
-                      [
-                        'Assigned Toilets',
-                        coverage?.modules.TOILET.assigned,
-                        'border-sky-200 bg-sky-50 text-sky-700',
-                        'Toilets assigned to this Daroga',
-                      ],
-                      [
-                        'Assigned Litter Bins',
-                        coverage?.modules.LITTERBINS.assigned,
-                        'border-emerald-200 bg-emerald-50 text-emerald-700',
-                        'Litter bins assigned to this Daroga',
-                      ],
-                      [
-                        'Assigned Beats',
-                        coverage?.modules.SWEEPING.assigned,
-                        'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
-                        'Sweeping beats assigned to this Daroga',
-                      ],
-                      [
-                        'Assigned Nala Points',
-                        coverage?.modules.NALA?.assigned ?? (coverage ? 0 : undefined),
-                        'border-cyan-200 bg-cyan-50 text-cyan-700',
-                        'NalaPoints assigned to this Daroga',
-                      ],
-                      [
-                        'Assigned GVPs',
-                        coverage?.modules.TASKFORCE?.assigned ?? (coverage ? 0 : undefined),
-                        'border-rose-200 bg-rose-50 text-rose-700',
-                        'Active GVPs (garbage vulnerable points) assigned to this Daroga',
-                      ],
-                      [
-                        'Required Inspection',
-                        coverage?.required,
-                        'border-indigo-200 bg-indigo-50 text-indigo-700',
-                        'Assigned beats, nala points, toilets, litter bins and GVPs x days in the selected range',
-                      ],
-                      [
-                        'Completed Inspection',
-                        coverage?.completed,
-                        'border-blue-200 bg-blue-50 text-blue-700',
-                        'Assigned asset-days this Daroga inspected in the selected range',
-                      ],
-                      [
-                        'Pending Inspection',
-                        coverage && coverage.required !== null ? Math.max(coverage.required - coverage.completed, 0) : null,
-                        'border-violet-200 bg-violet-50 text-violet-700',
-                        'Required - completed inspections',
-                      ],
-                    ] as Array<[string, number | null | undefined, string, string]>
-                  ).map(([label, value, tone, hint]) => (
-                    <div key={label} className={`rounded-xl border px-3 py-2 text-left ${tone}`} title={hint}>
-                      <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
-                      <div className="mt-1 text-xl font-black leading-none">{assetCountText(value)}</div>
-                    </div>
-                  ))}
+              const steps: Array<{
+                label: string;
+                value: React.ReactNode;
+                icon: React.ReactNode;
+                ring: string;
+                bar: string;
+                text: string;
+                onClick?: () => void;
+                hint: string;
+              }> = [
+                {
+                  label: 'Assigned',
+                  value: assetCountText(assignedTotal),
+                  icon: <ClipboardList size={22} />,
+                  ring: 'bg-blue-50 text-blue-600 ring-blue-100',
+                  bar: 'bg-blue-200',
+                  text: 'text-blue-700',
+                  hint: 'Assets assigned to this Daroga',
+                },
+                {
+                  label: 'Target',
+                  value: assetCountText(roundOrNull(coverage?.required)),
+                  icon: <Target size={22} />,
+                  ring: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+                  bar: 'bg-emerald-200',
+                  text: 'text-emerald-700',
+                  hint: 'Admin target; where none is set, every assigned asset every day',
+                },
+                {
+                  label: 'Inspected',
+                  value: assetCountText(coverage ? Math.round(coverage.completed) : null),
+                  icon: <Search size={22} />,
+                  ring: 'bg-violet-50 text-violet-600 ring-violet-100',
+                  bar: 'bg-violet-200',
+                  text: 'text-violet-700',
+                  onClick: () => openWorkflowTable('ALL'),
+                  hint: 'Inspections counted toward the target. Click to see records.',
+                },
+                {
+                  label: 'Cleaned',
+                  value: workflowCounts.APPROVED.toLocaleString('en-IN'),
+                  icon: <Sparkles size={22} />,
+                  ring: 'bg-sky-50 text-sky-600 ring-sky-100',
+                  bar: 'bg-sky-200',
+                  text: 'text-sky-700',
+                  onClick: () => openWorkflowTable('APPROVED'),
+                  hint: 'Reports the SI found clean',
+                },
+                {
+                  label: 'Not Cleaned',
+                  value: workflowCounts.REJECTED.toLocaleString('en-IN'),
+                  icon: <TriangleAlert size={22} />,
+                  ring: 'bg-orange-50 text-orange-500 ring-orange-100',
+                  bar: 'bg-orange-200',
+                  text: 'text-orange-600',
+                  onClick: () => openWorkflowTable('REJECTED'),
+                  hint: 'Reports the SI found not clean',
+                },
+                {
+                  label: 'Pending Review',
+                  value: workflowCounts.PENDING.toLocaleString('en-IN'),
+                  icon: <Clock size={22} />,
+                  ring: 'bg-rose-50 text-rose-500 ring-rose-100',
+                  bar: 'bg-rose-200',
+                  text: 'text-rose-600',
+                  onClick: () => openWorkflowTable('PENDING'),
+                  hint: 'Reports waiting for SI review',
+                },
+              ];
 
-                {roleKey === 'ACTION_OFFICER' && (
-                  <>
-                    <div
-                      className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-left text-indigo-700"
-                      title="Darogas working inside this IEC member's zones / wards"
-                    >
-                      <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">Total Daroga</div>
-                      <div className="mt-1 text-xl font-black leading-none">{iecCountText(iec?.darogas)}</div>
-                    </div>
+              return <ProcessStatus steps={steps} subtitle="From assignment to review status" />;
+            })()}
 
-                    {(
-                      [
-                        ['ACTION_REQUIRED', 'Attention Required', 'border-orange-200 bg-orange-50 text-orange-700', 'Reports in this scope that ULB sent for action'],
-                        ['ACTION_TAKEN', 'Resolved', 'border-teal-200 bg-teal-50 text-teal-700', 'Of those, reports already resolved'],
-                        ['PENDING_ACTION', 'Resolution Pending', 'border-cyan-200 bg-cyan-50 text-cyan-700', 'Of those, reports still waiting for action'],
-                      ] as Array<[WorkflowKey, string, string, string]>
-                    ).map(([key, label, tone, hint]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        title={hint}
-                        onClick={() => openWorkflowTable(key)}
-                        className={`rounded-xl border px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-md ${tone} ${
-                          tab === 'table' && tableWorkflowFilter === key ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
-                        }`}
-                      >
-                        <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
-                        <div className="mt-1 text-xl font-black leading-none">
-                          {iecCountText(iec ? iecKeys[IEC_WORKFLOW_BUCKET[key]!].size : null)}
+            {/* INSPECTION WORKFLOW (SI) */}
+            {roleKey === 'QC' && (() => {
+              const cohortTotal = (key: 'arrived' | 'onTime' | 'late' | 'overdue' | 'inProgress') =>
+                si ? Object.values(si.moduleStats || {}).reduce((sum, entry) => sum + (entry?.[key] ?? 0), 0) : null;
+              const steps: ProcessStep[] = [
+                {
+                  label: 'Reports Received',
+                  value: siCountText(cohortTotal('arrived')),
+                  icon: <ClipboardList size={22} />,
+                  ring: 'bg-blue-50 text-blue-600 ring-blue-100',
+                  bar: 'bg-blue-200',
+                  text: 'text-blue-700',
+                  onClick: () => openWorkflowTable('ALL'),
+                  hint: 'Reports that arrived in this SI scope during the range. Click to see records.',
+                },
+                {
+                  label: 'Reviewed',
+                  value: siCountText(si ? (cohortTotal('onTime') ?? 0) + (cohortTotal('late') ?? 0) : null),
+                  icon: <Search size={22} />,
+                  ring: 'bg-violet-50 text-violet-600 ring-violet-100',
+                  bar: 'bg-violet-200',
+                  text: 'text-violet-700',
+                  hint: 'Reports this SI has reviewed (on time or late)',
+                },
+                {
+                  label: 'On Time',
+                  value: siCountText(si?.onTime),
+                  icon: <CheckCircle2 size={22} />,
+                  ring: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+                  bar: 'bg-emerald-200',
+                  text: 'text-emerald-700',
+                  hint: 'Reviewed by the end of the day after the report arrived',
+                },
+                {
+                  label: 'Cleaned',
+                  value: siCountText(si ? siKeys.cleaned.size : null),
+                  icon: <Sparkles size={22} />,
+                  ring: 'bg-sky-50 text-sky-600 ring-sky-100',
+                  bar: 'bg-sky-200',
+                  text: 'text-sky-700',
+                  onClick: () => openWorkflowTable('APPROVED'),
+                  hint: 'Reports this SI found clean',
+                },
+                {
+                  label: 'Not Cleaned',
+                  value: siCountText(si ? siKeys.notCleaned.size : null),
+                  icon: <TriangleAlert size={22} />,
+                  ring: 'bg-orange-50 text-orange-500 ring-orange-100',
+                  bar: 'bg-orange-200',
+                  text: 'text-orange-600',
+                  onClick: () => openWorkflowTable('REJECTED'),
+                  hint: 'Reports this SI found not clean',
+                },
+                {
+                  label: 'Overdue',
+                  value: siCountText(si?.overdue),
+                  icon: <Clock size={22} />,
+                  ring: 'bg-rose-50 text-rose-500 ring-rose-100',
+                  bar: 'bg-rose-200',
+                  text: 'text-rose-600',
+                  onClick: () => openWorkflowTable('PENDING'),
+                  hint: 'Past the review deadline and still waiting',
+                },
+              ];
+              return (
+                <ProcessStatus
+                  steps={steps}
+                  subtitle="From report arrival to review"
+                  note={
+                    si && si.backlogOverdue > 0
+                      ? `${si.backlogOverdue.toLocaleString('en-IN')} overdue reports arrived before this date range (older backlog).`
+                      : undefined
+                  }
+                />
+              );
+            })()}
+
+            {/* INSPECTION WORKFLOW (IEC) */}
+            {roleKey === 'ACTION_OFFICER' && (() => {
+              const cohortTotal = (key: 'arrived' | 'onTime' | 'late' | 'overdue' | 'inProgress') =>
+                iec ? Object.values(iec.moduleStats || {}).reduce((sum, entry) => sum + (entry?.[key] ?? 0), 0) : null;
+              const steps: ProcessStep[] = [
+                {
+                  label: 'Sent To Action',
+                  value: iecCountText(cohortTotal('arrived')),
+                  icon: <ClipboardList size={22} />,
+                  ring: 'bg-blue-50 text-blue-600 ring-blue-100',
+                  bar: 'bg-blue-200',
+                  text: 'text-blue-700',
+                  onClick: () => openWorkflowTable('ACTION_REQUIRED'),
+                  hint: 'Reports ULB sent to action in this IEC scope during the range. Click to see records.',
+                },
+                {
+                  label: 'Resolved',
+                  value: iecCountText(iec ? iecKeys.resolved.size : null),
+                  icon: <CheckCircle2 size={22} />,
+                  ring: 'bg-violet-50 text-violet-600 ring-violet-100',
+                  bar: 'bg-violet-200',
+                  text: 'text-violet-700',
+                  onClick: () => openWorkflowTable('ACTION_TAKEN'),
+                  hint: 'Reports already resolved (by any IEC member of the zone)',
+                },
+                {
+                  label: 'On Time',
+                  value: iecCountText(iec?.onTime),
+                  icon: <Target size={22} />,
+                  ring: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+                  bar: 'bg-emerald-200',
+                  text: 'text-emerald-700',
+                  hint: 'Resolved by the end of the day after the report was sent to action',
+                },
+                {
+                  label: 'Resolved Late',
+                  value: iecCountText(iec?.late),
+                  icon: <TriangleAlert size={22} />,
+                  ring: 'bg-orange-50 text-orange-500 ring-orange-100',
+                  bar: 'bg-orange-200',
+                  text: 'text-orange-600',
+                  hint: 'Resolved, but after the deadline',
+                },
+                {
+                  label: 'Overdue',
+                  value: iecCountText(iec?.overdue),
+                  icon: <Clock size={22} />,
+                  ring: 'bg-rose-50 text-rose-500 ring-rose-100',
+                  bar: 'bg-rose-200',
+                  text: 'text-rose-600',
+                  onClick: () => openWorkflowTable('PENDING_ACTION'),
+                  hint: 'Past the deadline and still unresolved',
+                },
+                {
+                  label: 'Inside Deadline',
+                  value: iecCountText(iec?.inProgress),
+                  icon: <Search size={22} />,
+                  ring: 'bg-slate-50 text-slate-500 ring-slate-100',
+                  bar: 'bg-slate-200',
+                  text: 'text-slate-600',
+                  hint: 'Not resolved yet but the deadline has not passed: not counted in the score',
+                },
+              ];
+              return (
+                <ProcessStatus
+                  steps={steps}
+                  subtitle="From action request to resolution"
+                  note={
+                    iec ? (
+                      <div className="space-y-1.5">
+                        <div>
+                          Darogas in scope: <strong>{iecCountText(iec.darogas)}</strong>
+                          {iec.backlogOverdue > 0
+                            ? ` · ${iec.backlogOverdue.toLocaleString('en-IN')} overdue reports were sent before this date range (older backlog).`
+                            : ''}
+                          {iec.estimated > 0
+                            ? ` · ${iec.estimated.toLocaleString('en-IN')} reports were sent to action before the time started being recorded, so their report time is used instead.`
+                            : ''}
                         </div>
-                      </button>
-                    ))}
-
-                    <div
-                      className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-slate-700"
-                      title="Who resolved these reports - a zone can have several IEC members"
-                    >
-                      <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">Resolved By</div>
-                      {iecStatus === 'loading' ? (
-                        <div className="mt-1 text-xl font-black leading-none">…</div>
-                      ) : iecResolvedBy.length === 0 ? (
-                        <div className="mt-1 text-xl font-black leading-none">—</div>
-                      ) : (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {iecResolvedBy.map((resolver) => (
-                            <span
-                              key={resolver.id || 'unknown'}
-                              className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
-                                resolver.self
-                                  ? 'border-teal-200 bg-teal-50 text-teal-700'
-                                  : resolver.id
-                                  ? 'border-slate-200 bg-white text-slate-700'
-                                  : 'border-dashed border-slate-300 bg-white text-slate-400'
-                              }`}
-                            >
-                              {resolver.name}
-                              {resolver.self ? ' (self)' : ''} · {resolver.count.toLocaleString('en-IN')}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {roleKey === 'QC' && (
-                  <>
-                    {(
-                      [
-                        ['Total Daroga', si?.darogas, 'border-indigo-200 bg-indigo-50 text-indigo-700', 'Darogas working inside this SI\'s zones / wards'],
-                        ['Total Toilets', si?.assets.toilets, 'border-sky-200 bg-sky-50 text-sky-700', 'Approved toilets in this SI\'s scope'],
-                        ['Total Litter Bins', si?.assets.litterBins, 'border-emerald-200 bg-emerald-50 text-emerald-700', 'Approved litter bins in this SI\'s scope'],
-                        ['Total Beats', si?.assets.beats, 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700', 'Sweeping beats in this SI\'s scope'],
-                        ['Total Nala Points', si?.assets.nalaPoints ?? 0, 'border-cyan-200 bg-cyan-50 text-cyan-700', 'Approved NalaPoints in this SI\'s scope'],
-                        ['Total GVPs', si?.assets.gvps ?? 0, 'border-rose-200 bg-rose-50 text-rose-700', 'Active GVPs in this SI\'s scope'],
-                      ] as Array<[string, number | undefined, string, string]>
-                    ).map(([label, value, tone, hint]) => (
-                      <div key={label} className={`rounded-xl border px-3 py-2 text-left ${tone}`} title={hint}>
-                        <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
-                        <div className="mt-1 text-xl font-black leading-none">{siCountText(si ? value : null)}</div>
+                        {iecResolvedBy.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="font-black uppercase tracking-wide">Resolved by</span>
+                            {iecResolvedBy.map((resolver) => (
+                              <span
+                                key={resolver.id || 'unknown'}
+                                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
+                                  resolver.self
+                                    ? 'border-teal-200 bg-teal-50 text-teal-700'
+                                    : resolver.id
+                                    ? 'border-slate-200 bg-white text-slate-700'
+                                    : 'border-dashed border-slate-300 bg-white text-slate-400'
+                                }`}
+                              >
+                                {resolver.name}
+                                {resolver.self ? ' (self)' : ''} · {resolver.count.toLocaleString('en-IN')}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
-
-                    {(
-                      [
-                        ['ALL', 'Total Inspection Reports', 'border-blue-200 bg-blue-50 text-blue-700', 'Reports submitted in this SI\'s scope'],
-                        ['APPROVED', 'Cleaned', 'border-emerald-200 bg-emerald-50 text-emerald-700', 'Reports this SI approved'],
-                        ['REJECTED', 'Not Cleaned', 'border-rose-200 bg-rose-50 text-rose-700', 'Reports this SI rejected'],
-                        ['PENDING', 'Pending Review', 'border-amber-200 bg-amber-50 text-amber-700', 'Reports waiting for SI review'],
-                      ] as Array<[WorkflowKey, string, string, string]>
-                    ).map(([key, label, tone, hint]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        title={hint}
-                        onClick={() => openWorkflowTable(key)}
-                        className={`rounded-xl border px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-md ${tone} ${
-                          tab === 'table' && tableWorkflowFilter === key ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
-                        }`}
-                      >
-                        <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">{label}</div>
-                        <div className="mt-1 text-xl font-black leading-none">
-                          {siCountText(si ? siKeys[SI_WORKFLOW_BUCKET[key]!].size : null)}
-                        </div>
-                      </button>
-                    ))}
-                  </>
-                )}
-
-                {roleKey === 'SUPERVISOR' && WORKFLOW_CARDS.filter(([key]) => key !== 'ALL').map(([key, tone]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => openWorkflowTable(key)}
-                    className={`rounded-xl border px-3 py-2 text-left transition hover:-translate-y-0.5 hover:shadow-md ${tone} ${
-                      tab === 'table' && tableWorkflowFilter === key ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
-                    }`}
-                  >
-                    <div className="text-[8px] font-black uppercase tracking-[0.06em] opacity-75">
-                      {WORKFLOW_LABELS[key]}
-                    </div>
-                    <div className="mt-1 text-xl font-black leading-none">
-                      {workflowCounts[key].toLocaleString('en-IN')}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {roleKey === 'ACTION_OFFICER' && iecKeys.carriedOverPending.size > 0 && (
-                <div className="mt-2 text-[9px] font-semibold text-slate-400">
-                  Attention Required and Resolution Pending include {iecKeys.carriedOverPending.size.toLocaleString('en-IN')} older{' '}
-                  {iecKeys.carriedOverPending.size === 1 ? 'report' : 'reports'} submitted before this date range that{' '}
-                  {iecKeys.carriedOverPending.size === 1 ? 'is' : 'are'} still unresolved (not listed in the Data Table).
-                  Performance = resolved ÷ attention required.
-                </div>
-              )}
-
-              {roleKey === 'QC' && siKeys.carriedOverPending.size > 0 && (
-                <div className="mt-2 text-[9px] font-semibold text-slate-400">
-                  Pending Review includes {siKeys.carriedOverPending.size.toLocaleString('en-IN')} older{' '}
-                  {siKeys.carriedOverPending.size === 1 ? 'report' : 'reports'} submitted before this date range that{' '}
-                  {siKeys.carriedOverPending.size === 1 ? 'is' : 'are'} still waiting for review (not listed in the Data Table).
-                  Performance = reviewed ÷ (reviewed + pending review).
-                </div>
-              )}
-
-              {roleKey === 'SUPERVISOR' && legacyReviewedCount > 0 && (
-                <div className="mt-2 text-[9px] font-semibold text-slate-400">
-                  {legacyReviewedCount.toLocaleString('en-IN')} older escalated{' '}
-                  {legacyReviewedCount === 1 ? 'report has' : 'reports have'} no stored SI decision, so{' '}
-                  {legacyReviewedCount === 1 ? "it isn't" : "they aren't"} counted in Cleaned / Not Cleaned / Pending Review.
-                </div>
-              )}
-            </section>
+                    ) : undefined
+                  }
+                />
+              );
+            })()}
 
             {/* MODULE BIFURCATION */}
             <section className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-3 text-sm font-black text-slate-950">Module Bifurcation</div>
+              <div className="text-sm font-black text-slate-950">Module Bifurcation</div>
+              {roleKey === 'SUPERVISOR' && (
+                <div className="mb-3 mt-1 text-[10px] font-bold leading-relaxed text-slate-500">
+                  <strong className="text-blue-600">Total Target</strong> = assets assigned x days in the range (or the admin&apos;s daily target on days one is set).{' '}
+                  <strong className="text-emerald-600">Inspections Done</strong> = assets inspected, counted once per day and never above that day&apos;s target.{' '}
+                  <strong className="text-rose-600">Missed</strong> = Total Target - Inspections Done.
+                </div>
+              )}
+              {roleKey === 'ACTION_OFFICER' && (
+                <div className="mb-3 mt-1 text-[10px] font-bold leading-relaxed text-slate-500">
+                  <strong className="text-blue-600">Sent To Action</strong> = reports ULB sent to action in this IEC scope.{' '}
+                  <strong className="text-emerald-600">On Time</strong> = resolved by the end of the day after they were sent.{' '}
+                  <strong className="text-rose-600">Overdue</strong> = deadline passed and still unresolved. Completion = On Time / (On Time + Late + Overdue).
+                  Reports still inside the deadline are not counted yet.
+                </div>
+              )}
+              {roleKey === 'QC' && (
+                <div className="mb-3 mt-1 text-[10px] font-bold leading-relaxed text-slate-500">
+                  <strong className="text-blue-600">Reports Received</strong> = reports that arrived in this SI&apos;s scope.{' '}
+                  <strong className="text-emerald-600">On Time</strong> = reviewed by the end of the day after the report arrived.{' '}
+                  <strong className="text-rose-600">Overdue</strong> = deadline passed and still waiting. Completion = On Time / (On Time + Late + Overdue).
+                  Reports still inside the deadline are not counted yet.
+                </div>
+              )}
+              {(roleKey === 'SUPERVISOR' || roleKey === 'QC' || roleKey === 'ACTION_OFFICER') && (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <div className="grid grid-cols-[minmax(150px,1.6fr)_minmax(120px,1.6fr)_repeat(4,minmax(64px,1fr))] items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-2.5 text-[10px] font-black text-slate-500">
+                    <div>Module</div>
+                    <div>Completion</div>
+                    {isTimedRole ? (
+                      <>
+                        <div className="text-center">{roleKey === 'QC' ? 'Reports Received' : 'Sent To Action'}</div>
+                        <div className="text-center">{roleKey === 'QC' ? 'Reviewed' : 'Resolved'}</div>
+                        <div className="text-center">On Time</div>
+                        <div className="text-center">Overdue</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-center">Assets Assigned</div>
+                        <div className="text-center">
+                          Total Target
+                          {coverage?.days ? <span className="block text-[8px] font-bold text-slate-400">{coverage.days.toLocaleString('en-IN')} {coverage.days === 1 ? 'day' : 'days'}</span> : null}
+                        </div>
+                        <div className="text-center">Inspections Done</div>
+                        <div className="text-center">Missed</div>
+                      </>
+                    )}
+                  </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
-                {moduleSummaries.map((module) => (
-                  <button
-                    key={module.key}
-                    type="button"
-                    onClick={() => openModuleTable(module.key)}
-                    className={`rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
-                      tab === 'table' && tableFilterModule === module.key && !tableFilterDate
-                        ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100'
-                        : 'border-slate-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="truncate text-xs font-black text-slate-900">{module.label}</div>
-                      <div
-                        className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-600"
-                        title={
-                          roleKey === 'SUPERVISOR'
-                            ? 'Completed / required inspections'
-                            : roleKey === 'ACTION_OFFICER'
-                            ? 'Resolved / attention required'
-                            : 'Reviewed / (reviewed + pending review)'
-                        }
+                  {moduleSummaries.map((module) => {
+                    const visual: Record<InspectionModuleKey, { icon: React.ReactNode; tone: string }> = {
+                      TOILET: { icon: <Droplet size={15} />, tone: 'bg-blue-50 text-blue-600' },
+                      LITTERBINS: { icon: <Trash2 size={15} />, tone: 'bg-emerald-50 text-emerald-600' },
+                      SWEEPING: { icon: <Brush size={15} />, tone: 'bg-orange-50 text-orange-500' },
+                      NALA: { icon: <Waves size={15} />, tone: 'bg-sky-50 text-sky-600' },
+                      TASKFORCE: { icon: <Recycle size={15} />, tone: 'bg-green-50 text-green-600' },
+                    };
+                    const percent = module.performance;
+                    const barColor =
+                      percent === null || percent === undefined
+                        ? '#cbd5e1'
+                        : percent >= 99.995
+                        ? '#10b981'
+                        : percent >= 50
+                        ? '#6366f1'
+                        : '#f43f5e';
+                    const numberText = (value: number | null | undefined) =>
+                      assetCountText(value === null || value === undefined ? value : Math.round(value));
+
+                    return (
+                      <button
+                        key={module.key}
+                        type="button"
+                        onClick={() => openModuleTable(module.key)}
+                        className={`grid w-full grid-cols-[minmax(150px,1.6fr)_minmax(120px,1.6fr)_repeat(4,minmax(64px,1fr))] items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-indigo-50/40 ${
+                          tab === 'table' && tableFilterModule === module.key && !tableFilterDate ? 'bg-indigo-50/60' : ''
+                        }`}
                       >
-                        {roleKey === 'ACTION_OFFICER' ? (
+                        <div className="flex items-center gap-2.5">
+                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${visual[module.key].tone}`}>
+                            {visual[module.key].icon}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-xs font-black text-slate-900">{module.label}</span>
+                            {(() => {
+                              if (isTimedRole) {
+                                const stats = timed?.moduleStats?.[module.key];
+                                return stats && stats.inProgress > 0 ? (
+                                  <span className="block text-[9px] font-bold text-slate-400">
+                                    {stats.inProgress.toLocaleString('en-IN')} still inside the deadline
+                                  </span>
+                                ) : null;
+                              }
+                              const days = coverage?.days;
+                              if (!days || module.assigned === null || module.required === null || module.required === undefined) return null;
+                              const expected = module.assigned * days;
+                              const lowered = Math.round(expected - module.required);
+                              return (
+                                <span className="block text-[9px] font-bold text-slate-400">
+                                  {module.assigned} x {days} = {expected}
+                                  {lowered > 0 ? ` · admin target lowered by ${lowered}` : ''}
+                                </span>
+                              );
+                            })()}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${clamp(percent ?? 0)}%`, background: barColor }}
+                            />
+                          </div>
+                          <span className="w-10 shrink-0 text-right text-[10px] font-black text-slate-600">
+                            {percent === null || percent === undefined ? '—' : `${Math.round(percent)}%`}
+                          </span>
+                        </div>
+
+                        {isTimedRole ? (
                           <>
-                            {iecCountText(iec ? module.completed : null)}
-                            {' / '}
-                            {iecCountText(iec ? module.reports : null)}
-                          </>
-                        ) : roleKey === 'SUPERVISOR' ? (
-                          <>
-                            {assetCountText(coverage ? module.completed : null)}
-                            {' / '}
-                            {assetCountText(module.required)}
+                            <div className="text-center text-xs font-black text-slate-700">{timedCountText(timed ? module.reports : null)}</div>
+                            <div className="rounded-lg bg-blue-50 py-1.5 text-center text-sm font-black text-blue-600">
+                              {timedCountText(timed ? module.completed : null)}
+                            </div>
+                            <div className="rounded-lg bg-emerald-50 py-1.5 text-center text-sm font-black text-emerald-600">
+                              {timedCountText(timed ? module.onTime : null)}
+                            </div>
+                            <div className="rounded-lg bg-rose-50 py-1.5 text-center text-sm font-black text-rose-600">
+                              {timedCountText(timed ? module.overdue : null)}
+                            </div>
                           </>
                         ) : (
                           <>
-                            {siCountText(si ? module.completed : null)}
-                            {' / '}
-                            {siCountText(si ? module.workload : null)}
+                            <div className="text-center text-xs font-black text-slate-700">{numberText(module.assigned)}</div>
+                            <div className="rounded-lg bg-blue-50 py-1.5 text-center text-sm font-black text-blue-600">
+                              {numberText(module.required)}
+                            </div>
+                            <div className="rounded-lg bg-emerald-50 py-1.5 text-center text-sm font-black text-emerald-600">
+                              {coverage ? numberText(module.completed) : assetCountText(null)}
+                            </div>
+                            <div className="rounded-lg bg-rose-50 py-1.5 text-center text-sm font-black text-rose-600">
+                              {numberText(module.pendingInspection)}
+                            </div>
                           </>
                         )}
-                      </div>
-                    </div>
-
-                    <div className="mt-2 text-xl font-black text-slate-950">{percentText(module.performance)}</div>
-                    {module.assigned !== null && (
-                      <div className="text-[9px] font-bold text-slate-400">
-                        {module.assigned.toLocaleString('en-IN')} assigned
-                        {coverage?.days ? ` × ${coverage.days.toLocaleString('en-IN')} ${coverage.days === 1 ? 'day' : 'days'}` : ''}
-                      </div>
-                    )}
-
-                    {roleKey === 'ACTION_OFFICER' ? (
-                      <div className="mt-3 grid grid-cols-3 gap-1.5">
-                        <div className="rounded-xl bg-orange-50 px-1 py-2 text-center">
-                          <div className="text-[8px] font-black uppercase text-orange-600">Attention Req.</div>
-                          <div className="mt-1 text-sm font-black text-orange-800">{module.reports}</div>
-                        </div>
-                        <div className="rounded-xl bg-teal-50 px-1 py-2 text-center">
-                          <div className="text-[8px] font-black uppercase text-teal-600">Resolved</div>
-                          <div className="mt-1 text-sm font-black text-teal-800">{module.completed}</div>
-                        </div>
-                        <div className="rounded-xl bg-cyan-50 px-1 py-2 text-center">
-                          <div className="text-[8px] font-black uppercase text-cyan-600">Res. Pending</div>
-                          <div className="mt-1 text-sm font-black text-cyan-800">{module.pending}</div>
-                        </div>
-                      </div>
-                    ) : (
-                    <div
-                      className={`mt-3 grid gap-1.5 ${
-                        module.pendingInspection !== null || roleKey === 'QC' ? 'grid-cols-4' : 'grid-cols-3'
-                      }`}
-                    >
-                      {roleKey === 'QC' && (
-                        <div className="rounded-xl bg-blue-50 px-1 py-2 text-center" title="Reports submitted in this SI's scope">
-                          <div className="text-[8px] font-black uppercase text-blue-600">Reports</div>
-                          <div className="mt-1 text-sm font-black text-blue-800">{module.reports}</div>
-                        </div>
-                      )}
-                      <div className="rounded-xl bg-emerald-50 px-1 py-2 text-center">
-                        <div className="text-[8px] font-black uppercase text-emerald-600">Cleaned</div>
-                        <div className="mt-1 text-sm font-black text-emerald-800">{module.approved}</div>
-                      </div>
-                      <div className="rounded-xl bg-rose-50 px-1 py-2 text-center">
-                        <div className="text-[8px] font-black uppercase text-rose-600">Not Cleaned</div>
-                        <div className="mt-1 text-sm font-black text-rose-800">{module.rejected}</div>
-                      </div>
-                      <div className="rounded-xl bg-amber-50 px-1 py-2 text-center">
-                        <div className="text-[8px] font-black uppercase text-amber-600">Pending Review</div>
-                        <div className="mt-1 text-sm font-black text-amber-800">{module.pending}</div>
-                      </div>
-                      {module.pendingInspection !== null && (
-                        <div
-                          className="rounded-xl bg-violet-50 px-1 py-2 text-center"
-                          title="Required inspections not done yet (required - completed)"
-                        >
-                          <div className="text-[8px] font-black uppercase text-violet-600">Pending Insp.</div>
-                          <div className="mt-1 text-sm font-black text-violet-800">
-                            {module.pendingInspection.toLocaleString('en-IN')}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    )}
-                  </button>
-                ))}
-              </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           </div>
         )}
@@ -1895,6 +2129,168 @@ function UserDetailDrawer({
                 )}
               </div>
 
+              {roleKey === 'SUPERVISOR' && coverage && coverage.days !== null && (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <StatTile label="Days Target Met" value={`${darogaStats.daysMet}/${darogaStats.daysWithTarget}`} icon={<CheckCircle2 size={13} />} tone="emerald" />
+                    <StatTile label="Consistency" value={percentText(darogaStats.consistency)} icon={<Activity size={13} />} tone="blue" />
+                    <StatTile label="Current Streak" value={`${darogaStats.currentStreak} d`} icon={<Trophy size={13} />} tone="amber" />
+                    <StatTile label="Longest Streak" value={`${darogaStats.longestStreak} d`} icon={<Trophy size={13} />} tone="violet" />
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                      Weekday Pattern · Target achieved
+                    </div>
+                    <div className="grid grid-cols-7 gap-2">
+                      {WEEKDAY_LABELS.map((label, index) => {
+                        const value = darogaStats.weekday[index];
+                        return (
+                          <div key={label} className="flex flex-col items-center gap-1">
+                            <div className="flex h-24 w-full items-end overflow-hidden rounded-lg bg-slate-100">
+                              <div
+                                className="w-full rounded-lg"
+                                style={{
+                                  height: `${clamp(value ?? 0)}%`,
+                                  background: value === null ? 'transparent' : value >= 99.995 ? '#10b981' : value >= 80 ? '#3b82f6' : '#f43f5e',
+                                }}
+                              />
+                            </div>
+                            <div className="text-[9px] font-black text-slate-700">{value === null ? '-' : `${Math.round(value)}%`}</div>
+                            <div className="text-[8px] font-black uppercase text-slate-400">{label}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <div className="border-b border-slate-100 px-4 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                      Ward &amp; Module Targets
+                    </div>
+                    <table className="w-full text-left text-[10px]">
+                      <thead className="bg-slate-50 text-[8px] font-black uppercase tracking-wider text-slate-400">
+                        <tr>
+                          <th className="px-4 py-2">Module</th>
+                          <th className="px-4 py-2">Ward</th>
+                          <th className="px-4 py-2 text-right">Assigned</th>
+                          <th className="px-4 py-2 text-right">Target</th>
+                          <th className="px-4 py-2 text-right">Achieved</th>
+                          <th className="px-4 py-2 text-right">%</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {coverage.rows.map((entry) => (
+                          <tr key={`${entry.module}-${entry.wardId}`}>
+                            <td className="px-4 py-2 font-black text-slate-800">
+                              {INSPECTION_MODULES.find((module) => module.key === entry.module)?.label || entry.module}
+                            </td>
+                            <td className="px-4 py-2 font-bold text-slate-600">{entry.wardName}</td>
+                                                        <td className="px-4 py-2 text-right font-bold text-slate-600">{entry.assigned}</td>
+                            <td className="px-4 py-2 text-right font-black text-slate-900">{Math.round(entry.target)}</td>
+                            <td className="px-4 py-2 text-right font-black text-slate-900">{Math.round(entry.credit)}</td>
+                            <td className="px-4 py-2 text-right font-black text-slate-900">
+                              {entry.target > 0 ? percentText(clamp((entry.credit / entry.target) * 100)) : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                        {coverage.rows.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-6 text-center font-bold text-slate-400">
+                              No assets assigned to this Daroga.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
+              {isTimedRole && timed && (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <StatTile
+                      label={roleKey === 'QC' ? 'Avg Turnaround' : 'Avg Resolution Time'}
+                      value={timedAvgHours === null ? '—' : `${Math.round(timedAvgHours * 10) / 10} h`}
+                      icon={<Clock size={13} />}
+                      tone="blue"
+                    />
+                    <StatTile
+                      label="Oldest Pending"
+                      value={timed.oldestPendingDays === null ? '—' : `${timed.oldestPendingDays} d`}
+                      icon={<TriangleAlert size={13} />}
+                      tone="rose"
+                    />
+                    <StatTile
+                      label="Days All On Time"
+                      value={`${siStats.daysAllOnTime}/${siStats.daysTracked}`}
+                      icon={<CheckCircle2 size={13} />}
+                      tone="emerald"
+                    />
+                    <StatTile label="Current Streak" value={`${siStats.currentStreak} d`} icon={<Trophy size={13} />} tone="amber" />
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                      Weekday Pattern · {roleKey === 'QC' ? 'Reviewed' : 'Resolved'} on time (by {roleKey === 'QC' ? 'arrival' : 'action'} day)
+                    </div>
+                    <div className="grid grid-cols-7 gap-2">
+                      {WEEKDAY_LABELS.map((label, index) => {
+                        const value = siStats.weekday[index];
+                        return (
+                          <div key={label} className="flex flex-col items-center gap-1">
+                            <div className="flex h-24 w-full items-end overflow-hidden rounded-lg bg-slate-100">
+                              <div
+                                className="w-full rounded-lg"
+                                style={{
+                                  height: `${clamp(value ?? 0)}%`,
+                                  background: value === null ? 'transparent' : value >= 99.995 ? '#10b981' : value >= 50 ? '#6366f1' : '#f43f5e',
+                                }}
+                              />
+                            </div>
+                            <div className="text-[9px] font-black text-slate-700">{value === null ? '-' : `${Math.round(value)}%`}</div>
+                            <div className="text-[8px] font-black uppercase text-slate-400">{label}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                      {roleKey === 'QC' ? 'Pending Reviews' : 'Pending Resolutions'} · how long they have waited
+                    </div>
+                    {(() => {
+                      const buckets: Array<[string, number, string]> = [
+                        ['0-1 days', timed.backlogAging.d0to1, '#6366f1'],
+                        ['2-3 days', timed.backlogAging.d2to3, '#f59e0b'],
+                        ['4-7 days', timed.backlogAging.d4to7, '#f97316'],
+                        ['8+ days', timed.backlogAging.d8plus, '#f43f5e'],
+                      ];
+                      const max = Math.max(...buckets.map(([, count]) => count), 1);
+                      const total = buckets.reduce((sum, [, count]) => sum + count, 0);
+                      if (total === 0) {
+                        return <div className="py-3 text-xs font-bold text-emerald-600">Nothing is waiting for this {roleKey === 'QC' ? 'SI' : 'IEC member'}.</div>;
+                      }
+                      return (
+                        <div className="space-y-2">
+                          {buckets.map(([label, count, color]) => (
+                            <div key={label} className="flex items-center gap-3">
+                              <div className="w-16 shrink-0 text-[10px] font-black text-slate-500">{label}</div>
+                              <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100">
+                                <div className="h-full rounded-full" style={{ width: `${(count / max) * 100}%`, background: color }} />
+                              </div>
+                              <div className="w-8 shrink-0 text-right text-[11px] font-black text-slate-800">{count}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </>
+              )}
+
               {!isEmployee && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="mb-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
@@ -1925,18 +2321,38 @@ function UserDetailDrawer({
             <div className="space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Report submitted
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <i className="h-2.5 w-2.5 rounded-sm border border-rose-200 bg-rose-100" /> No report
-                  </span>
+                  {isTimedRole ? (
+                    <>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> All {timedVerb} on time</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-indigo-500" /> 50-99% on time</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> Under 50% on time</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm border-2 border-indigo-600 bg-white" /> Still inside deadline</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm border border-slate-200 bg-slate-100" /> {roleKey === 'QC' ? 'No reports arrived' : 'Nothing sent to action'}</span>
+                    </>
+                  ) : roleKey === 'SUPERVISOR' ? (
+                    <>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Target met</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-indigo-500" /> 50-99% done</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-rose-500" /> Under 50%</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm border-2 border-indigo-600 bg-white" /> Today (in progress)</span>
+                      <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm border border-slate-200 bg-slate-100" /> Nothing assigned</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-1.5">
+                        <i className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Report submitted
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <i className="h-2.5 w-2.5 rounded-sm border border-rose-200 bg-rose-100" /> No report
+                      </span>
+                    </>
+                  )}
                   <span className="flex items-center gap-1.5">
                     <i className="h-2.5 w-2.5 rounded-sm border border-slate-200 bg-slate-50" /> Outside range
                   </span>
                 </div>
                 <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                  Hover a green date for the module breakdown
+                  {roleKey === 'SUPERVISOR' || isTimedRole ? 'Hover a date for the module split' : 'Hover a green date for the module breakdown'}
                 </span>
               </div>
 
@@ -1970,23 +2386,72 @@ function UserDetailDrawer({
                           const hasReports = Boolean(entry && entry.total > 0);
                           const active = inRange && !isFuture;
 
-                          const cellStyle = !active
+                          const darogaDay = roleKey === 'SUPERVISOR' ? darogaDays.get(cell.dateStr) : undefined;
+                          const hasTarget = Boolean(darogaDay && darogaDay.target > 0);
+                          const ratio = darogaDay && darogaDay.target > 0 ? darogaDay.credit / darogaDay.target : 0;
+                          const siDay = isTimedRole ? siDays.get(cell.dateStr) : undefined;
+                          const siClosed = siDay ? siDay.onTime + siDay.late + siDay.overdue : 0;
+                          const siRatio = siDay && siClosed > 0 ? siDay.onTime / siClosed : 0;
+                          const clickable =
+                            roleKey === 'SUPERVISOR'
+                              ? active && hasTarget
+                              : isTimedRole
+                              ? active && Boolean(siDay && siDay.arrived > 0)
+                              : active && hasReports;
+
+                          let cellStyle = !active
                             ? 'border-slate-100 bg-slate-50 text-slate-300'
                             : hasReports
                             ? 'border-emerald-500 bg-emerald-500 text-white cursor-pointer'
                             : 'border-rose-200 bg-rose-100 text-rose-500';
+                          if (roleKey === 'SUPERVISOR') {
+                            cellStyle = !active
+                              ? 'border-slate-100 bg-slate-50 text-slate-300'
+                              : !hasTarget
+                              ? 'border-slate-200 bg-slate-100 text-slate-400'
+                              : ratio >= 0.9999
+                              ? 'border-emerald-600 bg-emerald-500 text-white shadow-sm cursor-pointer'
+                              : cell.dateStr === todayStr
+                              ? 'border-2 border-indigo-600 bg-white text-indigo-700 shadow-sm cursor-pointer'
+                              : ratio >= 0.5
+                              ? 'border-indigo-600 bg-indigo-500 text-white shadow-sm cursor-pointer'
+                              : 'border-rose-600 bg-rose-500 text-white shadow-sm cursor-pointer';
+                          }
+                          if (isTimedRole) {
+                            cellStyle = !active
+                              ? 'border-slate-100 bg-slate-50 text-slate-300'
+                              : !siDay || siDay.arrived === 0
+                              ? 'border-slate-200 bg-slate-100 text-slate-400'
+                              : siClosed === 0
+                              ? 'border-2 border-indigo-600 bg-white text-indigo-700 shadow-sm cursor-pointer'
+                              : siRatio >= 0.9999
+                              ? 'border-emerald-600 bg-emerald-500 text-white shadow-sm cursor-pointer'
+                              : siRatio >= 0.5
+                              ? 'border-indigo-600 bg-indigo-500 text-white shadow-sm cursor-pointer'
+                              : 'border-rose-600 bg-rose-500 text-white shadow-sm cursor-pointer';
+                          }
 
                           return (
                             <div key={cell.dateStr} className="relative">
                               <button
                                 type="button"
-                                disabled={!active || !hasReports}
-                                onMouseEnter={(event) => active && hasReports && openTooltip(cell.dateStr, event.currentTarget)}
+                                disabled={!clickable}
+                                onMouseEnter={(event) => clickable && openTooltip(cell.dateStr, event.currentTarget)}
                                 onMouseLeave={scheduleCloseTooltip}
-                                onClick={(event) => active && hasReports && toggleTooltip(cell.dateStr, event.currentTarget)}
-                                className={`flex h-8 w-full items-center justify-center rounded-md border text-[9px] font-black transition ${cellStyle}`}
+                                onClick={(event) => clickable && toggleTooltip(cell.dateStr, event.currentTarget)}
+                                className={`flex ${roleKey === 'SUPERVISOR' || isTimedRole ? 'h-10 flex-col' : 'h-8'} w-full items-center justify-center rounded-md border text-[9px] font-black transition ${cellStyle}`}
                               >
                                 {cell.day}
+                                {isTimedRole && active && siDay && siDay.arrived > 0 && (
+                                  <span className="text-[7px] font-bold leading-none opacity-80">
+                                    {siDay.onTime}/{siDay.arrived}
+                                  </span>
+                                )}
+                                {roleKey === 'SUPERVISOR' && active && hasTarget && darogaDay && (
+                                  <span className="text-[7px] font-bold leading-none opacity-80">
+                                    {Math.round(darogaDay.credit)}/{Math.round(darogaDay.target)}
+                                  </span>
+                                )}
                               </button>
                             </div>
                           );
@@ -1997,7 +2462,207 @@ function UserDetailDrawer({
                 </div>
               )}
 
-              {hoverDate && tooltipPos && recordsByDate.get(hoverDate) && (
+              {hoverDate && tooltipPos && roleKey === 'SUPERVISOR' && darogaDays.get(hoverDate) && (
+                <div
+                  onMouseEnter={clearCloseTimer}
+                  onMouseLeave={scheduleCloseTooltip}
+                  style={{
+                    position: 'fixed',
+                    top: tooltipPos.top,
+                    left: tooltipPos.left,
+                    width: DAROGA_TOOLTIP_WIDTH,
+                    maxHeight: 'calc(100vh - 24px)',
+                    transform: tooltipPos.openUpward ? 'translateY(-100%)' : 'none',
+                  }}
+                  className="z-[100] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl"
+                >
+                  {(() => {
+                    const day = darogaDays.get(hoverDate)!;
+                    const ratio = day.target > 0 ? day.credit / day.target : 0;
+                    const isToday = hoverDate === todayStr;
+                    const met = ratio >= 0.9999;
+                    const status = met
+                      ? { label: 'Target met', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200', bar: '#10b981' }
+                      : isToday
+                      ? { label: 'In progress', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200', bar: '#4f46e5' }
+                      : ratio >= 0.5
+                      ? { label: 'Partly done', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200', bar: '#6366f1' }
+                      : { label: 'Target missed', tone: 'bg-rose-50 text-rose-700 border-rose-200', bar: '#f43f5e' };
+                    const left = Math.max(Math.round(day.target) - Math.round(day.credit), 0);
+                    return (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                            {new Date(`${hoverDate}T00:00:00`).toLocaleDateString('en-IN', {
+                              weekday: 'short',
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </div>
+                          <span className={`rounded-md border px-1.5 py-0.5 text-[8px] font-black ${status.tone}`}>{status.label}</span>
+                        </div>
+
+                        <div className="mt-2 flex items-end justify-between">
+                          <div className="text-2xl font-black leading-none text-slate-950">
+                            {Math.round(day.credit)}
+                            <span className="text-sm font-bold text-slate-400"> / {Math.round(day.target)}</span>
+                          </div>
+                          <div className="text-[11px] font-black" style={{ color: status.bar }}>
+                            {Math.round(ratio * 100)}%
+                          </div>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full" style={{ width: `${clamp(ratio * 100)}%`, background: status.bar }} />
+                        </div>
+                        <div className="mt-1 text-[9px] font-bold text-slate-400">
+                          {met ? 'All assigned inspections done' : `${left} inspection${left === 1 ? '' : 's'} left to reach target`}
+                        </div>
+
+                        <div className="mt-3 border-t border-slate-100 pt-2 text-[8px] font-black uppercase tracking-[0.1em] text-slate-400">
+                          Module wise
+                        </div>
+                        <div className="mt-1 space-y-1.5">
+                          {INSPECTION_MODULES.filter((module) => day.modules[module.key]).map((module) => {
+                            const entry = day.modules[module.key]!;
+                            const moduleRatio = entry.target > 0 ? entry.credit / entry.target : 0;
+                            const moduleMet = moduleRatio >= 0.9999;
+                            return (
+                              <button
+                                key={module.key}
+                                type="button"
+                                onClick={() => goToDateTable(hoverDate, module.key)}
+                                className="block w-full rounded-lg px-2 py-1.5 text-left transition hover:bg-indigo-50"
+                              >
+                                <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-slate-700">
+                                  <span className="truncate">{module.label}</span>
+                                  <span className={`shrink-0 font-black ${moduleMet ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                    {Math.round(entry.credit)}/{Math.round(entry.target)}
+                                  </span>
+                                </div>
+                                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-100">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${clamp(moduleRatio * 100)}%`, background: moduleMet ? '#10b981' : moduleRatio >= 0.5 ? '#6366f1' : '#f43f5e' }}
+                                  />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => goToDateTable(hoverDate, null)}
+                          className="mt-2 w-full rounded-lg border border-indigo-100 bg-indigo-50/60 py-1.5 text-[9px] font-black text-indigo-600 transition hover:bg-indigo-100"
+                        >
+                          View records of this day
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {hoverDate && tooltipPos && isTimedRole && siDays.get(hoverDate) && (
+                <div
+                  onMouseEnter={clearCloseTimer}
+                  onMouseLeave={scheduleCloseTooltip}
+                  style={{
+                    position: 'fixed',
+                    top: tooltipPos.top,
+                    left: tooltipPos.left,
+                    width: DAROGA_TOOLTIP_WIDTH,
+                    maxHeight: 'calc(100vh - 24px)',
+                    transform: tooltipPos.openUpward ? 'translateY(-100%)' : 'none',
+                  }}
+                  className="z-[100] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3.5 text-left shadow-2xl"
+                >
+                  {(() => {
+                    const day = siDays.get(hoverDate)!;
+                    const closed = day.onTime + day.late + day.overdue;
+                    const ratio = closed > 0 ? day.onTime / closed : 0;
+                    const status =
+                      closed === 0
+                        ? { label: 'Inside deadline', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200', bar: '#4f46e5' }
+                        : ratio >= 0.9999
+                        ? { label: 'All on time', tone: 'bg-emerald-50 text-emerald-700 border-emerald-200', bar: '#10b981' }
+                        : ratio >= 0.5
+                        ? { label: 'Partly on time', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200', bar: '#6366f1' }
+                        : { label: 'Mostly overdue', tone: 'bg-rose-50 text-rose-700 border-rose-200', bar: '#f43f5e' };
+                    return (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                            {new Date(`${hoverDate}T00:00:00`).toLocaleDateString('en-IN', {
+                              weekday: 'short',
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </div>
+                          <span className={`rounded-md border px-1.5 py-0.5 text-[8px] font-black ${status.tone}`}>{status.label}</span>
+                        </div>
+
+                        <div className="mt-2 flex items-end justify-between">
+                          <div className="text-2xl font-black leading-none text-slate-950">
+                            {day.onTime}
+                            <span className="text-sm font-bold text-slate-400"> / {closed}</span>
+                          </div>
+                          <div className="text-[11px] font-black" style={{ color: status.bar }}>
+                            {closed > 0 ? `${Math.round(ratio * 100)}%` : '—'}
+                          </div>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full" style={{ width: `${clamp(ratio * 100)}%`, background: status.bar }} />
+                        </div>
+                        <div className="mt-1 text-[9px] font-bold text-slate-400">{timedVerb} on time of reports whose deadline has passed</div>
+
+                        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] font-bold text-slate-600">
+                          <span>{timedArrivedLabel}: <strong className="text-slate-900">{day.arrived}</strong></span>
+                          <span>On time: <strong className="text-emerald-600">{day.onTime}</strong></span>
+                          <span>Late: <strong className="text-amber-600">{day.late}</strong></span>
+                          <span>Overdue: <strong className="text-rose-600">{day.overdue}</strong></span>
+                          <span className="col-span-2">Inside deadline: <strong className="text-indigo-600">{day.inProgress}</strong></span>
+                        </div>
+
+                        <div className="mt-3 border-t border-slate-100 pt-2 text-[8px] font-black uppercase tracking-[0.1em] text-slate-400">
+                          Module wise
+                        </div>
+                        <div className="mt-1 space-y-1">
+                          {INSPECTION_MODULES.filter((module) => day.modules[module.key]).map((module) => {
+                            const entry = day.modules[module.key]!;
+                            const moduleClosed = entry.onTime + entry.late + entry.overdue;
+                            return (
+                              <button
+                                key={module.key}
+                                type="button"
+                                onClick={() => goToDateTable(hoverDate, module.key)}
+                                className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] font-bold text-slate-700 transition hover:bg-indigo-50"
+                              >
+                                <span className="truncate">{module.label}</span>
+                                <span className={`shrink-0 font-black ${moduleClosed > 0 && entry.onTime < moduleClosed ? 'text-rose-500' : 'text-emerald-600'}`}>
+                                  {entry.onTime}/{entry.arrived}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => goToDateTable(hoverDate, null)}
+                          className="mt-2 w-full rounded-lg border border-indigo-100 bg-indigo-50/60 py-1.5 text-[9px] font-black text-indigo-600 transition hover:bg-indigo-100"
+                        >
+                          View records of this day
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {hoverDate && tooltipPos && roleKey !== 'SUPERVISOR' && !isTimedRole && recordsByDate.get(hoverDate) && (
                 <div
                   onMouseEnter={clearCloseTimer}
                   onMouseLeave={scheduleCloseTooltip}
@@ -2404,6 +3069,13 @@ export default function UserPerformancePage() {
         const darogaFull = role === 'SUPERVISOR' ? darogaData?.[person.id] : undefined;
         const coverage = darogaFull ? restrictDarogaModules(darogaFull, moduleFilter) : null;
 
+        // A Daroga's zones / wards come from where their assigned assets are,
+        // so they show even before any report is filed.
+        (darogaFull?.rows || []).forEach((entry) => {
+          if (entry.zoneName) zones.add(entry.zoneName);
+          if (entry.wardId && entry.wardName) wards.add(entry.wardName);
+        });
+
         // Shared with the Team Leaderboard (lib/userPerformanceScores).
         const performance = role === 'QC' ? siScore(si) : darogaScore(coverage);
 
@@ -2690,10 +3362,48 @@ export default function UserPerformancePage() {
 
   const topPerformer = activeRoleRows[0] || null;
 
+  const isDarogaView = roleFilter === 'SUPERVISOR';
+  const isSiView = roleFilter === 'QC';
+  const isIecView = roleFilter === 'ACTION_OFFICER';
+  /** SI and IEC are both judged on meeting a deadline. */
+  const isTimedView = isSiView || isIecView;
+  const lowThreshold = isDarogaView ? 80 : 50;
+
   const belowHalf = useMemo(
-    () => activeRoleRows.filter((row) => row.performance !== null && row.performance < 50).length,
-    [activeRoleRows]
+    () => activeRoleRows.filter((row) => row.performance !== null && row.performance < lowThreshold).length,
+    [activeRoleRows, lowThreshold]
   );
+
+  /* SI KPI strip: on-time review across every SI in view. */
+  const siKpis = useMemo(() => {
+    if (!isTimedView) return null;
+    const list = activeRoleRows
+      .map((row) => row.si ?? row.iec)
+      .filter((entry): entry is SiPerformance | IecPerformance => Boolean(entry));
+    const hours = list
+      .map((entry) => ('avgTurnaroundHours' in entry ? entry.avgTurnaroundHours : entry.avgResolutionHours))
+      .filter((h): h is number => typeof h === 'number');
+    return {
+      due: list.reduce((sum, entry) => sum + entry.due, 0),
+      onTime: list.reduce((sum, entry) => sum + entry.onTime, 0),
+      overdue: list.reduce((sum, entry) => sum + entry.overdue, 0),
+      avgHours: hours.length ? hours.reduce((sum, h) => sum + h, 0) / hours.length : null,
+    };
+  }, [isTimedView, activeRoleRows]);
+
+  /* Daroga KPI strip: target achievement across every Daroga in view. */
+  const darogaKpis = useMemo(() => {
+    if (!isDarogaView) return null;
+    const scored = activeRoleRows.filter((row) => row.performance !== null);
+    return {
+      targetMet: scored.filter((row) => (row.performance ?? 0) >= 99.995).length,
+      required: activeRoleRows.reduce((sum, row) => sum + (row.coverage?.required ?? 0), 0),
+      completed: activeRoleRows.reduce((sum, row) => sum + (row.coverage?.completed ?? 0), 0),
+      defaultTarget: activeRoleRows.filter(
+        (row) => row.coverage?.rows?.length && row.coverage.rows.every((entry) => entry.source === 'DEFAULT')
+      ).length,
+    };
+  }, [isDarogaView, activeRoleRows]);
 
   function applyDates() {
     setAppliedFrom(from);
@@ -2973,7 +3683,7 @@ export default function UserPerformancePage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
               <Activity size={13} className="text-violet-600" />
-              Average Performance
+              {isDarogaView ? 'Average Target Achievement' : isSiView ? 'Average On-Time Review' : isIecView ? 'Average On-Time Resolution' : 'Average Performance'}
             </div>
             <div className="mt-1.5 text-2xl font-black text-slate-950">{percentText(avgPerformance)}</div>
           </div>
@@ -2992,11 +3702,59 @@ export default function UserPerformancePage() {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
               <ShieldCheck size={13} className="text-rose-600" />
-              Below 50% Performance
+              {isDarogaView ? 'Needs Attention (<80%)' : isSiView ? 'Overdue Reviews' : isIecView ? 'Overdue Resolutions' : 'Below 50% Performance'}
             </div>
-            <div className="mt-1.5 text-2xl font-black text-slate-950">{belowHalf}</div>
+            <div className="mt-1.5 text-2xl font-black text-slate-950">{isTimedView ? siKpis?.overdue ?? 0 : belowHalf}</div>
           </div>
         </section>
+
+        {siKpis && isTimedView && (
+          <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">{isSiView ? 'Reviewed On Time' : 'Resolved On Time'}</div>
+              <div className="mt-1.5 text-2xl font-black text-slate-950">
+                {siKpis.onTime.toLocaleString('en-IN')}
+                <span className="text-sm font-bold text-slate-400"> / {siKpis.due.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-[10px] font-bold text-slate-400">Reports whose deadline has passed</div>
+            </div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4 shadow-sm">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-rose-700">{isSiView ? 'Overdue Reviews' : 'Overdue Resolutions'}</div>
+              <div className="mt-1.5 text-2xl font-black text-slate-950">{siKpis.overdue.toLocaleString('en-IN')}</div>
+              <div className="text-[10px] font-bold text-slate-400">Still waiting after the next-day deadline</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">{isSiView ? 'Avg Turnaround' : 'Avg Resolution Time'}</div>
+              <div className="mt-1.5 text-2xl font-black text-slate-950">
+                {siKpis.avgHours === null ? '—' : `${Math.round(siKpis.avgHours * 10) / 10} h`}
+              </div>
+              <div className="text-[10px] font-bold text-slate-400">{isSiView ? 'From report arrival to review' : 'From action request to resolution'}</div>
+            </div>
+          </section>
+        )}
+
+        {darogaKpis && (
+          <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">Target Met (100%)</div>
+              <div className="mt-1.5 text-2xl font-black text-slate-950">{darogaKpis.targetMet}</div>
+              <div className="text-[10px] font-bold text-slate-400">Darogas who delivered their full target</div>
+            </div>
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-indigo-700">Inspections vs Target</div>
+              <div className="mt-1.5 text-2xl font-black text-slate-950">
+                {Math.round(darogaKpis.completed).toLocaleString('en-IN')}
+                <span className="text-sm font-bold text-slate-400"> / {Math.round(darogaKpis.required).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-[10px] font-bold text-slate-400">Counted up to each day&apos;s target</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">On Default Target</div>
+              <div className="mt-1.5 text-2xl font-black text-slate-950">{darogaKpis.defaultTarget}</div>
+              <div className="text-[10px] font-bold text-slate-400">No admin target set: judged on all assigned assets</div>
+            </div>
+          </section>
+        )}
 
         {/* DIRECTORY */}
         <section className="mt-4 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
@@ -3068,6 +3826,48 @@ export default function UserPerformancePage() {
               </div>
             </div>
 
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <CalendarDays size={13} className="text-indigo-600" />
+              {DRAWER_PRESETS.map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPreset(key)}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[10px] font-black text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                >
+                  {label}
+                </button>
+              ))}
+              <input
+                type="date"
+                value={appliedFrom}
+                max={appliedTo || undefined}
+                onChange={(event) => {
+                  setFrom(event.target.value);
+                  setAppliedFrom(event.target.value);
+                }}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 outline-none focus:border-indigo-400"
+              />
+              <span className="text-[10px] font-bold text-slate-400">to</span>
+              <input
+                type="date"
+                value={appliedTo}
+                min={appliedFrom || undefined}
+                onChange={(event) => {
+                  setTo(event.target.value);
+                  setAppliedTo(event.target.value);
+                }}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 outline-none focus:border-indigo-400"
+              />
+              <span className="text-[10px] font-bold text-slate-400">
+                {appliedFrom && appliedTo
+                  ? `${formatDate(appliedFrom)} - ${formatDate(appliedTo)}${isDarogaView ? ' · targets cover these days' : ''}`
+                  : isDarogaView
+                  ? 'Pick a date range: targets need a range'
+                  : 'All time'}
+              </span>
+            </div>
+
             <div className="mt-3 text-[9px] font-bold text-slate-400">
               Showing {filteredRows.length > 0 ? pageStart + 1 : 0} -{' '}
               {Math.min(pageStart + PAGE_SIZE, filteredRows.length)} of {filteredRows.length} matching{' '}
@@ -3081,10 +3881,25 @@ export default function UserPerformancePage() {
                 <tr className="border-b border-slate-200 text-[9px] font-black uppercase tracking-wider text-slate-400">
                   <th className="w-12 p-4 text-center">Rank</th>
                   <th className="p-4">Name</th>
-                  <th className="p-4">Zone / Ward</th>
-                  <th className="p-4">Modules</th>
-                  <th className="p-4">Performance</th>
-                  <th className="p-4">Attendance</th>
+                  <th className="p-4">Zone</th>
+                  <th className="p-4">Ward</th>
+                  {isTimedView ? (
+                    <>
+                      <th className="p-4">Reports Due</th>
+                      <th className="p-4">On Time</th>
+                      <th className="p-4">Overdue</th>
+                    </>
+                  ) : isDarogaView ? (
+                    <>
+                      <th className="p-4">Target</th>
+                      <th className="p-4">Achieved</th>
+                      <th className="p-4">Days Met</th>
+                    </>
+                  ) : (
+                    <th className="p-4">Modules</th>
+                  )}
+                  <th className="p-4">{isDarogaView ? 'Achievement' : isSiView ? 'On-Time Review' : isIecView ? 'On-Time Resolution' : 'Performance'}</th>
+                  {!isDarogaView && !isTimedView && <th className="p-4">Attendance</th>}
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -3104,20 +3919,41 @@ export default function UserPerformancePage() {
                       </button>
                     </td>
 
-                    <td className="p-4">
-                      {row.zones.length || row.wards.length ? (
-                        <div className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500">
-                          <MapPin size={9} />
-                          {[...row.zones, ...row.wards].slice(0, 3).join(', ')}
-                          {row.zones.length + row.wards.length > 3
-                            ? ` +${row.zones.length + row.wards.length - 3}`
-                            : ''}
-                        </div>
-                      ) : (
-                        <span className="text-[9px] font-semibold text-slate-400">No location on record</span>
-                      )}
-                    </td>
+                    {[row.zones, row.wards].map((names, columnIndex) => (
+                      <td key={columnIndex} className="p-4">
+                        {names.length ? (
+                          <div className="flex items-start gap-1 text-[9px] font-bold uppercase text-slate-500">
+                            <MapPin size={9} className="mt-0.5 shrink-0" />
+                            <span>
+                              {names.slice(0, 3).join(', ')}
+                              {names.length > 3 ? ` +${names.length - 3}` : ''}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[9px] font-semibold text-slate-400">—</span>
+                        )}
+                      </td>
+                    ))}
 
+                    {isTimedView ? (
+                      <>
+                        <td className="p-4 text-[10px] font-black text-slate-900">{(row.si ?? row.iec) ? (row.si ?? row.iec)!.due.toLocaleString('en-IN') : '—'}</td>
+                        <td className="p-4 text-[10px] font-black text-emerald-700">{(row.si ?? row.iec) ? (row.si ?? row.iec)!.onTime.toLocaleString('en-IN') : '—'}</td>
+                        <td className="p-4 text-[10px] font-black text-rose-600">{(row.si ?? row.iec) ? (row.si ?? row.iec)!.overdue.toLocaleString('en-IN') : '—'}</td>
+                      </>
+                    ) : isDarogaView ? (
+                      <>
+                        <td className="p-4 text-[10px] font-black text-slate-900">
+                          {row.coverage?.required != null ? Math.round(row.coverage.required).toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="p-4 text-[10px] font-black text-slate-900">
+                          {row.coverage ? Math.round(row.coverage.completed).toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="p-4 text-[10px] font-black text-slate-900">
+                          {row.coverage?.daysWithTarget ? `${row.coverage.daysMet}/${row.coverage.daysWithTarget}` : '—'}
+                        </td>
+                      </>
+                    ) : (
                     <td className="p-4">
                       <div className="flex flex-wrap gap-1">
                         {row.modules.length ? (
@@ -3136,6 +3972,7 @@ export default function UserPerformancePage() {
                         )}
                       </div>
                     </td>
+                    )}
 
                     <td className="p-4">
                       <div className="flex items-center gap-2">
@@ -3151,10 +3988,17 @@ export default function UserPerformancePage() {
                         <span className="text-[10px] font-black text-slate-900">
                           {percentText(row.performance)}
                         </span>
+                        {isDarogaView && (
+                          <span className={`rounded-md border px-1.5 py-0.5 text-[8px] font-black ${darogaTier(row.performance).tone}`}>
+                            {darogaTier(row.performance).label}
+                          </span>
+                        )}
                       </div>
                     </td>
 
-                    <td className="p-4 text-[10px] font-black text-slate-900">{percentText(row.attendance)}</td>
+                    {!isDarogaView && !isTimedView && (
+                      <td className="p-4 text-[10px] font-black text-slate-900">{percentText(row.attendance)}</td>
+                    )}
 
                     <td className="p-4 text-right">
                       <button
@@ -3171,7 +4015,7 @@ export default function UserPerformancePage() {
 
                 {pagedRows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-14 text-center text-[10px] font-bold text-slate-400">
+                    <td colSpan={isDarogaView || isTimedView ? 9 : 8} className="py-14 text-center text-[10px] font-bold text-slate-400">
                       No {roleLabel.toLowerCase()}s match the selected search.
                     </td>
                   </tr>
