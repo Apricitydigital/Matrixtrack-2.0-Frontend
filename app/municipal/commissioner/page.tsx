@@ -111,6 +111,12 @@ import {
   type WardRankingRow,
 } from '@lib/wardRankingApi';
 import ModalPortal from "@components/ui/ModalPortal";
+import type { EmbeddedUserDrawer } from './user-performance/UserPerformanceView';
+
+const UserPerformanceView = dynamic(
+  () => import('./user-performance/UserPerformanceView'),
+  { ssr: false }
+);
 
 
 /* =========================================================
@@ -3513,9 +3519,7 @@ function DrilldownDrawer({
     {
       key: 'REQUIRED',
       label:
-        isSweepingDrawer
-          ? 'Total Inspections Required'
-          : 'Total Required Inspections',
+        'Total Inspection Target',
       value:
         totalRequiredInspection,
       tone:
@@ -12738,7 +12742,7 @@ const [
       },
       {
         label:
-          'Required Inspections',
+          'Inspection Target',
         value:
           row.inspectionRequired.toLocaleString(
             'en-IN'
@@ -13158,6 +13162,28 @@ const [
     });
   }
 
+  /*
+   * Leaderboard rows open the very same detail drawer as the User
+   * Performance page (shared view, rendered in place).
+   */
+  const [leaderboardUser, setLeaderboardUser] =
+    useState<EmbeddedUserDrawer | null>(
+      null
+    );
+
+  function openLeaderboardUser(
+    row: RolePerformanceRow
+  ) {
+    setLeaderboardUser({
+      role: performanceRole,
+      userId:
+        row.id ||
+        row.key,
+      from: appliedFrom,
+      to: appliedTo,
+    });
+  }
+
   function openRoleRow(
     row: RolePerformanceRow
   ) {
@@ -13245,7 +13271,7 @@ setDrilldown({
       breakdown: [
         {
           label:
-            'Required Inspections',
+            'Inspection Target',
           value:
             (
               row.requiredInspections ??
@@ -14144,7 +14170,7 @@ setDrilldown({
               }
               tooltip={[
                 {
-                  label: 'Inspections Required',
+                  label: 'Inspection Target',
                   value:
                     sweepingInspection.required.toLocaleString(
                       'en-IN'
@@ -14232,7 +14258,7 @@ setDrilldown({
               }
               tooltip={[
                 {
-                  label: 'Required Inspections',
+                  label: 'Inspection Target',
                   value:
                     litterBinInspection.required.toLocaleString(
                       'en-IN'
@@ -14320,7 +14346,7 @@ setDrilldown({
               }
               tooltip={[
                 {
-                  label: 'Required Inspections',
+                  label: 'Inspection Target',
                   value:
                     toiletInspection.required.toLocaleString(
                       'en-IN'
@@ -14409,7 +14435,7 @@ setDrilldown({
                 }
                 tooltip={[
                   {
-                    label: 'Required Inspections',
+                    label: 'Inspection Target',
                     value:
                       nalaInspection.required.toLocaleString(
                         'en-IN'
@@ -14499,7 +14525,7 @@ setDrilldown({
                 }
                 tooltip={[
                   {
-                    label: 'Required Inspections',
+                    label: 'Inspection Target',
                     value: gvpInspection.required.toLocaleString('en-IN'),
                   },
                   {
@@ -14543,6 +14569,100 @@ setDrilldown({
                 }
               />
             )}
+          </div>
+        </section>
+
+        {/* ZONE PERFORMANCE & WARD INSPECTION OVERVIEW */}
+        <section className="mt-4 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2 px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10">
+                <MapPin size={14} />
+              </div>
+
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                  Zone Performance &amp; Ward Inspection Overview
+                </h2>
+
+                <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Click any Zone card below to view detailed Ward reports, SI reviews, expected vs received metrics, and raw inspection logs.
+                </p>
+              </div>
+            </div>
+
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <Layers3 size={11} />
+              {zoneRows.length} Zones Active
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            {zoneRows.map((row) => {
+              const score =
+                row.performance === null
+                  ? null
+                  : Math.max(0, Math.min(100, row.performance));
+
+              return (
+                <a
+                  key={row.label}
+                  href={`/municipal/commissioner/inspection-performance?zone=${encodeURIComponent(row.label)}`}
+                  className="group block rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex items-center justify-between text-[10px] font-bold">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
+                      <MapPin size={10} />
+                      {row.label}
+                    </span>
+
+                    <span className="uppercase text-slate-400">
+                      {row.wards.length} Wards
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-end justify-between">
+                    <div>
+                      <div className="text-2xl font-black text-slate-900 dark:text-white">
+                        {loading ? '-' : percentText(score)}
+                      </div>
+
+                      <div className="text-[9px] font-bold uppercase text-slate-400">
+                        Zone Health Score
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-base font-black text-indigo-600">
+                        {row.records.length.toLocaleString('en-IN')}
+                      </div>
+
+                      <div className="text-[9px] font-semibold text-slate-400">
+                        Reports Received
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                    <div
+                      className="h-full rounded-full bg-violet-500"
+                      style={{ width: `${score ?? 0}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-[10px] font-bold">
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                      {row.inspectionStats.pending.toLocaleString('en-IN')} Pending
+                    </span>
+
+                    <span className="inline-flex items-center text-indigo-600 group-hover:underline">
+                      Details
+                      <ChevronRight size={12} />
+                    </span>
+                  </div>
+                </a>
+              );
+            })}
           </div>
         </section>
 
@@ -14610,7 +14730,7 @@ setDrilldown({
                       '#31518F',
                   }}
                 >
-                  Highest cleanliness achieved against required inspections
+                  Highest cleanliness achieved against inspection target
                 </div>
               </div>
             </div>
@@ -14708,7 +14828,7 @@ setDrilldown({
                     '#065F46',
                 }}
               >
-                Based on clean inspections achieved vs required inspections
+                Based on clean inspections achieved vs inspection target
               </div>
             </div>
           </div>
@@ -14772,7 +14892,7 @@ setDrilldown({
                       '#31518F',
                   }}
                 >
-                  Lowest cleanliness achieved against required inspections
+                  Lowest cleanliness achieved against inspection target
                 </div>
               </div>
             </div>
@@ -14867,7 +14987,7 @@ setDrilldown({
                     '#9F1239',
                 }}
               >
-                Based on clean inspections achieved vs required inspections
+                Based on clean inspections achieved vs inspection target
               </div>
             </div>
           </div>
@@ -14902,7 +15022,7 @@ setDrilldown({
                   accent:
                     'text-blue-700',
                   requiredLabel:
-                    'Inspections Required',
+                    'Inspection Target',
                   assignedLabel:
                     'Assigned Beats',
                   assigned:
@@ -14957,7 +15077,7 @@ setDrilldown({
                   accent:
                     'text-emerald-700',
                   requiredLabel:
-                    'Required Litter Bins',
+                    'Litter Bin Inspection Target',
           assignedLabel:
             'Assigned Litter Bins',
           assigned:
@@ -15012,7 +15132,7 @@ setDrilldown({
                   accent:
                     'text-amber-700',
                   requiredLabel:
-                    'Required Toilets',
+                    'Toilet Inspection Target',
           assignedLabel:
             'Assigned Toilets',
           assigned:
@@ -15069,7 +15189,7 @@ setDrilldown({
                       accent:
                         'text-sky-700',
                       requiredLabel:
-                        'Required Nala Points',
+                        'Nala Inspection Target',
                       assignedLabel:
                         'Assigned Nala Points',
                       assigned:
@@ -15128,7 +15248,7 @@ setDrilldown({
                       accent:
                         'text-rose-700',
                       requiredLabel:
-                        'Required GVP Inspections',
+                        'GVP Inspection Target',
                       assignedLabel:
                         'Active GVPs',
                       assigned:
@@ -15412,12 +15532,6 @@ setDrilldown({
                 label:
                   'IEC Member',
               },
-              {
-                key:
-                  'EMPLOYEE',
-                label:
-                  'Health Worker',
-              },
             ] as const).map(
               (role) => (
                   <button
@@ -15458,7 +15572,7 @@ setDrilldown({
                   }
                   type="button"
                   onClick={() =>
-                    openRoleRow(
+                    openLeaderboardUser(
                       row
                     )
                   }
@@ -15514,6 +15628,16 @@ setDrilldown({
 
 
         </section>
+
+        {leaderboardUser && (
+          <UserPerformanceView
+            key={`${leaderboardUser.role}-${leaderboardUser.userId}`}
+            embedded={leaderboardUser}
+            onEmbeddedClose={() =>
+              setLeaderboardUser(null)
+            }
+          />
+        )}
 
         {/* ZONE x MODULE */}
         <section className="mt-4 overflow-hidden rounded-[22px] border border-[#dfe7f5] bg-[#fbfdff] shadow-[0_10px_34px_-22px_rgba(30,64,175,.28)]">

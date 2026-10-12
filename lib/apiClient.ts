@@ -1067,6 +1067,8 @@ export const CityUserApi = {
     const params = new URLSearchParams();
     if (range.startDate) params.append("startDate", range.startDate);
     if (range.endDate) params.append("endDate", range.endDate);
+    // "A day" is the viewer's local day.
+    params.append("tzOffset", String(new Date().getTimezoneOffset()));
     const query = params.toString();
     return apiFetch<{ users: Record<string, IecPerformance> }>(`/city/users/iec-performance${query ? `?${query}` : ""}`);
   },
@@ -1074,6 +1076,8 @@ export const CityUserApi = {
     const params = new URLSearchParams();
     if (range.startDate) params.append("startDate", range.startDate);
     if (range.endDate) params.append("endDate", range.endDate);
+    // "A day" is the viewer's local day.
+    params.append("tzOffset", String(new Date().getTimezoneOffset()));
     const query = params.toString();
     return apiFetch<{ users: Record<string, SiPerformance> }>(`/city/users/si-performance${query ? `?${query}` : ""}`);
   },
@@ -1100,11 +1104,36 @@ export type SiReportBuckets = {
   carriedOverPending: string[];
 };
 
+/** Reports of one arrival day (or module) by how the SI handled them against the SLA. */
+export type SiCohort = { arrived: number; onTime: number; late: number; overdue: number; inProgress: number };
+
+export type SiDay = SiCohort & {
+  /** Local arrival day, YYYY-MM-DD. */
+  date: string;
+  modules: Partial<Record<"TOILET" | "LITTERBINS" | "SWEEPING" | "NALA" | "TASKFORCE", SiCohort>>;
+};
+
 export type SiPerformance = {
   darogas: number;
   assets: { toilets: number; litterBins: number; beats: number; nalaPoints?: number; gvps?: number };
   // NALA / TASKFORCE (GVP) are absent on backends that predate those modules.
   modules: Record<"TOILET" | "LITTERBINS" | "SWEEPING", SiReportBuckets> & { NALA?: SiReportBuckets; TASKFORCE?: SiReportBuckets };
+  /** On-time review rate (0-100); null until a report has reached its SLA. */
+  performance: number | null;
+  /** Reports whose SLA ended: onTime + late + overdue. */
+  due: number;
+  onTime: number;
+  late: number;
+  overdue: number;
+  /** Still inside the SLA: not in the score yet. */
+  inProgress: number;
+  /** Part of `overdue` that arrived before the range start. */
+  backlogOverdue: number;
+  avgTurnaroundHours: number | null;
+  oldestPendingDays: number | null;
+  backlogAging: { d0to1: number; d2to3: number; d4to7: number; d8plus: number };
+  moduleStats: Partial<Record<"TOILET" | "LITTERBINS" | "SWEEPING" | "NALA" | "TASKFORCE", SiCohort & { backlogOverdue: number }>>;
+  daily: SiDay[];
 };
 
 /** Daroga required vs completed inspections (asset-days) in a date range. */
@@ -1115,9 +1144,51 @@ export type DarogaPerformance = {
     NALA?: { assigned: number; required: number | null; completed: number };
     TASKFORCE?: { assigned: number; required: number | null; completed: number };
   };
+  /** Sum of targets / credit in the range (admin ward targets, else all assigned assets per day). */
   required: number | null;
   completed: number;
   performance: number | null;
+  /** One entry per local day in the range (target 0 = nothing assigned that day). */
+  daily: DarogaDay[];
+  rows: DarogaTargetRow[];
+  periods: DarogaPeriod[];
+  /** Days with a target where credit reached the target. */
+  daysMet: number;
+  daysWithTarget: number;
+};
+
+export type DarogaModuleKey = "TOILET" | "LITTERBINS" | "SWEEPING" | "NALA" | "TASKFORCE";
+
+export type DarogaDay = {
+  date: string;
+  target: number;
+  credit: number;
+  modules: Partial<Record<DarogaModuleKey, { target: number; credit: number }>>;
+};
+
+export type DarogaTargetRow = {
+  module: DarogaModuleKey;
+  wardId: string | null;
+  wardName: string;
+  zoneName: string;
+  source: "ADMIN" | "DEFAULT";
+  periodType: "DAILY" | "WEEKLY" | "MONTHLY";
+  assigned: number;
+  target: number;
+  achieved: number;
+  credit: number;
+};
+
+export type DarogaPeriod = {
+  module: DarogaModuleKey;
+  wardId: string | null;
+  wardName: string;
+  periodType: "WEEKLY" | "MONTHLY";
+  from: string;
+  to: string;
+  target: number;
+  achieved: number;
+  credit: number;
 };
 
 /** Action-cycle report ids in an IEC member's scope. */
@@ -1135,6 +1206,23 @@ export type IecPerformance = {
   /** Resolver user id per resolved report, keyed "MODULE:reportId" (null = not recorded). */
   resolvers: Record<string, string | null>;
   resolverNames: Record<string, string>;
+  /** On-time resolution rate (0-100); null until a report has reached its deadline. */
+  performance: number | null;
+  /** Reports whose deadline passed: onTime + late + overdue. */
+  due: number;
+  onTime: number;
+  late: number;
+  overdue: number;
+  /** Still inside the deadline: not in the score yet. */
+  inProgress: number;
+  backlogOverdue: number;
+  avgResolutionHours: number | null;
+  oldestPendingDays: number | null;
+  backlogAging: { d0to1: number; d2to3: number; d4to7: number; d8plus: number };
+  /** Reports whose "sent to action" time was estimated from createdAt. */
+  estimated: number;
+  moduleStats: Partial<Record<"TOILET" | "LITTERBINS" | "SWEEPING" | "NALA" | "TASKFORCE", SiCohort & { backlogOverdue: number }>>;
+  daily: SiDay[];
 };
 
 export type UserWorkSummaryCounts = { total: number; approved: number; completed?: number; pending: number; attention: number };
