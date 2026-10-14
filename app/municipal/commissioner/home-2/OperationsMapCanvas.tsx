@@ -485,6 +485,7 @@ function QuickAssetPreview({
   zoneName,
   wardName,
   actors,
+  employees,
 }: {
   moduleLabel: string;
   name: string;
@@ -492,6 +493,7 @@ function QuickAssetPreview({
   zoneName: string;
   wardName: string;
   actors?: MapActor[];
+  employees?: BeatMapItem['employees'];
 }) {
   const supervisor =
     actorForRole(
@@ -534,6 +536,14 @@ function QuickAssetPreview({
       </div>
 
       <div className="mt-3 space-y-1">
+        {employees && (
+          <div className="flex items-start justify-between gap-3 text-[10px]">
+            <span className="shrink-0 text-slate-500">Employee</span>
+            <b className="max-w-[160px] whitespace-normal text-right text-slate-800">
+              {employees.length ? employees.map((employee) => employee.name).join(', ') : 'Unassigned'}
+            </b>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 text-[10px]">
           <span className="text-slate-500">
             Daroga
@@ -1211,6 +1221,9 @@ export default function OperationsMapCanvas({
   gvps = [],
   visible,
   focusLevel,
+  onViewBeatReport,
+  reportLoadingId,
+  reportError,
 }: {
   beats: BeatMapItem[];
   toilets: PointMapItem[];
@@ -1219,6 +1232,9 @@ export default function OperationsMapCanvas({
   gvps?: PointMapItem[];
 
   focusLevel: MapFocusLevel;
+  onViewBeatReport: (beat: BeatMapItem) => void;
+  reportLoadingId?: string | null;
+  reportError?: { beatId: string; message: string } | null;
 
   visible: {
     beats: boolean;
@@ -1341,6 +1357,7 @@ export default function OperationsMapCanvas({
                   zoneName={beat.zoneName}
                   wardName={beat.wardName}
                   actors={beat.actors}
+                  employees={beat.employees || []}
                 />
               </Tooltip>
 
@@ -1381,6 +1398,25 @@ export default function OperationsMapCanvas({
                     state={beat.state}
                     actors={beat.actors}
                   />
+
+                  <div className="mt-3 space-y-1.5">
+                    <div className="text-[9px] font-black uppercase tracking-[.15em] text-slate-400">Assigned Employees</div>
+                    {beat.employees?.length ? beat.employees.map((employee) => (
+                      <QuickPerson key={employee.id} label="Employee" value={employee.name} />
+                    )) : <QuickPerson label="Employee" value="Unassigned" />}
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!beat.reportId || Boolean(reportLoadingId)}
+                    onClick={() => onViewBeatReport(beat)}
+                    className="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                  >
+                    {reportLoadingId === beat.id ? 'Loading report...' : beat.reportId ? 'View Report' : 'No report for selected date'}
+                  </button>
+                  {reportError?.beatId === beat.id && (
+                    <p role="alert" className="mt-2 whitespace-normal text-xs text-rose-600">{reportError.message}</p>
+                  )}
 
                   <WorkflowTimeline
                     state={beat.state}

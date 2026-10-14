@@ -30,9 +30,11 @@ import {
   Flag,
 } from 'lucide-react';
 
-import { apiFetch, CityModulesApi } from '@lib/apiClient';
+import { apiFetch, CityModulesApi, ModuleRecordsApi } from '@lib/apiClient';
+import UniversalReportModal from '@components/UniversalReportModal';
 
 import type {
+  BeatMapItem,
   MapActor,
   OperationalRole,
   OperationsMapData,
@@ -257,6 +259,44 @@ export default function CommissionerHome2Page() {
   const [error, setError] =
     useState('');
 
+  const [proofReport, setProofReport] = useState<any>(null);
+  const [reportLoadingId, setReportLoadingId] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<{ beatId: string; message: string } | null>(null);
+  const reportRequestId = useRef(0);
+
+  useEffect(() => {
+    reportRequestId.current += 1;
+    setProofReport(null);
+    setReportError(null);
+    setReportLoadingId(null);
+  }, [date]);
+
+  const viewBeatReport = async (beat: BeatMapItem) => {
+    if (!beat.reportId) return;
+    const requestId = ++reportRequestId.current;
+    setReportLoadingId(beat.id);
+    setReportError(null);
+    try {
+      const response = await ModuleRecordsApi.getRecords('SWEEPING', {
+        recordId: beat.reportId,
+        limit: 1,
+      });
+      if (requestId !== reportRequestId.current) return;
+      const record = response.data.find((item) => item.id === beat.reportId);
+      if (!record) throw new Error('Report is unavailable or you do not have access.');
+      // The report modal uses a body portal, outside the fullscreen map element.
+      if (document.fullscreenElement) await document.exitFullscreen();
+      if (requestId !== reportRequestId.current) return;
+      setProofReport({ ...record, beatName: beat.name, zoneName: beat.zoneName, wardName: beat.wardName });
+    } catch (err) {
+      if (requestId === reportRequestId.current) {
+        setReportError({ beatId: beat.id, message: err instanceof Error ? err.message : 'Unable to load report. Please try again.' });
+      }
+    } finally {
+      if (requestId === reportRequestId.current) setReportLoadingId(null);
+    }
+  };
+
   const [visible, setVisible] =
     useState({
       beats: true,
@@ -460,7 +500,10 @@ export default function CommissionerHome2Page() {
           data?.beats || []
         ).filter((item) =>
           matchesActorFilter(
-            item.actors,
+            [
+              ...item.actors,
+              ...(item.employees || []).map((employee): MapActor => ({ ...employee, role: 'EMPLOYEE' })),
+            ],
             roleFilter,
             userId,
           ),
@@ -1367,6 +1410,9 @@ const moduleLabels = (
             }`}
         >
           <OperationsMapCanvas
+            onViewBeatReport={viewBeatReport}
+            reportLoadingId={reportLoadingId}
+            reportError={reportError}
             beats={filteredBeats}
             toilets={
               filteredToilets
@@ -1630,6 +1676,14 @@ const moduleLabels = (
             )}
         </section>
       </div>
+      {proofReport && (
+        <UniversalReportModal
+          moduleTitle="Sweeping"
+          moduleBadge="Commissioner"
+          record={proofReport}
+          onClose={() => setProofReport(null)}
+        />
+      )}
     </main>
   );
 }
