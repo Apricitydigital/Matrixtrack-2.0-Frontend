@@ -80,6 +80,7 @@ import {
   apiFetch,
   AreaBeatApi,
   CityUserApi,
+  CityModulesApi,
   NalaApi,
   GeoApi,
   ModuleRecordsApi,
@@ -6760,12 +6761,52 @@ export default function CommissionerDashboard() {
     );
 
   const cityId =
+    user?.cityId ||
     user?.city?.id ||
     undefined;
 
   const cityName =
+    user?.cityName ||
     user?.city?.name ||
     'Municipal Corporation';
+  const [commissionerCityModules, setCommissionerCityModules] =
+    useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    setCommissionerCityModules(null);
+
+    console.log('[COMMISSIONER MODULE DEBUG] cityId:', cityId);
+
+    if (!cityId) {
+      return () => {
+        active = false;
+      };
+    }
+
+    CityModulesApi.list()
+      .then((modules) => {
+        if (!active) return;
+
+        const enabled = new Set(
+          modules
+            .filter((module) => module.enabled === true)
+            .map((module) => module.key.toUpperCase())
+        );
+
+        setCommissionerCityModules(enabled);
+      })
+      .catch((error) => {
+        console.error('Failed to load city modules', error);
+        if (active) setCommissionerCityModules(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [cityId]);
+
 
   /* =========================
      DATA
@@ -10139,9 +10180,7 @@ const [
     );
 
   // Show Nala only for cities that actually run the Nala module.
-  const showNalaModule =
-    inspectionTargets.nalaPoints.length > 0 ||
-    nalaInspection.records.length > 0;
+  const showNalaModule = commissionerCityModules?.has('NALA') ?? false;
 
   const gvpInspection =
     commissionerModuleInspection(
@@ -10156,9 +10195,7 @@ const [
     );
 
   // Show GVP only for cities that actually have GVPs or GVP reports.
-  const showGvpModule =
-    inspectionTargets.gvpPoints.length > 0 ||
-    gvpInspection.records.length > 0;
+  const showGvpModule = (commissionerCityModules?.has('TASKFORCE') || commissionerCityModules?.has('GVP')) ?? false;
 
 
   /* =========================================================
@@ -14420,7 +14457,7 @@ setDrilldown({
                 label="Nala"
                 value={
                   loading
-                    ? '—'
+                    ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'
                     : percentText(
                       nalaInspection.performance
                     )
@@ -14510,7 +14547,7 @@ setDrilldown({
                 label="GVP"
                 value={
                   loading
-                    ? '—'
+                    ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'
                     : percentText(
                       gvpInspection.performance
                     )
@@ -16611,21 +16648,3 @@ setDrilldown({
     </RoleGuard>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
