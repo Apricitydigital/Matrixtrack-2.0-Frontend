@@ -14464,7 +14464,7 @@ setDrilldown({
                 label="Nala"
                 value={
                   loading
-                    ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'
+                    ? '-'
                     : percentText(
                       nalaInspection.performance
                     )
@@ -14554,7 +14554,7 @@ setDrilldown({
                 label="GVP"
                 value={
                   loading
-                    ? 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'
+                    ? '-'
                     : percentText(
                       gvpInspection.performance
                     )

@@ -122,8 +122,8 @@ const STATUS_CONFIG: Record<
   }
 > = {
   TOTAL: {
-    label: 'Total Inspection',
-    shortLabel: 'Total Inspection',
+    label: 'Completed Inspection',
+    shortLabel: 'Completed Inspection',
     text: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-500',
@@ -138,48 +138,48 @@ const STATUS_CONFIG: Record<
     icon: FileText,
   },
   PENDING: {
-    label: 'SI Pending Reports',
-    shortLabel: 'SI Pending',
+    label: 'Pending Review',
+    shortLabel: 'Pending Review',
     text: 'text-amber-600',
     bg: 'bg-amber-50',
     border: 'border-amber-500',
     icon: Clock3,
   },
   APPROVED: {
-    label: 'SI Approved Reports',
-    shortLabel: 'SI Approved',
+    label: 'Cleaned',
+    shortLabel: 'Cleaned',
     text: 'text-emerald-600',
     bg: 'bg-emerald-50',
     border: 'border-emerald-500',
     icon: CheckCircle2,
   },
   REJECTED: {
-    label: 'SI Rejected Reports',
-    shortLabel: 'SI Rejected',
+    label: 'Not Cleaned',
+    shortLabel: 'Not Cleaned',
     text: 'text-rose-600',
     bg: 'bg-rose-50',
     border: 'border-rose-500',
     icon: XCircle,
   },
   ACTION_REQUIRED: {
-    label: 'Action Required Reports',
-    shortLabel: 'Action Req.',
+    label: 'Attention Required',
+    shortLabel: 'Attention Required',
     text: 'text-orange-600',
     bg: 'bg-orange-50',
     border: 'border-orange-500',
     icon: AlertTriangle,
   },
   PENDING_ACTION: {
-    label: 'Pending Action Reports',
-    shortLabel: 'Pending Action',
+    label: 'Resolution Pending',
+    shortLabel: 'Resolution Pending',
     text: 'text-cyan-600',
     bg: 'bg-cyan-50',
     border: 'border-cyan-500',
     icon: Clock3,
   },
   ACTION_TAKEN: {
-    label: 'Action Taken Reports',
-    shortLabel: 'Action Taken',
+    label: 'Resolved',
+    shortLabel: 'Resolved',
     text: 'text-indigo-600',
     bg: 'bg-indigo-50',
     border: 'border-indigo-500',
@@ -2531,8 +2531,8 @@ function ReportCard({
                     }`}
                 >
                   {aiSuggestsAction
-                    ? 'Action Required'
-                    : 'No Action Required'}
+                    ? 'Attention Required'
+                    : 'No Attention Required'}
                 </div>
               </div>
             </div>
@@ -2574,7 +2574,7 @@ function ReportCard({
           title={
             actionEnabled
               ? 'Send this SI-reviewed report for corrective action'
-              : 'Action Required can only be raised from Approved or Rejected reports'
+              : 'Attention Required can only be raised from Approved or Rejected reports'
           }
           className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${actionEnabled
             ? 'border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100'
@@ -2582,7 +2582,7 @@ function ReportCard({
             }`}
         >
           <AlertTriangle className="h-3.5 w-3.5" />
-          Action Required
+          Attention Required
         </button>
         )}
       </footer>
@@ -2741,7 +2741,7 @@ export function DetailModal({
               <div className="space-y-2">
                 {qcRemark && <RemarkBox label="SI Remark" value={qcRemark} tone="blue" />}
                 {actionRequiredRemark && (
-                  <RemarkBox label="ULB Action Required Instruction" value={actionRequiredRemark} tone="orange" />
+                  <RemarkBox label="ULB Attention Required Instruction" value={actionRequiredRemark} tone="orange" />
                 )}
                 {actionTakenRemark && (
                   <RemarkBox label="IEC Member Response" value={actionTakenRemark} tone="indigo" />
@@ -3066,7 +3066,7 @@ function ReportJourneySection({
       icon: Sparkles,
       title: 'Intelligence Suggest',
       time: formatFullDate(report?.actionAiAt),
-      description: actionRequired ? 'Action Required Recommended' : 'No Action Required',
+      description: actionRequired ? 'Attention Required Recommended' : 'No Attention Required',
       descriptionColor: actionRequired ? 'text-amber-600' : 'text-emerald-600',
     });
   }
@@ -3200,8 +3200,8 @@ function AiInsightsSection({
                   }`}
               >
                 {actionRequired
-                  ? 'Action Required'
-                  : 'No Action Required'}
+                  ? 'Attention Required'
+                  : 'No Attention Required'}
               </span>
             </div>
 
@@ -3288,7 +3288,7 @@ function AiInsightsSection({
               <p className="mt-3 text-[10px] font-semibold leading-4 text-slate-400">
                 AI provides operational guidance only.
                 The ULB Officer remains responsible for
-                the final Action Required decision.
+                the final Attention Required decision.
               </p>
             </div>
           </div>
@@ -3711,7 +3711,7 @@ function ActionRequiredModal({
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-900">Mark Action Required</h2>
+                <h2 className="text-lg font-black text-slate-900">Mark Attention Required</h2>
                 <p className="mt-0.5 text-xs font-medium text-slate-500">
                   Send this SI-reviewed report to the mapped IEC Member.
                 </p>
