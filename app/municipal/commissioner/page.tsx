@@ -11416,6 +11416,13 @@ const [
     };
   }, [appliedFrom, appliedTo]);
 
+  // Warm the leaderboard drawer's record downloads so a row click opens it right away.
+  useEffect(() => {
+    import('./user-performance/UserPerformanceView')
+      .then((mod) => mod.prefetchUserPerformanceRecords(appliedFrom || undefined, appliedTo || undefined))
+      .catch(() => undefined);
+  }, [appliedFrom, appliedTo]);
+
   const buildRoleRows =
     useCallback(
       (

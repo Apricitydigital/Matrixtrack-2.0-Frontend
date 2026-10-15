@@ -28,6 +28,7 @@ const STANDALONE_PATHS = [
   "/ulb/attendance",
   "/ulb/inspection-performance",
   "/ulb/ward-ranking",
+  "/ulb/user-performance",
   "/ulb/map-view-dashboard",
 ];
 

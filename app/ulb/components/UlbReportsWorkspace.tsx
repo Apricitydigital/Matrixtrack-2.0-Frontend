@@ -75,6 +75,7 @@ import PortalHomeLayout
     from '@components/PortalHomeLayout';
 
 import {
+    GeoApi,
     ModuleRecordsApi,
     ToiletApi,
     apiFetch,
@@ -92,6 +93,7 @@ import {
 } from '@lib/wardRankingApi';
 import { createPortal } from 'react-dom';
 import ToiletComponentCollage from '../../../components/ToiletComponentCollage';
+import UlbTeamLeaderboard from './UlbTeamLeaderboard';
 
 /* =========================================================
    TYPES
@@ -2002,6 +2004,26 @@ export default function UlbOperationsWorkspace({
     }
 
 
+    /* City zones / wards, so every zone shows up in the overview even with no reports yet */
+    const [geoZones, setGeoZones] = useState<any[]>([]);
+    const [geoWards, setGeoWards] = useState<any[]>([]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        Promise.allSettled([GeoApi.list('ZONE'), GeoApi.list('WARD')]).then(
+            ([zRes, wRes]) => {
+                if (cancelled) return;
+                if (zRes.status === 'fulfilled') setGeoZones(zRes.value?.nodes || []);
+                if (wRes.status === 'fulfilled') setGeoWards(wRes.value?.nodes || []);
+            }
+        );
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     useEffect(() => {
         loadRecords();
     }, []);
@@ -2496,9 +2518,11 @@ export default function UlbOperationsWorkspace({
      * stat - so every link must pass this same range.
      */
     function inspectionPerformanceHref(
-        status?: string
+        status?: string,
+        zone?: string
     ) {
         const params = new URLSearchParams();
+        if (zone) params.set('zone', zone);
         if (status) params.set('status', status);
         if (appliedDashFromDate) params.set('from', appliedDashFromDate);
         if (appliedDashToDate) params.set('to', appliedDashToDate);
@@ -2962,6 +2986,62 @@ export default function UlbOperationsWorkspace({
             () => buildLeaderboard(dashboardRecords, zoneIdentity, 8),
             [dashboardRecords]
         );
+
+
+    /*
+     * Zone cards for the "Zone Performance & Ward Inspection
+     * Overview" section: every zone (not just the top 8), with its
+     * distinct ward count. Health score = QC approval rate.
+     */
+    const zoneOverviewRows =
+        useMemo(() => {
+            const wardsByZone = new Map<string, Set<string>>();
+
+            const addWard = (zone: string, ward: string) => {
+                if (!wardsByZone.has(zone)) wardsByZone.set(zone, new Set());
+                wardsByZone.get(zone)!.add(ward);
+            };
+
+            dashboardRecords.forEach((item) => {
+                const zone = zoneIdentity(item);
+                const ward = wardIdentity(item);
+                if (zone && ward) addWard(zone, ward);
+            });
+
+            const zoneNameById = new Map<string, string>();
+            geoZones.forEach((zone) => {
+                if (zone?.id && zone?.name) zoneNameById.set(zone.id, zone.name);
+            });
+
+            geoWards.forEach((ward) => {
+                const zoneName = zoneNameById.get(ward?.parentId || ward?.parent?.id);
+                if (zoneName && ward?.name) addWard(zoneName, ward.name);
+            });
+
+            const rowsByZone = new Map(
+                buildLeaderboard(dashboardRecords, zoneIdentity, Infinity).map(
+                    (row) => [row.key, row] as const
+                )
+            );
+
+            geoZones.forEach((zone) => {
+                if (zone?.name && !rowsByZone.has(zone.name)) {
+                    rowsByZone.set(zone.name, emptyLeaderboardRow(zone.name));
+                }
+            });
+
+            return Array.from(rowsByZone.values())
+                .map((row) => ({
+                    ...row,
+                    wardCount: wardsByZone.get(row.key)?.size || 0,
+                    healthScore: approvalRateOf(row),
+                    pending: pendingOf(row),
+                    received: row.total - row.draft,
+                }))
+                .sort((a, b) =>
+                    a.label.localeCompare(b.label, undefined, { numeric: true })
+                );
+        }, [dashboardRecords, geoZones, geoWards]);
 
 
     const wardLeaderboard =
@@ -3780,6 +3860,103 @@ export default function UlbOperationsWorkspace({
 
 
                                         {/* =========================================
+                        ZONE PERFORMANCE & WARD INSPECTION OVERVIEW
+
+                        Each zone card opens the Inspection & Performance
+                        screen on the same date range.
+                    ========================================= */}
+
+                                        {zoneOverviewRows.length > 0 && (
+                                            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                                                <div className="mb-3 flex flex-wrap items-start justify-between gap-2 px-1">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                                                            <MapPin size={14} />
+                                                        </div>
+
+                                                        <div>
+                                                            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                                                                Zone Performance &amp; Ward Inspection Overview
+                                                            </h2>
+
+                                                            <p className="mt-1 text-[11px] font-medium text-slate-500">
+                                                                Click any Zone card below to view detailed Ward reports, SI reviews, expected vs received metrics, and raw inspection logs.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                                                        <Layers3 size={11} />
+                                                        {zoneOverviewRows.length} Zones Active
+                                                    </span>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+                                                    {zoneOverviewRows.map((row) => (
+                                                        <button
+                                                            type="button"
+                                                            key={row.key}
+                                                            onClick={() => router.push(inspectionPerformanceHref(undefined, row.label))}
+                                                            className="group block rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+                                                        >
+                                                            <div className="flex items-center justify-between text-[10px] font-bold">
+                                                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">
+                                                                    <MapPin size={10} />
+                                                                    {row.label}
+                                                                </span>
+
+                                                                <span className="uppercase text-slate-400">
+                                                                    {row.wardCount} Wards
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="mt-3 flex items-end justify-between">
+                                                                <div>
+                                                                    <div className="text-2xl font-black text-slate-900">
+                                                                        {row.healthScore === null ? '-' : `${row.healthScore}%`}
+                                                                    </div>
+
+                                                                    <div className="text-[9px] font-bold uppercase text-slate-400">
+                                                                        Zone Health Score
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="text-right">
+                                                                    <div className="text-base font-black text-indigo-600">
+                                                                        {row.received.toLocaleString('en-IN')}
+                                                                    </div>
+
+                                                                    <div className="text-[9px] font-semibold text-slate-400">
+                                                                        Reports Received
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                                                <div
+                                                                    className="h-full rounded-full bg-violet-500"
+                                                                    style={{ width: `${row.healthScore ?? 0}%` }}
+                                                                />
+                                                            </div>
+
+                                                            <div className="mt-3 flex items-center justify-between text-[10px] font-bold">
+                                                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                                                                    {row.pending.toLocaleString('en-IN')} Pending
+                                                                </span>
+
+                                                                <span className="inline-flex items-center text-indigo-600 group-hover:underline">
+                                                                    Details
+                                                                    <ChevronRight size={12} />
+                                                                </span>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                        )}
+
+
+                                        {/* =========================================
                         INSPECTION & PERFORMANCE
 
                         Wraps the QC workflow stat cards, the module
@@ -4412,43 +4589,11 @@ export default function UlbOperationsWorkspace({
 
                                                 </div>
 
-                                                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-
-                                                    <div
-                                                        id="supervisor-performance"
-                                                        className="scroll-mt-6"
-                                                    >
-                                                        <PeopleLeaderboardCard
-                                                            icon={UsersRound}
-                                                            tone="indigo"
-                                                            title="Supervisor Performance"
-                                                            rows={supervisorLeaderboard}
-                                                            rateType="approval"
-                                                            emptyMessage="No records are attributed to a named supervisor yet."
-                                                        />
-                                                    </div>
-
-                                                    <PeopleLeaderboardCard
-                                                        icon={ShieldCheck}
-                                                        tone="teal"
-                                                        title="SI Reviewer Performance"
-                                                        rows={qcLeaderboard}
-                                                        rateType="approval"
-                                                        emptyMessage="No QC reviewer identity is available yet."
-                                                        note="Currently available for Toilet inspections only — other modules don't expose reviewer identity via the API yet."
-                                                    />
-
-                                                    <PeopleLeaderboardCard
-                                                        icon={Award}
-                                                        tone="amber"
-                                                        title="IEC Member Performance"
-                                                        rows={actionOfficerLeaderboard}
-                                                        rateType="closure"
-                                                        emptyMessage="No IEC Member identity is available yet."
-                                                        note="Named officers are shown for Toilets, Litter Bins and Sweeping. Litter Bin records assigned before this data was joined may still fall back to a short officer ID."
-                                                    />
-
-                                                </div>
+                                                <UlbTeamLeaderboard
+                                                    from={appliedDashFromDate}
+                                                    to={appliedDashToDate}
+                                                    moduleFilter={moduleFilter}
+                                                />
 
                                             </div>
 

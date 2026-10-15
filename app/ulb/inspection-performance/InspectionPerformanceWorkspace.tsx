@@ -32,14 +32,17 @@ import {
 } from 'lucide-react';
 
 import {
+  CityUserApi,
   GeoApi,
   ModuleRecordsApi,
   ToiletApi,
   apiFetch,
+  type DarogaPerformance,
 } from '@lib/apiClient';
+import { performanceRangeParams } from '@lib/userPerformanceScores';
 import { resolveMediaUrl, resolveMediaUrls } from '@lib/mediaUrl';
 
-type ModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA';
+type ModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA' | 'TASKFORCE';
 type ModuleFilter = 'ALL' | ModuleKey;
 
 /*
@@ -84,6 +87,7 @@ const MODULES: Array<{
     { key: 'LITTERBINS', label: 'Litter Bins', shortLabel: 'Litter Bin' },
     { key: 'SWEEPING', label: 'Sweeping', shortLabel: 'Sweeping' },
     { key: 'NALA', label: 'Nala Cleaning', shortLabel: 'Nala' },
+    { key: 'TASKFORCE', label: 'GVP Transformation', shortLabel: 'GVP' },
   ];
 
 const DATE_PRESETS: Array<{ key: DatePreset; label: string }> = [
@@ -313,6 +317,15 @@ function reportTitle(item: any, moduleKey: ModuleKey) {
       [item?.nalaName || item?.nala?.nalaName, item?.nalaPointName]
         .filter(Boolean)
         .join(' - ') || 'Nala Report'
+    );
+  }
+
+  if (moduleKey === 'TASKFORCE') {
+    return (
+      item?.feederPointName ||
+      item?.feederPoint?.feederPointName ||
+      item?.areaName ||
+      'GVP Report'
     );
   }
 
@@ -1088,7 +1101,7 @@ function getActionTakenRemark(item: any, moduleKey: ModuleKey) {
   if (moduleKey === 'LITTERBINS' && item?.type === 'VISIT_REPORT') {
     return item?.actionRemark || null;
   }
-  if (moduleKey === 'LITTERBINS') return item?.actionOfficerRemark || null;
+  if (moduleKey === 'LITTERBINS' || moduleKey === 'TASKFORCE') return item?.actionOfficerRemark || null;
   return item?.actionNote || null;
 }
 
@@ -1206,6 +1219,8 @@ export default function InspectionPerformanceWorkspace() {
   const [actionRemark, setActionRemark] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [darogaTargets, setDarogaTargets] = useState<Record<string, DarogaPerformance> | null>(null);
+  const [targetLoading, setTargetLoading] = useState(false);
 
   const suggestionBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1228,14 +1243,17 @@ export default function InspectionPerformanceWorkspace() {
           });
 
           const response =
-            module.key === 'NALA'
+            module.key === 'NALA' || module.key === 'TASKFORCE'
               ? await request.catch((err) => {
                 console.warn('Nala reports unavailable', err);
                 return { data: [] } as any;
               })
               : await request;
 
-          return (response.data || []).map((record: any) => ({
+          return (response.data || [])
+            // GVP list also carries feeder-point registrations; only inspection reports belong here.
+            .filter((record: any) => module.key !== 'TASKFORCE' || record?.type === 'FEEDER_REPORT')
+            .map((record: any) => ({
             ...record,
             dashboardModule: module.key,
             dashboardModuleLabel: module.label,
@@ -1260,7 +1278,17 @@ export default function InspectionPerformanceWorkspace() {
   async function loadGeo() {
     try {
       const [zRes, wRes] = await Promise.allSettled([GeoApi.list('ZONE'), GeoApi.list('WARD')]);
-      if (zRes.status === 'fulfilled') setZones(zRes.value?.nodes || []);
+      if (zRes.status === 'fulfilled') {
+        const zoneNodes = zRes.value?.nodes || [];
+        setZones(zoneNodes);
+
+        // Deep link from the dashboard zone cards: ?zone=<zone name>
+        const requestedZone = (searchParams.get('zone') || '').trim().toLowerCase();
+        const match = requestedZone
+          ? zoneNodes.find((zone: any) => String(zone.name || '').trim().toLowerCase() === requestedZone)
+          : null;
+        if (match) setSelectedZone(match.id);
+      }
       if (wRes.status === 'fulfilled') setAllWards(wRes.value?.nodes || []);
     } catch (err) {
       console.error('Unable to load zone/ward metadata', err);
@@ -1430,11 +1458,71 @@ export default function InspectionPerformanceWorkspace() {
     const base = canonicalLocationRecords;
     return {
       TOILET: base.filter((item) => item.dashboardModule === 'TOILET').length,
+      TASKFORCE: base.filter((item) => item.dashboardModule === 'TASKFORCE').length,
       LITTERBINS: base.filter((item) => item.dashboardModule === 'LITTERBINS').length,
       SWEEPING: base.filter((item) => item.dashboardModule === 'SWEEPING').length,
       NALA: base.filter((item) => item.dashboardModule === 'NALA').length,
     };
   }, [canonicalLocationRecords]);
+
+  /*
+   * Target progress: inspections credited against the Daroga targets
+   * (admin target, else every assigned asset every day) for the selected
+   * period. 'All' has no date range, so no target.
+   */
+  useEffect(() => {
+    if (dateRange.start === '2000-01-01') {
+      setDarogaTargets(null);
+      return;
+    }
+
+    let cancelled = false;
+    setTargetLoading(true);
+
+    CityUserApi.darogaPerformance(performanceRangeParams(dateRange.start, dateRange.end))
+      .then((response) => {
+        if (!cancelled) setDarogaTargets(response.users || {});
+      })
+      .catch((err) => {
+        console.warn('Target progress unavailable', err);
+        if (!cancelled) setDarogaTargets(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTargetLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange.start, dateRange.end]);
+
+  const targetProgress = useMemo(() => {
+    if (!darogaTargets) return null;
+
+    const norm = (value: any) => String(value || '').trim().toLowerCase();
+    const zoneName = norm(zones.find((zone) => zone.id === selectedZone)?.name);
+    const wardName = norm(allWards.find((ward) => ward.id === selectedWard)?.name);
+
+    let target = 0;
+    let credit = 0;
+
+    Object.values(darogaTargets).forEach((user) => {
+      (user.rows || []).forEach((row) => {
+        if (moduleFilter !== 'ALL' && row.module !== moduleFilter) return;
+        if (selectedZone && norm(row.zoneName) !== zoneName) return;
+        if (selectedWard && row.wardId !== selectedWard && norm(row.wardName) !== wardName) return;
+
+        target += row.target;
+        credit += row.credit;
+      });
+    });
+
+    return {
+      target: Math.round(target),
+      credit: Math.round(credit),
+      percent: target > 0 ? Math.min(100, (credit / target) * 100) : null,
+    };
+  }, [darogaTargets, moduleFilter, selectedZone, selectedWard, zones, allWards]);
 
   const suggestions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1822,7 +1910,7 @@ export default function InspectionPerformanceWorkspace() {
           status: 'ACTION_REQUIRED',
           comment: remark,
         });
-      } else if (isPointModule(moduleKey)) {
+      } else if (isPointModule(moduleKey) || moduleKey === 'TASKFORCE') {
         await ModuleRecordsApi.updateRecordStatus(
           moduleKey,
           actionTarget.id,
@@ -1912,7 +2000,7 @@ export default function InspectionPerformanceWorkspace() {
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {(['ALL', 'TOILET', 'LITTERBINS', 'SWEEPING', 'NALA'] as ModuleFilter[]).map((moduleKey) => {
+              {(['ALL', 'TOILET', 'LITTERBINS', 'SWEEPING', 'NALA', 'TASKFORCE'] as ModuleFilter[]).map((moduleKey) => {
                 const active = moduleFilter === moduleKey;
                 const label =
                   moduleKey === 'ALL'
@@ -1923,7 +2011,9 @@ export default function InspectionPerformanceWorkspace() {
                         ? 'Litter Bin'
                         : moduleKey === 'NALA'
                           ? 'Nala'
-                          : 'Sweeping';
+                          : moduleKey === 'TASKFORCE'
+                            ? 'GVP'
+                            : 'Sweeping';
 
                 return (
                   <button
@@ -2072,6 +2162,48 @@ export default function InspectionPerformanceWorkspace() {
               <span className="text-emerald-600">L: {moduleSplit.LITTERBINS}</span>
               <span className="text-violet-600">S: {moduleSplit.SWEEPING}</span>
               <span className="text-sky-600">N: {moduleSplit.NALA}</span>
+              <span className="text-rose-600">G: {moduleSplit.TASKFORCE}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 pt-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-black uppercase tracking-[0.12em]">
+              <span className="text-slate-500">Target Progress</span>
+              {targetProgress?.percent != null ? (
+                <span
+                  className={
+                    targetProgress.percent >= 100
+                      ? 'text-emerald-600'
+                      : targetProgress.percent >= 80
+                        ? 'text-amber-600'
+                        : 'text-rose-600'
+                  }
+                >
+                  {targetProgress.credit.toLocaleString()} / {targetProgress.target.toLocaleString()} ({Math.round(targetProgress.percent)}%)
+                </span>
+              ) : (
+                <span className="text-slate-400">
+                  {targetLoading
+                    ? 'Loading...'
+                    : dateRange.start === '2000-01-01'
+                      ? 'Pick a date range to see target'
+                      : 'No target for this selection'}
+                </span>
+              )}
+            </div>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  (targetProgress?.percent ?? 0) >= 100
+                    ? 'bg-emerald-500'
+                    : (targetProgress?.percent ?? 0) >= 80
+                      ? 'bg-amber-500'
+                      : 'bg-rose-500'
+                }`}
+                style={{ width: `${targetProgress?.percent ?? 0}%` }}
+              />
             </div>
           </div>
         </div>
@@ -2267,7 +2399,9 @@ function ReportCard({
       ? 'border-blue-200 bg-blue-50 text-blue-700'
       : report.dashboardModule === 'LITTERBINS'
         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-        : 'border-violet-200 bg-violet-50 text-violet-700';
+        : report.dashboardModule === 'TASKFORCE'
+          ? 'border-rose-200 bg-rose-50 text-rose-700'
+          : 'border-violet-200 bg-violet-50 text-violet-700';
 
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">

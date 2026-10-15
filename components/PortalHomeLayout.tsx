@@ -19,6 +19,7 @@ import {
   MapPin,
   Target,
   Users,
+  UsersRound,
   UserPlus,
   Layers,
   Lock,
@@ -630,6 +631,10 @@ function PortalHomeLayoutContent({
 
   if (pathname.startsWith('/ulb/inspection-performance')) {
     pageTitle = 'Inspection and Performance';
+  }
+
+  if (pathname.startsWith('/ulb/user-performance')) {
+    pageTitle = 'User Performance';
   }
 
   if (pathname.startsWith('/ulb/attendance')) {
@@ -2807,6 +2812,24 @@ function PortalHomeLayoutContent({
 
                   <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                     Inspection and Performance
+                  </span>
+                </Link>
+
+
+                {/* USER PERFORMANCE */}
+
+                <Link
+                  href="/ulb/user-performance"
+                  title="User Performance"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/user-performance')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                >
+                  <UsersRound size={15} className="shrink-0" />
+
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                    User Performance
                   </span>
                 </Link>
 

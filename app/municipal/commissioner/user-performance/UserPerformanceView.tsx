@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import {
   Activity,
@@ -609,7 +610,35 @@ function inspectionStats(records: DashboardRecord[]) {
   return { total, approved, rejected, actionRequired, actionTaken, pending, performance };
 }
 
-async function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: string, to?: string): Promise<any[]> {
+/*
+ * Short-lived cache of in-flight/finished history loads, so the Team
+ * Leaderboard can prefetch them and its drawer opens without re-downloading
+ * every module's records. Failed loads are evicted so they can be retried.
+ */
+const RECORDS_CACHE_TTL_MS = 5 * 60 * 1000;
+const recordsCache = new Map<string, { at: number; promise: Promise<any[]> }>();
+
+function loadAllModuleRecords(moduleKey: InspectionModuleKey, from?: string, to?: string): Promise<any[]> {
+  const key = `${moduleKey}|${from || ''}|${to || ''}`;
+  const hit = recordsCache.get(key);
+  if (hit && Date.now() - hit.at < RECORDS_CACHE_TTL_MS) return hit.promise;
+
+  const promise = fetchAllModuleRecords(moduleKey, from, to);
+  recordsCache.set(key, { at: Date.now(), promise });
+  promise.catch(() => {
+    if (recordsCache.get(key)?.promise === promise) recordsCache.delete(key);
+  });
+  return promise;
+}
+
+/** Warm the records cache for a date range (fire and forget). */
+export function prefetchUserPerformanceRecords(from?: string, to?: string) {
+  INSPECTION_MODULES.forEach((module) => {
+    loadAllModuleRecords(module.key, from || undefined, to || undefined).catch(() => undefined);
+  });
+}
+
+async function fetchAllModuleRecords(moduleKey: InspectionModuleKey, from?: string, to?: string): Promise<any[]> {
   if (moduleKey === 'TASKFORCE') {
     return loadAllModuleRecordsStrict(moduleKey, from, to)
       .then((rows) =>
@@ -2847,6 +2876,7 @@ export default function UserPerformanceView({
   onEmbeddedClose?: () => void;
 } = {}) {
   const { user } = useAuth();
+  const isUlbOfficerView = usePathname().startsWith('/ulb/');
 
   const cityId = user?.city?.id || undefined;
   const cityName = user?.city?.name || 'Municipal Corporation';
@@ -2950,7 +2980,50 @@ export default function UserPerformanceView({
       setIecStatus('loading');
       setDarogaStatus('loading');
 
-      const [moduleResult, attendanceResult, siResult, iecResult, darogaResult] = await Promise.allSettled([
+      /*
+       * The score endpoints are fast; apply each as soon as it lands (instead
+       * of after the heavy history download) so an embedded drawer can open
+       * on them while the records keep loading.
+       */
+      const siRequest = CityUserApi.siPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) });
+      const iecRequest = CityUserApi.iecPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) });
+      const darogaRequest = CityUserApi.darogaPerformance(performanceRangeParams(appliedFrom, appliedTo));
+
+      darogaRequest.then(
+        (value) => {
+          setDarogaPerformance(value.users || {});
+          setDarogaStatus('ready');
+        },
+        (reason) => {
+          console.error('Failed to load Daroga performance', reason);
+          setDarogaPerformance(null);
+          setDarogaStatus('error');
+        }
+      );
+      iecRequest.then(
+        (value) => {
+          setIecPerformance(value.users || {});
+          setIecStatus('ready');
+        },
+        (reason) => {
+          console.error('Failed to load IEC Member performance', reason);
+          setIecPerformance(null);
+          setIecStatus('error');
+        }
+      );
+      siRequest.then(
+        (value) => {
+          setSiPerformance(value.users || {});
+          setSiStatus('ready');
+        },
+        (reason) => {
+          console.error('Failed to load Sanitary Inspector performance', reason);
+          setSiPerformance(null);
+          setSiStatus('error');
+        }
+      );
+
+      const [moduleResult, attendanceResult] = await Promise.allSettled([
         Promise.all(
           INSPECTION_MODULES.map((module) =>
             loadAllModuleRecords(module.key, appliedFrom || undefined, appliedTo || undefined).then(
@@ -2971,37 +3044,10 @@ export default function UserPerformanceView({
           page: 1,
           pageSize: 5000,
         }),
-        CityUserApi.siPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) }),
-        CityUserApi.iecPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) }),
-        CityUserApi.darogaPerformance(performanceRangeParams(appliedFrom, appliedTo)),
+        siRequest.catch(() => undefined),
+        iecRequest.catch(() => undefined),
+        darogaRequest.catch(() => undefined),
       ]);
-
-      if (darogaResult.status === 'fulfilled') {
-        setDarogaPerformance(darogaResult.value.users || {});
-        setDarogaStatus('ready');
-      } else {
-        console.error('Failed to load Daroga performance', darogaResult.reason);
-        setDarogaPerformance(null);
-        setDarogaStatus('error');
-      }
-
-      if (iecResult.status === 'fulfilled') {
-        setIecPerformance(iecResult.value.users || {});
-        setIecStatus('ready');
-      } else {
-        console.error('Failed to load IEC Member performance', iecResult.reason);
-        setIecPerformance(null);
-        setIecStatus('error');
-      }
-
-      if (siResult.status === 'fulfilled') {
-        setSiPerformance(siResult.value.users || {});
-        setSiStatus('ready');
-      } else {
-        console.error('Failed to load Sanitary Inspector performance', siResult.reason);
-        setSiPerformance(null);
-        setSiStatus('error');
-      }
 
       if (moduleResult.status === 'fulfilled') {
         // LITTERBINS history also returns bin registration requests; those
@@ -3375,8 +3421,17 @@ export default function UserPerformanceView({
     setPage(1);
   }, [roleFilter, moduleFilter, search]);
 
+  const roleScoresReady =
+    roleFilter === 'SUPERVISOR'
+      ? darogaStatus !== 'loading'
+      : roleFilter === 'QC'
+        ? siStatus !== 'loading'
+        : roleFilter === 'ACTION_OFFICER'
+          ? iecStatus !== 'loading'
+          : !loading;
+
   useEffect(() => {
-    if (!pendingUserId || loading) return;
+    if (!pendingUserId || !roleScoresReady) return;
 
     const match = activeRoleRows.find(
       (row) => row.id === pendingUserId || row.key === pendingUserId
@@ -3390,7 +3445,7 @@ export default function UserPerformanceView({
       setPendingUserId(null);
       onEmbeddedClose?.();
     }
-  }, [pendingUserId, loading, activeRoleRows, cityUsers.length]);
+  }, [pendingUserId, roleScoresReady, activeRoleRows, cityUsers.length]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const pageStart = (page - 1) * PAGE_SIZE;
@@ -3501,7 +3556,7 @@ export default function UserPerformanceView({
 
         {activeRow && (
           <UserDetailDrawer
-            row={activeRow}
+            row={activeRoleRows.find((row) => row.key === activeRow.key) || activeRow}
             roleLabel={roleLabel}
             roleKey={roleFilter}
             fromDate={appliedFrom}
@@ -3533,7 +3588,7 @@ export default function UserPerformanceView({
   }
 
   return (
-    <RoleGuard roles={['COMMISSIONER', 'HMS_SUPER_ADMIN']}>
+    <RoleGuard roles={['COMMISSIONER', 'HMS_SUPER_ADMIN', 'ULB_OFFICER']}>
       <div className="min-h-full bg-[#f6f8fc] pb-12">
         {/* HEADER */}
         <section
@@ -3568,7 +3623,7 @@ export default function UserPerformanceView({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1, minWidth: '280px' }}>
             <Link
-              href="/municipal/commissioner"
+              href={isUlbOfficerView ? '/ulb/dashboard' : '/municipal/commissioner'}
               style={{
                 fontSize: '10px',
                 fontWeight: 900,
@@ -3581,7 +3636,7 @@ export default function UserPerformanceView({
                 width: 'fit-content',
               }}
             >
-              <ArrowLeft size={12} color="#60a5fa" /> Back to Executive Dashboard
+              <ArrowLeft size={12} color="#60a5fa" /> {isUlbOfficerView ? 'Back to Dashboard' : 'Back to Executive Dashboard'}
             </Link>
 
             <h1
