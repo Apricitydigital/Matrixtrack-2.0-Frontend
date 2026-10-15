@@ -12,7 +12,7 @@ const sections = [
     items: [
       { question: "How do I get an account?", answer: "Accounts are created and assigned by your City Administrator. If you don't have login credentials, contact your City Administrator to have an account set up with the correct role, zone, and ward mapping." },
       { question: "I can't see my ward / assigned assets.", answer: "Zones and wards are mapped to your profile by the City Admin. If your ward isn't showing up, ask your administrator to confirm your profile is mapped to the correct zones and wards." },
-      { question: "Why was I logged out automatically?", answer: "For security, sessions expire after 20 minutes of inactivity. Simply log back in to continue. Submit any in-progress inspection before your session ends, as unsaved work may be lost on logout." },
+      { question: "Why was I logged out automatically?", answer: "For security, sessions expire after 90 days. Simply log back in to continue. Submit any in-progress inspection before your session ends, as unsaved work may be lost on logout." },
     ],
   },
   {
