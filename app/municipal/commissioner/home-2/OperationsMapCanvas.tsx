@@ -1232,7 +1232,7 @@ export default function OperationsMapCanvas({
   gvps?: PointMapItem[];
 
   focusLevel: MapFocusLevel;
-  onViewBeatReport: (beat: BeatMapItem) => void;
+  onViewBeatReport?: (beat: BeatMapItem) => void;
   reportLoadingId?: string | null;
   reportError?: { beatId: string; message: string } | null;
 
@@ -1406,14 +1406,16 @@ export default function OperationsMapCanvas({
                     )) : <QuickPerson label="Employee" value="Unassigned" />}
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={!beat.reportId || Boolean(reportLoadingId)}
-                    onClick={() => onViewBeatReport(beat)}
-                    className="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                  >
-                    {reportLoadingId === beat.id ? 'Loading report...' : beat.reportId ? 'View Report' : 'No report for selected date'}
-                  </button>
+                  {onViewBeatReport && (
+                    <button
+                      type="button"
+                      disabled={!beat.reportId || Boolean(reportLoadingId)}
+                      onClick={() => onViewBeatReport(beat)}
+                      className="mt-3 w-full rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                    >
+                      {reportLoadingId === beat.id ? 'Loading report...' : beat.reportId ? 'View Report' : 'No report for selected date'}
+                    </button>
+                  )}
                   {reportError?.beatId === beat.id && (
                     <p role="alert" className="mt-2 whitespace-normal text-xs text-rose-600">{reportError.message}</p>
                   )}
