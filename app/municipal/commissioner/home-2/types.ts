@@ -61,6 +61,8 @@ export type BeatMapItem = {
   reportedSegments: number;
   totalSegments: number;
   supervisors: AssignedSupervisor[];
+  employees?: AssignedSupervisor[];
+  reportId?: string | null;
   actors: MapActor[];
   workflow?: AssetWorkflow;
   workflowTimes?: WorkflowTimes;

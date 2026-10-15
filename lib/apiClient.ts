@@ -1513,6 +1513,7 @@ export const ModuleRecordsApi = {
       tab?: string;
       fromDate?: string;
       toDate?: string;
+      recordId?: string;
     }
   ) => {
     const params = new URLSearchParams();
@@ -1524,6 +1525,7 @@ export const ModuleRecordsApi = {
     if (filters?.tab) params.append("tab", filters.tab);
     if (filters?.fromDate) params.append("startDate", filters.fromDate);
     if (filters?.toDate) params.append("endDate", filters.toDate);
+    if (filters?.recordId) params.append("recordId", filters.recordId);
 
     const queryString = params.toString();
     const url = `/modules/${moduleKey}/records${queryString ? `?${queryString}` : ""}`;
