@@ -68,6 +68,7 @@ import {
   YAxis,
 } from "recharts";
 import UserPerformanceModal from "@components/ui/UserPerformanceModal";
+import DailySubmissionReport from "./DailySubmissionReport";
 
 type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "TASKFORCE" | "NALA";
 type GeoLevel = "zone" | "ward" | "area";
@@ -2572,6 +2573,7 @@ const beatRequests = (
               <Download size={12} />
               {pdfBusy ? "Preparing..." : "Download PDF"}
             </button>
+            <DailySubmissionReport initialDate={reportDate} />
           </div>
         </div>
 
