@@ -1452,10 +1452,12 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
         showAiSection = false,
         photos,
         pending = false,
-        pendingContacts
+        pendingContacts,
+        personPhone
     }: {
         title: string;
         person?: string | null;
+        personPhone?: string | null;
         time?: string | null;
         statusValue?: string | null;
         remarks?: string | null;
@@ -1565,6 +1567,11 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                     }}
                                 >
                                     {person}
+                                    {personPhone && (
+                                        <span style={{ fontWeight: 600, color: '#64748b' }}>
+                                            {' · '}{personPhone}
+                                        </span>
+                                    )}
                                 </div>
                             )}
 
@@ -1795,6 +1802,20 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
             )
             .map((u) => ({ name: String(u.name || ''), phone: u.phone ? String(u.phone) : '' }));
     };
+
+    // Phone of the SI who reviewed: from the record if present, else matched by name in the roster.
+    const siPhone = (() => {
+        const direct = [record.reviewedByQc, record.reviewedBy, record.qcReviewer, record.sanitaryInspector]
+            .map((p: any) => (p && typeof p === 'object' ? p.phone || p.mobile : ''))
+            .find(Boolean);
+        if (direct) return String(direct);
+        const target = String(siName || '').trim().toLowerCase();
+        if (!target) return '';
+        const match = rosterUsers.find(
+            (u) => u.role === 'QC' && String(u.name || '').trim().toLowerCase() === target
+        );
+        return match?.phone ? String(match.phone) : '';
+    })();
 
     if (!mounted || typeof document === 'undefined') return null;
 
@@ -2810,6 +2831,7 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                                     person={
                                         siName
                                     }
+                                    personPhone={siPhone}
                                     time={
                                         siReviewedAt
                                     }

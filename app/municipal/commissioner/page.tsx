@@ -13411,6 +13411,7 @@ setDrilldown({
   function setPreset(
     preset:
       | 'TODAY'
+      | 'YESTERDAY'
       | '7D'
       | '30D'
       | 'MONTH'
@@ -13435,6 +13436,20 @@ setDrilldown({
 
     const start =
       new Date(today);
+
+    if (
+      preset === 'YESTERDAY'
+    ) {
+      start.setDate(
+        start.getDate() -
+        1
+      );
+
+      today.setDate(
+        today.getDate() -
+        1
+      );
+    }
 
     if (
       preset === '7D'
@@ -13612,6 +13627,10 @@ setDrilldown({
                   'Today',
                 ],
                 [
+                  'YESTERDAY',
+                  'Yesterday',
+                ],
+                [
                   '7D',
                   '7D',
                 ],
@@ -13641,6 +13660,7 @@ setDrilldown({
                       setPreset(
                         key as
                         | 'TODAY'
+                        | 'YESTERDAY'
                         | '7D'
                         | '30D'
                         | 'MONTH'
