@@ -1006,6 +1006,15 @@ export const PublicGeoApi = {
 };
 
 export const CityUserApi = {
+  // MATRIXTRACK_SUPER_ADMIN_OVERVIEW_API_V1
+  superAdminOverview: () =>
+    apiFetch<{
+      users: { id: string; name: string; email: string | null; phone: string | null; cityId: string; cityName: string; role: string }[];
+      requests: { id: string; name: string; status: string; requestedRole: string | null; cityId: string; createdAt: string }[];
+      generatedAt: string;
+    }>("/city/super-admin-overview"),
+
+
   list: () =>
     apiFetch<{
       users: {
