@@ -438,15 +438,15 @@ export const CityApi = {
     apiFetch<{ divisions: (MasterNode & { stateId: string })[] }>(
       `/hms/locations/divisions?stateId=${encodeURIComponent(stateId)}`
     ),
-  listDistricts: (stateId: string, divisionId: string) =>
+  listDistricts: (stateId: string, divisionId?: string) =>
     apiFetch<{ districts: (MasterNode & { stateId: string; divisionId: string })[] }>(
-      `/hms/locations/districts?stateId=${encodeURIComponent(stateId)}&divisionId=${encodeURIComponent(divisionId)}`
+      `/hms/locations/districts?stateId=${encodeURIComponent(stateId)}${divisionId ? `&divisionId=${encodeURIComponent(divisionId)}` : ""}`
     ),
   listCities: (districtId: string) =>
     apiFetch<{ cities: CityMasterNode[] }>(
       `/hms/locations/cities?districtId=${encodeURIComponent(districtId)}`
     ),
-  create: (body: { stateId: string; divisionId: string; districtId: string; cityMasterId: string; code: string; ulbCode: string }) =>
+  create: (body: { stateId: string; divisionId?: string; districtId: string; cityMasterId: string; code: string; ulbCode: string }) =>
     apiFetch("/hms/cities", { method: "POST", body: JSON.stringify(body) }),
   update: (cityId: string, body: { stateId?: string; divisionId?: string; districtId?: string; cityMasterId?: string; name?: string; code?: string; ulbCode?: string; enabled?: boolean; adminName?: string; adminEmail?: string }) =>
     apiFetch(`/hms/cities/${cityId}`, { method: "PATCH", body: JSON.stringify(body) }),
@@ -950,7 +950,7 @@ export const PublicGeoApi = {
       `/public/locations/divisions?stateId=${encodeURIComponent(stateId)}`
     ),
 
-  districts: (stateId: string, divisionId: string) =>
+  districts: (stateId: string, divisionId?: string) =>
     apiFetch<{
       districts: {
         id: string;
@@ -962,7 +962,7 @@ export const PublicGeoApi = {
     }>(
       `/public/locations/districts?stateId=${encodeURIComponent(
         stateId
-      )}&divisionId=${encodeURIComponent(divisionId)}`
+      )}${divisionId ? `&divisionId=${encodeURIComponent(divisionId)}` : ""}`
     ),
 
   citiesByDistrict: (districtId: string) =>

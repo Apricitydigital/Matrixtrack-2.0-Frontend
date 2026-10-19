@@ -187,10 +187,14 @@ export default function LoginPage() {
     setLoadingGeo(true);
 
     try {
-      const response =
-        await PublicGeoApi.divisions(stateId);
+      const [divisionResponse, districtResponse] =
+        await Promise.all([
+          PublicGeoApi.divisions(stateId),
+          PublicGeoApi.districts(stateId),
+        ]);
 
-      setDivisions(response.divisions || []);
+      setDivisions(divisionResponse.divisions || []);
+      setDistricts(districtResponse.districts || []);
     } finally {
       setLoadingGeo(false);
     }
@@ -218,15 +222,16 @@ export default function LoginPage() {
     setZones([]);
     setWards([]);
 
-    if (!regForm.stateId || !divisionId) return;
+    if (!regForm.stateId) return;
 
     setLoadingGeo(true);
 
     try {
+      // Division is optional: with none selected, list all districts of the state.
       const response =
         await PublicGeoApi.districts(
           regForm.stateId,
-          divisionId,
+          divisionId || undefined,
         );
 
       setDistricts(response.districts || []);
@@ -694,12 +699,11 @@ export default function LoginPage() {
     try {
       if (
         !regForm.stateId ||
-        !regForm.divisionId ||
         !regForm.districtId ||
         !regForm.cityId
       ) {
         setError(
-          "Please select State, Division, District and City."
+          "Please select State, District and City."
         );
         return;
       }
@@ -767,7 +771,7 @@ export default function LoginPage() {
         password: regForm.password,
 
         stateId: regForm.stateId,
-        divisionId: regForm.divisionId,
+        divisionId: regForm.divisionId || undefined,
         districtId: regForm.districtId,
         cityId: regForm.cityId,
         zoneId: regForm.zoneId,
@@ -2127,7 +2131,7 @@ export default function LoginPage() {
 
                   <div className="mt-field">
                     <label className="mt-field-label">
-                      <Layers size={14} /> Division
+                      <Layers size={14} /> Division (optional)
                     </label>
 
                     <select
@@ -2139,9 +2143,8 @@ export default function LoginPage() {
                         )
                       }
                       disabled={!regForm.stateId || loadingGeo}
-                      required
                     >
-                      <option value="">Select Division</option>
+                      <option value="">All Divisions</option>
 
                       {divisions.map((division) => (
                         <option
@@ -2168,7 +2171,7 @@ export default function LoginPage() {
                         )
                       }
                       disabled={
-                        !regForm.divisionId || loadingGeo
+                        !regForm.stateId || loadingGeo
                       }
                       required
                     >
