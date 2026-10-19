@@ -2982,6 +2982,30 @@ function ReportJourneySection({
   const actionAi = getActionAiResult(report);
   const qcDecision = getQcDecision(report);
 
+  const [siRoster, setSiRoster] = useState<any[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    CityUserApi.list()
+      .then((res: any) => {
+        if (!cancelled) setSiRoster(res?.users || []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const siName = qcReviewerName(report);
+  const siPhone = (() => {
+    const reviewer = report?.reviewedByQc || report?.reviewedBy || report?.qcReviewedBy || report?.qcReviewer || report?.qcReviewedByUser;
+    const direct = reviewer && typeof reviewer === 'object' ? reviewer.phone || reviewer.mobile : '';
+    if (direct) return String(direct);
+    const target = String(siName || '').trim().toLowerCase();
+    if (!target) return '';
+    const match = siRoster.find((u) => u.role === 'QC' && String(u.name || '').trim().toLowerCase() === target);
+    return match?.phone ? String(match.phone) : '';
+  })();
+
   const autoDecision = String(autoQc?.decision || '').toUpperCase();
   const autoRejected = autoDecision === 'REJECTED';
 
@@ -3028,8 +3052,8 @@ function ReportJourneySection({
       icon: ShieldCheck,
       title: 'SI Review',
       time: formatFullDate(report?.qcReviewedAt || report?.reviewedAt),
-      description: qcReviewerName(report)
-        ? `${qcReviewerName(report)} - ${
+      description: siName
+        ? `${siName}${siPhone ? ` · ${siPhone}` : ''} - ${
             qcDecision === 'REJECTED' ? 'Rejected' : 'Approved'
           }`
         : qcDecision === 'REJECTED'

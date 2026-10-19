@@ -14,6 +14,7 @@ import {
   CalendarRange,
   CheckCircle2,
   Clock3,
+  Download,
   Filter,
   Gauge,
   History,
@@ -31,6 +32,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { apiFetch, ApiError } from "@lib/apiClient";
+import { downloadExcel } from "@lib/exportExcel";
 
 import {
   TargetsApi,
@@ -1740,6 +1742,29 @@ export default function TargetAssignmentPage() {
                         <option value="IN_PROGRESS">In Progress</option>
                         <option value="NOT_STARTED">Not Started</option>
                       </select>
+
+                      <button
+                        type="button"
+                        disabled={filteredTargets.length === 0}
+                        onClick={() =>
+                          downloadExcel(filteredTargets, [
+                            { header: "User", value: (t) => t.user.name },
+                            { header: "Email", value: (t) => t.user.email },
+                            { header: "Role", value: (t) => (t.role === "QC" ? "SI" : "Daroga") },
+                            { header: "Ward", value: (t) => t.ward?.name },
+                            { header: "Module", value: (t) => moduleLabel(t.module.name) },
+                            { header: "Period", value: (t) => t.periodType },
+                            { header: "Target", value: (t) => t.targetValue },
+                            { header: "Achieved", value: (t) => t.achieved },
+                            { header: "Remaining", value: (t) => t.remaining },
+                            { header: "Progress %", value: (t) => t.progress },
+                            { header: "Status", value: (t) => (t.targetMet ? "Target Met" : t.achieved > 0 ? "In Progress" : "Not Started") },
+                          ], "Targets", "Targets")
+                        }
+                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <Download size={14} className="text-emerald-600" /> Download Excel
+                      </button>
 
                       {(searchTerm || roleFilter !== "ALL" || moduleFilter !== "ALL" || periodFilter !== "ALL" || statusFilter !== "ALL") && (
                         <button

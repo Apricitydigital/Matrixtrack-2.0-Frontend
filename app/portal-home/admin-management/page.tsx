@@ -11,6 +11,8 @@ import {
 import { Protected, RoleGuard } from '@components/Guards';
 import { useAuth } from '@hooks/useAuth';
 import { CityUserApi, CityModulesApi } from '@lib/apiClient';
+import { downloadExcel } from "@lib/exportExcel";
+
 import ModalPortal from "@components/ui/ModalPortal";
 
 export type AccessLevel = 'WRITE' | 'READ' | 'RESTRICTED';
@@ -691,6 +693,21 @@ export default function SuperAdminAccessManagementPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <button
+              type="button"
+              disabled={filteredUsers.length === 0}
+              onClick={() => downloadExcel(filteredUsers, [
+                { header: 'Name', value: (u: any) => u.name },
+                { header: 'Email', value: (u: any) => u.email },
+                { header: 'Role', value: (u: any) => u.role },
+                { header: 'Inspection Access', value: (u: any) => u.taskforceAccess },
+                { header: 'Ward Ranking Access', value: (u: any) => u.swachhAccess },
+                { header: 'Workforce Access', value: (u: any) => u.workforceAccess },
+              ], 'Admin_Users', 'Users')}
+              style={{ height: 44, padding: '0 16px', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: 13.5, fontWeight: 700, color: '#0f172a', background: '#fff', cursor: filteredUsers.length ? 'pointer' : 'not-allowed' }}
+            >
+              Download Excel
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 13, fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Role:</span>
               <select

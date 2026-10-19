@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import { auditLogApi } from "@lib/apiClient";
 import { Trash2, RotateCcw, AlertTriangle, Search, Filter, ShieldCheck, Calendar, Clock } from "lucide-react";
 import Link from "next/link";
+import { downloadExcel } from "@lib/exportExcel";
+
 
 export default function TrashHubPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -117,6 +119,20 @@ export default function TrashHubPage() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              disabled={filteredItems.length === 0}
+              onClick={() => downloadExcel(filteredItems, [
+                { header: "Type", value: (i: any) => i.type },
+                { header: "Name", value: (i: any) => i.name },
+                { header: "Identifier", value: (i: any) => i.identifier },
+                { header: "Deleted On", value: (i: any) => (i.deletedAt ? new Date(i.deletedAt).toLocaleString("en-IN") : "") },
+                { header: "Expires On", value: (i: any) => (i.expiresAt ? new Date(i.expiresAt).toLocaleString("en-IN") : "") },
+              ], "Trash", "Trash")}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-50 cursor-pointer"
+            >
+              Download Excel
+            </button>
             <button
               onClick={() => setTypeFilter("ALL")}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${

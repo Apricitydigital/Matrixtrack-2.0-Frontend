@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { auditLogApi } from "@lib/apiClient";
 import { useAuth } from "@hooks/useAuth";
+import { downloadExcel } from "@lib/exportExcel";
+
 import {
   Activity,
   Laptop,
@@ -307,6 +309,22 @@ export default function AuditLogsPage() {
                   className="w-full pl-9 pr-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
+              <button
+                type="button"
+                disabled={finalSessions.length === 0}
+                onClick={() => downloadExcel(finalSessions, [
+                  { header: "User", value: (s: any) => s.user?.name },
+                  { header: "Email", value: (s: any) => s.user?.email },
+                  { header: "Role", value: (s: any) => s.user?.role },
+                  { header: "IP Address", value: (s: any) => cleanIp(s.ipAddress) },
+                  { header: "Device", value: (s: any) => s.deviceType },
+                  { header: "Browser", value: (s: any) => s.browser },
+                  { header: "OS", value: (s: any) => s.os },
+                  { header: "Last Active", value: (s: any) => (s.lastActiveAt ? new Date(s.lastActiveAt).toLocaleString("en-IN") : "") },
+                ], "Login_Sessions", "Sessions")}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-50 cursor-pointer">
+                Download Excel
+              </button>
 
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:inline">
@@ -369,6 +387,21 @@ export default function AuditLogsPage() {
                   className="w-full pl-9 pr-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
+              <button
+                type="button"
+                disabled={filteredLogs.length === 0}
+                onClick={() => downloadExcel(filteredLogs, [
+                  { header: "Date & Time", value: (l: any) => new Date(l.createdAt).toLocaleString("en-IN") },
+                  { header: "User", value: (l: any) => l.userName },
+                  { header: "Email", value: (l: any) => l.userEmail },
+                  { header: "Action", value: (l: any) => l.action },
+                  { header: "Module", value: (l: any) => l.module },
+                  { header: "Description", value: (l: any) => l.description, width: 50 },
+                  { header: "IP Address", value: (l: any) => cleanIp(l.ipAddress) },
+                ], "Activity_Logs", "Activity Logs")}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-50 cursor-pointer">
+                Download Excel
+              </button>
 
               {/* Date Filter */}
               <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">

@@ -7,6 +7,7 @@ import { useAuth } from "@hooks/useAuth";
 import type { Role } from "../../../types/auth";
 import { RoleGuard } from "@components/Guards";
 import { roleLabel, moduleLabel } from "@lib/labels";
+import { downloadExcel } from "@lib/exportExcel";
 import {
   canonicalizeModules,
   normalizeModuleKey,
@@ -573,7 +574,17 @@ function CityUsersPage() {
                       zIndex: 150, display: "flex", flexDirection: "column", gap: "4px"
                     }}>
                       <button
-                        onClick={() => { alert("Export to Excel/CSV functionality pending"); setDownloadOpen(false); }}
+                        onClick={async () => {
+                          setDownloadOpen(false);
+                          const ok = await downloadExcel(filteredUsers, [
+                            { header: "Name", value: (u) => u.name },
+                            { header: "Email", value: (u) => u.email },
+                            { header: "Role", value: (u) => roleLabel(u.role) },
+                            { header: "Modules", value: (u) => (u.modules || []).map((m) => m.name).join(", ") },
+                            { header: "Created On", value: (u) => (u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-IN") : "") },
+                          ], "City_Users", "Users");
+                          if (!ok) alert("No users to export");
+                        }}
                         style={{
                           display: "flex", alignItems: "center", gap: "10px", width: "100%", padding: "10px 12px",
                           border: "none", background: "transparent", cursor: "pointer", borderRadius: "8px", fontSize: "0.875rem",
