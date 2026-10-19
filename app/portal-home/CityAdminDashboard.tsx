@@ -14,6 +14,7 @@ import {
   type SupervisorAssignmentStatus,
 } from "@lib/apiClient";
 import { roleLabel } from "@lib/labels";
+import { downloadExcel } from "@lib/exportExcel";
 import swachhApi from "../../modules/swachh-ranking/api/axios";
 
 import {
@@ -4361,6 +4362,22 @@ const beatRequests = (
               >
                 View All Users
                 <ArrowRight size={12} />
+              </button>
+              <button
+                type="button"
+                disabled={filteredUsers.length === 0}
+                onClick={() => downloadExcel(filteredUsers, [
+                  { header: "Name", value: (u: any) => u.name },
+                  { header: "Email", value: (u: any) => u.email },
+                  { header: "Phone", value: (u: any) => u.phone },
+                  { header: "Role", value: (u: any) => getUserRoleLabels(u).join(", ") },
+                  { header: "Modules", value: (u: any) => getUserModuleLabels(u).join(", ") },
+                  { header: "Status", value: (u: any) => getUserStatus(u) },
+                ], "Daroga_Directory", "Darogas")}
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3.5 text-[10px] font-black text-slate-700 flex items-center gap-1.5 hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
+              >
+                <Download size={12} />
+                Download Excel
               </button>
             </div>
           </div>

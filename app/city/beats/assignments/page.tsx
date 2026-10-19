@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { AreaBeatApi } from "@lib/apiClient";
+import { downloadExcel } from "@lib/exportExcel";
 import { RoleGuard } from "@components/Guards";
 import { useAuth } from "@hooks/useAuth";
 
@@ -779,6 +780,23 @@ export default function BeatAssignmentsPage() {
                 {filteredBeats.length} beat(s) found
               </div>
             </div>
+            <button
+              type="button"
+              disabled={filteredBeats.length === 0}
+              onClick={() =>
+                downloadExcel(filteredBeats, [
+                  { header: "Beat", value: (b: any) => b.beatName },
+                  { header: "Zone", value: (b: any) => b.zoneName },
+                  { header: "Ward", value: (b: any) => b.wardName },
+                  { header: "Area", value: (b: any) => b.areaName },
+                  { header: "Assigned To", value: (b: any) => b.assignedToName },
+                  { header: "Darogas", value: (b: any) => (b.supervisorsSummary || []).map((s: any) => s.name).filter(Boolean).join(", ") },
+                ], "Beat_Assignments", "Beat Assignments")
+              }
+              style={{ height: "40px", padding: "0 14px", borderRadius: "10px", border: "1px solid #e2e8f0", background: "white", fontWeight: 700, fontSize: "0.8rem", color: "#475569", cursor: filteredBeats.length ? "pointer" : "not-allowed" }}
+            >
+              Download Excel
+            </button>
           </div>
 
           {loading ? (

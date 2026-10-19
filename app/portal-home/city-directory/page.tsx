@@ -31,8 +31,11 @@ import {
   Users,
   Zap,
   MoreVertical,
+  Download,
 } from "lucide-react";
 import { ApiError, CityApi } from "@lib/apiClient";
+import { downloadExcel } from "@lib/exportExcel";
+
 import { useToast } from "@components/ui/ToastProvider";
 import { Card } from "@components/ui/Card";
 import { Button } from "@components/ui/Button";
@@ -767,6 +770,25 @@ export default function HmsDashboardPage() {
               ))}
             </select>
           </div>
+          <button
+              type="button"
+              disabled={filteredCities.length === 0}
+              onClick={() =>
+                downloadExcel(filteredCities, [
+                { header: "City", value: (c: any) => c.name },
+                { header: "City Code", value: (c: any) => c.code },
+                { header: "ULB Code", value: (c: any) => c.ulbCode },
+                { header: "State", value: (c: any) => c.state?.name },
+                { header: "Division", value: (c: any) => c.division?.name },
+                { header: "District", value: (c: any) => c.district?.name },
+                { header: "Status", value: (c: any) => (c.enabled ? "Live" : "Dormant") },
+                { header: "City Admins", value: (c: any) => ((c.cityAdmins ?? []).length ? c.cityAdmins : c.cityAdmin ? [c.cityAdmin] : []).map((a: any) => `${a.name} (${a.email})`).join(", ") },
+              ], "Cities", "Cities")
+              }
+              className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Download size={16} /> Download Excel
+            </button>
         </div>
 
         {/* Active Filter Summary Pills */}
