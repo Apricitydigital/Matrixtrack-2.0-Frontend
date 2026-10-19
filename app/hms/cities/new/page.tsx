@@ -118,7 +118,7 @@ export default function CreateCityPage() {
   }, [stateId]);
 
   useEffect(() => {
-    if (!stateId || !divisionId) {
+    if (!stateId) {
       setDistricts([]);
       setDistrictId("");
       setMasterCities([]);
@@ -128,7 +128,7 @@ export default function CreateCityPage() {
 
     setMasterLoading(true);
 
-    CityApi.listDistricts(stateId, divisionId)
+    CityApi.listDistricts(stateId, divisionId || undefined)
       .then((res: any) => {
         setDistricts(res.districts ?? []);
         setDistrictId("");
@@ -190,7 +190,7 @@ export default function CreateCityPage() {
     try {
       await CityApi.create({
         stateId,
-        divisionId,
+        divisionId: divisionId || undefined,
         districtId,
         cityMasterId,
         code,
@@ -232,7 +232,6 @@ export default function CreateCityPage() {
 
   const hierarchyCompleted =
     Boolean(stateId) &&
-    Boolean(divisionId) &&
     Boolean(districtId) &&
     Boolean(cityMasterId);
 
@@ -485,7 +484,7 @@ export default function CreateCityPage() {
                 <label className="block">
                   <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
                     Division{" "}
-                    <span className="text-rose-500">*</span>
+                    <span className="font-semibold normal-case tracking-normal text-slate-400">(optional)</span>
                   </span>
 
                   <select
@@ -495,13 +494,12 @@ export default function CreateCityPage() {
                       setDivisionId(event.target.value)
                     }
                     disabled={!stateId}
-                    required
                   >
                     <option value="">
                       {stateId
                         ? masterLoading
                           ? "Loading..."
-                          : "Select division"
+                          : "All divisions"
                         : "Select state first"}
                     </option>
 
@@ -528,15 +526,15 @@ export default function CreateCityPage() {
                     onChange={(event) =>
                       setDistrictId(event.target.value)
                     }
-                    disabled={!divisionId}
+                    disabled={!stateId}
                     required
                   >
                     <option value="">
-                      {divisionId
+                      {stateId
                         ? masterLoading
                           ? "Loading..."
                           : "Select district"
-                        : "Select division first"}
+                        : "Select state first"}
                     </option>
 
                     {districts.map((district) => (

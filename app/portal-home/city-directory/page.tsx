@@ -50,7 +50,7 @@ import { Sparkline } from "@components/ui/Sparkline";
 
 type CityCreateInput = {
   stateId: string;
-  divisionId: string;
+  divisionId?: string;
   districtId: string;
   cityMasterId: string;
   code: string;
@@ -231,14 +231,14 @@ export default function HmsDashboardPage() {
   }, [stateId]);
 
   useEffect(() => {
-    if (!stateId || !divisionId) {
+    if (!stateId) {
       setDistricts([]); setDistrictId("");
       setMasterCities([]); setCityMasterId("");
       return;
     }
     let active = true;
     setMasterLoading(true);
-    CityApi.listDistricts(stateId, divisionId)
+    CityApi.listDistricts(stateId, divisionId || undefined)
       .then((res) => {
         if (!active) return;
         setDistricts(res.districts);
@@ -286,7 +286,7 @@ export default function HmsDashboardPage() {
     setCityStatus("Creating...");
     try {
       const payload: CityCreateInput = {
-        stateId, divisionId, districtId, cityMasterId,
+        stateId, divisionId: divisionId || undefined, districtId, cityMasterId,
         code: cityCode, ulbCode: cityUlbCode || cityCode
       };
       await CityApi.create(payload);
@@ -474,7 +474,7 @@ export default function HmsDashboardPage() {
     0
   );
   const hierarchyReadyCities = cities.filter(
-    (city) => city.state?.name && city.division?.name && city.district?.name
+    (city) => city.state?.name && city.district?.name
   ).length;
   const coverageRate = totalCities ? Math.round((activeCities / totalCities) * 100) : 0;
   const adminRate = totalCities ? Math.round((managedCities / totalCities) * 100) : 0;
@@ -550,8 +550,8 @@ export default function HmsDashboardPage() {
   // ── Zone-performance analog: top cities by hierarchy completeness ──
   const topCities = [...cities]
     .map((c) => {
-      const filled = [c.state?.name, c.division?.name, c.district?.name].filter(Boolean).length;
-      return { name: c.name, pct: Math.round((filled / 3) * 100) };
+      const filled = [c.state?.name, c.district?.name].filter(Boolean).length;
+      return { name: c.name, pct: Math.round((filled / 2) * 100) };
     })
     .sort((a, b) => b.pct - a.pct)
     .slice(0, 5);
@@ -647,7 +647,7 @@ export default function HmsDashboardPage() {
   );
 
   const hierarchyIssues = cities.filter(
-    (city) => !city.state?.name || !city.division?.name || !city.district?.name
+    (city) => !city.state?.name || !city.district?.name
   );
 
   const selectClass =
@@ -899,7 +899,7 @@ export default function HmsDashboardPage() {
 
                   const hierarchyItems = [
                     { label: city.state?.name || "No state", missing: !city.state?.name },
-                    { label: city.division?.name || "No division", missing: !city.division?.name },
+                    { label: city.division?.name || "No division", missing: false },
                     { label: city.district?.name || "No district", missing: !city.district?.name },
                   ];
 
@@ -942,7 +942,7 @@ export default function HmsDashboardPage() {
                       <td className="px-5 py-4 align-middle">
                         <div className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
                           {[
-                            { label: city.division?.name || "No division", missing: !city.division?.name },
+                            { label: city.division?.name || "No division", missing: false },
                             { label: city.district?.name || "No district", missing: !city.district?.name },
                           ].map((item, hierarchyIndex, arr) => (
                             <div
@@ -1352,15 +1352,15 @@ export default function HmsDashboardPage() {
               {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Division" required>
-            <select className={selectClass} value={divisionId} onChange={(e) => setDivisionId(e.target.value)} disabled={!stateId} required>
-              <option value="">{stateId ? (masterLoading ? "Loading divisions..." : "Select division") : "Select state first"}</option>
+          <FormField label="Division (optional)">
+            <select className={selectClass} value={divisionId} onChange={(e) => setDivisionId(e.target.value)} disabled={!stateId}>
+              <option value="">{stateId ? (masterLoading ? "Loading divisions..." : "All divisions") : "Select state first"}</option>
               {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>
           <FormField label="District" required>
-            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!divisionId} required>
-              <option value="">{divisionId ? (masterLoading ? "Loading districts..." : "Select district") : "Select division first"}</option>
+            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!stateId} required>
+              <option value="">{stateId ? (masterLoading ? "Loading districts..." : "Select district") : "Select state first"}</option>
               {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>
@@ -1939,14 +1939,14 @@ function EditCityModal({
   }, [stateId]);
 
   useEffect(() => {
-    if (!stateId || !divisionId) {
+    if (!stateId) {
       setDistricts([]); setDistrictId("");
       setMasterCities([]); setCityMasterId("");
       return;
     }
     let active = true;
     setLoadingMasters(true);
-    CityApi.listDistricts(stateId, divisionId)
+    CityApi.listDistricts(stateId, divisionId || undefined)
       .then((res) => {
         if (!active) return;
         setDistricts(res.districts);
@@ -1986,7 +1986,7 @@ function EditCityModal({
     setLoading(true);
     try {
       await onSave(city.id, {
-        ...(stateId && divisionId && districtId && cityMasterId ? { stateId, divisionId, districtId, cityMasterId } : {}),
+        ...(stateId && districtId && cityMasterId ? { stateId, divisionId: divisionId || undefined, districtId, cityMasterId } : {}),
         ...(selectedMasterCity ? { name: selectedMasterCity.name } : { name: city.name }),
         code, ulbCode, adminName, adminEmail
       });
@@ -2014,15 +2014,15 @@ function EditCityModal({
               {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Division">
+          <FormField label="Division (optional)">
             <select className={selectClass} value={divisionId} onChange={(e) => setDivisionId(e.target.value)} disabled={!stateId}>
-              <option value="">{stateId ? (loadingMasters ? "Loading..." : "Select division") : "Select state first"}</option>
+              <option value="">{stateId ? (loadingMasters ? "Loading..." : "All divisions") : "Select state first"}</option>
               {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>
           <FormField label="District">
-            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!divisionId}>
-              <option value="">{divisionId ? (loadingMasters ? "Loading..." : "Select district") : "Select division first"}</option>
+            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!stateId}>
+              <option value="">{stateId ? (loadingMasters ? "Loading..." : "Select district") : "Select state first"}</option>
               {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>

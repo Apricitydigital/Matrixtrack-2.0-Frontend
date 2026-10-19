@@ -32,6 +32,11 @@ type CityMasterNode = MasterNode & {
   districtId: string;
 };
 
+// Backend stores a placeholder division named after the state for states with no divisions.
+const isNoDivision = (division: MasterNode, stateName?: string) =>
+  Boolean(stateName) &&
+  division.name.trim().toLowerCase() === stateName!.trim().toLowerCase();
+
 export default function CreateCityPage() {
   const router = useRouter();
 
@@ -102,12 +107,13 @@ export default function CreateCityPage() {
 
     CityApi.listDivisions(stateId)
       .then((res: any) => {
-        setDivisions(res.divisions ?? []);
+        // Division is optional. Hide the placeholder division some states carry (named after the state).
+        const stateName = states.find((s) => s.id === stateId)?.name;
+        const list: MasterNode[] = (res.divisions ?? []).filter(
+          (d: MasterNode) => !isNoDivision(d, stateName)
+        );
+        setDivisions(list);
         setDivisionId("");
-        setDistricts([]);
-        setDistrictId("");
-        setMasterCities([]);
-        setCityMasterId("");
       })
       .catch(() => {
         setStatus("Failed to load divisions");
@@ -117,8 +123,9 @@ export default function CreateCityPage() {
       });
   }, [stateId]);
 
+  // Districts load as soon as a state is chosen; a division (optional) narrows them.
   useEffect(() => {
-    if (!stateId || !divisionId) {
+    if (!stateId) {
       setDistricts([]);
       setDistrictId("");
       setMasterCities([]);
@@ -128,7 +135,7 @@ export default function CreateCityPage() {
 
     setMasterLoading(true);
 
-    CityApi.listDistricts(stateId, divisionId)
+    CityApi.listDistricts(stateId, divisionId || undefined)
       .then((res: any) => {
         setDistricts(res.districts ?? []);
         setDistrictId("");
@@ -190,7 +197,7 @@ export default function CreateCityPage() {
     try {
       await CityApi.create({
         stateId,
-        divisionId,
+        divisionId: divisionId || undefined,
         districtId,
         cityMasterId,
         code,
@@ -232,7 +239,6 @@ export default function CreateCityPage() {
 
   const hierarchyCompleted =
     Boolean(stateId) &&
-    Boolean(divisionId) &&
     Boolean(districtId) &&
     Boolean(cityMasterId);
 
@@ -394,7 +400,7 @@ export default function CreateCityPage() {
                 <label className="block">
                   <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
                     Division{" "}
-                    <span className="text-rose-500">*</span>
+                    <span className="font-semibold normal-case tracking-normal text-slate-400">(optional)</span>
                   </span>
 
                   <select
@@ -403,15 +409,16 @@ export default function CreateCityPage() {
                     onChange={(event) =>
                       setDivisionId(event.target.value)
                     }
-                    disabled={!stateId}
-                    required
+                    disabled={!stateId || (!masterLoading && divisions.length === 0)}
                   >
                     <option value="">
-                      {stateId
-                        ? masterLoading
+                      {!stateId
+                        ? "Select state first"
+                        : masterLoading
                           ? "Loading..."
-                          : "Select division"
-                        : "Select state first"}
+                          : divisions.length === 0
+                            ? "No divisions for this state"
+                            : "All divisions"}
                     </option>
 
                     {divisions.map((division) => (
@@ -437,15 +444,15 @@ export default function CreateCityPage() {
                     onChange={(event) =>
                       setDistrictId(event.target.value)
                     }
-                    disabled={!divisionId}
+                    disabled={!stateId}
                     required
                   >
                     <option value="">
-                      {divisionId
+                      {stateId
                         ? masterLoading
                           ? "Loading..."
                           : "Select district"
-                        : "Select division first"}
+                        : "Select state first"}
                     </option>
 
                     {districts.map((district) => (
