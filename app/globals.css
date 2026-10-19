@@ -1487,3 +1487,69 @@ html.dark-theme .no-invert {
 .leaflet-control-attribution {
   display: none !important;
 }
+
+/* -------------------------------------------------- */
+/* Global responsive safety net                       */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Flex/grid children may shrink instead of forcing page-wide overflow */
+main,
+.portal-main-content {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  /* Tables scroll inside their own box instead of widening the page */
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* Fixed-pixel widths (modals, drawers, popovers) must fit the viewport */
+  [class*="w-["],
+  [class*="max-w-["] {
+    max-width: 100vw;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Prevent iOS zoom-on-focus and give touch targets room */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  button,
+  [role="button"],
+  select {
+    min-height: 36px;
+  }
+
+  /* Dialogs: keep a margin from screen edges */
+  [role="dialog"],
+  .modal,
+  .modal-content {
+    max-width: calc(100vw - 16px) !important;
+  }
+
+  /* Plotly / Leaflet / charts never exceed their container */
+  .js-plotly-plot,
+  .plot-container,
+  .leaflet-container,
+  .recharts-wrapper {
+    max-width: 100% !important;
+  }
+
+  .page {
+    padding: 10px 12px !important;
+  }
+}

@@ -15358,7 +15358,7 @@ setDrilldown({
                   key={module.key}
                   className={`rounded-2xl border p-3.5 shadow-sm ${module.theme}`}
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <div
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-md ${module.iconTheme}`}
@@ -15385,7 +15385,7 @@ setDrilldown({
                     </div>
 
 
-                    <div className="flex shrink-0 items-stretch gap-2">
+                    <div className="flex w-full shrink-0 items-stretch sm:w-auto gap-2">
                       <div className="min-w-[104px] rounded-xl border border-indigo-100 bg-indigo-50/90 px-3 py-2 text-right shadow-sm dark:border-indigo-800 dark:bg-indigo-950/30">
                         <div className="text-[20px] font-black leading-none text-indigo-700 dark:text-indigo-300">
                           {(module.assigned ?? 0).toLocaleString(
@@ -16024,7 +16024,7 @@ setDrilldown({
           <div className="grid grid-cols-1 gap-3 border-t border-[#edf1f7] bg-[#fbfdff] p-3 xl:grid-cols-[1.22fr_1fr]">
             {/* VISUAL ZONE MAP */}
             <div className="overflow-hidden rounded-[18px] border border-[#dfe7f3] bg-white shadow-[0_14px_35px_-24px_rgba(37,99,235,.38)]">
-              <div className="flex items-center justify-between gap-3 border-b border-[#eef2f7] px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#eef2f7] px-4 py-3">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-indigo-500 to-blue-600 text-[#10235e] shadow-[0_8px_18px_-9px_rgba(79,70,229,.75)]">
                     <MapPin size={14} />
