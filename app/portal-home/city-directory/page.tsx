@@ -1,4 +1,8 @@
+// MATRIXTRACK_LOCATION_CORRECTION_V1
 'use client';
+
+import { useCityLocationSelection } from "../../../hooks/useCityLocationSelection";
+
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -69,15 +73,18 @@ type CityUpdateInput = {
   adminEmail?: string;
 };
 
+function usableDivision(city: CityRow) {
+  return !!city.division?.name || ["GUJARAT", "CHANDIGARH_UT"].includes(city.state?.code || "");
+}
+
 export default function HmsDashboardPage() {
   const { showToast } = useToast();
   const [cities, setCities] = useState<CityRow[]>([]);
   const [states, setStates] = useState<MasterNode[]>([]);
-  const [divisions, setDivisions] = useState<MasterNode[]>([]);
-  const [districts, setDistricts] = useState<MasterNode[]>([]);
-  const [masterCities, setMasterCities] = useState<CityMasterNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [masterLoading, setMasterLoading] = useState(false);
+  const [loadingStates, setLoadingStates] = useState(false);
+  const { stateId, setStateId, divisionId, setDivisionId, districtId, setDistrictId, cityMasterId, setCityMasterId, divisions, setDivisions, districts, setDistricts, masterCities, setMasterCities, masterLoading: selectionLoading, divisionOptional, divisionMode, divisionPlaceholder, districtEnabled, hierarchyCompleted, loadingDivisions, loadingDistricts, loadingCities, locationError } = useCityLocationSelection();
+  const masterLoading = loadingStates || selectionLoading;
   const [error, setError] = useState<string | null>(null);
   const [editingCity, setEditingCity] = useState<CityRow | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<{ cityId: string; cityName: string; admin: CityAdminInfo } | null>(null);
@@ -115,10 +122,6 @@ export default function HmsDashboardPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "live" | "dormant" | "managed" | "unmanaged">("all");
   const [tablePage, setTablePage] = useState(1);
 
-  const [stateId, setStateId] = useState("");
-  const [divisionId, setDivisionId] = useState("");
-  const [districtId, setDistrictId] = useState("");
-  const [cityMasterId, setCityMasterId] = useState("");
   const [cityCode, setCityCode] = useState("");
   const [cityUlbCode, setCityUlbCode] = useState("");
   const [cityStatus, setCityStatus] = useState("");
@@ -190,13 +193,13 @@ export default function HmsDashboardPage() {
 
   const loadStates = async () => {
     try {
-      setMasterLoading(true);
+      setLoadingStates(true);
       const res = await CityApi.listStates();
       setStates(res.states);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load states");
     } finally {
-      setMasterLoading(false);
+      setLoadingStates(false);
     }
   };
 
@@ -209,63 +212,7 @@ export default function HmsDashboardPage() {
     setTablePage(1);
   }, [searchQuery, statusFilter]);
 
-  useEffect(() => {
-    if (!stateId) {
-      setDivisions([]); setDivisionId("");
-      setDistricts([]); setDistrictId("");
-      setMasterCities([]); setCityMasterId("");
-      return;
-    }
-    let active = true;
-    setMasterLoading(true);
-    CityApi.listDivisions(stateId)
-      .then((res) => {
-        if (!active) return;
-        setDivisions(res.divisions);
-        setDivisionId(""); setDistricts([]); setDistrictId("");
-        setMasterCities([]); setCityMasterId("");
-      })
-      .catch((err) => { if (active) setError(err instanceof ApiError ? err.message : "Failed to load divisions"); })
-      .finally(() => { if (active) setMasterLoading(false); });
-    return () => { active = false; };
-  }, [stateId]);
 
-  useEffect(() => {
-    if (!stateId) {
-      setDistricts([]); setDistrictId("");
-      setMasterCities([]); setCityMasterId("");
-      return;
-    }
-    let active = true;
-    setMasterLoading(true);
-    CityApi.listDistricts(stateId, divisionId || undefined)
-      .then((res) => {
-        if (!active) return;
-        setDistricts(res.districts);
-        setDistrictId(""); setMasterCities([]); setCityMasterId("");
-      })
-      .catch((err) => { if (active) setError(err instanceof ApiError ? err.message : "Failed to load districts"); })
-      .finally(() => { if (active) setMasterLoading(false); });
-    return () => { active = false; };
-  }, [stateId, divisionId]);
-
-  useEffect(() => {
-    if (!districtId) {
-      setMasterCities([]); setCityMasterId("");
-      return;
-    }
-    let active = true;
-    setMasterLoading(true);
-    CityApi.listCities(districtId)
-      .then((res) => {
-        if (!active) return;
-        setMasterCities(res.cities);
-        setCityMasterId("");
-      })
-      .catch((err) => { if (active) setError(err instanceof ApiError ? err.message : "Failed to load cities"); })
-      .finally(() => { if (active) setMasterLoading(false); });
-    return () => { active = false; };
-  }, [districtId]);
 
   useEffect(() => {
     const selectedCity = masterCities.find((city) => city.id === cityMasterId);
@@ -282,6 +229,7 @@ export default function HmsDashboardPage() {
 
   const handleCreateCity = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hierarchyCompleted) { setCityStatus("Select a complete, valid location hierarchy first."); return; }
     setCityCreating(true);
     setCityStatus("Creating...");
     try {
@@ -474,7 +422,7 @@ export default function HmsDashboardPage() {
     0
   );
   const hierarchyReadyCities = cities.filter(
-    (city) => city.state?.name && city.district?.name
+    (city) => city.state?.name && usableDivision(city) && city.district?.name
   ).length;
   const coverageRate = totalCities ? Math.round((activeCities / totalCities) * 100) : 0;
   const adminRate = totalCities ? Math.round((managedCities / totalCities) * 100) : 0;
@@ -550,8 +498,8 @@ export default function HmsDashboardPage() {
   // ── Zone-performance analog: top cities by hierarchy completeness ──
   const topCities = [...cities]
     .map((c) => {
-      const filled = [c.state?.name, c.district?.name].filter(Boolean).length;
-      return { name: c.name, pct: Math.round((filled / 2) * 100) };
+      const filled = [c.state?.name, usableDivision(c), c.district?.name].filter(Boolean).length;
+      return { name: c.name, pct: Math.round((filled / 3) * 100) };
     })
     .sort((a, b) => b.pct - a.pct)
     .slice(0, 5);
@@ -582,8 +530,8 @@ export default function HmsDashboardPage() {
   const [filterDistrict, setFilterDistrict] = useState("");
 
   const uniqueFilterStates = useMemo(() => Array.from(new Set(cities.map((c) => c.state?.name).filter(Boolean))), [cities]);
-  const uniqueFilterDivisions = useMemo(() => Array.from(new Set(cities.map((c) => c.division?.name).filter(Boolean))), [cities]);
-  const uniqueFilterDistricts = useMemo(() => Array.from(new Set(cities.map((c) => c.district?.name).filter(Boolean))), [cities]);
+  const uniqueFilterDivisions = useMemo(() => Array.from(new Set(cities.filter((c) => !filterState || c.state?.name === filterState).map((c) => c.division?.name).filter(Boolean))).sort(), [cities, filterState]);
+  const uniqueFilterDistricts = useMemo(() => Array.from(new Set(cities.filter((c) => (!filterState || c.state?.name === filterState) && (!filterDivision || c.division?.name === filterDivision)).map((c) => c.district?.name).filter(Boolean))).sort(), [cities, filterState, filterDivision]);
 
   useEffect(() => {
     setTablePage(1);
@@ -647,7 +595,7 @@ export default function HmsDashboardPage() {
   );
 
   const hierarchyIssues = cities.filter(
-    (city) => !city.state?.name || !city.district?.name
+    (city) => !city.state?.name || !usableDivision(city) || !city.district?.name
   );
 
   const selectClass =
@@ -733,7 +681,7 @@ export default function HmsDashboardPage() {
           <div className="relative min-w-[140px]">
             <select
               value={filterState}
-              onChange={(e) => { setFilterState(e.target.value); setTablePage(1); }}
+              onChange={(e) => { setFilterState(e.target.value); setFilterDivision(""); setFilterDistrict(""); setTablePage(1); }}
               className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
             >
               <option value="">All States</option>
@@ -747,7 +695,7 @@ export default function HmsDashboardPage() {
           <div className="relative min-w-[140px]">
             <select
               value={filterDivision}
-              onChange={(e) => { setFilterDivision(e.target.value); setTablePage(1); }}
+              onChange={(e) => { setFilterDivision(e.target.value); setFilterDistrict(""); setTablePage(1); }}
               className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none hover:border-slate-300 focus:border-blue-400"
             >
               <option value="">All Divisions</option>
@@ -804,13 +752,13 @@ export default function HmsDashboardPage() {
             {filterState && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
                 State: {filterState}
-                <button type="button" onClick={() => setFilterState("")} className="text-slate-400 hover:text-slate-700">×</button>
+                <button type="button" onClick={() => { setFilterState(""); setFilterDivision(""); setFilterDistrict(""); }} className="text-slate-400 hover:text-slate-700">×</button>
               </span>
             )}
             {filterDivision && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold text-slate-700">
                 Division: {filterDivision}
-                <button type="button" onClick={() => setFilterDivision("")} className="text-slate-400 hover:text-slate-700">×</button>
+                <button type="button" onClick={() => { setFilterDivision(""); setFilterDistrict(""); }} className="text-slate-400 hover:text-slate-700">×</button>
               </span>
             )}
             {filterDistrict && (
@@ -899,7 +847,7 @@ export default function HmsDashboardPage() {
 
                   const hierarchyItems = [
                     { label: city.state?.name || "No state", missing: !city.state?.name },
-                    { label: city.division?.name || "No division", missing: false },
+                    { label: city.division?.name || "Not configured", missing: !usableDivision(city) },
                     { label: city.district?.name || "No district", missing: !city.district?.name },
                   ];
 
@@ -942,7 +890,7 @@ export default function HmsDashboardPage() {
                       <td className="px-5 py-4 align-middle">
                         <div className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
                           {[
-                            { label: city.division?.name || "No division", missing: false },
+                            { label: city.division?.name || "Not configured", missing: !usableDivision(city) },
                             { label: city.district?.name || "No district", missing: !city.district?.name },
                           ].map((item, hierarchyIndex, arr) => (
                             <div
@@ -1346,21 +1294,22 @@ export default function HmsDashboardPage() {
         size="md"
       >
         <form onSubmit={handleCreateCity} className="flex flex-col gap-4">
+          {locationError && <div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{locationError}</div>}
           <FormField label="State" required>
             <select className={selectClass} value={stateId} onChange={(e) => setStateId(e.target.value)} required>
               <option value="">{masterLoading ? "Loading states..." : "Select state"}</option>
               {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Division (optional)">
-            <select className={selectClass} value={divisionId} onChange={(e) => setDivisionId(e.target.value)} disabled={!stateId}>
-              <option value="">{stateId ? (masterLoading ? "Loading divisions..." : "All divisions") : "Select state first"}</option>
+          <FormField label="Division" required={!divisionOptional}>
+            <select className={selectClass} value={divisionId} onChange={(e) => setDivisionId(e.target.value)} disabled={!stateId || loadingDivisions || divisionOptional || divisionMode === 'UNVERIFIED'} required={!divisionOptional}>
+              <option value="">{divisionPlaceholder}</option>
               {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>
           <FormField label="District" required>
-            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!stateId} required>
-              <option value="">{stateId ? (masterLoading ? "Loading districts..." : "Select district") : "Select state first"}</option>
+            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!districtEnabled || loadingDistricts} required>
+              <option value="">{districtEnabled ? (loadingDistricts ? "Loading districts..." : "Select district") : "Select state and division first"}</option>
               {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>
@@ -1377,7 +1326,7 @@ export default function HmsDashboardPage() {
                   setCityUlbCode(match.code.toLowerCase());
                 }
               }}
-              disabled={!districtId}
+              disabled={!districtId || loadingCities || !districts.some((entry) => entry.id === districtId)}
               required
             >
               <option value="">{districtId ? (masterLoading ? "Loading cities..." : "Select city") : "Select district first"}</option>
@@ -1888,19 +1837,13 @@ function EditCityModal({
   city: CityRow; states: MasterNode[]; onClose: () => void;
   onSave: (id: string, data: CityUpdateInput) => Promise<void>;
 }) {
-  const [stateId, setStateId] = useState(city.state?.id || "");
-  const [divisionId, setDivisionId] = useState(city.division?.id || "");
-  const [districtId, setDistrictId] = useState(city.district?.id || "");
-  const [cityMasterId, setCityMasterId] = useState("");
-  const [divisions, setDivisions] = useState<MasterNode[]>([]);
-  const [districts, setDistricts] = useState<MasterNode[]>([]);
-  const [masterCities, setMasterCities] = useState<CityMasterNode[]>([]);
   const [code, setCode] = useState(city.code);
   const [ulbCode, setUlbCode] = useState(city.ulbCode || "");
   const [adminName, setAdminName] = useState(city.cityAdmin?.name || "");
   const [adminEmail, setAdminEmail] = useState(city.cityAdmin?.email || "");
   const [loading, setLoading] = useState(false);
-  const [loadingMasters, setLoadingMasters] = useState(false);
+  const { stateId, setStateId, divisionId, setDivisionId, districtId, setDistrictId, cityMasterId, setCityMasterId, divisions, setDivisions, districts, setDistricts, masterCities, setMasterCities, masterLoading, divisionOptional, divisionMode, divisionPlaceholder, districtEnabled, hierarchyCompleted, loadingDivisions, loadingDistricts, loadingCities, locationError } = useCityLocationSelection({ stateId: city.state?.id, divisionId: city.division?.id, districtId: city.district?.id, cityName: city.name });
+  const loadingMasters = masterLoading;
 
   // Module & Sub-Module Authorization Checkboxes State
   const [modules, setModules] = useState({
@@ -1918,66 +1861,7 @@ function EditCityModal({
   const inputClass = selectClass;
   const readOnlyClass = "h-10 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500";
 
-  useEffect(() => {
-    if (!stateId) {
-      setDivisions([]); setDivisionId("");
-      setDistricts([]); setDistrictId("");
-      setMasterCities([]); setCityMasterId("");
-      return;
-    }
-    let active = true;
-    setLoadingMasters(true);
-    CityApi.listDivisions(stateId)
-      .then((res) => {
-        if (!active) return;
-        setDivisions(res.divisions);
-        setDivisionId((current) => (res.divisions.some((item: MasterNode) => item.id === current) ? current : ""));
-      })
-      .catch(() => { if (active) { setDivisions([]); setDivisionId(""); } })
-      .finally(() => { if (active) setLoadingMasters(false); });
-    return () => { active = false; };
-  }, [stateId]);
 
-  useEffect(() => {
-    if (!stateId) {
-      setDistricts([]); setDistrictId("");
-      setMasterCities([]); setCityMasterId("");
-      return;
-    }
-    let active = true;
-    setLoadingMasters(true);
-    CityApi.listDistricts(stateId, divisionId || undefined)
-      .then((res) => {
-        if (!active) return;
-        setDistricts(res.districts);
-        setDistrictId((current) => (res.districts.some((item: MasterNode) => item.id === current) ? current : ""));
-      })
-      .catch(() => { if (active) { setDistricts([]); setDistrictId(""); } })
-      .finally(() => { if (active) setLoadingMasters(false); });
-    return () => { active = false; };
-  }, [stateId, divisionId]);
-
-  useEffect(() => {
-    if (!districtId) {
-      setMasterCities([]); setCityMasterId("");
-      return;
-    }
-    let active = true;
-    setLoadingMasters(true);
-    CityApi.listCities(districtId)
-      .then((res) => {
-        if (!active) return;
-        setMasterCities(res.cities);
-        setCityMasterId((current) => {
-          if (res.cities.some((item: CityMasterNode) => item.id === current)) return current;
-          const matched = res.cities.find((item: CityMasterNode) => item.name.toLowerCase() === city.name.toLowerCase());
-          return matched?.id || "";
-        });
-      })
-      .catch(() => { if (active) { setMasterCities([]); setCityMasterId(""); } })
-      .finally(() => { if (active) setLoadingMasters(false); });
-    return () => { active = false; };
-  }, [districtId, city.name]);
 
   const selectedMasterCity = masterCities.find((item) => item.id === cityMasterId) || null;
 
@@ -1986,7 +1870,7 @@ function EditCityModal({
     setLoading(true);
     try {
       await onSave(city.id, {
-        ...(stateId && districtId && cityMasterId ? { stateId, divisionId: divisionId || undefined, districtId, cityMasterId } : {}),
+        ...(hierarchyCompleted ? { stateId, divisionId, districtId, cityMasterId } : {}),
         ...(selectedMasterCity ? { name: selectedMasterCity.name } : { name: city.name }),
         code, ulbCode, adminName, adminEmail
       });
@@ -2003,10 +1887,11 @@ function EditCityModal({
       open
       onClose={onClose}
       title="Edit city"
-      subtitle={`${city.state?.name || "No state"} / ${city.division?.name || "No division"} / ${city.district?.name || "No district"}`}
+      subtitle={`${city.state?.name || "No state"} / ${city.division?.name || "Not configured"} / ${city.district?.name || "No district"}`}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        {locationError && <div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{locationError}</div>}
         <div className="grid grid-cols-2 gap-4">
           <FormField label="State">
             <select className={selectClass} value={stateId} onChange={(e) => setStateId(e.target.value)}>
@@ -2014,20 +1899,20 @@ function EditCityModal({
               {states.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </FormField>
-          <FormField label="Division (optional)">
-            <select className={selectClass} value={divisionId} onChange={(e) => setDivisionId(e.target.value)} disabled={!stateId}>
-              <option value="">{stateId ? (loadingMasters ? "Loading..." : "All divisions") : "Select state first"}</option>
+          <FormField label="Division">
+            <select className={selectClass} value={divisionId} onChange={(e) => setDivisionId(e.target.value)} disabled={!stateId || loadingDivisions || divisionOptional || divisionMode === 'UNVERIFIED'}>
+              <option value="">{divisionPlaceholder}</option>
               {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>
           <FormField label="District">
-            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!stateId}>
-              <option value="">{stateId ? (loadingMasters ? "Loading..." : "Select district") : "Select state first"}</option>
+            <select className={selectClass} value={districtId} onChange={(e) => setDistrictId(e.target.value)} disabled={!districtEnabled || loadingDistricts}>
+              <option value="">{districtEnabled ? (loadingDistricts ? "Loading districts..." : "Select district") : "Select state and division first"}</option>
               {districts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </FormField>
           <FormField label="City">
-            <select className={selectClass} value={cityMasterId} onChange={(e) => setCityMasterId(e.target.value)} disabled={!districtId}>
+            <select className={selectClass} value={cityMasterId} onChange={(e) => setCityMasterId(e.target.value)} disabled={!districtId || loadingCities || !districts.some((entry) => entry.id === districtId)}>
               <option value="">{districtId ? (loadingMasters ? "Loading..." : "Select city") : "Select district first"}</option>
               {masterCities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>

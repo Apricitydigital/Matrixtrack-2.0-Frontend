@@ -1,3 +1,4 @@
+// MATRIXTRACK_LOCATION_CORRECTION_V1
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { ApiError, CityApi } from "@lib/apiClient";
+import { useCityLocationSelection } from "../../../hooks/useCityLocationSelection";
 
 type MasterNode = {
   id: string;
@@ -41,14 +43,7 @@ export default function CreateCityPage() {
   const router = useRouter();
 
   const [states, setStates] = useState<MasterNode[]>([]);
-  const [divisions, setDivisions] = useState<MasterNode[]>([]);
-  const [districts, setDistricts] = useState<MasterNode[]>([]);
-  const [masterCities, setMasterCities] = useState<CityMasterNode[]>([]);
 
-  const [stateId, setStateId] = useState("");
-  const [divisionId, setDivisionId] = useState("");
-  const [districtId, setDistrictId] = useState("");
-  const [cityMasterId, setCityMasterId] = useState("");
 
   const [code, setCode] = useState("");
   const [ulbCode, setUlbCode] = useState("");
@@ -68,7 +63,7 @@ export default function CreateCityPage() {
 
   const [status, setStatus] = useState("");
   const [creating, setCreating] = useState(false);
-  const [masterLoading, setMasterLoading] = useState(false);
+  const { stateId, setStateId, divisionId, setDivisionId, districtId, setDistrictId, cityMasterId, setCityMasterId, divisions, setDivisions, districts, setDistricts, masterCities, setMasterCities, masterLoading, divisionOptional, divisionMode, divisionPlaceholder, districtEnabled, hierarchyCompleted, loadingDivisions, loadingDistricts, loadingCities, locationError } = useCityLocationSelection();
 
   const fieldClass = `
     h-12 w-full rounded-[12px]
@@ -92,85 +87,7 @@ export default function CreateCityPage() {
       });
   }, []);
 
-  useEffect(() => {
-    if (!stateId) {
-      setDivisions([]);
-      setDivisionId("");
-      setDistricts([]);
-      setDistrictId("");
-      setMasterCities([]);
-      setCityMasterId("");
-      return;
-    }
 
-    setMasterLoading(true);
-
-    CityApi.listDivisions(stateId)
-      .then((res: any) => {
-        // Division is optional. Hide the placeholder division some states carry (named after the state).
-        const stateName = states.find((s) => s.id === stateId)?.name;
-        const list: MasterNode[] = (res.divisions ?? []).filter(
-          (d: MasterNode) => !isNoDivision(d, stateName)
-        );
-        setDivisions(list);
-        setDivisionId("");
-      })
-      .catch(() => {
-        setStatus("Failed to load divisions");
-      })
-      .finally(() => {
-        setMasterLoading(false);
-      });
-  }, [stateId]);
-
-  // Districts load as soon as a state is chosen; a division (optional) narrows them.
-  useEffect(() => {
-    if (!stateId) {
-      setDistricts([]);
-      setDistrictId("");
-      setMasterCities([]);
-      setCityMasterId("");
-      return;
-    }
-
-    setMasterLoading(true);
-
-    CityApi.listDistricts(stateId, divisionId || undefined)
-      .then((res: any) => {
-        setDistricts(res.districts ?? []);
-        setDistrictId("");
-        setMasterCities([]);
-        setCityMasterId("");
-      })
-      .catch(() => {
-        setStatus("Failed to load districts");
-      })
-      .finally(() => {
-        setMasterLoading(false);
-      });
-  }, [stateId, divisionId]);
-
-  useEffect(() => {
-    if (!districtId) {
-      setMasterCities([]);
-      setCityMasterId("");
-      return;
-    }
-
-    setMasterLoading(true);
-
-    CityApi.listCities(districtId)
-      .then((res: any) => {
-        setMasterCities(res.cities ?? []);
-        setCityMasterId("");
-      })
-      .catch(() => {
-        setStatus("Failed to load cities");
-      })
-      .finally(() => {
-        setMasterLoading(false);
-      });
-  }, [districtId]);
 
   useEffect(() => {
     const selectedCity = masterCities.find(
@@ -191,6 +108,7 @@ export default function CreateCityPage() {
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (!hierarchyCompleted) { setStatus("Select a complete, valid location hierarchy first."); return; }
     setCreating(true);
     setStatus("Saving...");
 
@@ -237,10 +155,7 @@ export default function CreateCityPage() {
     !isSuccess &&
     !isSaving;
 
-  const hierarchyCompleted =
-    Boolean(stateId) &&
-    Boolean(districtId) &&
-    Boolean(cityMasterId);
+
 
   return (
     <div className="min-h-screen bg-[#f6f8fc]">
@@ -372,6 +287,7 @@ export default function CreateCityPage() {
               onSubmit={handleCreate}
               className="px-5 py-5 sm:px-7 sm:py-6"
             >
+              {locationError && <div role="alert" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{locationError}</div>}
               {/* Hierarchy fields */}
               <div className="grid grid-cols-1 gap-x-5 gap-y-5 md:grid-cols-2">
                 <label className="block">
@@ -399,8 +315,7 @@ export default function CreateCityPage() {
 
                 <label className="block">
                   <span className="mb-2 block text-[11px] font-black uppercase tracking-[0.06em] text-slate-600">
-                    Division{" "}
-                    <span className="font-semibold normal-case tracking-normal text-slate-400">(optional)</span>
+                    Division{" "}{!divisionOptional && <span className="text-rose-500">*</span>}
                   </span>
 
                   <select
@@ -409,17 +324,10 @@ export default function CreateCityPage() {
                     onChange={(event) =>
                       setDivisionId(event.target.value)
                     }
-                    disabled={!stateId || (!masterLoading && divisions.length === 0)}
+                    disabled={!stateId || loadingDivisions || divisionOptional || divisionMode === 'UNVERIFIED'}
+                    required={!divisionOptional}
                   >
-                    <option value="">
-                      {!stateId
-                        ? "Select state first"
-                        : masterLoading
-                          ? "Loading..."
-                          : divisions.length === 0
-                            ? "No divisions for this state"
-                            : "All divisions"}
-                    </option>
+                    <option value="">{divisionPlaceholder}</option>
 
                     {divisions.map((division) => (
                       <option
@@ -444,16 +352,10 @@ export default function CreateCityPage() {
                     onChange={(event) =>
                       setDistrictId(event.target.value)
                     }
-                    disabled={!stateId}
+                    disabled={!districtEnabled || loadingDistricts}
                     required
                   >
-                    <option value="">
-                      {stateId
-                        ? masterLoading
-                          ? "Loading..."
-                          : "Select district"
-                        : "Select state first"}
-                    </option>
+                    <option value="">{districtEnabled ? (loadingDistricts ? "Loading districts..." : "Select district") : "Select state and division first"}</option>
 
                     {districts.map((district) => (
                       <option
@@ -477,7 +379,7 @@ export default function CreateCityPage() {
                     onChange={(event) =>
                       setCityMasterId(event.target.value)
                     }
-                    disabled={!districtId}
+                    disabled={!districtId || loadingCities || !districts.some((entry) => entry.id === districtId)}
                     required
                   >
                     <option value="">
