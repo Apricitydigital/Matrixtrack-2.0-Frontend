@@ -2438,9 +2438,9 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   const [name, setName] = useState(user.name);
   const [email] = useState(user.email || "");
   const [role, setRole] = useState(user.role);
-  const isSingleZoneRole =
-    role === "SUPERVISOR" ||
-    role === "QC";
+  // Daroga (Supervisor) is limited to one zone; SI (QC) can hold many zones/wards.
+  const isSingleZoneRole = role === "SUPERVISOR";
+  const requiresZoneAndWard = role === "QC" || role === "ULB_OFFICER";
   const [password, setPassword] = useState("");
 
   const [assignedModules, setAssignedModules] =
@@ -2625,7 +2625,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
 
   const availableWards = useMemo(() => {
     if (
-      isSingleZoneRole &&
+      (isSingleZoneRole || requiresZoneAndWard) &&
       zoneIds.length === 0
     ) {
       return [];
@@ -2648,7 +2648,8 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
   }, [
     wards,
     zoneIds,
-    isSingleZoneRole
+    isSingleZoneRole,
+    requiresZoneAndWard
   ]);
 
   const handleZoneChange = (
@@ -2734,7 +2735,20 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
       setStatusMsg({
         type: "error",
         text:
-          "Daroga and SI users must be assigned to exactly one zone."
+          "Daroga users must be assigned to exactly one zone."
+      });
+
+      return;
+    }
+
+    if (
+      requiresZoneAndWard &&
+      (zoneIds.length === 0 || wardIds.length === 0)
+    ) {
+      setStatusMsg({
+        type: "error",
+        text:
+          "SI and ULB Officer users require at least one zone and ward."
       });
 
       return;
@@ -3342,7 +3356,7 @@ function EditUserModal({ user, onClose, onSave }: { user: UserRecord; onClose: (
                 selectedIds={wardIds}
                 onChange={setWardIds}
                 placeholder={
-                  isSingleZoneRole &&
+                  (isSingleZoneRole || requiresZoneAndWard) &&
                     zoneIds.length === 0
                     ? "Select zone first..."
                     : "Select assigned wards..."
