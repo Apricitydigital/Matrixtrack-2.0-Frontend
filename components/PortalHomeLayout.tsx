@@ -649,6 +649,10 @@ function PortalHomeLayoutContent({
     pageTitle = 'Map View Dashboard';
   }
 
+  if (pathname.startsWith('/ulb/cleanliness-issues')) {
+    pageTitle = 'Cleanliness Issue Approvals';
+  }
+
   if (pathname.startsWith('/city/processing-plant')) {
     pageTitle = 'Plant & Processing Dashboard';
   }
@@ -2848,6 +2852,24 @@ function PortalHomeLayoutContent({
 
                   <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
                     Ward Ranking
+                  </span>
+                </Link>
+
+
+                {/* CLEANLINESS ISSUE APPROVALS */}
+
+                <Link
+                  href="/ulb/cleanliness-issues"
+                  title="Cleanliness Issue Approvals"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/ulb/cleanliness-issues')
+                    ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    } ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''}`}
+                >
+                  <ClipboardCheck size={15} className="shrink-0" />
+
+                  <span className={sidebarCollapsed ? 'lg:hidden' : ''}>
+                    Cleanliness Issue Approvals
                   </span>
                 </Link>
 
