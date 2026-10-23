@@ -413,7 +413,7 @@ function submittedByName(item: any) {
     item?.createdBy ||
     item?.supervisor?.name ||
     item?.employee?.name ||
-    '—'
+    '-'
   );
 }
 
@@ -643,7 +643,7 @@ function reportTimestamp(item: any) {
 
 function formatShortDate(item: any) {
   const time = reportTimestamp(item);
-  if (!time) return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
+  if (!time) return '-';
 
   return new Date(time).toLocaleString('en-IN', {
     day: '2-digit',
@@ -654,9 +654,9 @@ function formatShortDate(item: any) {
 }
 
 function formatFullDate(value: any) {
-  if (!value) return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
+  if (!value) return '-';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
+  if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('en-IN');
 }
 
@@ -684,7 +684,7 @@ function normalizeImages(values: any[]) {
   return resolveMediaUrls(values);
 }
 
-function displayAnswer(value: any, emptyText = 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â') {
+function displayAnswer(value: any, emptyText = '-') {
   if (value === null || value === undefined || value === '') return emptyText;
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -755,7 +755,7 @@ function extractAnswers(item: any): AnswerRow[] {
           String(raw.section || '').toLowerCase() === 'remarks' ||
           String(question || '').toLowerCase().includes('remark')
             ? 'No remarks provided'
-            : 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'
+            : '-'
         ),
         photos,
         section: raw.section || raw.category || raw.group || undefined,
@@ -1082,7 +1082,7 @@ function formatAiConfidence(value: any) {
   const confidence = Number(value);
 
   if (!Number.isFinite(confidence)) {
-    return 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â';
+    return '-';
   }
 
   return `${Math.round(confidence * 100)}%`;
@@ -1559,7 +1559,7 @@ export default function CommissionerInspectionWorkspace() {
 
       candidates.forEach((candidate) => {
         const label = String(candidate.label || '').trim();
-        if (!label || label === 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â' || !label.toLowerCase().includes(query)) return;
+        if (!label || label === '-' || !label.toLowerCase().includes(query)) return;
         const key = `${candidate.type}:${label}`;
         if (!values.has(key)) values.set(key, { label, type: candidate.type });
       });
@@ -2826,7 +2826,7 @@ export function DetailModal({
 
                         <div>
                           <div className="text-sm font-black text-slate-700">
-                            {qcReviewer?.name || 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'}
+                            {qcReviewer?.name || '-'}
                           </div>
 
                           <div className="text-[9px] font-bold text-slate-400">
@@ -3118,7 +3118,7 @@ function ReportJourneySection({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-black text-slate-800">{step.title}</div>
 
-                {step.time !== 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â' && (
+                {step.time !== '-' && (
                   <div className="text-[10px] font-semibold text-slate-400">{step.time}</div>
                 )}
               </div>
@@ -3251,7 +3251,7 @@ function AiInsightsSection({
                   <div className="mt-1 text-sm font-black text-slate-800">
                     {String(
                       actionAi.sourceQcDecision ||
-                      'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'
+                      '-'
                     ).replace(/_/g, ' ')}
                   </div>
                 </div>
@@ -3623,7 +3623,7 @@ function SweepingPointEvidenceSection({
                               ).toFixed(
                                 1
                               )} m`
-                              : 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'}
+                              : '-'}
                           </div>
                         </div>
 
@@ -3636,7 +3636,7 @@ function SweepingPointEvidenceSection({
                             {String(
                               finding
                                 ?.result ||
-                              'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â'
+                              '-'
                             ).replace(
                               /_/g,
                               ' '
@@ -3758,7 +3758,7 @@ function ActionRequiredModal({
               {reportTitle(report, report.dashboardModule)}
             </div>
             <div className="mt-1 text-xs font-medium text-slate-500">
-              {moduleLabel(report.dashboardModule)} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {submittedByName(report)}
+              {moduleLabel(report.dashboardModule)} · {submittedByName(report)}
             </div>
           </div>
 

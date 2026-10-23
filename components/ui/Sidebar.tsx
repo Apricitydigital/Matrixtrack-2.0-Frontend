@@ -34,6 +34,7 @@ import {
   CheckCircle2,
   ChartNoAxesCombined,
   Award,
+  ClipboardList,
   Factory,
   Waves,
 } from "lucide-react";
@@ -333,6 +334,11 @@ export default function Sidebar() {
           href: "/municipal/commissioner/ward-ranking",
           icon: <Award size={18} />,
         },
+        {
+          label: "IEC Cleanliness Issues",
+          href: "/municipal/commissioner/cleanliness-issues",
+          icon: <ClipboardList size={18} />,
+        },
         ...(hasProcessingPlantModule
           ? [
             {
@@ -369,6 +375,11 @@ export default function Sidebar() {
           label: "Ward Ranking",
           href: "/ulb/ward-ranking",
           icon: <Award size={18} />,
+        });
+        links.push({
+          label: "Cleanliness Issues",
+          href: "/city/cleanliness-issues",
+          icon: <ClipboardList size={18} />,
         });
         if (hasProcessingPlantModule) {
           links.push({

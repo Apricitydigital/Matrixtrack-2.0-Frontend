@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { LayoutDashboard, Map, MapPin, Target, Users, Package, CheckCircle2 } from "lucide-react";
+import { LayoutDashboard, Map, MapPin, Target, Users, Package, CheckCircle2, ClipboardList } from "lucide-react";
 import { useAuth } from "@hooks/useAuth";
 
 export default function CityNavTabs() {
@@ -15,6 +15,8 @@ export default function CityNavTabs() {
         return user.roles.some((role) => ["CITY_ADMIN", "COMMISSIONER", "ULB_OFFICER", "HMS_SUPER_ADMIN"].includes(role));
     }, [user]);
 
+    const isCityAdmin = useMemo(() => Boolean(user?.roles.includes("CITY_ADMIN")), [user]);
+
     const tabs = [
         { name: "Dashboard", href: "/city", icon: <LayoutDashboard size={16} /> },
         { name: "Modules", href: "/city/modules", icon: <Package size={16} /> },
@@ -24,6 +26,9 @@ export default function CityNavTabs() {
             { name: "Areas & Beats", href: "/city/areas", icon: <Target size={16} /> },
             { name: "Beat Status", href: "/city/beat-status", icon: <CheckCircle2 size={16} /> },
             { name: "Municipal Users", href: "/city/users", icon: <Users size={16} /> },
+        ] : []),
+        ...(isCityAdmin ? [
+            { name: "Cleanliness Issues", href: "/city/cleanliness-issues", icon: <ClipboardList size={16} /> },
         ] : []),
     ];
 

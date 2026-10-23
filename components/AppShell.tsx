@@ -30,6 +30,7 @@ const STANDALONE_PATHS = [
   "/ulb/ward-ranking",
   "/ulb/user-performance",
   "/ulb/map-view-dashboard",
+  "/ulb/cleanliness-issues",
 ];
 
 const HIDE_TOPBAR_PATHS = [
