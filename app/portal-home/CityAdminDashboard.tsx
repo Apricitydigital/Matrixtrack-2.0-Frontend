@@ -70,6 +70,7 @@ import {
 } from "recharts";
 import UserPerformanceModal from "@components/ui/UserPerformanceModal";
 import DailySubmissionReport from "./DailySubmissionReport";
+import ZoneExportButton from "@components/ZoneExportButton";
 
 type ModuleKey = "SWEEPING" | "TOILET" | "TWINBIN" | "TASKFORCE" | "NALA";
 type GeoLevel = "zone" | "ward" | "area";
@@ -2574,6 +2575,7 @@ const beatRequests = (
               <Download size={12} />
               {pdfBusy ? "Preparing..." : "Download PDF"}
             </button>
+            <ZoneExportButton />
             <DailySubmissionReport initialDate={reportDate} />
           </div>
         </div>

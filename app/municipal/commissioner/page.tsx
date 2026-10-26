@@ -49,6 +49,7 @@ import {
 import dynamic from 'next/dynamic';
 
 import { RoleGuard } from '@components/Guards';
+import ZoneExportButton from '@components/ZoneExportButton';
 
 /*
  * recharts (and its d3 sub-dependencies) is only needed once these
@@ -13652,6 +13653,8 @@ setDrilldown({
               <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               {refreshing ? 'Refreshing...' : 'Refresh'}
             </button>
+
+            <ZoneExportButton variant="dark" />
           </div>
         </section>
 
