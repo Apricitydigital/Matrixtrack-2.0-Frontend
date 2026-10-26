@@ -248,6 +248,13 @@ type DrilldownState = {
     value: string;
   }>;
 
+  /** Components averaged into `value` (Zone/Ward overall score). */
+  scoreComponents?: Array<{
+    tab: 'INSPECTION' | 'ATTENDANCE' | 'WARD_RANKING';
+    label: string;
+    value: string;
+  }>;
+
   inspectionRecords?: DashboardRecord[];
   attendanceEmployees?: AttendanceEmployeeSummary[];
   wardRows?: WardRankingRow[];
@@ -2882,7 +2889,9 @@ function DrilldownDrawer({
         list.push({
           key:
             'INSPECTION',
-          label: 'Cleanliness Performance',
+          label: data.scoreComponents?.length
+            ? 'Inspection Completion'
+            : 'Cleanliness Performance',
         });
       }
 
@@ -3825,6 +3834,40 @@ function DrilldownDrawer({
               <X size={18} />
             </button>
           </div>
+
+          {!!data.scoreComponents?.length && (
+            <div className="mt-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {data.scoreComponents.map((item) => (
+                  <button
+                    key={item.tab}
+                    type="button"
+                    disabled={!tabs.some((t) => t.key === item.tab)}
+                    onClick={() => {
+                      setTab(item.tab);
+                      setPage(1);
+                    }}
+                    className={`rounded-xl border px-3 py-2.5 text-left transition disabled:cursor-default ${tab === item.tab
+                      ? 'border-indigo-300 bg-indigo-50 ring-1 ring-indigo-100'
+                      : 'border-slate-200 bg-slate-50 hover:bg-white'
+                      }`}
+                  >
+                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400 dark:text-slate-500">
+                      {item.label}
+                    </div>
+
+                    <div className="mt-1 text-sm font-black text-slate-950 dark:text-white">
+                      {item.value}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-1.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                Overall score = average of the available components above.
+              </div>
+            </div>
+          )}
 
           {tab !== 'INSPECTION' &&
             !!data.breakdown?.length && (
@@ -11044,17 +11087,18 @@ const [
              * very large target from appearing as 100%
              * overall Zone performance.
              */
+            /*
+             * Same score as the Zone Performance & Ward
+             * Inspection Overview cards (row.performance).
+             */
             const rankingPerformance =
-              required > 0
-                ? clamp(
-                  (
-                    cleanliness.clean /
-                    required
-                  ) * 100,
+              row.performance === null
+                ? null
+                : clamp(
+                  row.performance,
                   0,
                   100
-                )
-                : null;
+                );
 
             return {
               row,
@@ -11111,17 +11155,18 @@ const [
               cleanliness.notClean +
               cleanliness.pendingReview;
 
+            /*
+             * Same score as the Zone Performance & Ward
+             * Inspection Overview cards (row.performance).
+             */
             const rankingPerformance =
-              required > 0
-                ? clamp(
-                  (
-                    cleanliness.clean /
-                    required
-                  ) * 100,
+              row.performance === null
+                ? null
+                : clamp(
+                  row.performance,
                   0,
                   100
-                )
-                : null;
+                );
 
             return {
               row,
@@ -12934,6 +12979,23 @@ const [
         breakdownForGeo(
           row
         ),
+      scoreComponents: [
+        {
+          tab: 'INSPECTION',
+          label: 'Inspection Completion',
+          value: percentText(row.inspection),
+        },
+        {
+          tab: 'ATTENDANCE',
+          label: 'Attendance',
+          value: percentText(row.attendance),
+        },
+        {
+          tab: 'WARD_RANKING',
+          label: 'Ward Ranking',
+          value: percentText(row.wardRanking),
+        },
+      ],
       inspectionRecords:
         row.records,
       inspectionModuleCompletion:
@@ -14662,7 +14724,14 @@ setDrilldown({
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-            {zoneRows.map((row) => {
+            {[...zoneRows]
+              .sort((a, b) =>
+                String(a.label).localeCompare(String(b.label), undefined, {
+                  numeric: true,
+                  sensitivity: 'base',
+                })
+              )
+              .map((row) => {
               const score =
                 row.performance === null
                   ? null
