@@ -1525,6 +1525,7 @@ export default function CommissionerInspectionWorkspace() {
 
     let target = 0;
     let credit = 0;
+    const percents = new Set<number>();
 
     Object.values(darogaTargets).forEach((user) => {
       (user.rows || []).forEach((row) => {
@@ -1534,12 +1535,14 @@ export default function CommissionerInspectionWorkspace() {
 
         target += row.target;
         credit += row.credit;
+        if (row.targetPercent != null) percents.add(row.targetPercent);
       });
     });
 
     return {
       target: Math.round(target),
       credit: Math.round(credit),
+      percentTargets: Array.from(percents).sort((a, b) => a - b),
       percent: target > 0 ? Math.min(100, (credit / target) * 100) : null,
     };
   }, [darogaTargets, moduleFilter, selectedZone, selectedWard, zones, allWards]);
@@ -2193,7 +2196,19 @@ export default function CommissionerInspectionWorkspace() {
         <div className="px-4 pt-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-black uppercase tracking-[0.12em]">
-              <span className="text-slate-500">Target Progress</span>
+              <span className="text-slate-500">
+                Target Progress
+                {targetProgress && targetProgress.percentTargets.length > 0 && (
+                  <span
+                    title="Some targets are set as a percentage of each Daroga's assigned assets"
+                    className="ml-2 rounded-md bg-blue-50 px-1.5 py-0.5 text-[9px] text-blue-700"
+                  >
+                    {targetProgress.percentTargets.length === 1
+                      ? `${targetProgress.percentTargets[0]}% targets`
+                      : '% targets'}
+                  </span>
+                )}
+              </span>
               {targetProgress?.percent != null ? (
                 <span
                   className={
