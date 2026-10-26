@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --test tests/cleanlinessIssues.test.cjs tests/ulbCleanliness.test.cjs"
   },
   "dependencies": {
     "@indic-transliteration/sanscript": "^1.3.3",

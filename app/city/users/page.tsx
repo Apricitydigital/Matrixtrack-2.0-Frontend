@@ -1129,6 +1129,34 @@ function UserRow({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Bulk zone/ward selection so an SI can be given many zones/wards in one click.
+  const applyScope = (zoneIds: Set<string>, wardIds: Set<string>) => {
+    setEditing((prev) => {
+      const cur = prev[u.id];
+      if (!cur) return prev;
+      const modules = usesGeoScope(cur.role)
+        ? Object.fromEntries(
+          Object.entries(cur.modules).map(([mid, val]) => [
+            mid,
+            { ...val, zoneIds: Array.from(zoneIds), wardIds: Array.from(wardIds) }
+          ])
+        )
+        : cur.modules;
+      return { ...prev, [u.id]: { ...cur, zoneIds, wardIds, modules } };
+    });
+  };
+  const selectAllZones = () => applyScope(new Set(zones.map((z) => z.id)), edit.wardIds);
+  const clearZones = () => applyScope(new Set(), new Set());
+  const selectAllWards = () =>
+    applyScope(
+      edit.zoneIds,
+      new Set([
+        ...Array.from(edit.wardIds),
+        ...wards.filter((w) => w.parentId && edit.zoneIds.has(w.parentId)).map((w) => w.id)
+      ])
+    );
+  const clearWards = () => applyScope(edit.zoneIds, new Set());
+
   // Role Badge Styling
   const getRoleStyle = (role: Role) => {
     switch (role) {
@@ -1299,7 +1327,15 @@ function UserRow({
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                       <div>
-                        <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "10px", textTransform: "uppercase" }}>Primary Zones</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                          <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Primary Zones ({edit.zoneIds.size}/{zones.length})</span>
+                          {!isReadOnly && (
+                            <span style={{ display: "flex", gap: "8px" }}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); selectAllZones(); }} style={{ fontSize: "10px", fontWeight: 700, color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>Select all</button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); clearZones(); }} style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", background: "none", border: "none", cursor: "pointer" }}>Clear</button>
+                            </span>
+                          )}
+                        </div>
                         <div className="pill-grid" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                           {zones.map((z) => (
                             <label key={z.id} className={`pill ${edit.zoneIds.has(z.id) ? 'pill-active' : ''}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: "0.75rem", cursor: isReadOnly ? "default" : "pointer", padding: "6px 14px", borderRadius: "10px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "8px", fontWeight: 600 }}>
@@ -1311,7 +1347,15 @@ function UserRow({
                         </div>
                       </div>
                       <div>
-                        <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#94a3b8", display: "block", marginBottom: "10px", textTransform: "uppercase" }}>Service Wards</span>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                          <span style={{ fontSize: "0.65rem", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Service Wards ({edit.wardIds.size})</span>
+                          {!isReadOnly && (
+                            <span style={{ display: "flex", gap: "8px" }}>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); selectAllWards(); }} style={{ fontSize: "10px", fontWeight: 700, color: "#2563eb", background: "none", border: "none", cursor: "pointer" }}>Select all in selected zones</button>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); clearWards(); }} style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", background: "none", border: "none", cursor: "pointer" }}>Clear</button>
+                            </span>
+                          )}
+                        </div>
                         <div className="pill-grid max-h-[160px] overflow-y-auto pr-2 custom-scrollbar" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                           {wards.filter((w) => edit.zoneIds.size === 0 || (w.parentId && edit.zoneIds.has(w.parentId))).map((w) => (
                             <label key={w.id} className={`pill ${edit.wardIds.has(w.id) ? 'pill-active' : ''}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: "0.75rem", cursor: isReadOnly ? "default" : "pointer", padding: "6px 14px", borderRadius: "10px", border: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: "8px", fontWeight: 600 }}>
