@@ -44,6 +44,9 @@ export type EmployeeTarget = {
 
   targetValue: number;
 
+  /** Ward-wise: target is this % of the Daroga's assigned assets (targetValue = resolved count). */
+  targetPercent?: number | null;
+
   startDate: string;
   endDate: string;
 
@@ -111,7 +114,9 @@ export type CreateTargetPayload = {
   role: TargetRole;
   periodType: TargetPeriodType;
   startDate: string;
-  targetValue: number;
+  /** Send either targetValue or targetPercent. */
+  targetValue?: number;
+  targetPercent?: number;
   wardId?: string;
   allowRepeat?: boolean;
 };
@@ -141,7 +146,8 @@ export type BulkTargetPayload = {
     userId: string;
     moduleId: string;
     wardId: string;
-    targetValue: number;
+    targetValue?: number;
+    targetPercent?: number;
     allowRepeat?: boolean;
   }>;
 };
@@ -151,7 +157,9 @@ export type CreateTargetResponse = {
 };
 
 export type UpdateTargetPayload = {
-  targetValue: number;
+  /** Send either targetValue or targetPercent. */
+  targetValue?: number;
+  targetPercent?: number;
   allowRepeat?: boolean;
 };
 

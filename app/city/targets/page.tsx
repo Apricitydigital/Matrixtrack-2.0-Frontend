@@ -447,6 +447,8 @@ export default function TargetAssignmentPage() {
   const [busyKeys, setBusyKeys] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [fillValue, setFillValue] = useState("");
+  /* COUNT = fixed number of assets, PERCENT = % of the Daroga's assigned assets. */
+  const [targetMode, setTargetMode] = useState<"COUNT" | "PERCENT">("COUNT");
   const [showNoAssets, setShowNoAssets] = useState(false);
 
   /* =======================================================
@@ -478,6 +480,8 @@ export default function TargetAssignmentPage() {
 
   const [editingTarget, setEditingTarget] = useState<EmployeeTargetPerformance | null>(null);
   const [editValue, setEditValue] = useState("");
+  /* Ward-wise targets can be edited as a % of the assigned assets. */
+  const [editPercent, setEditPercent] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<EmployeeTargetPerformance | null>(null);
   const [historyData, setHistoryData] = useState<TargetHistoryResponse | null>(null);
@@ -705,22 +709,52 @@ export default function TargetAssignmentPage() {
      DRAFT HELPERS
   ======================================================= */
 
+  const percentMode = targetMode === "PERCENT";
+
   const maxFor = (row: AssignmentRow) => row.assigned * periodDays;
 
-  const draftOf = (row: MatrixRow) =>
-    drafts[row.key] ??
-    (row.existing ? String(row.existing.targetValue) : "");
+  /** Largest value the input accepts: 100 (%) or the asset cap (count). */
+  const limitFor = (row: AssignmentRow) => (percentMode ? 100 : maxFor(row));
+
+  /** Assets a percentage resolves to (rounded up), for the preview next to the input. */
+  const assetsForPercent = (row: AssignmentRow, percent: number) =>
+    Math.min(maxFor(row), Math.max(1, Math.ceil((maxFor(row) * percent) / 100)));
+
+  /** API fields for a validated value in the current mode. */
+  const valueFields = (value: number) =>
+    percentMode ? { targetPercent: value } : { targetValue: value };
+
+  const draftOf = (row: MatrixRow) => {
+    if (drafts[row.key] !== undefined) return drafts[row.key];
+
+    if (!row.existing) return "";
+
+    if (percentMode) {
+      return row.existing.targetPercent != null ? String(row.existing.targetPercent) : "";
+    }
+
+    return String(row.existing.targetValue);
+  };
 
   const validateRow = (row: MatrixRow, raw: string) => {
     const value = Number(raw);
-    const max = maxFor(row);
+    const max = limitFor(row);
 
     if (!raw.trim()) {
       return { ok: false as const, error: "Enter a target." };
     }
 
     if (!Number.isInteger(value) || value <= 0) {
-      return { ok: false as const, error: "Target must be a positive whole number." };
+      return {
+        ok: false as const,
+        error: percentMode
+          ? "Percentage must be a whole number from 1 to 100."
+          : "Target must be a positive whole number.",
+      };
+    }
+
+    if (percentMode && value > 100) {
+      return { ok: false as const, error: "Percentage cannot be more than 100." };
     }
 
     if (value > max) {
@@ -749,13 +783,17 @@ export default function TargetAssignmentPage() {
 
     if (raw === undefined || raw.trim() === "") return false;
 
-    return row.existing ? Number(raw) !== row.existing.targetValue : true;
+    if (!row.existing) return true;
+
+    return percentMode
+      ? Number(raw) !== row.existing.targetPercent
+      : Number(raw) !== row.existing.targetValue;
   };
 
   const dirtyRows = useMemo(
     () => matrixRows.filter(isDirty),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [matrixRows, drafts, repeatDrafts, defaultRepeat],
+    [matrixRows, drafts, repeatDrafts, defaultRepeat, targetMode],
   );
 
   const setDraft = (key: string, value: string) =>
@@ -823,7 +861,7 @@ export default function TargetAssignmentPage() {
     try {
       if (row.existing) {
         await TargetsApi.update(row.existing.id, {
-          targetValue: check.value,
+          ...valueFields(check.value),
           allowRepeat: repeatOf(row),
         });
       } else {
@@ -833,7 +871,7 @@ export default function TargetAssignmentPage() {
           role: "SUPERVISOR",
           periodType,
           startDate,
-          targetValue: check.value,
+          ...valueFields(check.value),
           wardId: row.wardId,
           allowRepeat: repeatOf(row),
         });
@@ -841,7 +879,7 @@ export default function TargetAssignmentPage() {
 
       clearDrafts([row.key]);
       setSuccessMessage(
-        `${row.userName}: ${moduleLabel(row.moduleName)} target ${row.existing ? "updated to" : "set to"} ${check.value}.`,
+        `${row.userName}: ${moduleLabel(row.moduleName)} target ${row.existing ? "updated to" : "set to"} ${check.value}${percentMode ? `% (${assetsForPercent(row, check.value)} of ${maxFor(row)})` : ""}.`,
       );
 
       await loadTargets();
@@ -858,8 +896,10 @@ export default function TargetAssignmentPage() {
     setError("");
     setSuccessMessage("");
 
-    const fresh: Array<{ userId: string; moduleId: string; wardId: string; targetValue: number; allowRepeat: boolean }> = [];
-    const updates: Array<{ id: string; targetValue: number; allowRepeat: boolean }> = [];
+    type ValueFields = { targetValue?: number; targetPercent?: number };
+
+    const fresh: Array<{ userId: string; moduleId: string; wardId: string; allowRepeat: boolean } & ValueFields> = [];
+    const updates: Array<{ id: string; allowRepeat: boolean } & ValueFields> = [];
 
     for (const row of dirtyRows) {
       const check = validateRow(row, draftOf(row));
@@ -870,13 +910,13 @@ export default function TargetAssignmentPage() {
       }
 
       if (row.existing) {
-        updates.push({ id: row.existing.id, targetValue: check.value, allowRepeat: repeatOf(row) });
+        updates.push({ id: row.existing.id, ...valueFields(check.value), allowRepeat: repeatOf(row) });
       } else {
         fresh.push({
           userId: row.userId,
           moduleId: row.moduleId,
           wardId: row.wardId,
-          targetValue: check.value,
+          ...valueFields(check.value),
           allowRepeat: repeatOf(row),
         });
       }
@@ -897,10 +937,9 @@ export default function TargetAssignmentPage() {
       }
 
       for (const update of updates) {
-        await TargetsApi.update(update.id, {
-          targetValue: update.targetValue,
-          allowRepeat: update.allowRepeat,
-        });
+        const { id, ...fields } = update;
+
+        await TargetsApi.update(id, fields);
       }
 
       clearDrafts();
@@ -923,7 +962,11 @@ export default function TargetAssignmentPage() {
     const typed = Number(fillValue);
 
     if (mode === "VALUE" && (!Number.isInteger(typed) || typed <= 0)) {
-      setError("Enter a positive whole number to apply.");
+      setError(
+        percentMode
+          ? "Enter a percentage from 1 to 100 to apply."
+          : "Enter a positive whole number to apply.",
+      );
       return;
     }
 
@@ -932,7 +975,7 @@ export default function TargetAssignmentPage() {
     for (const row of matrixRows) {
       if (row.existing) continue;
 
-      const max = maxFor(row);
+      const max = limitFor(row);
       next[row.key] = String(mode === "MAX" ? max : Math.min(typed, max));
     }
 
@@ -1053,7 +1096,11 @@ export default function TargetAssignmentPage() {
   const openEdit = (target: EmployeeTargetPerformance) => {
     setModalError("");
     setEditingTarget(target);
-    setEditValue(String(target.targetValue));
+
+    const asPercent = target.targetPercent != null;
+
+    setEditPercent(asPercent);
+    setEditValue(String(asPercent ? target.targetPercent : target.targetValue));
   };
 
   const closeEdit = () => {
@@ -1073,8 +1120,19 @@ export default function TargetAssignmentPage() {
 
     const numericValue = Number(editValue);
 
+    const asPercent = editPercent && Boolean(editingTarget.wardId);
+
     if (!Number.isInteger(numericValue) || numericValue <= 0) {
-      setModalError("Target must be a positive whole number.");
+      setModalError(
+        asPercent
+          ? "Percentage must be a whole number from 1 to 100."
+          : "Target must be a positive whole number.",
+      );
+      return;
+    }
+
+    if (asPercent && numericValue > 100) {
+      setModalError("Percentage cannot be more than 100.");
       return;
     }
 
@@ -1082,14 +1140,23 @@ export default function TargetAssignmentPage() {
     setEditSaving(true);
 
     try {
-      const response = await TargetsApi.update(editingTarget.id, {
-        targetValue: numericValue,
-      });
+      const response = await TargetsApi.update(
+        editingTarget.id,
+        asPercent
+          ? { targetPercent: numericValue }
+          : { targetValue: numericValue },
+      );
+
+      const was =
+        editingTarget.targetPercent != null
+          ? `${editingTarget.targetPercent}%`
+          : String(editingTarget.targetValue);
+      const now = asPercent ? `${numericValue}%` : String(numericValue);
 
       setSuccessMessage(
         response.changed
-          ? `Target updated from ${editingTarget.targetValue} to ${numericValue}.`
-          : `Target is already set to ${numericValue}.`,
+          ? `Target updated from ${was} to ${now}.`
+          : `Target is already set to ${now}.`,
       );
 
       setEditingTarget(null);
@@ -1395,6 +1462,37 @@ export default function TargetAssignmentPage() {
                     </div>
 
                     <div
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-1 pl-3"
+                      title="Count = a fixed number of assets. Percent = a share of the assets assigned to the Daroga, rounded up, so it follows the Daroga's assets if they change."
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                        Target in
+                      </span>
+
+                      <div className="inline-flex rounded-lg bg-slate-50 p-0.5">
+                        {([
+                          ["COUNT", "Count"],
+                          ["PERCENT", "Percent %"],
+                        ] as const).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => {
+                              if (id === targetMode) return;
+                              setTargetMode(id);
+                              clearDrafts();
+                              setFillValue("");
+                              setError("");
+                            }}
+                            className={`h-8 rounded-md px-3 text-[11px] font-black transition ${targetMode === id ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div
                       className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5"
                       title="Off = an inspected asset stays locked until every assigned asset has been inspected once. On = the same assets can be inspected again the next day."
                     >
@@ -1415,7 +1513,8 @@ export default function TargetAssignmentPage() {
                         min={1}
                         value={fillValue}
                         onChange={(event) => setFillValue(event.target.value)}
-                        placeholder="e.g. 5"
+                        max={percentMode ? 100 : undefined}
+                        placeholder={percentMode ? "e.g. 50 %" : "e.g. 5"}
                         className="h-8 w-20 rounded-lg border border-slate-200 px-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
                       />
 
@@ -1432,7 +1531,7 @@ export default function TargetAssignmentPage() {
                         onClick={() => fillRows("MAX")}
                         className="h-8 rounded-lg bg-blue-50 px-3 text-[11px] font-black text-blue-700 hover:bg-blue-100"
                       >
-                        Use max
+                        {percentMode ? "Use 100%" : "Use max"}
                       </button>
                     </div>
                   </div>
@@ -1495,7 +1594,7 @@ export default function TargetAssignmentPage() {
 
                           {group.rows.map((row) => {
                             const raw = draftOf(row);
-                            const max = maxFor(row);
+                            const max = limitFor(row);
                             const typed = Number(raw);
                             const over = raw !== "" && Number.isFinite(typed) && typed > max;
                             const dirty = isDirty(row);
@@ -1535,9 +1634,13 @@ export default function TargetAssignmentPage() {
                                           void saveRow(row);
                                         }
                                       }}
-                                      placeholder={`1 – ${max}`}
+                                      placeholder={percentMode ? "1 – 100" : `1 – ${max}`}
                                       className={`h-10 w-28 rounded-xl border bg-white px-3 text-sm font-black text-slate-800 outline-none focus:ring-2 ${over ? "border-rose-400 focus:ring-rose-500/10" : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/10"}`}
                                     />
+
+                                    {percentMode && (
+                                      <span className="text-sm font-black text-slate-500">%</span>
+                                    )}
 
                                     {!row.existing && raw !== String(max) && (
                                       <button
@@ -1545,13 +1648,25 @@ export default function TargetAssignmentPage() {
                                         onClick={() => setDraft(row.key, String(max))}
                                         className="text-[10px] font-black text-blue-600 hover:text-blue-800"
                                       >
-                                        max
+                                        {percentMode ? "100%" : "max"}
                                       </button>
                                     )}
                                   </div>
 
+                                  {percentMode &&
+                                    raw !== "" &&
+                                    Number.isInteger(typed) &&
+                                    typed >= 1 &&
+                                    typed <= 100 && (
+                                      <div className="mt-1 text-[10px] font-black text-blue-600">
+                                        = {assetsForPercent(row, typed)} of {maxFor(row)} {periodDays > 1 ? "in period" : "assets"}
+                                      </div>
+                                    )}
+
                                   {over && (
-                                    <div className="mt-1 text-[10px] font-black text-rose-600">Maximum is {max}</div>
+                                    <div className="mt-1 text-[10px] font-black text-rose-600">
+                                      {percentMode ? "Maximum is 100%" : `Maximum is ${max}`}
+                                    </div>
                                   )}
                                 </td>
 
@@ -1570,6 +1685,11 @@ export default function TargetAssignmentPage() {
                                       <div className="mb-1.5 flex items-center justify-between gap-2">
                                         <span className="text-xs font-black text-slate-800">
                                           {row.existing.achieved}/{row.existing.targetValue}
+                                          {row.existing.targetPercent != null && (
+                                            <span className="ml-1 text-[10px] font-bold text-blue-600">
+                                              ({row.existing.targetPercent}%)
+                                            </span>
+                                          )}
                                         </span>
 
                                         <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${state.className}`}>
@@ -2200,17 +2320,46 @@ export default function TargetAssignmentPage() {
                         editingTarget.targetValue
                       }
                     </div>
+
+                    {editingTarget.targetPercent != null && (
+                      <div className="mt-1 text-[11px] font-black text-blue-600">
+                        {editingTarget.targetPercent}% of assigned assets
+                      </div>
+                    )}
                   </div>
 
                   <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4">
-                    <label className="text-[10px] font-black uppercase tracking-wide text-blue-700">
-                      New Target
+                    <label className="flex items-center justify-between text-[10px] font-black uppercase tracking-wide text-blue-700">
+                      <span>New Target{editPercent && editingTarget.wardId ? " (%)" : ""}</span>
+
+                      {editingTarget.wardId && (
+                        <span className="inline-flex rounded-md bg-white p-0.5 normal-case tracking-normal">
+                          {([
+                            [false, "Count"],
+                            [true, "%"],
+                          ] as const).map(([asPercent, text]) => (
+                            <button
+                              key={text}
+                              type="button"
+                              onClick={() => {
+                                if (editPercent === asPercent) return;
+                                setEditPercent(asPercent);
+                                setEditValue("");
+                              }}
+                              className={`h-6 rounded px-2 text-[10px] font-black ${editPercent === asPercent ? "bg-blue-600 text-white" : "text-slate-500"}`}
+                            >
+                              {text}
+                            </button>
+                          ))}
+                        </span>
+                      )}
                     </label>
 
                     <input
                       autoFocus
                       type="number"
                       min={1}
+                      max={editPercent && editingTarget.wardId ? 100 : undefined}
                       step={1}
                       value={
                         editValue
@@ -2809,6 +2958,12 @@ function TargetRow({
 
       <td className="px-5 py-4 text-center text-lg font-black text-slate-900">
         {target.targetValue}
+
+        {target.targetPercent != null && (
+          <div className="text-[10px] font-black text-blue-600">
+            {target.targetPercent}%
+          </div>
+        )}
       </td>
 
       {/* ACHIEVED */}
@@ -2959,7 +3114,7 @@ function TargetMobileCard({
       <div className="mt-4 grid grid-cols-3 gap-2">
 
         <SmallMetric
-          label="Target"
+          label={target.targetPercent != null ? `Target (${target.targetPercent}%)` : "Target"}
           value={
             target.targetValue
           }
