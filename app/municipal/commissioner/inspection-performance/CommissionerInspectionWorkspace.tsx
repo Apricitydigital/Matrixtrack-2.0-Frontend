@@ -1280,7 +1280,9 @@ export default function CommissionerInspectionWorkspace() {
       setRecords(responses.flat());
     } catch (err: any) {
       console.error('Inspection & Performance load failed', err);
-      setError(err?.message || 'Unable to load inspection reports.');
+      if (!/write access not permitted/i.test(String(err?.message || ''))) {
+        setError(err?.message || 'Unable to load inspection reports.');
+      }
     } finally {
       setLoading(false);
     }
@@ -1892,10 +1894,13 @@ export default function CommissionerInspectionWorkspace() {
         err
       );
 
-      setError(
-        err?.message ||
-        'Unable to generate ULB AI insight.'
-      );
+      // Read-only roles cannot trigger AI generation; that is not a user-facing error.
+      if (!/write access not permitted/i.test(String(err?.message || ''))) {
+        setError(
+          err?.message ||
+          'Unable to generate ULB AI insight.'
+        );
+      }
     } finally {
       setDetailLoading(false);
     }
@@ -2384,6 +2389,7 @@ function ReportCard({
   onView: (report: DashboardRecord) => void;
   onActionRequired?: (report: DashboardRecord) => void;
 }) {
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const status = normalizedStatus(report);
   const classes = statusClasses(status);
   const StatusIcon = classes.icon;
@@ -2566,6 +2572,19 @@ function ReportCard({
           View
         </button>
 
+        <button
+          type="button"
+          onClick={() => setTimelineOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:border-blue-200 hover:text-blue-700"
+        >
+          <Clock3 className="h-3.5 w-3.5" />
+          View Report Timeline
+        </button>
+
+        {timelineOpen && (
+          <ReportTimelineModal report={report} onClose={() => setTimelineOpen(false)} />
+        )}
+
         {onActionRequired && (
         <button
           type="button"
@@ -2587,6 +2606,185 @@ function ReportCard({
         )}
       </footer>
     </article>
+  );
+}
+
+/*
+ * Full status timeline built only from fields already on the loaded
+ * record (no extra API call): every stage the report has passed through,
+ * each with its own time.
+ */
+function buildReportTimeline(report: DashboardRecord) {
+  const autoQc = getAutoQcResult(report);
+  const actionAi = getActionAiResult(report);
+  const qcDecision = getQcDecision(report);
+  const status = normalizedStatus(report);
+  const moduleKey = report.dashboardModule;
+  const siName = qcReviewerName(report);
+
+  type Step = {
+    key: string;
+    color: string;
+    icon: any;
+    title: string;
+    time: any;
+    description: string;
+    descriptionColor?: string;
+  };
+
+  const steps: Step[] = [
+    {
+      key: 'submitted',
+      color: 'bg-blue-600',
+      icon: Clock3,
+      title: 'Submitted',
+      time: report?.createdAt || report?.submittedAt || report?.visitedAt,
+      description: `${submittedByName(report)} submitted report`,
+    },
+  ];
+
+  if (autoQc) {
+    const rejected = String(autoQc?.decision || '').toUpperCase() === 'REJECTED';
+    steps.push({
+      key: 'auto-qc',
+      color: rejected ? 'bg-rose-500' : 'bg-emerald-500',
+      icon: Sparkles,
+      title: 'AI Quality Assessment',
+      time: report?.autoQcAt || report?.createdAt,
+      description: rejected ? 'Suggested Reject' : 'Suggested Approve',
+      descriptionColor: rejected ? 'text-rose-600' : 'text-emerald-600',
+    });
+  }
+
+  if (qcDecision) {
+    const rejected = qcDecision === 'REJECTED';
+    steps.push({
+      key: 'qc-review',
+      color: rejected ? 'bg-rose-500' : 'bg-emerald-500',
+      icon: ShieldCheck,
+      title: rejected ? 'SI Review - Rejected' : 'SI Review - Approved',
+      time: report?.qcReviewedAt || report?.reviewedAt,
+      description: siName ? `${siName} ${rejected ? 'rejected' : 'approved'} the report` : rejected ? 'Rejected' : 'Approved',
+      descriptionColor: rejected ? 'text-rose-600' : 'text-emerald-600',
+    });
+  }
+
+  if (actionAi) {
+    const required = String(actionAi?.recommendation || '').toUpperCase() === 'ACTION_REQUIRED';
+    steps.push({
+      key: 'action-ai',
+      color: required ? 'bg-amber-500' : 'bg-emerald-500',
+      icon: Sparkles,
+      title: 'Intelligence Suggest',
+      time: report?.actionAiAt,
+      description: required ? 'Attention Required Recommended' : 'No Attention Required',
+      descriptionColor: required ? 'text-amber-600' : 'text-emerald-600',
+    });
+  }
+
+  const requiredRemark = getActionRequiredRemark(report, moduleKey);
+  if (status === 'ACTION_REQUIRED' || status === 'ACTION_TAKEN' || requiredRemark) {
+    steps.push({
+      key: 'action-required',
+      color: 'bg-orange-500',
+      icon: AlertTriangle,
+      title: 'Attention Required',
+      time:
+        report?.actionRequiredAt ||
+        report?.ulbActionAt ||
+        report?.ulbRemarkAt ||
+        report?.escalatedAt ||
+        (status === 'ACTION_REQUIRED' ? report?.updatedAt : null),
+      description: requiredRemark ? `Sent for corrective action - ${requiredRemark}` : 'Sent for corrective action',
+      descriptionColor: 'text-orange-600',
+    });
+  }
+
+  if (status === 'ACTION_TAKEN') {
+    const takenRemark = getActionTakenRemark(report, moduleKey);
+    steps.push({
+      key: 'action-taken',
+      color: 'bg-emerald-600',
+      icon: CheckCircle2,
+      title: 'Action Taken',
+      time: report?.actionTakenAt || report?.actionOfficerRespondedAt || report?.updatedAt,
+      description: takenRemark ? `Corrective action completed - ${takenRemark}` : 'Corrective action completed',
+      descriptionColor: 'text-emerald-600',
+    });
+  }
+
+  if (!qcDecision && status === 'PENDING') {
+    steps.push({
+      key: 'pending',
+      color: 'bg-slate-400',
+      icon: Clock3,
+      title: 'Awaiting SI Review',
+      time: null,
+      description: 'Review is pending',
+    });
+  }
+
+  return steps;
+}
+
+function ReportTimelineModal({
+  report,
+  onClose,
+}: {
+  report: DashboardRecord;
+  onClose: () => void;
+}) {
+  if (typeof document === 'undefined') return null;
+  const steps = buildReportTimeline(report);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-black text-slate-800">Report Timeline</h3>
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+              {reportTitle(report, report.dashboardModule)}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          {steps.map((step, index) => (
+            <div key={step.key} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${step.color}`}>
+                  <step.icon className="h-3.5 w-3.5 text-white" />
+                </div>
+                {index < steps.length - 1 && <div className="mt-1 w-px flex-1 bg-slate-300" />}
+              </div>
+
+              <div className={index < steps.length - 1 ? 'flex-1 pb-4' : 'flex-1'}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs font-black text-slate-800">{step.title}</div>
+                  <div className="text-[10px] font-semibold text-slate-400">
+                    {formatFullDate(step.time)}
+                  </div>
+                </div>
+                <div className={`mt-0.5 text-[11px] font-semibold ${step.descriptionColor || 'text-slate-500'}`}>
+                  {step.description}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

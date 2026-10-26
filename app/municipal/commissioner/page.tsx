@@ -12979,31 +12979,10 @@ const [
         breakdownForGeo(
           row
         ),
-      scoreComponents: [
-        {
-          tab: 'INSPECTION',
-          label: 'Inspection Completion',
-          value: percentText(row.inspection),
-        },
-        {
-          tab: 'ATTENDANCE',
-          label: 'Attendance',
-          value: percentText(row.attendance),
-        },
-        {
-          tab: 'WARD_RANKING',
-          label: 'Ward Ranking',
-          value: percentText(row.wardRanking),
-        },
-      ],
       inspectionRecords:
         row.records,
       inspectionModuleCompletion:
         geoInspectionModuleCompletion,
-      attendanceEmployees:
-        row.employees,
-      wardRows:
-        row.wards,
     });
   }
 
