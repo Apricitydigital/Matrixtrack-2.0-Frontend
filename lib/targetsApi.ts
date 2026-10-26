@@ -42,7 +42,11 @@ export type EmployeeTarget = {
   role: TargetRole;
   periodType: TargetPeriodType;
 
+  /** Count per period. For a percentage target this is what the percent resolves to now. */
   targetValue: number;
+
+  /** 1-100 when the target is a percentage of the assigned assets; null = count target. */
+  targetPercent?: number | null;
 
   startDate: string;
   endDate: string;
@@ -111,7 +115,9 @@ export type CreateTargetPayload = {
   role: TargetRole;
   periodType: TargetPeriodType;
   startDate: string;
-  targetValue: number;
+  /** Exactly one of targetValue / targetPercent. Percent is for ward-wise targets only. */
+  targetValue?: number;
+  targetPercent?: number;
   wardId?: string;
   allowRepeat?: boolean;
 };
@@ -141,7 +147,8 @@ export type BulkTargetPayload = {
     userId: string;
     moduleId: string;
     wardId: string;
-    targetValue: number;
+    targetValue?: number;
+    targetPercent?: number;
     allowRepeat?: boolean;
   }>;
 };
@@ -150,8 +157,10 @@ export type CreateTargetResponse = {
   target: EmployeeTarget;
 };
 
+/** Exactly one of targetValue / targetPercent. Re-send the target's own mode when only toggling allowRepeat. */
 export type UpdateTargetPayload = {
-  targetValue: number;
+  targetValue?: number;
+  targetPercent?: number;
   allowRepeat?: boolean;
 };
 
@@ -165,6 +174,9 @@ export type TargetHistoryItem = {
   targetId: string;
   oldTargetValue: number;
   newTargetValue: number;
+  /** null = that side was a count target. */
+  oldTargetPercent?: number | null;
+  newTargetPercent?: number | null;
   changedById: string;
   changedAt: string;
 };
@@ -173,6 +185,7 @@ export type TargetHistoryResponse = {
   target: {
     id: string;
     targetValue: number;
+    targetPercent?: number | null;
 
     user: {
       id: string;
@@ -255,3 +268,12 @@ export const TargetsApi = {
     );
   },
 };
+
+/** "20% (3)" for a percentage target, "3" for a count target. */
+export function formatTargetValue(
+  target: { targetValue: number; targetPercent?: number | null }
+) {
+  return target.targetPercent != null
+    ? `${target.targetPercent}% (${target.targetValue})`
+    : String(target.targetValue);
+}

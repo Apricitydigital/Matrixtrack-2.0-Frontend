@@ -2216,7 +2216,12 @@ function UserDetailDrawer({
                             </td>
                             <td className="px-4 py-2 font-bold text-slate-600">{entry.wardName}</td>
                                                         <td className="px-4 py-2 text-right font-bold text-slate-600">{entry.assigned}</td>
-                            <td className="px-4 py-2 text-right font-black text-slate-900">{Math.round(entry.target)}</td>
+                            <td className="px-4 py-2 text-right font-black text-slate-900">
+                              {Math.round(entry.target)}
+                              {entry.targetPercent != null && (
+                                <div className="text-[8px] font-black text-blue-600">{entry.targetPercent}% of assigned</div>
+                              )}
+                            </td>
                             <td className="px-4 py-2 text-right font-black text-slate-900">{Math.round(entry.credit)}</td>
                             <td className="px-4 py-2 text-right font-black text-slate-900">
                               {entry.target > 0 ? percentText(clamp((entry.credit / entry.target) * 100)) : '-'}

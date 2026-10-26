@@ -36,6 +36,7 @@ import { downloadExcel } from "@lib/exportExcel";
 
 import {
   TargetsApi,
+  formatTargetValue,
   type AssignmentRow,
   type EmployeeTargetPerformance,
   type TargetHistoryResponse,
@@ -447,6 +448,8 @@ export default function TargetAssignmentPage() {
   const [busyKeys, setBusyKeys] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [fillValue, setFillValue] = useState("");
+  /* COUNT = type a number of inspections, PERCENT = % of the Daroga's assigned assets. */
+  const [unit, setUnit] = useState<"COUNT" | "PERCENT">("COUNT");
   const [showNoAssets, setShowNoAssets] = useState(false);
 
   /* =======================================================
@@ -478,6 +481,7 @@ export default function TargetAssignmentPage() {
 
   const [editingTarget, setEditingTarget] = useState<EmployeeTargetPerformance | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [editUnit, setEditUnit] = useState<"COUNT" | "PERCENT">("COUNT");
   const [editSaving, setEditSaving] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<EmployeeTargetPerformance | null>(null);
   const [historyData, setHistoryData] = useState<TargetHistoryResponse | null>(null);
@@ -707,9 +711,24 @@ export default function TargetAssignmentPage() {
 
   const maxFor = (row: AssignmentRow) => row.assigned * periodDays;
 
-  const draftOf = (row: MatrixRow) =>
-    drafts[row.key] ??
-    (row.existing ? String(row.existing.targetValue) : "");
+  /* Shown in the input: the draft, else the saved value when it is in the unit being edited. */
+  const draftOf = (row: MatrixRow) => {
+    if (drafts[row.key] !== undefined) return drafts[row.key];
+    if (!row.existing) return "";
+
+    if (unit === "PERCENT") {
+      return row.existing.targetPercent != null ? String(row.existing.targetPercent) : "";
+    }
+
+    return String(row.existing.targetValue);
+  };
+
+  /* Highest value the input accepts in the current unit. */
+  const inputMax = (row: AssignmentRow) => (unit === "PERCENT" ? 100 : maxFor(row));
+
+  /* Count a typed percentage works out to for this row (same rounding as the server). */
+  const percentToCount = (row: AssignmentRow, percent: number) =>
+    Math.max(1, Math.ceil((row.assigned * periodDays * percent) / 100));
 
   const validateRow = (row: MatrixRow, raw: string) => {
     const value = Number(raw);
@@ -717,6 +736,14 @@ export default function TargetAssignmentPage() {
 
     if (!raw.trim()) {
       return { ok: false as const, error: "Enter a target." };
+    }
+
+    if (unit === "PERCENT") {
+      if (!Number.isInteger(value) || value < 1 || value > 100) {
+        return { ok: false as const, error: "Percentage must be a whole number from 1 to 100." };
+      }
+
+      return { ok: true as const, value };
     }
 
     if (!Number.isInteger(value) || value <= 0) {
@@ -731,6 +758,28 @@ export default function TargetAssignmentPage() {
     }
 
     return { ok: true as const, value };
+  };
+
+  /*
+   * What to send for a row. A row whose value was not edited (only "Allow repeat"
+   * changed) keeps its own mode, so a percentage target is never turned into a count.
+   */
+  const inputFor = (row: MatrixRow) => {
+    const edited = drafts[row.key]?.trim();
+
+    if (!edited && row.existing) {
+      return row.existing.targetPercent != null
+        ? { ok: true as const, percent: row.existing.targetPercent, value: undefined, label: `${row.existing.targetPercent}%` }
+        : { ok: true as const, percent: undefined, value: row.existing.targetValue, label: String(row.existing.targetValue) };
+    }
+
+    const check = validateRow(row, edited ?? "");
+
+    if (!check.ok) return check;
+
+    return unit === "PERCENT"
+      ? { ok: true as const, percent: check.value, value: undefined, label: `${check.value}%` }
+      : { ok: true as const, percent: undefined, value: check.value, label: String(check.value) };
   };
 
   const repeatOf = (row: MatrixRow) =>
@@ -749,7 +798,12 @@ export default function TargetAssignmentPage() {
 
     if (raw === undefined || raw.trim() === "") return false;
 
-    return row.existing ? Number(raw) !== row.existing.targetValue : true;
+    if (!row.existing) return true;
+
+    if (unit === "PERCENT") return Number(raw) !== row.existing.targetPercent;
+
+    // A percentage target typed as a count is switched to a count target.
+    return row.existing.targetPercent != null || Number(raw) !== row.existing.targetValue;
   };
 
   const dirtyRows = useMemo(
@@ -757,6 +811,15 @@ export default function TargetAssignmentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [matrixRows, drafts, repeatDrafts, defaultRepeat],
   );
+
+  const changeUnit = (next: "COUNT" | "PERCENT") => {
+    if (next === unit) return;
+
+    // Typed values mean something else in the other unit, so start clean.
+    setDrafts({});
+    setFillValue("");
+    setUnit(next);
+  };
 
   const setDraft = (key: string, value: string) =>
     setDrafts((prev) => ({ ...prev, [key]: value }));
@@ -810,8 +873,7 @@ export default function TargetAssignmentPage() {
     setError("");
     setSuccessMessage("");
 
-    const raw = draftOf(row);
-    const check = validateRow(row, raw);
+    const check = inputFor(row);
 
     if (!check.ok) {
       setError(`${row.userName} / ${row.wardName} / ${moduleLabel(row.moduleName)}: ${check.error}`);
@@ -823,7 +885,7 @@ export default function TargetAssignmentPage() {
     try {
       if (row.existing) {
         await TargetsApi.update(row.existing.id, {
-          targetValue: check.value,
+          ...(check.percent !== undefined ? { targetPercent: check.percent } : { targetValue: check.value }),
           allowRepeat: repeatOf(row),
         });
       } else {
@@ -833,7 +895,7 @@ export default function TargetAssignmentPage() {
           role: "SUPERVISOR",
           periodType,
           startDate,
-          targetValue: check.value,
+          ...(check.percent !== undefined ? { targetPercent: check.percent } : { targetValue: check.value }),
           wardId: row.wardId,
           allowRepeat: repeatOf(row),
         });
@@ -841,7 +903,7 @@ export default function TargetAssignmentPage() {
 
       clearDrafts([row.key]);
       setSuccessMessage(
-        `${row.userName}: ${moduleLabel(row.moduleName)} target ${row.existing ? "updated to" : "set to"} ${check.value}.`,
+        `${row.userName}: ${moduleLabel(row.moduleName)} target ${row.existing ? "updated to" : "set to"} ${check.label}.`,
       );
 
       await loadTargets();
@@ -858,11 +920,11 @@ export default function TargetAssignmentPage() {
     setError("");
     setSuccessMessage("");
 
-    const fresh: Array<{ userId: string; moduleId: string; wardId: string; targetValue: number; allowRepeat: boolean }> = [];
-    const updates: Array<{ id: string; targetValue: number; allowRepeat: boolean }> = [];
+    const fresh: Array<{ userId: string; moduleId: string; wardId: string; targetValue?: number; targetPercent?: number; allowRepeat: boolean }> = [];
+    const updates: Array<{ id: string; targetValue?: number; targetPercent?: number; allowRepeat: boolean }> = [];
 
     for (const row of dirtyRows) {
-      const check = validateRow(row, draftOf(row));
+      const check = inputFor(row);
 
       if (!check.ok) {
         setError(`${row.userName} / ${row.wardName} / ${moduleLabel(row.moduleName)}: ${check.error}`);
@@ -870,13 +932,14 @@ export default function TargetAssignmentPage() {
       }
 
       if (row.existing) {
-        updates.push({ id: row.existing.id, targetValue: check.value, allowRepeat: repeatOf(row) });
+        updates.push({ id: row.existing.id, targetValue: check.value, targetPercent: check.percent, allowRepeat: repeatOf(row) });
       } else {
         fresh.push({
           userId: row.userId,
           moduleId: row.moduleId,
           wardId: row.wardId,
           targetValue: check.value,
+          targetPercent: check.percent,
           allowRepeat: repeatOf(row),
         });
       }
@@ -898,7 +961,7 @@ export default function TargetAssignmentPage() {
 
       for (const update of updates) {
         await TargetsApi.update(update.id, {
-          targetValue: update.targetValue,
+          ...(update.targetPercent !== undefined ? { targetPercent: update.targetPercent } : { targetValue: update.targetValue }),
           allowRepeat: update.allowRepeat,
         });
       }
@@ -923,7 +986,7 @@ export default function TargetAssignmentPage() {
     const typed = Number(fillValue);
 
     if (mode === "VALUE" && (!Number.isInteger(typed) || typed <= 0)) {
-      setError("Enter a positive whole number to apply.");
+      setError(unit === "PERCENT" ? "Enter a percentage from 1 to 100 to apply." : "Enter a positive whole number to apply.");
       return;
     }
 
@@ -932,7 +995,7 @@ export default function TargetAssignmentPage() {
     for (const row of matrixRows) {
       if (row.existing) continue;
 
-      const max = maxFor(row);
+      const max = inputMax(row);
       next[row.key] = String(mode === "MAX" ? max : Math.min(typed, max));
     }
 
@@ -1053,7 +1116,8 @@ export default function TargetAssignmentPage() {
   const openEdit = (target: EmployeeTargetPerformance) => {
     setModalError("");
     setEditingTarget(target);
-    setEditValue(String(target.targetValue));
+    setEditUnit(target.targetPercent != null ? "PERCENT" : "COUNT");
+    setEditValue(String(target.targetPercent ?? target.targetValue));
   };
 
   const closeEdit = () => {
@@ -1073,7 +1137,14 @@ export default function TargetAssignmentPage() {
 
     const numericValue = Number(editValue);
 
-    if (!Number.isInteger(numericValue) || numericValue <= 0) {
+    const asPercent = editUnit === "PERCENT";
+
+    if (asPercent && (!Number.isInteger(numericValue) || numericValue < 1 || numericValue > 100)) {
+      setModalError("Percentage must be a whole number from 1 to 100.");
+      return;
+    }
+
+    if (!asPercent && (!Number.isInteger(numericValue) || numericValue <= 0)) {
       setModalError("Target must be a positive whole number.");
       return;
     }
@@ -1082,14 +1153,17 @@ export default function TargetAssignmentPage() {
     setEditSaving(true);
 
     try {
-      const response = await TargetsApi.update(editingTarget.id, {
-        targetValue: numericValue,
-      });
+      const response = await TargetsApi.update(
+        editingTarget.id,
+        asPercent ? { targetPercent: numericValue } : { targetValue: numericValue },
+      );
+
+      const nextLabel = asPercent ? `${numericValue}%` : String(numericValue);
 
       setSuccessMessage(
         response.changed
-          ? `Target updated from ${editingTarget.targetValue} to ${numericValue}.`
-          : `Target is already set to ${numericValue}.`,
+          ? `Target updated from ${formatTargetValue(editingTarget)} to ${nextLabel}.`
+          : `Target is already set to ${nextLabel}.`,
       );
 
       setEditingTarget(null);
@@ -1251,7 +1325,9 @@ export default function TargetAssignmentPage() {
                       </div>
 
                       <div className="text-xs font-semibold text-slate-500">
-                        Stays the same until you change it. Maximum per row = assigned assets × {periodDays} {periodDays === 1 ? "day" : "days"}.
+                        Stays the same until you change it. {unit === "PERCENT"
+                          ? "Percentage of the assets assigned to each Daroga (rounded up)."
+                          : <>Maximum per row = assigned assets × {periodDays} {periodDays === 1 ? "day" : "days"}.</>}
                       </div>
                     </div>
                   </div>
@@ -1405,6 +1481,14 @@ export default function TargetAssignmentPage() {
                       <RepeatSwitch on={defaultRepeat} onChange={setDefaultRepeat} />
                     </div>
 
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                        Target in
+                      </span>
+
+                      <UnitToggle value={unit} onChange={changeUnit} />
+                    </div>
+
                     <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-1 pl-3">
                       <span className="text-[10px] font-black uppercase tracking-wide text-slate-500">
                         Fill empty rows
@@ -1415,7 +1499,7 @@ export default function TargetAssignmentPage() {
                         min={1}
                         value={fillValue}
                         onChange={(event) => setFillValue(event.target.value)}
-                        placeholder="e.g. 5"
+                        placeholder={unit === "PERCENT" ? "e.g. 50 %" : "e.g. 5"}
                         className="h-8 w-20 rounded-lg border border-slate-200 px-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-400"
                       />
 
@@ -1432,7 +1516,7 @@ export default function TargetAssignmentPage() {
                         onClick={() => fillRows("MAX")}
                         className="h-8 rounded-lg bg-blue-50 px-3 text-[11px] font-black text-blue-700 hover:bg-blue-100"
                       >
-                        Use max
+                        {unit === "PERCENT" ? "Use 100%" : "Use max"}
                       </button>
                     </div>
                   </div>
@@ -1495,7 +1579,7 @@ export default function TargetAssignmentPage() {
 
                           {group.rows.map((row) => {
                             const raw = draftOf(row);
-                            const max = maxFor(row);
+                            const max = inputMax(row);
                             const typed = Number(raw);
                             const over = raw !== "" && Number.isFinite(typed) && typed > max;
                             const dirty = isDirty(row);
@@ -1535,9 +1619,11 @@ export default function TargetAssignmentPage() {
                                           void saveRow(row);
                                         }
                                       }}
-                                      placeholder={`1 – ${max}`}
+                                      placeholder={unit === "PERCENT" ? "1 – 100 %" : `1 – ${max}`}
                                       className={`h-10 w-28 rounded-xl border bg-white px-3 text-sm font-black text-slate-800 outline-none focus:ring-2 ${over ? "border-rose-400 focus:ring-rose-500/10" : "border-slate-200 focus:border-blue-500 focus:ring-blue-500/10"}`}
                                     />
+
+                                    {unit === "PERCENT" && <span className="text-sm font-black text-slate-400">%</span>}
 
                                     {!row.existing && raw !== String(max) && (
                                       <button
@@ -1551,7 +1637,25 @@ export default function TargetAssignmentPage() {
                                   </div>
 
                                   {over && (
-                                    <div className="mt-1 text-[10px] font-black text-rose-600">Maximum is {max}</div>
+                                    <div className="mt-1 text-[10px] font-black text-rose-600">Maximum is {max}{unit === "PERCENT" ? "%" : ""}</div>
+                                  )}
+
+                                  {unit === "PERCENT" && !over && raw !== "" && Number.isFinite(typed) && typed >= 1 && (
+                                    <div className="mt-1 text-[10px] font-black text-blue-600">
+                                      = {percentToCount(row, typed)} of {row.assigned * periodDays}
+                                    </div>
+                                  )}
+
+                                  {row.existing?.targetPercent != null && unit === "COUNT" && drafts[row.key] === undefined && (
+                                    <div className="mt-1 text-[10px] font-black text-blue-600">
+                                      Set as {row.existing.targetPercent}%
+                                    </div>
+                                  )}
+
+                                  {row.existing && row.existing.targetPercent == null && unit === "PERCENT" && drafts[row.key] === undefined && (
+                                    <div className="mt-1 text-[10px] font-black text-slate-400">
+                                      Now {row.existing.targetValue} (count)
+                                    </div>
                                   )}
                                 </td>
 
@@ -1570,6 +1674,9 @@ export default function TargetAssignmentPage() {
                                       <div className="mb-1.5 flex items-center justify-between gap-2">
                                         <span className="text-xs font-black text-slate-800">
                                           {row.existing.achieved}/{row.existing.targetValue}
+                                          {row.existing.targetPercent != null && (
+                                            <span className="ml-1 text-[10px] font-black text-blue-600">({row.existing.targetPercent}%)</span>
+                                          )}
                                         </span>
 
                                         <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${state.className}`}>
@@ -1755,6 +1862,7 @@ export default function TargetAssignmentPage() {
                             { header: "Module", value: (t) => moduleLabel(t.module.name) },
                             { header: "Period", value: (t) => t.periodType },
                             { header: "Target", value: (t) => t.targetValue },
+                            { header: "Target %", value: (t) => (t.targetPercent != null ? t.targetPercent : "") },
                             { header: "Achieved", value: (t) => t.achieved },
                             { header: "Remaining", value: (t) => t.remaining },
                             { header: "Progress %", value: (t) => t.progress },
@@ -2197,21 +2305,47 @@ export default function TargetAssignmentPage() {
 
                     <div className="mt-2 text-3xl font-black text-slate-900">
                       {
-                        editingTarget.targetValue
+                        editingTarget.targetPercent != null
+                          ? `${editingTarget.targetPercent}%`
+                          : editingTarget.targetValue
                       }
                     </div>
+
+                    {editingTarget.targetPercent != null && (
+                      <div className="mt-1 text-[11px] font-semibold text-slate-500">
+                        = {editingTarget.targetValue}
+                        {editingTarget.assignedAssets != null
+                          ? ` of ${editingTarget.assignedAssets} assigned per day`
+                          : ""}
+                      </div>
+                    )}
                   </div>
 
                   <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4">
-                    <label className="text-[10px] font-black uppercase tracking-wide text-blue-700">
-                      New Target
-                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[10px] font-black uppercase tracking-wide text-blue-700">
+                        New Target
+                      </label>
+
+                      {editingTarget.wardId && (
+                        <UnitToggle
+                          value={editUnit}
+                          onChange={(next) => {
+                            setEditUnit(next);
+                            setEditValue("");
+                          }}
+                          small
+                        />
+                      )}
+                    </div>
 
                     <input
                       autoFocus
                       type="number"
                       min={1}
+                      max={editUnit === "PERCENT" ? 100 : undefined}
                       step={1}
+                      placeholder={editUnit === "PERCENT" ? "1 – 100 %" : undefined}
                       value={
                         editValue
                       }
@@ -2393,8 +2527,8 @@ export default function TargetAssignmentPage() {
 
                 <ModalInfo
                   label="Current Target"
-                  value={String(
-                    historyTarget.targetValue,
+                  value={formatTargetValue(
+                    historyData?.target ?? historyTarget,
                   )}
                   emphasized
                 />
@@ -2475,7 +2609,9 @@ export default function TargetAssignmentPage() {
 
                                   <span className="text-xl font-black text-slate-500">
                                     {
-                                      item.oldTargetValue
+                                      item.oldTargetPercent != null
+                                        ? `${item.oldTargetPercent}%`
+                                        : item.oldTargetValue
                                     }
                                   </span>
 
@@ -2486,7 +2622,9 @@ export default function TargetAssignmentPage() {
 
                                   <span className="text-xl font-black text-blue-600">
                                     {
-                                      item.newTargetValue
+                                      item.newTargetPercent != null
+                                        ? `${item.newTargetPercent}%`
+                                        : item.newTargetValue
                                     }
                                   </span>
 
@@ -2809,6 +2947,19 @@ function TargetRow({
 
       <td className="px-5 py-4 text-center text-lg font-black text-slate-900">
         {target.targetValue}
+
+        {target.targetPercent != null && (
+          <div
+            title={
+              target.assignedAssets != null
+                ? `${target.targetPercent}% of ${target.assignedAssets} assigned per day`
+                : undefined
+            }
+            className="mt-0.5 text-[10px] font-black text-blue-600"
+          >
+            {target.targetPercent}%
+          </div>
+        )}
       </td>
 
       {/* ACHIEVED */}
@@ -2959,7 +3110,11 @@ function TargetMobileCard({
       <div className="mt-4 grid grid-cols-3 gap-2">
 
         <SmallMetric
-          label="Target"
+          label={
+            target.targetPercent != null
+              ? `Target (${target.targetPercent}%)`
+              : "Target"
+          }
           value={
             target.targetValue
           }
@@ -3059,6 +3214,31 @@ function TargetMobileCard({
 /* =========================================================
    SMALL METRIC
 ========================================================= */
+
+function UnitToggle({
+  value,
+  onChange,
+  small,
+}: {
+  value: "COUNT" | "PERCENT";
+  onChange: (next: "COUNT" | "PERCENT") => void;
+  small?: boolean;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+      {(["COUNT", "PERCENT"] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          className={`rounded-md font-black transition ${small ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-[11px]"} ${value === option ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-white"}`}
+        >
+          {option === "COUNT" ? "Count" : "%"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function SmallMetric({
   label,

@@ -1184,6 +1184,8 @@ export type DarogaTargetRow = {
   periodType: "DAILY" | "WEEKLY" | "MONTHLY";
   assigned: number;
   target: number;
+  /** Set when the admin target counted here is a percentage of the assigned assets. */
+  targetPercent?: number | null;
   achieved: number;
   credit: number;
 };
