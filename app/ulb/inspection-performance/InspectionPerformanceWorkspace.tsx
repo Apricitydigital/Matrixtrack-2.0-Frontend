@@ -2210,8 +2210,9 @@ export default function InspectionPerformanceWorkspace() {
             from={dateRange.start} to={dateRange.end}
             zoneId={selectedZone} wardId={selectedWard}
             search={debouncedSearch} refresh={summaryRefresh}
+            targetProgress={targetProgress}
             overlayOpen={Boolean(selected || actionTarget || imagePreview)}
-            renderReport={report => <ReportCard report={report} onView={openDetail} onActionRequired={beginActionRequired} />}
+            renderReport={report => <ReportCard report={report} onView={item => { if (normalizedStatus(item) === 'DRAFT') { setSelected(item); setDetailLoading(false); } else { openDetail(item); } }} onActionRequired={beginActionRequired} />}
           />
         ) : (<>
         <InspectionOverviewCards

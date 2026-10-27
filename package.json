@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test tests/cleanlinessIssues.test.cjs tests/ulbCleanliness.test.cjs tests/inspectionOverview.test.cjs tests/beatReports.test.cjs tests/inspectionCards.test.cjs"
+    "test": "node --test tests/cleanlinessIssues.test.cjs tests/ulbCleanliness.test.cjs tests/inspectionOverview.test.cjs tests/beatReports.test.cjs tests/inspectionCards.test.cjs tests/beatReportStats.test.cjs"
   },
   "dependencies": {
     "@indic-transliteration/sanscript": "^1.3.3",

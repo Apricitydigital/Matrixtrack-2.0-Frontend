@@ -29,5 +29,9 @@ test('opening a beat requests only its submitted reports, preserving date range 
     assert.equal(requested.init.headers.Authorization, 'Bearer test-token');
     assert.equal(response.meta.total, 21);
     assert.equal(response.data[0].id, 'r1');
+    await ModuleRecordsApi.getRecords('SWEEPING', { beatId: 'beat-a', beatReportStatus: 'pendingReview', page: 2, limit: 20, tab: 'HISTORY' });
+    assert.equal(requested.url.searchParams.get('beatReportStatus'), 'pendingReview');
+    assert.equal(requested.url.searchParams.get('beatId'), 'beat-a');
+    assert.equal(requested.url.searchParams.get('page'), '2');
   } finally { global.fetch = originalFetch; }
 });

@@ -1527,6 +1527,7 @@ export const ModuleRecordsApi = {
       toDate?: string;
       recordId?: string;
       beatId?: string;
+      beatReportStatus?: import('./beatReportStats').BeatReportStatus;
     }
   ) => {
     const params = new URLSearchParams();
@@ -1540,6 +1541,7 @@ export const ModuleRecordsApi = {
     if (filters?.toDate) params.append("endDate", filters.toDate);
     if (filters?.recordId) params.append("recordId", filters.recordId);
     if (filters?.beatId) params.append("beatId", filters.beatId);
+    if (filters?.beatReportStatus) params.append("beatReportStatus", filters.beatReportStatus);
 
     const queryString = params.toString();
     const url = `/modules/${moduleKey}/records${queryString ? `?${queryString}` : ""}`;
