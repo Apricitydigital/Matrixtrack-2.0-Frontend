@@ -1,7 +1,7 @@
 require('./helpers/registerTs.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { inspectionOverview, inspectionRangeDays } = require('../lib/inspectionOverview.ts');
+const { inspectionOverview, inspectionRangeDays, inspectionRollingRange } = require('../lib/inspectionOverview.ts');
 const inventory = [
   { module: 'SWEEPING', wardId: 'w1', zoneId: 'z1', total: 10 },
   { module: 'LITTERBINS', wardId: 'w1', zoneId: 'z1', total: 5 },
@@ -74,4 +74,24 @@ test('credit cannot produce negative pending, and future dates are not due', () 
   assert.equal(inspectionRangeDays('2026-10-26', '2026-11-10', '2026-10-27'), 2);
   assert.equal(inspectionRangeDays('2026-11-01', '2026-11-10', '2026-10-27'), 0);
   assert.equal(inspectionRangeDays('2000-01-01', '2026-10-27', '2026-10-27'), null);
+});
+
+test('This Week is seven inclusive dates, so 65 default daily assets produce 455 targets', () => {
+  const range = inspectionRollingRange(7, new Date(2026, 9, 27, 12));
+  assert.deepEqual(range, { start: '2026-10-21', end: '2026-10-27' });
+  const days = inspectionRangeDays(range.start, range.end, '2026-10-27');
+  assert.equal(days, 7);
+  const overview = summarize({ inventory: [{ module: 'TOILET', wardId: 'w1', zoneId: 'z1', total: 65 }], days });
+  assert.equal(overview.target, 455);
+  assert.deepEqual(inspectionRollingRange(7, new Date(2026, 0, 3, 12)), { start: '2025-12-28', end: '2026-01-03' });
+});
+
+test('pending drilldown includes only unfinished scopes and reconciles exactly to the card', () => {
+  const users = { d: { rows: [row('SWEEPING', 'w1', 10, 5, 3), row('TOILET', 'w2', 5, 5, 5)] } };
+  const overview = summarize({ users });
+  assert.equal(overview.pending, 7);
+  assert.equal(overview.pendingRows.reduce((sum, row) => sum + row.pending, 0), overview.pending);
+  assert.deepEqual(overview.pendingRows.map(row => [row.module, row.wardId, row.pending]), [['SWEEPING', 'w1', 2], ['LITTERBINS', 'w1', 5]]);
+  assert.equal(summarize({ users, wardId: 'w2' }).pendingRows.length, 0);
+  assert.equal(summarize({ users: null }).pendingRows.length, 0);
 });

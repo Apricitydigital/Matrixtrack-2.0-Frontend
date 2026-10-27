@@ -1,5 +1,6 @@
 'use client';
 
+import { inspectionRollingRange } from '@lib/inspectionOverview';
 import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import {
   useEffect,
@@ -226,9 +227,7 @@ function dateRangeForPreset(
    * different record sets depending which screen you're on.
    */
   if (preset === 'WEEK') {
-    const start = new Date(today);
-    start.setDate(start.getDate() - 7);
-    return { start: toLocalISO(start), end: toLocalISO(today) };
+    return inspectionRollingRange(7, today);
   }
 
   if (preset === 'MONTH') {

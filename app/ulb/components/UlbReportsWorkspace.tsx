@@ -1,5 +1,6 @@
 'use client';
 
+import { inspectionRollingRange } from '@lib/inspectionOverview';
 import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import {
     Fragment,
@@ -11628,9 +11629,7 @@ function UnifiedFilterBar({
             setPresetName('Yesterday');
             if (onApplyDateFilter) onApplyDateFilter(yStr, yStr);
         } else if (preset === 'WEEKLY') {
-            const w = new Date(now);
-            w.setDate(w.getDate() - 7);
-            const wStr = formatDateYYYYMMDD(w);
+            const wStr = inspectionRollingRange(7, now).start;
             const todayStr = formatDateYYYYMMDD(now);
             setFromDate(wStr);
             setToDate(todayStr);
