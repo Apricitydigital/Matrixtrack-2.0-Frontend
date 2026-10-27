@@ -9,10 +9,10 @@ import { BEAT_REPORT_CARDS, matchesBeatFilter, reportStatusForBeatFilter, type B
 
 type Beat = { id: string; beatName: string; beatCode: string | null; zoneName: string; wardName: string; covered: boolean; reportCount: number; reportCounts?: BeatReportCounts };
 type Coverage = { beats: Beat[]; summary: { total: number; covered: number; pending: number }; reportStats?: BeatReportCounts };
-export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search, refresh, overlayOpen, renderReport, targetProgress }: {
+export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search, refresh, overlayOpen, renderFullReport, targetProgress }: {
   from: string; to: string; zoneId: string; wardId: string; search: string; refresh: number;
   overlayOpen: boolean;
-  renderReport: (report: any) => ReactNode;
+  renderFullReport: (report: any, navigation: ReactNode, onClose: () => void) => ReactNode;
   targetProgress?: { target: number | null; credit: number | null; pending: number | null; percent: number | null };
 }) {
   const [data, setData] = useState<Coverage | null>(null);
@@ -22,6 +22,8 @@ export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search
   const [filter, setFilter] = useState<BeatFilter>('total');
   const [beat, setBeat] = useState<Beat | null>(null);
   const [reports, setReports] = useState<any[]>([]);
+  const [activeReportId, setActiveReportId] = useState<string | null>(null);
+  const navigationRef = useRef<HTMLDivElement>(null);
   const [reportPage, setReportPage] = useState(1);
   const [reportTotal, setReportTotal] = useState(0);
   const [reportsLoading, setReportsLoading] = useState(false);
@@ -50,7 +52,7 @@ export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search
     if (!beat) return;
     let cancelled = false;
     setReportsLoading(true); setReportsError('');
-    if (reportPage === 1) setReports([]);
+    if (reportPage === 1) { setReports([]); setActiveReportId(null); }
     const range = performanceRangeParams(from, to);
     ModuleRecordsApi.getRecords('SWEEPING', { beatId: beat.id, beatReportStatus: reportStatusForBeatFilter(filter), fromDate: range.startDate, toDate: range.endDate, tab: 'HISTORY', page: reportPage, limit: 20 })
       .then(response => {
@@ -58,6 +60,7 @@ export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search
         const rows = response.data.map(report => ({ ...report, dashboardModule: 'SWEEPING', dashboardModuleLabel: 'Sweeping' }));
         setReports(current => reportPage === 1 ? rows : [...current, ...rows]);
         setReportTotal(response.meta.total);
+        if (reportPage === 1) setActiveReportId(rows[0]?.id ?? null);
       })
       .catch(() => { if (!cancelled) setReportsError('Unable to load submitted reports. Please retry.'); })
       .finally(() => { if (!cancelled) setReportsLoading(false); });
@@ -78,16 +81,22 @@ export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.stopImmediatePropagation(); setBeat(null); }
       if (event.key === 'Tab') {
-        const elements = dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]');
+        const root = navigationRef.current?.closest('[role="dialog"]') ?? dialog.current;
+        const elements = root?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], select, summary, input:not(:disabled), textarea:not(:disabled)');
         if (!elements?.length) return;
         const first = elements[0]; const last = elements[elements.length - 1];
-        if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { event.preventDefault(); last.focus(); }
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === root)) { event.preventDefault(); last.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
       }
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
   }, [beat, overlayOpen]);
+
+  const activeReport = reports.find(report => report.id === activeReportId) ?? reports[0];
+  useEffect(() => {
+    (navigationRef.current?.closest('[role="dialog"]') as HTMLElement | null)?.focus();
+  }, [activeReport?.id]);
 
   const query = search.trim().toLowerCase();
   const reportStatus = reportStatusForBeatFilter(filter);
@@ -97,6 +106,17 @@ export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search
     matchesBeatFilter(row, filter) &&
     (!query || [row.beatName, row.beatCode, row.zoneName, row.wardName].join(' ').toLowerCase().includes(query))
   );
+  const navigation = <div ref={navigationRef} className="flex flex-wrap items-center gap-2">
+    {reportTotal > 1 && <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+      Report
+      <select aria-label="Select beat report" value={activeReport?.id ?? ''} onChange={event => setActiveReportId(event.target.value)} className="max-w-[65vw] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:max-w-md">
+        {reports.map((report, index) => <option key={report.id} value={report.id}>{index + 1}. {new Date(report.createdAt || report.submittedAt).toLocaleString()} &middot; {String(report.status || '').replace(/_/g, ' ')}</option>)}
+      </select>
+      <span>{reports.findIndex(report => report.id === activeReport?.id) + 1} / {reportTotal}</span>
+    </label>}
+    {reportsError && <span role="alert" className="text-xs text-rose-600">{reportsError} <button type="button" onClick={() => setReportRetry(value => value + 1)} className="underline">Retry</button></span>}
+    {reports.length < reportTotal && <button type="button" disabled={reportsLoading || Boolean(reportsError)} onClick={() => { setReportsLoading(true); setReportPage(value => value + 1); }} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 disabled:opacity-50">{reportsLoading ? 'Loading reports...' : `Load older reports (${reportTotal - reports.length})`}</button>}
+  </div>;
   return <div className="space-y-4 p-4">
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Beat coverage" aria-busy={loading}>
       {([
@@ -132,19 +152,19 @@ export default function BeatCoverageWorkspace({ from, to, zoneId, wardId, search
     {loading ? <p role="status" className="py-8 text-center text-sm text-slate-500">Loading beats...</p> : error ? <div role="alert" className="py-6 text-center text-sm text-rose-600">{error} <button type="button" onClick={() => setRetry(value => value + 1)} className="ml-2 font-bold underline">Retry</button></div> : <>
       <p className="text-xs text-slate-500">Showing {visible.length.toLocaleString()} beats{reportStatus ? ` · ${reportLabel}` : ''}</p>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {visible.map(row => <button type="button" key={row.id} onClick={() => { setReportPage(1); setReportTotal(0); setReports([]); setReportsLoading(true); setBeat(row); }} className="rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-400 hover:shadow-sm">
+        {visible.map(row => <button type="button" key={row.id} onClick={() => { setReportPage(1); setReportTotal(0); setReports([]); setActiveReportId(null); setReportsLoading(true); setBeat(row); }} className="rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-400 hover:shadow-sm">
           <div className="flex items-start justify-between gap-2"><span className="font-black text-slate-800">{row.beatName || row.beatCode || 'Beat'}</span><span className={`rounded-lg px-2 py-1 text-[10px] font-black uppercase ${row.covered ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{row.covered ? 'Covered' : 'Pending'}</span></div>
           <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500"><MapPin className="h-3.5 w-3.5" />{[row.zoneName, row.wardName].filter(Boolean).join(' / ') || 'Location unavailable'}</div>
-          <div className="mt-4 text-xs font-bold text-blue-600">{reportStatus ? `${row.reportCounts?.[reportStatus] ?? 0} ${reportLabel.toLowerCase()} reports` : `${row.reportCount} submitted reports`} &middot; View reports</div>
+          <div className="mt-4 text-xs font-bold text-blue-600">{reportStatus ? `${row.reportCounts?.[reportStatus] ?? 0} ${reportLabel.toLowerCase()} reports` : `${row.reportCount} submitted reports`}</div>
         </button>)}
       </div>
       {!visible.length && <p className="py-8 text-center text-sm text-slate-500">No beats match the selected filters.</p>}
     </>}
-    {beat && typeof document !== 'undefined' && createPortal(<div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" onClick={() => setBeat(null)}>
+    {beat && activeReport && renderFullReport(activeReport, navigation, () => setBeat(null))}
+    {beat && !activeReport && typeof document !== 'undefined' && createPortal(<div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4" onClick={() => setBeat(null)}>
       <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${beat.beatName} ${reportLabel.toLowerCase()} reports`} onClick={event => event.stopPropagation()} className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl outline-none">
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 p-4"><div><h2 className="font-black text-slate-800">{beat.beatName}</h2><p className="mt-1 text-xs text-slate-500">{reportLabel} inspection reports &middot; {from} to {to}</p></div><button type="button" aria-label="Close beat reports" onClick={() => setBeat(null)} className="rounded-lg bg-slate-100 p-2"><X className="h-5 w-5" /></button></div>
         <div className="overflow-y-auto p-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{reports.map(report => <div key={report.id}>{renderReport(report)}</div>)}</div>
           {reportsLoading && <p role="status" className="py-6 text-center text-sm text-slate-500">Loading reports...</p>}
           {reportsError && <p role="alert" className="py-6 text-center text-sm text-rose-600">{reportsError} <button type="button" onClick={() => setReportRetry(value => value + 1)} className="font-bold underline">Retry</button></p>}
           {!reportsLoading && !reportsError && !reports.length && <p className="py-10 text-center text-sm text-slate-500">No matching {reportLabel.toLowerCase()} reports for this beat in the selected period.</p>}

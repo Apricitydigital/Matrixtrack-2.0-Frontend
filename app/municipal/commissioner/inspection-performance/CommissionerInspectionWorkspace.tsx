@@ -2236,7 +2236,7 @@ export default function CommissionerInspectionWorkspace() {
             search={debouncedSearch} refresh={summaryRefresh}
             targetProgress={targetProgress}
             overlayOpen={Boolean(selected || imagePreview)}
-            renderReport={report => <ReportCard report={report} onView={item => { if (normalizedStatus(item) === 'DRAFT') { setSelected(item); setDetailLoading(false); } else { openDetail(item); } }} />}
+            renderFullReport={(report, navigation, onClose) => <DetailModal report={report} loading={false} onClose={onClose} onImagePreview={setImagePreview} reportNavigation={<div className="space-y-2">{navigation}<details className="text-xs text-slate-600"><summary className="cursor-pointer font-bold">Report Timeline</summary><ol className="mt-2 space-y-2">{buildReportTimeline(report).map(step => <li key={step.key}><strong>{step.title}</strong>{step.time ? ` - ${new Date(step.time).toLocaleString()}` : ''}<p>{step.description}</p></li>)}</ol></details></div>} />}
           />
         ) : (<>
         <InspectionOverviewCards
@@ -2855,6 +2855,7 @@ export function DetailModal({
   onImagePreview,
   stacked = false,
   qcReviewHistory = [],
+  reportNavigation,
 }: {
   report: DashboardRecord;
 
@@ -2874,6 +2875,7 @@ export function DetailModal({
 
   qcReviewHistory?:
   any[];
+  reportNavigation?: React.ReactNode;
 }) {
   const status = normalizedStatus(report);
   const classes = statusClasses(status);
@@ -2910,6 +2912,7 @@ export function DetailModal({
       onClick={onClose}
     >
       <div
+        role="dialog" aria-modal="true" aria-label={reportTitle(report, report.dashboardModule)} tabIndex={-1}
         className="flex max-h-[calc(100vh-32px)] w-[min(1080px,calc(100vw-32px))] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}
       >
         <div className="shrink-0 border-b border-slate-200 bg-gradient-to-r from-blue-50 via-white to-slate-50 px-5 py-4">
@@ -2938,6 +2941,8 @@ export function DetailModal({
             </button>
           </div>
         </div>
+
+        {reportNavigation && <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-5 py-3">{reportNavigation}</div>}
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {loading && (
