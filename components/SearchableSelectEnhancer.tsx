@@ -58,6 +58,10 @@ function setNativeValue(select: HTMLSelectElement, value: string) {
 
 export function SearchableSelectEnhancer() {
   useEffect(() => {
+    // Touch devices: keep the native picker. The search popup's input opens the
+    // keyboard, which scrolls/resizes the page and dismisses the popup at once.
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
     let popup: HTMLDivElement | null = null;
     let cleanup: (() => void) | null = null;
 
@@ -204,7 +208,18 @@ export function SearchableSelectEnhancer() {
         if (popup && !popup.contains(e.target as Node)) close();
       };
       const onScroll = (e: Event) => {
-        if (popup && !popup.contains(e.target as Node)) close();
+        if (!popup) return;
+        const target = e.target as Node;
+        if (popup.contains(target)) return;
+        // Only a scroll that moves the select itself (page or an ancestor)
+        // should dismiss the popup; auto-scrolling lists elsewhere must not.
+        if (target === document || target.contains(select)) close();
+      };
+
+      // Mobile keyboards / collapsing address bars change only the height; ignore those.
+      const startWidth = window.innerWidth;
+      const onResize = () => {
+        if (window.innerWidth !== startWidth) close();
       };
 
       input.addEventListener("input", () => {
@@ -214,12 +229,12 @@ export function SearchableSelectEnhancer() {
       input.addEventListener("keydown", onKey);
       document.addEventListener("mousedown", onOutside, true);
       window.addEventListener("scroll", onScroll, true);
-      window.addEventListener("resize", close);
+      window.addEventListener("resize", onResize);
 
       cleanup = () => {
         document.removeEventListener("mousedown", onOutside, true);
         window.removeEventListener("scroll", onScroll, true);
-        window.removeEventListener("resize", close);
+        window.removeEventListener("resize", onResize);
       };
 
       const sel = items.findIndex((it) => it.value === select.value);
