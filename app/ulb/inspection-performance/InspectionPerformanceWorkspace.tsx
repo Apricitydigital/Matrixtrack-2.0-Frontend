@@ -30,6 +30,8 @@ import {
   XCircle,
   ZoomIn,
   Sparkles,
+  Target,
+  Layers3,
 } from 'lucide-react';
 
 import {
@@ -41,6 +43,7 @@ import {
   type DarogaPerformance,
 } from '@lib/apiClient';
 import { performanceRangeParams } from '@lib/userPerformanceScores';
+import { inspectionOverview, inspectionRangeDays, type InspectionInventoryRow } from '@lib/inspectionOverview';
 import { resolveMediaUrl, resolveMediaUrls } from '@lib/mediaUrl';
 
 type ModuleKey = 'TOILET' | 'LITTERBINS' | 'SWEEPING' | 'NALA' | 'TASKFORCE';
@@ -123,8 +126,8 @@ const STATUS_CONFIG: Record<
   }
 > = {
   TOTAL: {
-    label: 'Completed Inspection',
-    shortLabel: 'Completed Inspection',
+    label: 'Submitted Reports',
+    shortLabel: 'Submitted Reports',
     text: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-500',
@@ -1222,6 +1225,11 @@ export default function InspectionPerformanceWorkspace() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [darogaTargets, setDarogaTargets] = useState<Record<string, DarogaPerformance> | null>(null);
   const [targetLoading, setTargetLoading] = useState(false);
+  const [inventory, setInventory] = useState<InspectionInventoryRow[] | null>(null);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState('');
+  const [targetError, setTargetError] = useState('');
+  const [summaryRefresh, setSummaryRefresh] = useState(0);
 
   const suggestionBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1229,6 +1237,18 @@ export default function InspectionPerformanceWorkspace() {
     () => dateRangeForPreset(datePreset, customStart, customEnd),
     [datePreset, customStart, customEnd]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    setInventoryLoading(true);
+    setInventoryError('');
+    setInventory(null);
+    CityUserApi.inspectionInventory()
+      .then(response => { if (!cancelled) setInventory(response.rows); })
+      .catch(() => { if (!cancelled) setInventoryError('Asset totals are unavailable. Refresh to retry.'); })
+      .finally(() => { if (!cancelled) setInventoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [summaryRefresh]);
 
   async function loadRecords() {
     setLoading(true);
@@ -1472,8 +1492,10 @@ export default function InspectionPerformanceWorkspace() {
    * period. 'All' has no date range, so no target.
    */
   useEffect(() => {
+    setDarogaTargets(null);
+    setTargetError('');
     if (dateRange.start === '2000-01-01') {
-      setDarogaTargets(null);
+      setTargetLoading(false);
       return;
     }
 
@@ -1486,7 +1508,7 @@ export default function InspectionPerformanceWorkspace() {
       })
       .catch((err) => {
         console.warn('Target progress unavailable', err);
-        if (!cancelled) setDarogaTargets(null);
+        if (!cancelled) setTargetError('Inspection targets are unavailable. Refresh to retry.');
       })
       .finally(() => {
         if (!cancelled) setTargetLoading(false);
@@ -1495,38 +1517,17 @@ export default function InspectionPerformanceWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [dateRange.start, dateRange.end]);
+  }, [dateRange.start, dateRange.end, summaryRefresh]);
 
-  const targetProgress = useMemo(() => {
-    if (!darogaTargets) return null;
-
-    const norm = (value: any) => String(value || '').trim().toLowerCase();
-    const zoneName = norm(zones.find((zone) => zone.id === selectedZone)?.name);
-    const wardName = norm(allWards.find((ward) => ward.id === selectedWard)?.name);
-
-    let target = 0;
-    let credit = 0;
-    const percents = new Set<number>();
-
-    Object.values(darogaTargets).forEach((user) => {
-      (user.rows || []).forEach((row) => {
-        if (moduleFilter !== 'ALL' && row.module !== moduleFilter) return;
-        if (selectedZone && norm(row.zoneName) !== zoneName) return;
-        if (selectedWard && row.wardId !== selectedWard && norm(row.wardName) !== wardName) return;
-
-        target += row.target;
-        credit += row.credit;
-        if (row.targetPercent != null) percents.add(row.targetPercent);
-      });
-    });
-
-    return {
-      target: Math.round(target),
-      credit: Math.round(credit),
-      percentTargets: Array.from(percents).sort((a, b) => a - b),
-      percent: target > 0 ? Math.min(100, (credit / target) * 100) : null,
-    };
-  }, [darogaTargets, moduleFilter, selectedZone, selectedWard, zones, allWards]);
+  const targetProgress = useMemo(() => inspectionOverview({
+    inventory,
+    users: darogaTargets,
+    module: moduleFilter,
+    zoneId: selectedZone,
+    wardId: selectedWard,
+    zoneName: zones.find(zone => zone.id === selectedZone)?.name || '',
+    days: inspectionRangeDays(dateRange.start, dateRange.end, todayString()),
+  }), [inventory, darogaTargets, moduleFilter, selectedZone, selectedWard, zones, dateRange.start, dateRange.end]);
 
   const suggestions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1938,6 +1939,7 @@ export default function InspectionPerformanceWorkspace() {
       setSelected(null);
       setActiveStatus('ACTION_REQUIRED');
       await loadRecords();
+      setSummaryRefresh(value => value + 1);
     } catch (err: any) {
       console.error('Unable to mark Action Required', err);
       setError(err?.message || 'Unable to send this report to the IEC Member.');
@@ -1955,8 +1957,8 @@ export default function InspectionPerformanceWorkspace() {
 
         <button
           type="button"
-          onClick={loadRecords}
-          disabled={loading}
+          onClick={() => { loadRecords(); setSummaryRefresh(value => value + 1); }}
+          disabled={loading || targetLoading || inventoryLoading}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -2171,6 +2173,28 @@ export default function InspectionPerformanceWorkspace() {
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-3 px-4 pt-4 xl:grid-cols-4" aria-label="Inspection overview" aria-busy={inventoryLoading || targetLoading}>
+          {[
+            { label: 'Total', value: targetProgress.total, hint: 'Registered inspection assets', icon: Layers3, color: 'text-slate-700', bg: 'bg-slate-100' },
+            { label: 'Targeted', value: targetProgress.target, hint: 'Set targets; full inventory by default', icon: Target, color: 'text-violet-600', bg: 'bg-violet-50' },
+            { label: 'Completed Inspection', value: targetProgress.credit, hint: 'Inspections credited to the target', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Pending Inspection', value: targetProgress.pending, hint: 'Targeted minus completed', icon: Clock3, color: 'text-amber-600', bg: 'bg-amber-50' },
+          ].map(card => {
+            const Icon = card.icon;
+            return <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${card.bg}`}><Icon className={`h-5 w-5 ${card.color}`} /></div>
+              <div className={`text-2xl font-black leading-none ${card.color}`}>{card.value == null ? '\u2014' : card.value.toLocaleString()}</div>
+              <div className="mt-2 text-[10px] font-black uppercase tracking-[0.12em] text-slate-600">{card.label}</div>
+              <p className="mt-1 text-[11px] text-slate-400">{card.hint}</p>
+            </div>;
+          })}
+        </div>
+        <div className="px-4 pt-2 text-[11px] text-slate-500">
+          Each beat counts as one asset. Targets and completions cover the selected period, module and location.
+          {dateRange.start === '2000-01-01' && <span className="ml-1">Choose a date range to see targeted, completed and pending inspections.</span>}
+          {(inventoryError || targetError) && <p role="alert" className="mt-1 font-semibold text-rose-600">{inventoryError || targetError}</p>}
+        </div>
+
         <div className="px-4 pt-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-black uppercase tracking-[0.12em]">
@@ -2197,12 +2221,14 @@ export default function InspectionPerformanceWorkspace() {
                         : 'text-rose-600'
                   }
                 >
-                  {targetProgress.credit.toLocaleString()} / {targetProgress.target.toLocaleString()} ({Math.round(targetProgress.percent)}%)
+                  {targetProgress.credit!.toLocaleString()} / {targetProgress.target!.toLocaleString()} ({Math.round(targetProgress.percent)}%)
                 </span>
               ) : (
                 <span className="text-slate-400">
-                  {targetLoading
+                  {targetLoading || inventoryLoading
                     ? 'Loading...'
+                    : inventoryError || targetError
+                      ? 'Targets unavailable'
                     : dateRange.start === '2000-01-01'
                       ? 'Pick a date range to see target'
                       : 'No target for this selection'}

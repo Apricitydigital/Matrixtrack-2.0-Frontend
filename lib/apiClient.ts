@@ -1064,6 +1064,7 @@ export const CityUserApi = {
   remove: (id: string) => apiFetch<{ success: boolean }>(`/city/users/${id}`, { method: "DELETE" }),
   workSummary: (id: string) =>
     apiFetch<UserWorkSummaryResponse>(`/city/users/${id}/work-summary`),
+  inspectionInventory: () => apiFetch<{ rows: import('./inspectionOverview').InspectionInventoryRow[] }>('/city/dashboard/inspection-inventory'),
   darogaPerformance: (range: { startDate?: string; endDate?: string; tzOffset?: number }) => {
     const params = new URLSearchParams();
     if (range.startDate) params.append("startDate", range.startDate);
