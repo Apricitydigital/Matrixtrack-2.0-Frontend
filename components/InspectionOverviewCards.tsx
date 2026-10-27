@@ -10,11 +10,13 @@ export default function InspectionOverviewCards({ overview, days, loading, onPen
   loading: boolean;
   onPending: () => void;
 }) {
+  const names: Record<string, string> = { TOILET: 'Toilet', LITTERBINS: 'Litter Bin', SWEEPING: 'Sweeping', NALA: 'Nala', TASKFORCE: 'GVP' };
+  const completionFormula = Object.entries(overview.completedByModule ?? {}).filter(([, value]) => (value ?? 0) > 0).map(([module, value]) => `${names[module]} ${value!.toLocaleString()}`).join(' + ');
   return <div className="grid grid-cols-2 gap-3 px-4 pt-4 xl:grid-cols-4" aria-label="Inspection overview" aria-busy={loading}>
     {[
       { label: 'Total', value: overview.total, hint: 'Registered inspection assets', icon: Layers3, color: 'text-slate-700', bg: 'bg-slate-100' },
       { label: 'Targeted', value: overview.target, hint: days === null ? 'Choose a date range' : `${days} days; full inventory by default`, icon: Target, color: 'text-violet-600', bg: 'bg-violet-50' },
-      { label: 'Completed Inspection', value: overview.credit, hint: 'Inspections credited to the target', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      { label: 'Completed Inspection', value: overview.credit, hint: completionFormula || 'Inspections credited to the target', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
       { label: 'Pending Inspection', value: overview.pending, hint: 'Targeted minus completed', icon: Clock3, color: 'text-amber-600', bg: 'bg-amber-50' },
     ].map(card => {
       const Icon = card.icon;

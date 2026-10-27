@@ -1,5 +1,6 @@
 'use client';
 
+import { loadInspectionRecords } from '@lib/inspectionRecords';
 import { inspectionOverview, inspectionRangeDays, inspectionRollingRange, type InspectionInventoryRow } from '@lib/inspectionOverview';
 import PendingInspectionsModal from '@components/PendingInspectionsModal';
 import InspectionOverviewCards from '@components/InspectionOverviewCards';
@@ -1274,10 +1275,9 @@ export default function CommissionerInspectionWorkspace() {
     try {
       const responses = await Promise.all(
         MODULES.map(async (module) => {
-          const request = ModuleRecordsApi.getRecords(module.key, {
+          const request = loadInspectionRecords(module.key, {
             page: 1,
             limit: 500,
-            tab: 'HISTORY',
           });
 
           const response =

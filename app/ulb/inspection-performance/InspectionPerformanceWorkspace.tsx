@@ -1,5 +1,6 @@
 'use client';
 
+import { loadInspectionRecords } from '@lib/inspectionRecords';
 import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import BeatCoverageWorkspace from '@components/BeatCoverageWorkspace';
 import PendingInspectionsModal from '@components/PendingInspectionsModal';
@@ -1257,10 +1258,9 @@ export default function InspectionPerformanceWorkspace() {
     try {
       const responses = await Promise.all(
         MODULES.map(async (module) => {
-          const request = ModuleRecordsApi.getRecords(module.key, {
+          const request = loadInspectionRecords(module.key, {
             page: 1,
             limit: 500,
-            tab: 'HISTORY',
           });
 
           const response =

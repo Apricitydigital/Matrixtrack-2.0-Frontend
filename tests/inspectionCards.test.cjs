@@ -35,3 +35,11 @@ test('summary shows unavailable values and disables pending click while target d
   assert.match(html, /<button[^>]+disabled=""[^>]+aria-label="View pending inspections"/);
   assert.match(html, /Choose a date range/);
 });
+
+test('completed card exposes the actual module breakdown rather than implying photo-point totals', () => {
+  const html = renderToStaticMarkup(React.createElement(Cards, {
+    overview: { total: 65, target: 65, credit: 19, pending: 46, completedByModule: { SWEEPING: 5, TOILET: 2, LITTERBINS: 12 } },
+    days: 1, loading: false, onPending() {},
+  }));
+  assert.match(html, /Sweeping 5 \+ Toilet 2 \+ Litter Bin 12/);
+});

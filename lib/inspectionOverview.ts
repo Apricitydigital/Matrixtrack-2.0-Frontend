@@ -19,7 +19,7 @@ export function inspectionOverview({ inventory, users, module = 'ALL', zoneId = 
   zoneName?: string;
   days: number | null;
 }) {
-  const unavailable = { total: null, target: null, credit: null, pending: null, percent: null, percentTargets: [] as number[], pendingRows: [] as PendingInspectionRow[] };
+  const unavailable = { total: null, target: null, credit: null, pending: null, percent: null, percentTargets: [] as number[], pendingRows: [] as PendingInspectionRow[], completedByModule: {} as Partial<Record<InspectionInventoryRow['module'], number>> };
   if (!inventory) return unavailable;
   const scoped = inventory.filter(row => (module === 'ALL' || row.module === module) && (!zoneId || row.zoneId === zoneId) && (!wardId || row.wardId === wardId));
   const total = scoped.reduce((sum, row) => sum + row.total, 0);
@@ -50,6 +50,7 @@ export function inspectionOverview({ inventory, users, module = 'ALL', zoneId = 
   let credit = 0;
   const round = (value: number) => Math.round(value * 100) / 100;
   const pendingRows: PendingInspectionRow[] = [];
+  const completedByModule: Partial<Record<InspectionInventoryRow['module'], number>> = {};
   buckets.forEach(bucket => {
     // Inventory without an assigned Daroga still defaults to the full daily requirement.
     // A shared assignment must not make a city's physical asset due more than once per day.
@@ -57,12 +58,13 @@ export function inspectionOverview({ inventory, users, module = 'ALL', zoneId = 
     const scopeCredit = round(Math.min(bucket.credit, scopeTarget));
     target += scopeTarget;
     credit += scopeCredit;
+    completedByModule[bucket.module] = round((completedByModule[bucket.module] ?? 0) + scopeCredit);
     const pending = round(Math.max(0, scopeTarget - scopeCredit));
     if (pending > 0) pendingRows.push({ module: bucket.module, wardId: bucket.wardId, zoneId: bucket.zoneId, target: scopeTarget, credit: scopeCredit, pending });
   });
   target = round(target);
   credit = round(Math.min(credit, target));
-  return { total, target, credit, pending: round(Math.max(0, target - credit)), percent: target > 0 ? Math.min(100, credit / target * 100) : null, percentTargets: [...percents].sort((a, b) => a - b), pendingRows };
+  return { total, target, credit, pending: round(Math.max(0, target - credit)), percent: target > 0 ? Math.min(100, credit / target * 100) : null, percentTargets: [...percents].sort((a, b) => a - b), pendingRows, completedByModule };
 }
 
 /** Same 800-day / future-day cap as Daroga performance; All Time has no target period. */

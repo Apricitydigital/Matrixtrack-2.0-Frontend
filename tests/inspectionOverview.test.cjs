@@ -95,3 +95,18 @@ test('pending drilldown includes only unfinished scopes and reconciles exactly t
   assert.equal(summarize({ users, wardId: 'w2' }).pendingRows.length, 0);
   assert.equal(summarize({ users: null }).pendingRows.length, 0);
 });
+
+test('All modules completion is five beat inspections plus two toilet inspections plus twelve bin inspections', () => {
+  const inventory = [
+    { module: 'SWEEPING', wardId: 'w1', zoneId: 'z1', total: 36 },
+    { module: 'LITTERBINS', wardId: 'w1', zoneId: 'z1', total: 24 },
+    { module: 'TOILET', wardId: 'w1', zoneId: 'z1', total: 5 },
+  ];
+  const users = { d: { rows: [row('SWEEPING', 'w1', 36, 36, 5), row('TOILET', 'w1', 5, 5, 2), row('LITTERBINS', 'w1', 24, 24, 12)] } };
+  const overview = summarize({ inventory, users });
+  assert.equal(overview.total, 65);
+  assert.equal(overview.target, 65);
+  assert.equal(overview.credit, 19);
+  assert.equal(overview.pending, 46);
+  assert.deepEqual(overview.completedByModule, { SWEEPING: 5, LITTERBINS: 12, TOILET: 2 });
+});

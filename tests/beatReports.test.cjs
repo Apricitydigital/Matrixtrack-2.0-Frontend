@@ -10,6 +10,7 @@ Module._load = function(request, parent, ...args) {
 };
 const { ModuleRecordsApi } = require('../lib/apiClient.ts');
 Module._load = originalLoad;
+const { loadInspectionRecords } = require('../lib/inspectionRecords.ts');
 
 test('opening a beat requests only its submitted reports, preserving date range and page', async () => {
   const originalFetch = global.fetch;
@@ -33,5 +34,26 @@ test('opening a beat requests only its submitted reports, preserving date range 
     assert.equal(requested.url.searchParams.get('beatReportStatus'), 'pendingReview');
     assert.equal(requested.url.searchParams.get('beatId'), 'beat-a');
     assert.equal(requested.url.searchParams.get('page'), '2');
+  } finally { global.fetch = originalFetch; }
+});
+
+test('inspection analytics includes unreviewed litter-bin inspections rather than QC-only history', async () => {
+  const originalFetch = global.fetch;
+  const urls = [];
+  global.fetch = async url => {
+    const parsed = new URL(url); urls.push(parsed);
+    const data = parsed.searchParams.get('tab') === 'DAILY_REPORTS'
+      ? Array.from({ length: 12 }, (_, index) => ({ id: `visit-${index}`, type: 'VISIT_REPORT', status: 'PENDING_QC' }))
+      : [];
+    return { ok: true, json: async () => ({ data, meta: { total: data.length } }) };
+  };
+  try {
+    const bins = await loadInspectionRecords('LITTERBINS', { page: 1, limit: 500 });
+    assert.equal(bins.data.length, 12);
+    assert.ok(bins.data.every(report => report.status === 'PENDING_QC'));
+    assert.equal(urls[0].pathname, '/modules/LITTERBINS/records');
+    assert.equal(urls[0].searchParams.get('tab'), 'DAILY_REPORTS');
+    await loadInspectionRecords('TOILET', { page: 1, limit: 500 });
+    assert.equal(urls[1].searchParams.get('tab'), 'HISTORY');
   } finally { global.fetch = originalFetch; }
 });
