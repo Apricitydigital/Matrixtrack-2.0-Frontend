@@ -1,3 +1,4 @@
+import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import React, { useEffect, useState } from 'react';
 import api from '../api/axios';
 import {
@@ -992,66 +993,12 @@ const Reports = () => {
             )}
 
             {/* ── Image Preview Lightbox ── */}
-            {previewImage && (
-                <div
-                    style={{
-                        position: 'fixed', inset: 0,
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        zIndex: 3000,
-                        padding: '1rem'
-                    }}
-                    onClick={() => setPreviewImage(null)}
-                    role="presentation"
-                >
-                    <div
-                        style={{
-                            position: 'relative',
-                            maxWidth: '90vw', maxHeight: '90vh',
-                            backgroundColor: '#000',
-                            borderRadius: '16px',
-                            overflow: 'hidden',
-                            boxShadow: '0 25px 70px rgba(0,0,0,0.4)',
-                            display: 'flex', flexDirection: 'column'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <img
-                            src={previewImage.url}
-                            alt={previewImage.alt}
-                            style={{ display: 'block', maxWidth: '90vw', maxHeight: '75vh', objectFit: 'contain', flex: 1 }}
-                        />
-                        <div style={{
-                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            padding: '0.75rem 1rem',
-                            background: 'rgba(0,0,0,0.75)', color: 'white',
-                            flexWrap: 'wrap', gap: '0.5rem',
-                            flexShrink: 0
-                        }}>
-                            <span style={{ fontWeight: 600, fontSize: '0.875rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {previewImage.alt}
-                            </span>
-                            <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                                <a
-                                    href={previewImage.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ color: 'white', fontWeight: 600, textDecoration: 'underline', fontSize: '0.875rem' }}
-                                >
-                                    Open Original
-                                </a>
-                                <button
-                                    type="button"
-                                    onClick={() => setPreviewImage(null)}
-                                    style={{ background: 'var(--primary)', border: 'none', borderRadius: '999px', padding: '0.35rem 1rem', color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem' }}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ImagePreviewModal
+                uri={previewImage?.url ?? null}
+                caption={previewImage?.alt}
+                onClose={() => setPreviewImage(null)}
+                footer={previewImage && <a href={previewImage.url} target="_blank" rel="noopener noreferrer" className="shrink-0 py-2 text-center text-sm text-white underline">Open Original</a>}
+            />
         </div>
     );
 };

@@ -1,5 +1,6 @@
 'use client';
 
+import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import {
   useEffect,
   useMemo,
@@ -7463,30 +7464,7 @@ export default function WardDrilldownDrawer({
       )}
 
 
-      {reportImagePreview &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4"
-            onClick={() => setReportImagePreview(null)}
-          >
-            <button
-              type="button"
-              onClick={() => setReportImagePreview(null)}
-              className="fixed right-5 top-5 z-[1000000] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
-            >
-              <X size={20} />
-            </button>
-
-            <img
-              src={reportImagePreview}
-              alt="Inspection evidence"
-              className="max-h-[92vh] max-w-[94vw] rounded-xl object-contain shadow-2xl"
-              onClick={(event) => event.stopPropagation()}
-            />
-          </div>,
-          document.body
-        )}
+      <ImagePreviewModal uri={reportImagePreview} onClose={() => setReportImagePreview(null)} />
     </div >,
     document.body
   );

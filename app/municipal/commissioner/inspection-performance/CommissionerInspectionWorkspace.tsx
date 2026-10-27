@@ -1,5 +1,6 @@
 'use client';
 
+import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import {
   useEffect,
   useMemo,
@@ -2370,27 +2371,7 @@ export default function CommissionerInspectionWorkspace() {
         />
       )}
 
-      {imagePreview && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setImagePreview(null)}
-        >
-          <button
-            type="button"
-            onClick={() => setImagePreview(null)}
-            className="fixed right-5 top-5 z-[1000000] flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <img
-            src={imagePreview}
-            alt="Inspection evidence"
-            className="max-h-[90vh] max-w-[92vw] rounded-xl object-contain shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          />
-        </div>,
-        document.body
-      )}
+      <ImagePreviewModal uri={imagePreview} onClose={() => setImagePreview(null)} />
     </div>
   );
 }

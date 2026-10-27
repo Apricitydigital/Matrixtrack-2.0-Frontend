@@ -1,3 +1,4 @@
+import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import React, { useEffect, useState } from 'react';
 import { useLocation } from '../react-router-shim';
 import api, { apiBaseUrl } from '../api/axios';
@@ -2397,35 +2398,16 @@ const SelfAssessmentQCReview = () => {
             )}
 
             {/* ── Lightbox ─────────────────────────────────────────────────────── */}
-            {lightboxIndex >= 0 && (
-                <div
-                    onClick={() => setLightboxIndex(-1)}
-                    style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                    <button onClick={() => setLightboxIndex(-1)} style={{ position: 'absolute', top: 16, right: 16, width: 36, height: 36, borderRadius: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                        <X size={18} color="white" />
-                    </button>
-                    {lightboxImages.length > 1 && (
-                        <button onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + lightboxImages.length) % lightboxImages.length); }} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                            <ChevronLeft size={22} color="white" />
-                        </button>
-                    )}
-                    <img
-                        src={lightboxImages[lightboxIndex]}
-                        alt={`Evidence ${lightboxIndex + 1}`}
-                        onClick={e => e.stopPropagation()}
-                        style={{ maxWidth: '88vw', maxHeight: '84vh', objectFit: 'contain', borderRadius: 8, boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
-                    />
-                    {lightboxImages.length > 1 && (
-                        <button onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % lightboxImages.length); }} style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', width: 40, height: 40, borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                            <ChevronRight size={22} color="white" />
-                        </button>
-                    )}
-                    <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.12)', borderRadius: 16, padding: '3px 12px', fontSize: '0.78rem', fontWeight: 600, color: 'white' }}>
-                        {lightboxIndex + 1} / {lightboxImages.length}
-                    </div>
-                </div>
-            )}
+            <ImagePreviewModal
+                uri={lightboxIndex >= 0 ? lightboxImages[lightboxIndex] : null}
+                caption={`Evidence ${lightboxIndex + 1}`}
+                onClose={() => setLightboxIndex(-1)}
+                footer={lightboxIndex >= 0 && <div className="flex shrink-0 items-center justify-center gap-4 py-3">
+                    {lightboxImages.length > 1 && <button type="button" aria-label="Previous photo" onClick={() => setLightboxIndex(i => (i - 1 + lightboxImages.length) % lightboxImages.length)} className="rounded-lg bg-white/10 p-2"><ChevronLeft size={22} /></button>}
+                    <span>{lightboxIndex + 1} / {lightboxImages.length}</span>
+                    {lightboxImages.length > 1 && <button type="button" aria-label="Next photo" onClick={() => setLightboxIndex(i => (i + 1) % lightboxImages.length)} className="rounded-lg bg-white/10 p-2"><ChevronRight size={22} /></button>}
+                </div>}
+            />
         </div>
     );
 };

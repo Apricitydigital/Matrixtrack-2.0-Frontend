@@ -1,5 +1,6 @@
 'use client';
 
+import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import ToiletComponentCollage from './ToiletComponentCollage';
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -2982,96 +2983,7 @@ const submitterPhone = record.phone || record.supervisor?.phone || record.employ
                     </div>
                 </div>
 
-                {previewPhoto && (
-                    <div
-                        onClick={() =>
-                            setPreviewPhoto(
-                                null
-                            )
-                        }
-                        style={{
-                            position: 'fixed',
-                            inset: 0,
-                            zIndex: 100000,
-                            display: 'flex',
-                            alignItems:
-                                'center',
-                            justifyContent:
-                                'center',
-                            padding: 22,
-                            background:
-                                'rgba(2,6,23,0.92)',
-                            backdropFilter:
-                                'blur(8px)'
-                        }}
-                    >
-                        <div
-                            onClick={(event) =>
-                                event.stopPropagation()
-                            }
-                            style={{
-                                position:
-                                    'relative',
-                                maxWidth:
-                                    '92vw',
-                                maxHeight:
-                                    '88vh',
-                                padding: 8,
-                                borderRadius: 16,
-                                background:
-                                    '#ffffff',
-                                boxShadow:
-                                    '0 30px 90px rgba(0,0,0,0.55)'
-                            }}
-                        >
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setPreviewPhoto(
-                                        null
-                                    )
-                                }
-                                style={{
-                                    position:
-                                        'absolute',
-                                    top: 12,
-                                    right: 12,
-                                    zIndex: 2,
-                                    width: 34,
-                                    height: 34,
-                                    border: 0,
-                                    borderRadius:
-                                        999,
-                                    background:
-                                        'rgba(15,23,42,0.85)',
-                                    color: '#ffffff',
-                                    fontSize: 18,
-                                    cursor:
-                                        'pointer'
-                                }}
-                            >
-                                ×
-                            </button>
-
-                            <img
-                                src={
-                                    previewPhoto
-                                }
-                                alt="Inspection evidence"
-                                style={{
-                                    display: 'block',
-                                    maxWidth:
-                                        '88vw',
-                                    maxHeight:
-                                        '82vh',
-                                    objectFit:
-                                        'contain',
-                                    borderRadius: 10
-                                }}
-                            />
-                        </div>
-                    </div>
-                )}
+                <ImagePreviewModal uri={previewPhoto} onClose={() => setPreviewPhoto(null)} />
             </>,
             document.body
         );
@@ -3772,7 +3684,9 @@ return createPortal(
                                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                                                 {aoPhotoUrls.map((url, idx) => (
                                                     <div key={url} style={{ position: 'relative', width: 56, height: 56 }}>
-                                                        <img src={resolveUrl(url) || url} alt={`Action photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                                                        <button type="button" aria-label={`Preview action photo ${idx + 1}`} onClick={() => setPreviewPhoto(resolveUrl(url) || url)} style={{ width: '100%', height: '100%', padding: 0, border: 0, background: 'transparent', cursor: 'zoom-in' }}>
+                                                            <img src={resolveUrl(url) || url} alt={`Action photo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setAoPhotoUrls(prev => prev.filter(item => item !== url))}
@@ -3817,21 +3731,7 @@ return createPortal(
             </div>
 
             {/* LIGHTBOX ENLARGED PHOTO PREVIEW OVERLAY */}
-            {previewPhoto && (
-                <div onClick={() => setPreviewPhoto(null)} style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '850px', maxHeight: '85vh', background: '#ffffff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
-                        <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 10 }}>
-                            <button
-                                onClick={() => setPreviewPhoto(null)}
-                                style={{ background: 'rgba(15,23,42,0.8)', border: 'none', color: '#ffffff', width: 34, height: 34, borderRadius: '50%', fontSize: '16px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                                ✕
-                            </button>
-                        </div>
-                        <img src={previewPhoto} alt="Enlarged Evidence" style={{ maxWidth: '100%', maxHeight: '80vh', display: 'block', objectFit: 'contain' }} />
-                    </div>
-                </div>
-            )}
+            <ImagePreviewModal uri={previewPhoto} onClose={() => setPreviewPhoto(null)} />
         </>,
         document.body
     );

@@ -133,6 +133,16 @@ test("panning is limited to the zoomed image's edge and impossible at fit", () =
   assert.deepEqual(L.clampPan({ x: 50, y: 50 }, 2, { width: 0, height: 0 }), { x: 0, y: 0 });
 });
 
+test("portrait and landscape photos stay visible when dragged inside a wide or tall viewer", () => {
+  const far = { x: 5000, y: -5000 };
+  const viewport = { width: 1200, height: 800 };
+  const portrait = { width: 400, height: 800 };
+  assert.deepEqual(L.clampPan(far, 2, viewport, portrait), { x: 0, y: -400 }, "narrow photos stay centered horizontally");
+  assert.deepEqual(L.clampPan(far, 6, viewport, portrait), { x: 600, y: -2000 }, "at maximum zoom the image edge cannot cross the viewport edge");
+  assert.deepEqual(L.clampPan(far, 2, { width: 600, height: 900 }, { width: 600, height: 300 }), { x: 300, y: 0 }, "short landscape photos stay centered vertically");
+  assert.deepEqual(L.clampPan(far, 1, viewport, portrait), { x: 0, y: 0 }, "reset always restores fit and center");
+});
+
 /* ------------------------------------------------------- photo metadata */
 
 test("photo metadata rows: IST date and time, latitude, longitude, accuracy - exactly as stored", () => {

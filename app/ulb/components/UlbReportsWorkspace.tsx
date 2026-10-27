@@ -1,5 +1,6 @@
 'use client';
 
+import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import {
     Fragment,
     useEffect,
@@ -11565,69 +11566,6 @@ function ActionRequiredModal({
 /* =========================================================
    FULL IMAGE PREVIEW
 ========================================================= */
-
-function ImagePreviewModal({
-    uri,
-    onClose,
-}: {
-    uri:
-    string | null;
-
-    onClose:
-    () => void;
-}) {
-
-    if (!uri) {
-        return null;
-    }
-
-
-    return (
-        <div
-            className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 p-4"
-
-            onClick={
-                onClose
-            }
-        >
-
-            <button
-                type="button"
-
-                onClick={
-                    onClose
-                }
-
-                className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur-md"
-            >
-
-                <X
-                    size={20}
-                />
-
-            </button>
-
-
-            <img
-                src={
-                    uri
-                }
-
-                alt="Evidence preview"
-
-                className="max-h-[90vh] max-w-[94vw] rounded-2xl object-contain shadow-2xl"
-
-                onClick={(
-                    event
-                ) =>
-                    event
-                        .stopPropagation()
-                }
-            />
-
-        </div>
-    );
-}
 
 
 /* =========================================================

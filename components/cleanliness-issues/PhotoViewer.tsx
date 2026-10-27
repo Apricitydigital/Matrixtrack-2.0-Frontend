@@ -9,6 +9,7 @@ import {
   describePhotoMetadata,
   distance,
   MIN_ZOOM,
+  MAX_ZOOM,
   pinchZoom,
   safeImageUrl,
   toggleZoom,
@@ -26,15 +27,18 @@ type Photo = PhotoLike & { url: string };
  * Escape / close button. The original capture metadata (IST date and time, latitude, longitude, GPS accuracy)
  * is shown over the photo exactly as stored; a missing value reads "Not available".
  */
-export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption?: string; onClose: () => void }) {
+export function PhotoViewer({ photo, caption, onClose, showMetadata = true, footer }: { photo: Photo; caption?: string; onClose: () => void; showMetadata?: boolean; footer?: React.ReactNode }) {
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [failed, setFailed] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
+  const image = useRef<HTMLImageElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef(MIN_ZOOM);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ startDistance: number; startZoom: number } | null>(null);
   const drag = useRef<{ x: number; y: number; pan: Pan } | null>(null);
-  const url = safeImageUrl(photo.url);
+  const url = safeImageUrl(photo.url) ?? (!showMetadata && /^(\/[^/]|blob:|data:image\/)/i.test(photo.url) ? photo.url : null);
 
   const viewport = () => {
     const r = stage.current?.getBoundingClientRect();
@@ -42,27 +46,57 @@ export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption
   };
   const apply = useCallback((nextZoom: number, nextPan?: Pan) => {
     const z = clampZoom(nextZoom);
+    zoomRef.current = z;
     setZoom(z);
     const r = stage.current?.getBoundingClientRect();
-    setPan((current) => clampPan(nextPan ?? current, z, { width: r?.width ?? 0, height: r?.height ?? 0 }));
+    setPan((current) => clampPan(nextPan ?? current, z, { width: r?.width ?? 0, height: r?.height ?? 0 }, { width: image.current?.clientWidth ?? 0, height: image.current?.clientHeight ?? 0 }));
   }, []);
   const reset = useCallback(() => apply(MIN_ZOOM, { x: 0, y: 0 }), [apply]);
 
   useEffect(() => {
+    reset();
+    setFailed(false);
+    pointers.current.clear();
+    pinch.current = null;
+    drag.current = null;
+  }, [photo.url, reset]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialog.current?.focus();
+    return () => previousFocus?.focus();
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('resize', reset);
+    return () => window.removeEventListener('resize', reset);
+  }, [reset]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "+" || e.key === "=") setZoom((z) => zoomIn(z));
-      else if (e.key === "-") setZoom((z) => zoomOut(z));
+      if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); }
+      else if (e.key === "+" || e.key === "=") apply(zoomIn(zoomRef.current));
+      else if (e.key === "-") apply(zoomOut(zoomRef.current));
       else if (e.key === "0") reset();
+      else if (e.key === "Tab") {
+        const buttons = dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]');
+        if (!buttons?.length) return;
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        return;
+      } else return;
+      e.preventDefault();
     };
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       document.body.style.overflow = previous;
     };
-  }, [onClose, reset]);
+  }, [onClose, reset, apply]);
 
   // A passive React onWheel cannot stop the page from scrolling, so the listener is attached by hand.
   useEffect(() => {
@@ -70,16 +104,11 @@ export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      setZoom((z) => {
-        const next = wheelZoom(z, e.deltaY);
-        const r = el.getBoundingClientRect();
-        setPan((p) => clampPan(p, next, { width: r.width, height: r.height }));
-        return next;
-      });
+      if (e.deltaY) apply(wheelZoom(zoomRef.current, e.deltaY));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [apply]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -100,7 +129,7 @@ export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption
       apply(pinchZoom(pinch.current.startZoom, pinch.current.startDistance, distance(a, b)));
     } else if (drag.current && zoom > MIN_ZOOM) {
       const d = drag.current;
-      setPan(clampPan({ x: d.pan.x + (e.clientX - d.x), y: d.pan.y + (e.clientY - d.y) }, zoom, viewport()));
+      setPan(clampPan({ x: d.pan.x + (e.clientX - d.x), y: d.pan.y + (e.clientY - d.y) }, zoom, viewport(), { width: image.current?.clientWidth ?? 0, height: image.current?.clientHeight ?? 0 }));
     }
   };
   const onPointerUp = (e: React.PointerEvent) => {
@@ -117,13 +146,13 @@ export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={caption ?? "Photo"} className="fixed inset-0 z-[10000] flex flex-col bg-black/95 text-white">
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+    <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-label={caption ?? "Photo"} onClick={(e) => e.stopPropagation()} className="fixed inset-0 z-[1000001] flex flex-col bg-black/95 text-white outline-none">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="truncate text-sm font-bold">{caption ?? "Photo"}</div>
         <div className="flex items-center gap-1.5">
           <button type="button" aria-label="Zoom out" onClick={() => apply(zoomOut(zoom))} disabled={zoom <= MIN_ZOOM} className="rounded-lg bg-white/10 p-2 hover:bg-white/20 disabled:opacity-40"><Minus size={18} /></button>
           <span className="w-12 text-center text-xs tabular-nums" aria-live="polite">{Math.round(zoom * 100)}%</span>
-          <button type="button" aria-label="Zoom in" onClick={() => apply(zoomIn(zoom))} className="rounded-lg bg-white/10 p-2 hover:bg-white/20"><Plus size={18} /></button>
+          <button type="button" aria-label="Zoom in" onClick={() => apply(zoomIn(zoom))} disabled={zoom >= MAX_ZOOM} className="rounded-lg bg-white/10 p-2 hover:bg-white/20 disabled:opacity-40"><Plus size={18} /></button>
           <button type="button" aria-label="Reset zoom" onClick={reset} className="rounded-lg bg-white/10 p-2 hover:bg-white/20"><RotateCcw size={18} /></button>
           <button type="button" aria-label="Close photo" onClick={onClose} className="ml-2 rounded-lg bg-white/10 p-2 hover:bg-white/20"><X size={18} /></button>
         </div>
@@ -131,7 +160,7 @@ export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption
 
       <div
         ref={stage}
-        className="relative flex-1 touch-none select-none overflow-hidden"
+        className="relative min-h-0 flex-1 touch-none select-none overflow-hidden"
         style={{ cursor: zoom > MIN_ZOOM ? "grab" : "zoom-in" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -142,6 +171,7 @@ export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption
         {url && !failed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
+            ref={image}
             src={url}
             alt={caption ?? "Evidence photo"}
             draggable={false}
@@ -157,14 +187,16 @@ export function PhotoViewer({ photo, caption, onClose }: { photo: Photo; caption
         )}
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 bg-black/70 px-4 py-3 text-xs sm:grid-cols-5" aria-label="Photo details">
+      <p className="shrink-0 px-4 py-2 text-center text-xs text-slate-300">Scroll or pinch to zoom. Drag to move. Double-click to zoom or fit.</p>
+      {footer}
+      {showMetadata && <dl className="grid shrink-0 grid-cols-2 gap-x-6 gap-y-1 bg-black/70 px-4 py-3 text-xs sm:grid-cols-5" aria-label="Photo details">
         {rows.map((r) => (
           <div key={r.label}>
             <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{r.label}</dt>
             <dd className={`font-semibold tabular-nums ${r.missing ? "italic text-amber-300" : ""}`}>{r.value}</dd>
           </div>
         ))}
-      </dl>
+      </dl>}
     </div>,
     document.body
   );

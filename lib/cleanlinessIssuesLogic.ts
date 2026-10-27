@@ -191,11 +191,11 @@ export const pinchZoom = (startZoom: number, startDistance: number, distance: nu
 
 export type Pan = { x: number; y: number };
 /** The image may be dragged only as far as its zoomed edge: no empty space can be dragged into view. */
-export function clampPan(pan: Pan, zoom: number, viewport: { width: number; height: number }): Pan {
+export function clampPan(pan: Pan, zoom: number, viewport: { width: number; height: number }, image?: { width: number; height: number }): Pan {
   if (zoom <= MIN_ZOOM) return { x: 0, y: 0 };
-  const maxX = ((zoom - 1) * viewport.width) / 2;
-  const maxY = ((zoom - 1) * viewport.height) / 2;
-  return { x: Math.min(maxX, Math.max(-maxX, pan.x)), y: Math.min(maxY, Math.max(-maxY, pan.y)) };
+  const maxX = Math.max(0, image ? (image.width * zoom - viewport.width) / 2 : ((zoom - 1) * viewport.width) / 2);
+  const maxY = Math.max(0, image ? (image.height * zoom - viewport.height) / 2 : ((zoom - 1) * viewport.height) / 2);
+  return { x: Math.min(maxX, Math.max(-maxX, pan.x)) || 0, y: Math.min(maxY, Math.max(-maxY, pan.y)) || 0 };
 }
 export const distance = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
