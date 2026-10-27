@@ -275,7 +275,7 @@ export async function downloadZonePdf(data: ZoneExportData) {
     const body = rows.map((zone) => {
       const t = zone.total!;
 
-      return [zone.zoneName, num(t.target), num(t.pending), num(t.completed), pct(completionPct(t)), num(t.cleaned), num(t.notCleaned), num(t.actionRequired), num(t.actionTaken), num(t.actionPending)];
+      return [zone.wardFilter ? `${zone.zoneName} (${zone.wardFilter.selected} of ${zone.wardFilter.total} wards)` : zone.zoneName, num(t.target), num(t.pending), num(t.completed), pct(completionPct(t)), num(t.cleaned), num(t.notCleaned), num(t.actionRequired), num(t.actionTaken), num(t.actionPending)];
     });
 
     body.push([
@@ -332,6 +332,18 @@ export async function downloadZonePdf(data: ZoneExportData) {
     let y = PAGE.contentTop + 4;
 
     text(zone.zoneName, PAGE.margin, y, 18, COLOR.navy, "bold");
+    if (zone.wardFilter) {
+      text(
+        `Selected wards only: ${zone.wardFilter.selected} of ${zone.wardFilter.total} wards`,
+        PAGE.width - PAGE.margin,
+        y,
+        9,
+        COLOR.blue,
+        "bold",
+        "right",
+      );
+    }
+
     doc.setDrawColor(...COLOR.blue);
     doc.setLineWidth(0.8);
     doc.line(PAGE.margin, y + 2.5, PAGE.margin + 22, y + 2.5);
@@ -386,8 +398,10 @@ export async function downloadZonePdf(data: ZoneExportData) {
 
     const half = (CONTENT_WIDTH - 9) / 2;
 
-    wardTable("Top 5 Wards", "Highest cleaned % and target completed", "good", zone.bestWards, PAGE.margin, y, half);
-    wardTable("Bottom 5 Wards", "Highest not cleaned % and target missed", "bad", zone.worstWards, PAGE.margin + half + 9, y, half);
+    const scope = zone.wardFilter ? " - selected wards" : "";
+
+    wardTable("Top 5 Wards", `Highest cleaned % and target completed${scope}`, "good", zone.bestWards, PAGE.margin, y, half);
+    wardTable("Bottom 5 Wards", `Highest not cleaned % and target missed${scope}`, "bad", zone.worstWards, PAGE.margin + half + 9, y, half);
 
     markPages(firstPage, zone.zoneName);
   };

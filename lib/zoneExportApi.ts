@@ -34,6 +34,8 @@ export type ZoneExportZone = {
   total: ZoneExportModuleRow | null;
   bestWards: ZoneExportWard[];
   worstWards: ZoneExportWard[];
+  /** Set when only some wards of the zone were picked: every number in the zone covers just those wards. */
+  wardFilter?: { selected: number; total: number } | null;
 };
 
 export type ZoneExportData = {
@@ -48,33 +50,56 @@ export type ZoneOption = {
   name: string;
 };
 
+export type WardOption = {
+  id: string;
+  name: string;
+  zoneId: string;
+};
+
 type GeoNodeRow = {
   id: string;
   name: string;
   displayName?: string | null;
+  parentId?: string | null;
+  parent_id?: string | null;
+  parent?: { id?: string } | null;
 };
+
+const geoName = (node: GeoNodeRow, fallback: string) =>
+  node.displayName && !node.name.toLowerCase().includes(node.displayName.toLowerCase())
+    ? `${node.name} - ${node.displayName}`
+    : node.name || node.displayName || fallback;
+
+const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, undefined, { numeric: true });
 
 export const ZoneExportApi = {
   async zones(): Promise<ZoneOption[]> {
     const response = await apiFetch<{ nodes: GeoNodeRow[] }>("/city/geo?level=ZONE");
 
+    return (response.nodes || []).map((node) => ({ id: node.id, name: geoName(node, "Zone") })).sort(byName);
+  },
+
+  async wards(): Promise<WardOption[]> {
+    const response = await apiFetch<{ nodes: GeoNodeRow[] }>("/city/geo?level=WARD");
+
     return (response.nodes || [])
       .map((node) => ({
         id: node.id,
-        name:
-          node.displayName && !node.name.toLowerCase().includes(node.displayName.toLowerCase())
-            ? `${node.name} - ${node.displayName}`
-            : node.name || node.displayName || "Zone",
+        name: geoName(node, "Ward"),
+        zoneId: node.parentId || node.parent_id || node.parent?.id || "",
       }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      .filter((ward) => ward.zoneId)
+      .sort(byName);
   },
 
-  report(params: { zoneIds: string[]; from: string; to: string }) {
+  report(params: { zoneIds: string[]; wardIds?: string[]; from: string; to: string }) {
     const query = new URLSearchParams({
       zoneIds: params.zoneIds.join(","),
       from: params.from,
       to: params.to,
     });
+
+    if (params.wardIds?.length) query.set("wardIds", params.wardIds.join(","));
 
     return apiFetch<ZoneExportData>(`/city/dashboard/zone-export?${query.toString()}`);
   },
