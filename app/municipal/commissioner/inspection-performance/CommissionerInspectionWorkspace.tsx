@@ -1,6 +1,8 @@
 'use client';
 
-import { inspectionRollingRange } from '@lib/inspectionOverview';
+import { inspectionOverview, inspectionRangeDays, inspectionRollingRange, type InspectionInventoryRow } from '@lib/inspectionOverview';
+import PendingInspectionsModal from '@components/PendingInspectionsModal';
+import InspectionOverviewCards from '@components/InspectionOverviewCards';
 import ImagePreviewModal from '@components/ui/ImagePreviewModal';
 import {
   useEffect,
@@ -124,8 +126,8 @@ const STATUS_CONFIG: Record<
   }
 > = {
   TOTAL: {
-    label: 'Completed Inspection',
-    shortLabel: 'Completed Inspection',
+    label: 'Submitted Reports',
+    shortLabel: 'Submitted Reports',
     text: 'text-blue-600',
     bg: 'bg-blue-50',
     border: 'border-blue-500',
@@ -1225,6 +1227,13 @@ export default function CommissionerInspectionWorkspace() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [darogaTargets, setDarogaTargets] = useState<Record<string, DarogaPerformance> | null>(null);
   const [targetLoading, setTargetLoading] = useState(false);
+  const [inventory, setInventory] = useState<InspectionInventoryRow[] | null>(null);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState('');
+  const [targetError, setTargetError] = useState('');
+  const [summaryRefresh, setSummaryRefresh] = useState(0);
+  const [pendingOpen, setPendingOpen] = useState(false);
+
 
   const suggestionBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1238,12 +1247,24 @@ export default function CommissionerInspectionWorkspace() {
       });
     });
     return MODULES.filter((module) => present.has(module.key)).map((module) => module.key);
-  }, [records]);
+  }, [records, darogaTargets]);
 
   const dateRange = useMemo(
     () => dateRangeForPreset(datePreset, customStart, customEnd),
     [datePreset, customStart, customEnd]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    setInventoryLoading(true);
+    setInventoryError('');
+    setInventory(null);
+    CityUserApi.inspectionInventory()
+      .then(response => { if (!cancelled) setInventory(response.rows); })
+      .catch(() => { if (!cancelled) setInventoryError('Asset totals are unavailable. Refresh to retry.'); })
+      .finally(() => { if (!cancelled) setInventoryLoading(false); });
+    return () => { cancelled = true; };
+  }, [summaryRefresh]);
 
   async function loadRecords() {
     setLoading(true);
@@ -1491,8 +1512,10 @@ export default function CommissionerInspectionWorkspace() {
    * period. 'All' has no date range, so no target.
    */
   useEffect(() => {
+    setDarogaTargets(null);
+    setTargetError('');
     if (dateRange.start === '2000-01-01') {
-      setDarogaTargets(null);
+      setTargetLoading(false);
       return;
     }
 
@@ -1505,7 +1528,7 @@ export default function CommissionerInspectionWorkspace() {
       })
       .catch((err) => {
         console.warn('Target progress unavailable', err);
-        if (!cancelled) setDarogaTargets(null);
+        if (!cancelled) setTargetError('Inspection targets are unavailable. Refresh to retry.');
       })
       .finally(() => {
         if (!cancelled) setTargetLoading(false);
@@ -1514,38 +1537,47 @@ export default function CommissionerInspectionWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, [dateRange.start, dateRange.end]);
+  }, [dateRange.start, dateRange.end, summaryRefresh]);
 
-  const targetProgress = useMemo(() => {
-    if (!darogaTargets) return null;
+  const targetProgress = useMemo(() => inspectionOverview({
+    inventory,
+    users: darogaTargets,
+    module: moduleFilter,
+    zoneId: selectedZone,
+    wardId: selectedWard,
+    zoneName: zones.find(zone => zone.id === selectedZone)?.name || '',
+    days: inspectionRangeDays(dateRange.start, dateRange.end, todayString()),
+  }), [inventory, darogaTargets, moduleFilter, selectedZone, selectedWard, zones, dateRange.start, dateRange.end]);
 
-    const norm = (value: any) => String(value || '').trim().toLowerCase();
-    const zoneName = norm(zones.find((zone) => zone.id === selectedZone)?.name);
-    const wardName = norm(allWards.find((ward) => ward.id === selectedWard)?.name);
+  useEffect(() => { setPendingOpen(false); }, [dateRange.start, dateRange.end, moduleFilter, selectedZone, selectedWard]);
 
-    let target = 0;
-    let credit = 0;
-    const percents = new Set<number>();
-
-    Object.values(darogaTargets).forEach((user) => {
-      (user.rows || []).forEach((row) => {
-        if (moduleFilter !== 'ALL' && row.module !== moduleFilter) return;
-        if (selectedZone && norm(row.zoneName) !== zoneName) return;
-        if (selectedWard && row.wardId !== selectedWard && norm(row.wardName) !== wardName) return;
-
-        target += row.target;
-        credit += row.credit;
-        if (row.targetPercent != null) percents.add(row.targetPercent);
-      });
+  const pendingDetails = useMemo(() => {
+    const pointGroups = new Map<string, Set<number>>();
+    const pointKey = (item: DashboardRecord) => `${item.dashboardModule}|${item.beatId || item.nalaPointId || sweepingBeatKey(item)}|${inspectionRecordDateKey(item)}`;
+    locationRecords.forEach(item => {
+      if (!isPointModule(item.dashboardModule) || normalizedStatus(item) === 'DRAFT') return;
+      const key = pointKey(item);
+      const points = pointGroups.get(key) ?? new Set<number>();
+      sweepingSubmittedPointIndexes(item).forEach(index => points.add(index));
+      pointGroups.set(key, points);
     });
-
-    return {
-      target: Math.round(target),
-      credit: Math.round(credit),
-      percentTargets: Array.from(percents).sort((a, b) => a - b),
-      percent: target > 0 ? Math.min(100, (credit / target) * 100) : null,
-    };
-  }, [darogaTargets, moduleFilter, selectedZone, selectedWard, zones, allWards]);
+    const incomplete = locationRecords.filter(item => normalizedStatus(item) === 'DRAFT' ||
+      (isPointModule(item.dashboardModule) && (pointGroups.get(pointKey(item))?.size ?? 0) < 3));
+    return targetProgress.pendingRows.map(row => {
+      const wardName = allWards.find(ward => ward.id === row.wardId)?.name || '';
+      return {
+        ...row,
+        moduleLabel: MODULES.find(module => module.key === row.module)?.label || row.module,
+        zoneName: zones.find(zone => zone.id === row.zoneId)?.name || '',
+        wardName,
+        reports: incomplete.filter(item => {
+          if (item.dashboardModule !== row.module) return false;
+          const id = item.wardId || item.toilet?.wardId || item.bin?.wardId || item.nala?.wardId || item.segment?.beat?.wardId || item.feederPoint?.wardId;
+          return row.wardId ? id === row.wardId || (!id && wardName && rawWardName(item).toLowerCase() === wardName.toLowerCase()) : !id;
+        }),
+      };
+    });
+  }, [targetProgress.pendingRows, locationRecords, allWards, zones]);
 
   const suggestions = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1960,6 +1992,7 @@ export default function CommissionerInspectionWorkspace() {
       setSelected(null);
       setActiveStatus('ACTION_REQUIRED');
       await loadRecords();
+      setSummaryRefresh(value => value + 1);
     } catch (err: any) {
       console.error('Unable to mark Action Required', err);
       setError(err?.message || 'Unable to send this report to the IEC Member.');
@@ -1977,8 +2010,8 @@ export default function CommissionerInspectionWorkspace() {
 
         <button
           type="button"
-          onClick={loadRecords}
-          disabled={loading}
+          onClick={() => { loadRecords(); setSummaryRefresh(value => value + 1); }}
+          disabled={loading || inventoryLoading || targetLoading}
           className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -2193,6 +2226,17 @@ export default function CommissionerInspectionWorkspace() {
           </div>
         </div>
 
+        <InspectionOverviewCards
+          overview={targetProgress}
+          days={inspectionRangeDays(dateRange.start, dateRange.end, todayString())}
+          loading={inventoryLoading || targetLoading}
+          onPending={() => setPendingOpen(true)}
+        />
+        {(inventoryError || targetError || dateRange.start === '2000-01-01') && <div className="px-4 pt-2 text-[11px] text-slate-500">
+          {dateRange.start === '2000-01-01' && <span>Choose a date range to see targeted, completed and pending inspections.</span>}
+          {(inventoryError || targetError) && <p role="alert" className="font-semibold text-rose-600">{inventoryError || targetError}</p>}
+        </div>}
+
         <div className="px-4 pt-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-black uppercase tracking-[0.12em]">
@@ -2219,11 +2263,11 @@ export default function CommissionerInspectionWorkspace() {
                         : 'text-rose-600'
                   }
                 >
-                  {targetProgress.credit.toLocaleString()} / {targetProgress.target.toLocaleString()} ({Math.round(targetProgress.percent)}%)
+                  {targetProgress.credit!.toLocaleString()} / {targetProgress.target!.toLocaleString()} ({Math.round(targetProgress.percent)}%)
                 </span>
               ) : (
                 <span className="text-slate-400">
-                  {targetLoading
+                  {targetLoading || inventoryLoading
                     ? 'Loading...'
                     : dateRange.start === '2000-01-01'
                       ? 'Pick a date range to see target'
@@ -2345,6 +2389,13 @@ export default function CommissionerInspectionWorkspace() {
           )}
         </div>
       </section>
+
+      {pendingOpen && <PendingInspectionsModal
+        rows={pendingDetails} total={targetProgress.pending ?? 0}
+        from={dateRange.start} to={dateRange.end}
+        onClose={() => setPendingOpen(false)} overlayOpen={Boolean(selected || actionTarget || imagePreview)}
+        renderReport={report => <ReportCard report={report} onView={item => { setSelected(item); setDetailLoading(false); }} />}
+      />}
 
       {selected && (
         <DetailModal
