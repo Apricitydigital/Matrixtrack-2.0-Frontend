@@ -1526,6 +1526,7 @@ export const ModuleRecordsApi = {
       fromDate?: string;
       toDate?: string;
       recordId?: string;
+      beatId?: string;
     }
   ) => {
     const params = new URLSearchParams();
@@ -1538,6 +1539,7 @@ export const ModuleRecordsApi = {
     if (filters?.fromDate) params.append("startDate", filters.fromDate);
     if (filters?.toDate) params.append("endDate", filters.toDate);
     if (filters?.recordId) params.append("recordId", filters.recordId);
+    if (filters?.beatId) params.append("beatId", filters.beatId);
 
     const queryString = params.toString();
     const url = `/modules/${moduleKey}/records${queryString ? `?${queryString}` : ""}`;

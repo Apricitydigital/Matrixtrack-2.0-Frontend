@@ -1,6 +1,7 @@
 'use client';
 
 import ImagePreviewModal from '@components/ui/ImagePreviewModal';
+import BeatCoverageWorkspace from '@components/BeatCoverageWorkspace';
 import {
   useEffect,
   useMemo,
@@ -2117,7 +2118,7 @@ export default function InspectionPerformanceWorkspace() {
               onBlur={() => {
                 suggestionBlurTimer.current = setTimeout(() => setShowSuggestions(false), 120);
               }}
-              placeholder="Search report, location, user, zone, ward..."
+              placeholder={moduleFilter === 'SWEEPING' ? 'Search beat, zone, ward...' : 'Search report, location, user, zone, ward...'}
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
 
@@ -2134,7 +2135,7 @@ export default function InspectionPerformanceWorkspace() {
               </button>
             )}
 
-            {showSuggestions && suggestions.length > 0 && (
+            {moduleFilter !== 'SWEEPING' && showSuggestions && suggestions.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                 {suggestions.map((suggestion, index) => (
                   <button
@@ -2158,6 +2159,7 @@ export default function InspectionPerformanceWorkspace() {
             )}
           </div>
 
+          {moduleFilter !== 'SWEEPING' && (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium text-slate-400">
             <span>
               Showing {displayedRecords.length.toLocaleString()} of{' '}
@@ -2171,8 +2173,18 @@ export default function InspectionPerformanceWorkspace() {
               <span className="text-rose-600">G: {moduleSplit.TASKFORCE}</span>
             </div>
           </div>
+          )}
         </div>
 
+        {moduleFilter === 'SWEEPING' ? (
+          <BeatCoverageWorkspace
+            from={dateRange.start} to={dateRange.end}
+            zoneId={selectedZone} wardId={selectedWard}
+            search={debouncedSearch} refresh={summaryRefresh}
+            overlayOpen={Boolean(selected || actionTarget || imagePreview)}
+            renderReport={report => <ReportCard report={report} onView={openDetail} onActionRequired={beginActionRequired} />}
+          />
+        ) : (<>
         <div className="grid grid-cols-2 gap-3 px-4 pt-4 xl:grid-cols-4" aria-label="Inspection overview" aria-busy={inventoryLoading || targetLoading}>
           {[
             { label: 'Total', value: targetProgress.total, hint: 'Registered inspection assets', icon: Layers3, color: 'text-slate-700', bg: 'bg-slate-100' },
@@ -2348,6 +2360,7 @@ export default function InspectionPerformanceWorkspace() {
             </>
           )}
         </div>
+        </>)}
       </section>
 
       {selected && (
