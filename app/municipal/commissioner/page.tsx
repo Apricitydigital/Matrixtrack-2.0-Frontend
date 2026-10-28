@@ -11414,6 +11414,66 @@ const [
     };
   }, [appliedFrom, appliedTo]);
 
+  /*
+   * Inspection Target = what the admin set for the Darogas (count or %),
+   * summed over the selected range; Inspection Range stays the 100% assigned
+   * count. null while loading or when no date range is applied.
+   */
+  const darogaTargetFor = (
+    moduleKey: DashboardModuleKey | InspectionModuleKey,
+    zone = 'ALL',
+    ward = 'ALL',
+    userId?: string | null
+  ): number | null => {
+    const users = roleScores.daroga;
+
+    if (!users) {
+      return null;
+    }
+
+    let total = 0;
+    let ranged = false;
+
+    Object.entries(users).forEach(([id, perf]) => {
+      if (userId && id !== userId) {
+        return;
+      }
+
+      if (perf.days !== null) {
+        ranged = true;
+      }
+
+      perf.rows.forEach((row) => {
+        if (moduleKey !== 'ALL' && row.module !== moduleKey) {
+          return;
+        }
+
+        if (zone !== 'ALL' && row.zoneName !== zone) {
+          return;
+        }
+
+        if (ward !== 'ALL' && row.wardName !== ward) {
+          return;
+        }
+
+        total += row.target;
+      });
+    });
+
+    return ranged ? Math.round(total) : null;
+  };
+
+  const darogaTargetText = (
+    moduleKey: DashboardModuleKey | InspectionModuleKey,
+    zone = 'ALL',
+    ward = 'ALL',
+    userId?: string | null
+  ) => {
+    const target = darogaTargetFor(moduleKey, zone, ward, userId);
+
+    return target === null ? '-' : target.toLocaleString('en-IN');
+  };
+
   // Warm the leaderboard drawer's record downloads so a row click opens it right away.
   useEffect(() => {
     import('./user-performance/UserPerformanceView')
@@ -12747,10 +12807,24 @@ const [
       },
       {
         label:
-          'Inspection Target',
+          'Inspection Range',
         value:
           row.inspectionRequired.toLocaleString(
             'en-IN'
+          ),
+      },
+      {
+        label:
+          'Inspection Target',
+        value:
+          darogaTargetText(
+            moduleFilter,
+            'geoLevel' in row && row.geoLevel === 'ZONE'
+              ? row.label
+              : 'ALL',
+            'geoLevel' in row && row.geoLevel === 'WARD'
+              ? row.label
+              : 'ALL'
           ),
       },
       {
@@ -13272,14 +13346,30 @@ setDrilldown({
       breakdown: [
         {
           label:
-            'Inspection Target',
+            'Inspection Range',
           value:
-            (
-              row.requiredInspections ??
-              0
-            ).toLocaleString(
+            (row.requiredInspections ?? 0).toLocaleString(
               'en-IN'
             ),
+        },
+        {
+          label:
+            'Inspection Target',
+          value:
+            row.id &&
+            roleScores.daroga?.[row.id]
+              ? darogaTargetText(
+                  'ALL',
+                  'ALL',
+                  'ALL',
+                  row.id
+                )
+              : (
+                row.requiredInspections ??
+                0
+              ).toLocaleString(
+                'en-IN'
+              ),
         },
         {
           label:
@@ -14133,7 +14223,7 @@ setDrilldown({
             />
 
             <KpiCard
-              label="Average Ward Score"
+              label="Average Ward Performance"
               value={
                 loading
                   ? '-'
@@ -14156,7 +14246,7 @@ setDrilldown({
               }
               tooltip={[
                 {
-                  label: 'Average Ward Score',
+                  label: 'Average Ward Performance',
                   value:
                     percentText(
                       wardRankingAverage
@@ -14193,11 +14283,14 @@ setDrilldown({
               }
               tooltip={[
                 {
+                  label: 'Inspection Range',
+                  value:
+                    sweepingInspection.required.toLocaleString('en-IN'),
+                },
+                {
                   label: 'Inspection Target',
                   value:
-                    sweepingInspection.required.toLocaleString(
-                      'en-IN'
-                    ),
+                    darogaTargetText('SWEEPING', zoneFilter, wardFilter),
                 },
                 {
                   label: 'Completed Beats',
@@ -14281,11 +14374,14 @@ setDrilldown({
               }
               tooltip={[
                 {
+                  label: 'Inspection Range',
+                  value:
+                    litterBinInspection.required.toLocaleString('en-IN'),
+                },
+                {
                   label: 'Inspection Target',
                   value:
-                    litterBinInspection.required.toLocaleString(
-                      'en-IN'
-                    ),
+                    darogaTargetText('LITTERBINS', zoneFilter, wardFilter),
                 },
                 {
                   label: 'Completed Inspections',
@@ -14369,11 +14465,14 @@ setDrilldown({
               }
               tooltip={[
                 {
+                  label: 'Inspection Range',
+                  value:
+                    toiletInspection.required.toLocaleString('en-IN'),
+                },
+                {
                   label: 'Inspection Target',
                   value:
-                    toiletInspection.required.toLocaleString(
-                      'en-IN'
-                    ),
+                    darogaTargetText('TOILET', zoneFilter, wardFilter),
                 },
                 {
                   label: 'Completed Inspections',
@@ -14458,11 +14557,14 @@ setDrilldown({
                 }
                 tooltip={[
                   {
+                    label: 'Inspection Range',
+                    value:
+                      nalaInspection.required.toLocaleString('en-IN'),
+                  },
+                  {
                     label: 'Inspection Target',
                     value:
-                      nalaInspection.required.toLocaleString(
-                        'en-IN'
-                      ),
+                      darogaTargetText('NALA', zoneFilter, wardFilter),
                   },
                   {
                     label: 'Completed Nala Points',
@@ -14548,8 +14650,12 @@ setDrilldown({
                 }
                 tooltip={[
                   {
-                    label: 'Inspection Target',
+                    label: 'Inspection Range',
                     value: gvpInspection.required.toLocaleString('en-IN'),
+                  },
+                  {
+                    label: 'Inspection Target',
+                    value: darogaTargetText('TASKFORCE', zoneFilter, wardFilter),
                   },
                   {
                     label: 'Completed GVP Inspections',
