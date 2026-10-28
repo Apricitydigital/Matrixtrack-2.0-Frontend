@@ -2,10 +2,10 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDays, Check, FileDown, Loader2, MapPin, X } from 'lucide-react';
+import { CalendarDays, Check, FileDown, Layers3, Loader2, MapPin, X } from 'lucide-react';
 
 import { ApiError } from '@lib/apiClient';
-import { ZoneExportApi, type ZoneOption } from '@lib/zoneExportApi';
+import { ZoneExportApi, type WardOption, type ZoneOption } from '@lib/zoneExportApi';
 
 type Preset = 'TODAY' | 'YESTERDAY' | 'WEEK' | 'MONTH' | 'THIS_MONTH' | 'CUSTOM';
 
@@ -68,8 +68,11 @@ export default function ZoneExportButton({ variant = 'light' }: Props) {
   const [mounted, setMounted] = useState(false);
 
   const [zones, setZones] = useState<ZoneOption[]>([]);
+  const [wards, setWards] = useState<WardOption[]>([]);
   const [zonesLoading, setZonesLoading] = useState(false);
+  // Nothing is ticked at first: the admin picks the zones (and wards) needed.
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedWards, setSelectedWards] = useState<string[]>([]);
 
   const [preset, setPreset] = useState<Preset>('WEEK');
   const [from, setFrom] = useState(() => rangeFor('WEEK')!.from);
@@ -102,11 +105,11 @@ export default function ZoneExportButton({ variant = 'light' }: Props) {
     setZonesLoading(true);
     setError('');
 
-    ZoneExportApi.zones()
-      .then((list) => {
+    Promise.all([ZoneExportApi.zones(), ZoneExportApi.wards().catch(() => [] as WardOption[])])
+      .then(([zoneList, wardList]) => {
         if (!active) return;
-        setZones(list);
-        setSelected(list.map((zone) => zone.id));
+        setZones(zoneList);
+        setWards(wardList);
       })
       .catch((err) => {
         if (active) setError(err instanceof ApiError ? err.message : 'Unable to load zones.');
@@ -122,8 +125,49 @@ export default function ZoneExportButton({ variant = 'light' }: Props) {
 
   const allSelected = zones.length > 0 && selected.length === zones.length;
 
-  const toggle = (id: string) =>
-    setSelected((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+  const wardsByZone = useMemo(() => {
+    const map = new Map<string, WardOption[]>();
+
+    wards.forEach((ward) => map.set(ward.zoneId, [...(map.get(ward.zoneId) ?? []), ward]));
+
+    return map;
+  }, [wards]);
+
+  const chosenZones = useMemo(() => zones.filter((zone) => selected.includes(zone.id)), [zones, selected]);
+
+  const toggle = (id: string) => {
+    const removing = selected.includes(id);
+
+    setSelected((current) => (removing ? current.filter((value) => value !== id) : [...current, id]));
+
+    // Unticking a zone also drops the wards that were ticked under it.
+    if (removing) {
+      const own = new Set((wardsByZone.get(id) ?? []).map((ward) => ward.id));
+      setSelectedWards((current) => current.filter((wardId) => !own.has(wardId)));
+    }
+  };
+
+  const toggleAllZones = () => {
+    if (allSelected) {
+      setSelected([]);
+      setSelectedWards([]);
+    } else {
+      setSelected(zones.map((zone) => zone.id));
+    }
+  };
+
+  const toggleWard = (id: string) =>
+    setSelectedWards((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+
+  const toggleZoneWards = (zoneId: string) => {
+    const own = (wardsByZone.get(zoneId) ?? []).map((ward) => ward.id);
+    const allTicked = own.length > 0 && own.every((id) => selectedWards.includes(id));
+
+    setSelectedWards((current) => {
+      const rest = current.filter((id) => !own.includes(id));
+      return allTicked ? rest : [...rest, ...own];
+    });
+  };
 
   const pickPreset = (next: Preset) => {
     setPreset(next);
@@ -153,7 +197,7 @@ export default function ZoneExportButton({ variant = 'light' }: Props) {
 
     try {
       const [data, pdf] = await Promise.all([
-        ZoneExportApi.report({ zoneIds: selected, from, to }),
+        ZoneExportApi.report({ zoneIds: selected, wardIds: selectedWards, from, to }),
         import('@lib/zoneExportPdf'),
       ]);
 
@@ -254,7 +298,7 @@ export default function ZoneExportButton({ variant = 'light' }: Props) {
                     <button
                       type="button"
                       disabled={!zones.length}
-                      onClick={() => setSelected(allSelected ? [] : zones.map((zone) => zone.id))}
+                      onClick={toggleAllZones}
                       className="text-xs font-black text-blue-600 hover:text-blue-800 disabled:opacity-40"
                     >
                       {allSelected ? 'Clear all' : 'Select all'}
@@ -304,6 +348,91 @@ export default function ZoneExportButton({ variant = 'light' }: Props) {
                     </div>
                   )}
                 </section>
+
+                {/* WARDS (only for the ticked zones) */}
+                {chosenZones.length > 0 && (
+                  <section>
+                    <div className="mb-1 flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                      <Layers3 size={13} />
+                      Wards
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">
+                        {selectedWards.length} picked
+                      </span>
+                    </div>
+                    <p className="mb-3 text-xs font-semibold text-slate-500">
+                      Tick wards to report only those wards (table and Top 5 / Bottom 5). A zone with no ward ticked covers all of its wards.
+                    </p>
+
+                    <div className="max-h-64 space-y-4 overflow-y-auto pr-1">
+                      {chosenZones.map((zone) => {
+                        const own = wardsByZone.get(zone.id) ?? [];
+                        const picked = own.filter((ward) => selectedWards.includes(ward.id)).length;
+
+                        return (
+                          <div key={zone.id}>
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <div className="text-xs font-black text-slate-700">
+                                {zone.name}
+                                <span className="ml-2 font-semibold text-slate-400">
+                                  {picked > 0 ? `${picked}/${own.length} wards` : `all ${own.length} wards`}
+                                </span>
+                              </div>
+
+                              {own.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleZoneWards(zone.id)}
+                                  className="text-[11px] font-black text-blue-600 hover:text-blue-800"
+                                >
+                                  {picked === own.length ? 'Clear' : 'Select all'}
+                                </button>
+                              )}
+                            </div>
+
+                            {own.length === 0 ? (
+                              <div className="rounded-xl border border-dashed border-slate-200 px-3 py-3 text-xs font-semibold text-slate-400">
+                                No wards found in this zone.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                {own.map((ward) => {
+                                  const checked = selectedWards.includes(ward.id);
+
+                                  return (
+                                    <label
+                                      key={ward.id}
+                                      title={ward.name}
+                                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-bold transition ${
+                                        checked
+                                          ? 'border-blue-300 bg-blue-50 text-blue-900'
+                                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleWard(ward.id)}
+                                        className="sr-only"
+                                      />
+                                      <span
+                                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                          checked ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'
+                                        }`}
+                                      >
+                                        {checked && <Check size={11} strokeWidth={3} />}
+                                      </span>
+                                      <span className="truncate">{ward.name}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
 
                 {/* DATES */}
                 <section>
@@ -372,6 +501,7 @@ export default function ZoneExportButton({ variant = 'light' }: Props) {
               <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
                 <p className="text-xs font-semibold text-slate-500">
                   {selected.length} {selected.length === 1 ? 'zone' : 'zones'} selected
+                  {selectedWards.length > 0 ? ` | ${selectedWards.length} ${selectedWards.length === 1 ? 'ward' : 'wards'} picked` : ''}
                 </p>
 
                 <div className="flex gap-3">

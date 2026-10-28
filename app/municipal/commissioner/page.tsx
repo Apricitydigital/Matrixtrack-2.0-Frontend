@@ -6821,8 +6821,6 @@ export default function CommissionerDashboard() {
 
     setCommissionerCityModules(null);
 
-    console.log('[COMMISSIONER MODULE DEBUG] cityId:', cityId);
-
     if (!cityId) {
       return () => {
         active = false;
@@ -9897,89 +9895,6 @@ const [
       'SWEEPING'
     );
 
-  if (typeof window !== 'undefined') {
-    const sweepingGroupingAudit =
-      sweepingInspection.records
-        .filter(
-          (item) =>
-            effectiveStatus(item) !==
-            'DRAFT'
-        )
-        .map((item) => ({
-          id:
-            item?.id,
-
-          segmentId:
-            (item as any)?.segmentId,
-
-          beatId:
-            (item as any)?.beatId,
-
-          beatObjectId:
-            (item as any)?.beat?.id,
-
-          areaId:
-            (item as any)?.areaId,
-
-          beatName:
-            (item as any)?.beatName ||
-            (item as any)?.beat?.beatName,
-
-          zone:
-            getRecordZone(item),
-
-          ward:
-            getRecordWard(item),
-
-          dateKey:
-            inspectionRecordDateKey(
-              item
-            ),
-
-          computedBeatKey:
-            sweepingBeatKey(
-              item
-            ),
-
-          points:
-            Array.from(
-              sweepingSubmittedPointIndexes(
-                item
-              )
-            ),
-
-          qcDecision:
-            getQcDecision(
-              item
-            ),
-
-          status:
-            effectiveStatus(
-              item
-            ),
-        }));
-
-    console.log(
-      "SWEEPING GROUPING AUDIT",
-      sweepingGroupingAudit
-    );
-
-    console.log(
-      "SWEEPING UNIQUE GROUPS",
-      Array.from(
-        new Set(
-          sweepingGroupingAudit.map(
-            (row) =>
-              `${row.computedBeatKey}::${row.dateKey}`
-          )
-        )
-      )
-    );
-
-    console.table(
-      sweepingGroupingAudit
-    );
-  }
 
 
   /*
