@@ -16,6 +16,7 @@ const COLOR = {
   red: [220, 38, 38] as Rgb,
   redSoft: [254, 242, 242] as Rgb,
   amber: [217, 119, 6] as Rgb,
+  violet: [124, 58, 237] as Rgb,
   white: [255, 255, 255] as Rgb,
 };
 
@@ -57,8 +58,9 @@ function safeFileName(value: string) {
 const HEAD = [
   "Module",
   "Assigned Target",
-  "Pending",
+  "Pending Target",
   "Completed",
+  "SI Pending",
   "Cleaned",
   "Not Cleaned",
   "Action Required",
@@ -71,6 +73,7 @@ const moduleCells = (row: ZoneExportModuleRow) => [
   num(row.target),
   num(row.pending),
   num(row.completed),
+  num(row.siPending),
   num(row.cleaned),
   num(row.notCleaned),
   num(row.actionRequired),
@@ -81,11 +84,12 @@ const moduleCells = (row: ZoneExportModuleRow) => [
 /** Text colour of a numeric column in the module table (index 0 is the module name). */
 const COLUMN_INK: Record<number, Rgb> = {
   3: COLOR.blue,
-  4: COLOR.green,
-  5: COLOR.red,
-  6: COLOR.amber,
-  7: COLOR.green,
-  8: COLOR.red,
+  4: COLOR.violet,
+  5: COLOR.green,
+  6: COLOR.red,
+  7: COLOR.amber,
+  8: COLOR.green,
+  9: COLOR.red,
 };
 
 export async function downloadZonePdf(data: ZoneExportData) {
@@ -139,7 +143,7 @@ export async function downloadZonePdf(data: ZoneExportData) {
       margin: { left: PAGE.margin, right: PAGE.margin, top: PAGE.contentTop },
       theme: "plain",
       styles: { font: "helvetica", fontSize: 9, cellPadding: { top: 2.3, bottom: 2.3, left: 3, right: 3 }, textColor: COLOR.ink, lineColor: COLOR.line, lineWidth: 0 },
-      headStyles: { fillColor: COLOR.navy, textColor: COLOR.white, fontStyle: "bold", fontSize: 8.5, halign: "center", valign: "middle" },
+      headStyles: { fillColor: COLOR.navy, textColor: COLOR.white, fontStyle: "bold", fontSize: 8, halign: "center", valign: "middle" },
       columnStyles: {
         0: { cellWidth: 48, fontStyle: "bold", halign: "left" },
         1: { halign: "center" },
@@ -150,6 +154,7 @@ export async function downloadZonePdf(data: ZoneExportData) {
         6: { halign: "center" },
         7: { halign: "center" },
         8: { halign: "center" },
+        9: { halign: "center" },
       },
       didParseCell: (hook) => {
         if (hook.section !== "body") return;
@@ -248,13 +253,14 @@ export async function downloadZonePdf(data: ZoneExportData) {
           pending: sum.pending + t.pending,
           completed: sum.completed + t.completed,
           cleaned: sum.cleaned + t.cleaned,
+          siPending: sum.siPending + t.siPending,
           notCleaned: sum.notCleaned + t.notCleaned,
           actionRequired: sum.actionRequired + t.actionRequired,
           actionTaken: sum.actionTaken + t.actionTaken,
           actionPending: sum.actionPending + t.actionPending,
         };
       },
-      { target: 0, pending: 0, completed: 0, cleaned: 0, notCleaned: 0, actionRequired: 0, actionTaken: 0, actionPending: 0 },
+      { target: 0, pending: 0, completed: 0, cleaned: 0, siPending: 0, notCleaned: 0, actionRequired: 0, actionTaken: 0, actionPending: 0 },
     );
 
     text("Overview - All Selected Zones", PAGE.margin, PAGE.contentTop + 4, 17, COLOR.navy, "bold");
@@ -264,7 +270,8 @@ export async function downloadZonePdf(data: ZoneExportData) {
       [
         { label: "Assigned Target", value: num(grand.target), color: COLOR.navy },
         { label: "Completed", value: num(grand.completed), color: COLOR.blue },
-        { label: "Pending", value: num(grand.pending), color: COLOR.amber },
+        { label: "Pending Target", value: num(grand.pending), color: COLOR.amber },
+        { label: "SI Pending", value: num(grand.siPending), color: COLOR.violet },
         { label: "Cleaned", value: num(grand.cleaned), color: COLOR.green },
         { label: "Not Cleaned", value: num(grand.notCleaned), color: COLOR.red },
         { label: "Action Pending", value: num(grand.actionPending), color: COLOR.amber },
@@ -275,7 +282,7 @@ export async function downloadZonePdf(data: ZoneExportData) {
     const body = rows.map((zone) => {
       const t = zone.total!;
 
-      return [zone.wardFilter ? `${zone.zoneName} (${zone.wardFilter.selected} of ${zone.wardFilter.total} wards)` : zone.zoneName, num(t.target), num(t.pending), num(t.completed), pct(completionPct(t)), num(t.cleaned), num(t.notCleaned), num(t.actionRequired), num(t.actionTaken), num(t.actionPending)];
+      return [zone.wardFilter ? `${zone.zoneName} (${zone.wardFilter.selected} of ${zone.wardFilter.total} wards)` : zone.zoneName, num(t.target), num(t.pending), num(t.completed), pct(completionPct(t)), num(t.siPending), num(t.cleaned), num(t.notCleaned), num(t.actionRequired), num(t.actionTaken), num(t.actionPending)];
     });
 
     body.push([
@@ -284,6 +291,7 @@ export async function downloadZonePdf(data: ZoneExportData) {
       num(grand.pending),
       num(grand.completed),
       pct(completionPct(grand)),
+      num(grand.siPending),
       num(grand.cleaned),
       num(grand.notCleaned),
       num(grand.actionRequired),
@@ -293,13 +301,13 @@ export async function downloadZonePdf(data: ZoneExportData) {
 
     autoTable(doc, {
       startY: PAGE.contentTop + 38,
-      head: [["Zone", "Assigned Target", "Pending", "Completed", "Completion", "Cleaned", "Not Cleaned", "Action Required", "Action Taken", "Action Pending"]],
+      head: [["Zone", "Assigned Target", "Pending Target", "Completed", "Completion", "SI Pending", "Cleaned", "Not Cleaned", "Action Required", "Action Taken", "Action Pending"]],
       body,
       margin: { left: PAGE.margin, right: PAGE.margin, top: PAGE.contentTop },
       theme: "plain",
       styles: { font: "helvetica", fontSize: 9, cellPadding: { top: 3, bottom: 3, left: 3, right: 3 }, textColor: COLOR.ink },
       headStyles: { fillColor: COLOR.navy, textColor: COLOR.white, fontStyle: "bold", fontSize: 8, halign: "center" },
-      columnStyles: { 0: { cellWidth: 52, fontStyle: "bold" }, 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "center" }, 6: { halign: "center" }, 7: { halign: "center" }, 8: { halign: "center" }, 9: { halign: "center" } },
+      columnStyles: { 0: { cellWidth: 50, fontStyle: "bold" }, 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "center" }, 6: { halign: "center" }, 7: { halign: "center" }, 8: { halign: "center" }, 9: { halign: "center" }, 10: { halign: "center" } },
       didParseCell: (hook) => {
         if (hook.section !== "body") return;
 
@@ -365,7 +373,8 @@ export async function downloadZonePdf(data: ZoneExportData) {
       [
         { label: "Assigned Target", value: num(total.target), color: COLOR.navy },
         { label: done === null ? "Completed" : `Completed (${done.toFixed(0)}%)`, value: num(total.completed), color: COLOR.blue },
-        { label: "Pending", value: num(total.pending), color: COLOR.amber },
+        { label: "Pending Target", value: num(total.pending), color: COLOR.amber },
+        { label: "SI Pending", value: num(total.siPending), color: COLOR.violet },
         { label: "Cleaned", value: num(total.cleaned), color: COLOR.green },
         { label: "Not Cleaned", value: num(total.notCleaned), color: COLOR.red },
         { label: "Action Pending", value: num(total.actionPending), color: COLOR.amber },
@@ -378,7 +387,7 @@ export async function downloadZonePdf(data: ZoneExportData) {
     y = lastY() + 4;
 
     text(
-      "Completed = inspections counted against the target (never above it).  Pending = Assigned Target - Completed.  Action Pending = Action Required - Action Taken.",
+      "Completed = inspections counted against the target (never above it).  Pending Target = Assigned Target - Completed.  SI Pending = waiting for SI review.  Action Pending = Action Required - Action Taken.",
       PAGE.margin,
       y + 2,
       6.8,
