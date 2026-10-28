@@ -5,9 +5,12 @@ export type ZoneExportModuleRow = {
   label: string;
   /** Assigned target as a count (a percentage target is already turned into a count). */
   target: number;
+  /** Pending Target = Assigned Target - Completed. */
   pending: number;
   completed: number;
   cleaned: number;
+  /** Submitted, waiting for the SI (QC) review. */
+  siPending: number;
   notCleaned: number;
   actionRequired: number;
   actionTaken: number;
