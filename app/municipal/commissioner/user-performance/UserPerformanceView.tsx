@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import TimedPerformanceOverview from './TimedPerformanceOverview';
 import { usePathname } from 'next/navigation';
 
 import {
@@ -15,9 +17,8 @@ import {
   Clock,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   Droplet,
-  Filter,
+  Info,
   MapPin,
   Recycle,
   RefreshCw,
@@ -37,9 +38,6 @@ import {
 } from 'lucide-react';
 
 import { RoleGuard } from '@components/Guards';
-import UniversalReportModal from '@components/UniversalReportModal';
-import { BarComparisonChart, DonutDistributionChart } from '@components/ui/charts/ExecutiveCharts';
-
 import { useAuth } from '@hooks/useAuth';
 import {
   CityUserApi,
@@ -57,6 +55,8 @@ import {
   type AttendanceEmployeeSummary,
 } from '@lib/attendanceApi';
 import ModalPortal from "@components/ui/ModalPortal";
+import { fetchPerformanceSummary } from '@lib/userPerformanceLoading';
+import { directoryNames, directoryScope, filterPerformanceRows, sortPerformanceRows, performanceAssessment, matchesPerformanceFocus, type DirectorySort, type PerformanceFocus } from '@lib/userPerformanceDirectory';
 import {
   darogaAnalytics,
   darogaScore,
@@ -70,6 +70,10 @@ import {
   siScore,
 } from '@lib/userPerformanceScores';
 
+// Charts and evidence modals are used only after opening a user's details.
+const UniversalReportModal = dynamic(() => import('@components/UniversalReportModal'), { ssr: false });
+const BarComparisonChart = dynamic(() => import('@components/ui/charts/ExecutiveCharts').then((module) => module.BarComparisonChart), { ssr: false });
+const DonutDistributionChart = dynamic(() => import('@components/ui/charts/ExecutiveCharts').then((module) => module.DonutDistributionChart), { ssr: false });
 
 /* =========================================================
    TYPES
@@ -844,6 +848,8 @@ function UserDetailDrawer({
   siStatus,
   iecStatus,
   allRecords,
+  detailsLoading = false,
+  detailsError = false,
   onClose,
   onOpenRecord,
 }: {
@@ -857,6 +863,8 @@ function UserDetailDrawer({
   siStatus: 'loading' | 'ready' | 'error';
   iecStatus: 'loading' | 'ready' | 'error';
   allRecords: DashboardRecord[];
+  detailsLoading?: boolean;
+  detailsError?: boolean;
   onClose: () => void;
   onOpenRecord: (record: DashboardRecord) => void;
 }) {
@@ -1591,6 +1599,12 @@ function UserDetailDrawer({
           </div>
           )}
         </div>
+
+        {usingPageRange && (detailsLoading || detailsError) && (
+          <div role="status" className={`border-b px-6 py-3 text-xs ${detailsError ? 'border-amber-100 bg-amber-50 text-amber-800' : 'border-indigo-100 bg-indigo-50 text-indigo-700'}`}>
+            {detailsError ? 'Some inspection or attendance details could not load. Close this panel and refresh to retry.' : 'Loading inspection records and attendance details. The performance score is already available.'}
+          </div>
+        )}
 
         {showWorkflowPanel && (
           <div className="space-y-4 border-b border-slate-200 px-6 py-5">
@@ -2874,95 +2888,6 @@ export type EmbeddedUserDrawer = {
  * same drawer in place.
  */
 
-/* SI_PORTAL_TOOLTIP_V1 */
-function SiStatusInfoTooltip({
-  label,
-  note
-}: {
-  label: string;
-  note: string;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const [position, setPosition] = React.useState({ top: 0, left: 0 });
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-
-  const updatePosition = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const width = Math.min(320, window.innerWidth - 24);
-    const estimatedHeight = 210;
-
-    const left = Math.max(
-      12,
-      Math.min(rect.right - width, window.innerWidth - width - 12)
-    );
-
-    const below = window.innerHeight - rect.bottom;
-    const top = below >= estimatedHeight + 12
-      ? rect.bottom + 8
-      : Math.max(12, rect.top - estimatedHeight - 8);
-
-    setPosition({ top, left });
-  };
-
-  React.useEffect(() => {
-    if (!open) return;
-
-    updatePosition();
-
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [open]);
-
-  return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={'Explain ' + label}
-        aria-expanded={open}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onClick={() => setOpen((value) => !value)}
-        className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-500 transition hover:border-violet-300 hover:text-violet-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-500"
-      >
-        i
-      </button>
-
-      {open && typeof document !== 'undefined' &&
-        require('react-dom').createPortal(
-          <div
-            role="tooltip"
-            style={{
-              position: 'fixed',
-              top: position.top,
-              left: position.left,
-              zIndex: 99999,
-              width: 'min(320px, calc(100vw - 24px))'
-            }}
-            className="pointer-events-none rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-2xl"
-          >
-            <div className="text-xs font-black text-slate-900">{label}</div>
-            <p className="mt-2 text-xs leading-5 text-slate-600">{note}</p>
-            <div className="mt-3 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-600">
-              <strong className="text-slate-900">Review deadline:</strong>
-              {' '}End of the next local calendar day after report arrival.
-            </div>
-          </div>,
-          document.body
-        )}
-    </>
-  );
-}
-
 export default function UserPerformanceView({
   embedded,
   onEmbeddedClose,
@@ -2974,7 +2899,6 @@ export default function UserPerformanceView({
   const isUlbOfficerView = usePathname().startsWith('/ulb/');
 
   const cityId = user?.city?.id || undefined;
-  const cityName = user?.city?.name || 'Municipal Corporation';
 
   const initial = useMemo(
     () => (embedded ? { from: embedded.from, to: embedded.to } : defaultRange()),
@@ -2982,21 +2906,29 @@ export default function UserPerformanceView({
     []
   );
 
-  const [from, setFrom] = useState(initial.from);
-  const [to, setTo] = useState(initial.to);
   const [appliedFrom, setAppliedFrom] = useState(initial.from);
   const [appliedTo, setAppliedTo] = useState(initial.to);
-  const [showFilters, setShowFilters] = useState(false);
 
   const [records, setRecords] = useState<DashboardRecord[]>([]);
   const [attendance, setAttendance] = useState<AttendanceDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [rosterLoading, setRosterLoading] = useState(true);
+  const [detailsStatus, setDetailsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [detailsVersion, setDetailsVersion] = useState(0);
+  const summaryRequestId = useRef(0);
+  const detailsSnapshot = useRef<{ key: string; records: DashboardRecord[]; attendance: AttendanceDashboardResponse } | null>(null);
 
   const [roleFilter, setRoleFilter] = useState<UserRoleKey>(embedded?.role || 'SUPERVISOR');
   const [moduleFilter, setModuleFilter] = useState<'ALL' | InspectionModuleKey>('ALL');
   const [search, setSearch] = useState('');
+  const [zoneFilter, setZoneFilter] = useState('');
+  const [wardFilter, setWardFilter] = useState('');
+  const [sortField, setSortField] = useState<DirectorySort>('performance');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [performanceFocus, setPerformanceFocus] = useState<PerformanceFocus>('all');
+  const directoryRef = useRef<HTMLElement | null>(null);
   const [page, setPage] = useState(1);
 
   const [activeRow, setActiveRow] = useState<UserPerformanceRow | null>(null);
@@ -3014,6 +2946,7 @@ export default function UserPerformanceView({
    */
   const [cityUsers, setCityUsers] = useState<CityUserSummary[]>([]);
   const [geoNameById, setGeoNameById] = useState<Map<string, string>>(new Map());
+  const [wardZoneByName, setWardZoneByName] = useState<Map<string, string>>(new Map());
   // Daroga required vs completed inspections for the applied date range.
   const [darogaPerformance, setDarogaPerformance] = useState<Record<string, DarogaPerformance> | null>(null);
   const [darogaStatus, setDarogaStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -3026,19 +2959,23 @@ export default function UserPerformanceView({
 
   useEffect(() => {
     let cancelled = false;
+    setRosterLoading(true);
 
     (async () => {
-      const [usersResult, zonesResult, wardsResult] = await Promise.allSettled([
-        CityUserApi.list(),
+      // Publish the roster independently; geography must not delay the score cards.
+      CityUserApi.list().then((result) => {
+        if (!cancelled) setCityUsers(result.users || []);
+      }).catch(() => {
+        if (!cancelled) setLoadError(true);
+      }).finally(() => {
+        if (!cancelled) setRosterLoading(false);
+      });
+      const [zonesResult, wardsResult] = await Promise.allSettled([
         GeoApi.list('ZONE'),
         GeoApi.list('WARD'),
       ]);
 
       if (cancelled) return;
-
-      if (usersResult.status === 'fulfilled') {
-        setCityUsers(usersResult.value.users || []);
-      }
 
       const nameMap = new Map<string, string>();
       if (zonesResult.status === 'fulfilled') {
@@ -3046,6 +2983,7 @@ export default function UserPerformanceView({
       }
       if (wardsResult.status === 'fulfilled') {
         (wardsResult.value.nodes || []).forEach((node: any) => nameMap.set(node.id, node.name));
+        setWardZoneByName(new Map((wardsResult.value.nodes || []).map((node: any) => [normalize(node.name), nameMap.get(node.parentId) || node.parent?.name || ''])));
       }
       setGeoNameById(nameMap);
     })();
@@ -3053,7 +2991,7 @@ export default function UserPerformanceView({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [cityId, detailsVersion]);
 
   const cityUsersByRole = useMemo(() => {
     const map = new Map<string, CityUserSummary[]>();
@@ -3067,111 +3005,94 @@ export default function UserPerformanceView({
 
   const loadData = useCallback(
     async (isRefresh = false) => {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-
+      const requestId = ++summaryRequestId.current;
+      setLoading(true);
+      setRefreshing(isRefresh);
       setLoadError(false);
-      setSiStatus('loading');
-      setIecStatus('loading');
-      setDarogaStatus('loading');
+      if (isRefresh) {
+        recordsCache.clear();
+        setDetailsVersion((version) => version + 1);
+      }
+      if (roleFilter === 'SUPERVISOR') setDarogaStatus('loading');
+      if (roleFilter === 'QC') setSiStatus('loading');
+      if (roleFilter === 'ACTION_OFFICER') setIecStatus('loading');
 
-      /*
-       * The score endpoints are fast; apply each as soon as it lands (instead
-       * of after the heavy history download) so an embedded drawer can open
-       * on them while the records keep loading.
-       */
-      const siRequest = CityUserApi.siPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) });
-      const iecRequest = CityUserApi.iecPerformance({ startDate: rangeStartIso(appliedFrom), endDate: rangeEndIso(appliedTo) });
-      const darogaRequest = CityUserApi.darogaPerformance(performanceRangeParams(appliedFrom, appliedTo));
-
-      darogaRequest.then(
-        (value) => {
-          setDarogaPerformance(value.users || {});
+      try {
+        const result = await fetchPerformanceSummary(roleFilter, appliedFrom, appliedTo, CityUserApi);
+        if (requestId !== summaryRequestId.current) return;
+        if (result?.role === 'SUPERVISOR') {
+          setDarogaPerformance(result.data.users || {});
           setDarogaStatus('ready');
-        },
-        (reason) => {
-          console.error('Failed to load Daroga performance', reason);
-          setDarogaPerformance(null);
-          setDarogaStatus('error');
-        }
-      );
-      iecRequest.then(
-        (value) => {
-          setIecPerformance(value.users || {});
-          setIecStatus('ready');
-        },
-        (reason) => {
-          console.error('Failed to load IEC Member performance', reason);
-          setIecPerformance(null);
-          setIecStatus('error');
-        }
-      );
-      siRequest.then(
-        (value) => {
-          setSiPerformance(value.users || {});
+        } else if (result?.role === 'QC') {
+          setSiPerformance(result.data.users || {});
           setSiStatus('ready');
-        },
-        (reason) => {
-          console.error('Failed to load Sanitary Inspector performance', reason);
-          setSiPerformance(null);
-          setSiStatus('error');
+        } else if (result?.role === 'ACTION_OFFICER') {
+          setIecPerformance(result.data.users || {});
+          setIecStatus('ready');
         }
-      );
-
-      const [moduleResult, attendanceResult] = await Promise.allSettled([
-        Promise.all(
-          INSPECTION_MODULES.map((module) =>
-            loadAllModuleRecords(module.key, appliedFrom || undefined, appliedTo || undefined).then(
-              (rows) =>
-                rows.map((row: any) => ({
-                  ...row,
-                  dashboardModule: module.key,
-                  dashboardModuleLabel: module.label,
-                }))
-            )
-          )
-        ),
-        AttendanceApi.dashboard({
-          cityId,
-          from: appliedFrom || undefined,
-          to: appliedTo || undefined,
-          employeeGroup: 'HEALTH_WORKERS',
-          page: 1,
-          pageSize: 5000,
-        }),
-        siRequest.catch(() => undefined),
-        iecRequest.catch(() => undefined),
-        darogaRequest.catch(() => undefined),
-      ]);
-
-      if (moduleResult.status === 'fulfilled') {
-        // LITTERBINS history also returns bin registration requests; those
-        // are asset master rows, not inspection reports.
-        setRecords(
-          moduleResult.value.flat().filter((record: any) => record.type !== 'BIN_REGISTRATION')
-        );
-      } else {
-        setRecords([]);
+      } catch (error) {
+        if (requestId !== summaryRequestId.current) return;
+        console.error('Failed to load user performance', error);
         setLoadError(true);
+        if (roleFilter === 'SUPERVISOR') { setDarogaPerformance(null); setDarogaStatus('error'); }
+        if (roleFilter === 'QC') { setSiPerformance(null); setSiStatus('error'); }
+        if (roleFilter === 'ACTION_OFFICER') { setIecPerformance(null); setIecStatus('error'); }
+      } finally {
+        if (requestId === summaryRequestId.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
-
-      if (attendanceResult.status === 'fulfilled') {
-        setAttendance(attendanceResult.value);
-      } else {
-        setAttendance(null);
-        setLoadError(true);
-      }
-
-      setLoading(false);
-      setRefreshing(false);
     },
-    [appliedFrom, appliedTo, cityId]
+    [appliedFrom, appliedTo, cityId, roleFilter]
   );
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFrom, appliedTo, cityId]);
+    return () => { summaryRequestId.current += 1; };
+  }, [loadData]);
+
+  // Score-based directories need no history or attendance download. Load those
+  // only for an open detail drawer, or the legacy attendance/ULB directories.
+  const needsDetails = Boolean(activeRow || pendingUserId) || roleFilter === 'EMPLOYEE' || roleFilter === 'ULB_OFFICER';
+  useEffect(() => {
+    let cancelled = false;
+    const key = `${cityId || ''}|${appliedFrom}|${appliedTo}|${detailsVersion}`;
+    if (!needsDetails) {
+      if (detailsSnapshot.current?.key !== key) { setRecords([]); setAttendance(null); }
+      setDetailsStatus('idle');
+      return;
+    }
+    if (detailsSnapshot.current?.key === key) {
+      setRecords(detailsSnapshot.current.records);
+      setAttendance(detailsSnapshot.current.attendance);
+      setDetailsStatus('ready');
+      return;
+    }
+    setRecords([]);
+    setAttendance(null);
+    setDetailsStatus('loading');
+
+    Promise.allSettled([
+      Promise.all(INSPECTION_MODULES.map((module) =>
+        loadAllModuleRecords(module.key, appliedFrom || undefined, appliedTo || undefined).then((rows) =>
+          rows.map((row: any) => ({ ...row, dashboardModule: module.key, dashboardModuleLabel: module.label }))
+        )
+      )),
+      AttendanceApi.dashboard({ cityId, from: appliedFrom || undefined, to: appliedTo || undefined, employeeGroup: 'HEALTH_WORKERS', page: 1, pageSize: 5000 }),
+    ]).then(([moduleResult, attendanceResult]) => {
+      if (cancelled) return;
+      if (moduleResult.status === 'fulfilled') setRecords(moduleResult.value.flat().filter((record: any) => record.type !== 'BIN_REGISTRATION'));
+      if (attendanceResult.status === 'fulfilled') setAttendance(attendanceResult.value);
+      const failed = moduleResult.status === 'rejected' || attendanceResult.status === 'rejected';
+      if (moduleResult.status === 'fulfilled' && attendanceResult.status === 'fulfilled') {
+        detailsSnapshot.current = { key, records: moduleResult.value.flat().filter((record: any) => record.type !== 'BIN_REGISTRATION'), attendance: attendanceResult.value };
+      }
+      setDetailsStatus(failed ? 'error' : 'ready');
+      if (failed && (roleFilter === 'EMPLOYEE' || roleFilter === 'ULB_OFFICER')) setLoadError(true);
+    });
+    return () => { cancelled = true; };
+  }, [needsDetails, appliedFrom, appliedTo, cityId, roleFilter, detailsVersion]);
 
   const moduleFilterApplicable = roleFilter !== 'EMPLOYEE';
 
@@ -3221,8 +3142,9 @@ export default function UserPerformanceView({
               employee.matrixTrackUserId && String(employee.matrixTrackUserId) === String(person.id)
           ) || null;
 
-        const zones = new Set<string>();
-        const wards = new Set<string>();
+        const scope = directoryScope(person, geoNameById, wardZoneByName);
+        const zones = new Set(scope.zones);
+        const wards = new Set(scope.wards);
         const modules = new Set<string>();
 
         matchedRecords.forEach((item) => {
@@ -3238,7 +3160,7 @@ export default function UserPerformanceView({
 
         // A Daroga's zones / wards come from where their assigned assets are,
         // so they show even before any report is filed.
-        (darogaFull?.rows || []).forEach((entry) => {
+        (coverage?.rows || []).forEach((entry) => {
           if (entry.zoneName) zones.add(entry.zoneName);
           if (entry.wardId && entry.wardName) wards.add(entry.wardName);
         });
@@ -3268,7 +3190,7 @@ export default function UserPerformanceView({
         };
       });
     },
-    [cityUsersByRole, filteredRecords, attendance, darogaPerformance, siPerformance, moduleFilter]
+    [cityUsersByRole, filteredRecords, attendance, darogaPerformance, siPerformance, moduleFilter, geoNameById, wardZoneByName]
   );
 
   const employeeRows = useMemo<UserPerformanceRow[]>(() => {
@@ -3317,15 +3239,11 @@ export default function UserPerformanceView({
     const roster = cityUsersByRole.get('ULB_OFFICER') || [];
 
     return roster.map((officer) => {
-      const zoneNames = (officer.zoneIds || [])
-        .map((id) => geoNameById.get(id))
-        .filter((name): name is string => Boolean(name));
-      const wardNames = (officer.wardIds || [])
-        .map((id) => geoNameById.get(id))
-        .filter((name): name is string => Boolean(name));
+      const { zones: zoneNames, wards: wardNames } = directoryScope(officer, geoNameById, wardZoneByName);
 
-      const zoneSet = new Set(zoneNames.map(normalize));
-      const wardSet = new Set(wardNames.map(normalize));
+      // Match records against assigned scope; inferred display parents must not widen it.
+      const zoneSet = new Set((officer.zoneIds || []).map((id) => geoNameById.get(id)).filter(Boolean).map(normalize));
+      const wardSet = new Set((officer.wardIds || []).map((id) => geoNameById.get(id)).filter(Boolean).map(normalize));
 
       const matchedRecords =
         zoneSet.size || wardSet.size
@@ -3368,7 +3286,7 @@ export default function UserPerformanceView({
         modules: Array.from(modules),
       };
     });
-  }, [cityUsersByRole, geoNameById, filteredRecords, attendance]);
+  }, [cityUsersByRole, geoNameById, wardZoneByName, filteredRecords, attendance]);
 
   /*
    * IEC Members own the reports that ULB sent to action inside their zone /
@@ -3384,12 +3302,7 @@ export default function UserPerformanceView({
       const roster = cityUsersByRole.get('ACTION_OFFICER') || [];
 
       return roster.map((officer) => {
-        const zoneNames = (officer.zoneIds || [])
-          .map((id) => geoNameById.get(id))
-          .filter((name): name is string => Boolean(name));
-        const wardNames = (officer.wardIds || [])
-          .map((id) => geoNameById.get(id))
-          .filter((name): name is string => Boolean(name));
+        const { zones: zoneNames, wards: wardNames } = directoryScope(officer, geoNameById, wardZoneByName);
 
         const iecFull = iecData?.[officer.id];
         const iec = iecFull ? restrictIecModules(iecFull, moduleFilter) : null;
@@ -3431,18 +3344,10 @@ export default function UserPerformanceView({
         };
       });
     },
-    [cityUsersByRole, geoNameById, filteredRecords, attendance, iecPerformance, moduleFilter]
+    [cityUsersByRole, geoNameById, wardZoneByName, filteredRecords, attendance, iecPerformance, moduleFilter]
   );
 
-  /*
-   * Daroga performance is judged on submission volume against the rest
-   * of the currently-viewed roster (count of reports submitted matters
-   * more than SI approval outcome), so the base approve/actionTaken
-   * score from buildInspectionRows is replaced with a relative score
-   * once every Daroga's total is known. The drawer additionally shows
-   * assets-assigned vs. reports-submitted coverage using work-summary
-   * data fetched per user.
-   */
+  // Rank by the shared role score: target credit for Daroga, on-time work for SI/IEC.
   const activeRoleRows = useMemo(() => {
     let rows: UserPerformanceRow[];
 
@@ -3503,18 +3408,27 @@ export default function UserPerformanceView({
     [roleFilter, moduleFilter, buildInspectionRows, buildActionOfficerRows]
   );
 
-  const filteredRows = useMemo(() => {
-    const query = normalize(search);
-    if (!query) return activeRoleRows;
-
-    return activeRoleRows.filter((row) =>
-      normalize([row.label, ...row.zones, ...row.wards, ...row.modules].join(' ')).includes(query)
-    );
-  }, [activeRoleRows, search]);
+  const zoneOptions = useMemo(() => directoryNames(activeRoleRows.flatMap((row) => row.zones)), [activeRoleRows]);
+  const wardOptions = useMemo(() => directoryNames(filterPerformanceRows(activeRoleRows, zoneFilter, '', '').flatMap((row) => row.wards)).filter((ward) => {
+    if (!zoneFilter) return true;
+    const parentZone = wardZoneByName.get(normalize(ward));
+    if (parentZone) return normalize(parentZone) === normalize(zoneFilter);
+    return activeRoleRows.some((row) => row.coverage?.rows.some((entry) => normalize(entry.wardName) === normalize(ward) && normalize(entry.zoneName) === normalize(zoneFilter)));
+  }), [activeRoleRows, zoneFilter, wardZoneByName]);
+  const matchingRows = useMemo(() => filterPerformanceRows(activeRoleRows, zoneFilter, wardFilter, search), [activeRoleRows, zoneFilter, wardFilter, search]);
+  const filteredRows = useMemo(() => sortPerformanceRows(matchingRows.filter((row) => matchesPerformanceFocus(row, performanceFocus, roleFilter)), sortField, sortDirection), [matchingRows, sortField, sortDirection, performanceFocus, roleFilter]);
+  const performanceRanks = useMemo(() => new Map(sortPerformanceRows(matchingRows, 'performance', 'desc').filter((row) => row.performance !== null).map((row, index) => [row.key, index + 1])), [matchingRows]);
 
   useEffect(() => {
     setPage(1);
-  }, [roleFilter, moduleFilter, search]);
+  }, [roleFilter, moduleFilter, search, zoneFilter, wardFilter, sortField, sortDirection, appliedFrom, appliedTo, performanceFocus]);
+
+  useEffect(() => {
+    setZoneFilter('');
+    setWardFilter('');
+    setSortField('performance');
+    setPerformanceFocus('all');
+  }, [roleFilter]);
 
   const roleScoresReady =
     roleFilter === 'SUPERVISOR'
@@ -3543,17 +3457,18 @@ export default function UserPerformanceView({
   }, [pendingUserId, roleScoresReady, activeRoleRows, cityUsers.length]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const pageStart = (page - 1) * PAGE_SIZE;
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
   const pagedRows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
 
   const roleLabel = ROLES.find((role) => role.key === roleFilter)?.label || 'User';
 
   const avgPerformance = useMemo(
-    () => averageApplicable(activeRoleRows.map((row) => row.performance)),
-    [activeRoleRows]
+    () => averageApplicable(matchingRows.map((row) => row.performance)),
+    [matchingRows]
   );
 
-  const topPerformer = activeRoleRows[0] || null;
+  const topPerformer = matchingRows.find((row) => row.performance !== null) || null;
 
   const isDarogaView = roleFilter === 'SUPERVISOR';
   const isSiView = roleFilter === 'QC';
@@ -3563,54 +3478,51 @@ export default function UserPerformanceView({
   const lowThreshold = isDarogaView ? 80 : 50;
 
   const belowHalf = useMemo(
-    () => activeRoleRows.filter((row) => row.performance !== null && row.performance < lowThreshold).length,
-    [activeRoleRows, lowThreshold]
+    () => matchingRows.filter((row) => row.performance !== null && row.performance < lowThreshold).length,
+    [matchingRows, lowThreshold]
   );
-
-  /* SI KPI strip: on-time review across every SI in view. */
-  const siKpis = useMemo(() => {
-    if (!isTimedView) return null;
-    const list = activeRoleRows
-      .map((row) => row.si ?? row.iec)
-      .filter((entry): entry is SiPerformance | IecPerformance => Boolean(entry));
-    const hours = list
-      .map((entry) => ('avgTurnaroundHours' in entry ? entry.avgTurnaroundHours : entry.avgResolutionHours))
-      .filter((h): h is number => typeof h === 'number');
-    return {
-      due: list.reduce((sum, entry) => sum + entry.due, 0),
-      onTime: list.reduce((sum, entry) => sum + entry.onTime, 0),
-      overdue: list.reduce((sum, entry) => sum + entry.overdue, 0),
-      avgHours: hours.length ? hours.reduce((sum, h) => sum + h, 0) / hours.length : null,
-    };
-  }, [isTimedView, activeRoleRows]);
 
   /* Daroga KPI strip: target achievement across every Daroga in view. */
   const darogaKpis = useMemo(() => {
     if (!isDarogaView) return null;
-    const scored = activeRoleRows.filter((row) => row.performance !== null);
+    const scored = matchingRows.filter((row) => row.performance !== null);
     return {
       targetMet: scored.filter((row) => (row.performance ?? 0) >= 99.995).length,
-      required: activeRoleRows.reduce((sum, row) => sum + (row.coverage?.required ?? 0), 0),
-      completed: activeRoleRows.reduce((sum, row) => sum + (row.coverage?.completed ?? 0), 0),
-      defaultTarget: activeRoleRows.filter(
+      required: matchingRows.reduce((sum, row) => sum + (row.coverage?.required ?? 0), 0),
+      completed: matchingRows.reduce((sum, row) => sum + (row.coverage?.completed ?? 0), 0),
+      noCredit: scored.filter((row) => row.coverage?.completed === 0).length,
+      noTarget: matchingRows.filter((row) => row.coverage?.required === 0).length,
+      unavailable: matchingRows.filter((row) => !row.coverage || row.coverage.required === null).length,
+      defaultTarget: matchingRows.filter(
         (row) => row.coverage?.rows?.length && row.coverage.rows.every((entry) => entry.source === 'DEFAULT')
       ).length,
     };
-  }, [isDarogaView, activeRoleRows]);
+  }, [isDarogaView, matchingRows]);
 
-  function applyDates() {
-    setAppliedFrom(from);
-    setAppliedTo(to);
+  function reviewGroup(focus: PerformanceFocus) {
+    setPerformanceFocus(focus);
+    if (focus === 'attention' || focus === 'zero') {
+      setSortField('performance');
+      setSortDirection('asc');
+    }
+    if (isTimedView) {
+      const timedSort: Partial<Record<PerformanceFocus, DirectorySort>> = { attention: 'overdue', overdue: 'overdue', pending: 'inProgress', late: 'late', backlog: 'backlog', onTime: 'onTime' };
+      if (timedSort[focus]) { setSortField(timedSort[focus]!); setSortDirection('desc'); }
+    }
+    directoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function resetFilters() {
     const range = defaultRange();
-    setFrom(range.from);
-    setTo(range.to);
     setAppliedFrom(range.from);
     setAppliedTo(range.to);
     setModuleFilter('ALL');
     setSearch('');
+    setZoneFilter('');
+    setWardFilter('');
+    setSortField('performance');
+    setSortDirection('desc');
+    setPerformanceFocus('all');
   }
 
   function setPreset(preset: 'TODAY' | '7D' | '30D' | 'MONTH') {
@@ -3626,8 +3538,6 @@ export default function UserPerformanceView({
     const nextFrom = toDateInput(start);
     const nextTo = toDateInput(today);
 
-    setFrom(nextFrom);
-    setTo(nextTo);
     setAppliedFrom(nextFrom);
     setAppliedTo(nextTo);
   }
@@ -3655,6 +3565,8 @@ export default function UserPerformanceView({
             siStatus={siStatus}
             iecStatus={iecStatus}
             allRecords={filteredRecords}
+            detailsLoading={detailsStatus === 'loading' || detailsStatus === 'idle'}
+            detailsError={detailsStatus === 'error'}
             onClose={() => {
               setActiveRow(null);
               onEmbeddedClose?.();
@@ -3678,222 +3590,15 @@ export default function UserPerformanceView({
 
   return (
     <RoleGuard roles={['COMMISSIONER', 'HMS_SUPER_ADMIN', 'ULB_OFFICER']}>
-      <div className="min-h-full bg-[#f6f8fc] pb-12">
+      <div className="min-h-full min-w-0 bg-[#f6f8fc] pb-12">
         {/* HEADER */}
-        <section
-          style={{
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
-            color: 'white',
-            borderRadius: '24px',
-            padding: '26px 32px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 12px 40px -10px rgba(15,23,42,0.6)',
-            position: 'relative',
-            overflow: 'hidden',
-            marginBottom: '24px',
-            flexWrap: 'wrap',
-            gap: '24px',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '100%',
-              height: '100%',
-              background: 'radial-gradient(ellipse at top, rgba(59, 130, 246, 0.2), transparent 70%)',
-              pointerEvents: 'none',
-            }}
-          />
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', zIndex: 1, minWidth: '280px' }}>
-            <Link
-              href={isUlbOfficerView ? '/ulb/dashboard' : '/municipal/commissioner'}
-              style={{
-                fontSize: '10px',
-                fontWeight: 900,
-                textTransform: 'uppercase',
-                letterSpacing: '0.18em',
-                color: '#60a5fa',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                width: 'fit-content',
-              }}
-            >
-              <ArrowLeft size={12} color="#60a5fa" /> {isUlbOfficerView ? 'Back to Dashboard' : 'Back to Executive Dashboard'}
-            </Link>
-
-            <h1
-              style={{
-                fontSize: '24px',
-                fontWeight: 900,
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                margin: 0,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              <UsersRound size={22} /> User Performance
-            </h1>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#38bdf8',
-                  background: 'rgba(56,189,248,0.12)',
-                  border: '1px solid rgba(56,189,248,0.25)',
-                  padding: '3px 10px',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                <MapPin size={12} color="#38bdf8" /> {cityName}
-              </span>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#818cf8',
-                  background: 'rgba(129,140,248,0.12)',
-                  border: '1px solid rgba(129,140,248,0.25)',
-                  padding: '3px 10px',
-                  borderRadius: '12px',
-                }}
-              >
-                Role-wise performance across every user
-              </span>
-            </div>
+        <header className="flex flex-wrap items-end justify-between gap-5 px-1 pb-2 pt-2">
+          <div>
+            <Link href={isUlbOfficerView ? '/ulb/dashboard' : '/municipal/commissioner'} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-indigo-600"><ArrowLeft size={13} />Back to dashboard</Link>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-950">User performance</h1>
           </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', zIndex: 1, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={() => setShowFilters((value) => !value)}
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                color: '#fff',
-                borderRadius: '12px',
-                padding: '9px 14px',
-                fontSize: '12px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                cursor: 'pointer',
-              }}
-            >
-              <Filter size={14} />
-              Filters
-              {showFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => loadData(true)}
-              disabled={refreshing}
-              style={{
-                background: '#2563eb',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '9px 16px',
-                fontSize: '12px',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                cursor: refreshing ? 'default' : 'pointer',
-                boxShadow: '0 4px 14px rgba(37,99,235,0.4)',
-                opacity: refreshing ? 0.6 : 1,
-              }}
-            >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
-          </div>
-        </section>
-
-        {/* FILTERS */}
-        <div
-          className={`grid transition-all duration-300 ease-in-out ${
-            showFilters ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          }`}
-        >
-          <section className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_14px_40px_-25px_rgba(15,23,42,.35)] backdrop-blur-xl">
-            <div className="flex flex-wrap gap-2">
-              {[
-                ['TODAY', 'Today'],
-                ['7D', '7D'],
-                ['30D', '30D'],
-                ['MONTH', 'This Month'],
-
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setPreset(key as 'TODAY' | '7D' | '30D' | 'MONTH')}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-black text-slate-600 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                  From
-                </span>
-                <input
-                  type="date"
-                  value={from}
-                  onChange={(event) => setFrom(event.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                />
-              </label>
-
-              <label>
-                <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                  To
-                </span>
-                <input
-                  type="date"
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                />
-              </label>
-
-              <button
-                type="button"
-                onClick={applyDates}
-                className="mt-auto h-10 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5"
-              >
-                Apply
-              </button>
-
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="mt-auto h-10 rounded-xl border border-slate-200 bg-white px-5 text-xs font-black text-slate-600 transition hover:bg-slate-50"
-              >
-                Reset
-              </button>
-            </div>
-          </section>
-        </div>
+          <button type="button" onClick={() => loadData(true)} disabled={refreshing || loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600 disabled:opacity-50"><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />{refreshing ? 'Refreshing data...' : 'Refresh data'}</button>
+        </header>
 
         {loadError && (
           <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800">
@@ -3902,206 +3607,30 @@ export default function UserPerformanceView({
         )}
 
         {/* KPI_EXPLANATIONS_V2 */}
-        {/* SUMMARY */}
-        <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div title={isDarogaView ? 'Total Daroga users in this city.' : isSiView ? 'Total Sanitary Inspectors in this city.' : 'Total IEC Members in this city.'} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
-              <Users size={13} className="text-indigo-600" />
-              {isDarogaView ? 'Total Daroga' : roleLabel === 'Sanitary Inspector (SI)' ? 'Total Sanitary Inspector (SI)' : 'Total IEC Member'}
-            </div>
-            <div className="mt-1.5 text-2xl font-black text-slate-950">{activeRoleRows.length}</div>
-          </div>
-
-          <div title={isDarogaView ? 'Average of individual eligible Daroga target-achievement percentages. Credit divided by required target, multiplied by 100.' : isSiView ? 'City-wide on-time review rate: ' + (siKpis?.onTime ?? 0) + ' on-time reviews divided by ' + (siKpis?.due ?? 0) + ' due reviews, multiplied by 100. Reviews are due by the end of the next local calendar day after arrival.' : 'Average of individual eligible IEC on-time resolution percentages.'} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
-              <Activity size={13} className="text-violet-600" />
-              {isDarogaView ? 'Average Target Achievement' : isSiView ? 'City-wide On-Time Review Rate' : isIecView ? 'Average On-Time Resolution' : 'Average Performance'}
-            </div>
-            <div className="mt-1.5 text-2xl font-black text-slate-950">{isSiView && siKpis ? percentText(siKpis.due > 0 ? (siKpis.onTime / siKpis.due) * 100 : null) : percentText(avgPerformance)}</div>
-          </div>
-
-          <div title={topPerformer ? 'Highest individual eligible performance in the selected date range: ' + topPerformer.label + ', ' + percentText(topPerformer.performance) : 'No eligible top performer available.'} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
-              <Trophy size={13} className="text-emerald-600" />
-              Top Performer
-            </div>
-            <div className="mt-1.5 truncate text-lg font-black text-slate-950">
-              {topPerformer?.label || '-'}
-            </div>
-            <div className="text-[10px] font-bold text-slate-400">{percentText(topPerformer?.performance)}</div>
-          </div>
-
-          <div title={isDarogaView ? 'Number of Darogas with target achievement below 80 percent.' : isSiView ? 'Average elapsed time between report arrival and completed review, using reviews with valid timestamps. Pending reports are excluded.' : 'Pending IEC resolutions whose deadline has passed.'} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
-              <ShieldCheck size={13} className="text-rose-600" />
-              {isDarogaView ? 'Needs Attention (<80%)' : isSiView ? 'Average Review Turnaround' : isIecView ? 'Overdue Resolutions' : 'Below 50% Performance'}
-            </div>
-            <div className="mt-1.5 text-2xl font-black text-slate-950">{isSiView ? (siKpis?.avgHours == null ? '-' : (Math.round(siKpis.avgHours * 10) / 10) + ' h') : isTimedView ? siKpis?.overdue ?? 0 : belowHalf}</div>
-          </div>
-        </section>
-
-
-        {/* SI_STATUS_BREAKDOWN_V1 */}
-        {siKpis && isSiView && (() => {
-          const onTime = siKpis.onTime;
-          const overdue = siKpis.overdue;
-          const due = siKpis.due;
-          const late = Math.max(0, due - onTime - overdue);
-          const inProgress = activeRoleRows.reduce(
-            (sum, row) => sum + (row.si?.inProgress ?? 0),
-            0
-          );
-          const consistent = onTime + late + overdue === due;
-          const entries = [
-            {
-              label: 'Reviewed On Time',
-              value: onTime,
-              color: 'text-emerald-700',
-              bg: 'border-emerald-100 bg-emerald-50/70',
-              note: 'Reviewed within the deadline'
-            },
-            {
-              label: 'Reviewed Late',
-              value: late,
-              color: 'text-amber-700',
-              bg: 'border-amber-100 bg-amber-50/70',
-              note: 'Completed after the deadline'
-            },
-            {
-              label: 'Overdue Pending',
-              value: overdue,
-              color: 'text-rose-700',
-              bg: 'border-rose-100 bg-rose-50/70',
-              note: 'Still pending after the deadline'
-            },
-            {
-              label: 'Pending Within Deadline',
-              value: inProgress,
-              color: 'text-indigo-700',
-              bg: 'border-indigo-100 bg-indigo-50/70',
-              note: 'Pending, but not overdue yet'
-            }
-          ];
-
-          return (
-            <section className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900">
-                    SI Review Status Breakdown
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Review Deadline: Every inspection report must be reviewed before 11:59 PM the following day. Example: Report submitted on 20 Oct, review must be completed by 21 Oct at 11:59 PM.
-                  </p>
-                </div>
-                <div className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-700">
-                  {due.toLocaleString('en-IN')} Due
-                </div>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {entries.map((entry) => (
-                  <div
-                    key={entry.label}
-                    className={'rounded-xl border p-3 ' + entry.bg}
-                  >
-                    {/* SI_PREMIUM_TOOLTIPS_V1 */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className={'text-[10px] font-black uppercase tracking-wide ' + entry.color}>
-                        {entry.label}
-                      </div>
-                      <SiStatusInfoTooltip label={entry.label} note={entry.note} />
-                    </div>
-                    <div className="mt-2 text-2xl font-black text-slate-950">
-                      {entry.value.toLocaleString('en-IN')}
-                    </div>
-
-                  </div>
-                ))}
-              </div>
-
-
-
-              {!consistent && (
-                <p className="mt-2 text-xs font-bold text-rose-700">
-                  Review totals need reconciliation. Check the underlying response.
-                </p>
-              )}
-            </section>
-          );
-        })()}
-
-        {siKpis && isIecView && (
-          <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm">
-              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">{isSiView ? 'Reviewed On Time' : 'Resolved On Time'}</div>
-              <div className="mt-1.5 text-2xl font-black text-slate-950">
-                {siKpis.onTime.toLocaleString('en-IN')}
-                <span className="text-sm font-bold text-slate-400"> / {siKpis.due.toLocaleString('en-IN')}</span>
-              </div>
-              <div className="text-[10px] font-bold text-slate-400">Reports whose deadline has passed</div>
-            </div>
-            <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4 shadow-sm">
-              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-rose-700">{isSiView ? 'Overdue Reviews' : 'Overdue Resolutions'}</div>
-              <div className="mt-1.5 text-2xl font-black text-slate-950">{siKpis.overdue.toLocaleString('en-IN')}</div>
-              <div className="text-[10px] font-bold text-slate-400">Still waiting after the next-day deadline</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">{isSiView ? 'Avg Turnaround' : 'Avg Resolution Time'}</div>
-              <div className="mt-1.5 text-2xl font-black text-slate-950">
-                {siKpis.avgHours === null ? '-' : `${Math.round(siKpis.avgHours * 10) / 10} h`}
-              </div>
-              <div className="text-[10px] font-bold text-slate-400">{isSiView ? 'From report arrival to review' : 'From action request to resolution'}</div>
-            </div>
-          </section>
-        )}
-
-        {darogaKpis && (
-          <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm">
-              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-700">Target Met (100%)</div>
-              <div className="mt-1.5 text-2xl font-black text-slate-950">{darogaKpis.targetMet}</div>
-              <div className="text-[10px] font-bold text-slate-400">Darogas who delivered their full target</div>
-            </div>
-            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
-              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-indigo-700">Inspections vs Target</div>
-              <div className="mt-1.5 text-2xl font-black text-slate-950">
-                {Math.round(darogaKpis.completed).toLocaleString('en-IN')}
-                <span className="text-sm font-bold text-slate-400"> / {Math.round(darogaKpis.required).toLocaleString('en-IN')}</span>
-              </div>
-              <div className="text-[10px] font-bold text-slate-400">Counted up to each day&apos;s target</div>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">On Default Target</div>
-              <div className="mt-1.5 text-2xl font-black text-slate-950">{darogaKpis.defaultTarget}</div>
-              <div className="text-[10px] font-bold text-slate-400">No admin target set: judged on all assigned assets</div>
-            </div>
-          </section>
-        )}
-
-        {/* DIRECTORY */}
-        <section className="mt-4 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-slate-50/80 p-5">
+        {/* SCOPE: applies to all cards and directory */}
+        <section id="performance-scope" aria-label="Review scope" className="mt-5 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_8px_32px_-20px_rgba(15,23,42,0.25)]">
+          <div className="border-b border-slate-100 bg-slate-50/50 p-5 lg:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <UsersRound size={16} className="text-blue-600" />
-                <h3 className="text-sm font-black text-slate-800">User Performance Directory</h3>
+                <h3 className="text-base font-semibold tracking-tight text-slate-900">Review scope</h3>
                 <span className="rounded-full border border-purple-100 bg-purple-50 px-2 py-0.5 text-[9px] font-black text-purple-700">
-                  {filteredRows.length} {roleLabel}
-                  {filteredRows.length === 1 ? '' : 's'}
+                  {matchingRows.length} {roleLabel}
+                  {matchingRows.length === 1 ? '' : 's'}
                 </span>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100/80 p-1">
                 {ROLES.map((role) => (
                   <button
                     key={role.key}
                     type="button"
+                    aria-pressed={roleFilter === role.key}
                     onClick={() => setRoleFilter(role.key)}
-                    className={`rounded-xl px-3 py-2 text-[10px] font-black transition ${
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
                       roleFilter === role.key
-                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg'
-                        : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-white hover:text-indigo-700'
                     }`}
                   >
                     {role.label}
@@ -4110,12 +3639,15 @@ export default function UserPerformanceView({
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="mt-5 grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
               {moduleFilterApplicable && (
+                <label className="block min-w-0 text-xs font-medium text-slate-500">
+                  <span className="mb-2 block">Inspection module</span>
                 <select
+                  aria-label="Inspection module"
                   value={moduleFilter}
                   onChange={(event) => setModuleFilter(event.target.value as 'ALL' | InspectionModuleKey)}
-                  className="h-9 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-[10px] font-black text-slate-600 outline-none transition focus:border-indigo-400 focus:bg-white"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 >
                   <option value="ALL">All Modules</option>
                   {INSPECTION_MODULES.map((module) => (
@@ -4124,9 +3656,45 @@ export default function UserPerformanceView({
                     </option>
                   ))}
                 </select>
+                </label>
               )}
 
-              <div className="relative ml-auto">
+              <label className="block min-w-0 text-xs font-medium text-slate-500">
+              <span className="mb-2 block">Zone</span>
+              <select aria-label="Filter by zone" value={zoneFilter} onChange={(event) => { setZoneFilter(event.target.value); setWardFilter(''); }} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                <option value="">All Zones</option>
+                {zoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
+              </select>
+              </label>
+              <label className="block min-w-0 text-xs font-medium text-slate-500">
+              <span className="mb-2 block">Ward</span>
+              <select aria-label="Filter by ward" value={wardFilter} onChange={(event) => setWardFilter(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                <option value="">All Wards</option>
+                {wardOptions.map((ward) => <option key={ward} value={ward}>{ward}</option>)}
+              </select>
+              </label>
+              <label className="block min-w-0 text-xs font-medium text-slate-500">
+              <span className="mb-2 block">Sort by</span>
+              <select data-native-select data-no-sort aria-label="Sort users by" value={sortField} onChange={(event) => setSortField(event.target.value as DirectorySort)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                <option value="performance">{isDarogaView ? 'Target achieved (%)' : 'On-time performance (%)'}</option>
+                <option value="name">User name</option>
+                <option value="zone">Zone</option>
+                <option value="ward">Ward</option>
+                {isDarogaView && <><option value="target">Required inspections</option><option value="achieved">Inspections counted</option><option value="shortfall">Inspections still required</option></>}
+                {isTimedView && <><option value="due">Scored reports</option><option value="onTime">Completed on time</option><option value="late">Completed late</option><option value="overdue">Overdue reports</option><option value="inProgress">Pending within deadline</option><option value="backlog">Older overdue backlog</option></>}
+              </select>
+              </label>
+              <label className="block min-w-0 text-xs font-medium text-slate-500">
+              <span className="mb-2 block">Order</span>
+              <select data-native-select data-no-sort aria-label="Sort direction" value={sortDirection} onChange={(event) => setSortDirection(event.target.value as 'asc' | 'desc')} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                <option value="desc">{['name', 'zone', 'ward'].includes(sortField) ? 'Z to A / 9 to 1' : 'Highest to lowest'}</option>
+                <option value="asc">{['name', 'zone', 'ward'].includes(sortField) ? 'A to Z / 1 to 9' : 'Lowest to highest'}</option>
+              </select>
+              </label>
+
+              <label className="block min-w-0 text-xs font-medium text-slate-500">
+              <span className="mb-2 block">Search users</span>
+              <div className="relative">
                 <Search
                   size={13}
                   className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -4134,12 +3702,13 @@ export default function UserPerformanceView({
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder={`Search ${roleLabel.toLowerCase()} name, zone, ward...`}
-                  className="h-9 w-64 rounded-xl border border-slate-200 bg-slate-50/70 pl-8 pr-8 text-[10px] font-bold text-slate-700 outline-none transition focus:border-indigo-400 focus:bg-white"
+                  placeholder="Name, zone or ward"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-8 text-xs text-slate-800 outline-none transition hover:border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                 />
                 {search && (
                   <button
                     type="button"
+                    aria-label="Clear user search"
                     onClick={() => setSearch('')}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600"
                   >
@@ -4147,10 +3716,12 @@ export default function UserPerformanceView({
                   </button>
                 )}
               </div>
+              </label>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
               <CalendarDays size={13} className="text-indigo-600" />
+              <span className="mr-1 text-xs font-medium text-slate-500">Period</span>
               {DRAWER_PRESETS.map(([key, label]) => (
                 <button
                   key={key}
@@ -4163,10 +3734,10 @@ export default function UserPerformanceView({
               ))}
               <input
                 type="date"
+                aria-label="Period start date"
                 value={appliedFrom}
                 max={appliedTo || undefined}
                 onChange={(event) => {
-                  setFrom(event.target.value);
                   setAppliedFrom(event.target.value);
                 }}
                 className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 outline-none focus:border-indigo-400"
@@ -4174,10 +3745,10 @@ export default function UserPerformanceView({
               <span className="text-[10px] font-bold text-slate-400">to</span>
               <input
                 type="date"
+                aria-label="Period end date"
                 value={appliedTo}
                 min={appliedFrom || undefined}
                 onChange={(event) => {
-                  setTo(event.target.value);
                   setAppliedTo(event.target.value);
                 }}
                 className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 outline-none focus:border-indigo-400"
@@ -4191,52 +3762,176 @@ export default function UserPerformanceView({
               </span>
             </div>
 
-            <div className="mt-3 text-[9px] font-bold text-slate-400">
-              Showing {filteredRows.length > 0 ? pageStart + 1 : 0} -{' '}
-              {Math.min(pageStart + PAGE_SIZE, filteredRows.length)} of {filteredRows.length} matching{' '}
-              {roleLabel}s
-            </div>
+            <details className="mt-3 text-xs leading-5 text-slate-500">
+              <summary className="w-fit cursor-pointer font-medium text-slate-600">How filters and ranks work</summary>
+              <p className="mt-2 max-w-3xl">Area filters select users working in that zone or ward. Each user&apos;s score covers their full assigned area for the selected module and dates. Cards summarize the matching users. Changing the display order does not change their performance rank.</p>
+            </details>
+            <div className="mt-3 flex justify-end"><button type="button" onClick={resetFilters} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Reset all filters</button></div>
           </div>
 
+        </section>
+
+        {isTimedView && <TimedPerformanceOverview
+          role={isSiView ? 'QC' : 'ACTION_OFFICER'}
+          rows={matchingRows}
+          moduleFilter={moduleFilter}
+          fromDate={appliedFrom}
+          toDate={appliedTo}
+          onReview={reviewGroup}
+          onOpen={(key) => { const row = matchingRows.find((entry) => entry.key === key); if (row) setActiveRow(row); }}
+        />}
+        {!isTimedView && !isDarogaView && <section aria-label="Performance overview" className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-xs font-semibold text-slate-600">Users in this review</p><p className="mt-3 text-3xl font-semibold text-slate-950">{matchingRows.length}</p></div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-xs font-semibold text-slate-600">Average performance</p><p className="mt-3 text-3xl font-semibold text-slate-950">{percentText(avgPerformance)}</p></div>
+        </section>}
+
+        {darogaKpis && (
+          <section aria-label="Daroga performance overview" className="mt-7">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 px-1">
+              <div><div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-600">Delivery overview</div><h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">How is the team performing?</h2></div>
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600"><CalendarDays size={13} />{appliedFrom && appliedTo ? `${formatDate(appliedFrom)} to ${formatDate(appliedTo)}` : 'Select a complete date range'}</div>
+            </div>
+            <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.4fr)]">
+              <div className="relative overflow-hidden rounded-3xl bg-[#111c3a] p-6 text-white shadow-[0_16px_40px_-20px_rgba(17,28,58,0.5)] lg:p-7">
+                <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500/15 blur-3xl" />
+                <div className="relative">
+                  <div className="flex items-center gap-2 text-sm font-medium text-indigo-100"><Target size={17} className="text-indigo-300" />Overall inspection completion</div>
+                  <div className="mt-5 flex flex-wrap items-baseline gap-3"><span className="text-6xl font-semibold tracking-[-0.05em]">{percentText(darogaKpis.required > 0 ? darogaKpis.completed / darogaKpis.required * 100 : null)}</span><span className="text-sm text-slate-300">of the combined inspection target</span></div>
+                  <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Combined inspection target completed" aria-valuemin={0} aria-valuemax={100} aria-valuenow={darogaKpis.required > 0 ? clamp(darogaKpis.completed / darogaKpis.required * 100) : 0}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-cyan-300 transition-all" style={{ width: `${darogaKpis.required > 0 ? clamp(darogaKpis.completed / darogaKpis.required * 100) : 0}%` }} />
+                  </div>
+                  <div className="mt-6 grid grid-cols-3 gap-3 border-t border-white/10 pt-5">
+                    {[
+                      ['Required', darogaKpis.required, 'inspections'],
+                      ['Counted', darogaKpis.completed, 'toward targets'],
+                      ['Still required', Math.max(0, darogaKpis.required - darogaKpis.completed), 'inspections'],
+                    ].map(([label, value, unit]) => <div key={String(label)}><p className="text-[11px] text-slate-300">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums tracking-tight lg:text-2xl">{Number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p><p className="mt-1 text-[10px] text-slate-400">{unit}</p></div>)}
+                  </div>
+                  <p className="mt-5 border-t border-white/10 pt-4 text-xs leading-5 text-slate-300">Calculated as (counted inspections / required inspections) x 100. Repeated or extra work cannot increase a target beyond 100%.</p>
+                  {appliedFrom && appliedTo && appliedFrom <= toDateInput(new Date()) && appliedTo >= toDateInput(new Date()) && <p className="mt-3 rounded-xl bg-white/5 px-3 py-2 text-xs leading-5 text-indigo-200">Today is included. Its daily target is counted, while inspections may still be in progress.</p>}
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <button type="button" onClick={() => reviewGroup('all')} className="group rounded-2xl border border-slate-200/80 bg-white p-5 text-left shadow-[0_4px_20px_-14px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-indigo-200 focus-visible:ring-2 focus-visible:ring-indigo-400">
+                  <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-600">Darogas in this review</span><span className="rounded-lg bg-indigo-50 p-2 text-indigo-600"><Users size={16} /></span></div>
+                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{matchingRows.length}<span className="ml-2 text-xs font-normal text-slate-400">Darogas</span></p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">{matchingRows.filter((row) => row.performance !== null).length} with a score; {darogaKpis.noTarget} with no requirement{darogaKpis.unavailable > 0 ? `; ${darogaKpis.unavailable} not calculated` : ''}</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600">View everyone <ChevronRight size={13} /></span>
+                </button>
+                <button type="button" onClick={() => reviewGroup('attention')} className="group rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-50/70 to-white p-5 text-left shadow-[0_4px_20px_-14px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-rose-200 focus-visible:ring-2 focus-visible:ring-rose-400">
+                  <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-rose-800">Below 80% achievement</span><span className="rounded-lg bg-rose-100/70 p-2 text-rose-600"><TriangleAlert size={16} /></span></div>
+                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{belowHalf}<span className="ml-2 text-xs font-normal text-slate-500">Darogas</span></p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Have a target but completed less than 80%. Review incomplete work before following up.</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-rose-700">Review these users <ChevronRight size={13} /></span>
+                </button>
+                <button type="button" onClick={() => reviewGroup('zero')} className="group rounded-2xl border border-slate-200/80 bg-white p-5 text-left shadow-[0_4px_20px_-14px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-amber-200 focus-visible:ring-2 focus-visible:ring-amber-400">
+                  <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-600">No inspections counted</span><span className="rounded-lg bg-amber-50 p-2 text-amber-600"><ClipboardList size={16} /></span></div>
+                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{darogaKpis.noCredit}<span className="ml-2 text-xs font-normal text-slate-400">Darogas</span></p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Have an inspection target, but no inspections counted toward it. Included in the below-80% group.</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-700">Check their records <ChevronRight size={13} /></span>
+                </button>
+                <button type="button" disabled={!topPerformer} onClick={() => topPerformer && setActiveRow(topPerformer)} className="group rounded-2xl border border-slate-200/80 bg-white p-5 text-left shadow-[0_4px_20px_-14px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-indigo-200 focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:opacity-60">
+                  <div className="flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-600">Highest individual achievement</span><span className="rounded-lg bg-violet-50 p-2 text-violet-600"><Trophy size={16} /></span></div>
+                  <p className="mt-3 truncate text-lg font-semibold tracking-tight text-slate-950">{topPerformer?.label || 'No eligible user'}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2"><span className="text-xl font-semibold tabular-nums text-slate-900">{percentText(topPerformer?.performance)}</span>{topPerformer && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${darogaTier(topPerformer.performance).tone}`}>{(topPerformer.performance ?? 0) < 80 ? 'Still below 80%' : darogaTier(topPerformer.performance).label}</span>}</div>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Highest score in this review. Ranking first does not mean the target has been met.</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600">Open performance <ChevronRight size={13} /></span>
+                </button>
+              </div>
+            </div>
+            {darogaKpis.unavailable > 0 && <div role="status" className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><TriangleAlert size={16} className="mt-0.5 shrink-0" /><p>Totals are incomplete. Performance could not be calculated for {darogaKpis.unavailable} Darogas. Select a complete date range and refresh before comparing users.</p></div>}
+            <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-slate-900">Where the team stands</h3><p className="mt-1 text-xs text-slate-500">Every Daroga belongs to one group below. Select a group to see the users.</p></div><span className="text-xs text-slate-500">{darogaKpis.targetMet} of {matchingRows.filter((row) => row.performance !== null).length} scored Darogas met their full target</span></div>
+              <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+                {([
+                  ['met', '100% completed', 'bg-emerald-500'], ['onTrack', '80% to below 100%', 'bg-blue-500'], ['attention', 'Below 80%', 'bg-rose-500'], ['noTarget', 'No requirement', 'bg-slate-300'], ['unavailable', 'Not calculated', 'bg-amber-400'],
+                ] as [PerformanceFocus, string, string][]).map(([key, label, color]) => <button key={key} type="button" onClick={() => reviewGroup(key)} className="flex items-center justify-between gap-2 rounded-xl border border-transparent bg-slate-50 px-3 py-3 text-left transition hover:border-slate-200 hover:bg-white focus-visible:ring-2 focus-visible:ring-indigo-400"><span className="flex items-center gap-2 text-[11px] font-medium text-slate-600"><span className={`h-2 w-2 shrink-0 rounded-full ${color}`} />{label}</span><span className="text-lg font-semibold tabular-nums text-slate-900">{matchingRows.filter((row) => matchesPerformanceFocus(row, key, roleFilter)).length}</span></button>)}
+              </div>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+              <div className="border-b border-slate-100 px-5 py-4"><h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Info size={16} className="text-indigo-500" />Understand the numbers</h3><p className="mt-1 text-xs leading-5 text-slate-500">Targets and scores use the selected module and dates. Area filters select users; each score includes that user's full assigned area.</p></div>
+              <div className="grid divide-y divide-slate-100 md:grid-cols-3 md:divide-x md:divide-y-0">
+                <div className="p-5"><p className="text-xs font-semibold text-slate-800">{darogaKpis.defaultTarget} Darogas use standard daily targets</p><p className="mt-2 text-xs leading-5 text-slate-500">The admin has not set a custom target. Each Daroga must inspect all assigned assets daily. 10 assets x 7 days = 70 required inspections.</p></div>
+                <div className="p-5"><p className="text-xs font-semibold text-slate-800">{darogaKpis.noTarget} Darogas have no inspection requirement</p><p className="mt-2 text-xs leading-5 text-slate-500">Their target is zero for this module and period. They are excluded from average achievement and attention counts.</p><button type="button" onClick={() => reviewGroup('noTarget')} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600">Review assignments <ChevronRight size={12} /></button></div>
+                <div className="p-5"><p className="text-xs font-semibold text-slate-800">{percentText(avgPerformance)} average individual achievement</p><p className="mt-2 text-xs leading-5 text-slate-500">Add the {matchingRows.filter((row) => row.performance !== null).length} eligible users' achievement percentages, then divide by that number of users. Each person has equal weight. Overall completion above gives more weight to larger targets.</p></div>
+              </div>
+              <details className="group border-t border-slate-100 bg-slate-50/50 px-5 py-4"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">How inspections, dates and missing information affect the score<ChevronDown size={14} className="shrink-0 transition group-open:rotate-180" /></summary>
+                <div className="mt-4 grid gap-5 text-xs leading-5 text-slate-500 md:grid-cols-3">
+                  <div><h4 className="font-semibold text-slate-800">Which inspections count?</h4><p className="mt-1">The score counts inspections of assigned assets, with each asset counted once per day. Credit is capped at the applicable daily, weekly or monthly target. The totals add each user's target and counted work; shared assignments may contribute to more than one user.</p></div>
+                  <div><h4 className="font-semibold text-slate-800">What does the period include?</h4><p className="mt-1">Dates are inclusive. Future days are excluded from calculated targets. If today is included, its daily target is included even while work is in progress. Daily targets met only measures daily targets; weekly and monthly targets contribute to the overall score.</p></div>
+                  <div><h4 className="font-semibold text-slate-800">Does missing data mean zero work?</h4><p className="mt-1">No. Not calculated means the performance response or a complete date range is missing. No requirement means the calculated target is zero. Neither is a zero score. Check dates, refresh, and review asset assignments where needed.</p></div>
+                </div>
+              </details>
+            </div>
+          </section>
+        )}
+
+        {/* DIRECTORY */}
+        <section ref={directoryRef} id="performance-directory" className="mt-6 scroll-mt-6 overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_8px_32px_-20px_rgba(15,23,42,0.25)]">
+          <div className="border-b border-slate-100 p-5 lg:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-lg font-semibold tracking-tight text-slate-900">Performance directory</h2><p className="mt-1 text-xs text-slate-500">See the reason for each assessment, then open the records to investigate.</p></div>
+              <span aria-live="polite" className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">{filteredRows.length ? pageStart + 1 : 0} to {Math.min(pageStart + PAGE_SIZE, filteredRows.length)} of {filteredRows.length} users</span>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2" aria-label="Focus on a performance group">
+              {([
+                ['all', 'Everyone'], ['attention', 'Needs attention'],
+                ...(isDarogaView ? [['zero', 'No inspections counted']] : []),
+                ...(isTimedView ? [['overdue', 'Overdue work'], ['pending', 'Within deadline'], ['late', 'Completed late'], ['backlog', 'Older backlog'], ['onTime', 'Completed on time']] : []),
+                ['met', isDarogaView ? 'Target completed' : 'All work on time'],
+                ...(isDarogaView ? [['onTrack', 'Partly completed']] : []), ['noTarget', isDarogaView ? 'No requirement' : 'Nothing scored yet'], ['unavailable', 'Not calculated'],
+              ] as [PerformanceFocus, string][]).map(([key, label]) => (
+                <button key={key} type="button" aria-pressed={performanceFocus === key} onClick={() => setPerformanceFocus(key)} className={`rounded-full border px-3 py-2 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${performanceFocus === key ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50'}`}>
+                  {label} <span className={`ml-1.5 tabular-nums ${performanceFocus === key ? 'text-indigo-100' : 'text-slate-400'}`}>{matchingRows.filter((row) => matchesPerformanceFocus(row, key, roleFilter)).length}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs leading-5 text-slate-500">Cards above summarize everyone in the review scope. These buttons narrow only this directory. Performance ranks stay the same when you change the display order.</p>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-xs">
+            <table className="w-full min-w-[1380px] text-left text-xs">
               <thead className="bg-white">
-                <tr className="border-b border-slate-200 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                <tr className="border-b border-slate-200 bg-slate-50/60 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <th className="w-12 p-4 text-center">Rank</th>
                   <th className="p-4">Name</th>
                   <th className="p-4">Zone</th>
                   <th className="p-4">Ward</th>
                   {isTimedView ? (
                     <>
-                      <th className="p-4">Reports Due</th>
-                      <th className="p-4">On Time</th>
+                      <th className="p-4" title="On-time completions + late completions + overdue reports. Pending work still within its deadline is excluded.">Scored reports</th>
+                      <th className="p-4">{isSiView ? 'Reviewed' : 'Resolved'}</th>
                       <th className="p-4">Overdue</th>
+                      <th className="p-4">Pending within deadline</th>
                     </>
                   ) : isDarogaView ? (
                     <>
-                      <th className="p-4">Target</th>
-                      <th className="p-4">Achieved</th>
-                      <th className="p-4">Days Met</th>
+                      <th className="p-4">Required inspections</th>
+                      <th className="p-4" title="Inspections that count toward the assigned daily, weekly or monthly target">Inspections counted</th>
+                      <th className="p-4">Still required</th>
+                      <th className="p-4" title="Days when the daily target was fully completed. Weekly and monthly targets are included in overall achievement separately.">Daily targets met</th>
                     </>
                   ) : (
                     <th className="p-4">Modules</th>
                   )}
                   <th className="p-4">{isDarogaView ? 'Achievement' : isSiView ? 'On-Time Review' : isIecView ? 'On-Time Resolution' : 'Performance'}</th>
                   {!isDarogaView && !isTimedView && <th className="p-4">Attendance</th>}
+                  <th className="min-w-[230px] p-4">Assessment & next step</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {pagedRows.map((row, index) => (
+                {pagedRows.map((row) => {
+                  const assessment = performanceAssessment(row, roleFilter);
+                  return (
                   <tr key={row.key} className="transition hover:bg-slate-50">
-                    <td className="p-4 text-center font-black text-slate-400">#{pageStart + index + 1}</td>
+                    <td className="p-4 text-center font-black text-slate-400">{performanceRanks.has(row.key) ? `#${performanceRanks.get(row.key)}` : '-'}</td>
 
                     <td className="p-4">
                       <button
                         type="button"
                         onClick={() => setActiveRow(row)}
-                        className="text-left text-[11px] font-black text-blue-600 hover:text-blue-700 hover:underline"
+                        className="text-left text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
                       >
                         {row.label || `Unnamed ${roleLabel}`}
                       </button>
@@ -4245,7 +3940,7 @@ export default function UserPerformanceView({
                     {[row.zones, row.wards].map((names, columnIndex) => (
                       <td key={columnIndex} className="p-4">
                         {names.length ? (
-                          <div className="flex items-start gap-1 text-[9px] font-bold uppercase text-slate-500">
+                          <div title={names.join(', ')} className="flex items-start gap-1 text-[11px] font-medium text-slate-500">
                             <MapPin size={9} className="mt-0.5 shrink-0" />
                             <span>
                               {names.slice(0, 3).join(', ')}
@@ -4261,16 +3956,20 @@ export default function UserPerformanceView({
                     {isTimedView ? (
                       <>
                         <td className="p-4 text-[10px] font-black text-slate-900">{(row.si ?? row.iec) ? (row.si ?? row.iec)!.due.toLocaleString('en-IN') : '-'}</td>
-                        <td className="p-4 text-[10px] font-black text-emerald-700">{(row.si ?? row.iec) ? (row.si ?? row.iec)!.onTime.toLocaleString('en-IN') : '-'}</td>
-                        <td className="p-4 text-[10px] font-black text-rose-600">{(row.si ?? row.iec) ? (row.si ?? row.iec)!.overdue.toLocaleString('en-IN') : '-'}</td>
+                        <td className="p-4 text-[11px] font-semibold text-emerald-700">{(row.si ?? row.iec) ? <><span>{(row.si ?? row.iec)!.onTime.toLocaleString('en-IN')} on time</span><span className="mt-1 block text-amber-700">{(row.si ?? row.iec)!.late.toLocaleString('en-IN')} late</span></> : '-'}</td>
+                        <td className="p-4 text-[11px] font-semibold text-rose-600">{(row.si ?? row.iec) ? <><span>{(row.si ?? row.iec)!.overdue.toLocaleString('en-IN')}</span><span className="mt-1 block text-[10px] font-normal text-slate-500">includes {(row.si ?? row.iec)!.backlogOverdue.toLocaleString('en-IN')} older</span></> : '-'}</td>
+                        <td className="p-4 text-[11px] font-semibold text-indigo-700">{(row.si ?? row.iec)?.inProgress.toLocaleString('en-IN') ?? '-'}</td>
                       </>
                     ) : isDarogaView ? (
                       <>
                         <td className="p-4 text-[10px] font-black text-slate-900">
-                          {row.coverage?.required != null ? Math.round(row.coverage.required).toLocaleString('en-IN') : '-'}
+                          {row.coverage?.required != null ? row.coverage.required.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-'}
                         </td>
                         <td className="p-4 text-[10px] font-black text-slate-900">
-                          {row.coverage ? Math.round(row.coverage.completed).toLocaleString('en-IN') : '-'}
+                          {row.coverage ? row.coverage.completed.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-'}
+                        </td>
+                        <td className="p-4 text-[10px] font-black text-rose-600">
+                          {row.coverage?.required != null ? Math.max(0, row.coverage.required - row.coverage.completed).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-'}
                         </td>
                         <td className="p-4 text-[10px] font-black text-slate-900">
                           {row.coverage?.daysWithTarget ? `${row.coverage.daysMet}/${row.coverage.daysWithTarget}` : '-'}
@@ -4311,11 +4010,6 @@ export default function UserPerformanceView({
                         <span className="text-[10px] font-black text-slate-900">
                           {percentText(row.performance)}
                         </span>
-                        {isDarogaView && (
-                          <span className={`rounded-md border px-1.5 py-0.5 text-[8px] font-black ${darogaTier(row.performance).tone}`}>
-                            {darogaTier(row.performance).label}
-                          </span>
-                        )}
                       </div>
                     </td>
 
@@ -4323,23 +4017,30 @@ export default function UserPerformanceView({
                       <td className="p-4 text-[10px] font-black text-slate-900">{percentText(row.attendance)}</td>
                     )}
 
+                    <td className="max-w-[280px] p-4">
+                      <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${assessment.tone}`}>{assessment.label}</span>
+                      <p className="mt-2 text-[11px] leading-5 text-slate-600">{assessment.reason}</p>
+                      <p className="mt-1 text-[11px] leading-5 text-slate-500"><span className="font-medium text-slate-700">Next: </span>{assessment.nextStep}</p>
+                    </td>
                     <td className="p-4 text-right">
                       <button
                         type="button"
+                        aria-label={`Review performance for ${row.label}`}
                         onClick={() => setActiveRow(row)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-100 bg-indigo-50/50 px-2.5 py-1.5 text-[10px] font-black text-indigo-600 shadow-sm transition hover:bg-indigo-100"
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-100"
                       >
                         <Activity size={12} />
-                        Performance
+                        Review details
                       </button>
                     </td>
                   </tr>
-                ))}
+                ); })}
 
                 {pagedRows.length === 0 && (
                   <tr>
-                    <td colSpan={isDarogaView || isTimedView ? 9 : 8} className="py-14 text-center text-[10px] font-bold text-slate-400">
-                      No {roleLabel.toLowerCase()}s match the selected search.
+                    <td colSpan={isDarogaView || isTimedView ? 11 : 9} className="py-14 text-center text-sm text-slate-500">
+                      No users in this performance group match your filters.
+                      <button type="button" onClick={() => { setPerformanceFocus('all'); setSearch(''); }} className="mx-auto mt-3 block rounded-xl bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-600">Show everyone in this area</button>
                     </td>
                   </tr>
                 )}
@@ -4350,14 +4051,14 @@ export default function UserPerformanceView({
           {filteredRows.length > 0 && (
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3">
               <span className="text-[10px] font-bold text-slate-500">
-                Page {page} of {totalPages} ({filteredRows.length} total records)
+                Page {currentPage} of {totalPages} ({filteredRows.length} total records)
               </span>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  onClick={() => setPage(Math.max(1, currentPage - 1))}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Previous
@@ -4365,8 +4066,8 @@ export default function UserPerformanceView({
 
                 <button
                   type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next
@@ -4376,7 +4077,7 @@ export default function UserPerformanceView({
           )}
         </section>
 
-        {loading && (
+        {(loading || rosterLoading || ((roleFilter === 'EMPLOYEE' || roleFilter === 'ULB_OFFICER') && detailsStatus === 'loading')) && (
           <div className="pointer-events-none fixed inset-x-0 bottom-0 top-0 z-[70] bg-white/10 backdrop-blur-[1px]">
             <div className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
           </div>
@@ -4384,7 +4085,7 @@ export default function UserPerformanceView({
 
         {activeRow && (
           <UserDetailDrawer
-            row={activeRow}
+            row={activeRoleRows.find((row) => row.key === activeRow.key) || activeRow}
             roleLabel={roleLabel}
             roleKey={roleFilter}
             fromDate={appliedFrom}
@@ -4394,6 +4095,8 @@ export default function UserPerformanceView({
             siStatus={siStatus}
             iecStatus={iecStatus}
             allRecords={filteredRecords}
+            detailsLoading={detailsStatus === 'loading' || detailsStatus === 'idle'}
+            detailsError={detailsStatus === 'error'}
             onClose={() => setActiveRow(null)}
             onOpenRecord={setProofRecord}
           />
