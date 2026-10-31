@@ -5,7 +5,7 @@ import { todayIST } from '../../services/api';
 import { datePreset } from '../../services/presentation';
 import { printElement } from '../../services/print';
 export function CommissionerToolbar({pageId,title,cityName}:{pageId:string;title:string;cityName:string}) {
-  const setupPage=['ca_dashboard','ca_zones_wards','ca_beats','ca_assignments','ca_geo_hierarchy','ca_module_dir','ca_municipal_users','ca_employees','ca_registration_mgmt','ca_logs'].includes(pageId);
+  const setupPage=['ca_dashboard','ca_zones_wards','ca_beats','ca_assignments','ca_geo_hierarchy','ca_module_dir','ca_municipal_users','ca_employees','ca_registration_mgmt','ca_targets','ca_logs'].includes(pageId);
   const receivedPage=/attendance$/.test(pageId)||['prod_plant','comm_plant'].includes(pageId);const range=matrixStore.getDateRange();const [from,setFrom]=useState(range.from),[to,setTo]=useState(range.to),[error,setError]=useState('');
   useEffect(()=>{setFrom(range.from);setTo(range.to);},[range.from,range.to]);
   const choices=[['today','Today'],['yesterday','Yesterday'],['last_7_days','Last 7 days'],['last_30_days','Last 30 days'],['this_month','This month']];
