@@ -34,6 +34,7 @@ import {
   Info,
   Trash2,
   Activity,
+  Plug,
   PlusCircle,
   CheckCircle2,
   ChartNoAxesCombined,
@@ -246,6 +247,7 @@ function PortalHomeLayoutContent({
   const isSystemManagementActive =
     pathname.startsWith('/portal-home/trash') ||
     pathname.startsWith('/portal-home/audit-logs') ||
+    pathname.startsWith('/hms/ranking-api') ||
     pathname === '/portal-home/profile' ||
     pathname === '/profile';
 
@@ -3384,6 +3386,23 @@ function PortalHomeLayoutContent({
                         className={`shrink-0 ${pathname.startsWith('/portal-home/audit-logs') ? 'text-white' : 'text-indigo-500'}`}
                       />
                       <span>Audit Logs</span>
+                    </Link>
+                  )}
+
+                  {isSuperAdmin && (
+                    <Link
+                      href="/hms/ranking-api"
+                      title="Ranking API Integration Health"
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 ${pathname.startsWith('/hms/ranking-api')
+                        ? 'bg-emerald-600 text-white font-bold shadow-sm shadow-emerald-500/20'
+                        : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+                        }`}
+                    >
+                      <Plug
+                        size={15}
+                        className={`shrink-0 ${pathname.startsWith('/hms/ranking-api') ? 'text-white' : 'text-emerald-500'}`}
+                      />
+                      <span>Ranking API</span>
                     </Link>
                   )}
                 </div>

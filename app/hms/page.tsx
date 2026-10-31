@@ -46,7 +46,6 @@ import { FormField } from "@components/ui/FormField";
 import type { CityAdminInfo, CityMasterNode, CityRow, MasterNode } from "../../types/api";
 import { TrendAreaChart, DonutChart, ChartLegend } from "@components/ui/Charts";
 import { Sparkline } from "@components/ui/Sparkline";
-import { RankingGatewayHealthCard } from "@components/ranking/RankingGatewayHealthCard";
 
 type CityCreateInput = {
   stateId: string;
@@ -2310,8 +2309,6 @@ export default function HmsDashboardPage() {
           </div>
         </form>
       </Modal>
-
-      <RankingGatewayHealthCard />
 
       {editingCity && (
         <EditCityModal city={editingCity} states={states} onClose={() => setEditingCity(null)} onSave={handleUpdateCity} />

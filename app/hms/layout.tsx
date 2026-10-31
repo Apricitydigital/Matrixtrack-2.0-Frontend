@@ -32,6 +32,12 @@ const PAGE_META: Record<
     crumb: "City Modules",
   },
 
+  "/hms/ranking-api": {
+    title: "Ranking API",
+    subtitle: "Connection health of the external Ward Ranking API.",
+    crumb: "Ranking API",
+  },
+
   "/hms/city-admins": {
     title: "City Administrators",
     subtitle: "Manage credentials for city-level administrators.",
