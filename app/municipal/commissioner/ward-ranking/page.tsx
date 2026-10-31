@@ -1,5 +1,5 @@
-import WardRankingWorkspace from '../../../ulb/ward-ranking/WardRankingWorkspace';
+import RankingApiWorkspace from '../../../ulb/ward-ranking/RankingApiWorkspace';
 
 export default function Page() {
-  return <WardRankingWorkspace />;
+  return <RankingApiWorkspace />;
 }

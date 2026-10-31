@@ -8,8 +8,8 @@ import {
 import PortalHomeLayout
   from '@components/PortalHomeLayout';
 
-import WardRankingWorkspace
-  from './WardRankingWorkspace';
+import RankingApiWorkspace
+  from './RankingApiWorkspace';
 
 export default function Page() {
   return (
@@ -24,7 +24,7 @@ export default function Page() {
       >
         <PortalHomeLayout>
           <Suspense fallback={null}>
-            <WardRankingWorkspace />
+            <RankingApiWorkspace />
           </Suspense>
         </PortalHomeLayout>
       </RoleGuard>
