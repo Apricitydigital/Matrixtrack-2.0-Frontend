@@ -10,18 +10,78 @@ import { RankingGatewayHealthCard } from "@components/ranking/RankingGatewayHeal
 import { useAuth } from "@hooks/useAuth";
 import {
   RankingGatewayApi,
+  type RankingDashboard,
+  type RankingGenericPage,
   type RankingParticipantPage,
   type RankingResponse,
   type RankingSummary,
   type RankingZone,
 } from "@lib/rankingGatewayApi";
 
-type Tab = "rankings" | "areas" | "participants";
+type Tab = "rankings" | "areas" | "participants" | "dashboard" | "assessments" | "scores" | "selfAssessments" | "reviews";
+
+type GenericColumn = { header: string; value: (row: Record<string, any>) => string };
+
+const GENERIC_TABS: Partial<Record<Tab, { columns: GenericColumn[] }>> = {
+  assessments: {
+    columns: [
+      { header: "Name", value: (r) => r.name || "-" },
+      { header: "Category", value: (r) => r.category || "-" },
+      { header: "Ward", value: (r) => r.ward || "-" },
+      { header: "Stage", value: (r) => String(r.stage || "-").replace(/_/g, " ") },
+      { header: "Approval", value: (r) => r.approvalStatus || "-" },
+      { header: "QC done", value: (r) => (r.qcReviewComplete ? "Yes" : "No") },
+    ],
+  },
+  scores: {
+    columns: [
+      { header: "Rank", value: (r) => (r.rankInCategory ? `#${r.rankInCategory}` : "-") },
+      { header: "Name", value: (r) => r.name || "-" },
+      { header: "Category", value: (r) => r.category || "-" },
+      { header: "Avg score", value: (r) => String(r.combinedAverage?.average ?? "-") },
+      { header: "Avg %", value: (r) => String(r.combinedAverage?.averagePercentage ?? "-") },
+      { header: "Self-assessment", value: (r) => String(r.selfAssessment?.verifiedScore ?? "-") },
+    ],
+  },
+  selfAssessments: {
+    columns: [
+      { header: "Name", value: (r) => r.name || "-" },
+      { header: "Category", value: (r) => r.category || "-" },
+      { header: "Status", value: (r) => r.status || "-" },
+      { header: "QC", value: (r) => r.qcStatus || "-" },
+      { header: "Verified score", value: (r) => String(r.verifiedScore ?? "-") },
+      { header: "Submitted", value: (r) => (r.submittedAt ? String(r.submittedAt).slice(0, 10) : "-") },
+    ],
+  },
+  reviews: {
+    columns: [
+      { header: "Name", value: (r) => r.name || "-" },
+      { header: "Category", value: (r) => r.category || "-" },
+      { header: "Survey", value: (r) => String(r.fieldSurveyNo ?? "-") },
+      { header: "Approval", value: (r) => String(r.approvalStatus || "-").replace(/_/g, " ") },
+      { header: "QC", value: (r) => r.qcStatus || "-" },
+      { header: "Verified", value: (r) => String(r.verifiedScore ?? "-") },
+      { header: "Assessor", value: (r) => String(r.assessorScore ?? "-") },
+    ],
+  },
+};
+
+const GENERIC_LOADERS: Record<string, (category: string | undefined, page: number, size: number) => Promise<RankingGenericPage>> = {
+  assessments: RankingGatewayApi.assessments,
+  scores: RankingGatewayApi.scores,
+  selfAssessments: RankingGatewayApi.selfAssessments,
+  reviews: RankingGatewayApi.reviewRecords,
+};
 
 const PAGE_SIZE = 25;
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: "dashboard", label: "Dashboard" },
   { key: "rankings", label: "Rankings" },
+  { key: "scores", label: "Verified Scores" },
+  { key: "assessments", label: "Assessments" },
+  { key: "selfAssessments", label: "Self-Assessments" },
+  { key: "reviews", label: "QC Review Records" },
   { key: "areas", label: "Zones & Wards" },
   { key: "participants", label: "Participants" },
 ];
@@ -49,7 +109,9 @@ export default function RankingApiWorkspace() {
     .filter(Boolean)
     .some((role) => /HMS|SUPER_ADMIN/i.test(String(role)));
 
-  const [tab, setTab] = useState<Tab>("rankings");
+  const [tab, setTab] = useState<Tab>("dashboard");
+  const [dashboard, setDashboard] = useState<RankingDashboard | null>(null);
+  const [generic, setGeneric] = useState<RankingGenericPage | null>(null);
   const [summary, setSummary] = useState<RankingSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [category, setCategory] = useState<string>("");
@@ -70,11 +132,13 @@ export default function RankingApiWorkspace() {
   }, []);
 
   const loadTab = useCallback(async () => {
-    if (!category && tab !== "areas") return;
+    if (!category && tab !== "areas" && tab !== "dashboard") return;
     setLoading(true);
     setError(null);
     try {
-      if (tab === "rankings") setRankings(await RankingGatewayApi.rankings(category, 100));
+      if (tab === "dashboard") setDashboard(await RankingGatewayApi.dashboard());
+      else if (GENERIC_LOADERS[tab]) setGeneric(await GENERIC_LOADERS[tab](category, page, PAGE_SIZE));
+      else if (tab === "rankings") setRankings(await RankingGatewayApi.rankings(category, 100));
       else if (tab === "areas") setZones((await RankingGatewayApi.zones()).data);
       else setParticipants(await RankingGatewayApi.participants(category, page, PAGE_SIZE));
     } catch (err: any) {
@@ -141,7 +205,7 @@ export default function RankingApiWorkspace() {
               </button>
             ))}
           </div>
-          {tab !== "areas" && summary && (
+          {tab !== "areas" && tab !== "dashboard" && summary && (
             <select
               className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
               value={category}
@@ -198,6 +262,85 @@ export default function RankingApiWorkspace() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </>
+            )
+          )}
+
+          {!loading && tab === "dashboard" && dashboard && (
+            <div className="space-y-4">
+              <p className="text-xs text-slate-400">{dashboard.population}</p>
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {Object.entries(dashboard.stages).map(([key, val]) => (
+                  <Stat
+                    key={key}
+                    label={key.replace(/_/g, " ")}
+                    value={typeof val === "number" ? val : val.count}
+                    hint={typeof val === "number" ? undefined : `${val.percent}%`}
+                  />
+                ))}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs uppercase text-slate-400">
+                    <tr>
+                      <th className="py-2 pr-3">Category</th>
+                      <th className="py-2 pr-3 text-right">Total</th>
+                      <th className="py-2 pr-3 text-right">Done</th>
+                      <th className="py-2 pr-3 text-right">QC verified</th>
+                      <th className="py-2 pr-3 text-right">QC pending</th>
+                      <th className="py-2 text-right">Completion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.categories.map((c) => (
+                      <tr key={c.category} className="border-t border-slate-100">
+                        <td className="py-2 pr-3 text-slate-800">{c.category}</td>
+                        <td className="py-2 pr-3 text-right">{c.total}</td>
+                        <td className="py-2 pr-3 text-right">{c.done}</td>
+                        <td className="py-2 pr-3 text-right">{c.approvedQcVerified}</td>
+                        <td className="py-2 pr-3 text-right">{c.approvedQcPending}</td>
+                        <td className="py-2 text-right">{c.completionPercent}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {!loading && GENERIC_TABS[tab] && (
+            !generic || generic.data.length === 0 ? (
+              <EmptyState title="No records" />
+            ) : (
+              <>
+                {generic.basis && <p className="mb-2 text-xs text-slate-400">{generic.basis}</p>}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="text-xs uppercase text-slate-400">
+                      <tr>
+                        {GENERIC_TABS[tab]!.columns.map((col) => (
+                          <th key={col.header} className="py-2 pr-3">{col.header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {generic.data.map((row, index) => (
+                        <tr key={row.assessmentId || row.selfAssessmentId || row.participantId || index} className="border-t border-slate-100">
+                          {GENERIC_TABS[tab]!.columns.map((col) => (
+                            <td key={col.header} className="py-2 pr-3 text-slate-700">{col.value(row)}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
+                  <span>Page {generic.page} of {generic.totalPages} · {generic.total} total</span>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+                    <Button variant="secondary" size="sm" disabled={page >= generic.totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
+                  </div>
                 </div>
               </>
             )

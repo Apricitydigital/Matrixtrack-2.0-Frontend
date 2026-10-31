@@ -64,6 +64,21 @@ export type RankingParticipantPage = Envelope & {
   data: RankingParticipant[];
 };
 
+export type RankingRow = Record<string, any>;
+export type RankingGenericPage = Envelope & {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  basis?: string;
+  data: RankingRow[];
+};
+export type RankingDashboard = Envelope & {
+  population?: string;
+  stages: Record<string, number | { count: number; percent: number }>;
+  categories: RankingRow[];
+};
+
 export type RankingGatewayHealth = {
   configured: boolean;
   connected: boolean;
@@ -99,6 +114,15 @@ export const RankingGatewayApi = {
   wards: () => apiFetch<Envelope & { data: RankingWard[] }>(`${BASE}/wards`),
   participants: (category: string | undefined, page: number, pageSize: number) =>
     apiFetch<RankingParticipantPage>(`${BASE}/participants${qs({ category, page, pageSize })}`),
+  dashboard: (category?: string) => apiFetch<RankingDashboard>(`${BASE}/dashboard${qs({ category })}`),
+  assessments: (category: string | undefined, page: number, pageSize: number) =>
+    apiFetch<RankingGenericPage>(`${BASE}/assessments${qs({ category, page, pageSize })}`),
+  selfAssessments: (category: string | undefined, page: number, pageSize: number) =>
+    apiFetch<RankingGenericPage>(`${BASE}/self-assessments${qs({ category, page, pageSize })}`),
+  scores: (category: string | undefined, page: number, pageSize: number) =>
+    apiFetch<RankingGenericPage>(`${BASE}/scores${qs({ category, page, pageSize })}`),
+  reviewRecords: (category: string | undefined, page: number, pageSize: number) =>
+    apiFetch<RankingGenericPage>(`${BASE}/reports/review-records${qs({ category, page, pageSize })}`),
   health: () => apiFetch<RankingGatewayHealth>(`${BASE}/health`),
   clearCache: () => apiFetch<{ ok: boolean }>(`${BASE}/cache/clear`, { method: "POST" }),
 };
