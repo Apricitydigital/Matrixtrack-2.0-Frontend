@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
   };
   return {
     define: {
-      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(env.VITE_API_BASE_URL || (mode === 'production' ? 'https://api.matrixtrack20.in' : '/backend')),
+      'process.env.NEXT_PUBLIC_API_BASE_URL': JSON.stringify(env.NEXT_PUBLIC_API_BASE_URL || env.VITE_API_BASE_URL || (mode === 'production' ? 'https://api.matrixtrack20.in' : '/backend')),
     },
     plugins: [react(), tailwindcss()],
     resolve: {

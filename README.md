@@ -1,6 +1,6 @@
 # MatrixTrack 2.0 Municipal Command Center
 
-React/Vite dashboard connected to the existing MatrixTrack Express backend. PostgreSQL and Prisma remain in that backend. The dashboard no longer seeds demo data or saves changes to localStorage.
+React dashboard hosted by Next.js and connected to the existing MatrixTrack Express backend. PostgreSQL and Prisma remain in that backend. The dashboard no longer seeds demo data or saves changes to localStorage.
 
 ## Run locally
 
@@ -8,9 +8,9 @@ React/Vite dashboard connected to the existing MatrixTrack Express backend. Post
 2. Run `npm install`, then `npm run dev` in this folder.
 3. Open the URL printed by Vite and sign in with an existing Super Admin, City Admin, ULB Officer or Commissioner account.
 
-To use the separate local/test backend, set `MATRIXTRACK_BACKEND_URL=http://127.0.0.1:4000` in `.env.local` and keep that backend running. Its credentials and database may differ from production. Restart Vite after changing configuration. `.env.example` is only a template; editing it does not apply runtime settings. `VITE_API_BASE_URL=/backend` uses the Vite proxy. No database passwords, private API keys or service keys belong in this frontend.
+To use the separate local/test backend, set `MATRIXTRACK_BACKEND_URL=http://127.0.0.1:4000` and `NEXT_PUBLIC_API_BASE_URL=/backend` in `.env.local` and keep that backend running. Its credentials and database may differ from production. Restart the development server after changing configuration. `.env.example` is only a template; editing it does not apply runtime settings. No database passwords, private API keys or service keys belong in this frontend.
 
-For production, set `VITE_API_BASE_URL` to the backend's HTTPS origin before building, or configure your web server to proxy `/backend/*` to the existing backend with that prefix removed. Vite's development proxy is not part of a static production build. The backend must allow the dashboard origin when using a direct URL.
+For production, retain the existing `NEXT_PUBLIC_API_BASE_URL` HTTPS backend setting, or use `/backend` with Next.js's built-in rewrite to `MATRIXTRACK_BACKEND_URL` (default `https://api.matrixtrack20.in`). The backend must allow the dashboard origin when using a direct URL. Existing `VITE_API_BASE_URL` settings remain a fallback during transition.
 
 ## Integration
 
@@ -48,9 +48,11 @@ City onboarding consists of separate backend writes for the city, administrator 
 
 ## Production replacement
 
-This application replaces the earlier Next.js portal at the repository root. Install with `npm ci`, build with `npm run build`, and serve `dist` as a Vite static application with SPA fallback to `index.html`. Existing Next.js build commands, output settings and start services must be changed. `npm start` provides a preview server on port 3000 for validation; use a production static host or reverse proxy for deployment.
+The new dashboard uses the existing Next.js deployment commands: install with `npm ci`, build with `npm run build` (`next build`) and restart the existing service using `npm start` (`next start`). Production output is `.next`. Keep Nginx/CloudFront pointing at the running Next.js service. The root, `/portal-home`, `/unified-login` and existing municipal URLs open the new dashboard with the same role-based authentication and screens. The Next.js shell imports the existing React application and styles without replacing the dashboard UI.
 
-Without a configured API variable, production builds use `https://api.matrixtrack20.in`. Set `VITE_API_BASE_URL` before building to override it. An existing `.env.local` can override this default; `/backend` requires an explicitly configured reverse proxy. Never publish `.env.local`, credentials, local screenshots or private backend source. Existing deployment environments should be reviewed for retained Next.js settings before release.
+The default public API prefix is `/backend`, which the Next.js server proxies to `https://api.matrixtrack20.in`. Set `NEXT_PUBLIC_API_BASE_URL` before building to retain an existing direct API URL. An existing `.env.local` can override this default. Never publish `.env.local`, credentials, local screenshots or private backend source. The server must pull the latest commit, build successfully and restart; pushing GitHub alone does not replace a running process. Invalidate CloudFront after the updated origin is verified.
+
+`npm run dev:vite` and `npm run build:vite` retain the optional Vite workflow for local comparison. Production EC2 uses Next.js. Use Node.js 22.12 or newer for the complete toolchain; the server's actual Node/PM2/Nginx settings still require verification with EC2 access.
 
 `npm test` runs frontend and shared contract checks. To include the six private backend integration checks, set `MATRIXTRACK_BACKEND_SOURCE_DIR` to that repository's `src` directory; otherwise those checks are explicitly skipped. Backend source and source backups are intentionally excluded from the public frontend repository.
 

@@ -1,8 +1,8 @@
-// Database credentials belong to the existing backend, never to this Vite app.
+// Database credentials belong to the existing backend, never to the browser application.
 import {cachedRead,clearReadCache,primeReadCache,readCacheKey,readCacheTtl} from './readCache';
 import {applyFixedWardWeights} from './wardScoring';
 export {clearReadCache};
-export const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL || '/backend').replace(/\/+$/, '');
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || '/backend').replace(/\/+$/, '');
 let cityContext:string|undefined;
 export function setApiCityContext(id?:string){if(cityContext!==id){clearReadCache();cityContext=id;}}
 const TOKEN_KEY = 'matrixtrack_command_access_token';
