@@ -52,7 +52,15 @@ The new dashboard uses the existing Next.js deployment commands: install with `n
 
 The default public API prefix is `/backend`, which the Next.js server proxies to `https://api.matrixtrack20.in`. Set `NEXT_PUBLIC_API_BASE_URL` before building to retain an existing direct API URL. An existing `.env.local` can override this default. Never publish `.env.local`, credentials, local screenshots or private backend source. The server must pull the latest commit, build successfully and restart; pushing GitHub alone does not replace a running process. Invalidate CloudFront after the updated origin is verified.
 
-`npm run dev:vite` and `npm run build:vite` retain the optional Vite workflow for local comparison. Production EC2 uses Next.js. Use Node.js 22.12 or newer for the complete toolchain; the server's actual Node/PM2/Nginx settings still require verification with EC2 access.
+`npm run dev:vite` and `npm run build:vite` retain the optional Vite workflow for local comparison. Production uses Next.js. Use Node.js 22.12 or newer for the complete toolchain; `.nvmrc` selects Node.js 22. The server's actual Node/PM2/Nginx settings still require verification for any self-hosted EC2 installation.
+
+### AWS Amplify Hosting
+
+The provided production logs identify the frontend deployment as AWS Amplify Hosting. `amplify.yml` explicitly runs `npm ci` and `next build` using Node.js 22 and publishes `.next`, matching Amplify's native Next.js SSR adapter. The repository build specification overrides the Amplify console's older build commands and artifact-directory settings. Keep the application on Amplify Hosting compute with Next.js SSR; do not switch it to Vite/static hosting for this configuration.
+
+Redeploy the latest `main` commit. The build log should show `next build` and Next.js routes, followed by successful deployment. Logs showing `vite build` and `dist/assets` describe the earlier build or an explicitly selected Vite command. A successful Vite compile followed by `Failed to find the deploy-manifest.json` is a deployment-output mismatch, not a JavaScript bundle-size failure. Do not fabricate a deployment manifest: Amplify's native Next.js adapter handles deployment packaging from `.next`.
+
+If Amplify still uses an older commit, check the connected repository/branch and deploy the latest commit rather than retrying an old failed job. Build configuration has been prepared and tested locally; AWS deployment status must be verified in the Amplify console.
 
 `npm test` runs frontend and shared contract checks. To include the six private backend integration checks, set `MATRIXTRACK_BACKEND_SOURCE_DIR` to that repository's `src` directory; otherwise those checks are explicitly skipped. Backend source and source backups are intentionally excluded from the public frontend repository.
 
