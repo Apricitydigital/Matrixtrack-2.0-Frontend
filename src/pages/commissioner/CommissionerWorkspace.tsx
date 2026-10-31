@@ -1,0 +1,45 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, FileDown, FileText, Image, LayoutGrid, List, Printer, ShieldCheck, Sparkles } from 'lucide-react';
+import type { City, OperationalReport, User, Ward, Zone, RoleType } from '../../types';
+import { emptyFilters, matchesFilters, MODULE_LABELS, ROLE_LABELS, statusLabel } from '../../services/presentation';
+import { OperationalFilters } from '../../components/common/OperationalFilters';
+import { Pagination, usePagination } from '../../components/common/Pagination';
+import { StatusBadge } from '../../components/common/Badge';
+import { RygLegend } from '../../components/common/RygLegend';
+import { matrixStore } from '../../services/store';
+import { downloadCsv, generateCsv } from '../../services/csv';
+import { printElement } from '../../services/print';
+import { formatDate, printReports } from '../../components/reports/ReportDocument';
+import { ImageLightbox } from '../../components/reports/ImageLightbox';
+import { RegisterInsights } from './RegisterInsights';
+import { reportContacts } from '../../services/reportContacts';
+import { ReportContacts } from '../../components/reports/ReportContacts';
+
+export function officialZoneTotals(data: any) {
+  const result={target:0,completed:0,pending:0,cleaned:0,notCleaned:0,siPending:0,actionRequired:0,actionPending:0,actionTaken:0};
+  for(const z of data.zones || [])for(const row of z.total?[z.total]:(z.modules || []))for(const key of Object.keys(result))result[key]+=Number(row[key]) || 0;
+  return result;
+}
+
+interface Props {city:City;reports:OperationalReport[];zones:Zone[];wards:Ward[];users:User[];onSelectReport:(id:string)=>void;onNavigate?:(id:string)=>void;registryOnly?:boolean;initialFilters?:Partial<ReturnType<typeof emptyFilters>>;role?:RoleType;title?:string;intro?:React.ReactNode;queueNavigation?:React.ReactNode;}
+export function CommissionerWorkspace({city,reports,zones,wards,users,onSelectReport,onNavigate,registryOnly=false,initialFilters,role='COMMISSIONER',title='Inspection Reports',intro,queueNavigation}:Props) {
+  const [filters,setFilters]=useState(()=>({...emptyFilters(),...initialFilters})),[view,setView]=useState<'table'|'images'>('table');
+  const container=useRef<HTMLDivElement>(null);
+  const [photo,setPhoto]=useState<OperationalReport|null>(null);
+  useEffect(()=>{if(matrixStore.getCollection('users').status==='idle')void matrixStore.loadCollection('users');},[city.id,matrixStore.loadRevision]);
+  const rows=reports.filter(r=>r.cityId===city.id && matchesFilters(r,filters,[r.assetName,r.reportNumber,r.submittedByName,r.reviewerName || ''])).sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt));
+  const paging=usePagination(rows,JSON.stringify(filters)+city.id+matrixStore.loadRevision);
+  const range=matrixStore.getDateRange();
+  const exportCsv=()=>downloadCsv(`${role.toLowerCase()}-inspection-reports.csv`,generateCsv(['Report','Module','Location','Zone','Ward','Daroga','Status','Sanitary Inspector','Images','AI review','Responsible officers and contacts'],rows.map(r=>[r.reportNumber,MODULE_LABELS[r.moduleId],r.assetName,zones.find(z=>z.id===r.zoneId)?.name || '',wards.find(w=>w.id===r.wardId)?.name || '',r.submittedByName,statusLabel(r.status),r.reviewerName || '',r.photos.length,r.aiReviews?.map(a=>a.summary).join('; ') || 'Not supplied',reportContacts(r,users).map(c=>`${ROLE_LABELS[c.role] || c.role}: ${c.name} | ${c.phone || 'Phone not supplied'} | ${c.source}`).join('; ')])));
+  return <div ref={container} className="commissioner-workspace space-y-5" data-role-dashboard={role}>
+    <section className="commissioner-heading"><div><div className="commissioner-kicker"><ShieldCheck size={15}/>INSPECTION OVERSIGHT · {city.name}</div><h1>{title}</h1><p>{range.from} — {range.to} <span>Inspection evidence & officer decisions</span></p></div><div className="commissioner-actions no-print"><button onClick={()=>printElement(`${city.name} · Inspection Register`,container.current,`${range.from} to ${range.to} · Visible filtered view`)}><Printer size={15}/>Print register</button>{role==='COMMISSIONER'&&<button className="dark" onClick={()=>onNavigate?.('comm_exec_summary')}><FileText size={15}/>Reports & exports<ArrowUpRight size={13}/></button>}</div></section>{intro}{queueNavigation}
+    <OperationalFilters value={filters} onChange={setFilters} zones={zones.filter(z=>z.cityId===city.id)} wards={wards.filter(w=>w.cityId===city.id)} users={users.filter(u=>u.cityId===city.id)} statuses={['pending_review','approved','rejected','action_required','action_taken','escalated']} resultCount={rows.length}/>
+    <RegisterInsights rows={rows} onStatus={ryg=>setFilters({...filters,status:'all',ryg})} onModule={moduleId=>setFilters({...filters,moduleId,status:'all',ryg:'yellow'})}/><p className="chart-footnote">Charts cover the reports currently in this register. Load more reports to include additional records.</p><RygLegend/>
+    <section className="workspace-panel"><div className="workspace-panel-heading"><div><span className="workspace-eyebrow">INSPECTION REGISTER</span><h2>Inspection register</h2><small className="register-coverage" title="Filters and exports apply to reports currently in this register. Load more to include further reports.">{matrixStore.getCollection('reports').loaded.toLocaleString()} / {matrixStore.getCollection('reports').total.toLocaleString()} reports</small><p className="text-xs text-slate-500 mt-1">Photos · Officer decisions · AI Visual Review · Timeline</p></div><div className="register-tools no-print"><div className="view-switch"><button aria-pressed={view==='table'} aria-label="Table view" onClick={()=>setView('table')}><List size={16}/></button><button aria-pressed={view==='images'} aria-label="Image view" onClick={()=>setView('images')}><LayoutGrid size={16}/></button></div><button onClick={exportCsv} title="Export all filtered loaded records"><FileDown size={15}/>CSV</button><button disabled={!rows.length} onClick={()=>printReports(`${city.name} · Inspection Reports`,rows)}><Printer size={15}/>Print with images</button></div></div>
+      {view==='table' ? <div className="overflow-x-auto"><table className="w-full text-xs text-left commissioner-report-table"><thead><tr><th>Evidence & location</th><th>Module / ward</th><th>Daroga & Sanitary Inspector</th><th>Review status</th><th>Decision & AI</th><th>Report</th></tr></thead><tbody>{paging.rows.map(r=><tr key={r.id}><td><div className="report-cell">{r.photos[0] ? <button className="report-photo-open" aria-label={`Open images for ${r.assetName}`} onClick={()=>setPhoto(r)}><img src={r.photos[0].url} alt={`Evidence: ${r.assetName}`} loading="lazy"/></button> : <span className="photo-placeholder"><Image size={19}/></span>}<span><strong>{r.assetName}</strong><small>{formatDate(r.submittedAt)}</small><small>{r.photos.length} images · {r.reportNumber.slice(0,16)}</small></span></div></td><td><strong>{MODULE_LABELS[r.moduleId]}</strong><small className="block text-slate-500">{wards.find(w=>w.id===r.wardId)?.name || 'Ward not recorded'}</small></td><td><ReportContacts report={r} compact/></td><td><StatusBadge status={r.status}/></td><td><div className="decision-indicators"><span><ShieldCheck size={12}/>{r.decisions?.length || 0} decisions</span><span><Sparkles size={12}/>{r.aiReviews?.length ? 'AI review available':'No AI review'}</span></div></td><td><button className="report-open-button" onClick={()=>onSelectReport(r.id)}>{role==='ULB_OFFICER'&&['approved','rejected'].includes(r.status)?'Review / Action Required':'View report'}<ArrowUpRight size={13}/></button></td></tr>)}</tbody></table></div> : <div className="report-gallery">{paging.rows.map(r=><button key={r.id} onClick={()=>onSelectReport(r.id)} className="report-gallery-card">{r.photos[0] ? <img loading="lazy" src={r.photos[0].url} alt={r.assetName}/> : <div className="gallery-placeholder"><Image size={32}/><span>No image supplied</span></div>}<div><StatusBadge status={r.status}/><h3>{r.assetName}</h3><p>{MODULE_LABELS[r.moduleId]} · {wards.find(w=>w.id===r.wardId)?.name || 'Ward not recorded'}</p><small>{r.submittedByName || 'Not recorded'} · {r.photos.length} images</small><span className="gallery-open">Open full report <ArrowUpRight size={14}/></span></div></button>)}</div>}
+      {!rows.length && <div className="workspace-empty"><FileText size={28}/><h3>No matching inspection reports</h3><p>Change dates or clear filters to review other reports.</p></div>}<Pagination {...paging}/>
+      {matrixStore.getCollection('reports').hasMore && <div className="server-page-control no-print"><span>More reports are available for the selected dates.</span><button disabled={matrixStore.getCollection('reports').status==='loading'} onClick={()=>{void matrixStore.loadMore('reports');}}>{matrixStore.getCollection('reports').status==='loading'?'Loading…':'Load more reports'}</button></div>}
+    </section>
+    <ImageLightbox isOpen={Boolean(photo)} onClose={()=>setPhoto(null)} images={photo?.photos || []}/>
+  </div>;
+}

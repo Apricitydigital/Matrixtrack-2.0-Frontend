@@ -1,0 +1,45 @@
+import React, { useState } from 'react';
+import { ArrowUpRight, Building2, CheckCircle2, Clock3, FileDown, TriangleAlert, UsersRound } from 'lucide-react';
+import type { City, User, RoleType, OperationalReport, Zone, Ward } from '../types';
+import { emptyFilters, matchesFilters, MODULE_LABELS, ROLE_LABELS, statusTone } from '../services/presentation';
+import { matrixStore } from '../services/store';
+import { generateCsv, downloadCsv } from '../services/csv';
+import { OperationalFilters } from '../components/common/OperationalFilters';
+import { StatusBadge } from '../components/common/Badge';
+import { StatCard } from '../components/common/StatCard';
+import { RygLegend } from '../components/common/RygLegend';
+
+interface Props { role: RoleType; city: City; cities: City[]; users: User[]; reports: OperationalReport[]; zones: Zone[]; wards: Ward[]; onSelectReport: (id: string) => void; onSelectCity: (id: string) => void; onNavigate: (id: string) => void; }
+export function RoleDashboard({ role, city, cities, users, reports, zones, wards, onSelectReport, onSelectCity, onNavigate }: Props) {
+  const [filters, setFilters] = useState(emptyFilters);
+  const superAdmin = role === 'HMS_SUPER_ADMIN';
+  const scope = superAdmin ? matrixStore.selectedCityId : city.id;
+  const scopedCities = cities.filter(c => scope === 'all' || c.id === scope);
+  const rows = reports.filter(r => r.cityId === city.id && matchesFilters(r, filters, [r.reportNumber, r.assetName, r.submittedByName, r.assignedDarogaName || '']));
+  const counts = { red: rows.filter(r => statusTone(r.status) === 'red').length, yellow: rows.filter(r => statusTone(r.status) === 'yellow').length, green: rows.filter(r => statusTone(r.status) === 'green').length };
+  const names = { CITY_ADMIN: ['CITY OPERATIONS', 'A clearer view of your city.', 'Geography, teams and inspections in one working view.'], ULB_OFFICER: ['OPERATIONS & REVIEW', 'Review. Prioritise. Resolve.', 'Focus on inspections and IEC issues that need your attention.'], COMMISSIONER: ['EXECUTIVE OVERSIGHT', 'Your city, at a glance.', 'Track municipal operations and direct attention where it matters.'], HMS_SUPER_ADMIN: ['PLATFORM GOVERNANCE', 'Every city. One clear view.', 'Manage city access, administrators and platform governance.'] }[role];
+  const openRequests = users.filter(u => u.status === 'pending_approval').length;
+  const exportRows = () => downloadCsv('matrixtrack-inspections.csv', generateCsv(['Report','Asset','Module','Zone','Ward','Submitted by','Status'], rows.map(r => [r.reportNumber,r.assetName,MODULE_LABELS[r.moduleId],zones.find(z => z.id === r.zoneId)?.name || '',wards.find(w => w.id === r.wardId)?.name || '',r.submittedByName,r.status])));
+  return <div className="space-y-6 role-overview" data-role-dashboard={role}>
+    <section className="workspace-hero"><div><span className="workspace-eyebrow">{names[0]} <i /> {superAdmin ? scope === 'all' ? 'ALL AUTHORIZED CITIES' : city.name : city.name}</span><h1>{names[1]}</h1><p>{names[2]}</p></div><div className="workspace-hero-mark"><Building2 size={34} strokeWidth={1.2} /><span>{ROLE_LABELS[role]} workspace</span></div></section>
+    {superAdmin ? <>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4"><StatCard label="Authorized cities" value={scopedCities.length} icon={<Building2 size={18} />} /><StatCard label="Active cities" value={scopedCities.filter(c => c.status === 'active').length} tone="green" icon={<CheckCircle2 size={18} />} /><StatCard label="Loaded personnel" value={users.length} icon={<UsersRound size={18} />} /><StatCard label="Pending registrations" value={openRequests} tone={openRequests ? 'yellow' : 'neutral'} onClick={() => onNavigate('sa_reg_requests')} icon={<Clock3 size={18} />} /></div>
+      <CityComparison cities={scopedCities} onSelectCity={onSelectCity} />
+    </> : <>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4"><StatCard label="Loaded inspections" value={rows.length} subtitle="Selected dates and filters" icon={<Building2 size={18} />} /><StatCard label="Action needed" value={counts.red} tone={counts.red ? 'red' : 'neutral'} subtitle="Rejected, escalated or action required" icon={<TriangleAlert size={18} />} onClick={() => setFilters({ ...filters, ryg: 'red' })} /><StatCard label="Attention / pending" value={counts.yellow} tone={counts.yellow ? 'yellow' : 'neutral'} subtitle="Review or verification outstanding" icon={<Clock3 size={18} />} onClick={() => setFilters({ ...filters, ryg: 'yellow' })} /><StatCard label="Approved / on track" value={counts.green} tone={counts.green ? 'green' : 'neutral'} subtitle="Approved inspection records" icon={<CheckCircle2 size={18} />} onClick={() => setFilters({ ...filters, ryg: 'green' })} /></div>
+      <RygLegend />
+      <OperationalFilters value={filters} onChange={setFilters} zones={zones.filter(z => z.cityId === city.id)} wards={wards.filter(w => w.cityId === city.id)} users={users.filter(u => u.cityId === city.id)} statuses={['pending_review','approved','rejected','action_required','action_taken','escalated']} resultCount={rows.length} />
+      <section className="workspace-panel"><div className="workspace-panel-heading"><div><span className="workspace-eyebrow">INSPECTION ACTIVITY</span><h2>{filters.ryg === 'red' ? 'Your attention queue' : 'Latest loaded inspections'}</h2></div><button onClick={exportRows} className="workspace-secondary-button"><FileDown size={15} />Export filtered records</button></div>
+        <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th>Asset & report</th><th>Module</th><th>Ward</th><th>Submitted by</th><th>Status</th><th><span className="sr-only">Details</span></th></tr></thead><tbody>{[...rows].sort((a,b) => b.submittedAt.localeCompare(a.submittedAt)).slice(0,20).map(r => <tr key={r.id}><td><strong>{r.assetName}</strong><small className="block text-slate-400 mt-1">{r.reportNumber}</small></td><td>{MODULE_LABELS[r.moduleId]}</td><td>{wards.find(w => w.id === r.wardId)?.name || 'Not provided'}</td><td>{r.submittedByName || 'Not provided'}</td><td><StatusBadge status={r.status} /></td><td><button aria-label={`Open report ${r.reportNumber}`} onClick={() => onSelectReport(r.id)} className="workspace-row-action"><ArrowUpRight size={17} /></button></td></tr>)}</tbody></table></div>
+        {!rows.length && <div className="workspace-empty"><CheckCircle2 size={26} /><h3>No matching inspections</h3><p>Adjust your dates or filters, or load more records above.</p></div>}
+        {rows.length > 20 && <p className="px-5 py-3 text-xs text-slate-500">Showing the latest 20 of {rows.length} matching loaded records. Export includes all matching loaded records.</p>}
+      </section>
+    </>}
+  </div>;
+}
+
+export function CityComparison({ cities, onSelectCity }: { cities: City[]; onSelectCity: (id: string) => void }) {
+  const [query, setQuery] = useState(''), [state, setState] = useState('all'), [status, setStatus] = useState('all');
+  const rows = cities.filter(c => (!query || `${c.name} ${c.cityCode} ${c.ulbCode}`.toLowerCase().includes(query.toLowerCase())) && (state === 'all' || c.state === state) && (status === 'all' || c.status === status));
+  return <section className="workspace-panel"><div className="workspace-panel-heading"><div><span className="workspace-eyebrow">CITY COVERAGE</span><h1 className="text-lg font-semibold">Authorized city comparison</h1><p className="text-xs text-slate-500 mt-1">Compare directory and provisioning data. Open a city for its operational records.</p></div></div><div className="flex flex-wrap gap-3 p-5 border-b border-slate-100"><input aria-label="Search cities" placeholder="Search city or code" value={query} onChange={e => setQuery(e.target.value)} /><select aria-label="Filter by state" value={state} onChange={e => setState(e.target.value)}><option value="all">All states</option>{[...new Set(cities.map(c => c.state).filter(Boolean))].map(s => <option key={s}>{s}</option>)}</select><select aria-label="Filter city status" value={status} onChange={e => setStatus(e.target.value)}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><button className="ops-reset" onClick={() => { setQuery(''); setState('all'); setStatus('all'); }}>Reset filters</button></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th>City</th><th>State / district</th><th>City / ULB code</th><th>Modules enabled</th><th>Status</th><th>Workspace</th></tr></thead><tbody>{rows.map(c => <tr key={c.id}><td><strong>{c.name}</strong></td><td>{c.state || 'Not provided'}<small className="block text-slate-400">{c.district}</small></td><td>{c.cityCode} / {c.ulbCode}</td><td>{c.enabledModules.length}</td><td><StatusBadge status={c.status} /></td><td><button onClick={() => onSelectCity(c.id)} className="workspace-secondary-button">Open city<ArrowUpRight size={14} /></button></td></tr>)}</tbody></table></div>{!rows.length && <div className="workspace-empty"><h3>No cities match these filters</h3></div>}</section>;
+}

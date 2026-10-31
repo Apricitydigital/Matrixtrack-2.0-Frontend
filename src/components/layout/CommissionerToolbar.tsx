@@ -1,0 +1,16 @@
+import React, { useEffect, useState } from 'react';
+import { CalendarDays, Check, ChevronDown, Printer } from 'lucide-react';
+import { matrixStore } from '../../services/store';
+import { todayIST } from '../../services/api';
+import { datePreset } from '../../services/presentation';
+import { printElement } from '../../services/print';
+export function CommissionerToolbar({pageId,title,cityName}:{pageId:string;title:string;cityName:string}) {
+  const setupPage=['ca_dashboard','ca_zones_wards','ca_beats','ca_assignments','ca_geo_hierarchy','ca_module_dir','ca_municipal_users','ca_employees','ca_registration_mgmt','ca_logs'].includes(pageId);
+  const receivedPage=/attendance$/.test(pageId)||['prod_plant','comm_plant'].includes(pageId);const range=matrixStore.getDateRange();const [from,setFrom]=useState(range.from),[to,setTo]=useState(range.to),[error,setError]=useState('');
+  useEffect(()=>{setFrom(range.from);setTo(range.to);},[range.from,range.to]);
+  const choices=[['today','Today'],['yesterday','Yesterday'],['last_7_days','Last 7 days'],['last_30_days','Last 30 days'],['this_month','This month']];
+  const selected=choices.find(([key])=>{const r=datePreset(key,todayIST());return r.from===range.from&&r.to===range.to;})?.[0] || 'custom';
+  const label=(value:string)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'});
+  const apply=async(a:string,b:string)=>{setError('');try{await matrixStore.setDateRange(a,b);}catch(e){setError(e instanceof Error?e.message:'Unable to update dates.');}};
+  return <section className="commissioner-toolbar no-print" aria-label="Review period"><div className="commissioner-breadcrumb">{cityName}<span>/</span><strong>{title}</strong></div>{!receivedPage&&!setupPage&&<div className="period-controls"><CalendarDays size={15}/>{pageId.endsWith('_map')?<label className="map-day"><span>Map date</span><input aria-label="Map date" type="date" value={range.to} max={todayIST()} onChange={e=>{if(e.target.value)void apply(e.target.value,e.target.value);}}/></label>:<><select aria-label="Review period" value={selected} onChange={e=>{if(e.target.value==='custom')return;const p=datePreset(e.target.value,todayIST());void apply(p.from,p.to);}}>{choices.map(([key,label])=><option value={key} key={key}>{label}</option>)}<option value="custom">Custom dates</option></select><details className="custom-period"><summary>{range.from===range.to?label(range.to):`${label(range.from)} – ${label(range.to)}`}<ChevronDown size={13}/></summary><form onSubmit={e=>{e.preventDefault();void apply(from,to);(e.currentTarget.closest('details') as HTMLDetailsElement).open=false;}}><label>From<input aria-label="Review from" required type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)}/></label><label>To<input aria-label="Review to" required type="date" value={to} min={from} max={todayIST()} onChange={e=>setTo(e.target.value)}/></label><button><Check size={14}/>Apply</button></form></details></>}<button className="period-print" aria-label="Print current view" onClick={()=>printElement(`${cityName} · ${title}`,document.querySelector('.commissioner-page-content'),`${range.from} to ${range.to}`)}><Printer size={15}/></button></div>}{error&&<p role="alert">{error}</p>}</section>;
+}

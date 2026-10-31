@@ -1,0 +1,1 @@
+export {UserPerformanceInsights} from './PerformanceWorkspaceInsights';

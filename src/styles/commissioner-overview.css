@@ -1,0 +1,196 @@
+/* Executive overview: delivery is primary; city reach is supporting context. */
+.inspection-module-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;padding:22px}
+.inspection-module-card{min-width:0;padding:21px;border:1px solid #dfe8ef;border-radius:13px;background:#fff;box-shadow:0 3px 12px #23465a03}
+.inspection-card-heading{display:flex;align-items:center;gap:11px;width:100%;text-align:left;min-height:45px;margin-bottom:20px}
+.inspection-card-heading>span{display:grid;place-items:center;flex-shrink:0;width:38px;height:38px;border-radius:10px;border:1px solid #d9e7f0;background:#f2f7fb;color:#638eac}
+.inspection-card-heading h3{font-size:16px;font-weight:600;color:#365c73;line-height:1.5;flex:1;min-width:0}
+.inspection-card-heading>svg{color:#8ca7b6;flex-shrink:0}
+.module-litter_bins .inspection-card-heading>span{color:#b68d4f;background:#fcf8f1;border-color:#eee1d0}.module-nala .inspection-card-heading>span{color:#4d969b;background:#f1f9f9;border-color:#d9ebeb}.module-ctu_gvp .inspection-card-heading>span{color:#649b81;background:#f3f9f5;border-color:#dcebe1}.module-toilets .inspection-card-heading>span{color:#8c7bb1;background:#f7f4fb;border-color:#e7dff0}
+.inspection-card-primary{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e3ebf0;border-radius:10px;overflow:hidden;background:#f8fafc}
+.inspection-card-primary>div{padding:15px 13px;min-width:0}.inspection-card-primary>div+div{border-left:1px solid #dfe8ee;background:#f1f7f8}
+.inspection-card-primary span{display:block;font-size:13.5px;line-height:1.55;color:#5e7d90;min-height:44px}.inspection-card-primary strong{display:block;margin:9px 0 5px;color:#2a5268;font-size:29px;line-height:1.25;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.inspection-card-primary small{font-size:12px;line-height:1.6;color:#748e9e;display:block}
+.inspection-card-achievement{padding:18px 0 16px;border-bottom:1px solid #edf2f5}.inspection-card-achievement>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}.inspection-card-achievement>div:first-child>span{font-size:14px;color:#607f92}.inspection-card-achievement>div:first-child>strong{font-size:16px;font-weight:600;color:#567d92;font-variant-numeric:tabular-nums}.inspection-card-achievement strong[data-met='true']{color:#4a9279}
+.inspection-card-achievement dl{display:grid;gap:8px;margin-top:13px}.inspection-card-achievement dl>div{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;line-height:1.5}.inspection-card-achievement dt{color:#718b9c}.inspection-card-achievement dd{color:#426b80;font-weight:600;font-variant-numeric:tabular-nums}
+.inspection-card-activity{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px;padding:17px 0;border-bottom:1px solid #edf2f5}.inspection-card-activity>div{min-width:0}.inspection-card-activity dt{font-size:12px;line-height:1.55;color:#78909f}.inspection-card-activity dd{font-size:19px;font-weight:600;line-height:1.4;color:#3f6b81;margin-top:4px;font-variant-numeric:tabular-nums}
+.inspection-card-status{display:grid;gap:4px;padding-top:13px}.inspection-card-status>button{display:flex;align-items:center;gap:7px;min-height:31px;width:100%;text-align:left;padding:4px 0;color:#668499;font-size:14px;line-height:1.5}.inspection-card-status>button>i{width:5px;height:5px;border-radius:50%;flex-shrink:0;background:#d4ad59}.inspection-card-status>button[data-tone='cleaned']>i{background:#70ad99}.inspection-card-status>button[data-tone='attention']>i{background:#cf7d87}.inspection-card-status>button>span{flex:1;min-width:0}.inspection-card-status>button>strong{font-size:15px;font-weight:600;color:#416a80;font-variant-numeric:tabular-nums}.inspection-card-status>button>svg{color:#9bb0bc}.inspection-card-status>button:hover{color:#2d5c75}
+.inspection-card-definitions{padding:0 24px 20px;font-size:13px;line-height:1.8;color:#718a9b}.inspection-card-definitions>summary{cursor:pointer;color:#547f91;width:fit-content}.inspection-card-definitions>p{margin-top:10px;max-width:1100px}.inspection-card-definitions strong{font-weight:600;color:#466d83}
+.inspection-card-primary strong[data-state]:not([data-state='configured']):not([data-state='full_coverage']){font-size:17px;line-height:1.45;letter-spacing:0;color:#698595}
+.inspection-card-activity-compact{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding-block:17px}.inspection-card-activity-compact dt{font-size:12px;min-height:37px}.inspection-card-activity-compact dd{font-size:18px}
+.inspection-card-activity-compact+.inspection-card-status{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 14px;padding-top:12px}.inspection-card-activity-compact+.inspection-card-status>button{font-size:13px;min-height:32px;gap:6px}.inspection-card-activity-compact+.inspection-card-status>button:last-child{grid-column:1/-1}.inspection-card-activity-compact+.inspection-card-status>button>svg{display:none}
+.inspection-card-details{margin-top:12px;padding-top:11px;border-top:1px solid #edf2f5;font-size:12px;color:#76909f;line-height:1.7}.inspection-card-details>summary{cursor:pointer;color:#5e8596}.inspection-card-details dl{display:grid;gap:7px;margin-top:12px}.inspection-card-details dl>div{display:flex;justify-content:space-between;gap:10px}.inspection-card-details dd{font-weight:600;color:#456c80}.inspection-card-details p{margin-top:9px;color:#849aa7;font-size:12px}
+.inspection-module-cards{align-items:start}
+@media(min-width:1800px){.inspection-module-cards{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;padding:20px}.inspection-module-card{padding:18px 16px}.inspection-card-heading{min-height:48px;gap:9px}.inspection-card-heading h3{font-size:15px}}
+@media(max-width:1100px){.inspection-module-cards{grid-template-columns:repeat(2,minmax(0,1fr));padding:18px;gap:14px}}
+@media(max-width:700px){.inspection-module-cards{grid-template-columns:1fr;padding:14px;gap:14px}.inspection-module-card{padding:19px}.inspection-card-primary span{min-height:44px}.inspection-card-heading{margin-bottom:16px}.inspection-card-activity dt{font-size:13px}.inspection-card-status>button{font-size:14px;min-height:34px}.inspection-card-definitions{padding:0 18px 18px}}
+@media print{.inspection-module-cards{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px;gap:12px}.inspection-module-card{break-inside:avoid}.inspection-card-definitions{display:none}}
+.commissioner-home{gap:22px;color:#28475b}
+.commissioner-home .city-welcome{padding:25px 28px;border:1px solid #dbe7ec;background:linear-gradient(110deg,#fff,#f0f7f8);border-radius:15px}
+.commissioner-home .city-welcome h1{font-size:clamp(23px,1.85vw,31px);line-height:1.4;letter-spacing:-.65px;max-width:950px;color:#213f53;margin-top:8px}
+.commissioner-home .city-welcome>div:first-child>span{font-size:12px;letter-spacing:1.3px;color:#5d828e}
+.commissioner-home .city-welcome p{font-size:16px;color:#627f91;margin-top:8px}
+.commissioner-home .welcome-watermark{opacity:.25;color:#b8d3d8;right:180px}
+.commissioner-home .welcome-actions button{color:#416f81;background:#fff;border-color:#cfdfe7;min-height:38px;font-size:14px;box-shadow:0 2px 5px #294f6510}
+.commissioner-home .welcome-actions button:hover{background:#edf5f7;border-color:#adc9d3}
+.commissioner-home .home-scope{background:#fff;border:1px solid #e0e8ef;border-radius:11px;padding:12px 16px;margin:0;gap:14px}
+.commissioner-home .home-scope select{background:#f8fafb;color:#385d71;font-size:15px!important}
+.commissioner-home .home-scope>button{color:#3c7183;font-size:14px;font-weight:600}
+.commissioner-home .home-kpis{gap:16px}
+.commissioner-home .home-kpis>button{padding:22px 23px;min-height:162px;border-radius:13px;background:#fff}
+.commissioner-home .home-kpis>button>span{font-size:15px;color:#567387;line-height:1.5}
+.commissioner-home .home-kpis>button>strong{font-size:34px;margin:15px 0 12px;color:#25495f;font-weight:650;line-height:1.25}
+.commissioner-home .home-kpis footer{font-size:14px;color:#668193;line-height:1.65;align-items:flex-start}
+.commissioner-home .home-kpis footer>svg{flex-shrink:0;margin-top:3px}
+.commissioner-home .target-kpi{border-color:#c9dedf;background:linear-gradient(140deg,#fff,#f1f8f6)!important}
+.commissioner-home .target-kpi .delivery-meter{margin-bottom:12px;max-width:100%}
+.commissioner-home .target-kpi>strong[data-target-state]:not([data-target-state='configured']):not([data-target-state='full_coverage']){font-size:22px;color:#688797}
+.zone-delivery-table .delivery-target strong{white-space:normal}
+.commissioner-home .home-section{border-radius:14px;border:1px solid #e0e9ef;background:#fff;overflow:hidden;min-width:0}
+.commissioner-home .home-section-heading{padding:23px 24px;gap:20px;align-items:center;border-bottom:1px solid #eaf0f4;flex-wrap:wrap}
+.commissioner-home .home-section-heading>div{min-width:0;flex:1}
+.commissioner-home .home-section-heading>div>span{font-size:12px;letter-spacing:1.35px;color:#6e899b;font-weight:650;line-height:1.5}
+.commissioner-home .home-section-heading h2{font-size:20px;font-weight:650;line-height:1.4;color:#294b60;margin:5px 0 0;letter-spacing:-.35px}
+.commissioner-home .home-section-heading p{font-size:14px;line-height:1.65;color:#6b8596;margin:6px 0 0;max-width:800px}
+.commissioner-home .home-section-heading>button{font-size:14px;color:#3d7183;white-space:nowrap;flex-shrink:0;line-height:1.5}
+.delivery-table-wrap,.zone-table-wrap{width:100%;overflow-x:auto}
+.commissioner-home .delivery-table,.commissioner-home .zone-delivery-table{width:100%;border-collapse:collapse;text-align:left;min-width:1080px;table-layout:auto;font-size:15px}
+.commissioner-home .delivery-table th,.commissioner-home .zone-delivery-table th{padding:14px 18px;background:#f8fafc;font-size:12px;letter-spacing:.45px;text-transform:uppercase;color:#71899a;line-height:1.5;white-space:normal;border-bottom:1px solid #e4ecf1}
+.commissioner-home .delivery-table td,.commissioner-home .zone-delivery-table td{padding:16px 18px;vertical-align:middle;line-height:1.5;color:#3d6075;border-bottom:1px solid #eaf0f4;min-width:0;max-width:none}
+.commissioner-home .delivery-table tr:last-child td,.commissioner-home .zone-delivery-table tr:last-child td{border-bottom:0}
+.commissioner-home .delivery-table tbody tr:hover,.commissioner-home .zone-delivery-table tbody tr:hover{background:#f9fcfd}
+.delivery-service{display:flex;align-items:center;gap:11px;text-align:left;width:100%;min-width:150px;max-width:245px;color:#31566d}
+.delivery-service>span{display:grid;place-items:center;width:37px;height:37px;border:1px solid #dbe8ef;background:#f2f7fa;border-radius:10px;color:#6590a8;flex-shrink:0}
+.delivery-service>strong{font-size:15px;font-weight:600;line-height:1.5;max-width:160px}
+.delivery-service>svg{flex-shrink:0;width:13px;color:#8ba5b5;margin-left:auto}
+.delivery-total{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:8px;padding-left:48px;font-size:13px;color:#698596;line-height:1.5}
+.delivery-total>strong{font-size:15px;color:#3d6278;font-variant-numeric:tabular-nums;font-weight:600}
+.delivery-target>.delivery-assigned-target{font-size:13px;color:#416e82;margin-top:8px}
+.delivery-service.module-litter_bins>span{color:#b88d4e;background:#fbf7f0;border-color:#eee2d2}
+.delivery-service.module-nala>span{color:#4c969c;background:#f0f9f9;border-color:#d6e9e9}
+.delivery-service.module-ctu_gvp>span{color:#60977d;background:#f1f8f3;border-color:#daeadf}
+.delivery-service.module-toilets>span{color:#8a79b3;background:#f7f4fb;border-color:#e5def0}
+.delivery-target{min-width:160px;max-width:260px}
+.delivery-target>div:first-child{display:flex;justify-content:space-between;align-items:center;gap:13px;margin-bottom:9px}
+.delivery-target strong{font-size:18px;font-weight:650;white-space:nowrap;color:#294f65;font-variant-numeric:tabular-nums}
+.delivery-target strong>small,.delivery-count>small{font-size:13px;font-weight:400;color:#77909f;white-space:normal}
+.delivery-met,.delivery-progress{font-size:12px;font-weight:650;white-space:nowrap;padding:3px 7px;border:1px solid #dce8ec;background:#f3f7f9;border-radius:5px;color:#5c7e90}
+.delivery-met{background:#eef8f3;color:#40836b;border-color:#d6e9df}
+.delivery-target>small{display:block;margin-top:7px;font-size:12px;color:#7a929f;line-height:1.5}
+.delivery-meter{height:5px;background:#e7eef3;overflow:hidden;border-radius:4px}
+.delivery-meter>i{display:block;height:100%;border-radius:4px;background:#7d9eb0;max-width:100%;min-width:0}
+.delivery-meter>i[data-met='true']{background:#6bae97}
+.delivery-count{display:block;font-size:18px;font-weight:650;color:#335970;font-variant-numeric:tabular-nums;white-space:nowrap}
+.delivery-caption{display:block;color:#7a929f;font-size:12px;line-height:1.6;margin-top:4px}
+.delivery-queue{display:inline-flex;justify-content:space-between;align-items:center;gap:11px;border-radius:7px;padding:6px 9px;min-width:58px;font-size:16px;font-weight:600;color:#6a8596;background:#f3f7f9}
+.delivery-queue[data-tone='pending']{color:#a17c37;background:#fcf7e9}.delivery-queue[data-tone='action']{color:#b16d70;background:#fbf0f1}
+.commissioner-home .delivery-note{padding:13px 24px;border-top:1px solid #edf2f5;font-size:13px;line-height:1.7;color:#758e9f;background:#fafcfd}
+.commissioner-home .coverage-stat-grid{padding:0;gap:0;border-bottom:1px solid #edf2f5}
+.commissioner-home .coverage-stat-grid article{background:#fff!important;border:0!important;border-radius:0;padding:20px 24px;min-width:0;border-right:1px solid #edf2f5!important}
+.commissioner-home .coverage-stat-grid article:last-child{border-right:0!important}
+.commissioner-home .coverage-stat-grid article>span{font-size:14px;font-weight:500;color:#678293;min-height:22px;line-height:1.6}
+.commissioner-home .coverage-stat-grid article>strong{font-size:28px;line-height:1.3;font-weight:600;color:#31576c;margin:10px 0 7px}
+.commissioner-home .coverage-stat-grid article>p{font-size:12px;color:#8197a4;line-height:1.6}
+.coverage-context{display:flex;align-items:center;gap:7px;font-size:14px;color:#5d8594;white-space:nowrap}
+.commissioner-home .coverage-explainer{margin:0;border:0;border-radius:0;padding:15px 24px;background:#f5f9fa;gap:10px;color:#638394}
+.commissioner-home .coverage-explainer p{font-size:13px;line-height:1.7}
+.commissioner-home .coverage-explainer strong{font-weight:600;color:#486f82}
+.coverage-method{padding:0 24px 17px;background:#f5f9fa;font-size:13px;line-height:1.8;color:#708b9b}
+.coverage-method>summary{display:flex;align-items:center;gap:7px;cursor:pointer;width:fit-content;color:#537c8d}
+.coverage-method>p{margin-top:10px;max-width:1000px}
+.commissioner-home .coverage-data-note{font-size:13px;line-height:1.7;padding:12px 24px;background:#fffbf2}
+.commissioner-home .zone-delivery-table{min-width:870px}
+.zone-select{display:flex;align-items:center;justify-content:space-between;gap:18px;min-width:90px;color:#406b81;font-size:16px;text-align:left}
+.zone-select strong{font-weight:600}.zone-select>svg{flex-shrink:0;color:#8ba5b5}
+.zone-pending{font-size:18px;font-variant-numeric:tabular-nums;font-weight:600;color:#8a793f}
+.commissioner-home .overview-decisions{gap:20px}
+.commissioner-home .overview-decisions>.analytics-card{border-radius:14px;display:flex;flex-direction:column;min-height:320px}
+.commissioner-home .overview-decisions .analytics-card>header{padding:22px 24px;border-bottom:1px solid #edf2f5}
+.commissioner-home .overview-decisions .analytics-card>header h2{font-size:20px;line-height:1.4}
+.commissioner-home .overview-decisions .analytics-card>header span{font-size:12px;color:#6e899b}
+.commissioner-home .overview-decisions .insight-donut-chart{padding:22px 24px;gap:24px;min-height:220px;flex:1}
+.commissioner-home .overview-decisions .insight-donut-chart>svg{width:185px;max-width:44%;flex-shrink:0}
+.commissioner-home .overview-decisions .donut-label{font-size:11px}.commissioner-home .overview-decisions .donut-legend{flex:1;min-width:0}
+.commissioner-home .overview-decisions .donut-legend button{font-size:14px;gap:8px;line-height:1.5}
+.commissioner-home .overview-decisions .insight-bar-chart{padding:16px 24px 20px;gap:10px;align-content:center;flex:1}
+.commissioner-home .overview-decisions .insight-bar-chart>button{padding-block:8px}
+.commissioner-home .overview-decisions .insight-bar-chart small{font-size:12px;line-height:1.65}
+.commissioner-home .home-insights-grid{gap:20px}
+.commissioner-home .team-score-list small,.commissioner-home .home-ward-list small{font-size:13px;color:#7a929f}
+.commissioner-home .team-score-list strong,.commissioner-home .home-ward-list strong{font-size:15px;color:#3e6278}
+.commissioner-home .home-ward-list .ward-score{font-size:22px}
+.commissioner-home .home-bottom-grid{gap:20px}
+.commissioner-home .home-evidence-title strong{font-size:14px;line-height:1.55}.commissioner-home .home-evidence-title small{font-size:12px;line-height:1.65}
+.commissioner-home .home-refresh-note{font-size:13px;line-height:1.7}
+/* Keep the conversation compact; the review period is the only persistent context line. */
+.nagar-insight .insight-conversation{width:410px;height:min(650px,calc(100dvh - 140px));border-radius:17px}
+.nagar-insight .insight-conversation>header{padding:18px;gap:11px}
+.nagar-insight .insight-avatar{width:41px;height:41px;border-radius:12px}
+.nagar-insight .insight-conversation h2{font-size:22px;margin-top:2px}
+.nagar-insight .insight-conversation>header>div>span{font-size:10px;letter-spacing:1px}
+.nagar-insight .insight-scope-strip{background:#f2f7f9;color:#668592;border-color:#e0eaef;padding:10px 18px}
+.nagar-insight .insight-scope-strip strong{font-size:12px;font-weight:500}
+.nagar-insight .insight-scope-strip>span{font-size:12px;color:#57798a}
+.nagar-insight .insight-welcome{padding:3px 0 8px}.nagar-insight .insight-welcome>span{margin-bottom:9px}
+.nagar-insight .insight-welcome h3{font-size:20px;line-height:1.45}.nagar-insight .insight-welcome p{font-size:14px;line-height:1.75;margin-top:8px}
+.nagar-insight .insight-suggestions{gap:7px;padding-bottom:15px}.nagar-insight .insight-suggestions button{font-size:13px;line-height:1.55;min-height:57px}
+.nagar-insight .insight-conversation>form{padding:13px 15px}.nagar-insight .insight-conversation>form>div{align-items:center;padding:8px}
+.nagar-insight .insight-conversation textarea{font-size:15px;padding:2px 3px}.nagar-insight .insight-conversation textarea:focus-visible{outline:none}
+.nagar-insight .insight-conversation>form>div:focus-within{border-color:#77adae;box-shadow:0 0 0 2px #78adae17}
+.nagar-insight .insight-launcher{min-height:58px;padding:9px 13px 9px 9px;border-radius:15px;gap:10px}.nagar-insight .insight-launcher>span:first-child{width:36px;height:36px;border-radius:10px}.nagar-insight .insight-launcher strong{font-size:15px}.nagar-insight .insight-launcher small{font-size:12px}
+@media(max-width:1350px){
+ .commissioner-home .delivery-table{display:block;min-width:0}.commissioner-home .delivery-table thead{display:none}
+ .commissioner-home .delivery-table tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;padding:18px}
+ .commissioner-home .delivery-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;padding:19px;border:1px solid #e2ebf0;border-radius:12px;background:#fff}
+ .commissioner-home .delivery-table td{display:block;padding:0;border:0;min-width:0;line-height:1.5}.commissioner-home .delivery-table td:first-child,.commissioner-home .delivery-table td:nth-child(2){grid-column:1/-1}
+ .commissioner-home .delivery-table td:not(:first-child)::before{content:attr(data-label);display:block;font-size:12px;line-height:1.5;color:#7a919f;margin-bottom:7px}
+ .commissioner-home .delivery-service{max-width:none;width:100%}.commissioner-home .delivery-service>strong{max-width:none;font-size:16px}.commissioner-home .delivery-target{max-width:none}
+ .commissioner-home .delivery-service>svg{margin-left:auto}.commissioner-home .delivery-count{font-size:17px}.commissioner-home .delivery-table td:last-child{grid-column:auto}
+ .commissioner-home .home-insights-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .commissioner-home .home-insights-grid>.plant-overview{grid-column:1/-1;display:block}
+ .commissioner-home .overview-decisions .insight-donut-chart{gap:15px;padding-inline:19px}.commissioner-home .overview-decisions .insight-donut-chart>svg{width:155px}
+}
+@media(max-width:1050px){
+ .commissioner-home .zone-delivery-table{display:block;min-width:0}.commissioner-home .zone-delivery-table thead{display:none}
+ .commissioner-home .zone-delivery-table tbody{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;padding:18px}
+ .commissioner-home .zone-delivery-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px;padding:19px;border:1px solid #e2ebf0;border-radius:12px;background:#fff}
+ .commissioner-home .zone-delivery-table td{display:block;padding:0;border:0;min-width:0}.commissioner-home .zone-delivery-table td:first-child,.commissioner-home .zone-delivery-table td:nth-child(2){grid-column:1/-1}
+ .commissioner-home .zone-delivery-table td:not(:first-child)::before{content:attr(data-label);display:block;font-size:12px;color:#7a919f;margin-bottom:7px}
+ .zone-select{width:100%}.commissioner-home .overview-decisions{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+ .commissioner-home{gap:16px}.commissioner-home .city-welcome{padding:21px}.commissioner-home .city-welcome h1{font-size:23px!important;line-height:1.45}
+ .commissioner-home .city-welcome p{font-size:14px}.commissioner-home .welcome-watermark{display:none}
+ .commissioner-home .home-scope{padding:11px;gap:10px}.commissioner-home .home-scope>button{font-size:13px}
+ .commissioner-home .home-kpis{gap:10px}.commissioner-home .home-kpis>button{padding:17px 14px;min-height:163px}.commissioner-home .home-kpis>button>span{font-size:13px}.commissioner-home .home-kpis>button>strong{font-size:29px}.commissioner-home .home-kpis footer{font-size:12px}
+ .commissioner-home .home-section-heading{padding:18px;gap:12px}.commissioner-home .home-section-heading h2{font-size:18px}.commissioner-home .home-section-heading p{font-size:13px}.commissioner-home .home-section-heading>div>span{font-size:11px}.commissioner-home .home-section-heading>button{font-size:13px}
+ .commissioner-home .service-delivery .home-section-heading,.commissioner-home .coverage-overview .home-section-heading,.commissioner-home .zone-performance .home-section-heading{display:block}
+ .commissioner-home .service-delivery .home-section-heading>button,.commissioner-home .zone-performance .home-section-heading>button,.commissioner-home .coverage-context{margin-top:12px}
+ .commissioner-home .delivery-table tbody,.commissioner-home .zone-delivery-table tbody{grid-template-columns:1fr;padding:13px;gap:12px}.commissioner-home .delivery-table tr,.commissioner-home .zone-delivery-table tr{padding:17px;gap:16px 18px}
+ .commissioner-home .delivery-table tr{grid-template-columns:repeat(6,minmax(0,1fr));gap:15px 12px}.commissioner-home .delivery-table td:first-child,.commissioner-home .delivery-table td:nth-child(2){grid-column:1/-1}.commissioner-home .delivery-table td:nth-child(3),.commissioner-home .delivery-table td:nth-child(4){grid-column:span 3}.commissioner-home .delivery-table td:nth-child(n+5){grid-column:span 2}.commissioner-home .delivery-table td:nth-child(n+5)::before{min-height:33px}.commissioner-home .delivery-table td:nth-child(n+5) .delivery-queue{min-width:0;width:100%;max-width:62px;padding-inline:7px;gap:6px}
+ .commissioner-home .coverage-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.commissioner-home .coverage-stat-grid article{padding:17px 18px;border-bottom:1px solid #edf2f5!important}.commissioner-home .coverage-stat-grid article:last-child{grid-column:1/-1}
+ .commissioner-home .coverage-stat-grid article>span{font-size:13px;min-height:21px}.commissioner-home .coverage-stat-grid article>strong{font-size:26px}.commissioner-home .coverage-stat-grid article>p{font-size:12px}
+ .coverage-context{font-size:13px}.commissioner-home .coverage-explainer{padding:14px 18px}.coverage-method{padding:0 18px 16px}
+ .commissioner-home .delivery-note{padding:12px 18px;font-size:12px}.commissioner-home .home-insights-grid{grid-template-columns:1fr}.commissioner-home .home-insights-grid>.plant-overview{grid-column:auto}
+ .commissioner-home .overview-decisions .analytics-card>header{padding:18px}.commissioner-home .overview-decisions .analytics-card>header h2{font-size:18px}.commissioner-home .overview-decisions .insight-donut-chart{padding:20px 16px;gap:13px;min-height:210px}.commissioner-home .overview-decisions .donut-legend button{font-size:13px;gap:6px}
+ .nagar-insight .insight-conversation{width:410px;max-width:calc(100vw - 24px);height:min(640px,calc(100dvh - 96px))}
+ .nagar-insight .insight-conversation>header{padding:16px}.nagar-insight .insight-scope-strip{padding-inline:16px}
+}
+@media print{.commissioner-home .delivery-table,.commissioner-home .zone-delivery-table{display:table;min-width:0;font-size:10px}.commissioner-home .delivery-table thead,.commissioner-home .zone-delivery-table thead{display:table-header-group}.commissioner-home .delivery-table tbody,.commissioner-home .zone-delivery-table tbody{display:table-row-group}.commissioner-home .delivery-table tr,.commissioner-home .zone-delivery-table tr{display:table-row}.commissioner-home .delivery-table td,.commissioner-home .zone-delivery-table td{display:table-cell;padding:9px}.commissioner-home .delivery-table td::before,.commissioner-home .zone-delivery-table td::before{display:none!important}.commissioner-home .delivery-table th,.commissioner-home .zone-delivery-table th{padding:9px}.delivery-target{min-width:0}.delivery-table-wrap,.zone-table-wrap{overflow:visible}.coverage-method{display:none}}
+
+.inspection-card-activity-four{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+
+/* Compact Commissioner overview; keep outcome colors semantic and counts prominent. */
+.commissioner-home .home-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.commissioner-home .home-kpis>button{min-height:146px;padding:18px 20px}.commissioner-home .home-kpis>button>strong{margin:10px 0;font-size:32px}.commissioner-home .home-kpis footer{font-size:13px}
+.inspection-module-card{padding:16px 17px}.inspection-card-heading{min-height:39px;margin-bottom:12px}.inspection-card-heading h3{font-size:16px}.inspection-card-heading>span{width:34px;height:34px}
+.inspection-card-primary>div{padding:10px 12px}.inspection-card-primary span{min-height:38px;font-size:13px;line-height:1.4}.inspection-card-primary strong{font-size:26px;margin:5px 0 0}.inspection-card-primary small{font-size:12px;margin-top:4px}
+.inspection-card-achievement{padding:12px 0 10px}.inspection-card-achievement>div:first-child{margin-bottom:8px}.inspection-card-achievement>div:first-child>span{font-size:13px}.inspection-card-achievement>div:first-child>strong{font-size:15px}
+.inspection-card-activity-compact{padding:11px 0;gap:8px}.inspection-card-activity-compact dt{font-size:13px;line-height:1.4;min-height:36px}.inspection-card-activity-compact dd{margin:3px 0 0;font-size:21px;line-height:1.2}
+.inspection-card-activity-compact+.inspection-card-status{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding-top:12px}.inspection-card-activity-compact+.inspection-card-status>button{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:5px;padding:9px 8px;border:1px solid #efe1b9;border-radius:8px;background:#fffaea;color:#91620e;min-height:76px;line-height:1.4}.inspection-card-activity-compact+.inspection-card-status>button:last-child{grid-column:auto}.inspection-card-status>button>i{display:none}.inspection-card-status>button>span{font-size:12px;font-weight:600;flex:0}.inspection-card-status>button>strong{font-size:20px;line-height:1.2;color:inherit}.inspection-card-activity-compact+.inspection-card-status>button[data-tone='cleaned']{border-color:#cce6da;background:#eff9f3;color:#26744f}.inspection-card-activity-compact+.inspection-card-status>button[data-tone='attention']{border-color:#efcdd0;background:#fff3f3;color:#b3444e}
+.inspection-card-details{margin-top:11px;padding-top:9px;font-size:13px}.inspection-card-details summary{line-height:1.6}.module-action-alert{display:inline-block;color:#b3444e;background:#fff1f1;border-radius:5px;padding:1px 6px;margin-left:6px;font-size:12px;font-weight:600}.inspection-card-actions{display:grid;gap:7px;margin-top:10px;padding-top:9px;border-top:1px solid #eaf0f4}.inspection-card-actions button{display:flex;gap:9px;align-items:center;font-size:13px;color:#94701a}.inspection-card-actions button[data-tone='attention']{color:#b3444e}.inspection-card-actions button span{flex:1;text-align:left}.inspection-card-actions strong{font-size:15px}
+.outcome-summary-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;padding:18px 22px}.outcome-summary-cards>button{padding:18px 20px;border:1px solid #cce6da;border-radius:12px;background:#eff9f3;color:#26744f;text-align:left;transition:box-shadow .15s,transform .15s}.outcome-summary-cards>button[data-tone='yellow']{border-color:#ecd9a8;background:#fff9e8;color:#94630e}.outcome-summary-cards>button[data-tone='red']{border-color:#efcdd0;background:#fff2f2;color:#b3444e}.outcome-summary-cards>button:hover{transform:translateY(-2px);box-shadow:0 5px 15px #243f5610}.outcome-summary-cards>button:focus-visible{outline:3px solid currentColor;outline-offset:3px}.outcome-summary-cards>button>div{display:flex;align-items:center;gap:10px}.outcome-summary-cards>button>div>span{flex:1;font-size:17px;font-weight:600}.outcome-summary-cards>button>strong{display:block;font-size:42px;line-height:1.2;margin:12px 0 7px;font-weight:650;font-variant-numeric:tabular-nums}.outcome-summary-cards>button>small{display:block;font-size:13px;line-height:1.5}.outcome-total{font-size:14px;color:#668394;white-space:nowrap}
+.commissioner-home .home-section-heading{padding:18px 22px}.commissioner-home .team-score-list>button{padding-block:13px}.commissioner-home .home-ward-list>button{padding-block:14px}.commissioner-home .home-bottom-grid{grid-template-columns:minmax(0,1fr)}
+@media(max-width:1100px){.commissioner-home .home-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.outcome-summary-cards{gap:10px;padding:15px}.outcome-summary-cards>button{padding:16px}.outcome-summary-cards>button>div>span{font-size:15px}.outcome-summary-cards>button>strong{font-size:36px}}
+@media(max-width:700px){.inspection-module-card{padding:16px}.inspection-card-heading{margin-bottom:12px}.inspection-card-primary span{min-height:36px}.outcome-summary-cards{grid-template-columns:1fr}.outcome-summary-cards>button{position:relative;padding:15px 17px 15px 78px;min-height:93px}.outcome-summary-cards>button>strong{position:absolute;left:17px;top:23px;font-size:34px;margin:0}.outcome-summary-cards>button>div{gap:8px}.outcome-summary-cards>button>div>span{font-size:17px}.outcome-summary-cards>button>small{margin-top:8px}.outcome-total{font-size:13px}.commissioner-home .home-section-heading{padding:17px 18px}}
+@media print{.outcome-summary-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.outcome-summary-cards>button{print-color-adjust:exact;-webkit-print-color-adjust:exact}.inspection-card-status>button{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+
+@media(max-width:700px){.overview-outcomes .home-section-heading{align-items:flex-start;flex-direction:column;gap:8px}.outcome-summary-cards>button{padding-left:112px}.outcome-summary-cards>button>strong{left:12px;width:86px;text-align:center;top:24px;font-size:31px;letter-spacing:-.5px}.outcome-summary-cards>button>div>svg:first-child{flex-shrink:0}}
