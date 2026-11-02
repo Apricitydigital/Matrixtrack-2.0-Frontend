@@ -65,7 +65,7 @@ export const RegistrationRequests: React.FC<RegistrationRequestsProps> = ({
             User Registration Approval Queue
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Review incoming credential requests for Darogas, Sanitary Inspectors, and Municipal Staff.
+            Review incoming credential requests for Darogas, SIs, and Municipal Staff.
           </p>
         </div>
 

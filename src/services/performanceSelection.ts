@@ -13,7 +13,7 @@ export function performanceGroups(users:User[],stats:Record<string,any>,loads:Re
  const query=filters.query.trim().toLowerCase();
  return Object.fromEntries(PERFORMANCE_ROLES.map(role=>[role,[...new Map(users.filter(u=>u.cityId===cityId&&u.role===role&&!u.isDeleted&&u.status!=='pending_approval'&&u.status!=='rejected').map(u=>[u.id,u])).values()].filter(u=>{
    const scope=officerGeography(u,wards,filters.module);
-   return (filters.zone==='all'||scope.zoneIds.includes(filters.zone))&&(filters.ward==='all'||scope.wardIds.includes(filters.ward))&&(!query||`${u.name} ${u.email} ${u.phone}`.toLowerCase().includes(query));
+   return (filters.module==='ALL'||(u.moduleAssignments||[]).some(m=>m.key===filters.module))&&(filters.zone==='all'||scope.zoneIds.includes(filters.zone))&&(filters.ward==='all'||scope.wardIds.includes(filters.ward))&&(!query||`${u.name} ${u.email} ${u.phone}`.toLowerCase().includes(query));
  }).map(user=>{
    const state=loads[role],error=state?.officerErrors?.[user.id];
    const availability=state?.status==='loading'?'loading':state?.status==='error'||error?'error':undefined;

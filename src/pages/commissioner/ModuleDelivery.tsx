@@ -1,3 +1,4 @@
+import {targetReadState} from '../../services/targetDelivery';
 import { inspectionMetrics } from '../../services/inspectionMetrics';
 import { CardInfo } from '../../components/common/CardInfo';
 import React from 'react';
@@ -12,11 +13,11 @@ import { COMMISSIONER_TERMS as terms } from '../../services/commissionerTerms';
 import { coverageNumber as number } from './CoverageOverview';
 
 const icons={sweeping:Brush,toilets:Building2,litter_bins:Trash2,nala:Waves,ctu_gvp:Flag};
-export function ModuleDelivery({modules,pulse,data,loading,zone,ward,onInspect}:{modules:OperationalModuleId[];pulse:CityPulse;data:InspectionCoverage;loading:boolean;zone:string;ward:string;onInspect:(module?:string,status?:string)=>void}) {
+export function ModuleDelivery({modules,pulse,data,loading,zone,ward,onInspect,targetsReady=true}:{modules:OperationalModuleId[];pulse:CityPulse;data:InspectionCoverage;loading:boolean;targetsReady?:boolean;zone:string;ward:string;onInspect:(module?:string,status?:string)=>void}) {
   return <section className="home-section service-delivery"><div className="home-section-heading"><div><span>SERVICE PERFORMANCE</span><h2>Every module. One view.</h2><p>Entity inventory, completed inspections and coverage for the selected dates.</p></div><button onClick={()=>onInspect()}>All inspections<ArrowUpRight size={16}/></button></div>
     <div className="inspection-module-cards">{modules.map(id=>{
       const source=pulse.official?.modules[id];
-      const metrics=inspectionMetrics(data,{module:id,zone,ward},source),{delivery}=metrics,Icon=icons[id];
+      const metrics=inspectionMetrics(data,{module:id,zone,ward},source),delivery=targetReadState(metrics.delivery,targetsReady),Icon=icons[id];
       const period=inspectionPeriod(metrics.completed,delivery,data.from,data.to);
       const count=(value:number|null)=>loading?'…':number(value);
       const queues=inspectionOutcomes(data,{module:id,zone,ward}).rows.map(row=>({label:row.label,value:row.value,status:row.id,tone:row.tone==='green'?'cleaned':row.tone==='red'?'attention':'pending'}));

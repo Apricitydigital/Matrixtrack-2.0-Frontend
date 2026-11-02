@@ -11,6 +11,7 @@ export type StatusVariant =
 
 interface StatusBadgeProps {
   status: string;
+  label?: string;
   variant?: StatusVariant;
   size?: 'sm' | 'md';
   className?: string;
@@ -18,12 +19,13 @@ interface StatusBadgeProps {
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
+  label,
   variant,
   size = 'md',
   className = ''
 }) => {
   // Infer variant if not explicitly provided
-  const normalized = statusLabel(status);
+  const normalized = label || statusLabel(status);
   let inferredVariant: StatusVariant = variant || 'neutral';
 
   if (!variant) {

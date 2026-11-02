@@ -1,8 +1,15 @@
+import { actionLifecycle, actionIsPending } from './actionLifecycle';
 import type { RoleType, OperationalModuleId } from '../types';
 
 // Display names match MatrixTrack 2.0 Frontend/lib/labels.ts. API identifiers stay unchanged.
-export const ROLE_LABELS: Record<RoleType | string, string> = { HMS_SUPER_ADMIN: 'HMS Super Admin', SUPER_ADMIN: 'Super Admin', DIVISION_ADMIN: 'Division Admin', CITY_ADMIN: 'City Admin', CITY_ADMINISTRATOR: 'City Admin', ULB_OFFICER: 'ULB Officer', COMMISSIONER: 'Commissioner', SUPERVISOR: 'Daroga', QC: 'Sanitary Inspector', ACTION_OFFICER: 'IEC Member', EMPLOYEE: 'Employee', ADMIN: 'Admin', ADMINISTRATOR: 'Admin' };
+export const ROLE_LABELS: Record<RoleType | string, string> = { HMS_SUPER_ADMIN: 'HMS Super Admin', SUPER_ADMIN: 'Super Admin', DIVISION_ADMIN: 'Division Admin', CITY_ADMIN: 'City Admin', CITY_ADMINISTRATOR: 'City Admin', ULB_OFFICER: 'ULB Officer', COMMISSIONER: 'Commissioner', SUPERVISOR: 'Daroga', QC: 'SI', ACTION_OFFICER: 'IEC', EMPLOYEE: 'Employee', ADMIN: 'Admin', ADMINISTRATOR: 'Admin' };
 export const MODULE_LABELS: Record<OperationalModuleId, string> = { sweeping: 'Sweeping', toilets: 'Cleanliness of Toilet', litter_bins: 'Litter Bins', nala: 'Nala', ctu_gvp: 'CTU/GVP Transformation' };
+// Translate source-system wording only where it is presented to a user.
+export function displayRoleText(value:unknown):string {
+  return String(value??'').replace(/\b(?:QC|Sanitary Inspector)\b/gi,'SI')
+    .replace(/\b(?:ACTION_OFFICER|Action Officer|IEC Member)\b/gi,'IEC')
+    .replace(/\b(?:SUPERVISOR|Supervisor)\b/gi,'Daroga');
+}
 // IEC issues use different API keys from operational inspection modules.
 export const ISSUE_MODULE_LABELS: Record<string,string> = { BEAT:'Beat', TOILET:'Toilet', LITTERBIN:'Litterbin', NALA:'Nala', GVP:'GVP', OTHER:'Other' };
 export type RygTone = 'red' | 'yellow' | 'green' | 'neutral';
@@ -15,7 +22,7 @@ export function statusTone(status: string): RygTone {
   if (['green','approved','approved_closed','closed','active','present','achieved','on_track','verified_clean','operating','completed','certified'].includes(key)) return 'green';
   return 'neutral';
 }
-const STATUS_LABELS: Record<string, string> = { all_actions_required:'Total actions required',actions_outstanding:'Outstanding actions',inspections_completed:'Completed inspections (excludes Draft)', unclassified:'Draft', action_taken: 'Action taken', action_required: 'Action required', pending_qc: 'Pending Sanitary Inspector review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
+const STATUS_LABELS: Record<string, string> = { all_actions_required:'Action required',all_actions_taken:'Action taken',actions_outstanding:'Action required (pending)',inspections_completed:'Completed inspections (excludes Draft)', unclassified:'Draft', action_taken: 'Action taken', action_required: 'Action required', pending_qc: 'Pending SI review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
 export function statusLabel(status: string) { const key = normalizeStatus(status); return STATUS_LABELS[key] || key.replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase()); }
 export function issueIsOverdue(issue: { status: string; deadlineTimestamp: string }, now = Date.now()) {
   const deadline = Date.parse(issue.deadlineTimestamp);
@@ -24,11 +31,11 @@ export function issueIsOverdue(issue: { status: string; deadlineTimestamp: strin
 
 export interface OperationalFilters { query: string; zoneId: string; wardId: string; moduleId: string; staffId: string; status: string; ryg: string; }
 export const emptyFilters = (): OperationalFilters => ({ query: '', zoneId: 'all', wardId: 'all', moduleId: 'all', staffId: 'all', status: 'all', ryg: 'all' });
-export function matchesFilters(record: { actionRequired?:boolean; zoneId?: string; wardId?: string; moduleId?: string; status?: string; submittedByUserId?: string; assignedDarogaId?: string; reviewerId?: string }, filters: OperationalFilters, searchable: string[]): boolean {
+export function matchesFilters(record: { actionRequired?:boolean; actionTaken?:boolean; zoneId?: string; wardId?: string; moduleId?: string; status?: string; submittedByUserId?: string; assignedDarogaId?: string; reviewerId?: string }, filters: OperationalFilters, searchable: string[]): boolean {
   return (filters.zoneId === 'all' || record.zoneId === filters.zoneId)
     && (filters.wardId === 'all' || record.wardId === filters.wardId)
     && (filters.moduleId === 'all' || record.moduleId === filters.moduleId)
-    && (filters.status === 'all' || (filters.status==='all_actions_required'?Boolean(record.actionRequired||['action_required','action_taken','escalated'].includes(record.status||'')):filters.status==='actions_outstanding'?Boolean((record.actionRequired||['action_required','escalated'].includes(record.status||''))&&record.status!=='action_taken'):filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
+    && (filters.status === 'all' || (filters.status==='all_actions_required'?actionLifecycle(record).required:filters.status==='all_actions_taken'?actionLifecycle(record).taken:filters.status==='actions_outstanding'?actionIsPending(record):filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
     && (filters.ryg === 'all' || statusTone(record.status || '') === filters.ryg)
     && (filters.staffId === 'all' || [record.submittedByUserId, record.assignedDarogaId, record.reviewerId].includes(filters.staffId))
     && (!filters.query.trim() || searchable.join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));

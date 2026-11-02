@@ -10,14 +10,14 @@ export type RoleType =
 
 export type StaffRole =
   | 'SUPERVISOR'     // Business label: Daroga
-  | 'QC'             // Business label: Sanitary Inspector
-  | 'ACTION_OFFICER' // Business label: IEC Member
+  | 'QC'             // Business label: SI
+  | 'ACTION_OFFICER' // Business label: IEC
   | 'EMPLOYEE';      // Business label: Employee
 
 export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
   SUPERVISOR: 'Daroga',
-  QC: 'Sanitary Inspector',
-  ACTION_OFFICER: 'IEC Member',
+  QC: 'SI',
+  ACTION_OFFICER: 'IEC',
   EMPLOYEE: 'Employee'
 };
 
@@ -243,6 +243,7 @@ export interface TimelineEvent {
 
 export interface OperationalReport {
   actionRequired?: boolean;
+  actionTaken?: boolean;
   contacts?: {id?:string;role:string;name:string;phone?:string;email?:string;source:string}[];
   currentOwnerRole?: string;
   stageSince?: string;

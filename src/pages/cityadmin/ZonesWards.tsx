@@ -50,7 +50,7 @@ export const ZonesWards: React.FC<ZonesWardsProps> = ({
   });
 
   const paging=usePagination(cityWards,JSON.stringify([city.id,selectedZoneId,wardFilter,search]));
-  const exportHeaders=['Ward','Zone','Darogas','Sanitary Inspectors'];
+  const exportHeaders=['Ward','Zone','Darogas','SIs'];
   const staffNames=(ward:Ward,role:string)=>users.filter(u=>u.cityId===city.id&&u.role===role&&u.status==='active'&&personnelAssignedToWard(u,ward)).map(u=>u.name).join('; ');
   const exportRows=cityWards.map(w=>[w.name,cityZones.find(z=>z.id===w.zoneId)?.name||'',staffNames(w,'SUPERVISOR'),staffNames(w,'QC')]);
   const exportExcel=async()=>{try{await downloadWorkbook('zones-and-wards.xlsx',exportHeaders,exportRows,'Wards');}catch(e){setExportError(e instanceof Error?e.message:'Export failed.');}};
@@ -155,7 +155,7 @@ export const ZonesWards: React.FC<ZonesWardsProps> = ({
                 <th className="px-5 py-3">Ward Number & Name</th>
                 <th className="px-5 py-3">Zone Membership</th>
                 <th className="px-5 py-3">Assigned Daroga</th>
-                <th className="px-5 py-3 text-right">Sanitary Inspector</th>
+                <th className="px-5 py-3 text-right">SI</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

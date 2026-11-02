@@ -353,7 +353,7 @@ export const INITIAL_USERS: User[] = [
     createdAt: '2025-08-01T09:00:00Z',
     lastActiveAt: '2026-10-27T19:00:00Z'
   },
-  // Staff - Daroga (Supervisors)
+  // Staff - Daroga (Darogas)
   {
     id: 'usr_daroga_vikram',
     name: 'Vikram Singh',
@@ -422,7 +422,7 @@ export const INITIAL_USERS: User[] = [
     createdAt: '2025-05-01T08:00:00Z',
     lastActiveAt: '2026-10-28T18:20:00Z'
   },
-  // Staff - Sanitary Inspectors (QC)
+  // Staff - SIs (QC)
   {
     id: 'usr_qc_devendra',
     name: 'Devendra Verma',
@@ -462,7 +462,7 @@ export const INITIAL_USERS: User[] = [
     createdAt: '2025-04-20T08:00:00Z',
     lastActiveAt: '2026-10-28T17:30:00Z'
   },
-  // Staff - IEC Members (Action Officers)
+  // Staff - IEC users (IEC users)
   {
     id: 'usr_iec_meenakshi',
     name: 'Meenakshi Vyas',
@@ -556,8 +556,8 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     assignedDarogaId: 'usr_daroga_vikram',
     assignedDarogaName: 'Vikram Singh (Daroga)',
     reviewerId: 'usr_qc_devendra',
-    reviewerName: 'Devendra Verma (Sanitary Inspector)',
-    reviewerRole: 'Sanitary Inspector',
+    reviewerName: 'Devendra Verma (SI)',
+    reviewerRole: 'SI',
     reviewedAt: '2026-10-29T08:30:00+05:30',
     status: 'approved',
     overallScore: 94,
@@ -575,7 +575,7 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     timeline: [
       { id: 'tl_1', timestamp: '2026-10-29 06:00 IST', action: 'Shift Rollcall & Beat Assignment', actorName: 'Vikram Singh', actorRole: 'Daroga', remarks: 'Staff deployed with safety jackets and brooms' },
       { id: 'tl_2', timestamp: '2026-10-29 07:15 IST', action: 'Inspection Report Submitted', actorName: 'Vikram Singh', actorRole: 'Daroga', statusBefore: 'pending_submission', statusAfter: 'pending_review' },
-      { id: 'tl_3', timestamp: '2026-10-29 08:30 IST', action: 'Field QC Spot Check Approved', actorName: 'Devendra Verma', actorRole: 'Sanitary Inspector', remarks: 'Physical spot inspection verified Grade A quality. Pavements pristine.', statusBefore: 'pending_review', statusAfter: 'approved' }
+      { id: 'tl_3', timestamp: '2026-10-29 08:30 IST', action: 'Field QC Spot Check Approved', actorName: 'Devendra Verma', actorRole: 'SI', remarks: 'Physical spot inspection verified Grade A quality. Pavements pristine.', statusBefore: 'pending_review', statusAfter: 'approved' }
     ]
   },
   // 2. Toilet Report - Rejected initially, eligible for ULB Escalation
@@ -597,8 +597,8 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     assignedDarogaId: 'usr_daroga_vikram',
     assignedDarogaName: 'Vikram Singh (Daroga)',
     reviewerId: 'usr_qc_devendra',
-    reviewerName: 'Devendra Verma (Sanitary Inspector)',
-    reviewerRole: 'Sanitary Inspector',
+    reviewerName: 'Devendra Verma (SI)',
+    reviewerRole: 'SI',
     reviewedAt: '2026-10-28T12:45:00+05:30',
     status: 'rejected',
     overallScore: 42,
@@ -614,7 +614,7 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     ],
     timeline: [
       { id: 'tl_t1', timestamp: '2026-10-28 11:20 IST', action: 'Daily Midday Inspection Submitted', actorName: 'Vikram Singh', actorRole: 'Daroga', statusBefore: 'pending_submission', statusAfter: 'pending_review' },
-      { id: 'tl_t2', timestamp: '2026-10-28 12:45 IST', action: 'QC Review Rejected with Notice', actorName: 'Devendra Verma', actorRole: 'Sanitary Inspector', remarks: 'Plumbing defect and odor unacceptable for high-density market facility. Requires pump repair and deep bleaching wash.', statusBefore: 'pending_review', statusAfter: 'rejected' }
+      { id: 'tl_t2', timestamp: '2026-10-28 12:45 IST', action: 'QC Review Rejected with Notice', actorName: 'Devendra Verma', actorRole: 'SI', remarks: 'Plumbing defect and odor unacceptable for high-density market facility. Requires pump repair and deep bleaching wash.', statusBefore: 'pending_review', statusAfter: 'rejected' }
     ]
   },
   // 3. Litter Bins Report - Pending Review
@@ -636,8 +636,8 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     assignedDarogaId: 'usr_daroga_manoj',
     assignedDarogaName: 'Manoj Tiwari (Daroga)',
     reviewerId: 'usr_qc_devendra',
-    reviewerName: 'Devendra Verma (Sanitary Inspector)',
-    reviewerRole: 'Sanitary Inspector',
+    reviewerName: 'Devendra Verma (SI)',
+    reviewerRole: 'SI',
     status: 'pending_review',
     overallScore: 82,
     cycleNumber: 1,
@@ -673,8 +673,8 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     assignedDarogaId: 'usr_daroga_kailash',
     assignedDarogaName: 'Kailash Patidar (Daroga)',
     reviewerId: 'usr_qc_rupesh',
-    reviewerName: 'Rupesh Sahu (Sanitary Inspector)',
-    reviewerRole: 'Sanitary Inspector',
+    reviewerName: 'Rupesh Sahu (SI)',
+    reviewerRole: 'SI',
     reviewedAt: '2026-10-27T11:40:00+05:30',
     status: 'action_required',
     overallScore: 54,
@@ -692,7 +692,7 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     ],
     timeline: [
       { id: 'tl_n1', timestamp: '2026-10-27 10:00 IST', action: 'Bi-Weekly Drain Inspection Logged', actorName: 'Kailash Patidar', actorRole: 'Daroga', statusBefore: 'pending_submission', statusAfter: 'pending_review' },
-      { id: 'tl_n2', timestamp: '2026-10-27 11:40 IST', action: 'QC Flagged Critical Obstruction', actorName: 'Rupesh Sahu', actorRole: 'Sanitary Inspector', remarks: 'Requires heavy desilting machinery.', statusBefore: 'pending_review', statusAfter: 'rejected' },
+      { id: 'tl_n2', timestamp: '2026-10-27 11:40 IST', action: 'QC Flagged Critical Obstruction', actorName: 'Rupesh Sahu', actorRole: 'SI', remarks: 'Requires heavy desilting machinery.', statusBefore: 'pending_review', statusAfter: 'rejected' },
       { id: 'tl_n3', timestamp: '2026-10-27 14:15 IST', action: 'ULB Officer Escalated to Action Required', actorName: 'Sunil Joshi', actorRole: 'ULB Officer', remarks: 'Urgent desilting notice issued to Zone 1 Engineering & Sanitation squad.', statusBefore: 'rejected', statusAfter: 'action_required' }
     ]
   },
@@ -715,8 +715,8 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     assignedDarogaId: 'usr_daroga_hardeep',
     assignedDarogaName: 'Hardeep Ahirwar (Daroga)',
     reviewerId: 'usr_qc_rupesh',
-    reviewerName: 'Rupesh Sahu (Sanitary Inspector)',
-    reviewerRole: 'Sanitary Inspector',
+    reviewerName: 'Rupesh Sahu (SI)',
+    reviewerRole: 'SI',
     reviewedAt: '2026-10-26T16:00:00+05:30',
     status: 'action_taken',
     overallScore: 92,
@@ -736,7 +736,7 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
     timeline: [
       { id: 'tl_g1', timestamp: '2026-10-20 08:30 IST', action: 'GVP Identified & Transformation Plan Approved', actorName: 'Hardeep Ahirwar', actorRole: 'Daroga', statusBefore: 'identified', statusAfter: 'action_required' },
       { id: 'tl_g2', timestamp: '2026-10-26 09:30 IST', action: 'Interim Progress Report', actorName: 'Hardeep Ahirwar', actorRole: 'Daroga', remarks: 'Waste cleared; fencing underway.' },
-      { id: 'tl_g3', timestamp: '2026-10-28 15:30 IST', action: 'Corrective Action Completed & Certified', actorName: 'Rupesh Sahu', actorRole: 'Sanitary Inspector', remarks: 'Site inspection verified full beautification.', statusBefore: 'action_required', statusAfter: 'action_taken' }
+      { id: 'tl_g3', timestamp: '2026-10-28 15:30 IST', action: 'Corrective Action Completed & Certified', actorName: 'Rupesh Sahu', actorRole: 'SI', remarks: 'Site inspection verified full beautification.', statusBefore: 'action_required', statusAfter: 'action_taken' }
     ]
   }
 ];
@@ -759,7 +759,7 @@ export const INITIAL_IEC_CLEANLINESS_ISSUES: IecCleanlinessIssue[] = [
     assignedDarogaId: 'usr_daroga_vikram',
     assignedDarogaName: 'Vikram Singh (Daroga)',
     sanitaryInspectorId: 'usr_qc_devendra',
-    sanitaryInspectorName: 'Devendra Verma (Sanitary Inspector)',
+    sanitaryInspectorName: 'Devendra Verma (SI)',
     status: 'pending_review',
     currentCycle: 1,
     deadlineTimestamp: '2026-10-29 15:30 IST',
@@ -778,7 +778,7 @@ export const INITIAL_IEC_CLEANLINESS_ISSUES: IecCleanlinessIssue[] = [
       { id: 't_iec_1', timestamp: '2026-10-27 15:30 IST', action: 'Citizen Grievance Registered', actorName: 'Kailash Chhabra', actorRole: 'IEC Citizen Reporter', remarks: 'GPS Coordinates accurate within 6m' },
       { id: 't_iec_2', timestamp: '2026-10-27 16:00 IST', action: 'Auto-Assigned to Ward Daroga', actorName: 'System Engine', actorRole: 'Workflow Dispatch', remarks: 'Assigned to Vikram Singh (Daroga - Ward 1)' },
       { id: 't_iec_3', timestamp: '2026-10-28 09:45 IST', action: 'Daroga Cleared Site & Uploaded After-Photo', actorName: 'Vikram Singh', actorRole: 'Daroga', remarks: 'Removed 1.2 tons of cardboard & organic refuse via mini tipper IND-09-5412' },
-      { id: 't_iec_4', timestamp: '2026-10-28 11:15 IST', action: 'Sanitary Inspector Verified Clean', actorName: 'Devendra Verma', actorRole: 'Sanitary Inspector', remarks: 'Site verified clean. Escalated to ULB Officer for final closure approval.', statusBefore: 'in_progress', statusAfter: 'pending_review' }
+      { id: 't_iec_4', timestamp: '2026-10-28 11:15 IST', action: 'SI Verified Clean', actorName: 'Devendra Verma', actorRole: 'SI', remarks: 'Site verified clean. Escalated to ULB Officer for final closure approval.', statusBefore: 'in_progress', statusAfter: 'pending_review' }
     ]
   },
   // Issue 2: Reopening Request Pending Decision (has active reopening request with 24h deadline)
@@ -798,7 +798,7 @@ export const INITIAL_IEC_CLEANLINESS_ISSUES: IecCleanlinessIssue[] = [
     assignedDarogaId: 'usr_daroga_manoj',
     assignedDarogaName: 'Manoj Tiwari (Daroga)',
     sanitaryInspectorId: 'usr_qc_devendra',
-    sanitaryInspectorName: 'Devendra Verma (Sanitary Inspector)',
+    sanitaryInspectorName: 'Devendra Verma (SI)',
     status: 'action_required',
     currentCycle: 1,
     deadlineTimestamp: '2026-10-29 18:00 IST',
@@ -824,7 +824,7 @@ export const INITIAL_IEC_CLEANLINESS_ISSUES: IecCleanlinessIssue[] = [
     timeline: [
       { id: 't_re_1', timestamp: '2026-10-24 10:15 IST', action: 'Grievance Registered', actorName: 'Anita Sharma', actorRole: 'Citizen Reporter' },
       { id: 't_re_2', timestamp: '2026-10-25 14:00 IST', action: 'Field Cleanup Attempt 1', actorName: 'Manoj Tiwari', actorRole: 'Daroga', remarks: 'Tractor trolley cleared branches' },
-      { id: 't_re_3', timestamp: '2026-10-26 11:00 IST', action: 'SI Flagged Incomplete Work', actorName: 'Devendra Verma', actorRole: 'Sanitary Inspector', remarks: 'Concrete debris remains. Returned for correction.' },
+      { id: 't_re_3', timestamp: '2026-10-26 11:00 IST', action: 'SI Flagged Incomplete Work', actorName: 'Devendra Verma', actorRole: 'SI', remarks: 'Concrete debris remains. Returned for correction.' },
       { id: 't_re_4', timestamp: '2026-10-28 16:20 IST', action: 'Reopening Request Submitted', actorName: 'Anita Sharma', actorRole: 'Citizen Reporter', remarks: 'Request ID reopen_req_901 created under 24-hr deadline policy.' }
     ]
   },
@@ -845,7 +845,7 @@ export const INITIAL_IEC_CLEANLINESS_ISSUES: IecCleanlinessIssue[] = [
     assignedDarogaId: 'usr_daroga_hardeep',
     assignedDarogaName: 'Hardeep Ahirwar (Daroga)',
     sanitaryInspectorId: 'usr_qc_rupesh',
-    sanitaryInspectorName: 'Rupesh Sahu (Sanitary Inspector)',
+    sanitaryInspectorName: 'Rupesh Sahu (SI)',
     status: 'approved_closed',
     currentCycle: 1,
     deadlineTimestamp: '2026-10-23 08:30 IST',
@@ -864,7 +864,7 @@ export const INITIAL_IEC_CLEANLINESS_ISSUES: IecCleanlinessIssue[] = [
     timeline: [
       { id: 't_cl_1', timestamp: '2026-10-22 08:30 IST', action: 'Complaint Logged', actorName: 'Dr. R. K. Saxena', actorRole: 'Citizen' },
       { id: 't_cl_2', timestamp: '2026-10-22 14:10 IST', action: 'Action Completed', actorName: 'Hardeep Ahirwar', actorRole: 'Daroga' },
-      { id: 't_cl_3', timestamp: '2026-10-22 16:30 IST', action: 'QC Inspection Certified', actorName: 'Rupesh Sahu', actorRole: 'Sanitary Inspector' },
+      { id: 't_cl_3', timestamp: '2026-10-22 16:30 IST', action: 'QC Inspection Certified', actorName: 'Rupesh Sahu', actorRole: 'SI' },
       { id: 't_cl_4', timestamp: '2026-10-23 09:00 IST', action: 'Approved and Closed by ULB Officer', actorName: 'Sunil Joshi', actorRole: 'ULB Officer', remarks: 'Satisfactory resolution within SLA of 24h.' }
     ]
   }

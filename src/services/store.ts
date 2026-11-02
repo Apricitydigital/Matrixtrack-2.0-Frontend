@@ -5,6 +5,7 @@ import { WorkspaceLoader, type Dataset } from './workspace';
 import { ROLE_CAPABILITIES } from './access';
 import { mapCity, mapUser, mapIssue, mapReport, MODULE_KEYS, rolesOf } from './adapters';
 import { reportAudit } from './reportAudit';
+import { ulbAiAvailability } from './reportAiAvailability';
 
 export interface AppStoreData {
   schemaVersion: string; cities: City[]; zones: Zone[]; wards: Ward[]; areas: Area[];
@@ -257,8 +258,10 @@ class MatrixStore {
     const report = this.getReportById(id);
     if (!report) throw new Error('Report not found.');
     if(!this.currentUser || !this.hasCapability(this.currentUser,'escalateOperationalReport',report.cityId))throw new Error('This account cannot request corrective action.');
-    if(!['approved','rejected'].includes(report.status))throw new Error('Action Required is available after a Sanitary Inspector decision.');
+    if(!['approved','rejected'].includes(report.status))throw new Error('Action Required is available after a SI decision.');
     if(!reason.trim())throw new Error('Enter the reason for corrective action.');
+    if(report.moduleId==='toilets')return this.mutate(`/modules/toilet/inspections/${report.backendId}/review`,'POST',{status:'ACTION_REQUIRED',comment:reason});
+    if(report.moduleId==='ctu_gvp')return this.mutate(`/modules/taskforce/reports/${report.backendId}/action-required`,'POST',{remarks:reason,ulbRemark:reason});
     if (report.moduleId === 'litter_bins') {
       if(report.backendType==='CITIZEN_REPORT')return this.mutate(`/modules/twinbin/reports/${report.backendId}/action-required`,'POST',{ulbRemark:reason,remarks:reason});
       if (report.backendType !== 'VISIT_REPORT') throw new Error('This litter-bin report type cannot be escalated.');
@@ -269,7 +272,7 @@ class MatrixStore {
   public async generateOperationalAi(id:string) {
     const report=this.getReportById(id),user=this.currentUser;
     if(!report||!user||user.role!=='ULB_OFFICER'||user.cityId!==report.cityId)throw new Error('ULB Officer access is required to generate this recommendation.');
-    if(!['approved','rejected'].includes(report.status)&&!['APPROVED','REJECTED'].includes(report.qcDecision || ''))throw new Error('ULB AI is available after the Sanitary Inspector decision.');
+    if(!ulbAiAvailability(report).eligible)throw new Error(ulbAiAvailability(report).detail);
     if(!report.backendId)throw new Error('Report identifier is missing.');
     const path=report.moduleId==='toilets'?`/modules/toilet/inspections/${report.backendId}/action-ai`:report.moduleId==='litter_bins'?`/modules/twinbin/reports/${report.backendId}/action-ai`:`/modules/${MODULE_KEYS[report.moduleId]}/records/${report.backendId}/action-ai`;
     if(report.moduleId==='litter_bins'&&report.backendType!=='CITIZEN_REPORT')throw new Error('ULB AI is available for daily Litter Bin reports.');
@@ -277,10 +280,10 @@ class MatrixStore {
     if(generation!==this.generation)throw new Error('Your workspace changed. Please open the report again.');
     const result=response.actionAiResult || response.record?.actionAiResult || response.report?.actionAiResult;
     if(!result)throw new Error('No ULB recommendation was returned.');
-    const ai=reportAudit({actionAiResult:result,actionAiAt:response.actionAiAt || response.record?.actionAiAt}).aiReviews || [];
+    const ai=reportAudit({actionAiResult:result,actionAiAt:response.actionAiAt || response.record?.actionAiAt || response.report?.actionAiAt,actionAiModel:response.actionAiModel || response.record?.actionAiModel || response.report?.actionAiModel}).aiReviews || [];
     report.aiReviews=[...(report.aiReviews || []).filter(r=>r.stage!=='ULB Officer'),...ai];this.notify();return ai;
   }
-  public async markReportActionTaken(_id: string, _remarks: string, _actor: User) { throw new Error('Corrective work must be submitted by the assigned Action Officer with the required photo evidence in the existing portal/app.'); }
+  public async markReportActionTaken(_id: string, _remarks: string, _actor: User) { throw new Error('Corrective work must be submitted by the assigned IEC with the required photo evidence in the existing portal/app.'); }
   public async loadIssue(id: string) {
     const role = this.currentUser?.role;
     const prefix = role === 'ULB_OFFICER' ? 'ulb' : role === 'COMMISSIONER' ? 'commissioner/issues' : 'admin/issues';

@@ -95,7 +95,7 @@ export function briefingNotices(pulse:CityPulse):BriefingNotice[] {
   const notices:BriefingNotice[]=[],t=pulse.official?.totals;
   if(pulse.iec?.overdueInspections>0)notices.push({id:'overdue',title:'Overdue cleanliness inspections',detail:'Review outstanding IEC inspections.',count:pulse.iec.overdueInspections,tone:'red',page:'comm_iec_oversight'});
   if(t?.actionRequired>0)notices.push({id:'action',title:'Corrective action required',detail:'Open the inspection queue for responsible officers.',count:t.actionRequired,tone:'red',page:'comm_inspection_perf'});
-  if(t?.siPending>0)notices.push({id:'reviews',title:'Inspections awaiting review',detail:'Pending Sanitary Inspector decisions.',count:t.siPending,tone:'yellow',page:'comm_inspection_perf'});
+  if(t?.siPending>0)notices.push({id:'reviews',title:'Inspections awaiting review',detail:'Pending SI decisions.',count:t.siPending,tone:'yellow',page:'comm_inspection_perf'});
   if(pulse.plants){const missing=pulse.plants.plantPerformance.filter(p=>p.daysReported===0).length;if(missing>0)notices.push({id:'plants',title:'Plants yet to report',detail:'Check reporting for the selected period.',count:missing,tone:'yellow',page:'comm_plant'});}
   return notices;
 }

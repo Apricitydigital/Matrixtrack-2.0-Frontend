@@ -17,6 +17,166 @@ const profile = { id: 'user-a', role: 'CITY_ADMIN', name: 'Test Administrator', 
 let requests;
 let failures;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+test('large inspection pages reduce round trips while retaining complete records and server caps',async()=>{
+ const {loadInspectionCoverage}=require('../src/services/inspectionCoverage.ts');
+ for(const cap of [100,500]){
+  setToken('large-register-'+cap);const calls=[];
+  global.fetch=async url=>{const u=new URL(url,'http://localhost');if(u.pathname.endsWith('operations-map'))return json({beats:[{id:'beat',zoneId:'z',wardId:'w'}]});
+   const limit=Math.min(cap,Number(u.searchParams.get('limit'))),page=Number(u.searchParams.get('page'));calls.push({limit,page,requested:Number(u.searchParams.get('limit'))});
+   return json({data:Array.from({length:Math.min(limit,1201-(page-1)*limit)},(_,i)=>({id:'r'+((page-1)*limit+i),beatId:'beat',status:'APPROVED',createdAt:'2026-11-02T04:00:00Z'})),meta:{total:1201,totalPages:Math.ceil(1201/limit),limit}});
+  };
+  const data=await loadInspectionCoverage({id:'city-a',enabledModules:['sweeping']},'2026-08-06','2026-11-03',new AbortController().signal);
+  assert.equal(data.visits.length,1201);assert.equal(new Set(data.visits.map(v=>v.id)).size,1201);assert.deepEqual(data.failedModules,[]);assert.equal(calls.length,Math.ceil(1201/cap));assert.ok(calls.every(c=>c.requested===500));
+  await loadInspectionCoverage({id:'city-a',enabledModules:['sweeping']},'2026-08-06','2026-11-03',new AbortController().signal);assert.equal(calls.length,Math.ceil(1201/cap),'same range must reuse the session cache');
+ }
+});
+test('Action required timeline retains SI and ULB decisions without inventing missing dates',()=>{
+ const {reportAudit}=require('../src/services/reportAudit.ts');
+ const raw={id:'r',createdAt:'2026-10-28T03:25:00Z',updatedAt:'2026-11-03T12:00:00Z',status:'ACTION_REQUIRED',qcDecision:'REJECTED',qcRemark:'Waste remains',reviewedByQc:{name:'Saved SI'},ulbRemark:'Clear waste',submittedBy:{name:'Saved Daroga'}};
+ const result=reportAudit(raw);assert.equal(result.timeline.length,3);
+ assert.deepEqual(result.timeline.map(t=>t.action),['Report submitted','REJECTED','ACTION_REQUIRED']);
+ assert.deepEqual(result.timeline.map(t=>t.timestamp),[raw.createdAt,'','']);
+ assert.equal(result.timeline[1].actorName,'Saved SI');assert.equal(result.timeline[2].remarks,'Clear waste');
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{ReportTimeline}=require('../src/components/reports/ReportDocument.tsx');
+ const html=renderToStaticMarkup(React.createElement(ReportTimeline,{report:{timeline:result.timeline}}));assert.match(html,/Rejected/);assert.match(html,/Action required/);assert.match(html,/Not recorded/);
+});
+test('timeline combines nested history, preserves review dates and deduplicates recorded stages',()=>{
+ const {reportAudit}=require('../src/services/reportAudit.ts');
+ const event={id:'ulb-event',at:'2026-10-31T06:00:00Z',event:'ACTION_REQUIRED',actor:{role:'ULB_OFFICER',name:'Saved ULB'},remarks:'Clear waste'};
+ const raw={submittedAt:'2026-10-28T03:25:00Z',createdAt:'2026-10-28T03:20:00Z',status:'ACTION_REQUIRED',qcDecision:'REJECTED',qcReviewedAt:'2026-10-31T05:00:00Z',actionRequiredAt:event.at,statusHistory:[],timeline:[event],payload:{statusHistory:[event]}};
+ const result=reportAudit(raw);assert.equal(result.timeline.length,3);assert.equal(result.timeline[0].timestamp,raw.submittedAt);
+ assert.equal(result.timeline[1].timestamp,raw.qcReviewedAt);assert.equal(result.timeline[2].timestamp,event.at);assert.equal(result.timeline[2].actorName,'Saved ULB');assert.equal(result.timeline[2].remarks,'Clear waste');
+});
+test('saved questionnaire objects and nested Toilet answers appear without workflow fields',()=>{
+ const bin=mapReport({id:'b',inspectionAnswers:[],questionnaire:{q1:{question:'Is the bin clean?',value:'No',remarks:'Waste present'}},status:'REJECTED',qcRemark:'Please clean',reviewedAt:'2026-10-23T12:00:00Z'},'litter_bins','city',[]);
+ assert.equal(bin.questions[0].question,'Is the bin clean?');assert.equal(bin.questions[0].answerValue,'No');assert.equal(bin.decisions.find(d=>d.role==='QC').remarks,'Please clean');
+ const toilet=mapReport({id:'t',answers:{answers:[{code:'T1',question:'Water available?',answer:false}],qcRemarks:'Repair tap',ulbRemark:'Assign repair'},status:'ACTION_TAKEN',payload:{qcRemarks:'Repair tap',ulbReviewedBy:{name:'Recorded ULB'},ulbReviewedAt:'2026-10-24T10:00:00Z'},qcDecision:'REJECTED'},'toilets','city',[]);
+ assert.equal(toilet.questions.length,1);assert.equal(toilet.questions[0].answerValue,false);assert.equal(toilet.decisions.find(d=>d.role==='QC').remarks,'Repair tap');
+ assert.equal(toilet.decisions.find(d=>d.role==='ULB_OFFICER').name,'Recorded ULB');assert.equal(toilet.decisions.find(d=>d.role==='ULB_OFFICER').decision,'ACTION_REQUIRED');
+ const legacy=mapReport({id:'legacy',payload:{qcRemark:'Saved SI reason',ulbRemark:'Saved ULB reason'}},'sweeping','city',[]);
+ assert.equal(legacy.decisions.find(d=>d.role==='QC').remarks,'Saved SI reason');assert.equal(legacy.decisions.find(d=>d.role==='ULB_OFFICER').remarks,'Saved ULB reason');
+});
+test('assignment errors distinguish an unavailable route from a missing city location',()=>{
+ const {assignmentError}=require('../src/services/assignmentError.ts'),{ApiError}=require('../src/services/api.ts');
+ assert.match(assignmentError(new ApiError(404,'Request failed (404)')),/administrator to update the service/);
+ assert.equal(assignmentError(new ApiError(404,'Location not found in this city')),'Location not found in this city');
+ assert.equal(assignmentError(new ApiError(409,'Assignments changed. Refresh.')),'Assignments changed. Refresh.');
+});
+test('frontend role names retain backend role identifiers',()=>{
+ const {ROLE_LABELS,displayRoleText}=require('../src/services/presentation.ts'),{PERSONNEL_ROLES}=require('../src/services/personnel.ts');
+ assert.equal(displayRoleText('Pending QC review; Supervisor assigned; Action Officer notified.'),'Pending SI review; Daroga assigned; IEC notified.');
+ for(const [key,label] of Object.entries({SUPERVISOR:'Daroga',QC:'SI',ACTION_OFFICER:'IEC'})){
+  assert.equal(ROLE_LABELS[key],label);assert.equal(PERSONNEL_ROLES[key],label);
+ }
+});
+test('report exports carry dates and Apricty branding while preserving numeric data and import templates',async()=>{
+ const {downloadWorkbook,downloadAuditWorkbook}=require('../src/services/spreadsheets.ts'),{downloadCsv,parseCsv}=require('../src/services/csv.ts'),{Workbook}=require('exceljs');
+ const originalDocument=global.document,originalCreate=URL.createObjectURL;let blob,filename;
+ global.document={createElement:()=>({setAttribute(k,v){this[k]=v;},click(){filename=this.download;}}),body:{appendChild(){},removeChild(){}}};URL.createObjectURL=value=>{blob=value;return originalCreate(value);};
+ try{
+  await downloadWorkbook('service-report-2026-08-01-to-2026-11-03.xlsx',['Entity','Completed'],[['Beat 1',12]],'Services');
+  const workbook=new Workbook();await workbook.xlsx.load(await blob.arrayBuffer());assert.equal(filename,'service-report-2026-08-01-to-2026-11-03.xlsx');assert.equal(workbook.worksheets[0].name,'Report overview');assert.match(workbook.getWorksheet('Report overview').getCell('B3').text,/2026-08-01 to 2026-11-03/);assert.equal(workbook.getWorksheet('Report overview').getCell('B6').text,'Apricty Digital Labs');assert.equal(workbook.getWorksheet('Services').getCell('B2').value,12);assert.match(workbook.getWorksheet('Services').headerFooter.oddFooter,/Powered by Apricty Digital Labs/);
+  await downloadWorkbook('toilets-template.xlsx',['Zone Name','Ward Name'],[],'Locations');const template=new Workbook();await template.xlsx.load(await blob.arrayBuffer());assert.equal(template.worksheets.length,1);assert.equal(template.worksheets[0].getCell('A1').text,'Zone Name');
+  await downloadAuditWorkbook('full-report-2026-08-01-to-2026-11-03.xlsx',[{name:'Records',headers:['Metric','Value'],rows:[['Missing',null],['Completed',12]]}]);const audit=new Workbook();await audit.xlsx.load(await blob.arrayBuffer());assert.equal(audit.getWorksheet('Records').getCell('B2').text,'Not available');assert.equal(audit.getWorksheet('Records').getCell('B3').value,12);
+  downloadCsv('service-report-2026-08-01-to-2026-11-03.csv','Module,Count\r\nSweeping,12');const csv=parseCsv(await blob.text());assert.equal(csv[1][1],'12');assert.ok(csv[0].includes('Powered by Apricty Digital Labs'));assert.ok(csv[1].includes('2026-08-01'));assert.ok(csv[1].includes('2026-11-03'));
+  downloadCsv('import-template.csv','Zone,Ward');assert.equal(await blob.text(),'Zone,Ward');
+ }finally{global.document=originalDocument;URL.createObjectURL=originalCreate;}
+});
+test('multi-zone report data applies the same entity and visit scope and does not invent attendance totals',()=>{
+ const {commissionerReportData}=require('../src/services/commissionerReportData.ts'),{emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+ const zones=['z1','z2','z3'].map((id,i)=>({id,name:'Zone '+(i+1),cityId:'c'})),wards=zones.map((z,i)=>({id:'w'+i,zoneId:z.id,cityId:'c',name:'Ward '+i}));
+ const coverage={...emptyCoverage(),inventoryAvailable:true,from:'2026-11-01',to:'2026-11-03',assets:zones.map((z,i)=>({id:'a'+i,module:'sweeping',zoneId:z.id,wardId:'w'+i})),visits:zones.map((z,i)=>({id:'r'+i,assetId:'a'+i,module:'sweeping',zoneId:z.id,wardId:'w'+i,status:'APPROVED',submittedAt:'2026-11-02T04:00:00Z'}))};
+ const report=commissionerReportData({city:{id:'c',enabledModules:['sweeping']},from:'2026-11-01',to:'2026-11-03',zones,wards,users:[],personnelComplete:true,selectedZoneIds:['z1','z2'],coverage,pulse:{pending:0,errors:{},attendance:{totalRecords:99}}});
+ assert.equal(report.modules[0].totalEntities,2);assert.equal(report.modules[0].achieved,2);assert.equal(report.facts.find(f=>f.id==='attendanceRecords').value,null);assert.equal(report.scope,'Zone 1, Zone 2');
+ const uncertain=commissionerReportData({city:{id:'c',enabledModules:['sweeping']},from:'2026-11-01',to:'2026-11-03',zones,wards,users:[],personnelComplete:true,selectedZoneIds:['z1','z2'],coverage:{...coverage,visits:[...coverage.visits,{...coverage.visits[0],id:'unknown',zoneId:''}]},pulse:{pending:0,errors:{}}});assert.equal(uncertain.modules[0].achieved,null,'Unknown report geography must not become an exact scoped total');
+});
+
+test('late SI review preserves submission day and corrective images stay with their response',()=>{
+ const {renderToStaticMarkup}=require('react-dom/server'),React=require('react'),{DecisionHistory}=require('../src/components/reports/ReportDocument.tsx');
+ const r=mapReport({id:'late',createdAt:'2026-10-28T04:00:00Z',updatedAt:'2026-10-31T08:00:00Z',qcReviewedAt:'2026-10-31T08:00:00Z',status:'ACTION_TAKEN',qcDecision:'APPROVED',actionTakenAt:'2026-11-01T08:00:00Z',actionNote:'Area cleared',actionPhotos:['https://example.test/corrective.jpg']},'toilets','city-a',[]);
+ assert.equal(r.inspectionDate,'2026-10-28');assert.equal(r.submittedAt,'2026-10-28T04:00:00Z');assert.equal(r.reviewedAt,'2026-10-31T08:00:00Z');assert.equal(r.photos[0].timestamp,'2026-11-01T08:00:00Z');
+ const html=renderToStaticMarkup(React.createElement(DecisionHistory,{report:r}));assert.match(html,/Area cleared/);assert.match(html,/action-evidence-gallery/);assert.match(html,/corrective.jpg/);
+});
+test('SI timing excludes unrecorded decisions and treats a three-day review as late',()=>{
+ const src=fs.readFileSync('.publish/backend/src/modules/siPerformance.ts','utf8'),a=src.indexOf('function classify('),b=src.indexOf('export async function computeSiPerformance',a);
+ const code=ts.transpileModule(src.slice(a,b),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ const classify=new Function('siDecision','PENDING_STATUSES','DAY_MS',code+';return classify;')((d,status)=>d||(['APPROVED','REJECTED'].includes(status)?status:null),new Set(['SUBMITTED']),86400000);
+ const createdAt=new Date('2026-10-28T04:00:00Z'),deadline=Date.parse('2026-10-29T18:30:00Z'),now=Date.parse('2026-10-31T08:00:00Z');
+ assert.equal(classify({id:'r',status:'APPROVED',createdAt,reviewerId:'si',reviewedAt:new Date(now)},'si',new Map(),deadline,now).state,'late');
+ assert.equal(classify({id:'r',status:'APPROVED',createdAt,reviewerId:'si'},'si',new Map(),deadline,now).state,'timingUnavailable');
+ const {performanceForRole}=require('../src/services/performanceModel.ts');assert.equal(performanceForRole({moduleStats:{SWEEPING:{onTime:9,late:1,overdue:0,timingUnavailable:1}}},'QC','SWEEPING').performance,null);
+});
+test('User Performance keeps formulas behind info icons and uses user terminology',()=>{
+ const {renderToStaticMarkup}=require('react-dom/server'),React=require('react'),{UserPerformanceInsights}=require('../src/pages/commissioner/PerformanceWorkspaceInsights.tsx');
+ const html=renderToStaticMarkup(React.createElement(UserPerformanceInsights,{groups:{SUPERVISOR:[],QC:[],ACTION_OFFICER:[]},role:'SUPERVISOR',onRole:()=>{},rawStats:{},wards:[]}));assert.match(html,/Average user score/);assert.match(html,/Individual performance/);assert.doesNotMatch(html,/SCORING GUIDE|Officer average|Workload score|Why the two percentages differ/);assert.match(html,/About Inspection target achievement/);
+});
+test('Action required stays cumulative across IEC submission, verification and reopened work',()=>{
+ const {actionLifecycle,actionIsPending}=require('../src/services/actionLifecycle.ts');
+ const {inspectionActions,emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+ const {ulbScopeData,ulbDrillVisits}=require('../src/services/ulbDashboard.ts');
+ const {emptyFilters,matchesFilters}=require('../src/services/presentation.ts');
+ const initial={id:'sweeping:report',module:'sweeping',status:'ACTION_REQUIRED',zoneId:'z',wardId:'w',raw:{payload:{actionRequiredAt:'2026-11-02T04:00:00Z'}}};
+ const data=visit=>({...emptyCoverage(),inventoryAvailable:true,visits:[visit]});
+ assert.deepEqual(inspectionActions(data(initial)),{totalRequired:1,taken:0,outstanding:1});
+ const taken={...initial,status:'ACTION_TAKEN',raw:{payload:{actionRequiredAt:'2026-11-02T04:00:00Z',actionTakenAt:'2026-11-02T05:00:00Z'}}};
+ assert.deepEqual(inspectionActions(data(taken)),{totalRequired:1,taken:1,outstanding:0});
+ const verified={...taken,status:'APPROVED'};assert.deepEqual(inspectionActions(data(verified)),{totalRequired:1,taken:1,outstanding:0});
+ const ulb=ulbScopeData(data(verified));assert.equal(ulb.actionRequiredTotal,1);assert.equal(ulb.actionTakenTotal,1);assert.equal(ulbDrillVisits(ulb,'action_required').length,1);assert.equal(ulbDrillVisits(ulb,'action_taken').length,1);
+ assert.equal(actionIsPending({...taken,status:'ACTION_REQUIRED'}),true);
+ const mapped={status:'approved',actionRequired:true,actionTaken:true};assert.equal(matchesFilters(mapped,{...emptyFilters(),status:'all_actions_required'},[]),true);assert.equal(matchesFilters(mapped,{...emptyFilters(),status:'all_actions_taken'},[]),true);
+ assert.deepEqual(actionLifecycle({status:'APPROVED',actionAiResult:{recommendation:'ACTION_REQUIRED'},statusHistory:[{event:'NO_ACTION_REQUIRED'}]}),{required:false,taken:false});
+ assert.deepEqual(actionLifecycle({status:'APPROVED',statusHistory:[{statusAfter:'ACTION_REQUIRED'},{statusAfter:'ACTION_TAKEN'}]}),{required:true,taken:true});
+});
+test('Hindi voice vocabulary preserves ward numbers and uses explicit dates without guessing kal',()=>{
+ const {normalizeInsightQuestion}=require('../src/services/insightQuestion.ts'),{questionPeriod}=require('../src/services/insightDates.ts'),{insightTopic}=require('../src/services/commissionerAssistant.ts');
+ assert.match(normalizeInsightQuestion('वार्ड १२ का निरीक्षण लक्ष्य'),/ward 12.*inspection target/);
+ assert.equal(insightTopic('उपस्थिति कितने'), 'attendance');
+ assert.deepEqual(questionPeriod('पिछले ७ दिन के निरीक्षण',{from:'2026-01-01',to:'2026-01-01'},'2026-11-03'),{from:'2026-10-28',to:'2026-11-03'});
+ assert.throws(()=>questionPeriod('कल के निरीक्षण',{from:'2026-11-01',to:'2026-11-03'},'2026-11-03'),/exact date/);
+});
+test('inspection register reconciles the overview and keeps SI queues distinct from corrective verification',()=>{
+ const {registerInsightData}=require('../src/services/registerInsights.ts');
+ const {emptyFilters,matchesFilters}=require('../src/services/presentation.ts');
+ const rows=[];
+ for(const [status,count] of Object.entries({approved:100,pending_review:1047,rejected:1,action_required:4,unclassified:106}))for(let i=0;i<count;i++)rows.push({id:`${status}-${i}`,status,moduleId:'sweeping',zoneId:'z',wardId:'w'});
+ const data=registerInsightData(rows,['sweeping']);
+ assert.equal(data.statuses.reduce((n,s)=>n+s.value,0),1258);
+ assert.equal(data.statuses.find(s=>s.id==='approved').label,'Cleaned');
+ assert.equal(data.statuses.find(s=>s.id==='unclassified').label,'Draft');
+ assert.equal(data.queues[0].value,1047);
+ assert.equal(rows.filter(r=>matchesFilters(r,{...emptyFilters(),status:'inspections_completed'},[])).length,1152);
+ const taken={id:'taken',moduleId:'sweeping',status:'action_taken',actionRequired:true};
+ const lifecycle=registerInsightData([...rows,taken],['sweeping']);
+ assert.equal(lifecycle.queues[0].value,1047);
+ assert.equal(lifecycle.statuses.find(s=>s.id==='action_taken').value,1);
+ assert.equal(matchesFilters(taken,{...emptyFilters(),status:'all_actions_required'},[]),true);
+ assert.equal(matchesFilters(taken,{...emptyFilters(),status:'pending_review'},[]),false);
+ const scoped=rows.filter(r=>matchesFilters(r,{...emptyFilters(),zoneId:'other'},[]));
+ assert.equal(registerInsightData(scoped,['nala','ctu_gvp']).statuses.reduce((n,s)=>n+s.value,0),0);
+ assert.deepEqual(registerInsightData(scoped,['nala','ctu_gvp']).queues.map(q=>q.id).sort(),['ctu_gvp','nala']);
+});
+test('ULB AI availability follows permanent SI decisions and explains pending records',()=>{
+ const {ulbAiAvailability,canViewUlbAi}=require('../src/services/reportAiAvailability.ts');
+ const report={moduleId:'sweeping',status:'pending_review'};
+ assert.equal(ulbAiAvailability(report).eligible,false);assert.match(ulbAiAvailability(report).title,/Waiting for SI/);
+ assert.equal(ulbAiAvailability({...report,qcDecision:'approved'}).eligible,true);
+ assert.equal(ulbAiAvailability({...report,status:'action_taken',qcDecision:'REJECTED'}).eligible,true);
+ assert.equal(ulbAiAvailability({...report,moduleId:'litter_bins',backendType:'REGISTRATION',qcDecision:'APPROVED'}).eligible,false);
+ assert.equal(ulbAiAvailability({...report,moduleId:'litter_bins',backendType:'CITIZEN_REPORT',qcDecision:'APPROVED'}).eligible,true);
+ assert.equal(canViewUlbAi('COMMISSIONER'),true);assert.equal(canViewUlbAi('QC'),false);assert.equal(canViewUlbAi('SUPERVISOR'),false);
+});
+test('stored ULB AI survives serialized and legacy response shapes with provenance',()=>{
+ const {reportAudit}=require('../src/services/reportAudit.ts');
+ const raw={payload:{ulbAiResult:JSON.stringify({summary:'Send a corrective crew',recommendedAction:'Clear the overflow',reasons:['Overflow visible'],confidence:0.9}),ulbAiAt:'2026-11-02T04:00:00Z'},actionAiModel:'stored-model'};
+ const ai=reportAudit(raw).aiReviews[0];
+ assert.equal(ai.stage,'ULB Officer');assert.equal(ai.summary,'Send a corrective crew');assert.equal(ai.recommendedAction,'Clear the overflow');assert.equal(ai.confidence,90);assert.equal(ai.generatedAt,'2026-11-02T04:00:00Z');assert.equal(ai.model,'stored-model');
+ assert.equal(reportAudit({actionAiResult:'Legacy plain summary'}).aiReviews[0].summary,'Legacy plain summary');
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{AiCards}=require('../src/components/reports/ReportAiPanel.tsx');
+ const report={status:'pending_review',moduleId:'sweeping',aiReviews:[ai]};
+ assert.match(renderToStaticMarkup(React.createElement(AiCards,{report,stage:'ULB Officer',role:'COMMISSIONER'})),/Clear the overflow/);
+ assert.doesNotMatch(renderToStaticMarkup(React.createElement(AiCards,{report,role:'QC'})),/Clear the overflow/);
+ assert.match(renderToStaticMarkup(React.createElement(AiCards,{report:{...report,aiReviews:[]},stage:'ULB Officer',role:'COMMISSIONER'})),/Waiting for SI review/);
+});
 beforeEach(() => {
   profile.role = 'CITY_ADMIN';
   matrixStore.logout(); values.clear(); requests = []; failures = new Map();
@@ -100,10 +260,10 @@ test('unscored performance role charts remain visible and selectable with honest
  const {UserPerformanceInsights}=require('../src/pages/commissioner/UserPerformanceInsights.tsx');
  const groups={SUPERVISOR:[],QC:[{user:{id:'q',name:'Inspector'},stat:{availability:'loading',performance:null,scoreBasis:'on_time'}}],ACTION_OFFICER:[]};
  const html=renderToStaticMarkup(React.createElement(UserPerformanceInsights,{groups,role:'QC',onRole:()=>{},rawStats:{},wards:[],loadStates:{QC:{status:'loading'},SUPERVISOR:{status:'ready'},ACTION_OFFICER:{status:'error'}}}));
- assert.match(html,/Loading workload/);assert.match(html,/Sanitary Inspector: Loading/);assert.match(html,/IEC Member: Unavailable/);assert.match(html,/Performance is still loading/);
- assert.doesNotMatch(html,/disabled=""[^>]+aria-label="IEC Member: Unavailable/);
+ assert.match(html,/Loading progress/);assert.match(html,/SI: Loading/);assert.match(html,/IEC: Unavailable/);assert.match(html,/Performance is still loading/);
+ assert.doesNotMatch(html,/disabled=""[^>]+aria-label="IEC: Unavailable/);
  const failed=renderToStaticMarkup(React.createElement(UserPerformanceInsights,{groups:{...groups,QC:[{user:{id:'q',name:'Inspector'},stat:{availability:'error',performance:null,scoreBasis:'on_time'}}]},role:'QC',onRole:()=>{},rawStats:{},wards:[],loadStates:{QC:{status:'ready',officerErrors:{q:'Unavailable'}}}}));
- assert.match(failed,/Sanitary Inspector: Unavailable/);assert.match(failed,/Workload unavailable/);assert.match(failed,/Summary counts cover the loaded officers only/);
+ assert.match(failed,/SI: Unavailable/);assert.match(failed,/Progress unavailable/);assert.match(failed,/Summary counts cover the available users only/);
 });
 
 test('compact dashboard reader uses one request, preserves exact metrics and separates detailed report cache', async()=>{
@@ -592,7 +752,7 @@ test('plant totals keep MT and liquid quantities separate and exclude incomparab
 
 test('display terminology matches MatrixTrack 2.0 frontend business labels', () => {
   const { ROLE_LABELS, MODULE_LABELS } = require('../src/services/presentation.ts');
-  assert.equal(ROLE_LABELS.EMPLOYEE, 'Employee'); assert.equal(ROLE_LABELS.QC, 'Sanitary Inspector'); assert.equal(ROLE_LABELS.ACTION_OFFICER, 'IEC Member'); assert.equal(MODULE_LABELS.toilets, 'Cleanliness of Toilet'); assert.equal(MODULE_LABELS.nala, 'Nala'); assert.equal(MODULE_LABELS.ctu_gvp, 'CTU/GVP Transformation');
+  assert.equal(ROLE_LABELS.EMPLOYEE, 'Employee'); assert.equal(ROLE_LABELS.QC, 'SI'); assert.equal(ROLE_LABELS.ACTION_OFFICER, 'IEC'); assert.equal(MODULE_LABELS.toilets, 'Cleanliness of Toilet'); assert.equal(MODULE_LABELS.nala, 'Nala'); assert.equal(MODULE_LABELS.ctu_gvp, 'CTU/GVP Transformation');
 });
 
 test('module-specific role performance matches the existing frontend formulas', () => {
@@ -730,7 +890,7 @@ test('ULB login uses assigned auth-profile modules when the city module director
   assert.equal(matrixStore.error, ''); assert.equal(matrixStore.currentUser.role, 'ULB_OFFICER');
   assert.deepEqual(matrixStore.getCities()[0].enabledModules, ['sweeping']);
   assert.equal(requests.some(r => r.path === '/city/modules'), false);
-  assert.ok(requests.some(r => r.path === '/modules/SWEEPING/records'));
+  assert.equal(requests.some(r => r.path === '/modules/SWEEPING/records'), false, 'complete register owns report loading; navigation must not duplicate it');
   assert.equal(requests.some(r => r.path === '/modules/TOILET/records'), false);
 });
 
@@ -769,7 +929,7 @@ test('ward contact candidates respect city, module and intersecting officer scop
 async function ulbReportSession() {
   profile.role = 'ULB_OFFICER'; const original = global.fetch;
   global.fetch = async (url, options) => new URL(url, 'http://localhost').pathname.endsWith('/auth/me') ? json({ user: { ...profile, modules: [{ key: 'SWEEPING', cityId: 'city-a' }] } }) : original(url, options);
-  await matrixStore.login('ulb@example.test', 'test-password'); await matrixStore.ensurePage('ulb_reports'); return matrixStore.getReports()[0];
+  await matrixStore.login('ulb@example.test', 'test-password'); await matrixStore.ensurePage('ulb_reports'); await matrixStore.loadCollection('reports'); return matrixStore.getReports()[0];
 }
 
 test('ULB AI preserves recommendation reasons and bilingual action without changing officer decision', async () => {
@@ -781,7 +941,7 @@ test('ULB AI preserves recommendation reasons and bilingual action without chang
 
 test('ULB corrective action requires completed SI decision and remarks; rejected writes retain report state', async () => {
   const r = await ulbReportSession(); const before = r.status; r.status = 'pending_review'; const count = requests.length;
-  await assert.rejects(matrixStore.escalateOperationalReport(r.id, 'Cleanup needed', '', matrixStore.currentUser), /after a Sanitary Inspector/); assert.equal(requests.length, count);
+  await assert.rejects(matrixStore.escalateOperationalReport(r.id, 'Cleanup needed', '', matrixStore.currentUser), /after a SI/); assert.equal(requests.length, count);
   r.status = before; await assert.rejects(matrixStore.escalateOperationalReport(r.id, '  ', '', matrixStore.currentUser), /reason/);
   failures.set('/modules/SWEEPING/records/record-a/status', 403); await assert.rejects(matrixStore.escalateOperationalReport(r.id, 'Cleanup needed', '', matrixStore.currentUser), /refused/); assert.equal(r.status, before);
   const request = requests.at(-1); assert.equal(request.options.method, 'PATCH'); assert.deepEqual(JSON.parse(request.options.body), { status: 'ACTION_REQUIRED', remarks: 'Cleanup needed' });
@@ -797,7 +957,7 @@ test('ULB corrective action success refreshes the report queue and Commissioner 
     return response;
   };
   await matrixStore.escalateOperationalReport(r.id, 'Fresh cleanup needed', '', matrixStore.currentUser);
-  await matrixStore.ensurePage('ulb_reports'); assert.equal(updated, true); assert.equal(matrixStore.getReports()[0].status, 'action_required');
+  await matrixStore.ensurePage('ulb_reports'); await matrixStore.loadCollection('reports'); assert.equal(updated, true); assert.equal(matrixStore.getReports()[0].status, 'action_required');
   matrixStore.currentUser.role = 'COMMISSIONER'; const count = requests.length;
   await assert.rejects(matrixStore.escalateOperationalReport(r.id, 'Another request', '', matrixStore.currentUser), /cannot request/); assert.equal(requests.length, count);
 });
@@ -813,7 +973,7 @@ test('ULB overview derives scoped outcomes and targets only from complete author
 });
 
 test('ULB overview starts with geography and keeps field-team performance without ULB scoring', () => {
-  const { pageDatasets } = require('../src/services/workspace.ts'); assert.deepEqual(pageDatasets('ulb_dashboard'), ['geography']); assert.deepEqual(pageDatasets('ulb_reports'), ['geography', 'reports']);
+  const { pageDatasets } = require('../src/services/workspace.ts'); assert.deepEqual(pageDatasets('ulb_dashboard'), ['geography']); assert.deepEqual(pageDatasets('ulb_reports'), ['geography']);
   const source = fs.readFileSync(require.resolve('../src/pages/commissioner/UserPerformance.tsx'), 'utf8'); assert.doesNotMatch(source, /\['ULB_OFFICER',/);
 });
 
@@ -847,7 +1007,7 @@ test('ULB opens exact pending litter-bin records from the authorized register wi
   const visit = inspectionVisit(raw, 'litter_bins', 'city-a'), before = requests.length;
   const id = await matrixStore.loadOperationalReport('litter_bins', raw.id, { name: 'Litter Bin A', wardId: 'ward-a' }, visit.raw);
   assert.equal(requests.length, before); const report = matrixStore.getReportById(id); assert.equal(report.backendId, 'older-bin-report'); assert.equal(report.status, 'pending_review'); assert.equal(report.questions.length, 1); assert.equal(report.backendType, 'VISIT_REPORT');
-  await assert.rejects(matrixStore.escalateOperationalReport(id, 'Cleanup needed', '', matrixStore.currentUser), /after a Sanitary Inspector/); assert.equal(requests.length, before);
+  await assert.rejects(matrixStore.escalateOperationalReport(id, 'Cleanup needed', '', matrixStore.currentUser), /after a SI/); assert.equal(requests.length, before);
   await assert.rejects(matrixStore.loadOperationalReport('litter_bins', raw.id, {}, { ...raw, cityId: 'city-b' }), /outside your city/);
   await assert.rejects(matrixStore.loadOperationalReport('litter_bins', raw.id, {}, { ...raw, id: 'different' }), /identifier does not match/);
 });
@@ -875,7 +1035,7 @@ test('ULB navigation includes pending review, analytics and plant uploads withou
   const { getNavGroups, canAccessPage } = require('../src/components/layout/Sidebar.tsx'); const { pageDatasets } = require('../src/services/workspace.ts');
   const groups = getNavGroups('ULB_OFFICER'); assert.equal(groups.some(g => g.groupTitle === 'CONNECTED PRODUCTS'), false);
   for (const page of ['ulb_pending', 'ulb_user_perf', 'prod_plant', 'ulb_attendance']) assert.equal(canAccessPage('ULB_OFFICER', page), true);
-  assert.deepEqual(pageDatasets('ulb_pending'), ['geography', 'reports']); assert.deepEqual(pageDatasets('ulb_attendance'), ['geography']);
+  assert.deepEqual(pageDatasets('ulb_pending'), ['geography']); assert.deepEqual(pageDatasets('ulb_attendance'), ['geography']);
 });
 
 test('latest received dates use the attendance latest-range default and newest plant entry independently', async () => {
@@ -1288,7 +1448,8 @@ test('coverage distinguishes 218 recorded inspections from 189 credited toward a
   const data = { ...emptyCoverage(), inventoryAvailable: true, assets: Array.from({ length: 2361 }, (_, i) => ({ id: String(i), module: 'toilets', zoneId: 'z', wardId: 'w' })), visits: Array.from({ length: 218 }, (_, i) => ({ id: 'report-' + i, assetId: String(i), module: 'toilets', zoneId: 'z', wardId: 'w' })) };
   const official = summarizeZones({ zones: [{ zoneId: 'z', zoneName: 'Zone 1', modules: [{ module: 'TOILET', target: 1511, completed: 189, targetConfigured: true }] }] });
   const html = renderToStaticMarkup(React.createElement(CoverageOverview, { data, loading: false, zone: '', ward: '', zones: [], rankings: [], official, from: '2026-10-31', to: '2026-10-31', onZone: () => { } }));
-  assert.match(html, /Achieved \(inspections completed\)<\/span><strong>218/); assert.match(html, /189 of 1,511 inspections counted toward target/); assert.match(html, /12.5% achievement/); assert.match(html, /218 inspection records/); assert.match(html, /employee assignments, inspection completeness and daily or period limits/); assert.doesNotMatch(html, /189 of 1,511 inspections completed|29 rejected|29 incomplete/);
+  const metrics=require('../src/services/inspectionMetrics.ts').inspectionMetrics(data,{},official.totals);assert.equal(metrics.achieved,218);assert.equal(metrics.delivery.completed,189);assert.equal(metrics.delivery.target,1511);
+  assert.match(html,/Unique entities inspected: 218/);assert.match(html,/About Coverage and inspection targets/);assert.doesNotMatch(html,/employee assignments, inspection completeness|189 of 1,511 inspections completed|29 rejected|29 incomplete/);
 });
 
 
@@ -1925,7 +2086,7 @@ test('action lifecycle totals retain required count through Action Taken while s
 test('pending reports retain photo storage URLs, nested point evidence and recorded SI AI',()=>{
  const {mapReport}=require('../src/services/adapters.ts');
  const raw={id:'pending-photo',status:'SUBMITTED',createdAt:'2026-11-02T04:00:00Z',photos:[],payload:{photos:[{storageUrl:'https://example.test/first.jpg'}],points:[{answers:[{photos:['https://example.test/second.jpg']}]}],surveyAnswers:[{answerType:'PHOTO',answer:'https://example.test/third.jpg'}]},autoQcResult:{summary:'Recorded SI visual assistance',checks:[]}};
- const report=mapReport(raw,'sweeping','city',[]);assert.equal(report.status,'pending_review');assert.equal(report.photos.length,3);assert.equal(report.aiReviews[0].stage,'Sanitary Inspector');
+ const report=mapReport(raw,'sweeping','city',[]);assert.equal(report.status,'pending_review');assert.equal(report.photos.length,3);assert.equal(report.aiReviews[0].stage,'SI');
  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');const {ReportAiPanel}=require('../src/components/reports/ReportAiPanel.tsx');
  const commissioner=renderToStaticMarkup(React.createElement(ReportAiPanel,{report,currentUser:{role:'COMMISSIONER'}}));assert.ok(commissioner.includes('Commissioner oversight'));assert.ok(commissioner.includes('Recorded SI visual assistance'));assert.ok(!commissioner.includes('Generate ULB suggestion'));
  const qc=renderToStaticMarkup(React.createElement(ReportAiPanel,{report:{...report,aiReviews:[...report.aiReviews,{...report.aiReviews[0],stage:'ULB Officer',summary:'Downstream recommendation'}]},currentUser:{role:'QC'}}));assert.ok(!qc.includes('Downstream recommendation'));
@@ -1957,3 +2118,44 @@ test('an expired request from a previous account cannot clear the new login toke
  const original=global.fetch;let release;setToken('old-account');global.fetch=()=>new Promise(resolve=>{release=()=>resolve(json({error:'Expired'},401));});
  try{const old=api('/city/users',{cache:'no-store'}).catch(e=>e);await new Promise(resolve=>setImmediate(resolve));setToken('new-account');release();assert.equal((await old).status,401);assert.equal(getToken(),'new-account');}finally{global.fetch=original;}
 });
+
+
+test('chart distributions reconcile zero and positive partitions without treating missing or negative values as zero',()=>{
+ const {breakdownData}=require('../src/services/chartData.ts');
+ assert.deepEqual(breakdownData([{value:20},{value:80}]),{available:true,total:100,shares:[20,80]});
+ assert.equal(breakdownData([{value:0},{value:0}]).total,0);
+ for(const value of [null,undefined,-1,NaN])assert.equal(breakdownData([{value:3},{value}]).available,false);
+});
+
+test('unmatched employee reconciliation buckets never count as ranked municipal wards',()=>{
+ const {isAdministrativeWard,wardAssessmentReason}=require('../src/services/wardAvailability.ts');
+ assert.equal(isAdministrativeWard({wardName:'Not Matched Employees'}),false);assert.equal(isAdministrativeWard({name:'Ward 17'}),true);
+ assert.match(wardAssessmentReason({rankable:false}),/does not prove/);
+ const {applyFixedWardWeights}=require('../src/services/wardScoring.ts');
+ const out=applyFixedWardWeights({rankings:[{wardId:'bucket',wardName:'Not Matched Employees',rankable:false},{wardId:'actual',wardName:'Ward 17',scoringPolicy:'WORKFORCE_30_EQUAL_70',rankable:false}]});
+ assert.deepEqual(out.rankings.map(r=>r.wardId),['actual']);assert.equal(out.rankings[0].cityRank,null);
+});
+
+test('audit export fetches every attendance page and refuses missing, repeating or changing pagination totals',async()=>{
+ const {allAuditPages}=require('../src/services/commissionerAuditExport.ts'),original=global.fetch,signal=new AbortController().signal;
+ try{
+  global.fetch=async url=>{const page=new URL(url,'http://localhost').searchParams.get('page');return json({records:[{id:page}],pagination:{total:2,totalPages:2}});};
+  assert.deepEqual((await allAuditPages('/city/attendance/dashboard?from=2026-08-01','records',signal)).map(r=>r.id),['1','2']);
+  global.fetch=async()=>json({records:[{id:'same'}],pagination:{total:2,totalPages:2}});await assert.rejects(()=>allAuditPages('/audit-repeat','records',signal),/reconcile|repeated/);
+  global.fetch=async url=>json({records:[{id:'row'}],pagination:{total:new URL(url,'http://localhost').searchParams.get('page')==='1'?2:3,totalPages:2}});await assert.rejects(()=>allAuditPages('/audit-changing','records',signal),/changed during/);
+  global.fetch=async()=>json({records:[]});await assert.rejects(()=>allAuditPages('/audit-no-meta','records',signal),/pagination/);
+ }finally{global.fetch=original;}
+});
+
+
+test('ULB excludes Draft from pending decisions and from registered-entity coverage',()=>{
+ const {ulbScopeData}=require('../src/services/ulbDashboard.ts');const {emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+ const data={...emptyCoverage(),inventoryAvailable:true,assets:[{id:'one',module:'sweeping',zoneId:'z',wardId:'w'},{id:'two',module:'sweeping',zoneId:'z',wardId:'w'}],visits:[{id:'draft',module:'sweeping',assetId:'two',zoneId:'z',wardId:'w',status:'DRAFT'},{id:'pending',module:'sweeping',assetId:'one',zoneId:'z',wardId:'w',status:'SUBMITTED'}]};
+ const result=ulbScopeData(data);assert.equal(result.counts.inspections,2);assert.equal(result.statusCount('pending_review'),1);assert.equal(result.statusCount('unclassified'),1);assert.equal(result.completedCounts.inspections,1);assert.equal(result.completedCounts.covered,1);assert.equal(result.notInspected[0].id,'two');
+});
+
+test('ward export explains no recorded reports, Draft-only and completed-but-unassessed states separately',()=>{
+ const {wardRecordReason}=require('../src/services/wardAvailability.ts');assert.match(wardRecordReason(null,null,null),/Do not infer zero/);assert.match(wardRecordReason(0,0,0),/no recorded report/);assert.match(wardRecordReason(2,0,2),/Draft/);assert.match(wardRecordReason(2,1,1),/scoring eligibility/);
+});
+
+test('target loading never presents an unverified planning fallback as the configured result',()=>{const {targetDelivery,targetReadState}=require('../src/services/targetDelivery.ts');const fallback=targetDelivery(undefined,{total:15,required:15,dailyCovered:4,unique:4});assert.equal(fallback.percent,4/15*100);assert.equal(targetReadState(fallback,false).percent,null);const configured=targetDelivery({target:17,completed:1,targetState:'configured'});assert.equal(targetReadState(configured,true).target,17);assert.equal(targetReadState(configured,true).completed,1);});

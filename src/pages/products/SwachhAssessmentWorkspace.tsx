@@ -69,7 +69,7 @@ export const SwachhAssessmentWorkspace: React.FC<SwachhAssessmentWorkspaceProps>
           icon={<Award className="w-4 h-4 text-emerald-600" />}
         />
         <StatCard
-          label="Under Sanitary Inspector review"
+          label="Under SI review"
           value="14"
           denominator="8 Pending Spot"
           subtitle="Assessor inspection submitted"
@@ -112,7 +112,7 @@ export const SwachhAssessmentWorkspace: React.FC<SwachhAssessmentWorkspaceProps>
                 <th className="px-5 py-3">Category</th>
                 <th className="px-5 py-3">Jurisdiction</th>
                 <th className="px-5 py-3">Score & Protocol</th>
-                <th className="px-5 py-3">Sanitary Inspector</th>
+                <th className="px-5 py-3">SI</th>
                 <th className="px-5 py-3 text-right">Accreditation</th>
               </tr>
             </thead>

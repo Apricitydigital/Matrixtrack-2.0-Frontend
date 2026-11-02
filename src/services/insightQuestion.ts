@@ -1,3 +1,4 @@
+import { municipalSpeech } from './municipalSpeech';
 /** Correct municipal vocabulary, never dates, IDs, figures or arbitrary user instructions. */
 const aliases:Record<string,string>={zome:'zone',zomes:'zones',znoe:'zone',zoen:'zone',zon:'zone',wrd:'ward',wardswise:'wards',wardwise:'wards',zoon:'zone',plnt:'plant',attendence:'attendance',attandance:'attendance',attendace:'attendance',insoection:'inspection',inspecion:'inspection',insepction:'inspection',inpection:'inspection',inspectionsdone:'inspections done',coverate:'coverage',peanding:'pending',reviw:'review',repeated:'repeat',repeaded:'repeat',repeatedly:'repeat',perfromance:'performance',performence:'performance',perfomance:'performance',performace:'performance',rankingg:'ranking',litterbins:'litter bins',dustbins:'litter bins',targte:'target',tagret:'target',taget:'target',targetswise:'targets'};
 const vocabulary=['performance','inspection','inspections','attendance','coverage','pending','review','cleaned','sweeping','toilets','targets','ranking','recovery'];
@@ -7,7 +8,7 @@ function closeWord(a:string,b:string){
  const shorter=a.length<b.length?a:b,longer=a.length<b.length?b:a;let i=0,j=0,skipped=false;while(i<shorter.length&&j<longer.length){if(shorter[i]===longer[j]){i++;j++;}else{if(skipped)return false;skipped=true;j++;}}return true;
 }
 export function normalizeInsightQuestion(question:string){
- let text=question.normalize('NFKC').toLowerCase().replace(/[a-z]+/g,word=>{
+ let text=municipalSpeech(question).toLowerCase().replace(/[a-z]+/g,word=>{
   if(aliases[word])return aliases[word];if(word.length<6||vocabulary.includes(word))return word;
   const matches=vocabulary.filter(candidate=>closeWord(word,candidate));return matches.length===1?matches[0]:word;
  });

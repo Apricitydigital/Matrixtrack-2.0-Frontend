@@ -1,3 +1,4 @@
+import { actionLifecycle, actionIsPending } from './actionLifecycle';
 import { INSPECTION_STATUSES, inspectionStatus } from './inspectionStatus';
 export { INSPECTION_STATUSES, inspectionStatus } from './inspectionStatus';
 import { api,getToken,ApiError } from './api';
@@ -7,7 +8,7 @@ import { MODULE_KEYS } from './adapters';
 import { mapAssets, type MapAsset } from './operationsMap';
 import type { City, OperationalModuleId, Zone } from '../types';
 
-export interface InspectionVisit { id: string; module: OperationalModuleId; assetId?: string; zoneId: string; wardId: string; status?: string; submittedAt?:string; actionRequired?:boolean; raw?:any; }
+export interface InspectionVisit { id: string; module: OperationalModuleId; assetId?: string; zoneId: string; wardId: string; status?: string; submittedAt?:string; actionRequired?:boolean; actionTaken?:boolean; raw?:any; }
 export interface CoverageCounts {
   total: number | null; inspections: number | null; unique: number | null;
   repeats: number | null; repeatedLocations: number | null; covered: number | null;
@@ -26,8 +27,8 @@ export function inspectionVisit(raw: any, module: OperationalModuleId, cityId: s
   const asset = raw.beat || raw.toilet || raw.bin || raw.nala || raw.feederPoint || {};
   const assetId = raw.assetId || (module==='sweeping'?raw.beatId:module==='toilets'?raw.toiletId:module==='litter_bins'?raw.binId:module==='nala'?raw.nalaPointId:raw.feederPointId || raw.gvpId) || (module==='nala'?raw.nalaPoint?.id:asset.id);
   const payload=raw.payload||{},history=raw.statusHistory||raw.timeline||payload.statusHistory||[];
-  const actionRequired=Boolean(raw.actionRequiredAt||payload.actionRequiredAt||[raw.status,raw.workspaceStatus,raw.actionStatus,raw.ulbStatus,payload.ulbStatus].some(s=>['ACTION_REQUIRED','ACTION_TAKEN'].includes(String(s).toUpperCase()))||(Array.isArray(history)&&history.some(h=>/ACTION_REQUIRED/i.test(String(h.event||h.action||h.status||h.statusAfter||'')))));
-  return {id:`${module}:${raw.id}`,module,raw,actionRequired,submittedAt:raw.submittedAt||raw.createdAt||'',status:String(raw.workspaceStatus || raw.status || 'SUBMITTED').toUpperCase(),assetId:assetId?String(assetId):undefined,zoneId:raw.zoneId || raw.zone?.id || asset.zoneId || asset.zone?.id || '',wardId:raw.wardId || raw.ward?.id || asset.wardId || asset.ward?.id || ''};
+  const lifecycle=actionLifecycle(raw),actionRequired=lifecycle.required;
+  return {id:`${module}:${raw.id}`,module,raw,actionRequired,actionTaken:lifecycle.taken,submittedAt:raw.submittedAt||raw.createdAt||'',status:String(raw.workspaceStatus || raw.status || 'SUBMITTED').toUpperCase(),assetId:assetId?String(assetId):undefined,zoneId:raw.zoneId || raw.zone?.id || asset.zoneId || asset.zone?.id || '',wardId:raw.wardId || raw.ward?.id || asset.wardId || asset.ward?.id || ''};
 }
 
 /** All calls are GETs to existing city-scoped endpoints; no report writes or decisions. */
@@ -63,7 +64,7 @@ async function fetchInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, f
   // Two modules at a time; date changes cancel every remaining page.
   const loadModule=async(module:OperationalModuleId)=>{
     try {
-      const query=new URLSearchParams({cityId:city.id,tab:module==='litter_bins'||module==='ctu_gvp'?'DAILY_REPORTS':'HISTORY',startDate:`${from}T00:00:00+05:30`,endDate:`${to}T23:59:59.999+05:30`,limit:'100'});
+      const query=new URLSearchParams({cityId:city.id,tab:module==='litter_bins'||module==='ctu_gvp'?'DAILY_REPORTS':'HISTORY',startDate:`${from}T00:00:00+05:30`,endDate:`${to}T23:59:59.999+05:30`,limit:'500'});
       const visits=new Map<string,InspectionVisit>(),seenReports=new Set<string>();let expectedTotal:number|undefined;
       const readPage=async(page:number)=>{
         signal.throwIfAborted();
@@ -142,7 +143,7 @@ export function inspectionOutcomes(data:InspectionCoverage,scope:{module?:Operat
 export function inspectionActions(data:InspectionCoverage,scope:{module?:OperationalModuleId;zone?:string;ward?:string}={}) {
  const known=coverageCounts(data,scope).inspections!=null;
  const visits=[...new Map(data.visits.filter(v=>(!scope.module||v.module===scope.module)&&(!scope.zone||v.zoneId===scope.zone)&&(!scope.ward||v.wardId===scope.ward)).map(v=>[v.id,v])).values()];
- const required=visits.filter(v=>v.actionRequired||['action_required','action_taken','escalated'].includes(inspectionStatus(v.status)));
- const taken=required.filter(v=>inspectionStatus(v.status)==='action_taken').length;
- return {totalRequired:known?required.length:null,taken:known?taken:null,outstanding:known?required.length-taken:null};
+ const required=visits.filter(v=>actionLifecycle(v).required);
+ const taken=required.filter(v=>actionLifecycle(v).taken).length;
+ return {totalRequired:known?required.length:null,taken:known?taken:null,outstanding:known?required.filter(actionIsPending).length:null};
 }

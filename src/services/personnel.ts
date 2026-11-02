@@ -5,7 +5,7 @@ import {matrixStore} from './store';
 import {assertCityAdmin} from './citySetup';
 import {MODULE_KEYS} from './adapters';
 
-export const PERSONNEL_ROLES:Record<string,string>={CITY_ADMIN:'City Admin',SUPERVISOR:'Daroga',QC:'Sanitary Inspector',ACTION_OFFICER:'IEC Member',EMPLOYEE:'Employee',ULB_OFFICER:'ULB Officer',COMMISSIONER:'Commissioner'};
+export const PERSONNEL_ROLES:Record<string,string>={CITY_ADMIN:'City Admin',SUPERVISOR:'Daroga',QC:'SI',ACTION_OFFICER:'IEC',EMPLOYEE:'Employee',ULB_OFFICER:'ULB Officer',COMMISSIONER:'Commissioner'};
 export const PERSONNEL_MODULE_LABELS:Record<string,string>={SWEEPING:'Sweeping',TOILET:'Cleanliness of Toilet',LITTERBINS:'Litter Bins',NALA:'Nala',TASKFORCE:'CTU/GVP Transformation',WORKFORCE_MONITORING:'Workforce Monitoring',SWACHH_RANKING:'Swachh Ward Ranking',MRF:'Processing & MRF',PROCESSING_PLANT:'Plant & Processing'};
 export const enabledPersonnelKeys=(cityId:string)=>matrixStore.getCityModules(cityId).filter(m=>m.enabled&&PERSONNEL_MODULE_LABELS[m.key]).map(m=>m.key);
 export const PERSONNEL_HEADERS=['Name','Email','Phone','Password','Role','Zone','Ward','Modules'];
@@ -24,13 +24,14 @@ export async function personnelModules(cityId:string){assertCityAdmin(cityId);co
 export function validatePersonnelScope(cityId:string,zoneIds:string[],wardIds:string[],role:string){
  assertCityAdmin(cityId);const {zones,wards}=matrixStore.getData();if(!PERSONNEL_ROLES[role])throw new Error('Select a municipal staff role.');
  if(zoneIds.some(id=>!zones.some(z=>z.id===id&&z.cityId===cityId))||wardIds.some(id=>!wards.some(w=>w.id===id&&w.cityId===cityId&&zoneIds.includes(w.zoneId))))throw new Error('Each Ward must belong to a selected Zone in this city.');
- if(['QC','ULB_OFFICER'].includes(role)&&(!zoneIds.length||!wardIds.length))throw new Error('Sanitary Inspectors and ULB Officers require a Zone and Ward.');
+ if(['QC','ULB_OFFICER'].includes(role)&&(!zoneIds.length||!wardIds.length))throw new Error('SIs and ULB Officers require a Zone and Ward.');
 }
 export async function createPersonnel(cityId:string,input:{name:string;email:string;phone:string;password:string;role:string;zoneIds:string[];wardIds:string[];moduleKeys:string[]}){
  validatePersonnelScope(cityId,input.zoneIds,input.wardIds,input.role);
  if(!input.name.trim()||!/^\S+@\S+\.\S+$/.test(input.email)||!/^\d{10}$/.test(input.phone)||input.password.length<6)throw new Error('Enter a name, valid email, 10-digit phone and password of at least 6 characters.');
  if(input.zoneIds.length>1||input.wardIds.length>1)throw new Error('Choose one Zone and Ward for registration. Additional scopes can be assigned after creation.');
  if(matrixStore.getUsers(cityId).some(u=>u.email.toLowerCase()===input.email.trim().toLowerCase()))throw new Error('This email is already registered. Use Edit user.');
+ if(matrixStore.getUsers(cityId).some(u=>u.phone?.replace(/\D/g,'').slice(-10)===input.phone))throw new Error('This mobile number is already registered. Use Edit user.');
  const enabled=await personnelModules(cityId);if(!input.moduleKeys.length||input.moduleKeys.some(key=>!enabled.some(m=>m.key===key)))throw new Error('Choose enabled city modules.');assertCityAdmin(cityId);
  const result=await writeApi('/common-registration/register','POST',{cityId,name:input.name.trim(),email:input.email.trim().toLowerCase(),phone:input.phone,password:input.password,zoneId:input.zoneIds[0],wardId:input.wardIds[0],targetSystems:['TASKFORCE_20'],taskforceConfig:{role:input.role,moduleKeys:input.moduleKeys}});
  if(result.success===false)throw new Error(result.message||'Registration was not accepted.');await matrixStore.refreshPersonnel();return result;
@@ -48,7 +49,7 @@ export async function editPersonnel(cityId:string,user:User,updates:{name?:strin
    const custom=(user.moduleAssignments||[]).some(m=>(m.zoneIds.length&&!same(m.zoneIds,user.assignedZoneIds||[]))||(m.wardIds.length&&!same(m.wardIds,user.assignedWardIds||[])));
    if(custom)throw new Error('This user has a custom module scope that the current edit endpoint cannot preserve. Profile editing remains available.');
  }
- if(updates.modules){const enabled=await personnelModules(cityId);for(const m of updates.modules){if(!enabled.some(e=>e.id===m.moduleId))throw new Error('A selected module is not enabled.');const z=m.zoneIds.length?m.zoneIds:updates.zoneIds??user.assignedZoneIds??[],w=m.wardIds.length?m.wardIds:updates.wardIds??user.assignedWardIds??[];validatePersonnelScope(cityId,z,w,user.role);if(['QC','ULB_OFFICER'].includes(user.role)&&(z.some(id=>!updates.zoneIds?.includes(id))||w.some(id=>!updates.wardIds?.includes(id))))throw new Error('Module scopes must stay within the city assignment.');if(user.role==='COMMISSIONER'&&m.canWrite)throw new Error('Commissioner module access must be view-only.');}if(user.role==='ACTION_OFFICER'&&!updates.modules.length)throw new Error('IEC Members require at least one module.');}
+ if(updates.modules){const enabled=await personnelModules(cityId);for(const m of updates.modules){if(!enabled.some(e=>e.id===m.moduleId))throw new Error('A selected module is not enabled.');const z=m.zoneIds.length?m.zoneIds:updates.zoneIds??user.assignedZoneIds??[],w=m.wardIds.length?m.wardIds:updates.wardIds??user.assignedWardIds??[];validatePersonnelScope(cityId,z,w,user.role);if(['QC','ULB_OFFICER'].includes(user.role)&&(z.some(id=>!updates.zoneIds?.includes(id))||w.some(id=>!updates.wardIds?.includes(id))))throw new Error('Module scopes must stay within the city assignment.');if(user.role==='COMMISSIONER'&&m.canWrite)throw new Error('Commissioner module access must be view-only.');}if(user.role==='ACTION_OFFICER'&&!updates.modules.length)throw new Error('IEC users require at least one module.');}
  assertCityAdmin(cityId);const result=await writeApi(`/city/users/${encodeURIComponent(user.id)}`,'PATCH',updates);await matrixStore.refreshPersonnel();return result;
 }
 export function personnelImportRows(cityId:string,rows:string[][]){
@@ -68,4 +69,9 @@ export async function approvePersonnelRegistration(cityId:string,request:User,mo
  validatePersonnelScope(cityId,zoneIds,wardIds,request.role);
  const enabled=enabledPersonnelKeys(cityId);if(!moduleKeys.length||moduleKeys.some(key=>!enabled.includes(key)))throw new Error('Choose enabled modules before approving.');
  const result=await writeApi(`/city/registration-requests/${encodeURIComponent(request.id)}/approve`,'POST',{role:request.role,moduleKeys,zoneIds,wardIds});await matrixStore.refreshPersonnel();return result;
+}
+
+export async function deletePersonnel(cityId:string,user:User){
+ assertCityAdmin(cityId);if(user.cityId!==cityId||user.id===matrixStore.currentUser?.id||user.role==='CITY_ADMIN')throw new Error('This account can only be managed by Super Admin.');
+ await writeApi('/audit-logs/trash/soft-delete','POST',{id:user.id,type:'User'});await matrixStore.refreshPersonnel();
 }

@@ -17,7 +17,7 @@ export function targetPreview(assigned:number,period:string,startDate:string,mod
 }
 export function targetPayload(draft:TargetDraft,assignments:TargetAssignment[],editing=false) {
   if(!draft.userId||!draft.moduleId)throw Error('Select an employee and module.');
-  if(!['SUPERVISOR','QC'].includes(draft.role))throw Error('Select a Daroga or Sanitary Inspector.');
+  if(!['SUPERVISOR','QC'].includes(draft.role))throw Error('Select a Daroga or SI.');
   if(!['DAILY','WEEKLY','MONTHLY'].includes(draft.periodType)||!/^\d{4}-\d{2}-\d{2}$/.test(draft.startDate)||Number.isNaN(Date.parse(draft.startDate))||new Date(draft.startDate).toISOString().slice(0,10)!==draft.startDate)throw Error('Select a valid period and effective date.');
   const value=Number(draft.value);
   if(!Number.isInteger(value)||value<1||(draft.mode==='percentage'&&value>100))throw Error(draft.mode==='percentage'?'Enter a whole percentage from 1 to 100.':'Enter a positive whole inspection count.');

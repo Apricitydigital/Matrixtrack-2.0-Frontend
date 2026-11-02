@@ -107,7 +107,7 @@ export const IecCleanlinessIssuesPage: React.FC<IecCleanlinessIssuesPageProps> =
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Review Daroga cleanups, verify Sanitary Inspector spot certifications, and manage IEC member reopening requests.
+            Review Daroga cleanups, verify SI spot certifications, and manage IEC member reopening requests.
           </p>
         </div>
 
@@ -192,7 +192,7 @@ export const IecCleanlinessIssuesPage: React.FC<IecCleanlinessIssuesPageProps> =
                     <span>·</span>
                     <span>Reported: <strong>{new Date(issue.reportedDate).toLocaleDateString('en-IN')}</strong></span>
                     <span>·</span>
-                    <span>Sanitary Inspector decision: <strong className="capitalize text-slate-700">{issue.qcDecision || 'Pending'}</strong></span>
+                    <span>SI decision: <strong className="capitalize text-slate-700">{issue.qcDecision || 'Pending'}</strong></span>
                   </div>
 
                   {issue.reopeningRequests.some(r => r.status === 'pending') && (

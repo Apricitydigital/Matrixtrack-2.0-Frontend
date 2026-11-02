@@ -4,6 +4,8 @@ const values=new Map<string,Entry>();
 type Job={controller:AbortController;promise:Promise<any>;users:number};
 const jobs=new Map<string,Job>();let epoch=0;
 export function clearReadCache(){epoch++;values.clear();for(const job of jobs.values())job.controller.abort();jobs.clear();}
+/** Expire matching saved reads without interrupting unrelated requests already in progress. */
+export function expireInspectionReads(){for(const key of values.keys())if(/inspection.coverage|inspection-coverage|\/modules\/[^?\n]+\/records\?/.test(key))values.delete(key);}
 export function readCacheKey(path:string,session:string){const [base,query='']=path.split('?'),params=new URLSearchParams(query);params.sort();return `${session}\n${base}?${params}`;}
 export function readCacheTtl(path:string){const base=path.split('?')[0];if(/^\/auth\//.test(base)||['/city/info','/city/modules','/hms/cities'].includes(base))return 0;return ['/city/geo','/city/users','/modules/processing-plant/plants'].includes(base)?120000:30000;}
 export function primeReadCache(key:string,value:any,ttl=30000){values.set(key,{value:structuredClone(value),expires:Date.now()+ttl});trim();}

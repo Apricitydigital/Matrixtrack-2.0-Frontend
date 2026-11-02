@@ -1,7 +1,9 @@
-import React from 'react';
+import React, {useMemo} from 'react';
+import { CardInfo } from '../../components/common/CardInfo';
 import type { OperationalReport } from '../../types';
-import { MODULE_LABELS, statusTone } from '../../services/presentation';
-import { BarChart, ChartCard, chartColors, DonutChart } from '../../components/analytics/Analytics';
-export function RegisterInsights({rows,onStatus,onModule}:{rows:OperationalReport[];onStatus:(value:string)=>void;onModule:(value:string)=>void}) {
-  return <div className="analytics-grid two"><ChartCard eyebrow="REGISTER STATUS" title="Which reports need follow-up?"><DonutChart label="register reports" items={[['red','Attention required',chartColors.red],['yellow','Pending / verification',chartColors.gold],['green','Approved',chartColors.teal],['neutral','Unassessed',chartColors.grey]].map(([id,label,color])=>({id,label,color,value:rows.filter(r=>statusTone(r.status)===id).length}))} onSelect={onStatus}/></ChartCard><ChartCard eyebrow="MODULE REVIEW QUEUES" title="Where pending reports are concentrated"><BarChart items={Object.entries(MODULE_LABELS).map(([id,label])=>({id,label,value:rows.filter(r=>r.moduleId===id&&statusTone(r.status)==='yellow').length,detail:`${rows.filter(r=>r.moduleId===id).length} reports in this register`,color:chartColors.gold})).sort((a,b)=>b.value-a.value)} onSelect={onModule}/></ChartCard></div>;
+import { BarChart, ChartCard, DonutChart } from '../../components/analytics/Analytics';
+import { registerInsightData } from '../../services/registerInsights';
+export function RegisterInsights({rows,modules,onStatus,onModule,unavailable}:{rows:OperationalReport[];modules?:string[];onStatus:(value:string)=>void;onModule:(value:string)=>void;unavailable?:string}) {
+  const data=useMemo(()=>registerInsightData(rows,modules),[rows,modules]);
+  return <div className="analytics-grid two"><ChartCard eyebrow="CURRENT REPORT STATUS" title="Every inspection accounted for" action={<CardInfo title="Current report statuses">One current status per record, using the same labels as City Overview. Completed inspections exclude Draft. Pending review includes submitted reports awaiting an SI decision.</CardInfo>}>{unavailable?<p role="status">{unavailable}</p>:<><DonutChart label="inspection records" items={data.statuses.filter(s=>s.value>0)} onSelect={onStatus}/></>}</ChartCard><ChartCard eyebrow="SI REVIEW QUEUES" title="Reports awaiting SI review" action={<CardInfo title="SI review queues">Pending review only. Action taken is tracked separately while corrective work awaits verification. Select a module to open its pending reports.</CardInfo>}>{unavailable?<p role="status">{unavailable}</p>:<><BarChart items={data.queues} onSelect={onModule}/></>}</ChartCard></div>;
 }

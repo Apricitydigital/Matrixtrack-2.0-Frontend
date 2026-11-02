@@ -98,7 +98,7 @@ export const ExecutiveSummaryReport: React.FC<ExecutiveSummaryReportProps> = ({
         {/* Core Key Performance Indicators Strip */}
         <div className="grid grid-cols-4 gap-3 text-xs font-mono">
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
-            <span className="text-[15px] text-slate-500 block uppercase font-sans">Sanitary Inspector approved</span>
+            <span className="text-[15px] text-slate-500 block uppercase font-sans">SI approved</span>
             <span className="text-xl font-bold text-slate-900 tabular-nums">{approved}</span>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">

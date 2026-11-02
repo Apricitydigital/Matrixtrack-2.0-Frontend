@@ -1,9 +1,11 @@
 import { todayIST } from './api';
+import { municipalSpeech } from './municipalSpeech';
 export interface InsightPeriod {from:string;to:string;}
 const day=(value:string,offset:number)=>new Date(Date.parse(value+'T12:00:00Z')+offset*86400000).toISOString().slice(0,10);
 function date(y:number,m:number,d:number){const value=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;return !Number.isNaN(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value?value:null;}
 export function questionPeriod(question:string,fallback:InsightPeriod,today=todayIST()):InsightPeriod {
- const q=question.toLowerCase();let found:string[]=[];
+ const q=municipalSpeech(question).toLowerCase();let found:string[]=[];
+ if(/(^|\s)कल(\s|$)/.test(question))throw Error('Please choose an exact date or say yesterday in English; kal can mean yesterday or tomorrow.');
  const tokens=/\b\d{4}-\d{1,2}-\d{1,2}\b|\b\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4}\b|\b\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/gi;
  for(const match of q.matchAll(tokens)){
   const text=match[0];let parsed:string|null=null;

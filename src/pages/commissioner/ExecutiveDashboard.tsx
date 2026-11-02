@@ -100,7 +100,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           label="Review Completion Rate"
           value={`${reviewCompletionRate}%`}
           denominator={`${cityReports.length} Submitted`}
-          subtitle="Sanitary Inspector spot-checks reviewed"
+          subtitle="SI spot-checks reviewed"
           icon={<CheckCircle2 className="w-4 h-4 text-emerald-600" />}
         />
         <StatCard

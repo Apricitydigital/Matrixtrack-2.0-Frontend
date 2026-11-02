@@ -175,10 +175,10 @@ export const IecIssueDrawer: React.FC<IecIssueDrawerProps> = ({
             </div>
 
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 text-xs">
-              <span className="text-slate-400 block font-medium uppercase mb-0.5">Sanitary Inspector</span>
+              <span className="text-slate-400 block font-medium uppercase mb-0.5">SI</span>
               <p className="font-semibold text-slate-900">{issue.sanitaryInspectorName || 'Pending'}</p>
               <p className="text-slate-500 mt-1">
-                Sanitary Inspector decision: <strong className="capitalize text-slate-800">{issue.qcDecision?.replace(/_/g, ' ') || 'Awaiting'}</strong>
+                SI decision: <strong className="capitalize text-slate-800">{issue.qcDecision?.replace(/_/g, ' ') || 'Awaiting'}</strong>
               </p>
             </div>
           </div>
@@ -186,7 +186,7 @@ export const IecIssueDrawer: React.FC<IecIssueDrawerProps> = ({
           {issue.qcRemarks && (
             <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-lg text-xs space-y-1">
               <span className="font-bold text-blue-900 uppercase tracking-wider block">
-                Sanitary Inspector field notes
+                SI field notes
               </span>
               <p className="text-blue-800">
                 {issue.qcRemarks}

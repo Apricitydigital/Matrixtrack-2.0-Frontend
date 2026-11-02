@@ -22,7 +22,7 @@ export function PlatformUserEditor({user,city,onClose,onSaved}:{user:User;city:C
   if(!name.trim())throw Error('Enter a name.');
   if(phone&&!/^\d{10}$/.test(phone))throw Error('Phone must contain 10 digits.');
   if(['QC','ULB_OFFICER'].includes(user.role)&&(!zoneIds.length||!wardIds.length))throw Error('Select a Zone and Ward.');
-  if(user.role==='ACTION_OFFICER'&&!access.length)throw Error('IEC Members require at least one module.');
+  if(user.role==='ACTION_OFFICER'&&!access.length)throw Error('IEC users require at least one module.');
   if(access.some(m=>m.zoneIds.some(id=>!zoneIds.includes(id))||m.wardIds.some(id=>!wardIds.includes(id))))throw Error('Module scopes must stay inside the selected city assignment.');
   await api(`/city/users/${encodeURIComponent(user.id)}`,{method:'PATCH',headers,body:JSON.stringify({assignmentRole:user.role,name:name.trim(),phone,zoneIds,wardIds,modules:access})});
   const saved=await api('/city/users',{headers,cache:'no-store'}),actual=(saved.users||[]).find((u:any)=>u.id===user.id&&u.role===user.role);

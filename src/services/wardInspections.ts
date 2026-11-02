@@ -20,6 +20,6 @@ export function wardInspectionRows(data:InspectionCoverage,cityId:string,wardId:
     const asset=assets.get(`${visit.module}:${visit.assetId}`),beat=visit.module==='sweeping'?beats.find(b=>b.id===visit.assetId):undefined;
     const readable=(value:unknown)=>typeof value==='string'&&value.trim()&&!uuid.test(value)&&![id,visit.id,visit.assetId].includes(value);
     const assetName=[report.assetName,asset?.name,beat?.name].find(readable)||`${MODULE_LABELS[visit.module]} inspection`;
-    return {...report,actionRequired:visit.actionRequired||report.actionRequired,id:visit.id,assetId:visit.assetId||report.assetId,assetName,reportNumber:readable(raw.reportNumber)?raw.reportNumber:assetName};
+    return {...report,actionRequired:visit.actionRequired||report.actionRequired,actionTaken:visit.actionTaken||report.actionTaken,id:visit.id,assetId:visit.assetId||report.assetId,assetName,reportNumber:readable(raw.reportNumber)?raw.reportNumber:assetName};
   }).sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt)||natural.compare(a.assetName,b.assetName));
 }

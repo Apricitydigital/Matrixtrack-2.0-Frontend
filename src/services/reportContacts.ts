@@ -7,9 +7,9 @@ export function rawReportContacts(raw:any):Contact[] {
   add('SUPERVISOR',raw.supervisor || raw.assignedDaroga || raw.daroga,'Assigned Daroga',raw.supervisorAssignedToId || raw.assignedDarogaId);
   add(raw.submittedBy?.role || raw.submittedByUser?.role || 'SUPERVISOR',raw.submittedBy || raw.submittedByUser || (raw.createdById?{id:raw.createdById,name:typeof raw.createdBy==='string'?raw.createdBy:raw.createdBy?.name,phone:raw.phone}:null),'Submitted report',raw.submittedById);
   add('QC',raw.reviewedByQc || raw.qcReviewer || raw.reviewedBy || p.reviewedByQc,'Recorded SI reviewer',raw.reviewedByQcId || raw.qcReviewerId);
-  add('QC',raw.assignedQc || raw.assignedSanitaryInspector || raw.sanitaryInspector,'Assigned Sanitary Inspector',raw.assignedQcId || raw.sanitaryInspectorId);
+  add('QC',raw.assignedQc || raw.assignedSanitaryInspector || raw.sanitaryInspector,'Assigned SI',raw.assignedQcId || raw.sanitaryInspectorId);
   add('ULB_OFFICER',raw.ulbReviewer || raw.ulbReviewedBy || p.ulbReviewedBy,'Recorded ULB reviewer',raw.ulbReviewedById);
-  add('ACTION_OFFICER',raw.actionOfficer || raw.actionTakenBy || p.actionTakenBy,'Assigned / recorded IEC Member',raw.actionOfficerId || raw.actionTakenById);
+  add('ACTION_OFFICER',raw.actionOfficer || raw.actionTakenBy || p.actionTakenBy,'Assigned / recorded IEC',raw.actionOfficerId || raw.actionTakenById);
   return contacts;
 }
 export function reportContacts(report:OperationalReport,users:User[]):Contact[] {
@@ -33,6 +33,6 @@ export function reportContacts(report:OperationalReport,users:User[]):Contact[] 
 }
 export function reportStage(report:OperationalReport){
   const role=report.currentOwnerRole || ({pending_review:'QC',approved:'ULB_OFFICER',rejected:'ULB_OFFICER',action_required:'ACTION_OFFICER',action_taken:'ULB_OFFICER',escalated:'ULB_OFFICER'}[report.status]);
-  return {role,since:report.stageSince || report.reviewedAt || report.submittedAt,label:({pending_review:'Pending Sanitary Inspector review',approved:'Sanitary Inspector approved · ULB oversight',rejected:'Sanitary Inspector rejected · ULB oversight',action_required:'Corrective action pending',action_taken:'Action submitted · verification pending',escalated:'Escalated for review'}[report.status])};
+  return {role,since:report.stageSince || report.reviewedAt || report.submittedAt,label:({pending_review:'Pending SI review',approved:'SI approved · ULB oversight',rejected:'SI rejected · ULB oversight',action_required:'Action required (pending)',action_taken:'Action submitted · verification pending',escalated:'Escalated for review'}[report.status])};
 }
 export const telephone=(phone:string)=>/^\+?[\d\s()-]{6,25}$/.test(phone)?`tel:${phone.replace(/[^\d+]/g,'')}`:undefined;

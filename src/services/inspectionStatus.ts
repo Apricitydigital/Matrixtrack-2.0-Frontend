@@ -12,3 +12,6 @@ export function inspectionStatus(status?:string) {
   if(['submitted','pending','pending_qc','qc_pending','under_review','pending_review','reinspection'].includes(key))return 'pending_review';
   return INSPECTION_STATUSES.some(s=>s.id===key)?key:'unclassified';
 }
+export function inspectionStatusLabel(status?:string) {
+  return INSPECTION_STATUSES.find(s=>s.id===inspectionStatus(status))!.label;
+}

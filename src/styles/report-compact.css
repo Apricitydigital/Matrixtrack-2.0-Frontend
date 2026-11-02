@@ -1,0 +1,37 @@
+/* Presentation only: retain all existing labels, figures and evidence. */
+.report-detail.report-detail{gap:12px;font-size:14px}
+.report-detail.report-detail .report-status-strip,.report-detail.report-detail .report-tabs button{font-size:13px}
+.report-detail.report-detail .report-tabs{gap:16px}
+.report-detail.report-detail .report-tabs button{padding:10px 0}
+.report-detail.report-detail .report-facts{gap:8px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.report-detail.report-detail .report-facts>div{padding:10px 12px}
+.report-detail.report-detail .report-facts small,.report-detail.report-detail .decision-card>span{font-size:11px}
+.report-detail.report-detail .report-facts strong{font-size:14px;margin-top:4px}
+.report-detail.report-detail .report-section-title{font-size:15px}
+.report-detail.report-detail .decision-grid{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.report-detail.report-detail .decision-card{padding:12px;min-width:0}
+.report-detail.report-detail .decision-card:last-child{grid-column:1/-1}
+.report-detail.report-detail .decision-card h3{font-size:15px;margin:5px 0 3px}
+.report-detail.report-detail .decision-card p,.report-detail.report-detail .decision-card small{font-size:12px;line-height:1.5}
+.report-detail.report-detail .decision-card blockquote{font-size:13px;line-height:1.5;margin-top:8px;padding:8px 10px}
+.report-detail.report-detail .action-evidence-gallery{grid-template-columns:repeat(auto-fill,minmax(160px,240px));gap:10px;margin-top:10px}
+.report-detail.report-detail .action-evidence-gallery img{height:160px}
+.report-detail.report-detail .action-evidence-gallery figcaption{padding:8px;font-size:11px}
+.report-detail.report-detail .evidence-empty{padding:16px;font-size:13px}
+.report-detail.report-detail .answer-card{padding:10px 12px}
+.report-detail.report-detail .answer-card h4,.report-detail.report-detail .answer-card p{font-size:14px;line-height:1.5}
+.report-detail.report-detail .answer-card small,.report-detail.report-detail .answer-card blockquote{font-size:12px}
+.commissioner-home.commissioner-home .home-section-heading{padding:14px 20px}
+.commissioner-home.commissioner-home .home-section-heading h2{font-size:19px}
+.commissioner-home.commissioner-home .home-section-heading p{font-size:13px;margin-top:4px}
+.commissioner-home.commissioner-home .status-breakdown{padding:16px 20px}
+.commissioner-home.commissioner-home .status-breakdown-track{height:16px}
+.commissioner-home.commissioner-home .status-breakdown-legend{margin-top:12px;gap:6px 20px}
+.commissioner-home.commissioner-home .status-breakdown-legend>button{padding:7px 0}
+.commissioner-home.commissioner-home .status-breakdown-legend>button>span{font-size:13px}
+.commissioner-home.commissioner-home .status-breakdown-legend strong{font-size:18px}
+.commissioner-home.commissioner-home .action-count-basis{padding:12px 20px 16px;gap:12px}
+.commissioner-home.commissioner-home .action-count-basis>button{flex-direction:row;align-items:center;justify-content:space-between;padding:12px 14px;font-size:13px}
+.commissioner-home.commissioner-home .action-count-basis strong{font-size:24px}
+@media(max-width:700px){.report-detail.report-detail .report-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.report-detail.report-detail .decision-grid{grid-template-columns:1fr}.report-detail.report-detail .action-evidence-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{.report-detail.report-detail .action-evidence-gallery img{object-fit:contain}}

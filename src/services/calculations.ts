@@ -29,9 +29,9 @@ export interface WardRankingFormulaInputs {
  * - Cleanliness of Toilet (15 pts): Average toilet inspection score (0-100) / 100 * 15
  * - Litter Bin Clearance (10 pts): Bins inspected non-overflowing / Total bin inspections * 10
  * - CTU/GVP Transformation (10 pts): Cleared & monitored GVPs / Total GVPs in ward * 10
- * - Supervisor (Daroga) Timeliness (10 pts): Daroga reviews completed within 2h / total * 10
- * - QC (Sanitary Inspector) Verification (10 pts): SI inspections completed / expected * 10
- * - Action Officer (IEC Member) Closure (10 pts): IEC complaints resolved & verified / total * 10
+ * - Daroga (Daroga) Timeliness (10 pts): Daroga reviews completed within 2h / total * 10
+ * - QC (SI) Verification (10 pts): SI inspections completed / expected * 10
+ * - IEC (IEC) Closure (10 pts): IEC complaints resolved & verified / total * 10
  * Total = 100 pts
  */
 export function computeWardRanking(
@@ -114,7 +114,7 @@ export function computeWardRanking(
       gvpDetails = `${transformed}/${gvpReports.length} GVPs transformed or zero-waste`;
     }
 
-    // 7. Supervisor (Daroga) Score (max 10)
+    // 7. Daroga (Daroga) Score (max 10)
     const darogaReports = wardReports.filter(r => r.submittedByRole === 'SUPERVISOR');
     let supervisorScore = 0;
     let supervisorDetails = 'No backend data available';
@@ -124,8 +124,8 @@ export function computeWardRanking(
       supervisorDetails = `${timely}/${darogaReports.length} submissions meeting benchmark`;
     }
 
-    // 8. QC (Sanitary Inspector) Score (max 10)
-    const reviewedReports = wardReports.filter(r => r.reviewerRole === 'QC' || r.reviewerRole === 'Sanitary Inspector');
+    // 8. QC (SI) Score (max 10)
+    const reviewedReports = wardReports.filter(r => r.reviewerRole === 'QC' || r.reviewerRole === 'SI');
     let qcScore = 0;
     let qcDetails = 'No backend data available';
     if (reviewedReports.length > 0) {
@@ -134,7 +134,7 @@ export function computeWardRanking(
       qcDetails = `${verified}/${reviewedReports.length} spot checks certified`;
     }
 
-    // 9. Action Officer (IEC Member) Score (max 10)
+    // 9. IEC (IEC) Score (max 10)
     let actionOfficerScore = 0;
     let actionOfficerDetails = 'No backend data available';
     if (wardIec.length > 0) {

@@ -69,7 +69,7 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
             Registered Municipal Personnel & Access Directory
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Comprehensive roster of Administrators, Sanitary Inspectors, Darogas, IEC Members, and Field Staff.
+            Comprehensive roster of Administrators, SIs, Darogas, IEC users, and Field Staff.
           </p>
         </div>
 
@@ -114,9 +114,9 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
             className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium capitalize"
           >
             <option value="all">All Roles</option>
-            <option value="SUPERVISOR">Daroga (Supervisor)</option>
-            <option value="QC">Sanitary Inspector</option>
-            <option value="ACTION_OFFICER">IEC Member</option>
+            <option value="SUPERVISOR">Daroga (Daroga)</option>
+            <option value="QC">SI</option>
+            <option value="ACTION_OFFICER">IEC</option>
             <option value="EMPLOYEE">Employee</option>
             <option value="CITY_ADMIN">City Admin</option>
             <option value="ULB_OFFICER">ULB Officer</option>

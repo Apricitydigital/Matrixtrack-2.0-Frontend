@@ -13,3 +13,6 @@ export function targetDelivery(figures?:({target?:number;completed?:number;targe
   const configuredPercent=!fallback&&typeof figures?.targetPercent==='number'&&Number.isFinite(figures.targetPercent)&&figures.targetPercent>=0&&figures.targetPercent<=100?figures.targetPercent:null;
   return {target,completed:credited,configuredPercent,state,confirmed,available:target!=null&&(confirmed||fallback),fallback,stateLabel:TARGET_STATE_LABELS[state],percent:configured&&credited!=null?credited/target*100:null,remaining:target!=null&&credited!=null?Math.max(0,target-credited):null,met:configured&&credited!=null&&credited>=target};
 }
+
+/** Never show a planning fallback while saved targets are still being read. */
+export function targetReadState(delivery:TargetDelivery,ready:boolean):TargetDelivery{return ready?delivery:{...delivery,target:null,completed:null,percent:null,remaining:null,available:false,fallback:false,met:false,stateLabel:'Target source unavailable'};}

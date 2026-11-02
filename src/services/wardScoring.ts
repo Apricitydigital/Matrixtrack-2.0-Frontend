@@ -1,11 +1,12 @@
+import {isAdministrativeWard} from './wardAvailability';
 import {distributeWardMarks,WARD_SCORING_POLICY} from './wardMarks';
 // Workforce keeps 30 marks; other eligible components share 70.
 // Missing activity earns zero and does not release a responsibility share.
 const numeric=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
 export function applyFixedWardWeights<T extends {rankings?:any[];config?:any}>(data:T,enabledModules?:readonly string[]):T {
   if(!Array.isArray(data?.rankings))return data;
-  let changed=false;
-  const rankings=data.rankings.map(row=>{
+  let changed=data.rankings.some(row=>!isAdministrativeWard(row));
+  const rankings=data.rankings.filter(isAdministrativeWard).map(row=>{
     if(row.scoringPolicy==='WORKFORCE_30_EQUAL_70' && !enabledModules)return {...row};
     if(!row.components)return {...row};
     const components=distributeWardMarks(row.components,enabledModules||row.enabledModuleKeys||data.config?.enabledModuleKeys);

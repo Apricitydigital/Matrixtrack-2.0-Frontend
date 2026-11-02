@@ -146,7 +146,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         </div>
 
         <div className="space-y-1">
-          <span className="text-slate-400 font-medium uppercase tracking-wider block">Sanitary Inspector</span>
+          <span className="text-slate-400 font-medium uppercase tracking-wider block">SI</span>
           <p className="font-bold text-slate-900 text-sm">{inspector?.name || 'Not assigned'}</p>
           <p className="text-slate-500 font-mono">{inspector?.email || 'Not supplied'}</p>
         </div>
@@ -180,7 +180,6 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         />
       </div>
 
-      <p className="executive-scope-note">Inspections still needed counts additional inspections required to meet the target or daily baseline. Awaiting review counts reports already submitted; those reports are included in Inspections done.</p>
       <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={coverage.data} loading={coverage.loading} ward={currentWard?.id} onInspect={(_module,status)=>setFilters({...emptyFilters(),status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).map(id=>{const target=inspectionMetrics(coverage.data,{module:id,ward:currentWard?.id},figures?.modules[id]).delivery;return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:inspectionPeriod(coverageCounts(coverage.data,{module:id,ward:currentWard?.id}),target).achievement};})}/></ChartCard></div>
       {/* Supporting Report List for this Ward */}
       {failed&&<div className="compact-error">Some ward summaries are unavailable.<button onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}

@@ -96,7 +96,7 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Separate review queues with full report dossiers, Sanitary Inspector spot check results, and intervention controls.
+            Separate review queues with full report dossiers, SI spot check results, and intervention controls.
           </p>
         </div>
 

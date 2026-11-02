@@ -22,7 +22,9 @@ export function pageDatasets(pageId: string, role?: string): Dataset[] {
   if (['ca_inspections','ca_daily_reports','ca_attention','ca_inspection_perf'].includes(pageId)) return ['geography','reports'];
   if(['ca_exec_summary','comm_exec_summary'].includes(pageId))return ['geography'];
   if(pageId==='ulb_dashboard')return ['geography'];
-  if(['ulb_reports','ulb_pending','ulb_approved','ulb_rejected','ulb_action_req','ulb_action_taken','ulb_inspection_perf'].includes(pageId))return ['geography','reports'];
+  // These pages load the complete, date-scoped inspection register themselves.
+  // Loading the legacy first report page here duplicates requests for every module.
+  if(['ulb_reports','ulb_pending','ulb_approved','ulb_rejected','ulb_action_req','ulb_action_taken','ulb_inspection_perf'].includes(pageId))return ['geography'];
   if(['ulb_attendance','ca_attendance','ulb_map'].includes(pageId))return ['geography'];
   if(pageId==='ulb_user_perf')return ['geography','users'];
   if (['comm_dashboard','comm_map'].includes(pageId)) return ['geography'];

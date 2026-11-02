@@ -108,7 +108,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
         >
           <span className="text-xs text-rose-700 font-semibold uppercase tracking-wider block mb-1">Rejected</span>
           <div className="text-2xl font-bold font-mono text-slate-900 tabular-nums">{rejected.length}</div>
-          <span className="text-[15px] text-slate-400 mt-1 block">Sanitary Inspector spot-check failed</span>
+          <span className="text-[15px] text-slate-400 mt-1 block">SI spot-check failed</span>
         </div>
 
         <div
