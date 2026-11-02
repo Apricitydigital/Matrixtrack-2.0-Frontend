@@ -15,7 +15,7 @@ export function statusTone(status: string): RygTone {
   if (['green','approved','approved_closed','closed','active','present','achieved','on_track','verified_clean','operating','completed','certified'].includes(key)) return 'green';
   return 'neutral';
 }
-const STATUS_LABELS: Record<string, string> = { inspections_completed:'Completed inspections (excludes Draft)', unclassified:'Draft', action_taken: 'Action taken', action_required: 'Action required', pending_qc: 'Pending Sanitary Inspector review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
+const STATUS_LABELS: Record<string, string> = { all_actions_required:'Total actions required',actions_outstanding:'Outstanding actions',inspections_completed:'Completed inspections (excludes Draft)', unclassified:'Draft', action_taken: 'Action taken', action_required: 'Action required', pending_qc: 'Pending Sanitary Inspector review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
 export function statusLabel(status: string) { const key = normalizeStatus(status); return STATUS_LABELS[key] || key.replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase()); }
 export function issueIsOverdue(issue: { status: string; deadlineTimestamp: string }, now = Date.now()) {
   const deadline = Date.parse(issue.deadlineTimestamp);
@@ -24,11 +24,11 @@ export function issueIsOverdue(issue: { status: string; deadlineTimestamp: strin
 
 export interface OperationalFilters { query: string; zoneId: string; wardId: string; moduleId: string; staffId: string; status: string; ryg: string; }
 export const emptyFilters = (): OperationalFilters => ({ query: '', zoneId: 'all', wardId: 'all', moduleId: 'all', staffId: 'all', status: 'all', ryg: 'all' });
-export function matchesFilters(record: { zoneId?: string; wardId?: string; moduleId?: string; status?: string; submittedByUserId?: string; assignedDarogaId?: string; reviewerId?: string }, filters: OperationalFilters, searchable: string[]): boolean {
+export function matchesFilters(record: { actionRequired?:boolean; zoneId?: string; wardId?: string; moduleId?: string; status?: string; submittedByUserId?: string; assignedDarogaId?: string; reviewerId?: string }, filters: OperationalFilters, searchable: string[]): boolean {
   return (filters.zoneId === 'all' || record.zoneId === filters.zoneId)
     && (filters.wardId === 'all' || record.wardId === filters.wardId)
     && (filters.moduleId === 'all' || record.moduleId === filters.moduleId)
-    && (filters.status === 'all' || (filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
+    && (filters.status === 'all' || (filters.status==='all_actions_required'?Boolean(record.actionRequired||['action_required','action_taken','escalated'].includes(record.status||'')):filters.status==='actions_outstanding'?Boolean((record.actionRequired||['action_required','escalated'].includes(record.status||''))&&record.status!=='action_taken'):filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
     && (filters.ryg === 'all' || statusTone(record.status || '') === filters.ryg)
     && (filters.staffId === 'all' || [record.submittedByUserId, record.assignedDarogaId, record.reviewerId].includes(filters.staffId))
     && (!filters.query.trim() || searchable.join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));

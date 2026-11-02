@@ -168,6 +168,7 @@ export interface User {
   customCapabilities?: Capability[];
   createdAt: string;
   lastActiveAt?: string;
+  updatedAt?: string;
   isDeleted?: boolean;
   deletedAt?: string;
   deletedBy?: string;
@@ -241,6 +242,7 @@ export interface TimelineEvent {
 }
 
 export interface OperationalReport {
+  actionRequired?: boolean;
   contacts?: {id?:string;role:string;name:string;phone?:string;email?:string;source:string}[];
   currentOwnerRole?: string;
   stageSince?: string;

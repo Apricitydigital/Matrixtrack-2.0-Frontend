@@ -5,6 +5,8 @@ import {Pagination,usePagination} from '../../components/common/Pagination';
 import {api} from '../../services/api';
 import {mapUser} from '../../services/adapters';
 import {matrixStore} from '../../services/store';
+import {PlatformUserEditor} from './PlatformUserEditor';
+import {directoryDate} from '../../services/directoryDate';
 import { generateCsv, downloadCsv } from '../../services/csv';
 import { Users, Search, Filter, Download, UserPlus, Phone, Mail, MapPin } from 'lucide-react';
 
@@ -17,7 +19,8 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
   cities
 }) => {
   const [users,setUsers]=useState<User[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
-  useEffect(()=>{const c=new AbortController();api('/city/super-admin-overview',{signal:c.signal}).then(d=>{if(!Array.isArray(d.users))throw Error('User directory unavailable.');if(!c.signal.aborted)setUsers(d.users.map((u:any)=>mapUser(u,u.cityId)));}).catch(e=>{if(!c.signal.aborted)setError(e.message);}).finally(()=>{if(!c.signal.aborted)setLoading(false);});return()=>c.abort();},[matrixStore.loadRevision]);
+  const [editing,setEditing]=useState<User|null>(null),[revision,setRevision]=useState(0),[notice,setNotice]=useState('');
+  useEffect(()=>{const c=new AbortController();setLoading(true);setError('');api('/city/super-admin-overview',{signal:c.signal,cache:'no-store'}).then(d=>{if(!Array.isArray(d.users))throw Error('User directory unavailable.');if(!c.signal.aborted)setUsers(d.users.map((u:any)=>mapUser(u,u.cityId)));}).catch(e=>{if(!c.signal.aborted)setError(e.message);}).finally(()=>{if(!c.signal.aborted)setLoading(false);});return()=>c.abort();},[matrixStore.loadRevision,revision]);
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState(matrixStore.selectedCityId||'all');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -38,7 +41,7 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
 
   const paging=usePagination(filteredUsers,search+cityFilter+roleFilter+statusFilter);
   const handleExportCsv = () => {
-    const headers = ['User_ID', 'Name', 'Email', 'Phone', 'Role', 'City', 'Status', 'Created_At'];
+    const headers = ['User_ID', 'Name', 'Email', 'Phone', 'Role', 'City', 'Status', 'Created_At','Updated_At'];
     const rows = filteredUsers.map(u => {
       const city = cities.find(c => c.id === u.cityId);
       return [
@@ -49,7 +52,7 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
         u.role,
         city ? city.name : 'State HQ',
         u.status,
-        u.createdAt
+        u.createdAt,u.updatedAt||''
       ];
     });
     downloadCsv(`registered_users_${Date.now()}.csv`, generateCsv(headers, rows));
@@ -57,6 +60,8 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
 
   return (
     <div className="space-y-6">
+      {notice&&<p role="status">{notice}</p>}
+      {editing&&cities.find(c=>c.id===editing.cityId)&&<PlatformUserEditor user={editing} city={cities.find(c=>c.id===editing.cityId)!} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);setNotice('User profile and assignments saved and verified.');setRevision(v=>v+1);}}/>}
       {/* Title */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -144,6 +149,9 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
                 <th className="px-5 py-3">Assigned Jurisdiction</th>
                 <th className="px-5 py-3">Contact</th>
                 <th className="px-5 py-3 text-right">Account Status</th>
+                <th className="px-5 py-3">Created date</th>
+                <th className="px-5 py-3">Updated date</th>
+                <th className="px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -152,7 +160,7 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
                 const businessRole = (STAFF_ROLE_LABELS as any)[user.role] || user.role;
 
                 return (
-                  <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr key={`${user.id}:${user.cityId}:${user.role}`} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="font-bold text-slate-900">{user.name}</div>
                       <div className="text-[15px] text-slate-400 font-mono">{user.email}</div>
@@ -173,6 +181,9 @@ export const RegisteredUsers: React.FC<RegisteredUsersProps> = ({
                     <td className="px-5 py-3.5 text-right">
                       <StatusBadge status={user.status} size="sm" />
                     </td>
+                    <td className="px-5 py-3.5">{directoryDate(user.createdAt)}</td>
+                    <td className="px-5 py-3.5">{directoryDate(user.updatedAt)}</td>
+                    <td className="px-5 py-3.5">{user.role!=='HMS_SUPER_ADMIN'&&cities.some(c=>c.id===user.cityId)&&<button className="workspace-secondary-button" onClick={()=>{setNotice('');setEditing(user);}}>Edit user</button>}</td>
                   </tr>
                 );
               })}

@@ -1,5 +1,6 @@
+import {canonicalModuleKey} from './moduleKeys';
 import type { City, Zone, Ward, Area, Beat, User, OperationalReport, IecCleanlinessIssue, AttendanceRecord, PlantLog, AuditLogEvent, ActiveSession, Target, Capability, OperationalModuleId, ProductId, RoleType } from '../types';
-import { api, writeApi, clearToken, setToken, getToken, clearReadCache,setApiCityContext } from './api';
+import { api, writeApi, clearToken, setToken, getToken, clearReadCache,setApiCityContext,setApiCityModules } from './api';
 import { WorkspaceLoader, type Dataset } from './workspace';
 import { ROLE_CAPABILITIES } from './access';
 import { mapCity, mapUser, mapIssue, mapReport, MODULE_KEYS, rolesOf } from './adapters';
@@ -38,7 +39,7 @@ class MatrixStore {
   public getCities() { return this.data.cities.filter(c => !c.isDeleted); }
   public getAllCitiesWithTrash() { return this.data.cities; }
   public getCityById(id: string) { return this.data.cities.find(c => c.id === id); }
-  public getCityModules(id:string):{id:string;key:string;enabled:boolean}[]{return (this.rawCities.get(id)?.modules||[]).map((m:any)=>({id:m.id||m.moduleId,key:m.key||m.name,enabled:m.enabled!==false}));}
+  public getCityModules(id:string):{id:string;key:string;enabled:boolean}[]{return (this.rawCities.get(id)?.modules||[]).map((m:any)=>({id:m.moduleId||m.module?.id||m.id,key:canonicalModuleKey(m.key||m.module?.name||m.name),enabled:m.enabled!==false}));}
   public getZones(cityId?: string) { return this.data.zones.filter(z => !cityId || cityId === 'all' || z.cityId === cityId); }
   public getWards(cityId?: string, zoneId?: string) { return this.data.wards.filter(w => (!cityId || cityId === 'all' || w.cityId === cityId) && (!zoneId || zoneId === 'all' || w.zoneId === zoneId)); }
   public getBeats(cityId?: string, wardId?: string) { return this.data.beats.filter(b => (!cityId || cityId === 'all' || b.cityId === cityId) && (!wardId || wardId === 'all' || b.wardId === wardId)); }
@@ -55,6 +56,7 @@ class MatrixStore {
   public getAvailableRoles(): RoleType[] { return dashboardRoles.filter(role => rolesOf(this.profile || {}).includes(role)); }
 
   public async login(identifier: string, password: string) {
+    this.logout();
     const response = await writeApi('/auth/login', 'POST', { identifier, password });
     if (!response.token) throw new Error('Backend did not return an access token.');
     setToken(response.token);
@@ -62,10 +64,11 @@ class MatrixStore {
   }
 
   public async initialize() {
-    if (!getToken()) return;
+    const sessionToken=getToken();if(!sessionToken)return;
     this.loading = true; this.error = ''; this.notify();
     try {
       const response = await api('/auth/me');
+      if(sessionToken!==getToken())return;
       this.profile = response.user;
       const role = this.getAvailableRoles()[0];
       if (!role) throw new Error('This account does not have a Command Center role. Use a Super Admin, Commissioner, City Admin or ULB Officer account.');
@@ -96,7 +99,7 @@ class MatrixStore {
     const generation = ++this.generation;
     this.workspace.cancel();
     const user = this.currentUser;
-    const selectedCityId = this.selectedCityId;
+    let selectedCityId = this.selectedCityId;
     this.loading = true; this.error = ''; this.warnings = []; this.notify();
     try {
       let rawCities: any[];
@@ -116,11 +119,14 @@ class MatrixStore {
         rawCities = [{ ...response.city, stateName: this.profile.stateName, districtName: this.profile.districtName, divisionName: this.profile.divisionName, modules }];
       }
       if (generation !== this.generation) return;
+      if(user.role==='HMS_SUPER_ADMIN'&&selectedCityId!=='all'&&!rawCities.some(c=>c.id===selectedCityId&&!c.isDeleted)){selectedCityId='all';this.selectedCityId='all';setApiCityContext(undefined);}
       const next = emptyData(); next.cities = rawCities.map(mapCity); next.users = [user];
       next.lastUpdated = new Date().toISOString();
       this.data = next; this.rawCities = new Map(rawCities.map(c => [c.id, c]));
       this.cleanlinessSummary = null;
       const scopeId = user.role === 'HMS_SUPER_ADMIN' ? selectedCityId === 'all' ? undefined : selectedCityId : user.cityId;
+      setApiCityContext(scopeId);
+      for(const city of rawCities)setApiCityModules(city.id,this.getCityModules(city.id).filter(m=>m.enabled).map(m=>m.key));
       this.workspace.configure(next, user, scopeId); this.loadRevision++;
     } catch (error) {
       if (generation === this.generation) this.error = error instanceof Error ? error.message : 'Unable to load backend data.';
@@ -133,7 +139,7 @@ class MatrixStore {
     const generation=this.generation,result=await api('/hms/cities');
     if(generation!==this.generation)return;
     if(!Array.isArray(result.cities))throw new Error('City directory could not be refreshed.');
-    this.rawCities=new Map(result.cities.map((c:any)=>[c.id,c]));this.data.cities=result.cities.map(mapCity);this.notify();
+    this.rawCities=new Map(result.cities.map((c:any)=>[c.id,c]));this.data.cities=result.cities.map(mapCity);for(const city of result.cities)setApiCityModules(city.id,this.getCityModules(city.id).filter(m=>m.enabled).map(m=>m.key));this.notify();
   }
   public async refreshCollections(keys:Dataset[]){await Promise.all([...new Set(keys)].map(key=>this.workspace.retry(key)));}
   public async refreshPersonnel(){
@@ -159,6 +165,19 @@ class MatrixStore {
     if(!report.wardId)report.wardId=labels?.wardId || '';
     this.data.reports=[...this.data.reports.filter(r=>r.id!==report.id),report];this.notify();return report.id;
   }
+  public async refreshOperationalReport(id:string,signal?:AbortSignal) {
+    const report=this.getReportById(id);if(!report?.backendId)throw new Error('Report identifier is missing.');
+    const city=this.getCities().find(c=>c.id===report.cityId);if(!city)throw new Error('City is unavailable.');
+    const generation=this.generation;clearReadCache();
+    const {loadInspectionCoverage}=await import('./inspectionCoverage');
+    const date=report.inspectionDate,controller=signal||new AbortController().signal;
+    const data=await loadInspectionCoverage({...city,enabledModules:[report.moduleId]},date,date,controller,false);
+    controller.throwIfAborted();if(generation!==this.generation)throw new Error('Your workspace changed. Reopen the report.');
+    if(data.failedModules.length)throw new Error(data.errors.join(' ')||'Report could not be refreshed.');
+    const visit=data.visits.find(v=>v.module===report.moduleId&&v.raw?.id===report.backendId);
+    if(!visit?.raw)throw new Error('This report is no longer available in your scope.');
+    const refreshed=await this.loadOperationalReport(report.moduleId,report.backendId,{name:report.assetName,zoneId:report.zoneId,wardId:report.wardId},visit.raw);this.loadRevision++;this.notify();return refreshed;
+  }
   public getCollection(key: Dataset) { return this.workspace.state(key); }
   public loadCollection(key: Dataset) { return this.workspace.ensure(key); }
   public retryCollection(key: Dataset) { return this.workspace.retry(key); }
@@ -168,7 +187,9 @@ class MatrixStore {
     const valid = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
     if (!valid(from) || !valid(to) || from > to) throw new Error('Choose a valid start and end date.');
     if (from === this.workspace.from && to === this.workspace.to) return;
-    if(this.currentUser?.role==='CITY_ADMIN'){clearReadCache();this.workspace.changePeriod(from,to);this.loadRevision++;this.notify();return;}
+    // Reads are already keyed by dates, geography and session. Keep unexpired
+    // results for return visits; refresh, mutations and sign-out still clear them.
+    if(['CITY_ADMIN','COMMISSIONER','ULB_OFFICER'].includes(this.currentUser?.role||'')){this.workspace.changePeriod(from,to);this.loadRevision++;this.notify();return;}
     this.workspace.from = from; this.workspace.to = to; await this.refresh();
   }
 
@@ -199,7 +220,7 @@ class MatrixStore {
     if (!raw) throw new Error('This product is not exposed in the backend module configuration. Manage it in the existing MatrixTrack portal.');
     return this.mutate(`/hms/cities/${id}/modules/${raw.id}`, 'PATCH', { enabled: !raw.enabled });
   }
-  public async softDeleteCity(id: string, _reason: string, _actor: User) { return this.mutate('/audit-logs/trash/soft-delete', 'POST', { id, type: 'City' }); }
+  public async softDeleteCity(id: string, reason: string, _actor: User) { return this.mutate('/audit-logs/trash/soft-delete', 'POST', { id, type: 'City',reason:reason.trim() }); }
   public async restoreCity(id: string, _actor: User) { return this.mutate('/audit-logs/trash/restore', 'POST', { id, type: 'City' }); }
   public async softDeleteUser(id: string, _reason: string, _actor: User) { return this.mutate('/audit-logs/trash/soft-delete', 'POST', { id, type: 'User' }); }
   public async restoreUser(id: string, _actor: User) { return this.mutate('/audit-logs/trash/restore', 'POST', { id, type: 'User' }); }
@@ -289,18 +310,17 @@ class MatrixStore {
     const state = match((await api('/hms/locations/states')).states, data.state!, 'State');
     const district = match((await api(`/hms/locations/districts?stateId=${state.id}`)).districts, data.district!, 'District');
     const cityMaster = match((await api(`/hms/locations/cities?districtId=${district.id}`)).cities, data.name!, 'City');
-    const modules = (await api('/hms/modules')).modules;
-    const response = await writeApi('/hms/cities', 'POST', { stateId: state.id, divisionId: district.divisionId || undefined, districtId: district.id, cityMasterId: cityMaster.id, code: data.cityCode, ulbCode: data.ulbCode });
-    try {
-      await writeApi(`/hms/cities/${response.city.id}/admins`, 'POST', { name: admin.name, email: admin.email, password: admin.password });
-      const enabled = new Set((data.enabledModules || []).map(m => MODULE_KEYS[m]));
-      if (data.enabledProducts?.includes('workforce_monitoring')) enabled.add('WORKFORCE_MONITORING');
-      if (data.enabledProducts?.includes('swachh_assessment')) enabled.add('SWACHH_RANKING');
-      if (data.enabledProducts?.includes('plant_processing')) enabled.add('PROCESSING_PLANT');
-      for (const module of modules) await writeApi(`/hms/cities/${response.city.id}/modules/${module.id}`, 'PATCH', { enabled: enabled.has(module.name) });
+    let response:any;
+    try{
+      const enabledModuleKeys=[...(data.enabledModules||[]).map(m=>MODULE_KEYS[m]),...(data.enabledProducts?.includes('workforce_monitoring')?['WORKFORCE_MONITORING']:[]),...(data.enabledProducts?.includes('swachh_assessment')?['SWACHH_RANKING']:[]),...(data.enabledProducts?.includes('plant_processing')?['PROCESSING_PLANT']:[])];
+      response=await writeApi('/hms/cities/onboard','POST',{stateId:state.id,divisionId:district.divisionId||undefined,districtId:district.id,cityMasterId:cityMaster.id,code:data.cityCode?.trim()||undefined,ulbCode:data.ulbCode?.trim()||undefined,administrator:{name:admin.name?.trim(),email:admin.email?.trim(),password:admin.password},enabledModuleKeys});
+    }catch(error){
+      if((error as any)?.status===404)throw new Error('The connected backend needs the city-onboarding update. City and ULB codes are optional in that update. No new city was created by this request.');
+      throw error;
     }
-    catch (error) { await this.refresh(); throw new Error(`City was created, but administrator or module setup failed: ${error instanceof Error ? error.message : error}. Open City Administrators and Product & Module Access to finish setup; do not submit this city again.`); }
-    await this.refresh(); return response;
+    await this.refresh();
+    this.warnings=[...this.warnings,...(response.integrationWarnings||[])];this.notify();
+    return response;
   }
 }
 export const matrixStore = new MatrixStore();

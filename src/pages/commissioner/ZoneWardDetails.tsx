@@ -54,7 +54,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const [filters,setFilters]=useState(emptyFilters);
   const [figures,setFigures]=useState<ReturnType<typeof summarizeZones>|null>(null),[present,setPresent]=useState<number|null>(null),[issues,setIssues]=useState<number|null>(null),[failed,setFailed]=useState(false),[revision,setRevision]=useState(0);
   const range=matrixStore.getDateRange();
-  const coverage=useInspectionCoverage({...city,enabledModules:city.enabledModules??[]},range.from,range.to,revision+matrixStore.loadRevision);
+  const coverage=useInspectionCoverage({...city,enabledModules:city.enabledModules??[]},range.from,range.to,revision+matrixStore.loadRevision,true,true);
   const wardOutcomes=inspectionOutcomes(coverage.data,{ward:currentWard?.id});
   const counts=coverageCounts(coverage.data,{ward:currentWard?.id});
   const metrics=inspectionMetrics(coverage.data,{ward:currentWard?.id},figures?.totals),delivery=metrics.delivery;
@@ -214,7 +214,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
                   </div>
                   <p className="text-xs text-slate-700 font-medium mt-1">{currentZone?.name || 'Zone name unavailable'} / {currentWard.name}</p>
                   <p className="text-[15px] text-slate-400 font-mono">
-                    Logged by {rep.submittedByName || 'Not supplied'} on {rep.inspectionDate} · Score: {rep.overallScore == null ? 'Not supplied' : `${rep.overallScore}/100`}
+                    Logged by {rep.submittedByName || 'Not supplied'} on {rep.inspectionDate} · Score: {coverage.data.compact?'Open report for score':rep.overallScore == null ? 'Not supplied' : `${rep.overallScore}/100`}
                   </p>
                 </div>
 

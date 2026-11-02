@@ -2,7 +2,8 @@ import type { AppStoreData } from './store';
 import type { User, Area } from '../types';
 import { api, todayIST } from './api';
 import {concurrentReads} from './concurrentReads';
-import { mapUser, mapGeography, mapBeat, mapReport, mapIssue, mapAttendance, MODULE_KEYS } from './adapters';
+import {scopedDirectoryUsers} from './scopedUsers';
+import { mapCity,mapUser, mapGeography, mapBeat, mapReport, mapIssue, mapAttendance, MODULE_KEYS } from './adapters';
 
 export type Dataset = 'users' | 'geography' | 'reports' | 'attendance' | 'beats' | 'iecIssues' | 'registration' | 'auditLogs' | 'activeSessions' | 'trash';
 export interface CollectionState { status: 'idle' | 'loading' | 'ready' | 'error'; loaded: number; total: number; hasMore: boolean; error?: string; }
@@ -18,7 +19,8 @@ export function pageDatasets(pageId: string, role?: string): Dataset[] {
   if (pageId === 'ca_dashboard') return ['geography','users','beats','registration'];
   if (['ca_map','ca_iec_oversight'].includes(pageId)) return ['geography'];
   if (pageId === 'ca_user_perf') return ['geography','users'];
-  if (['ca_inspections','ca_daily_reports','ca_attention','ca_inspection_perf','ca_exec_summary'].includes(pageId)) return ['geography','reports'];
+  if (['ca_inspections','ca_daily_reports','ca_attention','ca_inspection_perf'].includes(pageId)) return ['geography','reports'];
+  if(['ca_exec_summary','comm_exec_summary'].includes(pageId))return ['geography'];
   if(pageId==='ulb_dashboard')return ['geography'];
   if(['ulb_reports','ulb_pending','ulb_approved','ulb_rejected','ulb_action_req','ulb_action_taken','ulb_inspection_perf'].includes(pageId))return ['geography','reports'];
   if(['ulb_attendance','ca_attendance','ulb_map'].includes(pageId))return ['geography'];
@@ -28,8 +30,7 @@ export function pageDatasets(pageId: string, role?: string): Dataset[] {
   if (pageId === 'comm_attendance') return ['geography'];
   if (pageId === 'comm_zone_ward') return ['geography'];
   if (pageId === 'comm_user_perf') return ['geography','users'];
-  if (pageId === 'comm_inspection_perf') return ['geography','reports'];
-  if (pageId === 'comm_exec_summary') return ['geography','reports'];
+  if (pageId === 'comm_inspection_perf') return ['geography','users'];
   if (pageId === 'sa_dashboard') return ['users', 'registration'];
   if (['ca_dashboard','ulb_dashboard','comm_dashboard'].includes(pageId)) return ['geography', 'users', 'reports'];
   if (['sa_cross_city','ca_module_dir'].includes(pageId)) return [];
@@ -160,7 +161,7 @@ export class WorkspaceLoader {
   private updateWarnings() { this.warnings = Object.entries(this.states).filter(([, state]) => state.status === 'error').map(([key, state]) => `${DATASET_LABELS[key as Dataset]}: ${state.error}`); }
   private mergeUsers(rows: User[], registration = false) {
     const keep = this.data.users.filter(u => registration ? u.status === 'active' || u.status === 'inactive' || u.isDeleted : u.status !== 'active' && u.status !== 'inactive' || u.isDeleted);
-    this.data.users = [...new Map([...keep, ...rows, this.user].map(u => [`${u.id}:${u.cityId || ''}:${u.role}`, u])).values()];
+    this.data.users = [...new Map([this.user,...keep, ...rows].map(u => [`${u.id}:${u.cityId || ''}:${u.role}`, u])).values()];
   }
   private async load(key: Dataset, generation: number) {
     const cityId = this.user.cityId;
@@ -168,12 +169,12 @@ export class WorkspaceLoader {
     const range = `from=${this.from}&to=${this.to}`;
     if (key === 'users') {
       const response = await this.get(this.user.role === 'HMS_SUPER_ADMIN'&&!this.scopeId ? '/city/super-admin-overview' : '/city/users', generation);
-      this.mergeUsers(response.users.map((u: any) => mapUser(u, cityId))); return;
+      this.mergeUsers(scopedDirectoryUsers(response.users,this.scopeId||cityId)); return;
     }
     if (key === 'registration') {
       const global=this.user.role==='HMS_SUPER_ADMIN'&&!this.scopeId;
       const response = await this.get(global?'/city/super-admin-overview':'/city/registration-requests', generation);
-      this.mergeUsers(response.requests.filter((r: any) => r.status !== 'APPROVED').map((r: any) => mapUser({ ...r, role: r.requestedRole },cityId)), true); return;
+      this.mergeUsers(scopedDirectoryUsers(response.requests.filter((r: any) => r.status !== 'APPROVED').map((r:any)=>({...r,role:r.requestedRole})),global?undefined:this.scopeId||cityId), true); return;
     }
     if (key === 'geography') {
       // Cross-city geography is loaded only after the user chooses a city.
@@ -235,7 +236,7 @@ export class WorkspaceLoader {
     if (key === 'trash') {
       const response = await this.get('/audit-logs/trash', generation);
       for (const row of response.data) {
-        if (row.type === 'City') { const city = this.data.cities.find(c => c.id === row.id); if (city) { city.isDeleted = true; city.deletedAt = row.deletedAt; } }
+        if (row.type === 'City') { const city = this.data.cities.find(c => c.id === row.id); if (city) { city.isDeleted = true; city.deletedAt = row.deletedAt; }else this.data.cities.push({...mapCity({...row.details,id:row.id,name:row.name}),isDeleted:true,deletedAt:row.deletedAt}); }
         if (row.type === 'User') this.data.users.push({ ...mapUser(row), isDeleted: true, deletedAt: row.deletedAt });
       }
     }

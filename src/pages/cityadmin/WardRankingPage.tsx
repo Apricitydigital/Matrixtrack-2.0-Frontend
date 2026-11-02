@@ -1,3 +1,4 @@
+import { naturalCompare } from '../../services/wardRankingEvidence';
 import React, { useEffect, useState } from 'react';
 import { Download, ChevronDown, ChevronUp } from 'lucide-react';
 import type { City, Ward, Beat, AttendanceRecord, OperationalReport, IecCleanlinessIssue } from '../../types';
@@ -23,7 +24,7 @@ export function WardRankingPage({ city }: Props) {
     return () => controller.abort();
   },[city.id,matrixStore.loadRevision,retry]);
   const filtered = rows.filter(r => (!search || `${r.wardName} ${r.zoneName}`.toLowerCase().includes(search.toLowerCase())) && (zone === 'all' || r.zoneId === zone) && (band === 'all' || statusTone(r.rankable === false ? 'not_assessed' : r.performanceBand || '') === band));
-  const zones = [...new Map(rows.filter(r => r.zoneId).map(r => [r.zoneId,r.zoneName])).entries()];
+  const zones = [...new Map(rows.filter(r => r.zoneId).map(r => [r.zoneId,r.zoneName])).entries()].sort((a,b)=>naturalCompare(a[1],b[1]));
   const paging = usePagination(filtered, search + zone + band + city.id + matrixStore.loadRevision);
   if(['COMMISSIONER','ULB_OFFICER','CITY_ADMIN','HMS_SUPER_ADMIN'].includes(matrixStore.currentUser?.role || ''))return <WardRankingInsights city={city} rows={rows} config={config} loading={loading} error={error} onRetry={()=>setRetry(n=>n+1)}/>;
   return <section className="space-y-5"><div className="workspace-page-heading flex flex-wrap items-start justify-between gap-4"><div><span className="workspace-eyebrow">WARD PERFORMANCE</span><h1>Ward Ranking</h1><p>Compare wards, performance bands and score components.</p></div><button className="workspace-secondary-button" onClick={() => downloadCsv(`ward-rankings-${city.cityCode}.csv`,generateCsv(['Rank','Ward','Zone','Score','Performance band','Applicable weight'],filtered.map(r => [r.cityRank,r.wardName,r.zoneName,r.finalScore,r.performanceBand,r.applicableWeight])))}><Download size={15} />Export filtered rankings</button></div>

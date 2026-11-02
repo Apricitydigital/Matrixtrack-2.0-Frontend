@@ -47,6 +47,86 @@ beforeEach(() => {
   };
 });
 
+test('date filters reuse only fresh matching reads, while explicit refresh invalidates them',async()=>{
+ const originalRange=matrixStore.getDateRange();profile.role='COMMISSIONER';await matrixStore.login('review@example.test','test-password');
+ const fallback=global.fetch;let reads=0;
+ global.fetch=async(url,init)=>String(url).includes('/filter-cache-check')?(reads++,json({date:new URL(url,'http://localhost').searchParams.get('from'),read:reads})):fallback(url,init);
+ const read=()=>api('/filter-cache-check?'+new URLSearchParams(matrixStore.getDateRange()));
+ try{
+  await matrixStore.setDateRange('2026-10-01','2026-10-07');const first=await read();assert.equal(first.date,'2026-10-01');
+  await matrixStore.setDateRange('2026-11-02','2026-11-02');assert.equal((await read()).date,'2026-11-02');
+  await matrixStore.setDateRange('2026-10-01','2026-10-07');assert.deepEqual(await read(),first);assert.equal(reads,2);
+  await matrixStore.refresh();assert.equal((await read()).read,3);
+ }finally{await matrixStore.setDateRange(originalRange.from,originalRange.to);}
+});
+
+test('Commissioner and ULB date changes retain personnel and geography while replacing dated collections',async()=>{
+ const originalRange=matrixStore.getDateRange();
+ for(const role of ['COMMISSIONER','ULB_OFFICER']){
+  profile.role=role;await matrixStore.login('review@example.test','test-password');
+  await matrixStore.ensurePage(role==='COMMISSIONER'?'comm_user_perf':'ulb_user_perf');
+  const users=matrixStore.getData().users.slice(),wards=matrixStore.getData().wards.slice(),start=requests.length;
+  await matrixStore.setDateRange('2026-08-01','2026-11-02');
+  assert.deepEqual(matrixStore.getData().users,users);assert.deepEqual(matrixStore.getData().wards,wards);
+  assert.equal(matrixStore.getCollection('users').status,'ready');assert.equal(matrixStore.getCollection('geography').status,'ready');
+  assert.ok(!requests.slice(start).some(r=>['/city/info','/city/modules','/city/geo','/city/users','/auth/me'].includes(r.path)));
+  assert.deepEqual(matrixStore.getDateRange(),{from:'2026-08-01',to:'2026-11-02'});
+ }
+ await matrixStore.setDateRange(originalRange.from,originalRange.to);
+});
+
+test('performance assignment filters retain module-only wards, infer zones, and separate loading, failure, zero and no workload',()=>{
+ const {performanceGroups}=require('../src/services/performanceSelection.ts');
+ const {officerSummary}=require('../src/services/insights.ts');
+ const wards=[{id:'w1',zoneId:'z1'},{id:'w2',zoneId:'z2'}];
+ const people=['SUPERVISOR','QC','ACTION_OFFICER'].flatMap(role=>[
+  {id:role+'1',cityId:'city',role,name:'First '+role,status:'active',assignedWardIds:[],assignedZoneIds:[],moduleAssignments:[{key:'SWEEPING',wardIds:['w1'],zoneIds:[]}]},
+  {id:role+'2',cityId:'city',role,name:'Second '+role,status:'active',assignedWardIds:['w2'],assignedZoneIds:['z2'],moduleAssignments:[{key:'SWEEPING',wardIds:['w1'],zoneIds:['z1']}]}
+ ]);
+ const stats=Object.fromEntries(['SUPERVISOR','QC','ACTION_OFFICER'].map(role=>[role,Object.fromEntries(people.filter(u=>u.role===role).map(u=>[u.id,role==='SUPERVISOR'?{required:10,completed:0,performance:0,modules:{SWEEPING:{required:10,completed:0}}}:{due:10,onTime:0,late:2,overdue:8,performance:0,moduleStats:{SWEEPING:{onTime:0,late:2,overdue:8,inProgress:0}}}]))]));
+ const loads=Object.fromEntries(['SUPERVISOR','QC','ACTION_OFFICER'].map(role=>[role,{status:'ready'}]));
+ const filters={zone:'z1',ward:'w1',module:'SWEEPING',query:''};
+ for(const role of Object.keys(loads)){
+  const rows=performanceGroups(people,stats,loads,'city',wards,filters)[role];assert.equal(rows.length,2);assert.equal(officerSummary(rows,role).weighted,0);
+  assert.equal(performanceGroups(people,stats,loads,'city',wards,{...filters,zone:'z2',ward:'w2'})[role].length,0);
+  assert.equal(performanceGroups(people,stats,loads,'city',wards,{...filters,query:'  FIRST '})[role].length,1);
+  const loading=performanceGroups(people,stats,{...loads,[role]:{status:'loading'}},'city',wards,filters)[role];assert.equal(officerSummary(loading,role).unassessed,0);assert.equal(officerSummary(loading,role).loading,2);assert.equal(officerSummary(loading,role).weighted,null);
+  const partial=performanceGroups(people,stats,{...loads,[role]:{status:'ready',officerErrors:{[role+'2']:'Unavailable'}}},'city',wards,filters)[role];assert.equal(officerSummary(partial,role).failed,1);assert.equal(officerSummary(partial,role).unassessed,0);assert.equal(officerSummary(partial,role).weighted,0);
+ }
+});
+
+test('unscored performance role charts remain visible and selectable with honest availability labels',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const {UserPerformanceInsights}=require('../src/pages/commissioner/UserPerformanceInsights.tsx');
+ const groups={SUPERVISOR:[],QC:[{user:{id:'q',name:'Inspector'},stat:{availability:'loading',performance:null,scoreBasis:'on_time'}}],ACTION_OFFICER:[]};
+ const html=renderToStaticMarkup(React.createElement(UserPerformanceInsights,{groups,role:'QC',onRole:()=>{},rawStats:{},wards:[],loadStates:{QC:{status:'loading'},SUPERVISOR:{status:'ready'},ACTION_OFFICER:{status:'error'}}}));
+ assert.match(html,/Loading workload/);assert.match(html,/Sanitary Inspector: Loading/);assert.match(html,/IEC Member: Unavailable/);assert.match(html,/Performance is still loading/);
+ assert.doesNotMatch(html,/disabled=""[^>]+aria-label="IEC Member: Unavailable/);
+ const failed=renderToStaticMarkup(React.createElement(UserPerformanceInsights,{groups:{...groups,QC:[{user:{id:'q',name:'Inspector'},stat:{availability:'error',performance:null,scoreBasis:'on_time'}}]},role:'QC',onRole:()=>{},rawStats:{},wards:[],loadStates:{QC:{status:'ready',officerErrors:{q:'Unavailable'}}}}));
+ assert.match(failed,/Sanitary Inspector: Unavailable/);assert.match(failed,/Workload unavailable/);assert.match(failed,/Summary counts cover the loaded officers only/);
+});
+
+test('compact dashboard reader uses one request, preserves exact metrics and separates detailed report cache', async()=>{
+ const {loadInspectionCoverage,emptyCoverage,inspectionVisit}=require('../src/services/inspectionCoverage.ts');
+ const {inspectionMetrics}=require('../src/services/inspectionMetrics.ts');
+ const city={id:'city-a',enabledModules:['sweeping']},from='2026-08-01',to='2026-11-02',signal=new AbortController().signal;
+ const data={...emptyCoverage(),version:1,complete:true,cityId:city.id,from,to,modules:city.enabledModules,inventoryAvailable:true,assets:[{id:'a',module:'sweeping',zoneId:'z',wardId:'w'}],visits:Array.from({length:2501},(_,i)=>({id:'sweeping:'+i,module:'sweeping',assetId:'a',zoneId:'z',wardId:'w',status:i===0?'DRAFT':'SUBMITTED',submittedAt:'2026-11-02T04:00:00Z'}))};
+ let calls=[];setToken('compact-test');
+ global.fetch=async url=>{calls.push(String(url));return json(data);};
+ const loaded=await loadInspectionCoverage(city,from,to,signal,true),metrics=inspectionMetrics(loaded);
+ assert.equal(calls.length,1);assert.match(calls[0],/inspection-coverage\?/);
+ assert.equal(metrics.totalRecords,2501);assert.equal(metrics.achieved,2500);assert.equal(metrics.uniqueEntities,1);assert.equal(metrics.coveragePercent,100);
+ await loadInspectionCoverage(city,from,to,signal,true);assert.equal(calls.length,1);
+ assert.equal(inspectionVisit({id:'n',nalaId:'parent',nalaPointId:'point'},'nala',city.id).assetId,'point');
+ assert.equal(inspectionVisit({id:'n',nalaId:'parent'},'nala',city.id).assetId,undefined);
+ const {clearReadCache}=require('../src/services/api.ts');clearReadCache();
+ global.fetch=async url=>String(url).includes('inspection-coverage')?json({...data,from:'wrong'}):json({});
+ await assert.rejects(loadInspectionCoverage(city,from,to,signal,true),/wrong scope/);
+ clearReadCache();calls=[];
+ global.fetch=async url=>{calls.push(String(url));return String(url).includes('inspection-coverage')?json({error:'Not found'},404):String(url).includes('operations-map')?json({beats:[{id:'a'}]}):json({data:[],meta:{total:0,totalPages:0}});};
+ const fallback=await loadInspectionCoverage(city,from,to,signal,true);assert.equal(fallback.inventoryAvailable,true);assert.equal(calls.length,3);
+});
+
 test('coverage range changes preserve inventory and count completed entities once across days and geography', async () => {
   const { loadInspectionCoverage } = require('../src/services/inspectionCoverage.ts');
   const { inspectionMetrics } = require('../src/services/inspectionMetrics.ts');
@@ -603,21 +683,21 @@ test('ward score justification normalizes applicable components and identifies t
 test('ward scoring retains fixed Workforce and IEC weights without adding unearned marks', () => {
   const { applyFixedWardWeights } = require('../src/services/wardScoring.ts');
   const { wardExplanation } = require('../src/services/insights.ts');
-  const components = { workforce: { score: 0, maxScore: 15, applicable: false }, actionOfficer: { score: 0, maxScore: 10, applicable: false }, beat: { score: 6.67, maxScore: 10, applicable: true }, litterBin: { score: 8.66, maxScore: 10, applicable: true }, supervisor: { score: 10, maxScore: 10, applicable: true }, qc: { score: 0, maxScore: 10, applicable: true }, toilet: { score: 0, maxScore: 15, applicable: false } };
+  const components = { workforce: { score: 0, maxScore: 15, applicable: false }, actionOfficer: { score: 0, maxScore: 10, applicable: false }, beat: { score: 6.67, maxScore: 10, applicable: true }, litterBin: { score: 8.66, maxScore: 10, applicable: true }, supervisor: { score: 10, maxScore: 10, applicable: true }, qc: { score: 0, maxScore: 10, applicable: true }, toilet: { score: 0, maxScore: 15, applicable: false, metrics:{totalToilets:0} }, nala:{score:0,maxScore:10,applicable:false,metrics:{totalNalas:0}},gvp:{score:0,maxScore:10,applicable:false,metrics:{totalPoints:0}} };
   const data = { rankings: [{ wardId: 'a', wardName: 'Ward A', zoneId: 'z', cityRank: 1, rankable: true, finalScore: 63.32, applicableWeight: 40, components, trend: { change: 5 } }, { wardId: 'b', wardName: 'Ward B', zoneId: 'z', cityRank: 2, rankable: true, finalScore: 50, applicableWeight: 65, components: { ...components, beat: { score: 10, maxScore: 10, applicable: true }, workforce: { score: 15, maxScore: 15, applicable: true } } }] };
   const result = applyFixedWardWeights(data), row = result.rankings[0], explanation = wardExplanation(row);
-  assert.equal(row.applicableWeight, 65); assert.equal(row.finalScore, 38.97); assert.equal(row.components.workforce.score, 0); assert.equal(row.components.actionOfficer.applicable, true); assert.equal(row.components.toilet.applicable, false);
-  assert.equal(row.cityRank, 2); assert.equal(row.zoneRank, 2); assert.equal(row.trend, null); assert.equal(row.performanceBand, 'RED'); assert.equal(explanation.denominator, 65); assert.equal(explanation.excluded.length, 1);
+  assert.equal(row.applicableWeight, 100); assert.equal(row.finalScore, 35.46); assert.equal(row.components.workforce.score, 0); assert.equal(row.components.actionOfficer.applicable, true); assert.equal(row.components.toilet.applicable, false);
+  assert.equal(row.cityRank, 2); assert.equal(row.zoneRank, 2); assert.equal(row.trend, null); assert.equal(row.performanceBand, 'RED'); assert.equal(explanation.denominator, 100); assert.equal(explanation.excluded.length, 3);
   assert.equal(data.rankings[0].finalScore, 63.32); assert.equal(components.workforce.applicable, false);
   assert.deepEqual(applyFixedWardWeights(result), result);
-  const custom = applyFixedWardWeights({ ...data, config: { weights: { workforce: 20, actionOfficer: 5 } } }); assert.equal(custom.rankings[0].components.workforce.maxScore, 20); assert.equal(custom.rankings[0].components.actionOfficer.maxScore, 5);
-  const empty = applyFixedWardWeights({ rankings: [{ rankable: false, finalScore: 0, components: { workforce: components.workforce, actionOfficer: components.actionOfficer } }] }); assert.equal(empty.rankings[0].rankable, false); assert.equal(empty.rankings[0].finalScore, 0); assert.equal(empty.rankings[0].applicableWeight, 25);
+  const custom = applyFixedWardWeights({ ...data, config: { weights: { workforce: 20, actionOfficer: 5 } } }); assert.equal(custom.rankings[0].components.workforce.maxScore, 30); assert.equal(custom.rankings[0].components.actionOfficer.maxScore, 14);
+  const empty = applyFixedWardWeights({ rankings: [{ rankable: false, finalScore: 0, components: { workforce: components.workforce, actionOfficer: components.actionOfficer } }] }); assert.equal(empty.rankings[0].rankable, false); assert.equal(empty.rankings[0].finalScore, 0); assert.equal(empty.rankings[0].applicableWeight, 100);
 });
 
 test('ward ranking API applies the same fixed-weight calculation for every consumer', async () => {
   const original = global.fetch;
   global.fetch = async () => json({ rankings: [{ rankable: true, finalScore: 100, applicableWeight: 10, components: { workforce: { score: 0, maxScore: 15, applicable: false }, actionOfficer: { score: 0, maxScore: 10, applicable: false }, beat: { score: 10, maxScore: 10, applicable: true } } }] });
-  try { const data = await api('/ward-ranking?from=2026-10-31&to=2026-10-31'); assert.equal(data.rankings[0].applicableWeight, 35); assert.equal(data.rankings[0].finalScore, 28.57); } finally { global.fetch = original; }
+  try { const data = await api('/ward-ranking?from=2026-10-31&to=2026-10-31'); assert.equal(data.rankings[0].applicableWeight, 100); assert.equal(data.rankings[0].finalScore, 8.75); } finally { global.fetch = original; }
 });
 
 test('ward insights preserve unassessed wards and genuine zero scores', () => {
@@ -1377,6 +1457,29 @@ test('Setup refresh replaces geography without duplicate rows and does not reloa
 // Backend integration checks are opt-in; private backend source is never published with this public frontend.
 const backendSourceRoot = process.env.MATRIXTRACK_BACKEND_SOURCE_DIR || require('node:path').resolve('backend-patches/superadmin/src');
 const backendTest = fs.existsSync(require('node:path').join(backendSourceRoot, 'middleware/auth.ts')) ? test : (name, fn) => test(name, { skip: 'Set MATRIXTRACK_BACKEND_SOURCE_DIR to the private backend src directory' }, fn);
+backendTest('City onboarding accepts omitted or blank codes without treating absent ULB codes as duplicates', async () => {
+  const z = require(require.resolve('zod', { paths: [require('node:path').resolve(backendSourceRoot, '..')] })).z;
+  const {cityCodes,optionalCityCode}=loadStagedBackend('hms/cityCodes.ts',{'zod':{z}});
+  const source=fs.readFileSync(require('node:path').join(backendSourceRoot,'hms/router.ts'),'utf8');
+  const schemaText=source.slice(source.indexOf('const citySchema ='),source.indexOf('const cityUpdateSchema ='));
+  const schema=new Function('z','optionalCityCode',schemaText+'\nreturn citySchema;')(z,optionalCityCode);
+  const location={stateId:'11111111-1111-4111-8111-111111111111',districtId:'22222222-2222-4222-8222-222222222222',cityMasterId:'33333333-3333-4333-8333-333333333333'};
+  assert.ok(schema.safeParse(location).success);assert.ok(schema.safeParse({...location,code:' ',ulbCode:' '}).success);
+  assert.deepEqual(cityCodes(location),{code:'CITY-'+location.cityMasterId,ulbCode:null});
+  assert.deepEqual(cityCodes({...location,code:'  SIRSA  ',ulbCode:'  ULB-1  '}),{code:'SIRSA',ulbCode:'ULB-1'});
+  const start=source.indexOf('router.post("/cities",'),end=source.indexOf('router.patch("/cities/:cityId",',start);
+  let handler,lookup,created,audit,error;
+  const db={hMS:{findFirst:async()=>({id:'hms'})},city:{findFirst:async q=>{lookup=q;return null;},create:async q=>{created=q.data;return {id:'new-city',...q.data};}}};
+  const js=ts.transpileModule(source.slice(start,end),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+  new Function('router','validateBody','citySchema','cityCodes','prisma','prismaAny','HttpError','ensureModulesExist','resolveHierarchySelection','syncCityModules','logAudit',js)(
+    {post:(_path,_validation,fn)=>handler=fn},()=>()=>{},schema,cityCodes,db,db,BackendHttpError,async()=>{},async()=>({cityMaster:{name:'Sirsa'}}),async()=>{},async(_req,data)=>{audit=data;});
+  await handler({body:location},{json:()=>{}},e=>{error=e;});
+  assert.equal(error,undefined);assert.equal(created.code,'CITY-'+location.cityMasterId);assert.equal(created.ulbCode,null);
+  assert.deepEqual(lookup.where.OR,[{cityMasterId:location.cityMasterId},{code:created.code}]);assert.equal(audit.newValue.ulbCode,null);
+  db.city.findFirst=async()=>({id:'existing'});error=undefined;created=undefined;
+  await handler({body:location},{json:()=>assert.fail('Duplicate location accepted')},e=>{error=e;});
+  assert.equal(error.status,400);assert.equal(created,undefined);
+});
 function loadStagedBackend(relative, mocks) {
   const Module = require('node:module'), path = require('node:path'), filename = path.resolve(backendSourceRoot, relative), loaded = new Module(filename, module);
   loaded.filename = filename; loaded.paths = module.paths; loaded.require = id => { if (id in mocks) return mocks[id]; throw new Error('Unexpected backend dependency: ' + id); };
@@ -1697,4 +1800,160 @@ test('shared Daroga names survive Beat mapping even when the personnel directory
  const {mapBeat}=require('../src/services/adapters.ts');
  const beat=mapBeat({id:'beat',sharedSupervisorIds:['d1','d2'],assignedDarogaIds:['d1','d2'],assignedDarogaNames:['Daroga One','Daroga Two'],segments:[]},'city-a');
  assert.deepEqual(beat.assignedDarogaIds,['d1','d2']);assert.deepEqual(beat.assignedDarogaNames,['Daroga One','Daroga Two']);assert.deepEqual(beat.sharedSupervisorIds,['d1','d2']);
+});
+
+test('Super Admin progress uses the Commissioner metrics for single-day, seven-day and long-range targets',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const pulseModule=require('../src/services/commissioner.ts'),coverageModule=require('../src/services/useInspectionCoverage.ts');
+ const {emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+ const {CityProgress}=require('../src/pages/superadmin/CityProgress.tsx');
+ const savedPulse=pulseModule.useCityPulse,savedCoverage=coverageModule.useInspectionCoverage,savedRange=matrixStore.getDateRange;
+ const city=mapCity({id:'city-a',name:'Test City',modules:[{name:'SWEEPING',enabled:true}]});
+ let range={from:'2026-11-02',to:'2026-11-02'},configured=false,loading=false;
+ matrixStore.getDateRange=()=>range;
+ pulseModule.useCityPulse=()=>({pending:0,errors:{},official:{totals:{target:1574,completed:2,targetState:configured?'configured':'default'}}});
+ coverageModule.useInspectionCoverage=()=>({loading,data:{...emptyCoverage(),...range,inventoryAvailable:true,modules:['sweeping'],assets:[{id:'a',module:'sweeping'},{id:'b',module:'sweeping'},{id:'c',module:'sweeping'}],visits:[{id:'1',module:'sweeping',assetId:'a',status:'submitted',submittedAt:'2026-11-02T04:00:00Z'},{id:'2',module:'sweeping',assetId:'a',status:'approved',submittedAt:'2026-11-02T05:00:00Z'},{id:'3',module:'sweeping',assetId:'b',status:'DRAFT',submittedAt:'2026-11-02T06:00:00Z'}]}});
+ const render=()=>renderToStaticMarkup(React.createElement(CityProgress,{city,users:[],onNavigate:()=>{}}));
+ const number=(html,label)=>html.split('<p>'+label+'</p>')[1].match(/<strong[^>]*>(.*?)<\/strong>/)[1];
+ try{
+  for(const [from,days] of [['2026-11-02',1],['2026-10-27',7],['2026-08-01',94]]){
+   range={from,to:'2026-11-02'};const html=render();
+   assert.equal(number(html,'Inspection target'),String(3*days));
+   assert.equal(number(html,'Inspections completed'),'2');assert.equal(number(html,'Pending review'),'1');assert.match(html,/3 total inspection records/);
+  }
+  configured=true;assert.equal(number(render(),'Inspection target'),'1,574');
+  loading=true;assert.equal(number(render(),'Inspection target'),'Loading…');
+ }finally{pulseModule.useCityPulse=savedPulse;coverageModule.useInspectionCoverage=savedCoverage;matrixStore.getDateRange=savedRange;}
+});
+
+test('City onboarding form keeps location and administrator validation while both codes are optional',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const {OnboardCityModal}=require('../src/pages/superadmin/OnboardCityModal.tsx');
+ const html=renderToStaticMarkup(React.createElement(OnboardCityModal,{isOpen:true,onClose:()=>{},currentUser:profile,onSuccess:()=>{}}));
+ for(const label of ['City code (optional)','ULB code (optional)']){
+  const input=html.split(label)[1].match(/<input[^>]*>/)[0];assert.doesNotMatch(input,/required/);
+ }
+ assert.match(html,/type="email" required/);assert.match(html,/type="password" required/);assert.match(html,/<select required/);
+});
+
+test('Explicit per-request city selection overrides the workspace context and partitions cached reads',async()=>{
+ const {setApiCityContext,clearReadCache}=require('../src/services/api.ts');
+ setToken('platform-test');setApiCityContext('workspace-city');let reads=0;
+ global.fetch=async(_url,init)=>{reads++;return json({city:new Headers(init.headers).get('x-city-id')});};
+ try{
+  assert.equal((await api('/city/geo',{headers:{'x-city-id':'city-one'}})).city,'city-one');
+  assert.equal((await api('/city/geo',{headers:{'x-city-id':'city-two'}})).city,'city-two');
+  assert.equal((await api('/city/geo',{headers:{'x-city-id':'city-one'}})).city,'city-one');
+  assert.equal(reads,2);assert.equal((await api('/city/geo')).city,'workspace-city');
+ }finally{setApiCityContext(undefined);clearReadCache();}
+});
+
+test('City onboarding uses one atomic write and refuses an outdated backend without partial city creation',async()=>{
+ profile.role='HMS_SUPER_ADMIN';await matrixStore.login('admin@example.test','test-password');
+ const original=global.fetch,writes=[];
+ global.fetch=async(url,init={})=>{
+  const path=new URL(url,'http://localhost').pathname.replace('/backend','');
+  if(path==='/hms/locations/states')return json({states:[{id:'state',name:'Test State'}]});
+  if(path.startsWith('/hms/locations/districts'))return json({districts:[{id:'district',name:'Test District'}]});
+  if(path.startsWith('/hms/locations/cities'))return json({cities:[{id:'master',name:'New City'}]});
+  if(init.method==='POST'){writes.push({path,body:JSON.parse(init.body)});return json({error:'Not found'},404);}
+  return original(url,init);
+ };
+ await assert.rejects(matrixStore.onboardCity({name:'New City',state:'Test State',district:'Test District',enabledModules:['sweeping'],cityCode:'',ulbCode:''},{name:'Admin',email:'new@example.test',password:'test-password'},matrixStore.currentUser),/connected backend needs/);
+ assert.equal(writes.length,1);assert.equal(writes[0].path,'/hms/cities/onboard');assert.deepEqual(writes[0].body.enabledModuleKeys,['SWEEPING']);assert.equal('code' in writes[0].body,false);assert.equal('ulbCode' in writes[0].body,false);
+});
+
+test('Deleting the selected city resets context and Trash loads cities absent from the active directory',async()=>{
+ profile.role='HMS_SUPER_ADMIN';await matrixStore.login('admin@example.test','test-password');await matrixStore.selectCity('city-a');
+ const original=global.fetch;let deleted=false;
+ global.fetch=async(url,init={})=>{
+  const path=new URL(url,'http://localhost').pathname.replace('/backend','');
+  if(path==='/audit-logs/trash/soft-delete'){deleted=true;return json({success:true});}
+  if(path==='/hms/cities'&&deleted)return json({cities:[]});
+  if(path==='/audit-logs/trash')return json({data:[{id:'city-a',type:'City',name:'Test City',deletedAt:'2026-11-02T09:00:00Z',details:{code:'TEST',name:'Test City'}}]});
+  return original(url,init);
+ };
+ await matrixStore.softDeleteCity('city-a','Test cleanup',matrixStore.currentUser);
+ assert.equal(matrixStore.selectedCityId,'all');assert.equal(matrixStore.getCities().length,0);
+ await matrixStore.ensurePage('sa_trash_restore');
+ assert.equal(matrixStore.getAllCitiesWithTrash().find(c=>c.id==='city-a').isDeleted,true);assert.equal(matrixStore.getCities().length,0);
+});
+
+
+test('ranking evidence distinguishes planned visits from remaining visits and hides duplicate photo totals',()=>{
+  const {rankingEvidence,naturalCompare}=require('../src/services/wardRankingEvidence.ts');
+  const result=rankingEvidence('beat',{totalBeats:32,beatsDue:32,beatsChecked:5,beatsNotChecked:27,totalPointsExpected:160,pointsCaptured:16,imagesCaptured:16,beatsInProgress:0,completeBeatCoverage:0});
+  assert.equal(result.primary.find(r=>r.id==='beatsDue').label,'Planned beat visits');
+  assert.equal(result.primary.find(r=>r.id==='beatsNotChecked').value,27);
+  assert.equal(result.primary.find(r=>r.id==='pointsCaptured').value,16);
+  assert.ok(!result.primary.some(r=>r.id==='imagesCaptured'));
+  assert.deepEqual(['Ward 10','Ward 2','Ward 1'].sort(naturalCompare),['Ward 1','Ward 2','Ward 10']);
+});
+
+test('zone report preserves official ward score while reconciling completed and reviewed record counts',()=>{
+  const {reconcileZoneExport}=require('../src/services/commissioner.ts');
+  const {emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+  const coverage={...emptyCoverage(),from:'2026-11-02',to:'2026-11-02',modules:['sweeping'],inventoryAvailable:true,assets:[{id:'a',module:'sweeping',zoneId:'z',wardId:'w'}],visits:[{id:'1',assetId:'a',module:'sweeping',zoneId:'z',wardId:'w',status:'APPROVED'},{id:'2',assetId:'a',module:'sweeping',zoneId:'z',wardId:'w',status:'DRAFT'}]};
+  const result=reconcileZoneExport({zones:[{zoneId:'z',modules:[],bestWards:[{wardId:'w',score:37.45,completed:99,cleaned:99}],worstWards:[]}]},coverage);
+  assert.equal(result.zones[0].bestWards[0].score,37.45);
+  assert.equal(result.zones[0].bestWards[0].completed,1);
+  assert.equal(result.zones[0].bestWards[0].cleaned,1);
+});
+
+
+test('ranking clients preserve authoritative redistributed marks for every connected consumer',()=>{
+ const {applyFixedWardWeights}=require('../src/services/wardScoring.ts');
+ const row={scoringPolicy:'WORKFORCE_30_EQUAL_70',finalScore:65,applicableWeight:100,rankable:true,components:{workforce:{maxScore:30,score:30,applicable:true},actionOfficer:{maxScore:10,score:5,applicable:true,redistributedMarks:1.25},litterBin:{maxScore:0,score:0,applicable:false}}};
+ const data={config:{weights:{workforce:30,actionOfficer:8.75}},rankings:[row]};assert.deepEqual(applyFixedWardWeights(data),data);assert.equal(applyFixedWardWeights(data).rankings[0].components.actionOfficer.maxScore,10);
+});
+
+
+test('action lifecycle totals retain required count through Action Taken while statuses reconcile once',()=>{
+ const {emptyCoverage,inspectionActions,inspectionOutcomes}=require('../src/services/inspectionCoverage.ts');
+ const {inspectionMetrics}=require('../src/services/inspectionMetrics.ts');
+ const {matchesFilters,emptyFilters}=require('../src/services/presentation.ts');
+ const data={...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets:[],visits:[{id:'sweeping:a',module:'sweeping',zoneId:'z',wardId:'w',status:'ACTION_REQUIRED',actionRequired:true}]};
+ assert.deepEqual(inspectionActions(data),{totalRequired:1,taken:0,outstanding:1});
+ const achieved=inspectionMetrics(data).achieved;data.visits[0].status='ACTION_TAKEN';
+ assert.deepEqual(inspectionActions(data),{totalRequired:1,taken:1,outstanding:0});assert.equal(inspectionMetrics(data).achieved,achieved);
+ assert.equal(inspectionOutcomes(data).rows.reduce((n,r)=>n+r.value,0),1);
+ assert.deepEqual(inspectionActions(data,{ward:'other'}),{totalRequired:0,taken:0,outstanding:0});
+ assert.equal(matchesFilters({status:'action_taken',actionRequired:true},{...emptyFilters(),status:'all_actions_required'},[]),true);
+ assert.equal(matchesFilters({status:'action_taken',actionRequired:true},{...emptyFilters(),status:'actions_outstanding'},[]),false);
+});
+
+test('pending reports retain photo storage URLs, nested point evidence and recorded SI AI',()=>{
+ const {mapReport}=require('../src/services/adapters.ts');
+ const raw={id:'pending-photo',status:'SUBMITTED',createdAt:'2026-11-02T04:00:00Z',photos:[],payload:{photos:[{storageUrl:'https://example.test/first.jpg'}],points:[{answers:[{photos:['https://example.test/second.jpg']}]}],surveyAnswers:[{answerType:'PHOTO',answer:'https://example.test/third.jpg'}]},autoQcResult:{summary:'Recorded SI visual assistance',checks:[]}};
+ const report=mapReport(raw,'sweeping','city',[]);assert.equal(report.status,'pending_review');assert.equal(report.photos.length,3);assert.equal(report.aiReviews[0].stage,'Sanitary Inspector');
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');const {ReportAiPanel}=require('../src/components/reports/ReportAiPanel.tsx');
+ const commissioner=renderToStaticMarkup(React.createElement(ReportAiPanel,{report,currentUser:{role:'COMMISSIONER'}}));assert.ok(commissioner.includes('Commissioner oversight'));assert.ok(commissioner.includes('Recorded SI visual assistance'));assert.ok(!commissioner.includes('Generate ULB suggestion'));
+ const qc=renderToStaticMarkup(React.createElement(ReportAiPanel,{report:{...report,aiReviews:[...report.aiReviews,{...report.aiReviews[0],stage:'ULB Officer',summary:'Downstream recommendation'}]},currentUser:{role:'QC'}}));assert.ok(!qc.includes('Downstream recommendation'));
+});
+
+
+test('disabled modules and absent Toilets release their marks while card maxima remain 100',()=>{
+ const {applyFixedWardWeights}=require('../src/services/wardScoring.ts');
+ const components=Object.fromEntries(['workforce','beat','nala','toilet','litterBin','gvp','supervisor','qc','actionOfficer'].map(key=>[key,{maxScore:key==='workforce'?15:10,score:key==='workforce'?7.5:10,applicable:true,metrics:{totalToilets:0,totalNalas:3,totalPoints:3,totalBeats:32,totalBins:5}}]));
+ const row=applyFixedWardWeights({rankings:[{rankable:true,components}]},['SWEEPING','TOILET','LITTERBINS']).rankings[0];
+ assert.equal(row.applicableWeight,100);assert.equal(row.components.workforce.maxScore,30);assert.equal(row.components.workforce.score,15);assert.equal(row.finalScore,85);
+ for(const key of ['beat','litterBin','supervisor','qc','actionOfficer'])assert.equal(row.components[key].maxScore,14);
+ assert.equal(row.components.nala.exclusionReason,'module_disabled');assert.equal(row.components.toilet.exclusionReason,'no_entities');
+});
+
+test('directory accepts only explicit matching city membership and removes foreign module assignments',()=>{
+ const {scopedDirectoryUsers}=require('../src/services/scopedUsers.ts');
+ const rows=[{id:'indore',cityId:'indore',role:'QC',modules:[{id:'g',key:'GVP',cityId:'indore',role:'QC'},{id:'foreign',cityId:'ujjain',role:'QC'}]},{id:'ujjain',cityId:'ujjain',name:'Foreign user'},{id:'missing-city',name:'Unscoped user'}];
+ const result=scopedDirectoryUsers(rows,'indore');assert.deepEqual(result.map(u=>u.id),['indore']);assert.deepEqual(result[0].moduleAssignments.map(m=>m.key),['TASKFORCE']);
+});
+
+test('replacing a login token clears the previous platform city header',async()=>{
+ const {setApiCityContext}=require('../src/services/api.ts');let header;const original=global.fetch;
+ try{setToken('platform-old');setApiCityContext('ujjain');setToken('indore-admin');global.fetch=async(_url,init)=>{header=init.headers.get('x-city-id');return json({users:[]});};await api('/city/users');assert.equal(header,null);}finally{global.fetch=original;}
+});
+
+
+test('an expired request from a previous account cannot clear the new login token',async()=>{
+ const original=global.fetch;let release;setToken('old-account');global.fetch=()=>new Promise(resolve=>{release=()=>resolve(json({error:'Expired'},401));});
+ try{const old=api('/city/users',{cache:'no-store'}).catch(e=>e);await new Promise(resolve=>setImmediate(resolve));setToken('new-account');release();assert.equal((await old).status,401);assert.equal(getToken(),'new-account');}finally{global.fetch=original;}
 });

@@ -44,7 +44,7 @@ The updated backend recognizes the canonical `HMS_SUPER_ADMIN` audit role. City 
 
 Swachh Assessment uses a separate service and token and remains accessible through the existing portal. KML/KMZ beat bulk imports and Action Officer corrective evidence submission also remain in the existing portal/app. The old demo CSV import and correction-request decision are unavailable because their contracts do not exist in this backend. For beat creation, an existing Area is required under the selected Ward.
 
-City onboarding consists of separate backend writes for the city, administrator and modules. If a later step fails, the error identifies the partially created city; complete its setup in City Administrators and Product & Module Access instead of resubmitting it.
+City onboarding uses POST `/hms/cities/onboard` to create the city, administrator and module access in one database transaction. City/ULB codes are optional. The dashboard reports a connected-backend upgrade requirement if the endpoint is unavailable, without attempting partial legacy writes. Connected Workforce/Swachh provisioning is reported separately from saved local module access.
 
 ## Production replacement
 
@@ -170,3 +170,9 @@ The dashboard supports arbitrary custom ranges and a Last 90 days shortcut. Repo
 
 
 City Admin Staff Assignments now includes Assign Ward Darogas. Choose a Zone/Ward and multiple eligible Darogas, then review the full Ward before saving. Every selected Daroga shares every current approved Beat; Beats are not divided among the team. Add mode preserves existing Darogas; Replace resets whole-Beat/sub-beat Darogas to the selected shared team while preserving employee assignments. The preview is independent of table search and pagination. More Beats imported later require applying Ward assignment again. Shared team names appear in the Beat table, and an individual whole-Beat assignment replaces that Beat's shared team. The backend saves a Ward in one serializable, audited transaction and refuses stale previews. Deployment requires the additive database migration and backend release described in [Shared Ward Daroga assignments](backend-patches/shared-ward-darogas.md). No live migration or assignment has been executed during development.
+
+
+City Overview inspection metrics use a compact authenticated feed instead of downloading paginated photo/survey details. It retains the complete selected-date register, unique entity coverage and Draft reconciliation. Full report evidence loads through the existing register. See [Compact inspection coverage deployment](backend-patches/compact-inspection-coverage.md) for backend requirements and validation.
+
+
+User Performance now preserves filters across date changes, resolves module-specific assignment geography, separates loading/failure from unassessed scores, and retains good officer results when another calculation fails. SI/IEC scoring reads are shared within each request and run in bounded batches; score-only responses omit unused directory and report-ID details. See [User Performance review](backend-patches/user-performance-review.md) for filter semantics, source files and deployment requirements.

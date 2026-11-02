@@ -1,3 +1,4 @@
+import {canonicalModuleKey} from './moduleKeys';
 import type {User,Zone,Ward} from '../types';
 import {api,writeApi} from './api';
 import {matrixStore} from './store';
@@ -19,7 +20,7 @@ export function personnelAssignedToWard(user:User,ward:Ward){
  if(z.length||w.length)return matches(z,w)&&(!scopedModules.length||scopedModules.some(m=>matches(m.zoneIds,m.wardIds)));
  return scopedModules.some(m=>matches(m.zoneIds,m.wardIds));
 }
-export async function personnelModules(cityId:string){assertCityAdmin(cityId);const rows=await api('/city/modules');if(!Array.isArray(rows))throw new Error('Module directory is unavailable.');return rows.filter(m=>m.enabled!==false&&!!PERSONNEL_MODULE_LABELS[m.key||m.name]).map(m=>({id:m.id,key:m.key||m.name,name:m.name||m.key}));}
+export async function personnelModules(cityId:string){assertCityAdmin(cityId);const rows=await api('/city/modules');if(!Array.isArray(rows))throw new Error('Module directory is unavailable.');return rows.filter(m=>m.enabled!==false&&!!PERSONNEL_MODULE_LABELS[canonicalModuleKey(m.key||m.module?.name||m.name)]).map(m=>({id:m.moduleId||m.module?.id||m.id,key:canonicalModuleKey(m.key||m.module?.name||m.name),name:m.name||m.key}));}
 export function validatePersonnelScope(cityId:string,zoneIds:string[],wardIds:string[],role:string){
  assertCityAdmin(cityId);const {zones,wards}=matrixStore.getData();if(!PERSONNEL_ROLES[role])throw new Error('Select a municipal staff role.');
  if(zoneIds.some(id=>!zones.some(z=>z.id===id&&z.cityId===cityId))||wardIds.some(id=>!wards.some(w=>w.id===id&&w.cityId===cityId&&zoneIds.includes(w.zoneId))))throw new Error('Each Ward must belong to a selected Zone in this city.');

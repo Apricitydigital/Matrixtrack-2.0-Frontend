@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect,useState } from 'react';
+import {directoryDate} from '../../services/directoryDate';
 import { City, User } from '../../types';
 import { matrixStore } from '../../services/store';
 import { StatusBadge } from '../../components/common/Badge';
@@ -34,9 +35,12 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
   onRefresh
 }) => {
   const [search, setSearch] = useState('');
+  const [actionError,setActionError]=useState(''),[busyCity,setBusyCity]=useState('');
+  const [notice,setNotice]=useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isOnboardOpen, setIsOnboardOpen] = useState(false);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
+  useEffect(()=>{if(selectedCity)setSelectedCity(cities.find(c=>c.id===selectedCity.id)||null);},[cities,selectedCity?.id]);
   const [activeTab, setActiveTab] = useState<'overview' | 'admins' | 'modules' | 'activity'>('overview');
 
   // Deletion modal state
@@ -56,29 +60,32 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
   });
 
   const handleToggleStatus = async (city: City) => {
+    if(busyCity)return;setActionError('');
     try {
     if (confirm(`Are you sure you want to change status of ${city.name} to ${city.status === 'active' ? 'INACTIVE' : 'ACTIVE'}?`)) {
+      setBusyCity(city.id);
       await matrixStore.toggleCityStatus(city.id, currentUser);
       onRefresh();
     }
 
-    } catch (error) { alert(error instanceof Error ? error.message : "Backend action failed."); }
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'City status could not be changed.'); }finally{setBusyCity('');}
   };
 
   const handleSoftDelete = async (e: React.FormEvent) => {
     try {
     e.preventDefault();
     if (!deleteCityId || !deleteReason.trim()) return;
+    if(busyCity)return;setBusyCity(deleteCityId);setActionError('');
     await matrixStore.softDeleteCity(deleteCityId, deleteReason, currentUser);
     setDeleteCityId(null);
     setDeleteReason('');
     onRefresh();
 
-    } catch (error) { alert(error instanceof Error ? error.message : "Backend action failed."); }
+    } catch (error) { setActionError(error instanceof Error ? error.message : 'City could not be moved to Trash.'); }finally{setBusyCity('');}
   };
 
   const handleExportCsv = () => {
-    const headers = ['City_Name', 'City_Code', 'ULB_Code', 'State', 'District', 'Status', 'Population', 'Zones', 'Wards', 'Modules_Count'];
+    const headers = ['City_Name', 'City_Code', 'ULB_Code', 'State', 'District', 'Status', 'Population', 'Zones', 'Wards', 'Modules_Count','Created_At','Updated_At'];
     const rows = filteredCities.map(c => [
       c.name,
       c.cityCode,
@@ -89,7 +96,7 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
       c.populationAvailable?c.population:'Not available',
       c.geographyCountsAvailable?c.totalZones:'Not loaded',
       c.geographyCountsAvailable?c.totalWards:'Not loaded',
-      c.enabledModules.length
+      c.enabledModules.length,c.createdAt,c.updatedAt
     ]);
     downloadCsv(`cities_directory_${Date.now()}.csv`, generateCsv(headers, rows));
   };
@@ -99,6 +106,8 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
 
   return (
     <div className="space-y-6">
+      {actionError&&<p role="alert" className="text-red-700 bg-red-50 rounded-lg p-3">{actionError}</p>}
+      {notice&&<p role="status" className="workspace-panel p-3">{notice}</p>}
       {/* Header Strip */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -168,6 +177,8 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
                 <th className="px-6 py-3">Jurisdiction</th>
                 <th className="px-6 py-3">Zones / Wards</th>
                 <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">Created date</th>
+                <th className="px-6 py-3">Updated date</th>
                 <th className="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -185,7 +196,7 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
                   </td>
                   <td className="px-6 py-3.5 font-mono text-slate-700">
                     <div>{city.cityCode}</div>
-                    <div className="text-[15px] text-slate-400">{city.ulbCode}</div>
+                    <div className="text-[15px] text-slate-400">{city.ulbCode || 'ULB code not provided'}</div>
                   </td>
                   <td className="px-6 py-3.5 text-slate-600">
                     <div>{city.state}</div>
@@ -197,6 +208,8 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
                   <td className="px-6 py-3.5">
                     <StatusBadge status={city.status} size="sm" />
                   </td>
+                  <td className="px-6 py-3.5">{directoryDate(city.createdAt)}</td>
+                  <td className="px-6 py-3.5">{directoryDate(city.updatedAt)}</td>
                   <td className="px-6 py-3.5 text-right space-x-1 whitespace-nowrap">
                     <button
                       onClick={() => onSelectCityContext(city.id)}
@@ -207,6 +220,7 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
                     </button>
                     <button
                       onClick={() => handleToggleStatus(city)}
+                      disabled={!!busyCity}
                       className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded"
                       title={city.status === 'active' ? 'Deactivate Corporation' : 'Activate Corporation'}
                     >
@@ -238,6 +252,7 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
               This will soft-delete the tenant and deactivate active workflows. Records can be safely restored anytime from the Governance Trash panel.
             </p>
             <form onSubmit={handleSoftDelete} className="space-y-3">
+              {actionError&&<p role="alert" className="text-red-700">{actionError}</p>}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">
                   Required Reason for Soft-Deletion *
@@ -261,6 +276,7 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
                 </button>
                 <button
                   type="submit"
+                  disabled={!!busyCity}
                   className="px-4 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-xs"
                 >
                   Confirm Move to Trash
@@ -390,9 +406,9 @@ export const CityDirectory: React.FC<CityDirectoryProps> = ({
         isOpen={isOnboardOpen}
         onClose={() => setIsOnboardOpen(false)}
         currentUser={currentUser}
-        onSuccess={() => {
+        onSuccess={(warnings=[]) => {
           onRefresh();
-          alert('Municipal Corporation successfully onboarded.');
+          setNotice(['Municipal Corporation and administrator created successfully.',...warnings].join(' '));
         }}
       />
     </div>

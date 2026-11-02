@@ -18,9 +18,10 @@ export function officerSummary(rows:{user:any;stat:any}[],role:string) {
   const first=role==='SUPERVISOR'?'required':'due',second=role==='SUPERVISOR'?'completed':'onTime';
   const denominator=(s:any)=>s?.scoreDenominator ?? s?.[first],numerator=(s:any)=>s?.scoreNumerator ?? s?.[second];
   const workload=rows.filter(r=>finite(denominator(r.stat))&&finite(numerator(r.stat)));
-  const required=workload.length?workload.reduce((n,r)=>n+denominator(r.stat),0):null;
-  const completed=workload.length?workload.reduce((n,r)=>n+numerator(r.stat),0):null;
+  const mixed=new Set(workload.filter(r=>denominator(r.stat)>0).map(r=>r.stat?.scoreBasis||(role==='SUPERVISOR'?'target':'on_time'))).size>1;
+  const required=workload.length&&!mixed?workload.reduce((n,r)=>n+denominator(r.stat),0):null;
+  const completed=workload.length&&!mixed?workload.reduce((n,r)=>n+numerator(r.stat),0):null;
   const sum=(key:string)=>{const known=rows.filter(r=>finite(r.stat?.[key]));return known.length?known.reduce((n,r)=>n+r.stat[key],0):null;};
   const buckets=[{id:'zero',label:'0%',min:0,max:0},{id:'low',label:'Above 0–49%',min:0,max:50},{id:'middle',label:'50–79%',min:50,max:80},{id:'high',label:'80–99%',min:80,max:100},{id:'complete',label:'100%+',min:100,max:Infinity}].map(b=>({...b,value:assessed.filter(r=>b.id==='zero'?r.stat.performance===0:b.id==='low'?r.stat.performance>0&&r.stat.performance<50:r.stat.performance>=b.min&&r.stat.performance<b.max).length}));
-  return {assessed,mean,required,completed,weighted:required!=null&&required>0&&completed!=null?Math.min(100,completed/required*100):null,pending:required!=null&&completed!=null?Math.max(0,required-completed):null,late:sum('late'),overdue:sum('overdue'),buckets,unassessed:rows.length-assessed.length};
+  return {assessed,mean,required,completed,weighted:required!=null&&required>0&&completed!=null?Math.min(100,completed/required*100):null,pending:required!=null&&completed!=null?Math.max(0,required-completed):null,late:sum('late'),overdue:sum('overdue'),buckets,loading:rows.filter(r=>r.stat?.availability==='loading').length,failed:rows.filter(r=>r.stat?.availability==='error').length,unassessed:rows.filter(r=>!finite(r.stat?.performance)&&!r.stat?.availability).length};
 }

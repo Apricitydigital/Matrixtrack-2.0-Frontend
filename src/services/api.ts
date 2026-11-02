@@ -4,19 +4,21 @@ import {applyFixedWardWeights} from './wardScoring';
 export {clearReadCache};
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || '/backend').replace(/\/+$/, '');
 let cityContext:string|undefined;
+const cityModules=new Map<string,string[]>();
+export function setApiCityModules(id:string,keys:string[]){cityModules.set(id,keys);clearReadCache();}
 export function setApiCityContext(id?:string){if(cityContext!==id){clearReadCache();cityContext=id;}}
 const TOKEN_KEY = 'matrixtrack_command_access_token';
 export const getToken = () => sessionStorage.getItem(TOKEN_KEY);
-export const setToken = (token: string) => {clearReadCache();sessionStorage.setItem(TOKEN_KEY, token);};
-export const clearToken = () => {cityContext=undefined;clearReadCache();sessionStorage.removeItem(TOKEN_KEY);};
+export const setToken = (token: string) => {cityContext=undefined;cityModules.clear();clearReadCache();sessionStorage.setItem(TOKEN_KEY, token);};
+export const clearToken = () => {cityContext=undefined;cityModules.clear();clearReadCache();sessionStorage.removeItem(TOKEN_KEY);};
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
 export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
-  const token=getToken(),ttl=readCacheTtl(path);
-  if((!init.method||init.method.toUpperCase()==='GET')&&token&&ttl>0&&init.cache!=='no-store')return cachedRead(readCacheKey(path,`${token}\ncity:${cityContext||''}`),ttl,signal=>request<T>(path,{...init,signal}),init.signal || undefined);
+  const token=getToken(),ttl=readCacheTtl(path),scope=new Headers(init.headers).get('x-city-id')||cityContext||'';
+  if((!init.method||init.method.toUpperCase()==='GET')&&token&&ttl>0&&init.cache!=='no-store')return cachedRead(readCacheKey(path,`${token}\ncity:${scope}`),ttl,signal=>request<T>(path,{...init,signal}),init.signal || undefined);
   return request<T>(path,init);
 }
 export function primeApiRead(path:string,value:any){const token=getToken();if(token)primeReadCache(readCacheKey(path,`${token}\ncity:${cityContext||''}`),value,readCacheTtl(path));}
@@ -24,7 +26,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  if(cityContext&&/^\/(city|modules|cleanliness-issues|ward-ranking)(?:\/|\?|$)/.test(path))headers.set('x-city-id',cityContext);
+  if(cityContext&&!headers.has('x-city-id')&&/^\/(city|modules|cleanliness-issues|ward-ranking)(?:\/|\?|$)/.test(path))headers.set('x-city-id',cityContext);
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   let response: Response;
   try {
@@ -40,7 +42,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
   let body: any;
   try { body = raw ? JSON.parse(raw) : null; } catch { body = null; }
   if (!response.ok) {
-    if (response.status === 401 && path !== '/auth/login') {
+    if (response.status === 401 && path !== '/auth/login' && token===getToken()) {
       clearToken();
       window.dispatchEvent(new Event('matrixtrack:session-expired'));
     }
@@ -48,7 +50,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
   }
   if (raw && body === null) throw new ApiError(502, 'Backend returned an invalid JSON response. Check the API URL.');
   if(init.method&&!['GET','HEAD'].includes(init.method.toUpperCase()))clearReadCache();
-  return (path.split('?')[0]==='/ward-ranking'&&body ? applyFixedWardWeights(body) : body) as T;
+  return (path.split('?')[0]==='/ward-ranking'&&body ? applyFixedWardWeights(body,cityModules.get(headers.get('x-city-id')||body.cityId||cityContext||'')) : body) as T;
 }
 
 export const writeApi = (path: string, method: string, body?: unknown) =>

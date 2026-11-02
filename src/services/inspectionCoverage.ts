@@ -1,6 +1,6 @@
 import { INSPECTION_STATUSES, inspectionStatus } from './inspectionStatus';
 export { INSPECTION_STATUSES, inspectionStatus } from './inspectionStatus';
-import { api,getToken } from './api';
+import { api,getToken,ApiError } from './api';
 import {cachedRead} from './readCache';
 import {concurrentReads} from './concurrentReads';
 import { MODULE_KEYS } from './adapters';
@@ -14,6 +14,7 @@ export interface CoverageCounts {
   required?: number | null; dailyCovered?: number | null; days?: number; remaining: number | null; percent: number | null; unidentified: number; outsideRegister: number;
 }
 export interface InspectionCoverage {
+  compact?: boolean;
   from?: string; to?: string; assets: MapAsset[]; visits: InspectionVisit[]; modules: OperationalModuleId[];
   failedModules: OperationalModuleId[]; inventoryAvailable: boolean; errors: string[];
 }
@@ -23,18 +24,32 @@ export function inspectionVisit(raw: any, module: OperationalModuleId, cityId: s
   if (raw.type === 'BIN_REGISTRATION' || raw.cityId && raw.cityId !== cityId) return null;
   if (!raw.id) throw new Error('Inspection response is missing a report ID.');
   const asset = raw.beat || raw.toilet || raw.bin || raw.nala || raw.feederPoint || {};
-  const assetId = raw.assetId || (module==='sweeping'?raw.beatId:module==='toilets'?raw.toiletId:module==='litter_bins'?raw.binId:module==='nala'?raw.nalaId:raw.feederPointId || raw.gvpId) || asset.id;
+  const assetId = raw.assetId || (module==='sweeping'?raw.beatId:module==='toilets'?raw.toiletId:module==='litter_bins'?raw.binId:module==='nala'?raw.nalaPointId:raw.feederPointId || raw.gvpId) || (module==='nala'?raw.nalaPoint?.id:asset.id);
   const payload=raw.payload||{},history=raw.statusHistory||raw.timeline||payload.statusHistory||[];
   const actionRequired=Boolean(raw.actionRequiredAt||payload.actionRequiredAt||[raw.status,raw.workspaceStatus,raw.actionStatus,raw.ulbStatus,payload.ulbStatus].some(s=>['ACTION_REQUIRED','ACTION_TAKEN'].includes(String(s).toUpperCase()))||(Array.isArray(history)&&history.some(h=>/ACTION_REQUIRED/i.test(String(h.event||h.action||h.status||h.statusAfter||'')))));
   return {id:`${module}:${raw.id}`,module,raw,actionRequired,submittedAt:raw.submittedAt||raw.createdAt||'',status:String(raw.workspaceStatus || raw.status || 'SUBMITTED').toUpperCase(),assetId:assetId?String(assetId):undefined,zoneId:raw.zoneId || raw.zone?.id || asset.zoneId || asset.zone?.id || '',wardId:raw.wardId || raw.ward?.id || asset.wardId || asset.ward?.id || ''};
 }
 
 /** All calls are GETs to existing city-scoped endpoints; no report writes or decisions. */
-export async function loadInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, from: string, to: string, signal: AbortSignal): Promise<InspectionCoverage> {
+export async function loadInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, from: string, to: string, signal: AbortSignal,compact=false): Promise<InspectionCoverage> {
   const token=getToken();
-  if(!token)return fetchInspectionCoverage(city,from,to,signal);
-  const key=JSON.stringify(['inspection-coverage',token,city.id,[...city.enabledModules].sort(),from,to]);
-  return cachedRead(key,30000,sharedSignal=>fetchInspectionCoverage(city,from,to,sharedSignal),signal,result=>result.inventoryAvailable&&!result.failedModules.length&&!result.errors.length);
+  const read=async(sharedSignal:AbortSignal)=>{
+    if(compact&&city.enabledModules.length){
+      try{
+        const data=await api(`/city/dashboard/inspection-coverage?${new URLSearchParams({from,to,modules:city.enabledModules.join(',')})}`,{signal:sharedSignal,cache:'no-store'});
+        if(data?.version!==1||data.complete!==true||data.cityId!==city.id||data.from!==from||data.to!==to||!Array.isArray(data.assets)||!Array.isArray(data.visits)||!Array.isArray(data.modules)||!Array.isArray(data.failedModules)||!Array.isArray(data.errors)||typeof data.inventoryAvailable!=='boolean'||city.enabledModules.some(m=>!data.modules.includes(m)))throw Error('Compact inspection register is incomplete or has the wrong scope.');
+        if(data.visits.some((v:any)=>!v.id||!city.enabledModules.includes(v.module)||!v.submittedAt)||data.assets.some((a:any)=>!a.id||!city.enabledModules.includes(a.module)))throw Error('Compact inspection register is missing required identifiers.');
+        return {...data,compact:true} as InspectionCoverage;
+      }catch(error){
+        // Old backends and scoped field roles retain their existing authorized reader.
+        if(!(error instanceof ApiError)||![403,404].includes(error.status))throw error;
+      }
+    }
+    return fetchInspectionCoverage(city,from,to,sharedSignal);
+  };
+  if(!token)return read(signal);
+  const key=JSON.stringify(['inspection-coverage',compact,token,city.id,[...city.enabledModules].sort(),from,to]);
+  return cachedRead(key,30000,read,signal,result=>result.inventoryAvailable&&!result.failedModules.length&&!result.errors.length);
 }
 async function fetchInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, from: string, to: string, signal: AbortSignal): Promise<InspectionCoverage> {
   const result = emptyCoverage(); result.from=from; result.to=to; result.modules = [...city.enabledModules];
@@ -48,7 +63,7 @@ async function fetchInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, f
   // Two modules at a time; date changes cancel every remaining page.
   const loadModule=async(module:OperationalModuleId)=>{
     try {
-      const query=new URLSearchParams({cityId:city.id,tab:module==='litter_bins'?'DAILY_REPORTS':'HISTORY',startDate:`${from}T00:00:00+05:30`,endDate:`${to}T23:59:59.999+05:30`,limit:'100'});
+      const query=new URLSearchParams({cityId:city.id,tab:module==='litter_bins'||module==='ctu_gvp'?'DAILY_REPORTS':'HISTORY',startDate:`${from}T00:00:00+05:30`,endDate:`${to}T23:59:59.999+05:30`,limit:'100'});
       const visits=new Map<string,InspectionVisit>(),seenReports=new Set<string>();let expectedTotal:number|undefined;
       const readPage=async(page:number)=>{
         signal.throwIfAborted();
@@ -120,4 +135,14 @@ export function inspectionOutcomes(data:InspectionCoverage,scope:{module?:Operat
   const counts=coverageCounts(data,scope),known=counts.inspections!=null;
   const visits=[...new Map(data.visits.filter(v=>(!scope.module||v.module===scope.module)&&(!scope.zone||v.zoneId===scope.zone)&&(!scope.ward||v.wardId===scope.ward)).map(v=>[v.id,v])).values()];
   return {total:counts.inspections,rows:INSPECTION_STATUSES.map(row=>({...row,value:known?visits.filter(v=>inspectionStatus(v.status)===row.id).length:null}))};
+}
+
+
+/** Lifecycle totals overlap current status counts; they are never summed into inspections. */
+export function inspectionActions(data:InspectionCoverage,scope:{module?:OperationalModuleId;zone?:string;ward?:string}={}) {
+ const known=coverageCounts(data,scope).inspections!=null;
+ const visits=[...new Map(data.visits.filter(v=>(!scope.module||v.module===scope.module)&&(!scope.zone||v.zoneId===scope.zone)&&(!scope.ward||v.wardId===scope.ward)).map(v=>[v.id,v])).values()];
+ const required=visits.filter(v=>v.actionRequired||['action_required','action_taken','escalated'].includes(inspectionStatus(v.status)));
+ const taken=required.filter(v=>inspectionStatus(v.status)==='action_taken').length;
+ return {totalRequired:known?required.length:null,taken:known?taken:null,outstanding:known?required.length-taken:null};
 }
