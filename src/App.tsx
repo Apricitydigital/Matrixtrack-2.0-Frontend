@@ -1,3 +1,4 @@
+import { inspectionDrillFilters } from './services/inspectionPeriod';
 /**
  * MatrixTrack 2.0 - Core Municipal Command Center Web Application
  *
@@ -162,7 +163,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
   const [activePageId, setActivePageId] = useState<string>(initialPage || ({ HMS_SUPER_ADMIN: 'sa_dashboard', CITY_ADMIN: 'ca_dashboard', ULB_OFFICER: 'ulb_dashboard', COMMISSIONER: 'comm_dashboard' })[matrixStore.currentUser!.role] || 'ca_dashboard');
   const [isSidebarMobileOpen, setIsSidebarMobileOpen] = useState(false);
   const [noticeRequest,setNoticeRequest]=useState(0),[noticeCount,setNoticeCount]=useState(0);
-  const [reportIntent,setReportIntent]=useState({moduleId:'all',status:'all'});
+  const [reportIntent,setReportIntent]=useState(inspectionDrillFilters());
   useEffect(() => {
     document.querySelector('main')?.scrollTo({ top: 0, behavior: 'instant' });
   }, [activePageId,currentCityId]);
@@ -502,7 +503,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
           {activePageId==='comm_chat_history'&&currentUser.role==='COMMISSIONER'&&<ChatHistory user={currentUser} city={effectiveCity}/>}
           {activePageId==='ca_dashboard'&&currentUser.role==='HMS_SUPER_ADMIN'&&<CityProgress city={effectiveCity} users={users} onNavigate={navigate}/>}
           {activePageId==='ca_dashboard'&&currentUser.role!=='HMS_SUPER_ADMIN' && <CityDashboard city={effectiveCity} zones={zones} wards={wards} beats={beats} users={users} onNavigate={navigate}/>}
-          {activePageId==='comm_dashboard' && <CommissionerHome city={effectiveCity} zones={zones} wards={wards} reports={reports} currentUser={currentUser} onNavigate={navigate} onSelectReport={setInspectedReportId} onInspect={(moduleId='all',status='all')=>{setReportIntent({moduleId,status});navigate('comm_inspection_perf');}} noticeRequest={noticeRequest} onNoticeCount={setNoticeCount} onNoticeHandled={()=>setNoticeRequest(0)}/>}
+          {activePageId==='comm_dashboard' && <CommissionerHome city={effectiveCity} zones={zones} wards={wards} reports={reports} users={users} currentUser={currentUser} onNavigate={navigate} onSelectReport={setInspectedReportId} onInspect={(moduleId='all',status='all',zone='',ward='')=>{setReportIntent(inspectionDrillFilters(zone,ward,moduleId,status));navigate('comm_inspection_perf');}} noticeRequest={noticeRequest} onNoticeCount={setNoticeCount} onNoticeHandled={()=>setNoticeRequest(0)}/>}
           {activePageId === 'comm_inspection_perf' && <CommissionerWorkspace city={effectiveCity} reports={reports} zones={zones} wards={wards} users={users} onSelectReport={setInspectedReportId} onNavigate={navigate} registryOnly initialFilters={reportIntent}/>}
 
           {activePageId === 'comm_zone_ward' && (

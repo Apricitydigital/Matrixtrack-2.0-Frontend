@@ -141,6 +141,7 @@ export interface Beat {
   endCoords: [number, number];
   assignedDarogaId?: string;
   assignedDarogaIds?: string[];
+  sharedSupervisorIds?: string[];
   assignedDarogaNames?: string[];
   assignedEmployeeIds: string[];
   status: 'active' | 'under_review' | 'inactive';

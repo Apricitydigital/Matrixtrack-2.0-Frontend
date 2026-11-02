@@ -1,3 +1,5 @@
+import { inspectionMetrics } from '../../services/inspectionMetrics';
+import { inspectionPeriod } from '../../services/inspectionPeriod';
 import { geographyOrder, wardInspectionRows } from '../../services/wardInspections';
 import { COMMISSIONER_TERMS as terms } from '../../services/commissionerTerms';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -55,7 +57,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const coverage=useInspectionCoverage({...city,enabledModules:city.enabledModules??[]},range.from,range.to,revision+matrixStore.loadRevision);
   const wardOutcomes=inspectionOutcomes(coverage.data,{ward:currentWard?.id});
   const counts=coverageCounts(coverage.data,{ward:currentWard?.id});
-  const delivery=targetDelivery(figures?.totals,counts);
+  const metrics=inspectionMetrics(coverage.data,{ward:currentWard?.id},figures?.totals),delivery=metrics.delivery;
   const allWardReports=useMemo(()=>currentWard?wardInspectionRows(coverage.data,city.id,currentWard.id,cityZones,cityWards,beats):[],[coverage.data,city.id,currentWard?.id,zones,wards,beats]);
   const wardReports=allWardReports.filter(r=>matchesFilters(r,filters,[r.assetName,r.submittedByName,currentZone?.name||'',currentWard?.name||'']));
   const paging=usePagination(wardReports,`${city.id}:${currentWard?.id}:${range.from}:${range.to}:${JSON.stringify(filters)}`);
@@ -153,9 +155,9 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
       {/* KPI Cards Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label={delivery.fallback?'Daily inspection baseline':'Assigned inspection target'}
+          label={inspectionPeriod(counts,delivery).requirement}
           value={count(delivery.target)}
-          subtitle={`${count(delivery.completed)} counted toward ${delivery.fallback?'baseline':'target'}; ${count(delivery.remaining)} more inspections needed`}
+          subtitle={`${inspectionPeriod(counts,delivery,range.from,range.to).range}: ${inspectionPeriod(counts,delivery).progress}; ${count(delivery.remaining)} more inspections needed${delivery.fallback?`; ${inspectionPeriod(counts,delivery).basis}`:''}`}
           icon={<Layers className="w-4 h-4 text-indigo-600" />}
         />
         <StatCard
@@ -179,7 +181,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
       </div>
 
       <p className="executive-scope-note">Inspections still needed counts additional inspections required to meet the target or daily baseline. Awaiting review counts reports already submitted; those reports are included in Inspections done.</p>
-      <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={coverage.data} loading={coverage.loading} ward={currentWard?.id} onInspect={(_module,status)=>setFilters({...emptyFilters(),status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).map(id=>{const target=targetDelivery(figures?.modules[id],coverageCounts(coverage.data,{module:id,ward:currentWard?.id}));return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:target.fallback?'Daily coverage baseline':'Configured target credit'};})}/></ChartCard></div>
+      <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={coverage.data} loading={coverage.loading} ward={currentWard?.id} onInspect={(_module,status)=>setFilters({...emptyFilters(),status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).map(id=>{const target=inspectionMetrics(coverage.data,{module:id,ward:currentWard?.id},figures?.modules[id]).delivery;return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:inspectionPeriod(coverageCounts(coverage.data,{module:id,ward:currentWard?.id}),target).achievement};})}/></ChartCard></div>
       {/* Supporting Report List for this Ward */}
       {failed&&<div className="compact-error">Some ward summaries are unavailable.<button onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}
       <OperationalFilters value={filters} onChange={setFilters} users={users.filter(u=>u.cityId===city.id)} statuses={['pending_review','approved','rejected','action_required','action_taken','escalated','unclassified']} resultCount={wardReports.length}/>

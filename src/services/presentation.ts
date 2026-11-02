@@ -15,7 +15,7 @@ export function statusTone(status: string): RygTone {
   if (['green','approved','approved_closed','closed','active','present','achieved','on_track','verified_clean','operating','completed','certified'].includes(key)) return 'green';
   return 'neutral';
 }
-const STATUS_LABELS: Record<string, string> = { unclassified:'Draft', action_taken: 'Action taken', action_required: 'Action required', pending_qc: 'Pending Sanitary Inspector review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
+const STATUS_LABELS: Record<string, string> = { inspections_completed:'Completed inspections (excludes Draft)', unclassified:'Draft', action_taken: 'Action taken', action_required: 'Action required', pending_qc: 'Pending Sanitary Inspector review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
 export function statusLabel(status: string) { const key = normalizeStatus(status); return STATUS_LABELS[key] || key.replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase()); }
 export function issueIsOverdue(issue: { status: string; deadlineTimestamp: string }, now = Date.now()) {
   const deadline = Date.parse(issue.deadlineTimestamp);
@@ -28,7 +28,7 @@ export function matchesFilters(record: { zoneId?: string; wardId?: string; modul
   return (filters.zoneId === 'all' || record.zoneId === filters.zoneId)
     && (filters.wardId === 'all' || record.wardId === filters.wardId)
     && (filters.moduleId === 'all' || record.moduleId === filters.moduleId)
-    && (filters.status === 'all' || record.status === filters.status)
+    && (filters.status === 'all' || (filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
     && (filters.ryg === 'all' || statusTone(record.status || '') === filters.ryg)
     && (filters.staffId === 'all' || [record.submittedByUserId, record.assignedDarogaId, record.reviewerId].includes(filters.staffId))
     && (!filters.query.trim() || searchable.join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));
@@ -37,7 +37,7 @@ export function matchesFilters(record: { zoneId?: string; wardId?: string; modul
 export function datePreset(preset: string, today: string): { from: string; to: string } {
   const day = new Date(`${today}T12:00:00Z`), key = (date: Date) => date.toISOString().slice(0, 10);
   if (preset === 'yesterday') { day.setUTCDate(day.getUTCDate() - 1); return { from: key(day), to: key(day) }; }
-  if (preset === 'last_7_days' || preset === 'last_30_days') { day.setUTCDate(day.getUTCDate() - (preset === 'last_7_days' ? 6 : 29)); return { from: key(day), to: today }; }
+  if (preset === 'last_7_days' || preset === 'last_30_days' || preset === 'last_90_days') { day.setUTCDate(day.getUTCDate() - (preset === 'last_7_days' ? 6 : preset === 'last_30_days' ? 29 : 89)); return { from: key(day), to: today }; }
   if (preset === 'this_month') return { from: `${today.slice(0,7)}-01`, to: today };
   if (preset === 'previous_month') return { from: key(new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth() - 1, 1))), to: key(new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), 0))) };
   return { from: today, to: today };

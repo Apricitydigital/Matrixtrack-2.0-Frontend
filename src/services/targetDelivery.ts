@@ -1,7 +1,7 @@
 import { targetState, TARGET_STATE_LABELS, type TargetEvidence, type TargetState } from './targetConfiguration';
 export interface TargetDelivery {target:number|null;completed:number|null;percent:number|null;configuredPercent:number|null;remaining:number|null;met:boolean;state:TargetState;confirmed:boolean;stateLabel:string;available:boolean;fallback:boolean;}
 
-/** Configured targets use credited counts; full-coverage fallback counts registered locations once. */
+/** Configured targets use backend credit; the period baseline counts each registered location once per day. */
 export function targetDelivery(figures?:({target?:number;completed?:number;targetPercent?:number}&TargetEvidence)|null,baseline?:{total:number|null;unique:number|null;covered?:number|null;required?:number|null;dailyCovered?:number|null}):TargetDelivery {
   const state=targetState(figures),confirmed=state==='configured';
   const fallback=Boolean(baseline&&!confirmed);

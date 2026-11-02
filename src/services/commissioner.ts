@@ -1,4 +1,5 @@
 import { inspectionOutcomes } from './inspectionCoverage';
+import { inspectionMetrics } from './inspectionMetrics';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { moduleId, MODULE_KEYS } from './adapters';
@@ -61,7 +62,7 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
   const [pulse,setPulse]=useState<CityPulse>({pending:6,errors:{}});const zoneKey=zoneIds.join(','),topicKey=topics?.join(',')||'';
   useEffect(()=>{
     const c=new AbortController();setPulse({pending:6,errors:{}});
-    const range=new URLSearchParams({from,to}),geo=new URLSearchParams({from,to,...(zoneKey?{zoneId:zoneKey}:{}),...(wardId?{wardId}:{})});
+    const range=new URLSearchParams({from,to}),geo=new URLSearchParams({from,to,...(zoneIds.length===1?{zoneId:zoneKey}:{}),...(wardId?{wardId}:{})});
     const tasks:[string,()=>Promise<any>][]=[
       ['official',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER')return undefined;if(!zoneKey)throw Error('Zone information unavailable.');const q=new URLSearchParams({from,to,zoneIds:zoneKey,...(wardId?{wardIds:wardId}:{})});return summarizeZones(await api(`/city/dashboard/zone-export?${q}`,{signal:c.signal}));}],
       ['attendance',async()=>{const d=await api(`/city/attendance/dashboard?${geo}&page=1&pageSize=1`,{signal:c.signal});return d.summary || null;}],
@@ -100,12 +101,15 @@ export function ulbInspectionSummary(data:InspectionCoverage,zones:{id:string;na
 }
 
 /** Preserve backend target credit while sourcing all current statuses from the full report register. */
-export function reconcileZoneExport(report:any,coverage:InspectionCoverage,wardIds:string[]=[]) {
+export function reconcileZoneExport(report:any,coverage:InspectionCoverage,wardIds:string[]=[],performance?:Record<string,any>) {
   const data=wardIds.length?{...coverage,failedModules:[...new Set([...coverage.failedModules,...coverage.visits.filter(v=>!v.wardId).map(v=>v.module)])],assets:coverage.assets.filter(a=>wardIds.includes(a.wardId)),visits:coverage.visits.filter(v=>!v.wardId||wardIds.includes(v.wardId))}:coverage;
   const row=(value:any,zone:string,module?:OperationalModuleId)=>{
     const outcomes=inspectionOutcomes(data,{zone,module});
     const count=(id:string)=>outcomes.rows.find(r=>r.id===id)?.value??null;
-    return {...value,inspections:outcomes.total,cleaned:count('approved'),siPending:count('pending_review'),notCleaned:count('rejected'),actionRequired:count('action_required'),actionPending:count('action_required'),actionTaken:count('action_taken'),escalated:count('escalated'),unclassified:count('unclassified')};
+    const zoneSummary=summarizeZones({zones:(report.zones||[]).filter(z=>(z.zoneId||z.id)===zone)});
+    const official=performance?applyPerformanceTargets(zoneSummary,performance):zoneSummary;
+    const metrics=inspectionMetrics(data,{zone,module},module?official.modules[module]:official.totals);
+    return {...value,totalEntities:metrics.totalEntities,inspectionTarget:metrics.delivery.target,achieved:metrics.achieved,uniqueEntities:metrics.uniqueEntities,coveragePercent:metrics.coveragePercent,targetCredit:metrics.delivery.completed,targetAchievement:metrics.delivery.percent,targetMethod:metrics.delivery.fallback?'One completed visit per entity per selected day':'Configured target',inspections:outcomes.total,cleaned:count('approved'),siPending:count('pending_review'),notCleaned:count('rejected'),actionRequired:count('action_required'),actionPending:count('action_required'),actionTaken:count('action_taken'),escalated:count('escalated'),unclassified:count('unclassified')};
   };
   return {...report,zones:(report.zones||[]).map((z:any)=>({...z,modules:(z.modules||[]).map((m:any)=>{const id=moduleId(m.module||m.key||'');return id?row(m,z.zoneId||z.id,id):m;}),...(z.total?{total:row(z.total,z.zoneId||z.id)}:{})}))};
 }

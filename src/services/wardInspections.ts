@@ -10,10 +10,10 @@ export function geographyOrder(a:{name:string;wardNumber?:number;zoneNumber?:num
 }
 const uuid=/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
 /** One row per visit from the same complete date-scoped register used by the status cards. */
-export function wardInspectionRows(data:InspectionCoverage,cityId:string,wardId:string,zones:Zone[],wards:Ward[],beats:Beat[]=[]):OperationalReport[] {
+export function wardInspectionRows(data:InspectionCoverage,cityId:string,wardId:string|undefined,zones:Zone[],wards:Ward[],beats:Beat[]=[]):OperationalReport[] {
   const nodes=[...zones.map(z=>({...z,level:'ZONE'})),...wards.map(w=>({...w,level:'WARD'}))];
   const assets=new Map(data.assets.map(a=>[`${a.module}:${a.id}`,a]));
-  const visits=[...new Map(data.visits.filter(v=>v.wardId===wardId).map(v=>[v.id,v])).values()];
+  const visits=[...new Map(data.visits.filter(v=>!wardId||v.wardId===wardId).map(v=>[v.id,v])).values()];
   return visits.map(visit=>{
     const raw=visit.raw??{},id=raw.id??visit.id.slice(visit.id.indexOf(':')+1);
     const report=mapReport({...raw,id,zoneId:visit.zoneId,wardId:visit.wardId,submittedAt:visit.submittedAt||raw.submittedAt,status:visit.status||raw.status},visit.module,cityId,nodes);

@@ -46,6 +46,45 @@ beforeEach(() => {
     return path in routes ? json(routes[path]) : json({ error: `Unexpected route ${path}` }, 404);
   };
 });
+
+test('coverage range changes preserve inventory and count completed entities once across days and geography', async () => {
+  const { loadInspectionCoverage } = require('../src/services/inspectionCoverage.ts');
+  const { inspectionMetrics } = require('../src/services/inspectionMetrics.ts');
+  const { datePreset } = require('../src/services/presentation.ts');
+  const assets = [
+    { id:'a',zoneId:'z1',wardId:'w1' }, { id:'b',zoneId:'z1',wardId:'w1' },
+    { id:'c',zoneId:'z2',wardId:'w2' }, { id:'d',zoneId:'z2',wardId:'w2' }
+  ];
+  const row = (id, beatId, date, status='SUBMITTED') => ({...assets.find(a=>a.id===beatId),id,beatId,createdAt:date,status,cityId:'city-a'});
+  const rows = [row('r1','a','2026-11-02T00:00:00Z'),row('r2','a','2026-11-01T00:00:00Z'),
+    row('r3','a','2026-11-01T01:00:00Z'),row('r4','b','2026-11-02T00:00:00Z','DRAFT'),
+    row('r5','c','2026-10-27T00:00:00Z'),row('r6','d','2026-10-10T00:00:00Z'),
+    row('r7','b','2026-08-10T00:00:00Z'),row('r8','b','2026-10-26T18:29:59Z')];
+  const queries=[];
+  global.fetch=async url=>{
+    const u=new URL(url,'http://localhost');
+    if(u.pathname.endsWith('/operations-map'))return json({beats:assets});
+    const start=u.searchParams.get('startDate'),end=u.searchParams.get('endDate');queries.push({start,end});
+    const data=rows.filter(r=>Date.parse(r.createdAt)>=Date.parse(start)&&Date.parse(r.createdAt)<=Date.parse(end));
+    return json({data,meta:{total:data.length,totalPages:1}});
+  };
+  const ranges=['today','yesterday','last_7_days','last_30_days','last_90_days','this_month','previous_month'].map(p=>datePreset(p,'2026-11-02'));
+  ranges.push({from:'2026-10-10',to:'2026-10-27'},{from:'2026-01-01',to:'2026-01-02'});
+  for(const range of ranges){
+    const data=await loadInspectionCoverage({id:'city-a',enabledModules:['sweeping']},range.from,range.to,new AbortController().signal);
+    const request=queries.at(-1);assert.equal(request.start,range.from+'T00:00:00+05:30');assert.equal(request.end,range.to+'T23:59:59.999+05:30');
+    for(const scope of [{},{zone:'z1'},{ward:'w2'},{zone:'z1',ward:'w1'}]){
+      const matches=a=>(!scope.zone||a.zoneId===scope.zone)&&(!scope.ward||a.wardId===scope.ward);
+      const expected=rows.filter(r=>matches(r)&&Date.parse(r.createdAt)>=Date.parse(request.start)&&Date.parse(r.createdAt)<=Date.parse(request.end));
+      const completed=expected.filter(r=>r.status!=='DRAFT'),unique=new Set(completed.map(r=>r.beatId)).size;
+      const inventory=assets.filter(matches).length,metrics=inspectionMetrics(data,scope);
+      assert.equal(metrics.totalEntities,inventory);assert.equal(metrics.totalRecords,expected.length);
+      assert.equal(metrics.achieved,completed.length);assert.equal(metrics.uniqueEntities,unique);
+      assert.equal(metrics.coveragePercent,unique/inventory*100);
+    }
+  }
+  assert.equal(253/2361*100>10.7&&253/2361*100<10.8,true);
+});
 test('City Admin setup dashboard loads geography personnel and Beats without inspection history', async () => {
   await matrixStore.login('admin@example.test', 'test-password'); await matrixStore.ensurePage('ca_dashboard');
   assert.ok(requests.some(r => r.path === '/city/areas')); assert.ok(requests.some(r => r.path === '/city/geo'));
@@ -1008,7 +1047,7 @@ test('zone targets preserve official zone totals without adding module rows twic
 test('Commissioner target answers use assigned workload, and normal assistant copy omits database notices', () => {
   const { answerInsight } = require('../src/services/commissionerAssistant.ts'); const { emptyCoverage } = require('../src/services/inspectionCoverage.ts'); const { summarizeZones } = require('../src/services/commissioner.ts');
   const context = { city: { id: 'city-a', name: 'Test City' }, from: '2026-10-01', to: '2026-10-31', zones: [], wards: [], coverage: { ...emptyCoverage(), inventoryAvailable: true }, pulse: { pending: 0, errors: {}, official: summarizeZones({ zones: [{ total: { target: 50, completed: 50, targetConfigured: true }, modules: [] }] }) } };
-  const answer = answerInsight('Are we meeting our targets?', context); assert.match(answer.text, /Target achievement: 100%/); assert.match(answer.text, /Pending inspections: 0/); assert.match(answer.text, /5% or 10% target/);
+  const answer = answerInsight('Are we meeting our targets?', context); assert.match(answer.text, /Inspection target achievement: 100%/); assert.match(answer.text, /Pending inspections: 0/); assert.match(answer.text, /5% or 10% target/);
   for (const q of ['Hi', 'What can you do?', 'What is pending review?']) assert.doesNotMatch(answerInsight(q, context).text, /read.only|database|never change records|no write tools/i);
   const source = fs.readFileSync(require.resolve('../src/components/commissioner/NagarInsight.tsx'), 'utf8'); assert.doesNotMatch(source, /Read only|No database changes|never change records/);
 });
@@ -1033,7 +1072,7 @@ test('87 toilets retain total, configured 10% target and 100% achievement using 
   };
 const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx');
 const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data: coverage, loading: false, zone: '', ward: '', onInspect: () => { } }));
-assert.match(html, /Every module\. One view\./); assert.match(html, /Cleanliness of Toilet/); assert.match(html, /data-metric="required">87/); assert.match(html, /Total inspections required/); assert.match(html, /10% configured/); assert.match(html, /data-metric="target" data-state="configured">9/); assert.match(html, /data-metric="achievement" data-met="true">100%/);
+assert.match(html, /Every module\. One view\./); assert.match(html, /Cleanliness of Toilet/); assert.match(html, /data-metric="entities">87/); assert.match(html, /Total entities/); assert.match(html, /10% configured/); assert.match(html, /data-metric="target" data-state="configured">9/); assert.match(html, /data-metric="achievement" data-met="true">100%/);
 assert.equal(targetDelivery({ target: 9, completed: 9 }).configuredPercent, null);
 });
 
@@ -1057,7 +1096,7 @@ test('module cards keep required total independent when targets change and disti
   const official = summarizeZones({ zones: [{ modules: [{ module: 'TOILET', target: 9, targetConfigured: true, completed: 5, siPending: 3, cleaned: 2, notCleaned: 1, actionRequired: 1, actionTaken: 2 }] }] });
   const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data, loading: false, zone: '', ward: '', onInspect: () => { } }));
   assert.match(html, /inspection-module-card/); assert.doesNotMatch(html, /<table/); assert.match(html, /data-metric="pending">4/); assert.match(html, /data-metric="pending_review">3/); assert.match(html, /data-metric="action_taken">2/);
-  const { COMMISSIONER_TERMS } = require('../src/services/commissionerTerms.ts'); for (const key of ['totalRequired', 'target', 'pending', 'pendingReview', 'cleaned', 'notCleaned', 'unique', 'repeated', 'coverage', 'actionRequired', 'actionTaken']) assert.ok(html.includes(COMMISSIONER_TERMS[key]), key);
+  const { COMMISSIONER_TERMS } = require('../src/services/commissionerTerms.ts'); for (const key of ['target', 'pending', 'pendingReview', 'cleaned', 'notCleaned', 'unique', 'repeated', 'coverage', 'actionRequired', 'actionTaken']) assert.ok(html.includes(COMMISSIONER_TERMS[key]), key);
 });
 
 test('a numeric backend target is not evidence of configuration, and empty saved targets override an unverified reference', () => {
@@ -1089,10 +1128,10 @@ test('compact cards fall back to total inspections required and keep duplicated 
   const data = { ...emptyCoverage(), inventoryAvailable: true, assets: Array.from({ length: 87 }, (_, i) => ({ id: String(i), module: 'toilets', zoneId: 'z', wardId: 'w' })), visits: [{ id: 'report', module: 'toilets', assetId: '0', zoneId: 'z', wardId: 'w' }] };
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx');
   const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data, loading: false, zone: '', ward: '', onInspect: () => { } }));
-  assert.match(html, /data-metric="target" data-state="full_coverage">87/); assert.match(html, /data-metric="achievement"/); assert.match(html, /data-metric="required">87/);
+  assert.match(html, /data-metric="target" data-state="full_coverage">87/); assert.match(html, /data-metric="achievement"/); assert.match(html, /data-metric="entities">87/);
   const [front, details] = html.split('<details class="inspection-card-details"'); assert.doesNotMatch(front, /data-metric="completed"|data-metric="reference"/); assert.match(front, /data-metric="inspections">1/); assert.doesNotMatch(details, /Backend reference count/); assert.match(details, /data-metric="pending">86/);
   const context = { city: { id: 'city-a', name: 'Test City' }, from: '2026-10-31', to: '2026-10-31', zones: [], wards: [], coverage: data, pulse: { official, pending: 0, errors: {} } };
-  const answer = answerInsight('Is a target set for toilets?', context).text; assert.match(answer, /Target: 87/); assert.match(answer, /Target uses current registered locations multiplied by selected days/); assert.match(answer, /Pending inspections: 86/); assert.doesNotMatch(answer, /Not verified|Backend reference count/);
+  const answer = answerInsight('Is a target set for toilets?', context).text; assert.match(answer, /Inspection target: 87/); assert.match(answer, /The inspection target is current registered locations multiplied by selected days/); assert.match(answer, /Pending inspections: 86/); assert.doesNotMatch(answer, /Not verified|Backend reference count/);
 });
 
 
@@ -1158,8 +1197,8 @@ test('Commissioner target explanations preserve configured ward and module scope
   const official = applyPerformanceTargets(summarizeZones({ zones: [{ zoneId: 'z1', zoneName: 'Zone 1', modules: [{ module: 'TOILET', target: 72, completed: 1 }] }] }), performance.SUPERVISOR);
   const coverage = { ...emptyCoverage(), inventoryAvailable: true, assets: Array.from({ length: 87 }, (_, i) => ({ id: String(i), module: 'toilets', wardId: 'w1', zoneId: 'z1' })), visits: [] };
   const context = { city: { id: 'city-a', name: 'Test City' }, from: '2026-10-31', to: '2026-10-31', zones: [{ id: 'z1', name: 'Zone 1' }], wards: [{ id: 'w1', name: 'Ward 1', zoneId: 'z1' }, { id: 'w2', name: 'Ward 2', zoneId: 'z1' }], coverage, pulse: { official, performance, pending: 0, errors: {} } };
-  const ward = answerInsight('Target for toilets in Ward 1', context).text; assert.match(ward, /Target: 9/); assert.match(ward, /Target achievement: 100%/); assert.doesNotMatch(ward, /Target: 27/);
-  const zone = answerInsight('Target for toilets in Zone 1', context).text; assert.match(zone, /Target: 27/); assert.doesNotMatch(zone, /10% configured target|20% configured target/);
+  const ward = answerInsight('Target for toilets in Ward 1', context).text; assert.match(ward, /Inspection target: 9/); assert.match(ward, /Inspection target achievement: 100%/); assert.doesNotMatch(ward, /Inspection target: 27/);
+  const zone = answerInsight('Target for toilets in Zone 1', context).text; assert.match(zone, /Inspection target: 27/); assert.doesNotMatch(zone, /10% configured target|20% configured target/);
 });
 
 
@@ -1169,7 +1208,7 @@ test('coverage distinguishes 218 recorded inspections from 189 credited toward a
   const data = { ...emptyCoverage(), inventoryAvailable: true, assets: Array.from({ length: 2361 }, (_, i) => ({ id: String(i), module: 'toilets', zoneId: 'z', wardId: 'w' })), visits: Array.from({ length: 218 }, (_, i) => ({ id: 'report-' + i, assetId: String(i), module: 'toilets', zoneId: 'z', wardId: 'w' })) };
   const official = summarizeZones({ zones: [{ zoneId: 'z', zoneName: 'Zone 1', modules: [{ module: 'TOILET', target: 1511, completed: 189, targetConfigured: true }] }] });
   const html = renderToStaticMarkup(React.createElement(CoverageOverview, { data, loading: false, zone: '', ward: '', zones: [], rankings: [], official, from: '2026-10-31', to: '2026-10-31', onZone: () => { } }));
-  assert.match(html, /Inspections done<\/span><strong>218/); assert.match(html, /189 of 1,511 inspections counted toward target/); assert.match(html, /12.5% achievement/); assert.match(html, /218 inspection records/); assert.match(html, /employee assignments, inspection completeness and daily or period limits/); assert.doesNotMatch(html, /189 of 1,511 inspections completed|29 rejected|29 incomplete/);
+  assert.match(html, /Achieved \(inspections completed\)<\/span><strong>218/); assert.match(html, /189 of 1,511 inspections counted toward target/); assert.match(html, /12.5% achievement/); assert.match(html, /218 inspection records/); assert.match(html, /employee assignments, inspection completeness and daily or period limits/); assert.doesNotMatch(html, /189 of 1,511 inspections completed|29 rejected|29 incomplete/);
 });
 
 
@@ -1212,7 +1251,7 @@ test('assistant loads only the requested topic, respects scope and answers plura
   const context = await loadInsightContext(user, city, [], [], '2026-09-01', '2026-09-01', new AbortController().signal, 'Attendance on 01/09/2026');
   assert.equal(calls.length, 1); assert.match(calls[0].pathname, /attendance/); assert.equal(calls[0].searchParams.get('from'), '2026-09-01'); assert.match(answerInsight('Attendance on 01/09/2026', context).text, /Present: 10/);
   const countContext = { ...context, coverage: { ...emptyCoverage(), inventoryAvailable: true, visits: [{ id: '1', module: 'sweeping', assetId: 'a', zoneId: 'z', wardId: 'w' }] } };
-  assert.match(answerInsight('How many inspections yesterday?', countContext).text, /Inspections done: 1/); assert.equal(insightTopic('How many inspections in Ward 1?'), 'inspection');
+  assert.match(answerInsight('How many inspections yesterday?', countContext).text, /Achieved \(inspections completed\): 1/); assert.equal(insightTopic('How many inspections in Ward 1?'), 'inspection');
   assert.ok(instantInsight('Tell me a cricket score')); assert.ok(instantInsight('please delete reports')); assert.equal(instantInsight('How did inspections change yesterday?'), null);
   assert.ok(calls.every(url => !url.pathname.includes('targets')));
 });
@@ -1257,7 +1296,7 @@ test('municipal question normalization accepts common typos without rewriting da
 test('typo zone performance returns scoped figures and zone-filtered ward rankings instead of a refusal', () => {
   const { answerInsight } = require('../src/services/commissionerAssistant.ts'); const { summarizeZones } = require('../src/services/commissioner.ts'); const { emptyCoverage } = require('../src/services/inspectionCoverage.ts');
   const context = { city: { id: 'city-a', name: 'Test City' }, from: '2026-10-30', to: '2026-10-30', zones: [{ id: 'z1', name: 'Zone 1' }, { id: 'z2', name: 'Zone 2' }], wards: [{ id: 'w1', name: 'Ward 1 - Bhairavgarh', zoneId: 'z1' }, { id: 'w2', name: 'Ward 2', zoneId: 'z2' }], coverage: { ...emptyCoverage(), inventoryAvailable: true, assets: [{ id: 'a', module: 'toilets', zoneId: 'z1', wardId: 'w1' }, { id: 'b', module: 'toilets', zoneId: 'z2', wardId: 'w2' }], visits: [{ id: 'r', module: 'toilets', assetId: 'a', zoneId: 'z1', wardId: 'w1', status: 'SUBMITTED' }] }, pulse: { official: summarizeZones({ zones: [{ zoneId: 'z1', zoneName: 'Zone 1', modules: [{ module: 'TOILET', target: 1, completed: 1, siPending: 1, targetConfigured: true }] }, { zoneId: 'z2', zoneName: 'Zone 2', modules: [{ module: 'TOILET', target: 99, completed: 0, siPending: 99, targetConfigured: true }] }] }), rankings: [{ wardId: 'w1', wardName: 'Ward 1 - Bhairavgarh', zoneId: 'z1', finalScore: 70, cityRank: 2 }, { wardId: 'w2', wardName: 'Ward 2', zoneId: 'z2', finalScore: 90, cityRank: 1 }], pending: 0, errors: {} } };
-  for (const q of ['zome 1 performance', 'zone1 score', 'znoe 1 perfromance']) { const answer = answerInsight(q, context).text; assert.match(answer, /Zone 1/); assert.match(answer, /2026-10-30/); assert.match(answer, /Inspections done: 1/); assert.match(answer, /Pending review: 1/); assert.doesNotMatch(answer, /Zone 2|Please ask about/); }
+  for (const q of ['zome 1 performance', 'zone1 score', 'znoe 1 perfromance']) { const answer = answerInsight(q, context).text; assert.match(answer, /Zone 1/); assert.match(answer, /2026-10-30/); assert.match(answer, /Achieved \(inspections completed\): 1/); assert.match(answer, /Pending review: 1/); assert.doesNotMatch(answer, /Zone 2|Please ask about/); }
   const rankings = answerInsight('best wards in zome 1', context).text; assert.match(rankings, /Ward 1 - Bhairavgarh/); assert.doesNotMatch(rankings, /Ward 2:/);
   const unknown = answerInsight('zome99 performance', context).text; assert.match(unknown, /could not find zone 99/); assert.doesNotMatch(unknown, /Inspections done:/);
   const comparison = answerInsight('compare zones 1 and 2', context).text; assert.match(comparison, /Zone 1/); assert.match(comparison, /Zone 2/);
@@ -1455,8 +1494,8 @@ test('Commissioner overview and module cards use register statuses even when zon
   const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server'); const { OverviewInsights } = require('../src/pages/commissioner/OverviewInsights.tsx'); const { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx'); const { emptyCoverage } = require('../src/services/inspectionCoverage.ts'); const { summarizeZones } = require('../src/services/commissioner.ts');
   const data = { ...emptyCoverage(), inventoryAvailable: true, modules: ['sweeping'], from: '2026-10-26', to: '2026-11-01', assets: [{ id: 'a', module: 'sweeping', zoneId: 'z', wardId: 'w' }], visits: Array.from({ length: 200 }, (_, i) => ({ id: String(i), module: 'sweeping', assetId: 'a', zoneId: 'z', wardId: 'w', submittedAt: '2026-10-26T01:00:00Z', status: i < 10 ? 'APPROVED' : i < 170 ? 'SUBMITTED' : 'ESCALATED' })) };
   const pulse = { pending: 0, errors: {}, official: summarizeZones({ zones: [{ zoneId: 'z', modules: [{ module: 'SWEEPING', cleaned: 999, siPending: 999 }] }] }) };
-  const html = renderToStaticMarkup(React.createElement(OverviewInsights, { pulse, data, onInspect: () => { } })); assert.match(html, /200 inspections/); assert.match(html, /Escalated/); assert.match(html, /<strong>30<\/strong>/); assert.doesNotMatch(html, />999</);
-  const card = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['sweeping'], pulse, data, loading: false, zone: '', ward: '', onInspect: () => { } })); assert.match(card, /data-metric="required">7/); assert.match(card, /data-metric="pending_review">160/); assert.match(card, /data-metric="escalated">30/); assert.doesNotMatch(card, />999</);
+  const html = renderToStaticMarkup(React.createElement(OverviewInsights, { pulse, data, onInspect: () => { } })); assert.match(html, /200 total inspection records/); assert.match(html, /Escalated/); assert.match(html, /<strong>30<\/strong>/); assert.doesNotMatch(html, />999</);
+  const card = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['sweeping'], pulse, data, loading: false, zone: '', ward: '', onInspect: () => { } })); assert.match(card, /data-metric="target" data-state="full_coverage">7/); assert.match(card, /data-metric="pending_review">160/); assert.match(card, /data-metric="escalated">30/); assert.doesNotMatch(card, />999</);
 });
 
 
@@ -1535,4 +1574,127 @@ test('ward history uses all 29 source reports and readable names independently o
   const counts = coverageCounts(data, { ward: 'w10' }), target = targetDelivery(null, counts); assert.equal(counts.inspections, 29); assert.equal(target.target, 31); assert.equal(target.completed, 29); assert.equal(target.remaining, 2); assert.equal(inspectionOutcomes(data, { ward: 'w10' }).rows.find(r => r.id === 'pending_review').value, 29);
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'); const hook = require('../src/services/useInspectionCoverage.ts'), original = hook.useInspectionCoverage; hook.useInspectionCoverage = () => ({ data, loading: false });
   try { const { ZoneWardDetails } = require('../src/pages/commissioner/ZoneWardDetails.tsx'); const html = renderToStaticMarkup(React.createElement(ZoneWardDetails, { city: { id: 'city-a', name: 'City', enabledModules: ['sweeping'] }, zones: [{ id: 'z', cityId: 'city-a', name: 'Zone 1' }], wards: [wards[0]], beats: [], users: [], reports: rows.slice(0, 4), iecIssues: [], attendance: [], onSelectReport: () => { } })); assert.match(html, /29 submitted reports awaiting review/); assert.match(html, /2 more inspections needed/); assert.match(html, /29 matching \/ 29 available/); assert.match(html, /of 29/); assert.match(html, /Zone 1.*Ward 10 - Tilkeshwar/); assert.doesNotMatch(html, /00000000-0000|Load more reports|Backend target reference/); assert.equal((html.match(/data-ward-report/g) || []).length, 10); } finally { hook.useInspectionCoverage = original; }
+});
+
+
+test('selected-period baseline reconciles records, location-day credit and drill filters for every range and geography', () => {
+  const { emptyCoverage, coverageCounts, inspectionOutcomes } = require('../src/services/inspectionCoverage.ts');
+  const { targetDelivery } = require('../src/services/targetDelivery.ts');
+  const { inspectionPeriod, inspectionDrillFilters } = require('../src/services/inspectionPeriod.ts');
+  const { wardInspectionRows } = require('../src/services/wardInspections.ts');
+  const { emptyFilters, matchesFilters } = require('../src/services/presentation.ts');
+  const assets = [
+    { id: 'a', module: 'sweeping', zoneId: 'z1', wardId: 'w1', name: 'Beat A' },
+    { id: 'b', module: 'sweeping', zoneId: 'z2', wardId: 'w2', name: 'Beat B' },
+  ];
+  for (const days of [1, 7, 30, 5]) {
+    const from = '2026-10-01', to = `2026-10-${String(days).padStart(2, '0')}`;
+    const visits = assets.flatMap(asset => Array.from({length: days}, (_, i) => ({
+      id: `sweeping:${asset.id}-${i}`, module: asset.module, assetId: asset.id,
+      zoneId: asset.zoneId, wardId: asset.wardId, status: i%2?'DRAFT':'SUBMITTED',
+      submittedAt: `2026-10-${String(i+1).padStart(2,'0')}T05:00:00Z`,
+    })));
+    visits.push({...visits[0], id: 'sweeping:extra-same-day'});
+    const data = {...emptyCoverage(), from, to, inventoryAvailable: true, modules: ['sweeping'], assets, visits};
+    for (const [zone, ward] of [['',''], ['z1',''], ['z2','w2']]) {
+      const counts = coverageCounts(data, {module:'sweeping',zone,ward});
+      const delivery = targetDelivery(null, counts), period = inspectionPeriod(counts, delivery, from, to);
+      const locations = zone?1:2;
+      assert.equal(counts.required, locations*days);
+      assert.equal(delivery.completed, locations*days);
+      assert.equal(delivery.percent, 100);
+      assert.equal(counts.inspections, counts.unique+counts.repeats);
+      assert.equal(period.achievement, 'Inspection target achievement');
+      assert.ok(period.range.includes(`${days} ${days===1?'day':'days'}`));
+      assert.ok(period.basis.includes(`${locations*days} inspection opportunities`));
+      assert.ok(period.progress.includes(`${locations*days} location-day visits counted`));
+      const filters = {...emptyFilters(), ...inspectionDrillFilters(zone,ward,'sweeping','pending_review')};
+      const rows = wardInspectionRows(data, 'city-a', undefined, [], []);
+      const matching = rows.filter(r=>matchesFilters(r,filters,[]));
+      const pending = inspectionOutcomes(data,{module:'sweeping',zone,ward}).rows.find(r=>r.id==='pending_review').value;
+      assert.equal(matching.length,pending);
+      assert.equal(rows.length,visits.length);
+    }
+    const configured = targetDelivery({target:10,completed:4,targetConfigured:true},coverageCounts(data));
+    assert.equal(configured.percent,40);
+    assert.equal(inspectionPeriod(coverageCounts(data),configured).achievement,'Inspection target achievement');
+  }
+  const zero={...coverageCounts({...emptyCoverage(),inventoryAvailable:true,from:'2026-10-01',to:'2026-10-07'} )};
+  assert.equal(targetDelivery(null,zero).percent,null);
+});
+
+
+test('service metrics exclude Draft, distinguish completed repeats from unique entities and reconcile the report', () => {
+  const { emptyCoverage, inspectionOutcomes } = require('../src/services/inspectionCoverage.ts');
+  const { inspectionMetrics } = require('../src/services/inspectionMetrics.ts');
+  const { commissionerReportData } = require('../src/services/commissionerReportData.ts');
+  const { reconcileZoneExport } = require('../src/services/commissioner.ts');
+  const { datePreset } = require('../src/services/presentation.ts');
+  for(const module of ['sweeping','litter_bins','nala','toilets','ctu_gvp']) {
+    const assets=[{id:'a',module,zoneId:'z1',wardId:'w1'},{id:'b',module,zoneId:'z1',wardId:'w1'},{id:'c',module,zoneId:'z2',wardId:'w2'}];
+    const visit=(id,assetId,date,status='SUBMITTED',zoneId='z1',wardId='w1')=>({id,module,assetId,zoneId,wardId,status,submittedAt:date+'T05:00:00Z'});
+    const visits=[visit('1','a','2026-10-01'),visit('2','a','2026-10-01','APPROVED'),visit('3','a','2026-10-02','REJECTED'),visit('4','b','2026-10-01','DRAFT'),visit('5','b','2026-10-01','UNEXPECTED_STATUS'),visit('6','c','2026-10-01','SUBMITTED','z2','w2')];
+    const data={...emptyCoverage(),from:'2026-10-01',to:'2026-10-07',modules:[module],assets,visits,inventoryAvailable:true};
+    const metrics=inspectionMetrics(data,{zone:'z1',ward:'w1'});
+    assert.equal(metrics.totalEntities,2);assert.equal(metrics.totalRecords,5);assert.equal(metrics.achieved,3);assert.equal(metrics.drafts,2);
+    assert.equal(metrics.uniqueEntities,1);assert.equal(metrics.coveragePercent,50);assert.equal(metrics.repeatInspections,2);
+    assert.equal(metrics.delivery.target,14);assert.equal(metrics.delivery.completed,2);assert.equal(metrics.delivery.percent,2/14*100);
+    assert.equal(inspectionOutcomes(data,{zone:'z1'}).rows.reduce((sum,row)=>sum+row.value,0),5);
+    assert.equal(metrics.achieved+metrics.drafts,metrics.totalRecords);
+    const configured=inspectionMetrics(data,{zone:'z1'},{target:8,completed:4,targetConfigured:true});assert.equal(configured.delivery.percent,50);assert.equal(configured.achieved,3);
+    const report=commissionerReportData({city:{id:'city-a',enabledModules:[module]},from:data.from,to:data.to,zone:'z1',ward:'w1',zones:[{id:'z1',cityId:'city-a',name:'Zone 1'}],wards:[{id:'w1',cityId:'city-a',zoneId:'z1',name:'Ward 1'}],users:[],personnelComplete:false,coverage:data,pulse:{pending:0,errors:{}}});
+    const fact=id=>report.facts.find(f=>f.id===id).value;
+    assert.equal(fact('achieved'),3);assert.equal(fact('records'),5);assert.equal(fact('unique'),1);assert.equal(fact('coverage'),50);assert.equal(fact('entities'),2);
+    for(const id of ['workforce','verifiedPunches','geotaggedPhotos','weeklyScores','averageScore','sameDayResolution','improvedWard'])assert.equal(fact(id),null,id);
+    assert.equal(report.modules[0].delivery.target,metrics.delivery.target);assert.equal(report.modules[0].achieved,metrics.achieved);
+    const keys={sweeping:'SWEEPING',litter_bins:'LITTERBINS',nala:'NALA',toilets:'TOILET',ctu_gvp:'TASKFORCE'};
+    const exported=reconcileZoneExport({zones:[{zoneId:'z1',modules:[{module:keys[module],target:999,completed:999}]}]},data).zones[0].modules[0];
+    assert.equal(exported.totalEntities,2);assert.equal(exported.inspectionTarget,14);assert.equal(exported.achieved,3);assert.equal(exported.inspections,5);assert.equal(exported.uniqueEntities,1);assert.equal(exported.coveragePercent,50);
+    const missing=inspectionMetrics({...data,failedModules:[module]});assert.equal(missing.achieved,null);assert.equal(missing.coveragePercent,null);
+    const noInventory=inspectionMetrics({...data,inventoryAvailable:false});assert.equal(noInventory.achieved,4);assert.equal(noInventory.totalEntities,null);assert.equal(noInventory.coveragePercent,null);
+  }
+  const range=datePreset('last_90_days','2026-11-02');assert.equal(range.from,'2026-08-05');assert.equal(range.to,'2026-11-02');
+});
+
+
+test('completed-inspection drill filter excludes Draft without dropping other completed workflow stages', () => {
+ const { emptyFilters, matchesFilters } = require('../src/services/presentation.ts');
+ const filters={...emptyFilters(),status:'inspections_completed',zoneId:'z'};
+ for(const status of ['pending_review','approved','rejected','action_required','action_taken','escalated'])assert.equal(matchesFilters({zoneId:'z',status},filters,[]),true,status);
+ assert.equal(matchesFilters({zoneId:'z',status:'unclassified'},filters,[]),false);
+ assert.equal(matchesFilters({zoneId:'other',status:'approved'},filters,[]),false);
+});
+
+
+test('Ward assignment shares every selected Daroga with every Beat and submits one atomic request',async()=>{
+ const {loadWardAssignment,planWardAssignment,saveWardAssignment}=require('../src/services/wardBeatAssignments.ts');
+ await matrixStore.login('admin@example.test','test-password');await matrixStore.ensurePage('ca_assignments');
+ const snapshot={cityId:'city-a',zoneId:'zone-a',wardId:'ward-a',zoneName:'Zone 1',wardName:'Ward 1',revision:'a'.repeat(64),candidates:[{id:'d1',name:'Daroga One'},{id:'d2',name:'Daroga Two'}],beats:Array.from({length:13},(_,i)=>({id:'b'+i,name:'Beat '+i,sharedSupervisorIds:[],supervisors:i===0?[{id:'old',name:'Existing Daroga'}]:[],segmentCount:1}))};
+ const original=global.fetch,writes=[];
+ global.fetch=async(url,options={})=>{
+  if(String(url).includes('/areas/ward-assignments')){
+   if(options.method==='POST'){writes.push(JSON.parse(options.body));return json({success:true,beatCount:13,darogaCount:2,assignmentCount:26});}
+   return json(snapshot);
+  }
+  return original(url,options);
+ };
+ const data=await loadWardAssignment({cityId:'city-a',zoneId:'zone-a',wardId:'ward-a'});
+ const plan=planWardAssignment(data,['d1','d2','d1'],'add');assert.equal(plan.rows.length,13);assert.equal(plan.selected.length,2);
+ assert.ok(plan.rows.every(row=>['d1','d2'].every(id=>row.supervisors.some(u=>u.id===id))));assert.equal(plan.rows[0].supervisors.length,3);
+ const replace=planWardAssignment(data,['d1','d2'],'replace');assert.ok(replace.rows.every(row=>row.supervisors.length===2));
+ await saveWardAssignment(plan);assert.equal(writes.length,1);assert.deepEqual(writes[0],{zoneId:'zone-a',wardId:'ward-a',supervisorIds:['d1','d2'],mode:'add',expectedRevision:'a'.repeat(64)});
+ assert.throws(()=>planWardAssignment(data,['outside'],'add'),/eligible/);assert.throws(()=>planWardAssignment(data,[],'add'),/at least one/);
+ matrixStore.currentUser.role='COMMISSIONER';await assert.rejects(saveWardAssignment(plan),/City Admin/);assert.equal(writes.length,1);
+});
+test('Ward assignment refuses invalid geography and explains an older backend without individual-Beat writes',async()=>{
+ const {loadWardAssignment}=require('../src/services/wardBeatAssignments.ts');
+ await matrixStore.login('admin@example.test','test-password');await matrixStore.ensurePage('ca_assignments');
+ const before=requests.length;await assert.rejects(loadWardAssignment({cityId:'city-a',zoneId:'zone-a',wardId:'foreign-ward'}),/belonging/);assert.equal(requests.length,before);
+ global.fetch=async()=>json({error:'not found'},404);
+ await assert.rejects(loadWardAssignment({cityId:'city-a',zoneId:'zone-a',wardId:'ward-a'}),/updated backend/);
+});
+test('shared Daroga names survive Beat mapping even when the personnel directory is only partly loaded',()=>{
+ const {mapBeat}=require('../src/services/adapters.ts');
+ const beat=mapBeat({id:'beat',sharedSupervisorIds:['d1','d2'],assignedDarogaIds:['d1','d2'],assignedDarogaNames:['Daroga One','Daroga Two'],segments:[]},'city-a');
+ assert.deepEqual(beat.assignedDarogaIds,['d1','d2']);assert.deepEqual(beat.assignedDarogaNames,['Daroga One','Daroga Two']);assert.deepEqual(beat.sharedSupervisorIds,['d1','d2']);
 });

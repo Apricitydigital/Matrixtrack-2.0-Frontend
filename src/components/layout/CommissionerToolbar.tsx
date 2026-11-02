@@ -8,7 +8,7 @@ export function CommissionerToolbar({pageId,title,cityName}:{pageId:string;title
   const setupPage=['ca_dashboard','ca_zones_wards','ca_beats','ca_assignments','ca_geo_hierarchy','ca_module_dir','ca_municipal_users','ca_employees','ca_registration_mgmt','ca_targets','ca_logs'].includes(pageId);
   const receivedPage=/attendance$/.test(pageId)||['prod_plant','comm_plant'].includes(pageId);const range=matrixStore.getDateRange();const [from,setFrom]=useState(range.from),[to,setTo]=useState(range.to),[error,setError]=useState('');
   useEffect(()=>{setFrom(range.from);setTo(range.to);},[range.from,range.to]);
-  const choices=[['today','Today'],['yesterday','Yesterday'],['last_7_days','Last 7 days'],['last_30_days','Last 30 days'],['this_month','This month']];
+  const choices=[['today','Today'],['yesterday','Yesterday'],['last_7_days','Last 7 days'],['last_30_days','Last 30 days'],['last_90_days','Last 90 days'],['this_month','This month']];
   const selected=choices.find(([key])=>{const r=datePreset(key,todayIST());return r.from===range.from&&r.to===range.to;})?.[0] || 'custom';
   const label=(value:string)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'});
   const apply=async(a:string,b:string)=>{setError('');try{await matrixStore.setDateRange(a,b);}catch(e){setError(e instanceof Error?e.message:'Unable to update dates.');}};

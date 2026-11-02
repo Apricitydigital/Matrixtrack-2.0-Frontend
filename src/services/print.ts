@@ -20,7 +20,8 @@ export function printElement(title: string, element: HTMLElement | null, note = 
   if (!element) return;
   const clone=element.cloneNode(true) as HTMLElement;
   clone.querySelectorAll('.no-print,nav,.ops-filter-panel,.insight-filter-row,.workspace-secondary-button,.report-open-button,.commissioner-actions,.register-tools,input,select').forEach(n=>n.remove());
-  clone.querySelectorAll('details.analytics-register').forEach(n=>n.setAttribute('open',''));
+  clone.querySelectorAll('details.analytics-register,details.report-fact-section').forEach(n=>n.setAttribute('open',''));
+  clone.querySelectorAll('.card-info-control').forEach(n=>n.remove());
   // Clickable metric cards and report cells contain report data: retain their contents.
   clone.querySelectorAll('button').forEach(button=>{
     const block=document.createElement('div');
