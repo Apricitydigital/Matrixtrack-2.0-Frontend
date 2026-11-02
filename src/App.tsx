@@ -76,7 +76,8 @@ const CityDashboard=lazy(()=>import('./pages/cityadmin/CityDashboard').then(m=>(
 const ZonesWards=lazy(()=>import('./pages/cityadmin/ZonesWards').then(m=>({default:m.ZonesWards})));
 const AreasBeats=lazy(()=>import('./pages/cityadmin/AreasBeats').then(m=>({default:m.AreasBeats})));
 const CommissionerAttendance=lazy(()=>import('./pages/commissioner/CommissionerAttendance').then(m=>({default:m.CommissionerAttendance})));
-const WardRankingPage=lazy(()=>import('./pages/cityadmin/WardRankingPage').then(m=>({default:m.WardRankingPage})));
+const RankingApiPage=lazy(()=>import('./pages/cityadmin/RankingApiPage').then(m=>({default:m.RankingApiPage})));
+const RankingApiHealthPage=lazy(()=>import('./pages/superadmin/RankingApiHealthPage').then(m=>({default:m.RankingApiHealthPage})));
 const ChatHistory=lazy(()=>import('./pages/commissioner/ChatHistory').then(m=>({default:m.ChatHistory})));
 const NagarInsight=lazy(()=>import('./components/commissioner/NagarInsight').then(m=>({default:m.NagarInsight})));
 
@@ -249,6 +250,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
       sa_audit_logs: 'Governance Audit Ledger',
       sa_sessions: 'Active Session Telemetry',
       sa_trash_restore: 'Governance Trash & Safe Restore',
+      sa_ranking_api: 'Ranking API Integration',
 
       ca_dashboard: 'City Administration',
       ca_logs: 'Activity logs',
@@ -415,6 +417,8 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
             />
           )}
 
+          {activePageId === 'sa_ranking_api' && <RankingApiHealthPage />}
+
           {activePageId === 'sa_trash_restore' && (
             <TrashRestorePage
               currentUser={currentUser}
@@ -467,16 +471,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
           )}
 
           {['comm_attendance','ulb_attendance','ca_attendance'].includes(activePageId) && <CommissionerAttendance city={effectiveCity} zones={zones} wards={wards} onUpload={()=>setCsvImportModal({isOpen:true,type:'attendance',title:`Upload Attendance · ${effectiveCity.name}`})}/>}
-          {(activePageId === 'ca_ward_ranking' || activePageId === 'ulb_ward_ranking' || activePageId === 'comm_ward_ranking') && (
-            <WardRankingPage
-              city={effectiveCity}
-              wards={wards}
-              beats={beats}
-              attendance={attendance}
-              reports={reports}
-              iecIssues={iecIssues}
-            />
-          )}
+          {(activePageId === 'ca_ward_ranking' || activePageId === 'ulb_ward_ranking' || activePageId === 'comm_ward_ranking') && <RankingApiPage />}
 
           {(activePageId === 'ca_municipal_users' || activePageId === 'ca_employees') && <PersonnelDirectory key={activePageId} city={effectiveCity} users={users.filter(u=>u.cityId===effectiveCity.id&&(activePageId==='ca_employees'?u.role==='EMPLOYEE':u.role!=='EMPLOYEE'))} zones={zones.filter(z=>z.cityId===effectiveCity.id)} wards={wards.filter(w=>w.cityId===effectiveCity.id)} employeeOnly={activePageId==='ca_employees'}/>}
 

@@ -24,6 +24,7 @@ import {
   XCircle,
   Clock,
   Award,
+  Plug,
   SlidersHorizontal,
   ChevronRight,
   FolderSync,
@@ -58,7 +59,7 @@ export function canAccessPage(role: RoleType, pageId: string, city?: City): bool
   const superCityView = role === 'HMS_SUPER_ADMIN' && pageId.startsWith('ca_') && getNavGroups('CITY_ADMIN').some(group => group.items.some(item => item.id === pageId));
   if (!listed && !superCityView) return false;
   if (city && pageId.startsWith('mod_') && !city.enabledModules.includes(pageId.slice(4) as any)) return false;
-  const product = ({ prod_swachh: 'swachh_assessment', prod_workforce: 'workforce_monitoring', prod_plant: 'plant_processing', comm_plant: 'plant_processing' } as const)[pageId];
+  const product = ({ prod_swachh: 'swachh_assessment', prod_workforce: 'workforce_monitoring', prod_plant: 'plant_processing', comm_plant: 'plant_processing', ca_ward_ranking: 'swachh_assessment', ulb_ward_ranking: 'swachh_assessment', comm_ward_ranking: 'swachh_assessment' } as const)[pageId];
   if (city && product && role !== 'HMS_SUPER_ADMIN' && !city.enabledProducts.includes(product)) return false;
   return true;
 }
@@ -95,6 +96,7 @@ export function getNavGroups(currentRole: RoleType, pendingRequestCount = 0, ope
             groupTitle: 'GOVERNANCE',
             items: [
               { id: 'sa_audit_logs', label: 'Audit Logs', icon: FileText },
+              { id: 'sa_ranking_api', label: 'Ranking API', icon: Plug },
               { id: 'sa_sessions', label: 'Active Sessions', icon: Clock },
               { id: 'sa_trash_restore', label: 'Trash and Restore', icon: Trash2 }
             ]

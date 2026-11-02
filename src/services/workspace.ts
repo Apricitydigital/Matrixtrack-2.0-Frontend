@@ -41,7 +41,7 @@ export function pageDatasets(pageId: string, role?: string): Dataset[] {
   if (pageId === 'sa_trash_restore') return ['trash'];
   if (pageId === 'ca_registration_mgmt') return ['geography','registration'];
   if (pageId === 'sa_reg_requests') return ['registration'];
-  if (['sa_cities_dir', 'sa_city_admins', 'sa_module_matrix', 'sa_access_matrix', 'prod_swachh', 'prod_plant', 'comm_plant', 'comm_iec_oversight'].includes(pageId)) return [];
+  if (['sa_cities_dir', 'sa_city_admins', 'sa_module_matrix', 'sa_access_matrix', 'prod_swachh', 'prod_plant', 'comm_plant', 'comm_iec_oversight', 'sa_ranking_api'].includes(pageId)) return [];
   if (/ward_ranking|cross_city/.test(pageId)) return ['geography']; // Rankings have their own backend query.
   if (/zones_wards|geo_hierarchy/.test(pageId)) return ['geography', 'users'];
   if (pageId === 'ca_beats' || pageId === 'ca_assignments') return ['geography', 'users', 'beats'];

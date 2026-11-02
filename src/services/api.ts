@@ -24,7 +24,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  if(cityContext&&/^\/(city|modules|cleanliness-issues|ward-ranking)(?:\/|\?|$)/.test(path))headers.set('x-city-id',cityContext);
+  if(cityContext&&/^\/(city|modules|cleanliness-issues|ward-ranking|ranking-gateway)(?:\/|\?|$)/.test(path))headers.set('x-city-id',cityContext);
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   let response: Response;
   try {

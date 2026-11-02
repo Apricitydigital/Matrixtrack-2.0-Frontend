@@ -13,7 +13,7 @@ const loaders:Record<string,()=>Promise<unknown>>={
  ca_registration_mgmt:()=>import('../pages/superadmin/RegistrationRequests'),
  ca_attendance:()=>import('../pages/commissioner/CommissionerAttendance'),
  ca_user_perf:()=>import('../pages/commissioner/UserPerformance'),
- ca_ward_ranking:()=>import('../pages/cityadmin/WardRankingPage'),
+ ca_ward_ranking:()=>import('../pages/cityadmin/RankingApiPage'),
  ca_iec_oversight:()=>import('../pages/commissioner/CleanlinessOversight'),
  ca_exec_summary:()=>import('../pages/commissioner/ReportsExports'),
  prod_plant:()=>import('../pages/commissioner/PlantProcessing')

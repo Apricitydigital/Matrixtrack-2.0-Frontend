@@ -11,7 +11,7 @@ const loaders:Record<string,()=>Promise<unknown>>={
   ulb_iec_issues:()=>import('../pages/ulbofficer/IecCleanlinessIssuesPage'),
   ulb_attendance:()=>import('../pages/commissioner/CommissionerAttendance'),
   ulb_user_perf:()=>import('../pages/commissioner/UserPerformance'),
-  ulb_ward_ranking:()=>import('../pages/cityadmin/WardRankingPage'),
+  ulb_ward_ranking:()=>import('../pages/cityadmin/RankingApiPage'),
   prod_plant:()=>import('../pages/commissioner/PlantProcessing')
 };
 const pending=new Map<string,Promise<unknown>>();
