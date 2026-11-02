@@ -1,17 +1,16 @@
-import { COMMISSIONER_TERMS as terms } from '../../services/commissionerTerms';
 import React from 'react';
 import { ArrowUpRight, CheckCircle2, Clock3, XCircle } from 'lucide-react';
 import { amount } from '../../services/insights';
 import type { CityPulse } from '../../services/commissioner';
-export function OverviewInsights({pulse,onInspect}:{pulse:CityPulse;onInspect:(module?:string,status?:string)=>void}) {
+import { inspectionOutcomes, type InspectionCoverage } from '../../services/inspectionCoverage';
+export function OverviewInsights({pulse,data,loading=false,zone='',ward='',onInspect}:{pulse:CityPulse;data?:InspectionCoverage;loading?:boolean;zone?:string;ward?:string;onInspect:(module?:string,status?:string)=>void}) {
   const t=pulse.official?.totals;
-  const outcomes=[
-    {id:'approved',label:terms.cleaned,value:t?.cleaned,tone:'green',Icon:CheckCircle2,note:'Reviewed as cleaned'},
-    {id:'pending_review',label:terms.pendingReview,value:t?.siPending,tone:'yellow',Icon:Clock3,note:'Awaiting Sanitary Inspector decision'},
-    {id:'rejected',label:terms.notCleaned,value:t?.notCleaned,tone:'red',Icon:XCircle,note:'Reviewed as not cleaned'},
-  ];
-  const known=outcomes.every(row=>typeof row.value==='number'&&Number.isFinite(row.value));
-  return <section className="home-section overview-outcomes"><div className="home-section-heading"><div><span>INSPECTION OUTCOMES</span><h2>What is waiting for a decision?</h2></div><span className="outcome-total">{known?amount(outcomes.reduce((sum,row)=>sum+row.value!,0),0):'—'} reported outcomes</span></div>
-    <div className="outcome-summary-cards">{outcomes.map(({id,label,value,tone,Icon,note})=><button key={id} data-outcome={id} data-tone={tone} onClick={()=>onInspect(undefined,id)} aria-label={`${label}: ${amount(value,0)}. Open inspections.`}><div><Icon size={21}/><span>{label}</span><ArrowUpRight size={16}/></div><strong>{amount(value,0)}</strong><small>{note}</small></button>)}</div>
+  const outcomes=data?inspectionOutcomes(data,{zone,ward}):{total:t?t.cleaned+t.siPending+t.notCleaned:null,rows:[
+    {id:'approved',label:'Cleaned',value:t?.cleaned,tone:'green'},
+    {id:'pending_review',label:'Pending review',value:t?.siPending,tone:'yellow'},
+    {id:'rejected',label:'Not cleaned',value:t?.notCleaned,tone:'red'},
+  ]};
+  return <section className="home-section overview-outcomes"><div className="home-section-heading"><div><span>INSPECTION STATUS</span><h2>Every inspection accounted for</h2><p>Current status of reports submitted in the selected period. Each report is counted once.</p></div><span className="outcome-total">{loading?'\u2026':amount(outcomes.total,0)} {data?'inspections / all statuses':'reported outcomes'}</span></div>
+    <div className="outcome-summary-cards">{outcomes.rows.filter((row,i)=>i<3||row.id==='unclassified'||row.value!==0).map(({id,label,value,tone})=>{const Icon=tone==='green'?CheckCircle2:tone==='red'?XCircle:Clock3;return <button key={id} disabled={loading||value==null} data-outcome={id} data-tone={tone} onClick={()=>onInspect(undefined,id)} aria-label={`${label}: ${amount(value,0)}. Open inspections.`}><div><Icon size={21}/><span>{label}</span><ArrowUpRight size={16}/></div><strong>{loading?'\u2026':amount(value,0)}</strong><small>{id==='pending_review'?'Awaiting Sanitary Inspector decision':id==='unclassified'?'Draft report':'Current report status'}</small></button>;})}</div>
   </section>;
 }

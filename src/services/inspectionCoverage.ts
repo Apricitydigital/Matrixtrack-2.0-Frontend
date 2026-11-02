@@ -1,3 +1,5 @@
+import { INSPECTION_STATUSES, inspectionStatus } from './inspectionStatus';
+export { INSPECTION_STATUSES, inspectionStatus } from './inspectionStatus';
 import { api,getToken } from './api';
 import {cachedRead} from './readCache';
 import {concurrentReads} from './concurrentReads';
@@ -9,10 +11,10 @@ export interface InspectionVisit { id: string; module: OperationalModuleId; asse
 export interface CoverageCounts {
   total: number | null; inspections: number | null; unique: number | null;
   repeats: number | null; repeatedLocations: number | null; covered: number | null;
-  remaining: number | null; percent: number | null; unidentified: number; outsideRegister: number;
+  required?: number | null; dailyCovered?: number | null; days?: number; remaining: number | null; percent: number | null; unidentified: number; outsideRegister: number;
 }
 export interface InspectionCoverage {
-  assets: MapAsset[]; visits: InspectionVisit[]; modules: OperationalModuleId[];
+  from?: string; to?: string; assets: MapAsset[]; visits: InspectionVisit[]; modules: OperationalModuleId[];
   failedModules: OperationalModuleId[]; inventoryAvailable: boolean; errors: string[];
 }
 export const emptyCoverage = (): InspectionCoverage => ({assets:[],visits:[],modules:[],failedModules:[],inventoryAvailable:false,errors:[]});
@@ -35,7 +37,7 @@ export async function loadInspectionCoverage(city: Pick<City,'id'|'enabledModule
   return cachedRead(key,30000,sharedSignal=>fetchInspectionCoverage(city,from,to,sharedSignal),signal,result=>result.inventoryAvailable&&!result.failedModules.length&&!result.errors.length);
 }
 async function fetchInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, from: string, to: string, signal: AbortSignal): Promise<InspectionCoverage> {
-  const result = emptyCoverage(); result.modules = [...city.enabledModules];
+  const result = emptyCoverage(); result.from=from; result.to=to; result.modules = [...city.enabledModules];
   const inventory = api(`/city/dashboard/operations-map?${new URLSearchParams({date:to,cityId:city.id})}`,{signal}).then(data=>{
     const groups:Record<OperationalModuleId,string>={sweeping:'beats',toilets:'toilets',litter_bins:'bins',nala:'nalas',ctu_gvp:'gvps'};
     if (!city.enabledModules.every(module=>Array.isArray(data?.[groups[module]]))) throw new Error('Location inventory is incomplete.');
@@ -48,21 +50,32 @@ async function fetchInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, f
     try {
       const query=new URLSearchParams({cityId:city.id,tab:module==='litter_bins'?'DAILY_REPORTS':'HISTORY',startDate:`${from}T00:00:00+05:30`,endDate:`${to}T23:59:59.999+05:30`,limit:'100'});
       const visits=new Map<string,InspectionVisit>(),seenReports=new Set<string>();let expectedTotal:number|undefined;
-      for(let page=1;page<=1000;page++){
-        signal.throwIfAborted();query.set('page',String(page));
-        const response=await api(`/modules/${MODULE_KEYS[module]}/records?${query}`,{signal});
+      const readPage=async(page:number)=>{
+        signal.throwIfAborted();
+        const params=new URLSearchParams(query);params.set('page',String(page));
+        const response=await api(`/modules/${MODULE_KEYS[module]}/records?${params}`,{signal});
         if(!Array.isArray(response?.data))throw new Error('Unexpected inspection response.');
-        const pagination=response.meta || response.pagination || response;
-        if(Number.isFinite(Number(pagination.total)))expectedTotal=Number(pagination.total);
-        const totalPages=Number(pagination.totalPages ?? (expectedTotal!=null?Math.ceil(expectedTotal/100):1));
-        if(!Number.isFinite(totalPages)||totalPages>1000)throw new Error('Inspection period exceeds the supported page limit. Narrow the dates.');
+        return response;
+      };
+      const first=await readPage(1),pagination=first.meta || first.pagination || first;
+      if(pagination.total!=null&&Number.isFinite(Number(pagination.total)))expectedTotal=Number(pagination.total);
+      if(pagination.totalPages==null&&expectedTotal==null&&first.data.length>=100)throw new Error('Inspection pagination metadata is missing; a complete total cannot be verified.');
+      const pageSize=Number(pagination.limit || pagination.pageSize || first.data.length || 100);
+      const totalPages=Number(pagination.totalPages ?? (expectedTotal!=null?Math.ceil(expectedTotal/pageSize):1));
+      if(!Number.isInteger(totalPages)||totalPages<0||totalPages>1000)throw new Error('Inspection period exceeds the supported page limit. Narrow the dates.');
+      const consume=(response:any,page:number)=>{
         let added=0;
-        for(const raw of response.data){if(raw.id)seenReports.add(String(raw.id));const visit=inspectionVisit(raw,module,city.id);if(visit&&!visits.has(visit.id)){visits.set(visit.id,visit);added++;}}
-        if(page<totalPages&&!added&&response.data.length)throw new Error('Inspection pagination repeated a page.');
-        if(page>=totalPages){if(expectedTotal!=null&&seenReports.size!==expectedTotal)throw new Error('Inspection pages do not match the reported total.');result.visits.push(...visits.values());return;}
-        if(!response.data.length)throw new Error('Inspection pagination ended early.');
+        for(const raw of response.data){if(raw.id&&!seenReports.has(String(raw.id)))added++;if(raw.id)seenReports.add(String(raw.id));const visit=inspectionVisit(raw,module,city.id);if(visit)visits.set(visit.id,visit);}
+        if(page<=totalPages&&page>1&&!added)throw new Error('Inspection pagination repeated a page or ended early.');
+      };
+      consume(first,1);
+      // Fetch bounded batches instead of a long serial waterfall. Never publish partial module totals.
+      for(let page=2;page<=totalPages;page+=3){
+        const pages=Array.from({length:Math.min(3,totalPages-page+1)},(_,i)=>page+i);
+        const responses=await Promise.all(pages.map(readPage));responses.forEach((response,i)=>consume(response,pages[i]));
       }
-      throw new Error('Inspection period is too large. Narrow the dates.');
+      if(expectedTotal!=null&&seenReports.size!==expectedTotal)throw new Error('Inspection pages do not match the reported total.');
+      result.visits.push(...visits.values());return;
     }catch(error){if(signal.aborted)throw error;result.failedModules.push(module);result.errors.push(`${MODULE_KEYS[module]}: ${error instanceof Error?error.message:'Inspection counts unavailable.'}`);}
   };
   const records=concurrentReads(city.enabledModules.map(module=>()=>loadModule(module)),2).then(results=>{const failed=results.find(r=>r.status==='rejected');if(failed?.status==='rejected')throw failed.reason;});
@@ -84,7 +97,14 @@ export function coverageCounts(data:InspectionCoverage,{module,zone='',ward=''}:
   const registered=new Set(assets.map(a=>`${a.module}:${a.id}`));
   const covered=[...frequency.keys()].filter(key=>registered.has(key)).length;
   const total=data.inventoryAvailable?registered.size:null;
-  return {total,inspections:known?visits.length:null,unique:exact?frequency.size:null,repeats:exact?visits.length-frequency.size:null,repeatedLocations:exact?[...frequency.values()].filter(n=>n>1).length:null,covered:exact&&total!=null?covered:null,remaining:exact&&total!=null?total-covered:null,percent:exact&&total?covered/total*100:null,unidentified,outsideRegister:[...frequency.keys()].filter(key=>!registered.has(key)).length};
+  const days=data.from&&data.to?Math.max(1,Math.round((Date.parse(data.to)-Date.parse(data.from))/86400000)+1):1;
+  const daily=new Set<string>();
+  let dated=true;
+  for(const v of visits){if(!v.submittedAt||!Number.isFinite(Date.parse(v.submittedAt))){dated=false;continue;}
+    const date=new Date(Date.parse(v.submittedAt)+330*60000).toISOString().slice(0,10);
+    if(registered.has(`${v.module}:${v.assetId}`))daily.add(`${v.module}:${v.assetId}:${date}`);
+  }
+  return {days,required:total==null?null:total*days,dailyCovered:exact&&total!=null?(days===1?covered:dated?daily.size:null):null,total,inspections:known?visits.length:null,unique:exact?frequency.size:null,repeats:exact?visits.length-frequency.size:null,repeatedLocations:exact?[...frequency.values()].filter(n=>n>1).length:null,covered:exact&&total!=null?covered:null,remaining:exact&&total!=null?total-covered:null,percent:exact&&total?covered/total*100:null,unidentified,outsideRegister:[...frequency.keys()].filter(key=>!registered.has(key)).length};
 }
 
 export function zoneCoverage(data:InspectionCoverage,zones:Zone[],rankings:any[],ward='') {
@@ -93,4 +113,11 @@ export function zoneCoverage(data:InspectionCoverage,zones:Zone[],rankings:any[]
     const assessed=rankings.filter(r=>r.zoneId===zone.id&&(!ward||r.wardId===ward)&&r.rankable!==false&&typeof r.finalScore==='number'&&Number.isFinite(r.finalScore));
     return {id:zone.id,name:zone.name,...counts,assessed:assessed.length,wardAverage:assessed.length?assessed.reduce((n,r)=>n+r.finalScore,0)/assessed.length:null};
   });
+}
+
+/** Mutually exclusive current states from the same complete register as Inspections done. */
+export function inspectionOutcomes(data:InspectionCoverage,scope:{module?:OperationalModuleId;zone?:string;ward?:string}={}) {
+  const counts=coverageCounts(data,scope),known=counts.inspections!=null;
+  const visits=[...new Map(data.visits.filter(v=>(!scope.module||v.module===scope.module)&&(!scope.zone||v.zoneId===scope.zone)&&(!scope.ward||v.wardId===scope.ward)).map(v=>[v.id,v])).values()];
+  return {total:counts.inspections,rows:INSPECTION_STATUSES.map(row=>({...row,value:known?visits.filter(v=>inspectionStatus(v.status)===row.id).length:null}))};
 }

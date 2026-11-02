@@ -10,7 +10,10 @@ const Dashboard = dynamic(async () => {
   ]);
   initializeTheme();
   return App;
-}, { ssr: false });
+}, {
+  ssr: false,
+  loading: () => <main role="status" aria-live="polite" className="min-h-screen flex items-center justify-center text-slate-600">Loading MatrixTrack...</main>,
+});
 
 export default function DashboardClient() {
   return <Dashboard />;

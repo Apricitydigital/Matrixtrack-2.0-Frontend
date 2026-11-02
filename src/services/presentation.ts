@@ -15,7 +15,7 @@ export function statusTone(status: string): RygTone {
   if (['green','approved','approved_closed','closed','active','present','achieved','on_track','verified_clean','operating','completed','certified'].includes(key)) return 'green';
   return 'neutral';
 }
-const STATUS_LABELS: Record<string, string> = { action_taken: 'Action taken · awaiting verification', action_required: 'Action required', pending_qc: 'Pending Sanitary Inspector review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
+const STATUS_LABELS: Record<string, string> = { unclassified:'Draft', action_taken: 'Action taken', action_required: 'Action required', pending_qc: 'Pending Sanitary Inspector review', pending_approval: 'Pending approval', approved_closed: 'Approved & closed', needs_correction: 'Correction requested', verified_clean: 'Verified clean', unmarked: 'Not recorded', not_assessed: 'Not assessed', neutral: 'Not assessed', amber: 'Attention', green: 'On track', red: 'Action needed' };
 export function statusLabel(status: string) { const key = normalizeStatus(status); return STATUS_LABELS[key] || key.replaceAll('_', ' ').replace(/^\w/, c => c.toUpperCase()); }
 export function issueIsOverdue(issue: { status: string; deadlineTimestamp: string }, now = Date.now()) {
   const deadline = Date.parse(issue.deadlineTimestamp);

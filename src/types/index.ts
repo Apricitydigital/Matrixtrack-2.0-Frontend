@@ -212,7 +212,8 @@ export type InspectionStatus =
   | 'rejected'
   | 'action_required'
   | 'action_taken'
-  | 'escalated';
+  | 'escalated'
+  | 'unclassified';
 
 export interface InspectionQuestionAnswer {
   questionId: string;

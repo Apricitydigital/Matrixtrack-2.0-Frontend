@@ -1,5 +1,6 @@
 import type {
   ProcessingUnitTotals,
+  PlantQuantityKey,
   ProcessingPlantDashboardData,
   ProcessingPlantPerformanceRow,
   ProcessingPlantTrendPoint,
@@ -9,7 +10,11 @@ const n = (value: unknown) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
-const supplied=(row:any,keys:string[])=>keys.some(key=>typeof row?.[key]!=='boolean'&&row?.[key]!==''&&row?.[key]!=null&&Number.isFinite(Number(row[key])));
+const numericField=(row:any,keys:string[]):number|null=>{
+  for(const key of keys){const value=row?.[key];if(typeof value!=='boolean'&&value!=null&&String(value).trim()!==''&&Number.isFinite(Number(value)))return Number(value);}
+  return null;
+};
+const supplied=(row:any,keys:string[])=>numericField(row,keys)!=null;
 
 const pick = <T = number>(
   obj: any,
@@ -44,21 +49,21 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
   const trend: ProcessingPlantTrendPoint[] = Array.isArray(trendRaw)
     ? trendRaw.map((row: any) => ({
         date: String(pick(row, ['date', 'day', 'label'], '')),
-        received: n(pick(row, ['received', 'totalReceived', 'input'])),
-        processed: n(pick(row, ['processed', 'totalProcessed', 'output'])),
-        recovered: n(pick(row, ['recovered', 'totalRecovered'])),
-        reject: n(pick(row, ['reject', 'totalReject', 'residual'])),
-        efficiency: n(pick(row, ['efficiency', 'processingEfficiency'])),
+        received: (supplied(row,['received', 'totalReceived', 'input'])?(numericField(row,['received', 'totalReceived', 'input'])??0):null),
+        processed: (supplied(row,['processed', 'totalProcessed', 'output'])?(numericField(row,['processed', 'totalProcessed', 'output'])??0):null),
+        recovered: (supplied(row,['recovered', 'totalRecovered'])?(numericField(row,['recovered', 'totalRecovered'])??0):null),
+        reject: (supplied(row,['reject', 'totalReject', 'residual'])?(numericField(row,['reject', 'totalReject', 'residual'])??0):null),
+        efficiency: (supplied(row,['efficiency', 'processingEfficiency'])?(numericField(row,['efficiency', 'processingEfficiency'])??0):null),
         units: row?.units && typeof row.units === 'object'
           ? Object.fromEntries(
               Object.entries(row.units as Record<string, any>).map(([unit, q]) => [
                 unit,
                 {
-                  received: n(q?.received),
-                  processed: n(q?.processed),
-                  recovered: n(q?.recovered),
-                  reject: n(q?.reject),
-                  processLoss: n(q?.processLoss),
+                  received: (supplied(q,['received'])?n(q?.received):null),
+                  processed: (supplied(q,['processed'])?n(q?.processed):null),
+                  recovered: (supplied(q,['recovered'])?n(q?.recovered):null),
+                  reject: (supplied(q,['reject'])?n(q?.reject):null),
+                  processLoss: (supplied(q,['processLoss'])?n(q?.processLoss):null),
                 },
               ]),
             )
@@ -69,24 +74,33 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
   const plantRaw = source.plantPerformance ?? source.plants ?? source.plantWise ?? source.byPlant ?? [];
   const plantPerformance: ProcessingPlantPerformanceRow[] = Array.isArray(plantRaw)
     ? plantRaw.map((row: any) => {
-        const received = n(pick(row, ['received', 'totalReceived', 'input']));
-        const processed = n(pick(row, ['processed', 'totalProcessed', 'output']));
+        const received = (numericField(row,['received', 'totalReceived', 'input'])??0);
+        const processed = (numericField(row,['processed', 'totalProcessed', 'output'])??0);
         const capacity = pick(row, ['capacity', 'installedCapacity'], null);
+        const receivedAvailable=row.receivedAvailable!==false&&supplied(row,['received','totalReceived','input']);
+        const recoveredAvailable=row.recoveredAvailable!==false&&supplied(row,['recovered','totalRecovered']);
+        const rejectAvailable=row.rejectAvailable!==false&&supplied(row,['reject','totalReject','residual']);
+        const processLossAvailable=row.processLossAvailable!==false&&supplied(row,['processLoss']);
+        const recovered=(numericField(row,['recovered','totalRecovered'])??0);
+        const validDays=(v:unknown)=>typeof v!=='boolean'&&v!=null&&String(v).trim()!==''&&Number.isInteger(Number(v))&&Number(v)>=0?Number(v):undefined;
+        const daysInRange=validDays(row.daysInRange),reported=validDays(row.daysReported);
+        const daysReported=reported!=null&&(daysInRange==null||reported<=daysInRange)?reported:undefined;
         return {
           plantId: String(pick(row, ['plantId', 'id'], '')),
           plantName: String(pick(row, ['plantName', 'name'], 'Unnamed Plant')),
           plantType: String(pick(row, ['plantType', 'type'], '')),
           received,
           processed,
-          recovered: n(pick(row, ['recovered', 'totalRecovered'])),
-          reject: n(pick(row, ['reject', 'totalReject', 'residual'])),
-          processLoss: n(pick(row, ['processLoss'])),
-          processLossAvailable: row.processLossAvailable!==false&&supplied(row,['processLoss']),
-          balanceAvailable: ['received','recovered','reject'].every(key=>supplied(row,[key,`total${key[0].toUpperCase()+key.slice(1)}`]))&&row.efficiencyAvailable!==false,
-          efficiency: row?.efficiency !== undefined || row?.processingEfficiency !== undefined
-            ? n(pick(row, ['efficiency', 'processingEfficiency']))
-            : (received > 0 ? (n(pick(row, ['recovered', 'totalRecovered'])) / received) * 100 : 0),
-          efficiencyAvailable: row?.efficiencyAvailable !== false,
+          recovered,
+          receivedAvailable, recoveredAvailable, rejectAvailable,
+          materialComparable:row.efficiencyAvailable!==false,
+          processedAvailable:row.processedAvailable!==false&&supplied(row,['processed','totalProcessed','output']),
+          reject: (numericField(row,['reject', 'totalReject', 'residual'])??0),
+          processLoss: (numericField(row,['processLoss'])??0),
+          processLossAvailable,
+          balanceAvailable:receivedAvailable&&recoveredAvailable&&rejectAvailable&&processLossAvailable&&row.efficiencyAvailable!==false,
+          efficiency:receivedAvailable&&recoveredAvailable&&received>0?recovered/received*100:0,
+          efficiencyAvailable:row.efficiencyAvailable!==false&&receivedAvailable&&recoveredAvailable&&received>0,
           reportingGranularity: row?.reportingGranularity === 'MONTHLY' ? 'MONTHLY' : 'DAILY',
           monthly: Array.isArray(row?.monthly)
             ? row.monthly.map((m: any) => ({
@@ -99,20 +113,13 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
                 processLoss: n(m?.processLoss),
               }))
             : undefined,
-          capacity: capacity === null ? null : n(capacity),
-          utilization:
-            'utilization' in row || 'capacityUtilization' in row
-              ? (() => {
-                  const value = pick<number | null>(row, ['utilization', 'capacityUtilization'], null);
-                  return value === null ? null : n(value);
-                })()
-              : n(pick(row, ['utilization', 'capacityUtilization'])) ||
-                (capacity && n(capacity) > 0 ? (received / n(capacity)) * 100 : null),
+          capacity: numericField(row,['capacity','installedCapacity']),
+          utilization: numericField(row,['utilization','capacityUtilization']),
           reportingStatus: String(pick(row, ['reportingStatus', 'status'], '')),
           lastSubmissionAt: pick(row, ['lastSubmissionAt', 'lastReportedAt', 'updatedAt'], null) as string | null,
-          unit: row?.unit ? String(row.unit) : undefined,
-          daysReported: row?.daysReported !== undefined ? n(row.daysReported) : undefined,
-          daysInRange: row?.daysInRange !== undefined ? n(row.daysInRange) : undefined,
+          unit: row?.unit ? String(row.unit).trim().toUpperCase() : undefined,
+          daysReported,
+          daysInRange,
         };
       })
     : [];
@@ -121,8 +128,8 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
   const materialRecovery = Array.isArray(materialRaw)
     ? materialRaw.map((row: any) => ({
         name: String(pick(row, ['name', 'material', 'label', 'type'], 'Other')),
-        quantity: n(pick(row, ['quantity', 'value', 'recovered'])),
-        percentage: n(pick(row, ['percentage', 'share', 'percent'])),
+        quantity: (numericField(row,['quantity', 'value', 'recovered'])??0),
+        percentage: (numericField(row,['percentage', 'share', 'percent'])??0),
       }))
     : [];
 
@@ -133,8 +140,8 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
       Array.isArray(list)
         ? list.map((row: any) => ({
             name: String(pick(row, ['name', 'material', 'label'], 'Other')),
-            quantity: n(pick(row, ['quantity', 'value'])),
-            percentage: n(pick(row, ['percentage', 'share'])),
+            quantity: (numericField(row,['quantity', 'value'])??0),
+            percentage: (numericField(row,['percentage', 'share'])??0),
           }))
         : [],
     ]),
@@ -145,7 +152,7 @@ export function normalizeDashboardPayload(payload: any): ProcessingPlantDashboar
     ? otherOutputsRaw.map((row: any) => ({
         name: String(pick(row, ['name', 'label'], 'Other output')),
         unit: String(pick(row, ['unit'], '')),
-        quantity: n(pick(row, ['quantity', 'value'])),
+        quantity: (numericField(row,['quantity', 'value'])??0),
       }))
     : [];
 
@@ -200,51 +207,50 @@ export function lastNDaysRange(days: number) {
  * plant rows. Quantities in different units cannot be added, so every family is separate.
  * Only families that have some data are returned, MT first.
  */
+export function plantQuantity(row:ProcessingPlantPerformanceRow,key:PlantQuantityKey):number|null {
+  if(key==='recovered'&&(row.materialComparable===false||row.materialComparable==null&&row.efficiencyAvailable===false))return null;
+  const value=row[key];
+  return row[`${key}Available`]===false||typeof value!=='number'||!Number.isFinite(value)?null:value;
+}
 export function computeUnitTotals(rows: ProcessingPlantPerformanceRow[]): ProcessingUnitTotals[] {
-  const map = new Map<string, ProcessingUnitTotals & { comparableReceived: number; comparableRecovered: number; balanceRows:number }>();
+  const keys:PlantQuantityKey[]=['received','processed','recovered','reject','processLoss'];
+  const units=[...new Set(rows.map(row=>row.unit||'MT'))];
+  return units.map(unit=>{
+    const scoped=rows.filter(row=>(row.unit||'MT')===unit);
+    const values=Object.fromEntries(keys.map(key=>[key,scoped.map(row=>plantQuantity(row,key)).filter((value):value is number=>value!=null)])) as Record<PlantQuantityKey,number[]>;
+    const sums=Object.fromEntries(keys.map(key=>[key,values[key].reduce((total,value)=>total+value,0)])) as Record<PlantQuantityKey,number>;
+    const available=Object.fromEntries(keys.map(key=>[key,values[key].length>0])) as Record<PlantQuantityKey,boolean>;
+    const partial=Object.fromEntries(keys.map(key=>[key,values[key].length>0&&values[key].length<scoped.filter(row=>key!=='recovered'||!(row.materialComparable===false||row.materialComparable==null&&row.efficiencyAvailable===false)).length])) as Record<PlantQuantityKey,boolean>;
+    const comparable=scoped.filter(row=>row.efficiencyAvailable!==false&&(plantQuantity(row,'received')??0)>0&&plantQuantity(row,'recovered')!=null);
+    const received=comparable.reduce((total,row)=>total+row.received,0),recovered=comparable.reduce((total,row)=>total+row.recovered,0);
+    const balanceComplete=scoped.length>0&&scoped.every(row=>row.balanceAvailable!==false&&row.efficiencyAvailable!==false&&['received','recovered','reject','processLoss'].every(key=>plantQuantity(row,key as PlantQuantityKey)!=null));
+    return {unit,...sums,available,partial,scopePlants:scoped.length,comparablePlants:comparable.length,
+      hasProcessLoss:available.processLoss,unreconciledBalance:balanceComplete?sums.received-sums.recovered-sums.reject-sums.processLoss:null,
+      efficiency:received>0?recovered/received*100:0,hasEfficiency:received>0,
+      plants:scoped.filter(row=>keys.some(key=>(plantQuantity(row,key)??0)>0)).length};
+  }).sort((a,b)=>a.unit===b.unit?0:a.unit==='MT'?-1:b.unit==='MT'?1:a.unit.localeCompare(b.unit));
+}
 
-  for (const row of rows) {
-    const unit = row.unit || 'MT';
-    const current = map.get(unit) ?? {
-      unit,
-      received: 0,
-      processed: 0,
-      recovered: 0,
-      reject: 0,
-      processLoss: 0,
-      hasProcessLoss:false,
-      unreconciledBalance:null,
-      balanceRows:0,
-      efficiency: 0,
-      hasEfficiency: false,
-      plants: 0,
-      comparableReceived: 0,
-      comparableRecovered: 0,
-    };
+/** Unknown reporting counts remain unknown; they are never classified as unreported. */
+export function plantReporting(rows:ProcessingPlantPerformanceRow[]) {
+  return {total:rows.length,reported:rows.filter(row=>row.daysReported!=null&&row.daysReported>0).length,unknown:rows.filter(row=>row.daysReported==null).length};
+}
 
-    current.received += row.received;
-    current.processed += row.processed;
-    current.recovered += row.recovered;
-    current.reject += row.reject;
-    current.processLoss += row.processLoss || 0;
-    if(row.processLossAvailable!==false&&Number.isFinite(row.processLoss))current.hasProcessLoss=true;
-    if(row.balanceAvailable!==false&&row.efficiencyAvailable!==false&&row.received>0){current.unreconciledBalance=(current.unreconciledBalance || 0)+row.received-row.recovered-row.reject-(row.processLoss || 0);current.balanceRows++;}
-    if (row.received > 0 || row.recovered > 0 || row.reject > 0 || (row.processLoss || 0) > 0) current.plants += 1;
+export function plantEntriesPage(response:any,page:number,size:number) {
+  const rows=Array.isArray(response?.data)?response.data:response?.data?.items??response?.items;
+  if(!Array.isArray(rows))throw Error('Submission register returned an invalid response.');
+  const meta=response.meta??response.pagination??response.data?.meta??response;
+  const count=(value:unknown)=>value!=null&&String(value).trim()!==''&&typeof value!=='boolean'&&Number.isInteger(Number(value))&&Number(value)>=0?Number(value):null;
+  const total=count(meta.total),pages=count(meta.totalPages);
+  if(total!=null&&rows.length>0&&total<(page-1)*size+rows.length)throw Error('Submission rows do not match the reported total. Refresh this register.');
+  return {rows,total,pages:pages==null?total==null?null:Math.max(1,Math.ceil(total/size)):Math.max(1,pages)};
+}
 
-    if (row.efficiencyAvailable !== false && row.received > 0) {
-      current.comparableReceived += row.received;
-      current.comparableRecovered += row.recovered;
-    }
-
-    map.set(unit, current);
-  }
-
-  return Array.from(map.values())
-    .filter((totals) => totals.plants > 0)
-    .map(({ comparableReceived, comparableRecovered, balanceRows, ...totals }) => ({
-      ...totals,
-      efficiency: comparableReceived > 0 ? (comparableRecovered / comparableReceived) * 100 : 0,
-      hasEfficiency: comparableReceived > 0,
-    }))
-    .sort((a, b) => (a.unit === 'MT' ? -1 : b.unit === 'MT' ? 1 : a.unit.localeCompare(b.unit)));
+/** Never display other plants' totals if the server ignores an active filter. */
+export function scopePlantDashboard(data:ProcessingPlantDashboardData,plantId='',plantType=''):ProcessingPlantDashboardData {
+  if(!plantId&&!plantType)return data;
+  const rows=data.plantPerformance.filter(row=>(!plantId||row.plantId===plantId)&&(!plantType||row.plantType?.trim().toUpperCase()===plantType.trim().toUpperCase()));
+  if(rows.length===data.plantPerformance.length)return data;
+  // Aggregate trend/material rows cannot be attributed to an individual plant without source evidence.
+  return {...data,plantPerformance:rows,scopeMismatch:true,trend:[],materialRecovery:[],materialRecoveryByUnit:{},otherOutputs:[]};
 }

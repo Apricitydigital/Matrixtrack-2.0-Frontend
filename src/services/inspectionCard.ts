@@ -4,5 +4,5 @@ import { targetDelivery } from './targetDelivery';
 
 /** Full-coverage baseline is independent of the configured target percentage/count. */
 export function inspectionCard(counts:CoverageCounts,figures?:InspectionFigures) {
-  return {totalRequired:counts.total,delivery:targetDelivery(figures,counts),counts};
+  return {totalRequired:counts.required!==undefined?counts.required:counts.total,delivery:targetDelivery(figures,counts),counts};
 }

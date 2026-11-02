@@ -27,5 +27,6 @@ export function plantDetailSummary(entries:PlantSubmission[]){
   const total=(key:'received'|'recovered'|'reject'|'processLoss')=>{const values=entries.map(e=>e[key]).filter((v):v is number=>v!=null);return values.length?values.reduce((a,b)=>a+b,0):null;};
   const outputs=new Map<string,{name:string;unit:string;quantity:number}>();for(const e of entries)for(const o of e.otherOutputs){const key=o.name+'\n'+o.unit,previous=outputs.get(key);outputs.set(key,{...o,quantity:(previous?.quantity || 0)+o.quantity});}
   const latest=entries.map(e=>e.submittedAt).filter(v=>v&&!Number.isNaN(Date.parse(v))).sort((a,b)=>Date.parse(b)-Date.parse(a))[0] || '';
-  return {received:total('received'),recovered:total('recovered'),reject:total('reject'),processLoss:total('processLoss'),otherOutputs:[...outputs.values()],latest,latestDate:entries.map(e=>e.date).filter(Boolean).sort().at(-1) || ''};
+  const partial=Object.fromEntries((['received','recovered','reject','processLoss'] as const).map(key=>[key,entries.some(e=>e[key]!=null)&&entries.some(e=>e[key]==null)]));
+  return {partial,received:total('received'),recovered:total('recovered'),reject:total('reject'),processLoss:total('processLoss'),otherOutputs:[...outputs.values()],latest,latestDate:entries.map(e=>e.date).filter(Boolean).sort().at(-1) || ''};
 }

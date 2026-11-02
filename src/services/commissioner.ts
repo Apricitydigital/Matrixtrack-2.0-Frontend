@@ -1,3 +1,4 @@
+import { inspectionOutcomes } from './inspectionCoverage';
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { moduleId, MODULE_KEYS } from './adapters';
@@ -69,7 +70,7 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
       ['iec',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER'){const d=await api(`/cleanliness-issues/ulb/summary?${range}`,{signal:c.signal});return {pendingApprovals:d.pendingApprovals,pendingReopenRequests:d.pendingReopenRequests};}return (await api(`/cleanliness-issues/commissioner/summary?${range}${zoneIds.length===1?`&zoneId=${encodeURIComponent(zoneIds[0])}`:''}${wardId?`&wardId=${encodeURIComponent(wardId)}`:''}`,{signal:c.signal})).kpis || null;}],
       ['performance',async()=>{const q=new URLSearchParams({startDate:new Date(`${from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330'});const results=await Promise.allSettled([['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']].map(async([role,key])=>[role,(await api(`/city/users/${key}-performance?${q}`,{signal:c.signal})).users || {}] as const));if(results.every(r=>r.status==='rejected'))throw Error('Team performance unavailable.');return Object.fromEntries(results.flatMap(r=>r.status==='fulfilled'?[r.value]:[]));}]
     ];
-    const run=async([key,load]:[string,()=>Promise<any>])=>{if(c.signal.aborted)return;try{const value=await load();if(!c.signal.aborted)setPulse(p=>({...p,[key]:value,...(key==='performance'&&p.official&&value.SUPERVISOR?{official:applyPerformanceTargets(p.official,value.SUPERVISOR,wardId)}:{}),pending:p.pending-1}));}catch(e){if(!c.signal.aborted)setPulse(p=>({...p,errors:{...p.errors,[key]:e.message},pending:p.pending-1}));}};
+    const run=async([key,load]:[string,()=>Promise<any>])=>{if(c.signal.aborted)return;try{const value=await load();if(!c.signal.aborted)setPulse(p=>({...p,[key]:value,...(key==='performance'&&p.official&&value?.SUPERVISOR?{official:applyPerformanceTargets(p.official,value.SUPERVISOR,wardId)}:{}),...(key==='official'&&value&&p.performance?.SUPERVISOR?{official:applyPerformanceTargets(value,p.performance.SUPERVISOR,wardId)}:{}),pending:p.pending-1}));}catch(e){if(!c.signal.aborted)setPulse(p=>({...p,errors:{...p.errors,[key]:e.message},pending:p.pending-1}));}};
     // Let inspection totals finish before starting the three detailed officer-performance queries.
     const active=topicKey?tasks.filter(([key])=>topicKey.split(',').includes(key)):tasks;setPulse({pending:active.length,errors:{}});
     const primary=active[0]?run(active[0]):Promise.resolve();for(const task of active.slice(1))if(task[0]==='performance')void primary.then(()=>run(task));else void run(task);
@@ -96,4 +97,15 @@ export function ulbInspectionSummary(data:InspectionCoverage,zones:{id:string;na
     const count=(state:string)=>visits.filter(v=>v.status===state).length;
     return {module:MODULE_KEYS[module],target:total,targetState:'default',completed:visits.length,pending:Math.max(0,total-new Set(visits.map(v=>v.assetId).filter(Boolean)).size),cleaned:count('APPROVED'),notCleaned:count('REJECTED'),siPending:visits.filter(v=>!['APPROVED','REJECTED','ACTION_REQUIRED','ACTION_TAKEN','ESCALATED'].includes(v.status||'')).length,actionRequired:count('ACTION_REQUIRED'),actionPending:count('ACTION_REQUIRED'),actionTaken:count('ACTION_TAKEN')};
   })}))});
+}
+
+/** Preserve backend target credit while sourcing all current statuses from the full report register. */
+export function reconcileZoneExport(report:any,coverage:InspectionCoverage,wardIds:string[]=[]) {
+  const data=wardIds.length?{...coverage,failedModules:[...new Set([...coverage.failedModules,...coverage.visits.filter(v=>!v.wardId).map(v=>v.module)])],assets:coverage.assets.filter(a=>wardIds.includes(a.wardId)),visits:coverage.visits.filter(v=>!v.wardId||wardIds.includes(v.wardId))}:coverage;
+  const row=(value:any,zone:string,module?:OperationalModuleId)=>{
+    const outcomes=inspectionOutcomes(data,{zone,module});
+    const count=(id:string)=>outcomes.rows.find(r=>r.id===id)?.value??null;
+    return {...value,inspections:outcomes.total,cleaned:count('approved'),siPending:count('pending_review'),notCleaned:count('rejected'),actionRequired:count('action_required'),actionPending:count('action_required'),actionTaken:count('action_taken'),escalated:count('escalated'),unclassified:count('unclassified')};
+  };
+  return {...report,zones:(report.zones||[]).map((z:any)=>({...z,modules:(z.modules||[]).map((m:any)=>{const id=moduleId(m.module||m.key||'');return id?row(m,z.zoneId||z.id,id):m;}),...(z.total?{total:row(z.total,z.zoneId||z.id)}:{})}))};
 }

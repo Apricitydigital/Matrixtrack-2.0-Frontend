@@ -21,22 +21,22 @@ export interface ProcessingPlant {
 
 /** Quantities of one unit family (MT / KL / ML). */
 export interface ProcessingPlantUnitQuantities {
-  received: number;
-  processed: number;
-  recovered: number;
-  reject: number;
-  processLoss: number;
+  received: number | null;
+  processed: number | null;
+  recovered: number | null;
+  reject: number | null;
+  processLoss: number | null;
 }
 
 export interface ProcessingPlantTrendPoint {
   date: string;
   /** The same day split by unit family, so liquid plants get their own trend. */
   units?: Record<string, ProcessingPlantUnitQuantities>;
-  received: number;
-  processed: number;
-  recovered?: number;
-  reject?: number;
-  efficiency?: number;
+  received: number | null;
+  processed: number | null;
+  recovered?: number | null;
+  reject?: number | null;
+  efficiency?: number | null;
 }
 
 export interface ProcessingPlantMaterialPoint {
@@ -57,7 +57,14 @@ export interface ProcessingPlantMonthlyFigures {
   processLoss: number;
 }
 
+export type PlantQuantityKey = 'received'|'processed'|'recovered'|'reject'|'processLoss';
+
 export interface ProcessingPlantPerformanceRow {
+  materialComparable?: boolean;
+  receivedAvailable?: boolean;
+  processedAvailable?: boolean;
+  recoveredAvailable?: boolean;
+  rejectAvailable?: boolean;
   plantId: string;
   plantName: string;
   plantType?: string;
@@ -88,6 +95,7 @@ export interface ProcessingPlantPerformanceRow {
 }
 
 export interface ProcessingPlantDashboardData {
+  scopeMismatch?: boolean;
   totalReceived: number;
   totalProcessed: number;
   totalRecovered: number;
@@ -193,6 +201,10 @@ export type ProcessingMetricKey =
 
 /** Totals of the plants in one unit family - the numbers behind the stat cards and the flow graph. */
 export interface ProcessingUnitTotals {
+  available?: Record<PlantQuantityKey,boolean>;
+  partial?: Record<PlantQuantityKey,boolean>;
+  scopePlants?:number;
+  comparablePlants?:number;
   unit: string;
   received: number;
   processed: number;

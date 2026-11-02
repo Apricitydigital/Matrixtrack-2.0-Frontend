@@ -1,5 +1,6 @@
+import { geographyOrder, wardInspectionRows } from '../../services/wardInspections';
 import { COMMISSIONER_TERMS as terms } from '../../services/commissionerTerms';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { City, Zone, Ward, Beat, OperationalReport, IecCleanlinessIssue, AttendanceRecord, User } from '../../types';
 import { StatusBadge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
@@ -10,13 +11,13 @@ import { api } from '../../services/api';
 import { matrixStore } from '../../services/store';
 import { summarizeZones, applyPerformanceTargets } from '../../services/commissioner';
 import { useInspectionCoverage } from '../../services/useInspectionCoverage';
-import { coverageCounts } from '../../services/inspectionCoverage';
+import { coverageCounts, inspectionOutcomes } from '../../services/inspectionCoverage';
 import { targetDelivery } from '../../services/targetDelivery';
-import { ChartCard, BarChart, DonutChart, chartColors } from '../../components/analytics/Analytics';
-import { amount } from '../../services/insights';
+import { ChartCard, BarChart } from '../../components/analytics/Analytics';
+import { OverviewInsights } from './OverviewInsights';
 import { emptyFilters, matchesFilters } from '../../services/presentation';
 import { OperationalFilters } from '../../components/common/OperationalFilters';
-import { Building2, Layers, CheckCircle2, AlertTriangle, Users, MapPin, Eye } from 'lucide-react';
+import { Layers, CheckCircle2, AlertTriangle, Users, Eye } from 'lucide-react';
 
 interface ZoneWardDetailsProps {
   city: City;
@@ -35,14 +36,11 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   zones,
   wards,
   beats,
-  reports,
-  iecIssues,
-  attendance,
   users,
   onSelectReport
 }) => {
-  const cityZones = zones.filter(z => z.cityId === city.id);
-  const cityWards = wards.filter(w => w.cityId === city.id);
+  const cityZones = zones.filter(z => z.cityId === city.id).sort(geographyOrder);
+  const cityWards = wards.filter(w => w.cityId === city.id).sort(geographyOrder);
 
   const [selectedZoneId, setSelectedZoneId] = useState('all');
   const selectableWards = cityWards.filter(w => selectedZoneId === 'all' || w.zoneId === selectedZoneId);
@@ -51,17 +49,21 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const currentWard = selectableWards.find(w => w.id === selectedWardId) || selectableWards[0];
   const currentZone = cityZones.find(z => z.id === currentWard?.zoneId);
 
-  const wardBeats = beats.filter(b => b.wardId === currentWard?.id);
   const [filters,setFilters]=useState(emptyFilters);
-  const wardReports = reports.filter(r => r.wardId === currentWard?.id && matchesFilters(r,filters,[r.assetName,r.submittedByName,r.reportNumber]));
-  const wardIec = iecIssues.filter(i => i.wardId === currentWard?.id);
-  const wardAtt = attendance.filter(a => a.wardId === currentWard?.id);
-  const paging = usePagination(wardReports, selectedZoneId + selectedWardId + city.id+JSON.stringify(filters));
   const [figures,setFigures]=useState<ReturnType<typeof summarizeZones>|null>(null),[present,setPresent]=useState<number|null>(null),[issues,setIssues]=useState<number|null>(null),[failed,setFailed]=useState(false),[revision,setRevision]=useState(0);
   const range=matrixStore.getDateRange();
   const coverage=useInspectionCoverage({...city,enabledModules:city.enabledModules??[]},range.from,range.to,revision+matrixStore.loadRevision);
-  const delivery=targetDelivery(figures?.totals,coverageCounts(coverage.data,{ward:currentWard?.id}));
-  useEffect(()=>{if(figures){if(matrixStore.getCollection('reports').status==='idle')void matrixStore.loadCollection('reports');if(matrixStore.getCollection('users').status==='idle')void matrixStore.loadCollection('users');}},[figures]);
+  const wardOutcomes=inspectionOutcomes(coverage.data,{ward:currentWard?.id});
+  const counts=coverageCounts(coverage.data,{ward:currentWard?.id});
+  const delivery=targetDelivery(figures?.totals,counts);
+  const allWardReports=useMemo(()=>currentWard?wardInspectionRows(coverage.data,city.id,currentWard.id,cityZones,cityWards,beats):[],[coverage.data,city.id,currentWard?.id,zones,wards,beats]);
+  const wardReports=allWardReports.filter(r=>matchesFilters(r,filters,[r.assetName,r.submittedByName,currentZone?.name||'',currentWard?.name||'']));
+  const paging=usePagination(wardReports,`${city.id}:${currentWard?.id}:${range.from}:${range.to}:${JSON.stringify(filters)}`);
+  const historyComplete=!coverage.loading&&counts.inspections!=null;
+  const pendingReview=wardOutcomes.rows.find(r=>r.id==='pending_review')?.value;
+  const count=(n:number|null|undefined)=>coverage.loading?'Updating':n==null?'Unavailable':n.toLocaleString('en-IN');
+  useEffect(()=>{setFilters(emptyFilters());},[city.id,currentWard?.id,range.from,range.to]);
+  useEffect(()=>{if(figures){if(matrixStore.getCollection('users').status==='idle')void matrixStore.loadCollection('users');}},[figures]);
   useEffect(()=>{setFigures(null);setPresent(null);setIssues(null);setFailed(false);if(!currentWard||!currentZone)return;const c=new AbortController(),q=new URLSearchParams({from:range.from,to:range.to,zoneId:currentZone.id,wardId:currentWard.id});
     const tasks:[string,(d:any)=>void][]=[
       [`/city/dashboard/zone-export?${new URLSearchParams({from:range.from,to:range.to,zoneIds:currentZone.id,wardIds:currentWard.id})}`,d=>setFigures(summarizeZones(d))],
@@ -74,15 +76,15 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
     for(const [url,apply] of tasks)void api(url,{signal:c.signal}).then(d=>{if(!c.signal.aborted)apply(d);}).catch(()=>{if(!c.signal.aborted)setFailed(true);});return()=>c.abort();
   },[city.id,currentWard?.id,currentZone?.id,range.from,range.to,revision,matrixStore.loadRevision]);
 
-  const daroga = users.find(u => u.id === currentWard?.darogaId) || users.find(u=>u.role==='SUPERVISOR'&&u.assignedWardIds?.includes(currentWard?.id || ''));
-  const inspector = users.find(u => u.id === currentWard?.inspectorId) || users.find(u=>u.role==='QC'&&u.assignedWardIds?.includes(currentWard?.id || ''));
+  const daroga = users.filter(u=>u.cityId===city.id).find(u => u.id === currentWard?.darogaId) || users.find(u=>u.cityId===city.id&&u.role==='SUPERVISOR'&&u.assignedWardIds?.includes(currentWard?.id || ''));
+  const inspector = users.filter(u=>u.cityId===city.id).find(u => u.id === currentWard?.inspectorId) || users.find(u=>u.cityId===city.id&&u.role==='QC'&&u.assignedWardIds?.includes(currentWard?.id || ''));
 
   if (!cityWards.length) {
     return <div className="p-8 text-center text-xs text-slate-500">No wards available for {city.name}.</div>;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="zone-ward-details space-y-6">
       {/* Title */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -101,7 +103,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
 
         {/* Ward Selector */}
         <div className="flex flex-wrap items-center gap-2">
-          <button className="workspace-secondary-button" disabled={!wardReports.length} onClick={() => printReports(`${currentWard?.name || city.name} · Inspection Reports`,wardReports)}>Print ward reports with images</button>
+          <button className="workspace-secondary-button" disabled={!historyComplete||!wardReports.length} onClick={() => printReports(`${currentWard?.name || city.name} · Inspection Reports`,wardReports)}>Print ward reports with images</button>
           <label className="text-xs font-semibold text-slate-700" htmlFor="ward-zone">Zone:</label>
           <select id="ward-zone" value={selectedZoneId} onChange={e => { setSelectedZoneId(e.target.value); setSelectedWardId(''); }} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
             <option value="all">All zones</option>{cityZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
@@ -151,10 +153,9 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
       {/* KPI Cards Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          label={terms.target}
-          value={delivery.target ?? '\u2014'}
-          denominator={`${delivery.remaining ?? '\u2014'} ${terms.pending.toLowerCase()}${delivery.fallback?' (full coverage)':''}`}
-          subtitle="Selected ward and review period"
+          label={delivery.fallback?'Daily inspection baseline':'Assigned inspection target'}
+          value={count(delivery.target)}
+          subtitle={`${count(delivery.completed)} counted toward ${delivery.fallback?'baseline':'target'}; ${count(delivery.remaining)} more inspections needed`}
           icon={<Layers className="w-4 h-4 text-indigo-600" />}
         />
         <StatCard
@@ -164,10 +165,9 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
           icon={<Users className="w-4 h-4 text-emerald-600" />}
         />
         <StatCard
-          label={terms.credited}
-          value={figures?.totals.completed ?? '—'}
-          denominator={`${figures?.totals.siPending ?? '—'} pending review`}
-          subtitle="Assigned target achievement"
+          label={terms.done}
+          value={count(counts.inspections)}
+          subtitle={`${count(pendingReview)} submitted reports awaiting review`}
           icon={<CheckCircle2 className="w-4 h-4 text-blue-600" />}
         />
         <StatCard
@@ -178,37 +178,39 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         />
       </div>
 
-      <div className="analytics-grid two"><ChartCard eyebrow="WARD INSPECTIONS" title="Reported outcomes"><DonutChart label="outcomes" items={[{id:'clean',label:terms.cleaned,value:figures?.totals.cleaned,color:chartColors.teal},{id:'pending',label:terms.pendingReview,value:figures?.totals.siPending,color:chartColors.gold},{id:'unclean',label:terms.notCleaned,value:figures?.totals.notCleaned,color:chartColors.red}]}/></ChartCard><ChartCard eyebrow="MODULE TARGETS" title="Backend target reference"><BarChart max={100} items={Object.entries(figures?.modules || {}).map(([id,m])=>({id,label:MODULE_LABELS[id],value:m.target>0?m.completed/m.target*100:null,display:`${amount(m.completed,0)} / ${amount(m.target,0)}`,detail:`${amount(m.siPending,0)} pending review`}))}/></ChartCard></div>
+      <p className="executive-scope-note">Inspections still needed counts additional inspections required to meet the target or daily baseline. Awaiting review counts reports already submitted; those reports are included in Inspections done.</p>
+      <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={coverage.data} loading={coverage.loading} ward={currentWard?.id} onInspect={(_module,status)=>setFilters({...emptyFilters(),status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).map(id=>{const target=targetDelivery(figures?.modules[id],coverageCounts(coverage.data,{module:id,ward:currentWard?.id}));return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:target.fallback?'Daily coverage baseline':'Configured target credit'};})}/></ChartCard></div>
       {/* Supporting Report List for this Ward */}
       {failed&&<div className="compact-error">Some ward summaries are unavailable.<button onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}
-      <OperationalFilters value={filters} onChange={setFilters} users={users} statuses={['pending_review','approved','rejected','action_required','action_taken']} resultCount={wardReports.length}/>
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+      <OperationalFilters value={filters} onChange={setFilters} users={users.filter(u=>u.cityId===city.id)} statuses={['pending_review','approved','rejected','action_required','action_taken','escalated','unclassified']} resultCount={wardReports.length}/>
+      <div aria-label="Ward inspection history" className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-900">
-            Inspection History & Supporting Records ({wardReports.length})
+            Inspection history ({coverage.loading?'Updating':`${wardReports.length} matching / ${allWardReports.length} available`})
           </span>
           <span className="text-xs text-slate-500 font-mono">
-            Ward #{currentWard.wardNumber}
+            {currentZone?.name} / {currentWard.name}
           </span>
         </div>
 
+        <p className="px-6 py-3 text-sm text-slate-500" role="status">{coverage.loading?'Loading the complete ward inspection history...':historyComplete?`Complete ward register: ${allWardReports.length} inspections for ${range.from} to ${range.to}. Filters apply to this history and printing; summary cards cover the full ward.`:'Some inspection records are unavailable. Available rows are shown; ward totals and printing remain unavailable.'}</p>
         <div className="divide-y divide-slate-100">
-          {wardReports.length === 0 ? (
+          {coverage.loading ? <div className="p-8 text-center text-sm text-slate-500">Updating inspection records...</div> : wardReports.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400">
-              No field inspections logged for Ward #{currentWard.wardNumber} in the current period.
+              No available inspections match these filters for {currentWard.name}.
             </div>
           ) : (
             paging.rows.map(rep => (
-              <div key={rep.id} className="p-4 flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50">
+              <div data-ward-report key={rep.id} className="p-4 flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold font-mono text-slate-900 text-xs">{rep.reportNumber}</span>
+                    <span className="font-semibold text-slate-900 text-sm">{rep.assetName}</span>
                     <StatusBadge status={rep.status} size="sm" />
                     <span className="text-[15px] uppercase font-mono text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
                       {MODULE_LABELS[rep.moduleId]}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-700 font-medium mt-1">{rep.assetName}</p>
+                  <p className="text-xs text-slate-700 font-medium mt-1">{currentZone?.name || 'Zone name unavailable'} / {currentWard.name}</p>
                   <p className="text-[15px] text-slate-400 font-mono">
                     Logged by {rep.submittedByName || 'Not supplied'} on {rep.inspectionDate} · Score: {rep.overallScore == null ? 'Not supplied' : `${rep.overallScore}/100`}
                   </p>
@@ -225,8 +227,8 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
             ))
           )}
         </div>
-        <Pagination {...paging} noun="ward reports" />
-        {matrixStore.getCollection('reports').hasMore&&<div className="server-page-control"><span>Additional inspection reports available.</span><button disabled={matrixStore.getCollection('reports').status==='loading'} onClick={()=>{void matrixStore.loadMore('reports');}}>Load more reports</button></div>}
+        {!coverage.loading&&<Pagination {...paging} noun="ward reports" />}
+
       </div>
       </>}
     </div>
