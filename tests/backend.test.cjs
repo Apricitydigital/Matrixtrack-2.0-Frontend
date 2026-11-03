@@ -1871,7 +1871,7 @@ test('selected-period baseline reconciles records, location-day credit and drill
       assert.equal(period.achievement, 'Inspection target achievement');
       assert.ok(period.range.includes(`${days} ${days===1?'day':'days'}`));
       assert.ok(period.basis.includes(`${locations*days} inspection opportunities`));
-      assert.ok(period.progress.includes(`${locations*days} location-day visits counted`));
+      assert.ok(period.progress.includes(`${locations*days} inspections done`));
       const filters = {...emptyFilters(), ...inspectionDrillFilters(zone,ward,'sweeping','pending_review')};
       const rows = wardInspectionRows(data, 'city-a', undefined, [], []);
       const matching = rows.filter(r=>matchesFilters(r,filters,[]));
