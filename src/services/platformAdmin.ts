@@ -17,8 +17,7 @@ export async function saveCityAdministrator(cityId:string,input:{name:string;ema
  try{await matrixStore.refreshCityCatalog();}catch(e){return {...result,refreshWarning:'Administrator saved. Refresh the city directory to see the latest details.'};}return result;
 }
 export function credentialPassword(raw:any):string{
- const value=raw.plainPassword||raw.password;
- return typeof value==='string'&&value&&!/^\$(?:2[aby]\$|argon2)|^(?:scrypt|pbkdf2)[:$]/i.test(value)?value:'Not available';
+ return 'Set a new password through user management';
 }
 export function credentialRows(raw:any[],city:City,selected:User[],zones:Zone[],wards:Ward[]){
  const allowed=new Set(selected.filter(u=>u.cityId===city.id).map(u=>`${u.id}:${u.role}`));

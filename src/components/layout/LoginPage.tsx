@@ -1,6 +1,6 @@
 import {ThemeToggle} from '../common/ThemeToggle';
 import {BrandLogo} from '../common/BrandLogo';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, Building2, Eye, EyeOff, Landmark, LoaderCircle, LockKeyhole, MapPinned, ShieldCheck, TriangleAlert, UsersRound, UserRound } from 'lucide-react';
 
 interface LoginPageProps {
@@ -14,6 +14,8 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ identifier, password, submitting, error, onIdentifierChange, onPasswordChange, onSubmit }: LoginPageProps) {
+  const [renewPassword, setRenewPassword] = useState(false);
+  useEffect(() => { if (error.includes("new password")) setRenewPassword(true); }, [error]);
   const [visible, setVisible] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
 
@@ -73,6 +75,7 @@ export function LoginPage({ identifier, password, submitting, error, onIdentifie
                 </div>
                 {capsLock && <p id="login-caps-lock" className="login-caps-lock" role="status">Caps Lock is on.</p>}
               </div>
+              {renewPassword && <div className="login-field"><label htmlFor="new-password">New password</label><input id="new-password" name="newPassword" type="password" autoComplete="new-password" minLength={12} maxLength={72} required placeholder="At least 12 characters" /></div>}
               {error && <div id="login-error" className="login-error" role="alert"><TriangleAlert size={18} /><div><strong>We couldn't sign you in</strong><p>{error}</p></div></div>}
               <button type="submit" className="login-submit" disabled={submitting}>
                 <span>{submitting ? 'Signing in…' : 'Sign in to your workspace'}</span>{submitting ? <LoaderCircle size={18} className="login-submit-spinner" /> : <ArrowRight size={18} />}

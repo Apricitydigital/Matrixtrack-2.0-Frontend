@@ -1,6 +1,6 @@
 import {canonicalModuleKey} from './moduleKeys';
 import type { City, Zone, Ward, Area, Beat, User, OperationalReport, IecCleanlinessIssue, AttendanceRecord, PlantLog, AuditLogEvent, ActiveSession, Target, Capability, OperationalModuleId, ProductId, RoleType } from '../types';
-import { api, writeApi, clearToken, setToken, getToken, clearReadCache,setApiCityContext,setApiCityModules } from './api';
+import { api, writeApi, clearToken, setToken, getToken, clearReadCache,getSessionVersion,setRefreshToken,revokeCurrentSession,setApiCityContext,setApiCityModules } from './api';
 import { WorkspaceLoader, type Dataset } from './workspace';
 import { ROLE_CAPABILITIES } from './access';
 import { mapCity, mapUser, mapIssue, mapReport, MODULE_KEYS, rolesOf } from './adapters';
@@ -56,20 +56,22 @@ class MatrixStore {
   public getTargets(cityId?: string) { return this.data.targets.filter(t => !cityId || cityId === 'all' || t.cityId === cityId); }
   public getAvailableRoles(): RoleType[] { return dashboardRoles.filter(role => rolesOf(this.profile || {}).includes(role)); }
 
-  public async login(identifier: string, password: string) {
+  public async login(identifier: string, password: string, newPassword?: string) {
     this.logout();
-    const response = await writeApi('/auth/login', 'POST', { identifier, password });
+    const response = await writeApi('/auth/login', 'POST', { identifier, password, ...(newPassword ? {newPassword} : {}) });
+    if (response.passwordChangeRequired) throw new Error('Set a new password to secure your account.');
     if (!response.token) throw new Error('Backend did not return an access token.');
     setToken(response.token);
+    setRefreshToken(response.refreshToken);
     try { await this.initialize(); } catch (error) { clearToken(); this.currentUser = null; throw error; }
   }
 
   public async initialize() {
-    const sessionToken=getToken();if(!sessionToken)return;
+    const sessionToken=getToken(),version=getSessionVersion();if(!sessionToken)return;
     this.loading = true; this.error = ''; this.notify();
     try {
       const response = await api('/auth/me');
-      if(sessionToken!==getToken())return;
+      if(version!==getSessionVersion())return;
       this.profile = response.user;
       const role = this.getAvailableRoles()[0];
       if (!role) throw new Error('This account does not have a Command Center role. Use a Super Admin, Commissioner, City Admin or ULB Officer account.');
@@ -83,6 +85,7 @@ class MatrixStore {
   }
 
   public logout() {
+    revokeCurrentSession();
     sessionStorage.removeItem('matrixtrack_briefing_seen');sessionStorage.removeItem('matrixtrack_ulb_briefing_seen');
     clearToken(); this.generation++; this.workspace.cancel(); this.profile = null; this.currentUser = null;
     this.data = emptyData(); this.cleanlinessSummary = null; this.rawCities.clear(); this.loading = false; this.error = ''; this.warnings = []; this.notify();

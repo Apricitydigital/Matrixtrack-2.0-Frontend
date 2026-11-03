@@ -110,7 +110,7 @@ export default function App() {
   useEffect(()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER')preloadUlbPage('ulb_dashboard');else if(matrixStore.currentUser?.role==='CITY_ADMIN')preloadCityAdminPage('ca_dashboard');},[matrixStore.currentUser?.role]);
   const login = async (event: React.FormEvent) => {
     event.preventDefault(); if (submitting) return; setSubmitting(true); setLoginError('');
-    try { await matrixStore.login(identifier.trim(), password); setPassword(''); }
+    try { await matrixStore.login(identifier.trim(), password, String(new FormData(event.currentTarget as HTMLFormElement).get('newPassword') || '') || undefined); setPassword(''); }
     catch (error) { setLoginError(error instanceof Error ? error.message : 'Sign in failed.'); }
     finally { setSubmitting(false); }
   };

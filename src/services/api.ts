@@ -8,9 +8,43 @@ const cityModules=new Map<string,string[]>();
 export function setApiCityModules(id:string,keys:string[]){cityModules.set(id,keys);clearReadCache();}
 export function setApiCityContext(id?:string){if(cityContext!==id){clearReadCache();cityContext=id;}}
 const TOKEN_KEY = 'matrixtrack_command_access_token';
+const REFRESH_KEY = 'matrixtrack_command_refresh_token';
+let sessionVersion = 0;
+let refreshing: Promise<void> | null = null;
+export const getSessionVersion = () => sessionVersion;
+export const setRefreshToken = (token?: string) => token ? sessionStorage.setItem(REFRESH_KEY, token) : sessionStorage.removeItem(REFRESH_KEY);
 export const getToken = () => sessionStorage.getItem(TOKEN_KEY);
-export const setToken = (token: string) => {cityContext=undefined;cityModules.clear();clearReadCache();sessionStorage.setItem(TOKEN_KEY, token);};
-export const clearToken = () => {cityContext=undefined;cityModules.clear();clearReadCache();sessionStorage.removeItem(TOKEN_KEY);};
+export const setToken = (token: string) => {sessionVersion++;cityContext=undefined;cityModules.clear();clearReadCache();sessionStorage.setItem(TOKEN_KEY, token);sessionStorage.removeItem(REFRESH_KEY);};
+export const clearToken = () => {sessionVersion++;cityContext=undefined;cityModules.clear();clearReadCache();sessionStorage.removeItem(TOKEN_KEY);sessionStorage.removeItem(REFRESH_KEY);};
+
+async function ensureFreshToken() {
+  const token = getToken(), refreshToken = sessionStorage.getItem(REFRESH_KEY);
+  if (!token || !refreshToken) return;
+  let expires = 0;
+  try { expires = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000; } catch { return; }
+  if (expires > Date.now() + 60_000) return;
+  if (!refreshing) {
+    const version = sessionVersion;
+    refreshing = (async () => {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({refreshToken}), signal: AbortSignal.timeout(15000) });
+      if (version !== sessionVersion) return;
+      if (!response.ok) {
+        if (response.status === 401) { clearToken(); window.dispatchEvent(new Event('matrixtrack:session-expired')); }
+        throw new ApiError(response.status, 'Unable to renew your session. Please sign in again.');
+      }
+      const data = await response.json();
+      if (version !== sessionVersion) return;
+      if (!data.token || !data.refreshToken) throw new ApiError(502, 'Invalid session response.');
+      sessionStorage.setItem(TOKEN_KEY, data.token); setRefreshToken(data.refreshToken); clearReadCache();
+    })().finally(() => {refreshing = null;});
+  }
+  await refreshing;
+}
+
+export function revokeCurrentSession() {
+  const token = getToken();
+  if (token) void fetch(`${API_BASE_URL}/auth/logout`, {method:'POST', headers:{Authorization:`Bearer ${token}`}, keepalive:true}).catch(() => {});
+}
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -23,6 +57,9 @@ export async function api<T = any>(path: string, init: RequestInit = {}): Promis
 }
 export function primeApiRead(path:string,value:any){const token=getToken();if(token)primeReadCache(readCacheKey(path,`${token}\ncity:${cityContext||''}`),value,readCacheTtl(path));}
 async function request<T = any>(path: string, init: RequestInit = {}): Promise<T> {
+  const version = sessionVersion;
+  if (!path.startsWith('/auth/login')) await ensureFreshToken();
+  if (version !== sessionVersion) throw new ApiError(401, 'Your session has changed.');
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);

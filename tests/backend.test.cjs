@@ -98,7 +98,7 @@ test('late SI review preserves submission day and corrective images stay with th
  const html=renderToStaticMarkup(React.createElement(DecisionHistory,{report:r}));assert.match(html,/Area cleared/);assert.match(html,/action-evidence-gallery/);assert.match(html,/corrective.jpg/);
 });
 test('SI timing excludes unrecorded decisions and treats a three-day review as late',()=>{
- const src=fs.readFileSync('.publish/backend/src/modules/siPerformance.ts','utf8'),a=src.indexOf('function classify('),b=src.indexOf('export async function computeSiPerformance',a);
+ const src=fs.readFileSync(require('node:path').resolve(__dirname,'../../Matrixtrack-2.0-Backend/src/modules/siPerformance.ts'),'utf8'),a=src.indexOf('function classify('),b=src.indexOf('export async function computeSiPerformance',a);
  const code=ts.transpileModule(src.slice(a,b),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  const classify=new Function('siDecision','PENDING_STATUSES','DAY_MS',code+';return classify;')((d,status)=>d||(['APPROVED','REJECTED'].includes(status)?status:null),new Set(['SUBMITTED']),86400000);
  const createdAt=new Date('2026-10-28T04:00:00Z'),deadline=Date.parse('2026-10-29T18:30:00Z'),now=Date.parse('2026-10-31T08:00:00Z');
@@ -179,7 +179,7 @@ test('stored ULB AI survives serialized and legacy response shapes with provenan
 });
 beforeEach(() => {
   profile.role = 'CITY_ADMIN';
-  matrixStore.logout(); values.clear(); requests = []; failures = new Map();
+  values.clear(); matrixStore.logout(); requests = []; failures = new Map();
   global.fetch = async (url, options = {}) => {
     const parsed = new URL(url, 'http://localhost'); const path = parsed.pathname.replace('/backend', '');
     requests.push({ path, options });
@@ -1647,12 +1647,20 @@ function loadStagedBackend(relative, mocks) {
   const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText; loaded._compile(compiled, filename); return loaded.exports;
 }
 class BackendHttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
-backendTest('Platform city selection preserves the signed Super Admin role and refuses city overrides by City Admin', async () => {
+backendTest('Platform city selection preserves the live Super Admin role and refuses city overrides by City Admin', async () => {
   let claims = { sub: 'platform-user', roles: ['HMS_SUPER_ADMIN'], modules: [] }, reads = 0;
-  const { authenticate } = loadStagedBackend('middleware/auth.ts', { '../auth/jwt': { verifyAccessToken: () => claims }, '../utils/errors': { HttpError: BackendHttpError }, '../prisma': { prisma: { city: { findUnique: async ({ where }) => { reads++; return where.id === 'city-a' ? { id: 'city-a', isDeleted: false } : null; } } } } });
+  const versions = loadStagedBackend('auth/credentialVersion.ts', { crypto: require('node:crypto') });
+  const prisma = {
+    userSession: { findFirst: async () => ({ id: 'session-a', credentialVersion: versions.credentialVersion('synthetic-hash'), loginTime: new Date(), clientKind: 'browser' }) },
+    user: { findUnique: async () => ({ id: claims.sub, password: 'synthetic-hash', isDeleted: false, cities: claims.roles.map(role => ({ role, cityId: claims.cityId, zoneIds: [], wardIds: [] })), modules: [] }) },
+    city: { findUnique: async ({ where }) => { reads++; return where.id === 'city-a' ? { id: 'city-a', enabled: true, isDeleted: false } : null; } },
+    cityModule: { findMany: async () => [] },
+  };
+  const live = loadStagedBackend('auth/liveClaims.ts', { './credentialVersion': versions, '../prisma': { prisma }, '../utils/errors': { HttpError: BackendHttpError }, '../modules/moduleMetadata': { normalizeModuleKey: key => key, getModuleLabel: key => key }, '../utils/moduleAccess': { resolveCanWrite: () => true } });
+  const { authenticate } = loadStagedBackend('middleware/auth.ts', { '../auth/jwt': { verifyAccessToken: () => claims }, '../auth/liveClaims': live, '../services/sessionManager': { hashSessionToken: token => 'hash:' + token }, '../auth/clientPolicy': { assertSessionClient: () => {} }, '../utils/errors': { HttpError: BackendHttpError }, '../prisma': { prisma } });
   let failure; const req = { headers: { authorization: 'Bearer signed-token', 'x-city-id': 'city-a' } }; await authenticate(req, {}, e => failure = e); assert.equal(failure, undefined); assert.equal(req.auth.cityId, 'city-a'); assert.deepEqual(req.auth.roles, ['HMS_SUPER_ADMIN']); assert.equal(req.auth.sub, 'platform-user');
-  claims = { sub: 'city-user', cityId: 'city-a', roles: ['CITY_ADMIN'], modules: [] }; await authenticate({ headers: { authorization: 'Bearer signed-token', 'x-city-id': 'foreign-city' } }, {}, e => failure = e); assert.equal(failure.status, 403); assert.equal(reads, 1);
-  claims = { sub: 'platform-user', roles: ['HMS_SUPER_ADMIN'], modules: [] }; await authenticate({ headers: { authorization: 'Bearer signed-token', 'x-city-id': 'missing' } }, {}, e => failure = e); assert.equal(failure.status, 404);
+  claims = { sub: 'city-user', cityId: 'city-a', roles: ['CITY_ADMIN'], modules: [] }; await authenticate({ headers: { authorization: 'Bearer signed-token', 'x-city-id': 'foreign-city' } }, {}, e => failure = e); assert.equal(failure.status, 403); assert.equal(reads, 2);
+  claims = { sub: 'platform-user', roles: ['HMS_SUPER_ADMIN'], modules: [] }; await authenticate({ headers: { authorization: 'Bearer signed-token', 'x-city-id': 'missing' } }, {}, e => failure = e); assert.equal(failure.status, 403);
 });
 backendTest('Live module provisioning applies to city administrators and field staff, while platform administrators retain cross-city access', async () => {
   let enabled = false, reads = 0, assignments = []; const { requireModuleAccess } = loadStagedBackend('middleware/rbac.ts', { '../utils/errors': { HttpError: BackendHttpError }, '../prisma': { prisma: { cityModule: { findUnique: async () => { reads++; return { enabled }; } }, userModuleRole: { findMany: async () => assignments } } } });
@@ -1664,13 +1672,13 @@ backendTest('Live module provisioning applies to city administrators and field s
   assignments = [{ role: 'QC', canWrite: false }]; const req = make(['QC'], [{ moduleId: 'module-a', role: 'QC', canWrite: false }]); await guard(req, {}, e => failure = e); assert.equal(failure, undefined); req.method = 'POST'; await guard(req, {}, e => failure = e); assert.equal(failure.status, 403);
   enabled = false; const prior = reads; await guard(make(['HMS_SUPER_ADMIN']), {}, e => failure = e); assert.equal(failure, undefined); assert.equal(reads, prior);
 });
-test('Credentials export uses only matching city users and known non-hashed passwords', () => {
+test('Credentials export uses only matching city users and never exports passwords', () => {
   const { credentialPassword, credentialRows } = require('../src/services/platformAdmin.ts');
-  for (const value of [null, '$2b$hash', '$2a$hash', '$argon2id$hash', 'scrypt:hash', 'pbkdf2:hash']) assert.equal(credentialPassword({ password: value }), 'Not available');
-  assert.equal(credentialPassword({ plainPassword: 'Known-Example-Only' }), 'Known-Example-Only');
+  for (const value of [null, '$2b$hash', '$2a$hash', '$argon2id$hash', 'scrypt:hash', 'pbkdf2:hash']) assert.equal(credentialPassword({ password: value }), 'Set a new password through user management');
+  assert.equal(credentialPassword({ plainPassword: 'Known-Example-Only' }), 'Set a new password through user management');
   const selected = [{ id: 'u', role: 'QC', cityId: 'city-a', name: 'Inspector', assignedWardIds: [], assignedZoneIds: [], moduleAssignments: [] }];
   const rows = credentialRows([{ id: 'u', role: 'QC', cityId: 'city-a', name: 'Inspector', password: '$2b$hash' }, { id: 'u', role: 'QC', cityId: 'other', password: 'must-not-export' }], { id: 'city-a', name: 'City A' }, selected, [], []);
-  assert.equal(rows.length, 1); assert.equal(rows[0].at(-1), 'Not available');
+  assert.equal(rows.length, 1); assert.equal(rows[0].at(-1), 'Set a new password through user management');
 });
 test('City Administrator creation is restricted to Super Admin and uses the existing per-city endpoint', async () => {
   const { saveCityAdministrator } = require('../src/services/platformAdmin.ts'); await matrixStore.login('admin@example.test', 'test-password'); await assert.rejects(saveCityAdministrator('city-a', { name: 'Admin', email: 'a@example.test', password: 'test-password' }), /Super Admin/);
