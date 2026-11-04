@@ -1,3 +1,4 @@
+import {IntelligenceSummary} from '../../components/reports/IntelligenceSuggestion';
 import {MultiSelectDropdown} from '../../components/common/MultiSelectDropdown';
 import {CardInfo} from '../../components/common/CardInfo';
 import {StatusBreakdown} from '../../components/analytics/StatusBreakdown';
@@ -69,6 +70,7 @@ export function UlbDashboard({city,zones,wards,currentUser,onNavigate,onSelectRe
       {id:'escalated',label:'Escalated',value:data.statusCount('escalated'),tone:'red'},
       {id:'unclassified',label:'Draft',value:data.statusCount('unclassified'),tone:'neutral'}
     ].map(item=>({...item,attributes:{'data-ulb-metric':item.id},tone:item.tone as 'green'|'yellow'|'red'|'neutral'}))} onSelect={id=>open(id as UlbDrill)}/>
+    <IntelligenceSummary reports={coverage.data.visits.filter(v=>(!zone||v.zoneId===zone)&&(!ward||v.wardId===ward)).map(v=>({...v.raw,status:v.raw?.workspaceStatus||v.status}))} loading={coverage.loading} unavailable={coverage.data.failedModules.length>0}/>
     <button className="status-source-link" data-ulb-metric="action_required" onClick={()=>open('action_required')}>Action required: {number(data.actionRequiredTotal)} </button>
     <button className="status-source-link" data-ulb-metric="all_actions_taken" onClick={()=>open('action_taken')}>Action taken: {number(data.actionTakenTotal)}</button>
     <div className="flex gap-5 flex-wrap p-5">

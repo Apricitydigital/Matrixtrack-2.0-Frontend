@@ -1,3 +1,4 @@
+import { matchesIntelligence } from './intelligenceMetrics';
 import { actionLifecycle, actionIsPending } from './actionLifecycle';
 import type { RoleType, OperationalModuleId } from '../types';
 
@@ -39,7 +40,7 @@ export function matchesFilters(record: { actionRequired?:boolean; actionTaken?:b
   return (!zones.length || zones.includes(record.zoneId || ''))
     && (!wards.length || wards.includes(record.wardId || ''))
     && (filters.moduleId === 'all' || record.moduleId === filters.moduleId) && (!filters.moduleIds.length || filters.moduleIds.includes(record.moduleId || ''))
-    && (filters.status === 'all' || (filters.status==='all_actions_required'?actionLifecycle(record).required:filters.status==='all_actions_taken'?actionLifecycle(record).taken:filters.status==='actions_outstanding'?actionIsPending(record):filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
+    && (filters.status === 'all' || (filters.status.startsWith('intelligence_')?matchesIntelligence(record,filters.status):filters.status==='all_actions_required'?actionLifecycle(record).required:filters.status==='all_actions_taken'?actionLifecycle(record).taken:filters.status==='actions_outstanding'?actionIsPending(record):filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
     && (filters.ryg === 'all' || statusTone(record.status || '') === filters.ryg)
     && (filters.staffId === 'all' || [record.submittedByUserId, record.assignedDarogaId, record.reviewerId].includes(filters.staffId))
     && (!filters.query.trim() || searchable.join(' ').toLowerCase().includes(filters.query.trim().toLowerCase()));

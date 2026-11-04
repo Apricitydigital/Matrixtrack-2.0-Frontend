@@ -1,3 +1,4 @@
+import './styles/intelligence.css';
 import {initializeTheme} from './components/common/ThemeToggle';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';

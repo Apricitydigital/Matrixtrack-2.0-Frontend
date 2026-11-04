@@ -1,3 +1,4 @@
+import {IntelligenceSuggestion} from '../../components/reports/IntelligenceSuggestion';
 import { PhotoIntegrityWarning } from '../../components/reports/PhotoIntegrityWarning';
 import React, { useState, useEffect } from 'react';
 import { OperationalReport, City, User, InspectionStatus } from '../../types';
@@ -171,7 +172,7 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
                       <div className="text-[15px] text-slate-400 font-mono">{rep.submittedAt}</div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="font-semibold text-slate-900">{rep.assetName}</div><PhotoIntegrityWarning confidence={rep.photoRecaptureConfidence}/>
+                      <div className="font-semibold text-slate-900">{rep.assetName}</div><PhotoIntegrityWarning confidence={rep.photoRecaptureConfidence}/><IntelligenceSuggestion report={rep} compact/>
                       <div className="text-[15px] uppercase font-mono text-indigo-700">{MODULE_LABELS[rep.moduleId]}</div>
                     </td>
                     <td className="px-5 py-3.5">
