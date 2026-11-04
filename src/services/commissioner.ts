@@ -42,11 +42,12 @@ export function applyTargetConfiguration(official:ReturnType<typeof summarizeZon
   return {...official,totals:verifyTargetFigures(official.totals,configuration),modules:Object.fromEntries(Object.entries(official.modules).map(([id,value])=>[id,verifyTargetFigures(value,configuration)])),zones:official.zones.map(zone=>({...zone,totals:verifyTargetFigures(zone.totals,configuration)}))};
 }
 /** The zone export omits source metadata. Daroga rows expose the same target/credit calculation with ADMIN/DEFAULT evidence. */
-export function performanceTargetRows(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId='') {
-  const rows=Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>row.wardId&&moduleId(row.module)&&(!wardId||row.wardId===wardId)&&['ADMIN','DEFAULT'].includes(row.source)&&Number.isFinite(row.target)&&row.target>=0&&Number.isFinite(row.credit)&&row.credit>=0);
+export function performanceTargetRows(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='') {
+  const wardIds=Array.isArray(wardId)?wardId:wardId?[wardId]:[];
+  const rows=Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>row.wardId&&moduleId(row.module)&&(!wardIds.length||wardIds.includes(row.wardId))&&['ADMIN','DEFAULT'].includes(row.source)&&Number.isFinite(row.target)&&row.target>=0&&Number.isFinite(row.credit)&&row.credit>=0);
   return rows.filter(row=>official.zones.some(zone=>zone.name===row.zoneName));
 }
-export function applyPerformanceTargets(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId='') {
+export function applyPerformanceTargets(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='') {
   const selected=performanceTargetRows(official,users,wardId);
   const resolve=(figures:InspectionFigures,scope:any[])=>{
     if(!scope.length)return figures;
@@ -101,12 +102,13 @@ export function briefingNotices(pulse:CityPulse):BriefingNotice[] {
 }
 
 /** ULB uses its authorized inspection register; Commissioner-only summaries are not requested. */
-export function ulbInspectionSummary(data:InspectionCoverage,zones:{id:string;name:string}[],wardId='') {
+export function ulbInspectionSummary(data:InspectionCoverage,zones:{id:string;name:string}[],wardId:string|string[]='') {
+  const wardIds=Array.isArray(wardId)?wardId:wardId?[wardId]:[];
   if(data.failedModules.length||!data.inventoryAvailable)return undefined;
-  if(data.visits.some(v=>!v.zoneId || wardId&&!v.wardId))return undefined;
+  if(data.visits.some(v=>!v.zoneId || wardIds.length&&!v.wardId))return undefined;
   return summarizeZones({zones:zones.map(zone=>({zoneId:zone.id,zoneName:zone.name,modules:data.modules.map(module=>{
-    const visits=data.visits.filter(v=>v.module===module&&v.zoneId===zone.id&&(!wardId||v.wardId===wardId));
-    const total=data.assets.filter(a=>a.module===module&&a.zoneId===zone.id&&(!wardId||a.wardId===wardId)).length;
+    const visits=data.visits.filter(v=>v.module===module&&v.zoneId===zone.id&&(!wardIds.length||wardIds.includes(v.wardId)));
+    const total=data.assets.filter(a=>a.module===module&&a.zoneId===zone.id&&(!wardIds.length||wardIds.includes(a.wardId))).length;
     const count=(state:string)=>visits.filter(v=>v.status===state).length;
     return {module:MODULE_KEYS[module],target:total,targetState:'default',completed:visits.length,pending:Math.max(0,total-new Set(visits.map(v=>v.assetId).filter(Boolean)).size),cleaned:count('APPROVED'),notCleaned:count('REJECTED'),siPending:visits.filter(v=>!['APPROVED','REJECTED','ACTION_REQUIRED','ACTION_TAKEN','ESCALATED'].includes(v.status||'')).length,actionRequired:count('ACTION_REQUIRED'),actionPending:count('ACTION_REQUIRED'),actionTaken:count('ACTION_TAKEN')};
   })}))});

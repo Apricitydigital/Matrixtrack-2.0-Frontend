@@ -102,13 +102,13 @@ async function fetchInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, f
   return result;
 }
 
-export function coverageCounts(data:InspectionCoverage,{module,zone='',ward=''}:{module?:OperationalModuleId;zone?:string;ward?:string}={}):CoverageCounts {
-  const matches=(item:{module:OperationalModuleId;zoneId:string;wardId:string})=>(!module||item.module===module)&&(!zone||item.zoneId===zone)&&(!ward||item.wardId===ward);
+export function coverageCounts(data:InspectionCoverage,{module,zone='',ward='',zoneIds=[],wardIds=[]}:{module?:OperationalModuleId;zone?:string;ward?:string;zoneIds?:string[];wardIds?:string[]}={}):CoverageCounts {
+  const matches=(item:{module:OperationalModuleId;zoneId:string;wardId:string})=>(!module||item.module===module)&&(!zone||item.zoneId===zone)&&(!ward||item.wardId===ward)&&(!zoneIds.length||zoneIds.includes(item.zoneId))&&(!wardIds.length||wardIds.includes(item.wardId));
   const assets=data.assets.filter(matches),visits=[...new Map(data.visits.filter(matches).map(v=>[v.id,v])).values()];
   const reportsAvailable=!data.failedModules.some(m=>!module||m===module);
   const unidentified=visits.filter(v=>!v.assetId).length;
   const frequency=new Map<string,number>();for(const visit of visits)if(visit.assetId){const key=`${visit.module}:${visit.assetId}`;frequency.set(key,(frequency.get(key)||0)+1);}
-  const missingGeography=data.visits.some(v=>(!module||v.module===module)&&((zone&&!v.zoneId)||(ward&&!v.wardId)));
+  const missingGeography=data.visits.some(v=>(!module||v.module===module)&&(((zone||zoneIds.length)&&!v.zoneId)||((ward||wardIds.length)&&!v.wardId)));
   const known=reportsAvailable&&!missingGeography,exact=known&&!unidentified;
   const registered=new Set(assets.map(a=>`${a.module}:${a.id}`));
   const covered=[...frequency.keys()].filter(key=>registered.has(key)).length;

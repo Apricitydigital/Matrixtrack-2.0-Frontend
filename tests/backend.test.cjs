@@ -2248,3 +2248,46 @@ test('ULB reports received drill matches completed count within the selected war
  const scope=ulbScopeData({...emptyCoverage(),visits:[visit('draft','w','DRAFT'),visit('pending','w','SUBMITTED'),visit('clean','w','APPROVED'),visit('other','other','SUBMITTED')]},{zone:'z',ward:'w'});
  const received=ulbDrillVisits(scope,'inspections_completed');assert.deepEqual(received.map(v=>v.id),['pending','clean']);assert.equal(received.length,scope.completedCounts.inspections);
 });
+
+test('ULB multi-zone and ward selection reconciles targets, submitted reports, repeats and drill rows',()=>{
+ const {emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+ const {ulbScopeData,ulbDrillVisits,ulbSelectedWards}=require('../src/services/ulbDashboard.ts');
+ const {ulbInspectionSummary,applyPerformanceTargets}=require('../src/services/commissioner.ts');
+ const wards=[{id:'w1',zoneId:'z1'},{id:'w2',zoneId:'z1'},{id:'w3',zoneId:'z2'},{id:'w4',zoneId:'z3'}];
+ const assets=wards.map(w=>({id:w.id,module:'sweeping',zoneId:w.zoneId,wardId:w.id}));
+ const visits=assets.map(a=>({...a,id:`visit-${a.id}`,assetId:a.id,status:'SUBMITTED',submittedAt:'2026-11-04T04:00:00Z'}));
+ const data={...emptyCoverage(),from:'2026-11-04',to:'2026-11-04',inventoryAvailable:true,modules:['sweeping'],assets,visits:[...visits,{...visits[0],id:'repeat'},{...visits[0],id:'draft',status:'DRAFT'}]};
+ const scope={zoneIds:['z1','z2'],wardIds:['w1','w3']},selected=ulbScopeData(data,scope);
+ assert.equal(selected.counts.inspections,4);assert.equal(selected.completedCounts.inspections,3);assert.equal(selected.completedCounts.covered,2);assert.equal(selected.completedCounts.repeats,1);
+ assert.deepEqual(ulbDrillVisits(selected,'inspections_completed').map(v=>v.id),['visit-w1','visit-w3','repeat']);
+ const users={daroga:{rows:wards.map((w,i)=>({wardId:w.id,zoneName:`Zone ${w.zoneId.slice(1)}`,module:'SWEEPING',source:'ADMIN',target:i+2,credit:1}))}};
+ const official=applyPerformanceTargets(ulbInspectionSummary(data,[{id:'z1',name:'Zone 1'},{id:'z2',name:'Zone 2'}],scope.wardIds),users,scope.wardIds);
+ assert.equal(official.totals.target,6);assert.equal(official.totals.completed,2);
+ assert.deepEqual(ulbSelectedWards(scope.wardIds,['z2'],wards),['w3']);assert.deepEqual(ulbSelectedWards(['w1','w3','missing'],[],wards),['w1','w3']);
+ assert.equal(ulbScopeData(data,{zone:'z1',wardIds:scope.wardIds}).completedCounts.inspections,2);
+ assert.equal(ulbScopeData(data,{zoneIds:[],wardIds:[]}).counts.inspections,6);
+ const missing={...data,visits:[...data.visits,{...visits[0],id:'missing-ward',wardId:''}]};
+ assert.equal(ulbScopeData(missing,scope).counts.inspections,null);assert.equal(ulbInspectionSummary(missing,[{id:'z1',name:'Zone 1'}],scope.wardIds),undefined);
+});
+
+test('ULB dashboard renders one multi-zone ward selection consistently in target and intelligence cards',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const coverageHook=require('../src/services/useInspectionCoverage.ts'),commissioner=require('../src/services/commissioner.ts');
+ const {emptyCoverage}=require('../src/services/inspectionCoverage.ts'),{UlbDashboard}=require('../src/pages/ulbofficer/UlbDashboard.tsx');
+ const savedState=React.useState,savedCoverage=coverageHook.useInspectionCoverage,savedPulse=commissioner.useCityPulse;
+ const zones=[{id:'z1',cityId:'c',name:'Zone 1'},{id:'z2',cityId:'c',name:'Zone 2'},{id:'z3',cityId:'c',name:'Zone 3'}];
+ const wards=[{id:'w1',zoneId:'z1',cityId:'c',name:'Ward 1'},{id:'w2',zoneId:'z1',cityId:'c',name:'Ward 2'},{id:'w3',zoneId:'z2',cityId:'c',name:'Ward 3'},{id:'w4',zoneId:'z3',cityId:'c',name:'Ward 4'}];
+ const assets=wards.map(w=>({id:w.id,module:'sweeping',zoneId:w.zoneId,wardId:w.id,name:w.name}));
+ const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',submittedAt:'2026-11-04T04:00:00Z',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'CLEAN',confidencePercent:90,reason:'Clean'}}}));
+ let stateIndex=0;
+ React.useState=initial=>savedState(stateIndex++===0?['z1','z2']:stateIndex===2?['w1','w3']:initial);
+ coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits}});
+ commissioner.useCityPulse=()=>({pending:0,errors:{},performance:{SUPERVISOR:{u:{rows:wards.map(w=>({wardId:w.id,zoneName:zones.find(z=>z.id===w.zoneId).name,module:'SWEEPING',source:'ADMIN',target:10,credit:1}))}}}});
+ try {
+  const html=renderToStaticMarkup(React.createElement(UlbDashboard,{city:{id:'c',name:'City',enabledModules:['sweeping']},zones,wards,currentUser:{id:'ulb'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onNoticeCount:()=>{},onNoticeHandled:()=>{}}));
+  assert.match(html,/2 zones selected/);assert.match(html,/2 wards selected/);
+  assert.match(html,/data-target-progress="target">20</);assert.match(html,/data-target-progress="received">2</);assert.match(html,/data-target-progress="remaining">18</);
+  assert.match(html,/data-outcome="CLEAN"[^]*?<strong>2<\/strong>/);
+  assert.doesNotMatch(html,/value="z1"|>Ward 2<|>Ward 4</);
+ }finally{React.useState=savedState;coverageHook.useInspectionCoverage=savedCoverage;commissioner.useCityPulse=savedPulse;}
+});
