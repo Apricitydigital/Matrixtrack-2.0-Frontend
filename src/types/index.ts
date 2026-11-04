@@ -242,6 +242,7 @@ export interface TimelineEvent {
 }
 
 export interface OperationalReport {
+  photoRecaptureConfidence?: number | null;
   actionRequired?: boolean;
   actionTaken?: boolean;
   contacts?: {id?:string;role:string;name:string;phone?:string;email?:string;source:string}[];

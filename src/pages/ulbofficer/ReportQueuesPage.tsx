@@ -1,3 +1,4 @@
+import { PhotoIntegrityWarning } from '../../components/reports/PhotoIntegrityWarning';
 import React, { useState, useEffect } from 'react';
 import { OperationalReport, City, User, InspectionStatus } from '../../types';
 import { OperationalFilters } from '../../components/common/OperationalFilters';
@@ -59,7 +60,7 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
   });
 
   const handleExportCsv = () => {
-    const headers = ['Report_Number', 'Module', 'Asset_Name', 'Ward_ID', 'Submitted_By', 'Date', 'Score', 'Status', 'Assignee', 'Escalation_Reason'];
+    const headers = ['Report_Number', 'Module', 'Asset_Name', 'Ward_ID', 'Submitted_By', 'Date', 'Score', 'Status', 'Assignee', 'Escalation_Reason', 'Possible_Screen_Recapture_AI_Confidence_Percent'];
     const rows = filteredReports.map(r => [
       r.reportNumber,
       r.moduleId,
@@ -70,7 +71,8 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
       r.overallScore,
       r.status,
       r.assignedDarogaName || 'N/A',
-      r.escalationReason || 'None'
+      r.escalationReason || 'None',
+      r.photoRecaptureConfidence ?? ''
     ]);
     downloadCsv(`report_queue_${activeQueue}_${city.cityCode}_${Date.now()}.csv`, generateCsv(headers, rows));
   };
@@ -169,7 +171,7 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
                       <div className="text-[15px] text-slate-400 font-mono">{rep.submittedAt}</div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <div className="font-semibold text-slate-900">{rep.assetName}</div>
+                      <div className="font-semibold text-slate-900">{rep.assetName}</div><PhotoIntegrityWarning confidence={rep.photoRecaptureConfidence}/>
                       <div className="text-[15px] uppercase font-mono text-indigo-700">{MODULE_LABELS[rep.moduleId]}</div>
                     </td>
                     <td className="px-5 py-3.5">

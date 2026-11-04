@@ -14,6 +14,27 @@ const { api, pages, getToken, setToken } = require('../src/services/api.ts');
 const { matrixStore } = require('../src/services/store.ts');
 const { mapReport, mapCity } = require('../src/services/adapters.ts');
 const profile = { id: 'user-a', role: 'CITY_ADMIN', name: 'Test Administrator', email: 'admin@example.test', cityId: 'city-a' };
+test('all report evidence formats map screen warnings and render the saved confidence',()=>{
+  const {renderToStaticMarkup}=require('react-dom/server');
+  const React=require('react');
+  const {PhotoIntegrityWarning}=require('../src/components/reports/PhotoIntegrityWarning.tsx');
+  const flag={suspected:true,confidencePercent:86};
+  for(const evidence of [
+    {photoIntegrity:flag},
+    {answers:[{photoIntegrity:flag}]},
+    {questionnaire:[{photoIntegrity:flag}]},
+    {payload:{points:[{photo:'photo.jpg',photoIntegrity:flag}]}},
+    {payload:{photoIntegrity:flag}},
+    {answers:{photoIntegrity:flag}},
+  ]) {
+    const mapped=mapReport({id:'r',status:'SUBMITTED',createdAt:'2026-11-04T04:00:00Z',...evidence},'sweeping','city-a',[]);
+    assert.equal(mapped.photoRecaptureConfidence,86);
+    const html=renderToStaticMarkup(React.createElement(PhotoIntegrityWarning,{confidence:mapped.photoRecaptureConfidence}));
+    assert.match(html,/another device\/screen/);assert.match(html,/86%/);assert.match(html,/accepting the warning/);
+  }
+  assert.equal(mapReport({id:'normal'},'sweeping','city-a',[]).photoRecaptureConfidence,null);
+  assert.equal(renderToStaticMarkup(React.createElement(PhotoIntegrityWarning,{confidence:null})), '');
+});
 let requests;
 let failures;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
