@@ -14,6 +14,27 @@ const { api, pages, getToken, setToken } = require('../src/services/api.ts');
 const { matrixStore } = require('../src/services/store.ts');
 const { mapReport, mapCity } = require('../src/services/adapters.ts');
 const profile = { id: 'user-a', role: 'CITY_ADMIN', name: 'Test Administrator', email: 'admin@example.test', cityId: 'city-a' };
+test('all report evidence formats map screen warnings and render the saved confidence',()=>{
+  const {renderToStaticMarkup}=require('react-dom/server');
+  const React=require('react');
+  const {PhotoIntegrityWarning}=require('../src/components/reports/PhotoIntegrityWarning.tsx');
+  const flag={suspected:true,confidencePercent:86};
+  for(const evidence of [
+    {photoIntegrity:flag},
+    {answers:[{photoIntegrity:flag}]},
+    {questionnaire:[{photoIntegrity:flag}]},
+    {payload:{points:[{photo:'photo.jpg',photoIntegrity:flag}]}},
+    {payload:{photoIntegrity:flag}},
+    {answers:{photoIntegrity:flag}},
+  ]) {
+    const mapped=mapReport({id:'r',status:'SUBMITTED',createdAt:'2026-11-04T04:00:00Z',...evidence},'sweeping','city-a',[]);
+    assert.equal(mapped.photoRecaptureConfidence,86);
+    const html=renderToStaticMarkup(React.createElement(PhotoIntegrityWarning,{confidence:mapped.photoRecaptureConfidence}));
+    assert.match(html,/another device\/screen/);assert.match(html,/86%/);assert.match(html,/accepting the warning/);
+  }
+  assert.equal(mapReport({id:'normal'},'sweeping','city-a',[]).photoRecaptureConfidence,null);
+  assert.equal(renderToStaticMarkup(React.createElement(PhotoIntegrityWarning,{confidence:null})), '');
+});
 let requests;
 let failures;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -437,6 +458,32 @@ test('personnel creation uses integrated registration and editing retains explic
   await editPersonnel('city-a', user, { name: 'Updated SI', zoneIds: ['zone-a'], wardIds: ['ward-a'], modules: [{ moduleId: 'module-a', canWrite: false, zoneIds: ['zone-a'], wardIds: ['ward-a'] }] }); assert.equal(writes[0].body.modules[0].canWrite, false); assert.deepEqual(writes[0].body.modules[0].wardIds, ['ward-a']); assert.ok(writes[0].path.endsWith('/city/users/si')); assert.equal(matrixStore.getCollection('users').status, 'ready');
   await createPersonnel('city-a', { name: 'New Daroga', email: 'new@example.test', phone: '9999999999', password: 'fixture-secret', role: 'SUPERVISOR', zoneIds: ['zone-a'], wardIds: ['ward-a'], moduleKeys: ['SWEEPING'] }); assert.ok(writes[1].path.endsWith('/common-registration/register')); assert.deepEqual(writes[1].body.targetSystems, ['TASKFORCE_20']); assert.deepEqual(writes[1].body.taskforceConfig, { role: 'SUPERVISOR', moduleKeys: ['SWEEPING'] });
   const before = writes.length; profile.role = 'COMMISSIONER'; matrixStore.currentUser.role = 'COMMISSIONER'; await assert.rejects(createPersonnel('city-a', { name: 'No', email: 'no@example.test', phone: '9999999999', password: 'fixture-secret', role: 'SUPERVISOR', zoneIds: [], wardIds: [], moduleKeys: ['SWEEPING'] }), /City Admin/); assert.equal(writes.length, before);
+});
+
+test('personnel password reset validates before writing and profile edits omit credentials', async () => {
+  const { editPersonnel } = require('../src/services/personnel.ts');
+  await matrixStore.login('admin@example.test', 'test-password');
+  await matrixStore.ensurePage('ca_municipal_users');
+  const user = matrixStore.getUsers('city-a')[0];
+  assert.ok(user);
+  const original = global.fetch, writes = [];
+  global.fetch = async (url, options = {}) => {
+    if (options.method === 'PATCH') {
+      writes.push({ path: new URL(url, 'http://localhost').pathname, body: JSON.parse(options.body) });
+      return json({ success: true });
+    }
+    return original(url, options);
+  };
+  try {
+    for (const password of ['', 'short']) await assert.rejects(editPersonnel('city-a', user, { password }), /at least 6/);
+    await assert.rejects(editPersonnel('city-b', user, { password: 'fixture-reset-secret' }), /city/i);
+    assert.equal(writes.length, 0);
+    await editPersonnel('city-a', user, { password: 'fixture-reset-secret' });
+    assert.ok(writes[0].path.endsWith(`/city/users/${user.id}`));
+    assert.deepEqual(writes[0].body, { password: 'fixture-reset-secret' });
+    await editPersonnel('city-a', user, { name: 'Updated profile' });
+    assert.deepEqual(writes[1].body, { name: 'Updated profile' });
+  } finally { global.fetch = original; }
 });
 
 test('personnel imports preflight every row, reject duplicates and return partial backend results without discarding directories', async () => {
