@@ -22,3 +22,24 @@ test('dashboard and report rendering retain the reason and confidence without ch
  const detail=renderToStaticMarkup(React.createElement(IntelligenceSuggestion,{report}));assert.match(detail,/88% AI confidence/);assert.match(detail,/Visible waste at the location/);assert.match(detail,/official decision/);
  const hindi=renderToStaticMarkup(React.createElement(IntelligenceSuggestion,{report,language:'hi'}));assert.match(hindi,/कचरा/);
 });
+
+test('the ULB operations dashboard renders intelligence counts alongside the official SI counts',()=>{
+ const coverageHook=require('../src/services/useInspectionCoverage');
+ const commissioner=require('../src/services/commissioner');
+ const originalCoverage=coverageHook.useInspectionCoverage,originalPulse=commissioner.useCityPulse;
+ const {inspectionVisit}=require('../src/services/inspectionCoverage');
+ const records=Array.from({length:100},(_,i)=>raw(String(i),i<6?'APPROVED':i<10?'REJECTED':'SUBMITTED',i%2?'CLEAN':'NOT_CLEAN'));
+ const data={from:'2026-11-04',to:'2026-11-04',assets:[],visits:records.map(record=>inspectionVisit(record,'sweeping','city')),modules:['sweeping'],failedModules:[],inventoryAvailable:true,errors:[]};
+ coverageHook.useInspectionCoverage=()=>({data,loading:false});
+ commissioner.useCityPulse=()=>({pending:0,errors:{},performance:{}});
+ try {
+  const {UlbDashboard}=require('../src/pages/ulbofficer/UlbDashboard');
+  const html=renderToStaticMarkup(React.createElement(UlbDashboard,{city:{id:'city',name:'Test city',enabledModules:['sweeping']},zones:[],wards:[],currentUser:{id:'ulb'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onNoticeCount:()=>{},onNoticeHandled:()=>{}}));
+  assert.match(html,/Inspection decisions &amp; follow-up/);
+  assert.match(html,/data-ulb-metric="approved"[^]*?<strong>6<\/strong>/);
+  assert.match(html,/data-ulb-metric="rejected"[^]*?<strong>4<\/strong>/);
+  assert.match(html,/data-outcome="CLEAN"[^]*?<strong>45<\/strong>/);
+  assert.match(html,/data-outcome="NOT_CLEAN"[^]*?<strong>45<\/strong>/);
+  assert.match(html,/Intelligence suggested clean/);assert.match(html,/Intelligence suggested not cleaned/);
+ } finally {coverageHook.useInspectionCoverage=originalCoverage;commissioner.useCityPulse=originalPulse;}
+});
