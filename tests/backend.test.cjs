@@ -767,6 +767,9 @@ test('module-specific role performance matches the existing frontend formulas', 
   assert.equal(performanceForRole(siTarget, 'QC', 'TOILET').performance, 75);
   assert.equal(performanceForRole(siTarget, 'QC', 'SWEEPING').performance, null);
   assert.equal(performanceForRole({ target: { counted: 0, effectiveTarget: 0, modules: {} } }, 'QC').performance, null);
+  const siBreakdown = { ...siTarget, targetBreakdown: { TOILET: { approved: 2, rejected: 1, pending: 3 }, SWEEPING: { approved: 1, rejected: 0, pending: 1 } } };
+  assert.deepEqual(performanceForRole(siBreakdown, 'QC').targetReviews, { target: 8, counted: 8, approved: 3, rejected: 1, pending: 4 });
+  assert.deepEqual(performanceForRole(siBreakdown, 'QC', 'TOILET').targetReviews, { target: 4, counted: 3, approved: 2, rejected: 1, pending: 3 });
   assert.equal(performanceForRole({ modules: { SWEEPING: { cleaned: [1, 2], notCleaned: [], pendingReview: [3, 4] } } }, 'QC').performance, 50);
   assert.equal(performanceForRole({ modules: { SWEEPING: { attentionRequired: [1, 2], resolved: [1] } } }, 'ACTION_OFFICER').performance, 50);
 });
