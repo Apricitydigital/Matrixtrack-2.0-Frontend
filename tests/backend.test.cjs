@@ -760,6 +760,13 @@ test('module-specific role performance matches the existing frontend formulas', 
   assert.equal(performanceForRole({ performance: 80, modules: { SWEEPING: { required: 4, completed: 2 } } }, 'SUPERVISOR', 'SWEEPING').performance, 50);
   assert.equal(performanceForRole({ moduleStats: { SWEEPING: { onTime: 3, late: 1, overdue: 2 } } }, 'QC', 'SWEEPING').performance, 50);
   assert.equal(performanceForRole({ performance: null }, 'QC').performance, null);
+  // SI score = review target achievement; the on-time rate stays a separate KPI.
+  const siTarget = { performance: 100, onTimeRate: 50, target: { counted: 8, effectiveTarget: 8, modules: { TOILET: { counted: 3, effectiveTarget: 4 } } }, moduleStats: { TOILET: { onTime: 1, late: 1, overdue: 0 } } };
+  assert.equal(performanceForRole(siTarget, 'QC').scoreBasis, 'target');
+  assert.equal(performanceForRole(siTarget, 'QC').performance, 100);
+  assert.equal(performanceForRole(siTarget, 'QC', 'TOILET').performance, 75);
+  assert.equal(performanceForRole(siTarget, 'QC', 'SWEEPING').performance, null);
+  assert.equal(performanceForRole({ target: { counted: 0, effectiveTarget: 0, modules: {} } }, 'QC').performance, null);
   assert.equal(performanceForRole({ modules: { SWEEPING: { cleaned: [1, 2], notCleaned: [], pendingReview: [3, 4] } } }, 'QC').performance, 50);
   assert.equal(performanceForRole({ modules: { SWEEPING: { attentionRequired: [1, 2], resolved: [1] } } }, 'ACTION_OFFICER').performance, 50);
 });
