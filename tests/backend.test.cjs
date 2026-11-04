@@ -2291,3 +2291,51 @@ test('ULB dashboard renders one multi-zone ward selection consistently in target
   assert.doesNotMatch(html,/value="z1"|>Ward 2<|>Ward 4</);
  }finally{React.useState=savedState;coverageHook.useInspectionCoverage=savedCoverage;commissioner.useCityPulse=savedPulse;}
 });
+
+test('Commissioner multi-selection preserves geography in export, attendance and report drill filters',()=>{
+ const {cityPulseQueries,scopedIecSummary}=require('../src/services/commissioner.ts');
+ const {inspectionDrillFilters}=require('../src/services/inspectionPeriod.ts');
+ const {emptyFilters,matchesFilters}=require('../src/services/presentation.ts');
+ const q=cityPulseQueries('2026-11-04','2026-11-04',['z1','z2'],['w1','w3'],['z1','z2']);
+ assert.equal(q.official.get('zoneIds'),'z1,z2');assert.equal(q.official.get('wardIds'),'w1,w3');assert.equal(q.geo.get('zoneId'),'z1,z2');assert.equal(q.geo.get('wardId'),'w1,w3');
+ const all=cityPulseQueries('2026-11-04','2026-11-04',['z1','z2'],[],[]);assert.equal(all.geo.has('zoneId'),false);assert.equal(all.official.get('zoneIds'),'z1,z2');
+ const filters={...emptyFilters(),...inspectionDrillFilters(['z1','z2'],['w1','w3'],'sweeping','pending_review')};
+ const rows=[{zoneId:'z1',wardId:'w1'},{zoneId:'z1',wardId:'w2'},{zoneId:'z2',wardId:'w3'},{zoneId:'z3',wardId:'w4'}].map(r=>({...r,moduleId:'sweeping',status:'pending_review'}));
+ assert.deepEqual(rows.filter(r=>matchesFilters(r,filters,[])).map(r=>r.wardId),['w1','w3']);
+ const iec={kpis:{overdueInspections:999},wards:[{id:'w1',zoneId:'z1',total:10,closed:2,open:8,overdue:3},{id:'w3',zoneId:'z2',total:5,closed:1,open:4,overdue:2},{id:'w4',zoneId:'z3',total:100,closed:0,open:100,overdue:100}]};
+ assert.deepEqual(scopedIecSummary(iec,['z1','z2'],['w1','w3']),{totalReported:15,totalClosed:3,openIssues:12,overdueInspections:5});
+ assert.equal(scopedIecSummary({kpis:iec.kpis},['z1','z2'],['w1']),null);
+});
+
+test('Commissioner selected coverage excludes other wards while retaining unavailable geography and Draft rules',()=>{
+ const {emptyCoverage,selectInspectionCoverage}=require('../src/services/inspectionCoverage.ts');
+ const {inspectionMetrics}=require('../src/services/inspectionMetrics.ts');
+ const assets=[{id:'a',module:'sweeping',zoneId:'z1',wardId:'w1'},{id:'b',module:'sweeping',zoneId:'z2',wardId:'w3'},{id:'c',module:'sweeping',zoneId:'z3',wardId:'w4'}];
+ const visits=assets.map(a=>({...a,id:`v-${a.id}`,assetId:a.id,status:'SUBMITTED'}));
+ const data={...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits:[...visits,{...visits[0],id:'draft',status:'DRAFT'}]};
+ const selected=selectInspectionCoverage(data,['z1','z2'],['w1','w3']),m=inspectionMetrics(selected);
+ assert.equal(m.totalEntities,2);assert.equal(m.totalRecords,3);assert.equal(m.achieved,2);assert.equal(m.drafts,1);assert.equal(m.coveragePercent,100);
+ const unknown=selectInspectionCoverage({...data,visits:[...data.visits,{...visits[0],id:'unknown',wardId:''}]},['z1','z2'],['w1','w3']);
+ assert.equal(inspectionMetrics(unknown).achieved,null);assert.equal(inspectionMetrics(unknown).intelligence,null);assert.match(unknown.errors[0],/exact selected-area/);
+});
+
+test('Commissioner overview renders multi-zone and ward totals consistently across cards and module sections',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const coverageHook=require('../src/services/useInspectionCoverage.ts'),commissioner=require('../src/services/commissioner.ts');
+ const {emptyCoverage}=require('../src/services/inspectionCoverage.ts'),{CommissionerHome}=require('../src/pages/commissioner/CommissionerHome.tsx');
+ const savedState=React.useState,savedCoverage=coverageHook.useInspectionCoverage,savedPulse=commissioner.useCityPulse;
+ const zones=[{id:'z1',cityId:'c',name:'Zone 1'},{id:'z2',cityId:'c',name:'Zone 2'},{id:'z3',cityId:'c',name:'Zone 3'}];
+ const wards=[{id:'w1',zoneId:'z1',cityId:'c',name:'Ward 1'},{id:'w2',zoneId:'z1',cityId:'c',name:'Ward 2'},{id:'w3',zoneId:'z2',cityId:'c',name:'Ward 3'},{id:'w4',zoneId:'z3',cityId:'c',name:'Ward 4'}];
+ const assets=wards.map(w=>({id:w.id,module:'sweeping',zoneId:w.zoneId,wardId:w.id,name:w.name}));
+ const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'NOT_CLEAN',confidencePercent:90,reason:'Waste'}}}));
+ let stateIndex=0,requested;
+ React.useState=initial=>savedState(stateIndex++===0?['z1','z2']:stateIndex===2?['w1','w3']:initial);
+ coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits}});
+ commissioner.useCityPulse=(city,from,to,z,w,revision,topics,geo)=>{requested={z,w,geo};const users={u:{rows:wards.map(ward=>({wardId:ward.id,zoneName:zones.find(zone=>zone.id===ward.zoneId).name,module:'SWEEPING',source:'ADMIN',target:10,credit:1}))}};return {pending:0,errors:{},official:commissioner.applyPerformanceTargets(commissioner.ulbInspectionSummary({modules:['sweeping'],assets:[],visits:[],inventoryAvailable:true,failedModules:[]},zones.filter(zone=>z.includes(zone.id)),w),users,w),performance:{SUPERVISOR:users},attendance:{present:2,absent:1,attendanceRate:66.7},rankings:[]};};
+ try{
+  const html=renderToStaticMarkup(React.createElement(CommissionerHome,{city:{id:'c',name:'City',enabledModules:['sweeping']},zones,wards,reports:[],currentUser:{id:'comm',role:'COMMISSIONER'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onInspect:()=>{},onNoticeCount:()=>{}}));
+  assert.deepEqual(requested,{z:['z1','z2'],w:['w1','w3'],geo:['z1','z2']});assert.match(html,/2 zones selected/);assert.match(html,/2 wards selected/);
+  assert.match(html,/data-target-progress="target">20</);assert.match(html,/data-target-progress="received">2</);assert.match(html,/data-target-progress="remaining">18</);
+  assert.match(html,/data-metric="overview-inspections">2</);assert.match(html,/data-outcome="NOT_CLEAN"[^]*?<strong>2<\/strong>/);assert.match(html,/data-metric="entities">2</);assert.match(html,/66.7%/);assert.doesNotMatch(html,/>Ward 2<|>Ward 4<|>Zone 3</);
+ }finally{React.useState=savedState;coverageHook.useInspectionCoverage=savedCoverage;commissioner.useCityPulse=savedPulse;}
+});

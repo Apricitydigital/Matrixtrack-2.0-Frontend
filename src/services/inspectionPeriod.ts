@@ -19,6 +19,6 @@ export function inspectionPeriod(counts:CoverageCounts,delivery:TargetDelivery,f
 }
 
 /** Date range is shared by the app; carry geography and the clicked queue into the register. */
-export function inspectionDrillFilters(zone='',ward='',moduleId='all',status='all') {
-  return {zoneId:zone||'all',wardId:ward||'all',moduleId:moduleId||'all',status:status||'all'};
+export function inspectionDrillFilters(zone:string|string[]='',ward:string|string[]='',moduleId='all',status='all') {
+  return {zoneId:typeof zone==='string'?zone||'all':'all',wardId:typeof ward==='string'?ward||'all':'all',zoneIds:Array.isArray(zone)?zone:[],wardIds:Array.isArray(ward)?ward:[],moduleId:moduleId||'all',status:status||'all'};
 }
