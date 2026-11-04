@@ -29,12 +29,16 @@ export function issueIsOverdue(issue: { status: string; deadlineTimestamp: strin
   return issue.status !== 'approved_closed' && Number.isFinite(deadline) && deadline < now;
 }
 
-export interface OperationalFilters { query: string; zoneId: string; wardId: string; moduleId: string; staffId: string; status: string; ryg: string; }
-export const emptyFilters = (): OperationalFilters => ({ query: '', zoneId: 'all', wardId: 'all', moduleId: 'all', staffId: 'all', status: 'all', ryg: 'all' });
+/** zoneId/wardId are single-value drill-down filters; zoneIds/wardIds come from the multi-select dropdowns (empty = all). */
+export interface OperationalFilters { query: string; zoneId: string; wardId: string; zoneIds: string[]; wardIds: string[]; moduleId: string; moduleIds: string[]; staffId: string; status: string; ryg: string; }
+export const emptyFilters = (): OperationalFilters => ({ query: '', zoneId: 'all', wardId: 'all', zoneIds: [], wardIds: [], moduleId: 'all', moduleIds: [], staffId: 'all', status: 'all', ryg: 'all' });
+export const selectedZoneIds = (f: Pick<OperationalFilters, 'zoneId' | 'zoneIds'>) => f.zoneIds.length ? f.zoneIds : f.zoneId !== 'all' ? [f.zoneId] : [];
+export const selectedWardIds = (f: Pick<OperationalFilters, 'wardId' | 'wardIds'>) => f.wardIds.length ? f.wardIds : f.wardId !== 'all' ? [f.wardId] : [];
 export function matchesFilters(record: { actionRequired?:boolean; actionTaken?:boolean; zoneId?: string; wardId?: string; moduleId?: string; status?: string; submittedByUserId?: string; assignedDarogaId?: string; reviewerId?: string }, filters: OperationalFilters, searchable: string[]): boolean {
-  return (filters.zoneId === 'all' || record.zoneId === filters.zoneId)
-    && (filters.wardId === 'all' || record.wardId === filters.wardId)
-    && (filters.moduleId === 'all' || record.moduleId === filters.moduleId)
+  const zones = selectedZoneIds(filters), wards = selectedWardIds(filters);
+  return (!zones.length || zones.includes(record.zoneId || ''))
+    && (!wards.length || wards.includes(record.wardId || ''))
+    && (filters.moduleId === 'all' || record.moduleId === filters.moduleId) && (!filters.moduleIds.length || filters.moduleIds.includes(record.moduleId || ''))
     && (filters.status === 'all' || (filters.status==='all_actions_required'?actionLifecycle(record).required:filters.status==='all_actions_taken'?actionLifecycle(record).taken:filters.status==='actions_outstanding'?actionIsPending(record):filters.status === 'inspections_completed' ? ['approved','pending_review','rejected','action_required','action_taken','escalated'].includes(record.status||'') : record.status === filters.status))
     && (filters.ryg === 'all' || statusTone(record.status || '') === filters.ryg)
     && (filters.staffId === 'all' || [record.submittedByUserId, record.assignedDarogaId, record.reviewerId].includes(filters.staffId))

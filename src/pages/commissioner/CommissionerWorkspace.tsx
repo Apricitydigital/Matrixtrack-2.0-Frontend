@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, FileDown, FileText, Image, LayoutGrid, List, Printer, ShieldCheck, Sparkles } from 'lucide-react';
 import type { City, OperationalReport, User, Ward, Zone, RoleType } from '../../types';
-import { emptyFilters, matchesFilters, MODULE_LABELS, ROLE_LABELS } from '../../services/presentation';
+import { emptyFilters, matchesFilters, selectedZoneIds, selectedWardIds, MODULE_LABELS, ROLE_LABELS } from '../../services/presentation';
 import { CardInfo } from '../../components/common/CardInfo';
 import { INSPECTION_STATUSES, inspectionStatus } from '../../services/inspectionStatus';
 import { OperationalFilters } from '../../components/common/OperationalFilters';
@@ -41,7 +41,7 @@ export function CommissionerWorkspace({city,reports,zones,wards,users,onSelectRe
   const statusLabels=Object.fromEntries(INSPECTION_STATUSES.map(s=>[s.id,s.label]));
   const moduleIds=useMemo(()=>[...new Set([...city.enabledModules,...register.map(r=>r.moduleId)])],[city.enabledModules,register]);
   const staffOptions=useMemo(()=>[...new Map<string,string>([...users.filter(u=>u.cityId===city.id).map(u=>[u.id,`${u.name} (${ROLE_LABELS[u.role] || u.role})`] as [string,string]),...register.flatMap(r=>[[r.submittedByUserId,r.submittedByName],[r.reviewerId,r.reviewerName],[r.assignedDarogaId,r.assignedDarogaName]].filter((pair):pair is [string,string]=>Boolean(pair[0]&&pair[1]))) ]).entries()],[users,city.id,register]);
-  const activeFilters=[filters.zoneId!=='all'?zones.find(z=>z.id===filters.zoneId)?.name:undefined,filters.wardId!=='all'?wards.find(w=>w.id===filters.wardId)?.name:undefined,filters.moduleId!=='all'?MODULE_LABELS[filters.moduleId as keyof typeof MODULE_LABELS]:undefined,filters.status!=='all'?(statusLabels[filters.status]||filters.status.replaceAll('_',' ')):undefined,filters.staffId!=='all'?staffOptions.find(([id])=>id===filters.staffId)?.[1]:undefined,filters.ryg!=='all'?`Status colour: ${filters.ryg}`:undefined].filter(Boolean);
+  const activeFilters=[selectedZoneIds(filters).map(id=>zones.find(z=>z.id===id)?.name).filter(Boolean).join(', ')||undefined,selectedWardIds(filters).map(id=>wards.find(w=>w.id===id)?.name).filter(Boolean).join(', ')||undefined,(filters.moduleIds.length?filters.moduleIds:filters.moduleId!=='all'?[filters.moduleId]:[]).map(id=>MODULE_LABELS[id as keyof typeof MODULE_LABELS]).filter(Boolean).join(', ')||undefined,filters.status!=='all'?(statusLabels[filters.status]||filters.status.replaceAll('_',' ')):undefined,filters.staffId!=='all'?staffOptions.find(([id])=>id===filters.staffId)?.[1]:undefined,filters.ryg!=='all'?`Status colour: ${filters.ryg}`:undefined].filter(Boolean);
   const dataUnavailable=completeRegister&&(coverage.loading||coverage.data.failedModules.length>0);
   const paging=usePagination(rows,JSON.stringify(filters)+city.id+matrixStore.loadRevision);
   const [opening,setOpening]=useState(''),[openError,setOpenError]=useState('');
