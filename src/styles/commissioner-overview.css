@@ -249,3 +249,19 @@
 .inspection-metric-link{font:inherit;color:inherit;text-align:left;border-bottom:1px dotted #8ba9b8;cursor:pointer}.inspection-metric-link:focus-visible{outline:2px solid #568b9e;outline-offset:3px}
 .inspection-kpi-context{display:flex;flex-direction:column;gap:2px;min-width:0}
 .inspection-kpi-context small{font-size:inherit}
+.zone-overview-count{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#f1f3f9;color:#4b5563;font-size:12px;font-weight:600}
+.zone-overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:14px}
+.zone-overview-card{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #e3e7ef;border-radius:14px;background:#fff;text-align:left;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.zone-overview-card:hover,.zone-overview-card:focus-visible{border-color:#7c5cf0;box-shadow:0 4px 14px rgba(124,92,240,.15)}
+.zone-overview-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.zone-overview-top small{font-size:10px;color:#9aa3b2;font-weight:600}
+.zone-overview-name{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:#eceafd;color:#4a3fb5;font-size:12px;font-weight:700}
+.zone-overview-score{display:flex;justify-content:space-between;align-items:flex-end}
+.zone-overview-score strong{display:block;font-size:28px;line-height:1.1;color:#1f2937}
+.zone-overview-score b{display:block;text-align:right;font-size:18px;color:#6d4fe0}
+.zone-overview-score small{display:block;font-size:10px;color:#6b7280;font-weight:600;letter-spacing:.03em}
+.zone-overview-meter{height:5px;border-radius:99px;background:#e8eaf3;overflow:hidden}
+.zone-overview-meter i{display:block;height:100%;border-radius:99px;background:#7c5cf0}
+.zone-overview-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.zone-overview-pending{padding:3px 10px;border-radius:999px;background:#fdf1d3;color:#8a5a00;font-weight:600}
+.zone-overview-details{display:inline-flex;align-items:center;color:#4a3fb5;font-weight:700}
