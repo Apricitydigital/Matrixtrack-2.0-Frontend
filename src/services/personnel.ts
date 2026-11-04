@@ -36,11 +36,12 @@ export async function createPersonnel(cityId:string,input:{name:string;email:str
  const result=await writeApi('/common-registration/register','POST',{cityId,name:input.name.trim(),email:input.email.trim().toLowerCase(),phone:input.phone,password:input.password,zoneId:input.zoneIds[0],wardId:input.wardIds[0],targetSystems:['TASKFORCE_20'],taskforceConfig:{role:input.role,moduleKeys:input.moduleKeys}});
  if(result.success===false)throw new Error(result.message||'Registration was not accepted.');await matrixStore.refreshPersonnel();return result;
 }
-export async function editPersonnel(cityId:string,user:User,updates:{name?:string;phone?:string;employeeId?:string;zoneIds?:string[];wardIds?:string[];modules?:{moduleId:string;canWrite:boolean;zoneIds:string[];wardIds:string[]}[]}){
+export async function editPersonnel(cityId:string,user:User,updates:{name?:string;phone?:string;password?:string;employeeId?:string;zoneIds?:string[];wardIds?:string[];modules?:{moduleId:string;canWrite:boolean;zoneIds:string[];wardIds:string[]}[]}){
  assertCityAdmin(cityId);if(user.cityId!==cityId||!matrixStore.getUsers(cityId).some(u=>u.id===user.id))throw new Error('This user is outside your city.');
  if(new Set(matrixStore.getUsers(cityId).filter(u=>u.id===user.id).map(u=>u.role)).size>1)throw new Error('This user has multiple city roles. The current edit endpoint cannot preserve those roles safely.');
  const scoped=updates.zoneIds!==undefined||updates.wardIds!==undefined||updates.modules!==undefined;
  if(scoped)validatePersonnelScope(cityId,updates.zoneIds??user.assignedZoneIds??[],updates.wardIds??user.assignedWardIds??[],user.role);
+ if(updates.password!==undefined&&updates.password.length<6)throw new Error('New password must contain at least 6 characters.');
  if(updates.name!==undefined&&!updates.name.trim())throw new Error('Enter a name.');
  if(updates.phone&&!/^\d{10}$/.test(updates.phone))throw new Error('Phone must contain 10 digits.');
  if(updates.employeeId&&!/^[\w-]{3,50}$/.test(updates.employeeId))throw new Error('Employee ID must be 3–50 letters, numbers, hyphens or underscores.');

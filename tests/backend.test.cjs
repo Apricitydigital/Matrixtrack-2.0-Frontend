@@ -439,6 +439,32 @@ test('personnel creation uses integrated registration and editing retains explic
   const before = writes.length; profile.role = 'COMMISSIONER'; matrixStore.currentUser.role = 'COMMISSIONER'; await assert.rejects(createPersonnel('city-a', { name: 'No', email: 'no@example.test', phone: '9999999999', password: 'fixture-secret', role: 'SUPERVISOR', zoneIds: [], wardIds: [], moduleKeys: ['SWEEPING'] }), /City Admin/); assert.equal(writes.length, before);
 });
 
+test('personnel password reset validates before writing and profile edits omit credentials', async () => {
+  const { editPersonnel } = require('../src/services/personnel.ts');
+  await matrixStore.login('admin@example.test', 'test-password');
+  await matrixStore.ensurePage('ca_municipal_users');
+  const user = matrixStore.getUsers('city-a')[0];
+  assert.ok(user);
+  const original = global.fetch, writes = [];
+  global.fetch = async (url, options = {}) => {
+    if (options.method === 'PATCH') {
+      writes.push({ path: new URL(url, 'http://localhost').pathname, body: JSON.parse(options.body) });
+      return json({ success: true });
+    }
+    return original(url, options);
+  };
+  try {
+    for (const password of ['', 'short']) await assert.rejects(editPersonnel('city-a', user, { password }), /at least 6/);
+    await assert.rejects(editPersonnel('city-b', user, { password: 'fixture-reset-secret' }), /city/i);
+    assert.equal(writes.length, 0);
+    await editPersonnel('city-a', user, { password: 'fixture-reset-secret' });
+    assert.ok(writes[0].path.endsWith(`/city/users/${user.id}`));
+    assert.deepEqual(writes[0].body, { password: 'fixture-reset-secret' });
+    await editPersonnel('city-a', user, { name: 'Updated profile' });
+    assert.deepEqual(writes[1].body, { name: 'Updated profile' });
+  } finally { global.fetch = original; }
+});
+
 test('personnel imports preflight every row, reject duplicates and return partial backend results without discarding directories', async () => {
   const { PERSONNEL_HEADERS, personnelImportRows, importPersonnel } = require('../src/services/personnel.ts'); await matrixStore.login('admin@example.test', 'test-password'); await matrixStore.ensurePage('ca_municipal_users');
   const valid = [PERSONNEL_HEADERS, ['Worker One', 'one@example.test', '9999999991', 'fixture-secret', 'Employee', 'Zone 1', 'Ward 1', 'SWEEPING']];
