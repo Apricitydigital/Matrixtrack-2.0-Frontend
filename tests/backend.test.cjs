@@ -2229,3 +2229,22 @@ test('ward export explains no recorded reports, Draft-only and completed-but-una
 });
 
 test('target loading never presents an unverified planning fallback as the configured result',()=>{const {targetDelivery,targetReadState}=require('../src/services/targetDelivery.ts');const fallback=targetDelivery(undefined,{total:15,required:15,dailyCovered:4,unique:4});assert.equal(fallback.percent,4/15*100);assert.equal(targetReadState(fallback,false).percent,null);const configured=targetDelivery({target:17,completed:1,targetState:'configured'});assert.equal(targetReadState(configured,true).target,17);assert.equal(targetReadState(configured,true).completed,1);});
+
+test('dashboard target card separates reports received from credited progress and withholds unavailable targets',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const {InspectionTargetProgress}=require('../src/components/analytics/InspectionTargetProgress.tsx');
+ const {targetDelivery,targetReadState}=require('../src/services/targetDelivery.ts');
+ const props={from:'2026-11-03',to:'2026-11-03',delivery:targetDelivery({target:10,completed:4,targetConfigured:true}),received:7,loading:false,onInspect:()=>{}};
+ const render=changes=>renderToStaticMarkup(React.createElement(InspectionTargetProgress,{...props,...changes}));
+ const html=render({});assert.match(html,/data-target-progress="target">10</);assert.match(html,/data-target-progress="received">7</);assert.match(html,/data-target-progress="remaining">6</);assert.match(html,/4 credited · 40% achieved/);assert.match(html,/2026-11-03/);
+ const unavailable=render({delivery:targetReadState(props.delivery,false)});assert.match(unavailable,/Inspection target unavailable/);assert.match(unavailable,/data-target-progress="target">—</);assert.match(unavailable,/data-target-progress="received">7</);assert.doesNotMatch(unavailable,/role="progressbar"/);
+ const loading=render({loading:true});assert.doesNotMatch(loading,/40% achieved|>7</);assert.match(loading,/aria-busy="true"/);
+ const range=render({to:'2026-11-04'});assert.match(range,/Inspection target for selected dates/);assert.match(range,/2026-11-03 to 2026-11-04/);
+});
+
+test('ULB reports received drill matches completed count within the selected ward and excludes drafts',()=>{
+ const {emptyCoverage}=require('../src/services/inspectionCoverage.ts'),{ulbScopeData,ulbDrillVisits}=require('../src/services/ulbDashboard.ts');
+ const visit=(id,wardId,status)=>({id,module:'sweeping',zoneId:'z',wardId,status});
+ const scope=ulbScopeData({...emptyCoverage(),visits:[visit('draft','w','DRAFT'),visit('pending','w','SUBMITTED'),visit('clean','w','APPROVED'),visit('other','other','SUBMITTED')]},{zone:'z',ward:'w'});
+ const received=ulbDrillVisits(scope,'inspections_completed');assert.deepEqual(received.map(v=>v.id),['pending','clean']);assert.equal(received.length,scope.completedCounts.inspections);
+});

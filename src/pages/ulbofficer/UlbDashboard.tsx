@@ -1,4 +1,5 @@
 import {IntelligenceSummary} from '../../components/reports/IntelligenceSuggestion';
+import {InspectionTargetProgress} from '../../components/analytics/InspectionTargetProgress';
 import {MultiSelectDropdown} from '../../components/common/MultiSelectDropdown';
 import {CardInfo} from '../../components/common/CardInfo';
 import {StatusBreakdown} from '../../components/analytics/StatusBreakdown';
@@ -60,6 +61,7 @@ export function UlbDashboard({city,zones,wards,currentUser,onNavigate,onSelectRe
   return <div className="ulb-dashboard commissioner-home" data-role-dashboard="ULB_OFFICER">
     <section className="city-welcome"><div><span><ShieldCheck size={15}/>ULB OPERATIONS · {city.name}</span><h1>Inspection decisions & follow-up</h1><p>{range.from} to {range.to} · Review reports, track corrective work and close coverage gaps.</p></div></section>
     <div className="home-scope"><div><MapPin size={16}/><select aria-label="ULB dashboard zone" value={zone} onChange={e=>{setZone(e.target.value);setWard('');}}><option value="">All zones</option>{cityZones.map(z=><option key={z.id} value={z.id}>{z.name}</option>)}</select><select aria-label="ULB dashboard ward" value={ward} onChange={e=>setWard(e.target.value)}><option value="">All wards</option>{cityWards.filter(w=>!zone||w.zoneId===zone).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>{(zone||ward)&&<button onClick={()=>{setZone('');setWard('');}}>Clear filters</button>}</div><button onClick={()=>open('all')}>All inspection reports<ArrowUpRight size={15}/></button></div>
+    <InspectionTargetProgress from={range.from} to={range.to} delivery={delivery} received={data.completedCounts.inspections} loading={coverage.loading} onInspect={()=>open('inspections_completed')}/>
     <div className="ulb-activity-heading"><div><span className="page-eyebrow">REPORT STATUS & FOLLOW-UP</span><h2>Inspection activity</h2></div><button disabled={coverage.loading||data.counts.inspections==null} onClick={()=>open('all')}><span>Total inspection records</span><strong data-metric="ulb-total-inspections">{number(data.counts.inspections)}</strong><ArrowUpRight size={17}/></button></div>
     <section className="home-section"><div className="home-section-heading"><div><h2>Current report status</h2></div></div><StatusBreakdown label="ULB inspection workflow" loading={coverage.loading} items={[
       {id:'approved',label:'Cleaned',value:data.statusCount('approved'),tone:'green'},

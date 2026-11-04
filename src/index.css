@@ -59,7 +59,7 @@
 body:has(.workspace-app) { overflow: hidden !important; height: 100svh; }
 .workspace-app > header,.workspace-app > [role='alert'],.workspace-app > details,.workspace-app > [role='status'] { flex-shrink: 0; }
 .workspace-app > .flex-1 { flex: 1 1 0%; }
-.workspace-app > .flex-1 > aside { height: 100%; min-height: 0; }
+.workspace-app > .flex-1 > .workspace-sidebar { height: 100%; min-height: 0; }
 .workspace-app main { overscroll-behavior-y: contain; }
 .sidebar-navigation { overscroll-behavior: contain; }
 
@@ -103,11 +103,11 @@ body:has(.workspace-app) { overflow: hidden !important; height: 100svh; }
 .workspace-header select:disabled { opacity: 1; color: #41596c; appearance: none; cursor: default; }
 .workspace-live-badge { color: #577269; border-color: #dce9e3; background: #f6fbf8; font-size: 15px; }
 .workspace-app > .flex-1 { min-height: 0; min-width: 0; }
-.workspace-app aside { background: #10283b; border-color: #203a4d; width: 248px; }
-.workspace-app aside > div { border-color: #264052; }.workspace-app aside button { min-height: 37px; font-size: 15px; letter-spacing: .05px; }
-.workspace-app aside button[aria-current='page'] { background: #20475b; box-shadow: inset 3px 0 #8ecfc3; color: #f6fcfb; }
-.workspace-app aside button:not([aria-current='page']):hover { background: #19384c; }
-.workspace-app aside .bg-indigo-600 { background: #2b5665; }.workspace-app aside .text-indigo-400 { color: #91c5c5; }
+.workspace-app .workspace-sidebar { background: #10283b; border-color: #203a4d; width: 248px; }
+.workspace-app .workspace-sidebar > div { border-color: #264052; }.workspace-app .workspace-sidebar button { min-height: 37px; font-size: 15px; letter-spacing: .05px; }
+.workspace-app .workspace-sidebar button[aria-current='page'] { background: #20475b; box-shadow: inset 3px 0 #8ecfc3; color: #f6fcfb; }
+.workspace-app .workspace-sidebar button:not([aria-current='page']):hover { background: #19384c; }
+.workspace-app .workspace-sidebar .bg-indigo-600 { background: #2b5665; }.workspace-app .workspace-sidebar .text-indigo-400 { color: #91c5c5; }
 .workspace-app main { min-width: 0; scroll-behavior: smooth; scrollbar-gutter: stable; }
 .workspace-app main h1 { line-height: 1.35; letter-spacing: -.5px; }.workspace-app main h2 { letter-spacing: -.3px; }
 .workspace-app main table { border-collapse: collapse; }.workspace-app main table th { padding: 13px 18px; font-size: 15px; font-weight: 600; color: #7a8b9b; background: #f8fafc; letter-spacing: .5px; white-space: nowrap; border-bottom: 1px solid #e8eef3; }
@@ -140,7 +140,7 @@ body:has(.workspace-app) { overflow: hidden !important; height: 100svh; }
 .workspace-data-bar { box-shadow: none; border-radius: 12px; }.workspace-empty { display: flex; align-items: center; flex-direction: column; text-align: center; gap: 9px; padding: 45px 20px; color: #98a9b6; }.workspace-empty h3 { font-size: 17px; font-weight: 600; color: #5e788a; }.workspace-empty p { font-size: 15px; color: #91a1ad; }
 @media (max-width: 1100px) { .workspace-hero { padding: 26px; }.workspace-hero-mark { display: none; }.workspace-header > div:first-child > div:last-child { display: none; } }
 @media (max-width: 640px) { .workspace-hero { padding: 23px; border-radius: 12px; }.workspace-hero h1 { font-size: 25px; }.workspace-hero .workspace-eyebrow { font-size: 13px; letter-spacing: 1px; }.ops-filter-panel { padding: 15px; }.ops-filter { flex-basis: 135px; }.ops-filter-search { flex-basis: 100%; }.workspace-panel-heading { padding: 17px; }.ryg-legend small { margin-left: 0; }.workspace-header { gap: 8px; padding-inline: 12px; }.workspace-header a span { display: none; }.workspace-app main table td { min-width: 110px; } }
-@media print { .workspace-header,.workspace-app aside,.workspace-data-bar,.ryg-legend { display: none !important; }.workspace-app { height: auto; overflow: visible; background: white; }.workspace-app main { overflow: visible; max-width: none; padding: 0; } }
+@media print { .workspace-header,.workspace-app .workspace-sidebar,.workspace-data-bar,.ryg-legend { display: none !important; }.workspace-app { height: auto; overflow: visible; background: white; }.workspace-app main { overflow: visible; max-width: none; padding: 0; } }
 @media (max-width: 640px) {
   .workspace-header > div:last-child { min-width: 0; gap: 5px; }
   .workspace-header select[aria-label='Authorized role'] { width: 122px; max-width: 100%; font-size: 15px; text-overflow: ellipsis; }

@@ -8,6 +8,7 @@ import {targetModuleLabel,targetPayload,targetPreview,type TargetDraft,type Targ
 import {StatusBadge} from '../components/common/Badge';
 import {Pagination,usePagination} from '../components/common/Pagination';
 import {targetRegister,manualTargetIds,matchesTargetScope} from '../services/targetRegister';
+import {CardInfo} from '../components/common/CardInfo';
 
 const initialDraft=():TargetDraft=>({userId:'',moduleId:'',wardId:'',role:'SUPERVISOR',periodType:'DAILY',startDate:todayIST(),mode:'count',value:'',allowRepeat:true});
 export function TargetsWorkspace({city,wards}:{city:City;wards:Ward[]}) {
@@ -70,8 +71,9 @@ export function TargetsWorkspace({city,wards}:{city:City;wards:Ward[]}) {
       setSuccess(`${result.deletedCount} target${result.deletedCount===1?'':'s'} deleted. Inspection reports and assignments are unchanged.`);setDeleteIds([]);setCreating(false);setEditing(null);setRevision(r=>r+1);
     }catch(e){setDeleteError(e instanceof Error?e.message:'Unable to delete targets.');}finally{setBusy(false);}
   };
-  return <section className="targets-workspace"><aside className="intelligence-summary"><h3>SI daily review sample: 10%</h3><p>Assigned SI modules share a daily sample of 10% of available reports, rounded up once across modules. For 100 reports, the target is 10 SI decisions. An explicitly configured SI target takes precedence. AI suggestions never count as completed reviews.</p></aside>
+  return <section className="targets-workspace">
     <header className="targets-heading"><div><span className="workspace-eyebrow">ASSIGNMENTS & TARGETS</span><h1>Inspection targets</h1><p>View every saved target, track progress and manage ward-wise or employee targets.</p></div><div className="targets-actions"><button className="workspace-secondary-button" aria-label="Refresh targets" title="Refresh targets" onClick={()=>setRevision(r=>r+1)} disabled={loading||busy}><RefreshCw size={17}/></button><button className="targets-primary" onClick={openNew} disabled={loading||Boolean(error)||busy}><Plus size={17}/>Create target</button></div></header>
+    <div className="targets-policy" role="note" aria-label="SI daily review policy"><span className="targets-policy-label">SI daily sample <strong>10%</strong></span><p>100 reports = 10 SI reviews across assigned modules.</p><CardInfo title="SI daily review sample"><p>The daily sample is 10% of available reports, rounded up once across assigned modules. A configured manual SI target takes precedence. AI suggestions never count as completed SI reviews.</p></CardInfo></div>
     {!loading&&!error&&!samplingAvailable&&<p role="status" className="targets-error">Automatic SI target details are unavailable. Refresh targets to retry. Saved manual targets are shown below.</p>}
     {error&&<p role="alert" className="targets-error">{error}</p>}{success&&<p role="status" className="targets-success">{success}</p>}
     <div className="targets-summary targets-overview"><article><Target size={22}/><div><strong>{loading?'...':rows.length}</strong><span>Saved & automatic targets</span></div></article><article><strong>{loading?'...':new Set(rows.filter(r=>r.wardId).map(r=>r.wardId)).size}</strong><span>Wards with targets</span></article><article><strong>{loading?'...':new Set(rows.map(r=>r.userId)).size}</strong><span>Employees with targets</span></article></div>
