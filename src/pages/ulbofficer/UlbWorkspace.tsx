@@ -2,7 +2,7 @@ import {useInspectionCoverage} from '../../services/useInspectionCoverage';
 import {inspectionStatus} from '../../services/inspectionStatus';
 import { actionLifecycle } from '../../services/actionLifecycle';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, Bell, CheckCheck, Clock3, Flag, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight, CheckCheck, Clock3, Flag, ShieldCheck } from 'lucide-react';
 import type { City, OperationalReport, User, Ward, Zone } from '../../types';
 import { CommissionerWorkspace } from '../commissioner/CommissionerWorkspace';
 import { matrixStore } from '../../services/store';
@@ -21,7 +21,7 @@ export function UlbWorkspace({city,reports,users,zones,wards,currentUser,pageId,
   useEffect(()=>{if(noticeRequest>0){setBriefing(true);onNoticeHandled?.();}},[noticeRequest]);
   const notices=[{id:'si',title:'Reports awaiting SI review',detail:'Open reports to contact the assigned SI.',count:counts.pending_review,tone:'yellow' as const,page:'ulb_pending'},{id:'action',title:'Action required',detail:'Follow up with the assigned IEC.',count:counts.action_required,tone:'red' as const,page:'ulb_action_req'},{id:'verify',title:'Action taken',detail:'Review the recorded action and verification stage.',count:counts.action_taken,tone:'yellow' as const,page:'ulb_action_taken'}].filter(n=>n.count>0);
   const snapshot=<section className="briefing-snapshot"><h3>Your operational report queues</h3><DonutChart label="available reports" items={[{id:'si',label:'Pending SI review',value:counts.pending_review,color:chartColors.gold},{id:'processed',label:'SI reviewed',value:counts.approved+counts.rejected,color:chartColors.teal},{id:'action',label:'Action required (pending)',value:rows.filter(r=>r.status==='action_required').length,color:chartColors.red},{id:'verify',label:'Action taken',value:rows.filter(r=>r.status==='action_taken').length,color:chartColors.navy}]}/><p className="briefing-data-note">{rows.length} inspection records in this register. Figures follow the selected dates and your authorized module scope.</p></section>;
-  const intro=<><section className="city-welcome"><div><span><ShieldCheck size={14}/>ULB OFFICER · {city.name}</span><h1>Review. Follow up. Take action.</h1><p>SI decisions, responsible users and corrective work in one view.</p></div><div className="welcome-actions"><button onClick={()=>setBriefing(true)}><Bell size={16}/>Operations briefing</button></div></section><div className="home-kpis">{[
+  const intro=<><section className="city-welcome"><div><span><ShieldCheck size={14}/>ULB OFFICER · {city.name}</span><h1>Review. Follow up. Take action.</h1><p>SI decisions, responsible users and corrective work in one view.</p></div></section><div className="home-kpis">{[
     {label:'Pending SI review',value:counts.pending_review,note:'Contact the assigned SI from the report',icon:Clock3,page:'ulb_pending',tone:'yellow'},
     {label:'SI reviewed',value:counts.approved+counts.rejected,note:'Review decisions; mark Action Required if needed',icon:ShieldCheck,page:'ulb_approved',tone:'neutral'},
     {label:'Action required',value:counts.action_required,note:'Assigned IEC follow-up',icon:Flag,page:'ulb_action_req',tone:'red'},
