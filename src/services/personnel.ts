@@ -42,6 +42,7 @@ export async function editPersonnel(cityId:string,user:User,updates:{name?:strin
  const scoped=updates.zoneIds!==undefined||updates.wardIds!==undefined||updates.modules!==undefined;
  if(scoped)validatePersonnelScope(cityId,updates.zoneIds??user.assignedZoneIds??[],updates.wardIds??user.assignedWardIds??[],user.role);
  if(updates.password!==undefined&&updates.password.length<6)throw new Error('New password must contain at least 6 characters.');
+ if(updates.password!==undefined&&new TextEncoder().encode(updates.password).length>72)throw new Error('New password must not exceed 72 UTF-8 bytes.');
  if(updates.name!==undefined&&!updates.name.trim())throw new Error('Enter a name.');
  if(updates.phone&&!/^\d{10}$/.test(updates.phone))throw new Error('Phone must contain 10 digits.');
  if(updates.employeeId&&!/^[\w-]{3,50}$/.test(updates.employeeId))throw new Error('Employee ID must be 3–50 letters, numbers, hyphens or underscores.');
@@ -51,7 +52,7 @@ export async function editPersonnel(cityId:string,user:User,updates:{name?:strin
    if(custom)throw new Error('This user has a custom module scope that the current edit endpoint cannot preserve. Profile editing remains available.');
  }
  if(updates.modules){const enabled=await personnelModules(cityId);for(const m of updates.modules){if(!enabled.some(e=>e.id===m.moduleId))throw new Error('A selected module is not enabled.');const z=m.zoneIds.length?m.zoneIds:updates.zoneIds??user.assignedZoneIds??[],w=m.wardIds.length?m.wardIds:updates.wardIds??user.assignedWardIds??[];validatePersonnelScope(cityId,z,w,user.role);if(['QC','ULB_OFFICER'].includes(user.role)&&(z.some(id=>!updates.zoneIds?.includes(id))||w.some(id=>!updates.wardIds?.includes(id))))throw new Error('Module scopes must stay within the city assignment.');if(user.role==='COMMISSIONER'&&m.canWrite)throw new Error('Commissioner module access must be view-only.');}if(user.role==='ACTION_OFFICER'&&!updates.modules.length)throw new Error('IEC users require at least one module.');}
- assertCityAdmin(cityId);const result=await writeApi(`/city/users/${encodeURIComponent(user.id)}`,'PATCH',updates);await matrixStore.refreshPersonnel();return result;
+ assertCityAdmin(cityId);const result=await writeApi(`/city/users/${encodeURIComponent(user.id)}`,'PATCH',updates);if(updates.password!==undefined&&result.passwordUpdated!==true)throw new Error('The server did not confirm the password reset. Refresh and try again; contact support if this continues.');await matrixStore.refreshPersonnel();return result;
 }
 export function personnelImportRows(cityId:string,rows:string[][]){
  assertCityAdmin(cityId);if(rows.length<2||PERSONNEL_HEADERS.some((h,i)=>rows[0]?.[i]?.trim().toLowerCase()!==h.toLowerCase()))throw new Error('Use the provided personnel import template.');

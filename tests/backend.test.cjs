@@ -470,19 +470,24 @@ test('personnel password reset validates before writing and profile edits omit c
   global.fetch = async (url, options = {}) => {
     if (options.method === 'PATCH') {
       writes.push({ path: new URL(url, 'http://localhost').pathname, body: JSON.parse(options.body) });
-      return json({ success: true });
+      return json({ success: true, passwordUpdated: true });
     }
     return original(url, options);
   };
   try {
     for (const password of ['', 'short']) await assert.rejects(editPersonnel('city-a', user, { password }), /at least 6/);
     await assert.rejects(editPersonnel('city-b', user, { password: 'fixture-reset-secret' }), /city/i);
+    await assert.rejects(editPersonnel('city-a', user, { password: 'é'.repeat(37) }), /72 UTF-8/);
     assert.equal(writes.length, 0);
     await editPersonnel('city-a', user, { password: 'fixture-reset-secret' });
     assert.ok(writes[0].path.endsWith(`/city/users/${user.id}`));
     assert.deepEqual(writes[0].body, { password: 'fixture-reset-secret' });
     await editPersonnel('city-a', user, { name: 'Updated profile' });
     assert.deepEqual(writes[1].body, { name: 'Updated profile' });
+    global.fetch = async () => json({success:true});
+    await assert.rejects(editPersonnel('city-a', user, {password:'fixture-reset-secret'}), /did not confirm/);
+    global.fetch = async () => json({error:'This retired default password cannot be used.'},400);
+    await assert.rejects(editPersonnel('city-a', user, {password:'fixture-reset-secret'}), /retired default/);
   } finally { global.fetch = original; }
 });
 
@@ -807,6 +812,16 @@ test('module-specific role performance matches the existing frontend formulas', 
   assert.equal(performanceForRole({ performance: 80, modules: { SWEEPING: { required: 4, completed: 2 } } }, 'SUPERVISOR', 'SWEEPING').performance, 50);
   assert.equal(performanceForRole({ moduleStats: { SWEEPING: { onTime: 3, late: 1, overdue: 2 } } }, 'QC', 'SWEEPING').performance, 50);
   assert.equal(performanceForRole({ performance: null }, 'QC').performance, null);
+  // SI score = review target achievement; the on-time rate stays a separate KPI.
+  const siTarget = { performance: 100, onTimeRate: 50, target: { counted: 8, effectiveTarget: 8, modules: { TOILET: { counted: 3, effectiveTarget: 4 } } }, moduleStats: { TOILET: { onTime: 1, late: 1, overdue: 0 } } };
+  assert.equal(performanceForRole(siTarget, 'QC').scoreBasis, 'target');
+  assert.equal(performanceForRole(siTarget, 'QC').performance, 100);
+  assert.equal(performanceForRole(siTarget, 'QC', 'TOILET').performance, 75);
+  assert.equal(performanceForRole(siTarget, 'QC', 'SWEEPING').performance, null);
+  assert.equal(performanceForRole({ target: { counted: 0, effectiveTarget: 0, modules: {} } }, 'QC').performance, null);
+  const siBreakdown = { ...siTarget, targetBreakdown: { TOILET: { approved: 2, rejected: 1, pending: 3 }, SWEEPING: { approved: 1, rejected: 0, pending: 1 } } };
+  assert.deepEqual(performanceForRole(siBreakdown, 'QC').targetReviews, { target: 8, counted: 8, approved: 3, rejected: 1, pending: 4 });
+  assert.deepEqual(performanceForRole(siBreakdown, 'QC', 'TOILET').targetReviews, { target: 4, counted: 3, approved: 2, rejected: 1, pending: 3 });
   assert.equal(performanceForRole({ modules: { SWEEPING: { cleaned: [1, 2], notCleaned: [], pendingReview: [3, 4] } } }, 'QC').performance, 50);
   assert.equal(performanceForRole({ modules: { SWEEPING: { attentionRequired: [1, 2], resolved: [1] } } }, 'ACTION_OFFICER').performance, 50);
 });
