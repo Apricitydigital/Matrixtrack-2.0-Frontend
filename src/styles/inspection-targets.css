@@ -57,3 +57,4 @@
 .inspection-target-progress-meter>span{display:block;height:100%;background:var(--accent,#197d8d);border-radius:inherit}
 .inspection-target-progress>footer{margin-top:9px;font-size:12px;line-height:1.6;color:var(--muted,#637f91)}
 @media(max-width:520px){.inspection-target-progress{padding:16px}.inspection-target-progress dl{gap:10px}.inspection-target-progress dl>div+div{padding-left:10px}.inspection-target-progress dt{font-size:12px;min-height:36px}.inspection-target-progress dd{font-size:23px}}
+.inspection-target-progress .inspection-scoring-note{margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line,#dce6ee);font-size:12px;line-height:1.6;color:var(--muted,#637f91)}

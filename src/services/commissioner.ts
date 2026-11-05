@@ -6,6 +6,7 @@ import { api } from './api';
 import { moduleId, MODULE_KEYS } from './adapters';
 import { normalizeDashboardPayload } from './plantAnalytics';
 import {matrixStore} from './store';
+import {useOperationalRefresh} from './useOperationalRefresh';
 import type {InspectionCoverage} from './inspectionCoverage';
 import type { OperationalModuleId } from '../types';
 import { aggregateTargetState, verifyTargetFigures, type TargetEvidence, type TargetConfiguration } from './targetConfiguration';
@@ -47,6 +48,9 @@ export function performanceTargetRows(official:ReturnType<typeof summarizeZones>
   const rows=Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>row.wardId&&moduleId(row.module)&&(!wardIds.length||wardIds.includes(row.wardId))&&['ADMIN','DEFAULT'].includes(row.source)&&Number.isFinite(row.target)&&row.target>=0&&Number.isFinite(row.credit)&&row.credit>=0);
   return rows.filter(row=>official.zones.some(zone=>zone.name===row.zoneName));
 }
+export function unmappedTargetUnits(users:Record<string,any>,zoneNames:string[]) {
+  return Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>!zoneNames.includes(row.zoneName)&&Number.isFinite(row.target)&&row.target>0).reduce((total,row)=>total+row.target,0);
+}
 export function applyPerformanceTargets(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='') {
   const selected=performanceTargetRows(official,users,wardId);
   const resolve=(figures:InspectionFigures,scope:any[])=>{
@@ -75,7 +79,8 @@ export function scopedIecSummary(response:any,zoneIds:string[],wardIds:string[])
 }
 export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[],wardId:string|string[],revision:number,topics?:string[],geoZoneIds?:string[]):CityPulse {
   const [pulse,setPulse]=useState<CityPulse & {scopeKey:string}>({scopeKey:'',pending:6,errors:{}});const zoneKey=zoneIds.join(','),wardKey=Array.isArray(wardId)?wardId.join(','):wardId,geoZoneKey=geoZoneIds?.join(','),topicKey=topics?.join(',')||'';
-  const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey]);
+  const liveRevision=useOperationalRefresh(cityId,pulse.pending===0);
+  const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey,liveRevision]);
   useEffect(()=>{
     const c=new AbortController();setPulse({scopeKey,pending:6,errors:{}});
     const {range,geo,official}=cityPulseQueries(from,to,zoneIds,wardId,geoZoneIds);
@@ -88,7 +93,7 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
       ['performance',async()=>{
         const q=new URLSearchParams({startDate:new Date(`${from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330',view:'score'});
         const results=await concurrentReads([['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']].map(([role,key])=>async()=>{
-          const response=await api(`/city/users/${key}-performance?${q}`,{signal:c.signal}),users=response.users||{};
+          const response=await api(`/city/users/${key}-performance?${q}`,{signal:c.signal,cache:'no-store'}),users=response.users||{};
           if(!c.signal.aborted)setPulse(p=>({...p,performance:{...p.performance,[role]:users},...(role==='SUPERVISOR'&&p.official?{official:applyPerformanceTargets(p.official,users,wardId)}:{})}));
           return [role,users] as const;
         }),2);
@@ -102,7 +107,7 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
     const active=topicKey?tasks.filter(([key])=>topicKey.split(',').includes(key)):tasks;setPulse({scopeKey,pending:active.length,errors:{}});
     for(const task of active)void run(task);
     return()=>c.abort();
-  },[cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey]);
+  },[cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey,liveRevision]);
   return pulse.scopeKey===scopeKey?pulse:{pending:topics?.length||6,errors:{}};
 }
 export function briefingNotices(pulse:CityPulse):BriefingNotice[] {

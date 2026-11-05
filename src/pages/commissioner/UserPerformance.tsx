@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { FileDown, Printer, Users } from 'lucide-react';
 import type { City, User, Zone, Ward } from '../../types';
 import { api,clearReadCache } from '../../services/api';
+import {useOperationalRefresh} from '../../services/useOperationalRefresh';
 import { matrixStore } from '../../services/store';
 import { ROLE_LABELS, MODULE_LABELS } from '../../services/presentation';
 import { MODULE_KEYS } from '../../services/adapters';
@@ -17,13 +18,14 @@ export function UserPerformance({city,users,zones,wards}:{city:City;users:User[]
   const [role,setRole]=useState('SUPERVISOR'),[query,setQuery]=useState(''),[zone,setZone]=useState('all'),[ward,setWard]=useState('all');const ref=useRef<HTMLDivElement>(null);
   const {from,to}=matrixStore.getDateRange();
   const [module,setModule]=useState('ALL');
-  const readKey=JSON.stringify([city.id,from,to,retry,matrixStore.loadRevision]);
+  const liveRevision=useOperationalRefresh(city.id,!Object.values(loads).some(load=>load.status==='loading'));
+  const readKey=JSON.stringify([city.id,from,to,retry,matrixStore.loadRevision,liveRevision]);
   const activeLoads:Record<string,PerformanceLoad>=loadedKey===readKey?loads:Object.fromEntries(PERFORMANCE_ROLES.map(r=>[r,{status:'loading' as const}]));
   useEffect(()=>{const c=new AbortController();setLoadedKey(readKey);setLoads(Object.fromEntries(PERFORMANCE_ROLES.map(r=>[r,{status:'loading'}])));setStats({});
     const range=new URLSearchParams({startDate:new Date(`${from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330',view:'score'});
     for(const [role,key] of [['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']])void (async()=>{
       try{
-        const data=await api(`/city/users/${key}-performance?${range}`,{signal:c.signal});
+        const data=await api(`/city/users/${key}-performance?${range}`,{signal:c.signal,cache:'no-store'});
         if(!data?.users||typeof data.users!=='object'||Array.isArray(data.users))throw Error('Performance response is incomplete.');
         if(!c.signal.aborted){setStats(previous=>({...previous,[role]:data.users}));setLoads(previous=>({...previous,[role]:{status:'ready',officerErrors:data.errors||{}}}));}
       }catch(error){if(!c.signal.aborted)setLoads(previous=>({...previous,[role]:{status:'error',message:error.message}}));}
