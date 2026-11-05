@@ -16,3 +16,9 @@ export function targetDelivery(figures?:({target?:number;completed?:number;targe
 
 /** Never show a planning fallback while saved targets are still being read. */
 export function targetReadState(delivery:TargetDelivery,ready:boolean):TargetDelivery{return ready?delivery:{...delivery,target:null,completed:null,percent:null,remaining:null,available:false,fallback:false,met:false,stateLabel:'Target source unavailable'};}
+
+/** City report intake compares every submitted report to the target; officer scoring retains its own credit rules. */
+export function reportTargetDelivery(delivery:TargetDelivery,received:number|null):TargetDelivery {
+  const target=delivery.available?delivery.target:null,completed=received!=null&&Number.isFinite(received)&&received>=0?received:null;
+  return {...delivery,target,completed,percent:target!=null&&target>0&&completed!=null?completed/target*100:null,remaining:target!=null&&completed!=null?Math.max(0,target-completed):null,met:target!=null&&target>0&&completed!=null&&completed>=target};
+}

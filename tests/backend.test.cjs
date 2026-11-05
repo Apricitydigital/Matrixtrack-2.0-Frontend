@@ -2230,16 +2230,44 @@ test('ward export explains no recorded reports, Draft-only and completed-but-una
 
 test('target loading never presents an unverified planning fallback as the configured result',()=>{const {targetDelivery,targetReadState}=require('../src/services/targetDelivery.ts');const fallback=targetDelivery(undefined,{total:15,required:15,dailyCovered:4,unique:4});assert.equal(fallback.percent,4/15*100);assert.equal(targetReadState(fallback,false).percent,null);const configured=targetDelivery({target:17,completed:1,targetState:'configured'});assert.equal(targetReadState(configured,true).target,17);assert.equal(targetReadState(configured,true).completed,1);});
 
-test('dashboard target card separates reports received from credited progress and withholds unavailable targets',()=>{
+test('dashboard target card subtracts received reports while separately explaining scoring credit',()=>{
  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
  const {InspectionTargetProgress}=require('../src/components/analytics/InspectionTargetProgress.tsx');
  const {targetDelivery,targetReadState}=require('../src/services/targetDelivery.ts');
  const props={from:'2026-11-03',to:'2026-11-03',delivery:targetDelivery({target:10,completed:4,targetConfigured:true}),received:7,loading:false,onInspect:()=>{}};
  const render=changes=>renderToStaticMarkup(React.createElement(InspectionTargetProgress,{...props,...changes}));
- const html=render({});assert.match(html,/data-target-progress="target">10</);assert.match(html,/data-target-progress="received">7</);assert.match(html,/data-target-progress="remaining">6</);assert.match(html,/4 credited · 40% achieved/);assert.match(html,/2026-11-03/);
+ const html=render({});assert.match(html,/data-target-progress="target">10</);assert.match(html,/data-target-progress="received">7</);assert.match(html,/data-target-progress="remaining">3</);assert.match(html,/70% received/);assert.match(html,/Daroga scoring credit: 4 \/ 10/);assert.match(html,/2026-11-03/);
  const unavailable=render({delivery:targetReadState(props.delivery,false)});assert.match(unavailable,/Inspection target unavailable/);assert.match(unavailable,/data-target-progress="target">—</);assert.match(unavailable,/data-target-progress="received">7</);assert.doesNotMatch(unavailable,/role="progressbar"/);
  const loading=render({loading:true});assert.doesNotMatch(loading,/40% achieved|>7</);assert.match(loading,/aria-busy="true"/);
  const range=render({to:'2026-11-04'});assert.match(range,/Inspection target for selected dates/);assert.match(range,/2026-11-03 to 2026-11-04/);
+});
+
+test('220 report target minus 71 or 74 arrivals reconciles even when officer credit is only 10',()=>{
+ const {targetDelivery,reportTargetDelivery,targetReadState}=require('../src/services/targetDelivery.ts');
+ const scoring=targetDelivery({target:220,completed:10,targetConfigured:true});
+ for(const received of [71,74]){const progress=reportTargetDelivery(scoring,received);assert.equal(progress.remaining,220-received);assert.equal(progress.percent,received/220*100);assert.equal(progress.completed,received);}
+ assert.equal(scoring.remaining,210);assert.equal(scoring.completed,10);
+ assert.equal(reportTargetDelivery(scoring,300).remaining,0);assert.equal(reportTargetDelivery(scoring,null).remaining,null);
+ assert.equal(reportTargetDelivery(targetReadState(scoring,false),71).remaining,null);
+ const {unmappedTargetUnits}=require('../src/services/commissioner.ts');assert.equal(unmappedTargetUnits({u:{rows:[{target:220,zoneName:'Zone 1'},{target:3,zoneName:''}]}},['Zone 1']),3);
+});
+
+test('visible workspaces refresh reports and officer performance every 30 seconds and on return, then clean up',()=>{
+ const React=require('react'),{useOperationalRefresh}=require('../src/services/useOperationalRefresh.ts');
+ const savedState=React.useState,savedEffect=React.useEffect,savedWindow=global.window,savedDocument=global.document,savedNow=Date.now;
+ let effect,timer,timerCleared=false,updates=0,now=10000;
+ const fakeWindow=new EventTarget();fakeWindow.setInterval=(fn,ms)=>{timer=fn;assert.equal(ms,30000);return 8;};fakeWindow.clearInterval=id=>{assert.equal(id,8);timerCleared=true;};
+ const fakeDocument=new EventTarget();fakeDocument.hidden=false;
+ React.useState=()=>[0,update=>{assert.equal(update(0),1);updates++;}];React.useEffect=fn=>{effect=fn;};
+ global.window=fakeWindow;global.document=fakeDocument;Date.now=()=>now;
+ try{
+  useOperationalRefresh('city');const cleanup=effect();now+=30000;timer();assert.equal(updates,1);
+  fakeDocument.hidden=true;now+=30000;timer();assert.equal(updates,1);
+  fakeDocument.hidden=false;fakeDocument.dispatchEvent(new Event('visibilitychange'));assert.equal(updates,2);
+  fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,2,'focus and visibility events must not duplicate a refresh');
+  now+=6000;fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,3);
+  cleanup();assert.equal(timerCleared,true);now+=6000;fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,3);
+ }finally{React.useState=savedState;React.useEffect=savedEffect;global.window=savedWindow;global.document=savedDocument;Date.now=savedNow;}
 });
 
 test('ULB reports received drill matches completed count within the selected ward and excludes drafts',()=>{
