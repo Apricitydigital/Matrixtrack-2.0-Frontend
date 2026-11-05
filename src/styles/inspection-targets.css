@@ -58,3 +58,20 @@
 .inspection-target-progress>footer{margin-top:9px;font-size:12px;line-height:1.6;color:var(--muted,#637f91)}
 @media(max-width:520px){.inspection-target-progress{padding:16px}.inspection-target-progress dl{gap:10px}.inspection-target-progress dl>div+div{padding-left:10px}.inspection-target-progress dt{font-size:12px;min-height:36px}.inspection-target-progress dd{font-size:23px}}
 .inspection-target-progress .inspection-scoring-note{margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line,#dce6ee);font-size:12px;line-height:1.6;color:var(--muted,#637f91)}
+
+.inspection-target-actions{display:flex;align-items:center;gap:12px}
+.inspection-target-update{padding:7px 14px;border:1px solid var(--accent,#197d8d);border-radius:8px;background:transparent;color:var(--accent,#197d8d);font-size:13px;font-weight:600;cursor:pointer}
+.inspection-target-update:hover{background:var(--accent,#197d8d);color:#fff}
+.update-target-form{display:flex;flex-direction:column;gap:14px}
+.update-target-tabs{display:flex;gap:6px;padding:4px;border-radius:10px;background:var(--surface-soft,#f5f8fb)}
+.update-target-tabs button{flex:1;padding:8px 10px;border-radius:7px;font-size:13px;font-weight:600;color:var(--muted,#637f91);cursor:pointer}
+.update-target-tabs button.active{background:var(--surface,#fff);color:var(--ink,#19394d);box-shadow:0 1px 3px rgba(25,57,77,.15)}
+.update-target-percent{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted,#637f91)}
+.update-target-percent input{padding:10px 12px;border:1px solid var(--line,#dce6ee);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#19394d);font-size:16px}
+.update-target-hint{margin:0;font-size:12.5px;color:var(--muted,#637f91)}
+.update-target-error{margin:0;font-size:13px;color:#b42318}
+.update-target-done{margin:0;font-size:13px;color:#067647}
+.update-target-actions{display:flex;justify-content:flex-end;gap:10px}
+.update-target-actions button{padding:9px 16px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--line,#dce6ee)}
+.update-target-actions button[type=submit]{background:var(--accent,#197d8d);border-color:var(--accent,#197d8d);color:#fff}
+.update-target-actions button:disabled{opacity:.5;cursor:default}
