@@ -79,11 +79,13 @@ export function scopedIecSummary(response:any,zoneIds:string[],wardIds:string[])
 }
 export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[],wardId:string|string[],revision:number,topics?:string[],geoZoneIds?:string[]):CityPulse {
   const [pulse,setPulse]=useState<CityPulse & {scopeKey:string}>({scopeKey:'',pending:6,errors:{}});const zoneKey=zoneIds.join(','),wardKey=Array.isArray(wardId)?wardId.join(','):wardId,geoZoneKey=geoZoneIds?.join(','),topicKey=topics?.join(',')||'';
-  const liveRevision=useOperationalRefresh(cityId,pulse.pending===0);
+  const [refreshing,setRefreshing]=useState(false);
+  const liveRevision=useOperationalRefresh(cityId,pulse.pending===0&&!refreshing);
   const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey]);
   const loadedKey=useRef('');
   useEffect(()=>{
     const c=new AbortController(),background=loadedKey.current===scopeKey,step=background?0:1;if(!background)setPulse({scopeKey,pending:6,errors:{}});
+    setRefreshing(true);
     const {range,geo,official}=cityPulseQueries(from,to,zoneIds,wardId,geoZoneIds);
     const tasks:[string,()=>Promise<any>][]=[
       ['official',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER')return undefined;if(!zoneKey)throw Error('Zone information unavailable.');return summarizeZones(await api(`/city/dashboard/zone-export?${official}`,{signal:c.signal}));}],
@@ -93,20 +95,23 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
       ['iec',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER'){const d=await api(`/cleanliness-issues/ulb/summary?${range}`,{signal:c.signal});return {pendingApprovals:d.pendingApprovals,pendingReopenRequests:d.pendingReopenRequests};}const selectedZones=geoZoneIds??(zoneIds.length===1?zoneIds:[]),selectedWards=Array.isArray(wardId)?wardId:wardId?[wardId]:[];if(selectedZones.length<=1&&selectedWards.length<=1)return (await api(`/cleanliness-issues/commissioner/summary?${geo}`,{signal:c.signal})).kpis||null;const d=await api(`/cleanliness-issues/commissioner/summary?${range}`,{signal:c.signal});return scopedIecSummary(d,selectedZones,selectedWards);}],
       ['performance',async()=>{
         const q=new URLSearchParams({startDate:new Date(`${from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330',view:'score'});
-        const results=await concurrentReads([['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']].map(([role,key])=>async()=>{
-          const response=await api(`/city/users/${key}-performance?${q}`,{signal:c.signal,cache:'no-store'}),users=response.users||{};
-          if(!c.signal.aborted)setPulse(p=>({...p,performance:{...p.performance,[role]:users},...(role==='SUPERVISOR'&&p.official?{official:applyPerformanceTargets(p.official,users,wardId)}:{})}));
+        const roles=[['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']];
+        const results=await concurrentReads(roles.map(([role,key])=>async()=>{
+          const response=await api(`/city/users/${key}-performance?${q}`,{signal:c.signal,cache:'no-store'}),users=response?.users;
+          if(!users||typeof users!=='object'||Array.isArray(users))throw Error('Performance response is incomplete.');
+          if(!c.signal.aborted)setPulse(p=>({...p,performance:{...p.performance,[role]:users},errors:{...Object.fromEntries(Object.entries(p.errors).filter(([topic])=>topic!==`performance:${role}`)),...(Object.keys(response.errors||{}).length?{[`performance:${role}`]:'Some officer calculations are unavailable.'}:{})},...(role==='SUPERVISOR'&&p.official?{official:applyPerformanceTargets(p.official,users,wardId)}:{})}));
           return [role,users] as const;
         }),2);
+        if(!c.signal.aborted)for(const [index,result] of results.entries())if(result.status==='rejected')setPulse(p=>({...p,errors:{...p.errors,[`performance:${roles[index][0]}`]:background?'Live performance refresh failed; showing last loaded figures.':'Performance data unavailable.'}}));
         if(results.every(r=>r.status==='rejected'))throw Error('Team performance unavailable.');
         return Object.fromEntries(results.flatMap(r=>r.status==='fulfilled'?[r.value]:[]));
       }]
 
     ];
-    const run=async([key,load]:[string,()=>Promise<any>])=>{if(c.signal.aborted)return;try{const value=await load();if(!c.signal.aborted)setPulse(p=>({...p,[key]:value,...(key==='performance'&&p.official&&value?.SUPERVISOR?{official:applyPerformanceTargets(p.official,value.SUPERVISOR,wardId)}:{}),...(key==='official'&&value&&p.performance?.SUPERVISOR?{official:applyPerformanceTargets(value,p.performance.SUPERVISOR,wardId)}:{}),pending:p.pending-step}));}catch(e){if(!c.signal.aborted&&!background)setPulse(p=>({...p,errors:{...p.errors,[key]:e.message},pending:p.pending-step}));}};
+    const run=async([key,load]:[string,()=>Promise<any>])=>{if(c.signal.aborted)return;try{const value=await load();if(!c.signal.aborted)setPulse(p=>({...p,[key]:key==='performance'&&background?{...p.performance,...value}:value,...(key==='performance'&&p.official&&value?.SUPERVISOR?{official:applyPerformanceTargets(p.official,value.SUPERVISOR,wardId)}:{}),...(key==='official'&&value&&p.performance?.SUPERVISOR?{official:applyPerformanceTargets(value,p.performance.SUPERVISOR,wardId)}:{}),errors:Object.fromEntries(Object.entries(p.errors).filter(([topic])=>topic!==key)),pending:p.pending-step}));}catch(e){if(!c.signal.aborted)setPulse(p=>({...p,errors:{...p.errors,[key]:`${background?'Live refresh failed; showing last loaded figures. ':''}${e.message}`},pending:p.pending-step}));}};
     // Target credit and attendance need not wait for the zone-export report.
     const active=topicKey?tasks.filter(([key])=>topicKey.split(',').includes(key)):tasks;if(!background)setPulse({scopeKey,pending:active.length,errors:{}});
-    for(const task of active)void run(task);
+    void Promise.all(active.map(run)).finally(()=>{if(!c.signal.aborted)setRefreshing(false);});
     return()=>c.abort();
   },[cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey,liveRevision]);
   useEffect(()=>{if(pulse.pending===0&&pulse.scopeKey===scopeKey)loadedKey.current=scopeKey;},[pulse.pending,pulse.scopeKey,scopeKey]);

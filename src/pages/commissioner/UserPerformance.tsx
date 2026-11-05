@@ -18,23 +18,26 @@ export function UserPerformance({city,users,zones,wards}:{city:City;users:User[]
   const [role,setRole]=useState('SUPERVISOR'),[query,setQuery]=useState(''),[zone,setZone]=useState('all'),[ward,setWard]=useState('all');const ref=useRef<HTMLDivElement>(null);
   const {from,to}=matrixStore.getDateRange();
   const [module,setModule]=useState('ALL');
-  const liveRevision=useOperationalRefresh(city.id,!Object.values(loads).some(load=>load.status==='loading'));
+  const [refreshing,setRefreshing]=useState(false);
+  const liveRevision=useOperationalRefresh(city.id,!refreshing&&!Object.values(loads).some(load=>load.status==='loading'));
   // The automatic refresh counter is not part of the key: background refreshes update figures without blanking the page.
   const readKey=JSON.stringify([city.id,from,to,retry,matrixStore.loadRevision]),shownKey=useRef('');
   const activeLoads:Record<string,PerformanceLoad>=loadedKey===readKey?loads:Object.fromEntries(PERFORMANCE_ROLES.map(r=>[r,{status:'loading' as const}]));
   useEffect(()=>{const c=new AbortController(),background=shownKey.current===readKey;if(!background){setLoadedKey(readKey);setLoads(Object.fromEntries(PERFORMANCE_ROLES.map(r=>[r,{status:'loading'}])));setStats({});}
+    setRefreshing(true);let remaining=3;
     const range=new URLSearchParams({startDate:new Date(`${from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330',view:'score'});
     for(const [role,key] of [['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']])void (async()=>{
       try{
         const data=await api(`/city/users/${key}-performance?${range}`,{signal:c.signal,cache:'no-store'});
         if(!data?.users||typeof data.users!=='object'||Array.isArray(data.users))throw Error('Performance response is incomplete.');
         if(!c.signal.aborted){shownKey.current=readKey;setStats(previous=>({...previous,[role]:data.users}));setLoads(previous=>({...previous,[role]:{status:'ready',officerErrors:data.errors||{}}}));}
-      }catch(error){if(!c.signal.aborted&&!background)setLoads(previous=>({...previous,[role]:{status:'error',message:error.message}}));}
+      }catch(error){if(!c.signal.aborted)setLoads(previous=>({...previous,[role]:background?{...previous[role],refreshError:`Live refresh failed; showing last loaded figures. ${error.message}`}:{status:'error',message:error.message}}));}
+      finally{remaining--;if(!remaining&&!c.signal.aborted)setRefreshing(false);}
     })();return()=>c.abort();
   },[readKey,liveRevision]);
   const groups=performanceGroups(users,stats,activeLoads,city.id,wards,{zone,ward,module,query});
   const loading=activeLoads[role]?.status==='loading';
-  const errors=PERFORMANCE_ROLES.flatMap(r=>activeLoads[r]?.status==='error'?[`${ROLE_LABELS[r]}: ${activeLoads[r].message}`]:Object.keys(activeLoads[r]?.officerErrors||{}).length?[`${ROLE_LABELS[r]}: ${Object.keys(activeLoads[r].officerErrors!).length} user calculations unavailable. Other results are retained.`]:[]);
+  const errors=PERFORMANCE_ROLES.flatMap(r=>[...(activeLoads[r]?.status==='error'?[`${ROLE_LABELS[r]}: ${activeLoads[r].message}`]:[]),...(activeLoads[r]?.refreshError?[`${ROLE_LABELS[r]}: ${activeLoads[r].refreshError}`]:[]),...(Object.keys(activeLoads[r]?.officerErrors||{}).length?[`${ROLE_LABELS[r]}: ${Object.keys(activeLoads[r].officerErrors!).length} user calculations unavailable. Other results are retained.`]:[])]);
   const rows=groups[role] || [];
   const paging=usePagination(rows,role+query+zone+ward+module+from+to);
   const score=(v:any)=>v==null?'Not assessed':`${Number(v).toFixed(1)}%`;
