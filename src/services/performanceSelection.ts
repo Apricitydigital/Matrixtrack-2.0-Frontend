@@ -1,7 +1,7 @@
 import type { User,Ward } from '../types';
 import { performanceForRole } from './performanceModel';
 export const PERFORMANCE_ROLES=['SUPERVISOR','QC','ACTION_OFFICER'] as const;
-export type PerformanceLoad={status:'loading'|'ready'|'error';message?:string;officerErrors?:Record<string,string>};
+export type PerformanceLoad={status:'loading'|'ready'|'error';message?:string;refreshError?:string;officerErrors?:Record<string,string>};
 export function officerGeography(user:User,wards:Ward[],module='ALL'){
   const modules=(user.moduleAssignments||[]).filter(m=>module==='ALL'||m.key===module);
   const custom=module!=='ALL'&&modules.some(m=>m.zoneIds.length||m.wardIds.length);

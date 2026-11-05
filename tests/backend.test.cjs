@@ -2367,3 +2367,37 @@ test('Commissioner overview renders multi-zone and ward totals consistently acro
   assert.match(html,/data-metric="overview-inspections">2</);assert.match(html,/data-outcome="NOT_CLEAN"[^]*?<strong>2<\/strong>/);assert.match(html,/data-metric="entities">2</);assert.match(html,/66.7%/);assert.doesNotMatch(html,/>Ward 2<|>Ward 4<|>Zone 3</);
  }finally{React.useState=savedState;coverageHook.useInspectionCoverage=savedCoverage;commissioner.useCityPulse=savedPulse;}
 });
+
+function reviewHookHarness(){
+ const React=require('react'),saved={useState:React.useState,useEffect:React.useEffect,useRef:React.useRef},slots=[];let index=0,scheduled=[];
+ React.useState=initial=>{const at=index++;if(!slots[at])slots[at]={value:typeof initial==='function'?initial():initial};return [slots[at].value,next=>{slots[at].value=typeof next==='function'?next(slots[at].value):next;}];};
+ React.useRef=initial=>{const at=index++;return (slots[at]??={current:initial});};
+ React.useEffect=(effect,deps)=>{const at=index++,previous=slots[at];if(!previous||deps.some((dep,i)=>!Object.is(dep,previous.deps[i])))scheduled.push(()=>{previous?.cleanup?.();slots[at]={deps,cleanup:effect()};});};
+ return {render:read=>{index=0;scheduled=[];const value=read();scheduled.forEach(run=>run());return value;},close:()=>{for(const slot of slots)slot?.cleanup?.();Object.assign(React,saved);}};
+}
+
+test('slow background coverage refresh keeps figures, blocks overlap and identifies stale figures after failure',async()=>{
+ const coverage=require('../src/services/inspectionCoverage.ts'),refresh=require('../src/services/useOperationalRefresh.ts'),{useInspectionCoverage}=require('../src/services/useInspectionCoverage.ts');
+ const savedLoad=coverage.loadInspectionCoverage,savedRefresh=refresh.useOperationalRefresh,jobs=[];let revision=0,enabled;
+ coverage.loadInspectionCoverage=(city,from,to,signal)=>new Promise((resolve,reject)=>jobs.push({resolve,reject,signal}));refresh.useOperationalRefresh=(scope,active)=>{enabled=active;return revision;};
+ const harness=reviewHookHarness(),city={id:'city',enabledModules:['sweeping']},read=()=>useInspectionCoverage(city,'2026-11-05','2026-11-05',0),flush=()=>new Promise(setImmediate);
+ try{
+  assert.equal(harness.render(read).loading,true);jobs[0].resolve({...coverage.emptyCoverage(),marker:1});await flush();assert.equal(harness.render(read).data.marker,1);assert.equal(enabled,true);
+  revision++;assert.equal(harness.render(read).data.marker,1);assert.equal(harness.render(read).loading,false);assert.equal(enabled,false);assert.equal(jobs.length,2);assert.equal(jobs[1].signal.aborted,false);
+  jobs[1].reject(Error('offline'));await flush();const stale=harness.render(read);assert.equal(stale.data.marker,1);assert.match(stale.data.errors.join(),/Live refresh failed.*offline/);assert.equal(enabled,true);
+  revision++;harness.render(read);jobs[2].resolve({...coverage.emptyCoverage(),marker:2});await flush();const fresh=harness.render(read);assert.equal(fresh.data.marker,2);assert.equal(fresh.data.errors.length,0);
+ }finally{harness.close();coverage.loadInspectionCoverage=savedLoad;refresh.useOperationalRefresh=savedRefresh;}
+});
+
+test('partial live performance failure keeps the last Daroga score and reports the failed refresh',async()=>{
+ const apiModule=require('../src/services/api.ts'),refresh=require('../src/services/useOperationalRefresh.ts'),{useCityPulse}=require('../src/services/commissioner.ts');
+ const savedApi=apiModule.api,savedRefresh=refresh.useOperationalRefresh,jobs=[];let revision=0,enabled;
+ apiModule.api=path=>new Promise((resolve,reject)=>jobs.push({path,resolve,reject}));refresh.useOperationalRefresh=(scope,active)=>{enabled=active;return revision;};
+ const harness=reviewHookHarness(),read=()=>useCityPulse('city','2026-11-05','2026-11-05',['z'],[],0,['performance']),flush=()=>new Promise(setImmediate);
+ try{
+  harness.render(read);assert.equal(jobs.length,2);jobs[0].resolve({users:{u:{performance:50}}});jobs[1].resolve({users:{si:{performance:70}}});await flush();jobs[2].resolve({users:{iec:{performance:80}}});await flush();harness.render(read);harness.render(read);assert.equal(enabled,true);
+  revision++;const old=harness.render(read);assert.equal(old.performance.SUPERVISOR.u.performance,50);harness.render(read);assert.equal(enabled,false);
+  jobs[3].reject(Error('offline'));jobs[4].resolve({users:{si:{performance:75}}});await flush();jobs[5].resolve({users:{iec:{performance:90}}});await flush();const mixed=harness.render(read);
+  assert.equal(mixed.performance.SUPERVISOR.u.performance,50);assert.equal(mixed.performance.QC.si.performance,75);assert.match(mixed.errors['performance:SUPERVISOR'],/Live performance refresh failed/);assert.equal(enabled,true);
+ }finally{harness.close();apiModule.api=savedApi;refresh.useOperationalRefresh=savedRefresh;}
+});
