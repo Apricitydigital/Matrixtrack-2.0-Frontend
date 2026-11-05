@@ -95,7 +95,7 @@ test('report exports carry dates and Apricty branding while preserving numeric d
  const originalDocument=global.document,originalCreate=URL.createObjectURL;let blob,filename;
  global.document={createElement:()=>({setAttribute(k,v){this[k]=v;},click(){filename=this.download;}}),body:{appendChild(){},removeChild(){}}};URL.createObjectURL=value=>{blob=value;return originalCreate(value);};
  try{
-  await downloadWorkbook('service-report-2026-08-01-to-2026-11-03.xlsx',['Entity','Completed'],[['Beat 1',12]],'Services');
+  await downloadWorkbook('service-report-2026-08-01-to-2026-11-03.xlsx',['Asset','Completed'],[['Beat 1',12]],'Services');
   const workbook=new Workbook();await workbook.xlsx.load(await blob.arrayBuffer());assert.equal(filename,'service-report-2026-08-01-to-2026-11-03.xlsx');assert.equal(workbook.worksheets[0].name,'Report overview');assert.match(workbook.getWorksheet('Report overview').getCell('B3').text,/2026-08-01 to 2026-11-03/);assert.equal(workbook.getWorksheet('Report overview').getCell('B6').text,'Apricty Digital Labs');assert.equal(workbook.getWorksheet('Services').getCell('B2').value,12);assert.match(workbook.getWorksheet('Services').headerFooter.oddFooter,/Powered by Apricty Digital Labs/);
   await downloadWorkbook('toilets-template.xlsx',['Zone Name','Ward Name'],[],'Locations');const template=new Workbook();await template.xlsx.load(await blob.arrayBuffer());assert.equal(template.worksheets.length,1);assert.equal(template.worksheets[0].getCell('A1').text,'Zone Name');
   await downloadAuditWorkbook('full-report-2026-08-01-to-2026-11-03.xlsx',[{name:'Records',headers:['Metric','Value'],rows:[['Missing',null],['Completed',12]]}]);const audit=new Workbook();await audit.xlsx.load(await blob.arrayBuffer());assert.equal(audit.getWorksheet('Records').getCell('B2').text,'Not available');assert.equal(audit.getWorksheet('Records').getCell('B3').value,12);
@@ -103,7 +103,7 @@ test('report exports carry dates and Apricty branding while preserving numeric d
   downloadCsv('import-template.csv','Zone,Ward');assert.equal(await blob.text(),'Zone,Ward');
  }finally{global.document=originalDocument;URL.createObjectURL=originalCreate;}
 });
-test('multi-zone report data applies the same entity and visit scope and does not invent attendance totals',()=>{
+test('multi-zone report data applies the same asset and visit scope and does not invent attendance totals',()=>{
  const {commissionerReportData}=require('../src/services/commissionerReportData.ts'),{emptyCoverage}=require('../src/services/inspectionCoverage.ts');
  const zones=['z1','z2','z3'].map((id,i)=>({id,name:'Zone '+(i+1),cityId:'c'})),wards=zones.map((z,i)=>({id:'w'+i,zoneId:z.id,cityId:'c',name:'Ward '+i}));
  const coverage={...emptyCoverage(),inventoryAvailable:true,from:'2026-11-01',to:'2026-11-03',assets:zones.map((z,i)=>({id:'a'+i,module:'sweeping',zoneId:z.id,wardId:'w'+i})),visits:zones.map((z,i)=>({id:'r'+i,assetId:'a'+i,module:'sweeping',zoneId:z.id,wardId:'w'+i,status:'APPROVED',submittedAt:'2026-11-02T04:00:00Z'}))};
@@ -308,7 +308,7 @@ test('compact dashboard reader uses one request, preserves exact metrics and sep
  const fallback=await loadInspectionCoverage(city,from,to,signal,true);assert.equal(fallback.inventoryAvailable,true);assert.equal(calls.length,3);
 });
 
-test('coverage range changes preserve inventory and count completed entities once across days and geography', async () => {
+test('coverage range changes preserve inventory and count completed assets once across days and geography', async () => {
   const { loadInspectionCoverage } = require('../src/services/inspectionCoverage.ts');
   const { inspectionMetrics } = require('../src/services/inspectionMetrics.ts');
   const { datePreset } = require('../src/services/presentation.ts');
@@ -1374,7 +1374,7 @@ test('87 toilets retain total, configured 10% target and 100% achievement using 
   };
 const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx');
 const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data: coverage, loading: false, zone: '', ward: '', onInspect: () => { } }));
-assert.match(html, /Every module\. One view\./); assert.match(html, /Cleanliness of Toilet/); assert.match(html, /data-metric="entities">87/); assert.match(html, /Total entities/); assert.match(html, /10% configured/); assert.match(html, /data-metric="target" data-state="configured">9/); assert.match(html, /data-metric="achievement" data-met="true">100%/);
+assert.match(html, /Every module\. One view\./); assert.match(html, /Cleanliness of Toilet/); assert.match(html, /data-metric="entities">87/); assert.match(html, /Total assets/); assert.match(html, /10% configured/); assert.match(html, /data-metric="target" data-state="configured">9/); assert.match(html, /data-metric="achievement" data-met="true">100%/);
 assert.equal(targetDelivery({ target: 9, completed: 9 }).configuredPercent, null);
 });
 
@@ -1511,7 +1511,7 @@ test('coverage distinguishes 218 recorded inspections from 189 credited toward a
   const official = summarizeZones({ zones: [{ zoneId: 'z', zoneName: 'Zone 1', modules: [{ module: 'TOILET', target: 1511, completed: 189, targetConfigured: true }] }] });
   const html = renderToStaticMarkup(React.createElement(CoverageOverview, { data, loading: false, zone: '', ward: '', zones: [], rankings: [], official, from: '2026-10-31', to: '2026-10-31', onZone: () => { } }));
   const metrics=require('../src/services/inspectionMetrics.ts').inspectionMetrics(data,{},official.totals);assert.equal(metrics.achieved,218);assert.equal(metrics.delivery.completed,189);assert.equal(metrics.delivery.target,1511);
-  assert.match(html,/Unique entities inspected: 218/);assert.match(html,/About Coverage and inspection targets/);assert.doesNotMatch(html,/employee assignments, inspection completeness|189 of 1,511 inspections completed|29 rejected|29 incomplete/);
+  assert.match(html,/Unique assets inspected: 218/);assert.match(html,/About Coverage and inspection targets/);assert.doesNotMatch(html,/employee assignments, inspection completeness|189 of 1,511 inspections completed|29 rejected|29 incomplete/);
 });
 
 
@@ -1958,7 +1958,7 @@ test('selected-period baseline reconciles records, location-day credit and drill
 });
 
 
-test('service metrics exclude Draft, distinguish completed repeats from unique entities and reconcile the report', () => {
+test('service metrics exclude Draft, distinguish completed repeats from unique assets and reconcile the report', () => {
   const { emptyCoverage, inspectionOutcomes } = require('../src/services/inspectionCoverage.ts');
   const { inspectionMetrics } = require('../src/services/inspectionMetrics.ts');
   const { commissionerReportData } = require('../src/services/commissionerReportData.ts');
