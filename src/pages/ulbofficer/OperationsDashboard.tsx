@@ -1,3 +1,4 @@
+import {IntelligenceSuggestion} from '../../components/reports/IntelligenceSuggestion';
 import { PhotoIntegrityWarning } from '../../components/reports/PhotoIntegrityWarning';
 import React from 'react';
 import { OperationalReport, IecCleanlinessIssue, City, Zone, Ward, User } from '../../types';
@@ -163,7 +164,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
                   <div key={r.id} className="p-4 flex items-start justify-between gap-3 hover:bg-slate-50">
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold font-mono text-slate-900">{r.reportNumber}</span><PhotoIntegrityWarning confidence={r.photoRecaptureConfidence}/>
+                        <span className="font-bold font-mono text-slate-900">{r.reportNumber}</span><PhotoIntegrityWarning confidence={r.photoRecaptureConfidence}/><IntelligenceSuggestion report={r} compact/>
                         <StatusBadge status={r.status} size="sm" />
                         <span className="text-[15px] uppercase font-mono text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
                           {r.moduleId}

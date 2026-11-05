@@ -271,6 +271,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container */}
       <aside className={`
+          workspace-sidebar
         fixed lg:static top-0 bottom-0 left-0 z-50
         w-64 bg-slate-900 border-r border-slate-800 text-slate-300
         flex flex-col shrink-0 transition-transform duration-200 ease-in-out

@@ -42,11 +42,12 @@ export function applyTargetConfiguration(official:ReturnType<typeof summarizeZon
   return {...official,totals:verifyTargetFigures(official.totals,configuration),modules:Object.fromEntries(Object.entries(official.modules).map(([id,value])=>[id,verifyTargetFigures(value,configuration)])),zones:official.zones.map(zone=>({...zone,totals:verifyTargetFigures(zone.totals,configuration)}))};
 }
 /** The zone export omits source metadata. Daroga rows expose the same target/credit calculation with ADMIN/DEFAULT evidence. */
-export function performanceTargetRows(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId='') {
-  const rows=Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>row.wardId&&moduleId(row.module)&&(!wardId||row.wardId===wardId)&&['ADMIN','DEFAULT'].includes(row.source)&&Number.isFinite(row.target)&&row.target>=0&&Number.isFinite(row.credit)&&row.credit>=0);
+export function performanceTargetRows(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='') {
+  const wardIds=Array.isArray(wardId)?wardId:wardId?[wardId]:[];
+  const rows=Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>row.wardId&&moduleId(row.module)&&(!wardIds.length||wardIds.includes(row.wardId))&&['ADMIN','DEFAULT'].includes(row.source)&&Number.isFinite(row.target)&&row.target>=0&&Number.isFinite(row.credit)&&row.credit>=0);
   return rows.filter(row=>official.zones.some(zone=>zone.name===row.zoneName));
 }
-export function applyPerformanceTargets(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId='') {
+export function applyPerformanceTargets(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='') {
   const selected=performanceTargetRows(official,users,wardId);
   const resolve=(figures:InspectionFigures,scope:any[])=>{
     if(!scope.length)return figures;
@@ -59,18 +60,31 @@ export function applyPerformanceTargets(official:ReturnType<typeof summarizeZone
   return {...official,totals:resolve(official.totals,selected),modules:Object.fromEntries(Object.entries(official.modules).map(([id,value])=>[id,resolve(value,selected.filter(row=>moduleId(row.module)===id))])),zones:official.zones.map(zone=>({...zone,totals:resolve(zone.totals,selected.filter(row=>row.zoneName===zone.name))}))};
 }
 export interface CityPulse {official?:ReturnType<typeof summarizeZones>;attendance?:any;rankings?:any[];plants?:ReturnType<typeof normalizeDashboardPayload>;iec?:any;performance?:Record<string,any>;pending:number;errors:Record<string,string>;}
-export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[],wardId:string,revision:number,topics?:string[]):CityPulse {
-  const [pulse,setPulse]=useState<CityPulse & {scopeKey:string}>({scopeKey:'',pending:6,errors:{}});const zoneKey=zoneIds.join(','),topicKey=topics?.join(',')||'';
-  const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardId,revision,topicKey]);
+export function cityPulseQueries(from:string,to:string,zoneIds:string[],wardId:string|string[],geoZoneIds=zoneIds.length===1?zoneIds:[]) {
+  const wardKey=(Array.isArray(wardId)?wardId:wardId?[wardId]:[]).join(',');
+  return {range:new URLSearchParams({from,to}),geo:new URLSearchParams({from,to,...(geoZoneIds.length?{zoneId:geoZoneIds.join(',')}:{}),...(wardKey?{wardId:wardKey}:{})}),official:new URLSearchParams({from,to,zoneIds:zoneIds.join(','),...(wardKey?{wardIds:wardKey}:{})})};
+}
+/** The IEC endpoint supplies complete, disjoint zone/ward breakdowns. Never sum percentages. */
+export function scopedIecSummary(response:any,zoneIds:string[],wardIds:string[]) {
+  if(!zoneIds.length&&!wardIds.length)return response?.kpis||null;
+  const source=wardIds.length?response?.wards:response?.zones;
+  if(!Array.isArray(source))return null;
+  const rows=source.filter(row=>wardIds.length?wardIds.includes(row.id)&&(!zoneIds.length||zoneIds.includes(row.zoneId)):zoneIds.includes(row.id));
+  const sum=(key:string)=>rows.every(row=>typeof row[key]==='number'&&Number.isFinite(row[key]))?rows.reduce((total,row)=>total+row[key],0):null;
+  return {totalReported:sum('total'),totalClosed:sum('closed'),openIssues:sum('open'),overdueInspections:sum('overdue')};
+}
+export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[],wardId:string|string[],revision:number,topics?:string[],geoZoneIds?:string[]):CityPulse {
+  const [pulse,setPulse]=useState<CityPulse & {scopeKey:string}>({scopeKey:'',pending:6,errors:{}});const zoneKey=zoneIds.join(','),wardKey=Array.isArray(wardId)?wardId.join(','):wardId,geoZoneKey=geoZoneIds?.join(','),topicKey=topics?.join(',')||'';
+  const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey]);
   useEffect(()=>{
     const c=new AbortController();setPulse({scopeKey,pending:6,errors:{}});
-    const range=new URLSearchParams({from,to}),geo=new URLSearchParams({from,to,...(zoneIds.length===1?{zoneId:zoneKey}:{}),...(wardId?{wardId}:{})});
+    const {range,geo,official}=cityPulseQueries(from,to,zoneIds,wardId,geoZoneIds);
     const tasks:[string,()=>Promise<any>][]=[
-      ['official',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER')return undefined;if(!zoneKey)throw Error('Zone information unavailable.');const q=new URLSearchParams({from,to,zoneIds:zoneKey,...(wardId?{wardIds:wardId}:{})});return summarizeZones(await api(`/city/dashboard/zone-export?${q}`,{signal:c.signal}));}],
+      ['official',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER')return undefined;if(!zoneKey)throw Error('Zone information unavailable.');return summarizeZones(await api(`/city/dashboard/zone-export?${official}`,{signal:c.signal}));}],
       ['attendance',async()=>{const d=await api(`/city/attendance/dashboard?${geo}&page=1&pageSize=1`,{signal:c.signal});return d.summary || null;}],
       ['rankings',async()=>(await api(`/ward-ranking?${range}`,{signal:c.signal})).rankings || []],
       ['plants',async()=>normalizeDashboardPayload(await api(`/modules/processing-plant/dashboard?${range}`,{signal:c.signal}))],
-      ['iec',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER'){const d=await api(`/cleanliness-issues/ulb/summary?${range}`,{signal:c.signal});return {pendingApprovals:d.pendingApprovals,pendingReopenRequests:d.pendingReopenRequests};}return (await api(`/cleanliness-issues/commissioner/summary?${range}${zoneIds.length===1?`&zoneId=${encodeURIComponent(zoneIds[0])}`:''}${wardId?`&wardId=${encodeURIComponent(wardId)}`:''}`,{signal:c.signal})).kpis || null;}],
+      ['iec',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER'){const d=await api(`/cleanliness-issues/ulb/summary?${range}`,{signal:c.signal});return {pendingApprovals:d.pendingApprovals,pendingReopenRequests:d.pendingReopenRequests};}const selectedZones=geoZoneIds??(zoneIds.length===1?zoneIds:[]),selectedWards=Array.isArray(wardId)?wardId:wardId?[wardId]:[];if(selectedZones.length<=1&&selectedWards.length<=1)return (await api(`/cleanliness-issues/commissioner/summary?${geo}`,{signal:c.signal})).kpis||null;const d=await api(`/cleanliness-issues/commissioner/summary?${range}`,{signal:c.signal});return scopedIecSummary(d,selectedZones,selectedWards);}],
       ['performance',async()=>{
         const q=new URLSearchParams({startDate:new Date(`${from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330',view:'score'});
         const results=await concurrentReads([['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']].map(([role,key])=>async()=>{
@@ -88,7 +102,7 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
     const active=topicKey?tasks.filter(([key])=>topicKey.split(',').includes(key)):tasks;setPulse({scopeKey,pending:active.length,errors:{}});
     for(const task of active)void run(task);
     return()=>c.abort();
-  },[cityId,from,to,zoneKey,wardId,revision,topicKey]);
+  },[cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey]);
   return pulse.scopeKey===scopeKey?pulse:{pending:topics?.length||6,errors:{}};
 }
 export function briefingNotices(pulse:CityPulse):BriefingNotice[] {
@@ -101,12 +115,13 @@ export function briefingNotices(pulse:CityPulse):BriefingNotice[] {
 }
 
 /** ULB uses its authorized inspection register; Commissioner-only summaries are not requested. */
-export function ulbInspectionSummary(data:InspectionCoverage,zones:{id:string;name:string}[],wardId='') {
+export function ulbInspectionSummary(data:InspectionCoverage,zones:{id:string;name:string}[],wardId:string|string[]='') {
+  const wardIds=Array.isArray(wardId)?wardId:wardId?[wardId]:[];
   if(data.failedModules.length||!data.inventoryAvailable)return undefined;
-  if(data.visits.some(v=>!v.zoneId || wardId&&!v.wardId))return undefined;
+  if(data.visits.some(v=>!v.zoneId || wardIds.length&&!v.wardId))return undefined;
   return summarizeZones({zones:zones.map(zone=>({zoneId:zone.id,zoneName:zone.name,modules:data.modules.map(module=>{
-    const visits=data.visits.filter(v=>v.module===module&&v.zoneId===zone.id&&(!wardId||v.wardId===wardId));
-    const total=data.assets.filter(a=>a.module===module&&a.zoneId===zone.id&&(!wardId||a.wardId===wardId)).length;
+    const visits=data.visits.filter(v=>v.module===module&&v.zoneId===zone.id&&(!wardIds.length||wardIds.includes(v.wardId)));
+    const total=data.assets.filter(a=>a.module===module&&a.zoneId===zone.id&&(!wardIds.length||wardIds.includes(a.wardId))).length;
     const count=(state:string)=>visits.filter(v=>v.status===state).length;
     return {module:MODULE_KEYS[module],target:total,targetState:'default',completed:visits.length,pending:Math.max(0,total-new Set(visits.map(v=>v.assetId).filter(Boolean)).size),cleaned:count('APPROVED'),notCleaned:count('REJECTED'),siPending:visits.filter(v=>!['APPROVED','REJECTED','ACTION_REQUIRED','ACTION_TAKEN','ESCALATED'].includes(v.status||'')).length,actionRequired:count('ACTION_REQUIRED'),actionPending:count('ACTION_REQUIRED'),actionTaken:count('ACTION_TAKEN')};
   })}))});
@@ -121,12 +136,12 @@ export function reconcileZoneExport(report:any,coverage:InspectionCoverage,wardI
     const zoneSummary=summarizeZones({zones:(report.zones||[]).filter(z=>(z.zoneId||z.id)===zone)});
     const official=performance?applyPerformanceTargets(zoneSummary,performance):zoneSummary;
     const metrics=inspectionMetrics(data,{zone,module},module?official.modules[module]:official.totals);
-    return {...value,totalEntities:metrics.totalEntities,inspectionTarget:metrics.delivery.target,achieved:metrics.achieved,uniqueEntities:metrics.uniqueEntities,coveragePercent:metrics.coveragePercent,targetCredit:metrics.delivery.completed,targetAchievement:metrics.delivery.percent,targetMethod:metrics.delivery.fallback?'One completed visit per entity per selected day':'Configured target',inspections:outcomes.total,cleaned:count('approved'),siPending:count('pending_review'),notCleaned:count('rejected'),actionRequired:count('action_required'),actionPending:count('action_required'),actionTaken:count('action_taken'),escalated:count('escalated'),unclassified:count('unclassified')};
+    return {...value,intelligenceSuggestedClean:metrics.intelligence?.CLEAN??null,intelligenceSuggestedNotCleaned:metrics.intelligence?.NOT_CLEAN??null,intelligenceUnableToAssess:metrics.intelligence?.UNASSESSABLE??null,awaitingIntelligence:metrics.intelligence?.AWAITING_AI??null,totalEntities:metrics.totalEntities,inspectionTarget:metrics.delivery.target,achieved:metrics.achieved,uniqueEntities:metrics.uniqueEntities,coveragePercent:metrics.coveragePercent,targetCredit:metrics.delivery.completed,targetAchievement:metrics.delivery.percent,targetMethod:metrics.delivery.fallback?'One completed visit per entity per selected day':'Configured target',inspections:outcomes.total,cleaned:count('approved'),siPending:count('pending_review'),notCleaned:count('rejected'),actionRequired:count('action_required'),actionPending:count('action_required'),actionTaken:count('action_taken'),escalated:count('escalated'),unclassified:count('unclassified')};
   };
   const wardRow=(value:any,zone:string)=>{
     const outcomes=inspectionOutcomes(data,{zone,ward:value.wardId});
     const metrics=inspectionMetrics(data,{zone,ward:value.wardId});
-    return {...value,completed:metrics.achieved,cleaned:outcomes.rows.find(r=>r.id==='approved')?.value??null,notCleaned:outcomes.rows.find(r=>r.id==='rejected')?.value??null};
+    return {...value,intelligenceSuggestedClean:metrics.intelligence?.CLEAN??null,intelligenceSuggestedNotCleaned:metrics.intelligence?.NOT_CLEAN??null,completed:metrics.achieved,cleaned:outcomes.rows.find(r=>r.id==='approved')?.value??null,notCleaned:outcomes.rows.find(r=>r.id==='rejected')?.value??null};
   };
   return {...report,zones:(report.zones||[]).map((z:any)=>({...z,bestWards:(z.bestWards||[]).map((w:any)=>wardRow(w,z.zoneId||z.id)),worstWards:(z.worstWards||[]).map((w:any)=>wardRow(w,z.zoneId||z.id)),modules:(z.modules||[]).map((m:any)=>{const id=moduleId(m.module||m.key||'');return id?row(m,z.zoneId||z.id,id):m;}),...(z.total?{total:row(z.total,z.zoneId||z.id)}:{})}))};
 }

@@ -13,14 +13,14 @@ import type { Zone } from '../../types';
 
 export const coverageNumber=(n:number|null|undefined)=>n==null?'—':n.toLocaleString('en-IN',{maximumFractionDigits:1});
 
-export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone}:{data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void}) {
+export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone,scopeLabel}:{data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void;scopeLabel?:string}) {
   const metrics=inspectionMetrics(data,{zone,ward},official?.totals),counts=metrics.completed;
   const rows=zoneCoverage(data,zones.filter(z=>!zone||z.id===zone),rankings,ward).map(row=>({...row,...inspectionMetrics(data,{zone:row.id,ward}).completed}));
   const number=(n:number|null)=>loading?'…':coverageNumber(n);
   const delivery=metrics.delivery;
   const period=(value:string)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'});
   return <>
-    <section className="home-section coverage-overview"><div className="home-section-heading"><div><span>INSPECTIONS & LOCATION COVERAGE</span><h2>How much of the city have we covered?</h2><p>{period(from)}{from!==to?` – ${period(to)}`:''} · {zone?'Selected zone':'All zones'}{ward?' · Selected ward':''}</p></div><span className="coverage-context"><MapPin size={16}/>{number(counts.percent)}{counts.percent!=null?'%':''} coverage</span></div>
+    <section className="home-section coverage-overview"><div className="home-section-heading"><div><span>INSPECTIONS & LOCATION COVERAGE</span><h2>How much of the city have we covered?</h2><p>{period(from)}{from!==to?` – ${period(to)}`:''} · {scopeLabel||(zone?'Selected zone':'All zones')}{!scopeLabel&&ward?' · Selected ward':''}</p></div><span className="coverage-context"><MapPin size={16}/>{number(counts.percent)}{counts.percent!=null?'%':''} coverage</span></div>
       <StatusBreakdown label="Current registered entities: inspected versus not visited" loading={loading} items={[{id:'covered',label:'Unique entities inspected',value:counts.covered,tone:'green'},{id:'remaining',label:'Not visited in selected dates',value:counts.remaining,tone:'neutral'}]}/>
 
       <div className="chart-footnote"><CardInfo title="Coverage and inspection targets">Coverage measures unique registered entities inspected in the selected dates. Target achievement measures credited inspections against the inspection target.</CardInfo></div>
@@ -28,7 +28,7 @@ export function CoverageOverview({data,loading,zone,ward,zones,rankings,official
       {!loading&&(counts.unidentified>0||counts.outsideRegister>0)&&<p className="coverage-data-note">{counts.unidentified>0?`${counts.unidentified} reports lack a location ID; exact unique and repeat counts are unavailable. `:''}{counts.outsideRegister>0?`${counts.outsideRegister} inspected locations are outside the current register and excluded from registered-location coverage.`:''}</p>}
       {data.errors.length>0&&<div className="coverage-data-note" role="status">Some coverage figures are unavailable.<details><summary>View availability</summary>{data.errors.map(e=><p key={e}>{e}</p>)}</details></div>}
     </section>
-    <section className="home-section zone-performance"><div className="home-section-heading"><div><span>ZONE PERFORMANCE</span><h2>Zone performance</h2><p>Compare targets, inspections, location coverage and pending review.</p></div>{zone&&<button onClick={()=>onZone('')}>All zones<ArrowUpRight size={15}/></button>}</div>
+    <section className="home-section zone-performance"><div className="home-section-heading"><div><span>ZONE PERFORMANCE</span><h2>Zone performance</h2><p>Compare targets, inspections, location coverage and pending review.</p></div>{(zone||scopeLabel&&scopeLabel!=='All zones and wards')&&<button onClick={()=>onZone('')}>All zones<ArrowUpRight size={15}/></button>}</div>
       <div className="zone-table-wrap"><table className="zone-delivery-table"><thead><tr><th>Zone</th><th>Inspection target achievement</th><th>Inspections still needed</th><th>{terms.coverage}</th><th>{terms.pendingReview}</th><th>Ward score average<CardInfo title="Ward score average">Average of assessed wards in the selected area.</CardInfo></th></tr></thead><tbody>{rows.map(row=>{
         const source=official?.zones?.find(z=>z.id===row.id),target=targetDelivery(source?.totals,row);
         return <tr key={row.id}><td data-label="Zone"><button className="zone-select" onClick={()=>onZone(row.id)}><strong>{row.name}</strong><ArrowUpRight size={15}/></button></td>

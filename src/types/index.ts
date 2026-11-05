@@ -242,6 +242,7 @@ export interface TimelineEvent {
 }
 
 export interface OperationalReport {
+  intelligenceSuggestion?: import('../services/intelligenceSuggestion').IntelligenceSuggestion;
   photoRecaptureConfidence?: number | null;
   actionRequired?: boolean;
   actionTaken?: boolean;

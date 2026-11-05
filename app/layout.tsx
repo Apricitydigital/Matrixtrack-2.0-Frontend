@@ -7,6 +7,7 @@ import '../src/styles/inspection-targets.css';
 import '../src/styles/insight-history-map.css';
 import '../src/styles/themes.css';
 import '../src/styles/ulb-dashboard.css';
+import '../src/styles/intelligence.css';
 
 export const metadata: Metadata = {
   title: 'MatrixTrack 2.0 Municipal Command Center',
