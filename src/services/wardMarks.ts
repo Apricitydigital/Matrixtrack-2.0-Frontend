@@ -3,7 +3,7 @@ export const OTHER_COMPONENTS = ['beat','nala','toilet','litterBin','gvp','super
 const entityModules:Record<string,string>={beat:'SWEEPING',nala:'NALA',toilet:'TOILET',litterBin:'LITTERBINS',gvp:'TASKFORCE'};
 const inventory = {beat:'totalBeats',nala:'totalNalas',toilet:'totalToilets',litterBin:'totalBins',gvp:'totalPoints'};
 
-/** Disabled modules and absent entity inventories release marks. Missing submissions never do. */
+/** Disabled modules and absent asset inventories release marks. Missing submissions never do. */
 export function distributeWardMarks(source:Record<string,any>, enabledModuleKeys?:readonly string[]) {
   const eligible=OTHER_COMPONENTS.filter(key=>{
     if(enabledModuleKeys && entityModules[key] && !enabledModuleKeys.includes(entityModules[key]))return false;

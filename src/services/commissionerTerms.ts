@@ -10,7 +10,7 @@ export const COMMISSIONER_TERMS={
   pendingReview:'Pending review',
   cleaned:'Cleaned',
   notCleaned:'Not cleaned',
-  unique:'Unique entities inspected',
+  unique:'Unique assets inspected',
   repeated:'Repeat visits',
   coverage:'Coverage %',
   actionRequired:'Action required',
