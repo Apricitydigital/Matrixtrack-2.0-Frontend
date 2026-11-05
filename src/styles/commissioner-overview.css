@@ -265,3 +265,8 @@
 .zone-overview-foot{display:flex;justify-content:space-between;align-items:center;font-size:12px}
 .zone-overview-pending{padding:3px 10px;border-radius:999px;background:#fdf1d3;color:#8a5a00;font-weight:600}
 .zone-overview-details{display:inline-flex;align-items:center;color:#4a3fb5;font-weight:700}
+.zone-overview-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.zone-overview-stats b{display:block;font-size:17px;color:#1f2937}
+.zone-overview-stats small{display:block;font-size:10px;color:#6b7280;font-weight:600}
+.zone-overview-progress{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#6b7280;font-weight:600}
+.zone-overview-progress strong{font-size:20px;color:#4a3fb5}
