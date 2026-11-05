@@ -1,7 +1,7 @@
 import { concurrentReads } from './concurrentReads';
 import { inspectionOutcomes } from './inspectionCoverage';
 import { inspectionMetrics } from './inspectionMetrics';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { moduleId, MODULE_KEYS } from './adapters';
 import { normalizeDashboardPayload } from './plantAnalytics';
@@ -80,9 +80,10 @@ export function scopedIecSummary(response:any,zoneIds:string[],wardIds:string[])
 export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[],wardId:string|string[],revision:number,topics?:string[],geoZoneIds?:string[]):CityPulse {
   const [pulse,setPulse]=useState<CityPulse & {scopeKey:string}>({scopeKey:'',pending:6,errors:{}});const zoneKey=zoneIds.join(','),wardKey=Array.isArray(wardId)?wardId.join(','):wardId,geoZoneKey=geoZoneIds?.join(','),topicKey=topics?.join(',')||'';
   const liveRevision=useOperationalRefresh(cityId,pulse.pending===0);
-  const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey,liveRevision]);
+  const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey]);
+  const loadedKey=useRef('');
   useEffect(()=>{
-    const c=new AbortController();setPulse({scopeKey,pending:6,errors:{}});
+    const c=new AbortController(),background=loadedKey.current===scopeKey,step=background?0:1;if(!background)setPulse({scopeKey,pending:6,errors:{}});
     const {range,geo,official}=cityPulseQueries(from,to,zoneIds,wardId,geoZoneIds);
     const tasks:[string,()=>Promise<any>][]=[
       ['official',async()=>{if(matrixStore.currentUser?.role==='ULB_OFFICER')return undefined;if(!zoneKey)throw Error('Zone information unavailable.');return summarizeZones(await api(`/city/dashboard/zone-export?${official}`,{signal:c.signal}));}],
@@ -102,12 +103,13 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
       }]
 
     ];
-    const run=async([key,load]:[string,()=>Promise<any>])=>{if(c.signal.aborted)return;try{const value=await load();if(!c.signal.aborted)setPulse(p=>({...p,[key]:value,...(key==='performance'&&p.official&&value?.SUPERVISOR?{official:applyPerformanceTargets(p.official,value.SUPERVISOR,wardId)}:{}),...(key==='official'&&value&&p.performance?.SUPERVISOR?{official:applyPerformanceTargets(value,p.performance.SUPERVISOR,wardId)}:{}),pending:p.pending-1}));}catch(e){if(!c.signal.aborted)setPulse(p=>({...p,errors:{...p.errors,[key]:e.message},pending:p.pending-1}));}};
+    const run=async([key,load]:[string,()=>Promise<any>])=>{if(c.signal.aborted)return;try{const value=await load();if(!c.signal.aborted)setPulse(p=>({...p,[key]:value,...(key==='performance'&&p.official&&value?.SUPERVISOR?{official:applyPerformanceTargets(p.official,value.SUPERVISOR,wardId)}:{}),...(key==='official'&&value&&p.performance?.SUPERVISOR?{official:applyPerformanceTargets(value,p.performance.SUPERVISOR,wardId)}:{}),pending:p.pending-step}));}catch(e){if(!c.signal.aborted&&!background)setPulse(p=>({...p,errors:{...p.errors,[key]:e.message},pending:p.pending-step}));}};
     // Target credit and attendance need not wait for the zone-export report.
-    const active=topicKey?tasks.filter(([key])=>topicKey.split(',').includes(key)):tasks;setPulse({scopeKey,pending:active.length,errors:{}});
+    const active=topicKey?tasks.filter(([key])=>topicKey.split(',').includes(key)):tasks;if(!background)setPulse({scopeKey,pending:active.length,errors:{}});
     for(const task of active)void run(task);
     return()=>c.abort();
   },[cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey,liveRevision]);
+  useEffect(()=>{if(pulse.pending===0&&pulse.scopeKey===scopeKey)loadedKey.current=scopeKey;},[pulse.pending,pulse.scopeKey,scopeKey]);
   return pulse.scopeKey===scopeKey?pulse:{pending:topics?.length||6,errors:{}};
 }
 export function briefingNotices(pulse:CityPulse):BriefingNotice[] {
