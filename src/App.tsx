@@ -498,7 +498,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
 
           {['comm_user_perf','ulb_user_perf','ca_user_perf'].includes(activePageId) && <UserPerformance city={effectiveCity} users={users} zones={zones} wards={wards}/>}
 
-          {activePageId==='ulb_dashboard'&&<UlbDashboard city={effectiveCity} zones={zones} wards={wards} currentUser={currentUser} onNavigate={navigate} onSelectReport={setInspectedReportId} noticeRequest={noticeRequest} onNoticeCount={setNoticeCount} onNoticeHandled={()=>setNoticeRequest(0)}/>}
+          {activePageId==='ulb_dashboard'&&<UlbDashboard onInspectZone={(zone,ward='',module='all',status='all')=>{setReportIntent(inspectionDrillFilters(zone,ward,module,status));navigate('ulb_inspection_perf');}} city={effectiveCity} zones={zones} wards={wards} currentUser={currentUser} onNavigate={navigate} onSelectReport={setInspectedReportId} noticeRequest={noticeRequest} onNoticeCount={setNoticeCount} onNoticeHandled={()=>setNoticeRequest(0)}/>}
           {/* ================= COMMISSIONER PAGES ================= */}
           {activePageId==='comm_chat_history'&&currentUser.role==='COMMISSIONER'&&<ChatHistory user={currentUser} city={effectiveCity}/>}
           {activePageId==='ca_dashboard'&&currentUser.role==='HMS_SUPER_ADMIN'&&<CityProgress city={effectiveCity} users={users} onNavigate={navigate}/>}
