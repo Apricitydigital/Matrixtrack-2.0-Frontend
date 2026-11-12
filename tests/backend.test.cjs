@@ -2328,10 +2328,15 @@ test('ULB dashboard renders one multi-zone ward selection consistently in target
  const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',submittedAt:'2026-11-04T04:00:00Z',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'CLEAN',confidencePercent:90,reason:'Clean'}}}));
  let stateIndex=0;
  React.useState=initial=>savedState(stateIndex++===0?['z1','z2']:stateIndex===2?['w1','w3']:initial);
- coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits}});
- commissioner.useCityPulse=()=>({pending:0,errors:{},performance:{SUPERVISOR:{u:{rows:wards.map(w=>({wardId:w.id,zoneName:zones.find(z=>z.id===w.zoneId).name,module:'SWEEPING',source:'ADMIN',target:10,credit:1}))}}}});
+ coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits:[...visits,{...visits[0],id:'legacy-extra-point'},{...visits[0],id:'legacy-draft',status:'DRAFT',raw:{status:'DRAFT'}}]}});
+ commissioner.useCityPulse=()=>({pending:0,errors:{},performance:{SUPERVISOR:{u:{performance:2.4,rows:wards.map(w=>({wardId:w.id,zoneName:zones.find(z=>z.id===w.zoneId).name,module:'SWEEPING',source:'ADMIN',target:10,credit:1,targetPercent:20}))}},QC:{si:{performance:99}},ACTION_OFFICER:{iec:{performance:99}}}});
  try {
   const html=renderToStaticMarkup(React.createElement(UlbDashboard,{city:{id:'c',name:'City',enabledModules:['sweeping']},zones,wards,currentUser:{id:'ulb'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onNoticeCount:()=>{},onNoticeHandled:()=>{}}));
+  assert.match(html,/<span>Daroga<\/span><strong>10%<\/strong><small>2 \/ 20 target reports - selected area &amp; dates<\/small>/);
+  assert.match(html,/20% configured/);
+  assert.match(html,/<span>SI<\/span><strong>0%<\/strong><small>0 \/ 2 reports reviewed/);
+  assert.match(html,/0 \/ 0 actions completed - selected area &amp; dates/);
+  assert.doesNotMatch(html,/City-wide officer score|99%/);
   assert.match(html,/2 zones selected/);assert.match(html,/2 wards selected/);
   assert.match(html,/data-target-progress="target">20</);assert.match(html,/data-target-progress="received">2</);assert.match(html,/data-target-progress="remaining">18</);
   assert.match(html,/data-outcome="CLEAN"[^]*?<strong>2<\/strong>/);

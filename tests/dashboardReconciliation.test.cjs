@@ -7,6 +7,10 @@ const {ulbScopeData}=require('../src/services/ulbDashboard.ts');
 const {ulbInspectionSummary,applyPerformanceTargets,reconcileZoneExport}=require('../src/services/commissioner.ts');
 const {targetDelivery,reportTargetDelivery}=require('../src/services/targetDelivery.ts');
 const {inspectionMetrics}=require('../src/services/inspectionMetrics.ts');
+const {submittedBeatReportCount}=require('../src/services/beatReportCount.ts');
+const {darogaReportProgress}=require('../src/services/darogaReportProgress.ts');
+const {ulbReportRegister}=require('../src/services/ulbReportRegister.ts');
+const {ulbTeamProgress}=require('../src/services/ulbTeamProgress.ts');
 const {siReviewPercent,siReviewSummary}=require('../src/services/siReviewSummary.ts');
 const zones=[{id:'z1',name:'Zone 1'},{id:'z2',name:'Zone 2'}];
 const units=[['z1','w1','sweeping',10,['SUBMITTED','SUBMITTED','ACTION_REQUIRED']],['z1','w1','toilets',5,['APPROVED','REJECTED']],['z2','w2','sweeping',10,['SUBMITTED']],['z2','w2','toilets',5,['ACTION_TAKEN']],['z1','outside','sweeping',100,['SUBMITTED']]];
@@ -15,6 +19,113 @@ raw.visits.push({...raw.visits[0],id:'draft',status:'DRAFT'});
 const users={u:{rows:units.map(([zoneId,wardId,module,target])=>({wardId,zoneName:zones.find(z=>z.id===zoneId).name,module:module==='sweeping'?'SWEEPING':'TOILET',source:'ADMIN',target,credit:1,targetPercent:20,targetBasis:'current'}))}};
 const data=selectInspectionCoverage(raw,['z1','z2'],['w1','w2']);
 const official=applyPerformanceTargets(ulbInspectionSummary(raw,zones,['w1','w2']),users,['w1','w2']);
+
+test('one ULB beat register reconciles totals, statuses, modules, wards, SI, progress and drill rows',()=>{
+ const point=(id,status,index,at='2026-11-05T04:00:00Z')=>({id,module:'sweeping',assetId:'beat',zoneId:'z1',wardId:'w1',status,submittedAt:at,
+  raw:{id,cityId:'city',status,payload:{pointIndex:index,photos:[`${id}.jpg`]}}});
+ const input={...emptyCoverage(),from:'2026-11-05',to:'2026-11-06',inventoryAvailable:true,modules:['sweeping','toilets'],
+  assets:[{id:'beat',module:'sweeping',zoneId:'z1',wardId:'w1'},{id:'draft-beat',module:'sweeping',zoneId:'z1',wardId:'w1'},{id:'toilet',module:'toilets',zoneId:'z1',wardId:'w1'}],
+  visits:[point('p0','APPROVED',0),point('p1','SUBMITTED',1),point('p2','APPROVED',2),
+   point('next','APPROVED',0,'2026-11-05T19:00:00Z'),
+   {...point('draft','DRAFT',0),assetId:'draft-beat'},
+   {...point('toilet','ACTION_TAKEN',0),assetId:'toilet',module:'toilets'},
+   {...point('outside','REJECTED',0),assetId:'outside',zoneId:'z2',wardId:'w2'}]};
+ const normalized=ulbReportRegister(input),selected=selectInspectionCoverage(normalized,['z1'],['w1']);
+ assert.equal(input.visits.length,7,'normalization must not mutate the source register');
+ assert.equal(normalized.visits.length,5);
+ assert.deepEqual(ulbReportRegister(normalized),normalized,'normalization is idempotent');
+ const scope=ulbScopeData(selected),{ulbDrillVisits}=require('../src/services/ulbDashboard.ts');
+ assert.equal(scope.counts.inspections,4);assert.equal(scope.completedCounts.inspections,3);
+ assert.equal(scope.statusCount('unclassified'),1);assert.equal(scope.statusCount('pending_review'),1);
+ assert.equal(scope.statusCount('approved'),1);assert.equal(scope.statusCount('action_taken'),1);
+ assert.equal(scope.completedCounts.covered,2);assert.equal(scope.completedCounts.repeats,1);
+ assert.equal(ulbDrillVisits(scope,'inspections_completed').length,3);
+ assert.equal(ulbScopeData(selected,{module:'sweeping'}).completedCounts.inspections,2);
+ assert.equal(ulbDrillVisits(ulbScopeData(selected,{module:'sweeping'}),'pending_review').length,1);
+ const modules=selected.modules.map(module=>inspectionMetrics(selected,{module}));
+ assert.equal(modules.reduce((n,m)=>n+m.achieved,0),3);
+ const delivery=targetDelivery({target:10,completed:1,targetState:'configured',targetPercent:20});
+ assert.equal(darogaReportProgress(selected,delivery).percent,30);
+ const review=siReviewSummary(selected,10);assert.equal(review.received,3);assert.equal(review.target,2);
+ assert.deepEqual(ulbTeamProgress(selected),{si:{completed:2,target:3,percent:2/3*100},iec:{completed:1,target:1,percent:100}});
+ const group=selected.visits.find(v=>v.sourceReportIds?.length===3);
+ assert.equal(group.status,'SUBMITTED','partly reviewed beat cannot be shown as cleaned');
+ assert.equal(group.raw.payload.points.length,3);
+ assert.deepEqual(group.sourceReportIds,['p0','p1','p2']);
+});
+
+test('ULB legacy findings, action lifecycle and unavailable identity never inflate progress',()=>{
+ const v={id:'r',module:'sweeping',assetId:'beat',zoneId:'z1',wardId:'w1',status:'ACTION_REQUIRED',submittedAt:'2026-11-05T04:00:00Z'};
+ const source={...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],visits:[v,{...v,id:'taken',status:'ACTION_TAKEN'},{...v,id:'approved',status:'APPROVED'}]};
+ const normalized=ulbReportRegister(source);assert.equal(normalized.visits.length,1);
+ assert.equal(normalized.visits[0].status,'ACTION_REQUIRED');
+ assert.equal(ulbScopeData(normalized).actionTakenTotal,1,'historical action submission survives reopening');
+ assert.deepEqual(ulbTeamProgress(normalized).iec,{completed:0,target:1,percent:0},'reopened action remains outstanding');
+ for(const change of [{assetId:undefined},{submittedAt:undefined},{wardId:'conflicting'}]){
+  const invalid=ulbReportRegister({...source,visits:[v,{...v,id:'invalid',...change}]});
+  assert.deepEqual(invalid.failedModules,['sweeping']);
+  assert.equal(ulbScopeData(invalid).completedCounts.inspections,null);
+  assert.equal(ulbTeamProgress(invalid).si.percent,null);
+ }
+ assert.equal(ulbTeamProgress({...source,visits:[]}).iec.percent,null);
+ const duplicate=ulbReportRegister({...source,visits:[v,v]});assert.equal(duplicate.visits.length,1);
+});
+
+test('compact legacy beat drill hydrates every source photo without changing stored records',async()=>{
+ const coverage=require('../src/services/inspectionCoverage.ts'),saved=coverage.loadInspectionCoverage,{coverageReportDetail}=require('../src/services/coverageReportDetail.ts');
+ const rows=[0,1,2].map(i=>({id:`sweeping:r${i}`,module:'sweeping',assetId:'beat',zoneId:'z1',wardId:'w1',status:'SUBMITTED',submittedAt:'2026-11-05T04:00:00Z',raw:{id:`r${i}`,cityId:'city',payload:{pointIndex:i,photos:[`photo${i}.jpg`]}}}));
+ const data=ulbReportRegister({...emptyCoverage(),compact:true,visits:rows});
+ coverage.loadInspectionCoverage=async()=>({...emptyCoverage(),visits:rows});
+ try{
+  const result=await coverageReportDetail({id:'city'},data,data.visits[0],new AbortController().signal);
+  assert.deepEqual(result.payload.points.map(p=>p.photo),['photo0.jpg','photo1.jpg','photo2.jpg']);
+  assert.equal(rows[0].raw.payload.points,undefined);
+  coverage.loadInspectionCoverage=async()=>({...emptyCoverage(),visits:rows.slice(1)});
+  await assert.rejects(coverageReportDetail({id:'city'},data,data.visits[0],new AbortController().signal),/unavailable/);
+ }finally{coverage.loadInspectionCoverage=saved;}
+});
+
+test('Daroga dashboard compares scoped submitted reports with the configured range target, not average officer credit',()=>{
+ const source=targetDelivery(official.totals);
+ const progress=darogaReportProgress(data,source);
+ // Multiple sweeping point rows for a beat/day become one report; toilets remain individual reports.
+ assert.equal(progress.completed,5);assert.equal(progress.target,30);
+ assert.equal(progress.percent,5/30*100);assert.equal(progress.configuredPercent,20);
+ assert.notEqual(progress.percent,source.percent);
+ const selected=selectInspectionCoverage(data,['z1'],['w1']);
+ const selectedOfficial=applyPerformanceTargets(ulbInspectionSummary(selected,[zones[0]],['w1']),users,['w1']);
+ const scoped=darogaReportProgress(selected,targetDelivery(selectedOfficial.totals));
+ assert.equal(scoped.completed,3);assert.equal(scoped.target,15);assert.equal(scoped.percent,20);
+ assert.equal(darogaReportProgress({...selected,failedModules:['sweeping']},source).percent,null);
+ assert.equal(darogaReportProgress(data,{...source,available:false}).percent,null);
+ assert.equal(darogaReportProgress(data,{...source,target:0}).percent,null);
+ assert.equal(darogaReportProgress(data,{...source,target:2}).percent,250);
+});
+
+test('ULB sweeping counts submitted beat/day reports instead of point rows or Drafts',()=>{
+ const base={module:'sweeping',zoneId:'z1',wardId:'w1',status:'SUBMITTED',submittedAt:'2026-11-05T04:00:00Z'};
+ const sample={...emptyCoverage(),inventoryAvailable:true,modules:['sweeping','toilets'],visits:[
+  ...[3,4,5].flatMap((points,beat)=>Array.from({length:points},(_,i)=>({...base,id:`b${beat}-p${i}`,assetId:`b${beat}`}))),
+  {...base,id:'modern',assetId:'modern',raw:{payload:{points:[{photo:'a'},{photo:'b'},{photo:'c'}]}}},
+  {...base,id:'draft',assetId:'draft',status:'DRAFT'},
+  {...base,id:'other-module',assetId:'toilet',module:'toilets'},
+  {...base,id:'next-day',assetId:'b0',submittedAt:'2026-11-05T19:00:00Z'},
+  {...base,id:'other-ward',assetId:'b4',wardId:'w2'},
+ ]};
+ assert.equal(submittedBeatReportCount(sample),6);
+ assert.equal(submittedBeatReportCount(sample,'z1','w1'),5);
+ assert.equal(submittedBeatReportCount({...sample,failedModules:['sweeping']}),null);
+ assert.equal(submittedBeatReportCount({...sample,visits:[{...base,id:'missing-date',assetId:'b0',submittedAt:undefined}]}),null);
+ assert.equal(submittedBeatReportCount({...sample,visits:[{...base,id:'missing-beat'}]}),null);
+ assert.equal(submittedBeatReportCount({...sample,visits:[]}),0);
+ const {ModuleDelivery}=require('../src/pages/commissioner/ModuleDelivery.tsx');
+ const props={modules:['sweeping'],pulse:{official:null},data:sample,loading:false,zone:'z1',ward:'w1',onInspect:()=>{}};
+ const ulb=renderToStaticMarkup(React.createElement(ModuleDelivery,{...props,beatReports:true}));
+ assert.match(ulb,/Total beat reports<\/dt><dd data-metric="inspections">5<\/dd>/);
+ assert.match(ulb,/point photos are not separate reports/);
+ const commissioner=renderToStaticMarkup(React.createElement(ModuleDelivery,props));
+ assert.match(commissioner,/Total inspection records<\/dt><dd data-metric="inspections">15<\/dd>/);
+});
 
 test('top, zone and module report progress reconcile while scoring credit remains separate',()=>{
  const top=reportTargetDelivery(targetDelivery(official.totals),ulbScopeData(data).completedCounts.inspections);

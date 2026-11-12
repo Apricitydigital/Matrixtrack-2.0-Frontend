@@ -8,7 +8,7 @@ import { MODULE_KEYS } from './adapters';
 import { mapAssets, type MapAsset } from './operationsMap';
 import type { City, OperationalModuleId, Zone } from '../types';
 
-export interface InspectionVisit { id: string; module: OperationalModuleId; assetId?: string; zoneId: string; wardId: string; status?: string; submittedAt?:string; actionRequired?:boolean; actionTaken?:boolean; raw?:any; }
+export interface InspectionVisit { id: string; module: OperationalModuleId; assetId?: string; zoneId: string; wardId: string; status?: string; submittedAt?:string; actionRequired?:boolean; actionTaken?:boolean; raw?:any; sourceReportIds?:string[]; }
 export interface CoverageCounts {
   total: number | null; inspections: number | null; unique: number | null;
   repeats: number | null; repeatedLocations: number | null; covered: number | null;
