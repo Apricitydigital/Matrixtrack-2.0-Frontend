@@ -3,11 +3,11 @@ import { ArrowUpRight, Target } from 'lucide-react';
 import {reportTargetDelivery,type TargetDelivery} from '../../services/targetDelivery';
 import { CardInfo } from '../common/CardInfo';
 
-interface Props {from:string;to:string;delivery:TargetDelivery;received:number|null;loading:boolean;onInspect:()=>void;onUpdate?:()=>void;receivedLabel?:string;}
+interface Props {from:string;to:string;delivery:TargetDelivery;received:number|null;loading:boolean;onInspect:()=>void;onUpdate?:()=>void;receivedLabel?:string;showScoringCredit?:boolean;}
 const count=(value:number|null)=>value==null?'—':value.toLocaleString('en-IN',{maximumFractionDigits:1});
 
 /** The same date and geography scope as the dashboard's inspection register. */
-export function InspectionTargetProgress({from,to,delivery,received,loading,onInspect,onUpdate,receivedLabel='Reports received'}:Props) {
+export function InspectionTargetProgress({from,to,delivery,received,loading,onInspect,onUpdate,receivedLabel='Reports received',showScoringCredit=true}:Props) {
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const title=from===to?(from===today?"Today's inspection target":'Daily inspection target'):'Inspection target for selected dates';
   const target=!loading&&delivery.available?delivery.target:null;
@@ -24,6 +24,6 @@ export function InspectionTargetProgress({from,to,delivery,received,loading,onIn
     {percent!=null&&<div className="inspection-target-progress-meter" role="progressbar" aria-label="Report target progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100,percent)} aria-valuetext={`${count(credit)} of ${count(target)} target reports received`}><span style={{width:`${Math.min(100,percent)}%`}}/></div>}
     <footer>{loading?'Updating target progress…':target==null?'Inspection target unavailable':`${delivery.fallback?'Baseline target':'Configured target'}${credit==null?' · Reports unavailable':` · ${credit>target?`Target reached; ${count(credit-target)} additional reports`:`${count(target)} - ${count(credit)} = ${count(remaining)} reports still needed`}${percent==null?'':` · ${count(percent)}% received`}`}`}</footer>
     {!loading&&target!=null&&basis&&<p className="inspection-scoring-note">{basis}</p>}
-    {!loading&&target!=null&&!delivery.fallback&&delivery.completed!=null&&<p className="inspection-scoring-note">Daroga scoring credit: {count(delivery.completed)} / {count(target)}{delivery.percent==null?'':` (${count(delivery.percent)}%)`}. Scoring follows assigned location, photo-point and per-target limits.</p>}
+    {showScoringCredit&&!loading&&target!=null&&!delivery.fallback&&delivery.completed!=null&&<p className="inspection-scoring-note">Daroga scoring credit: {count(delivery.completed)} / {count(target)}{delivery.percent==null?'':` (${count(delivery.percent)}%)`}. Scoring follows assigned location, photo-point and per-target limits.</p>}
   </section>;
 }

@@ -109,16 +109,16 @@ test('frontend role names retain backend role identifiers',()=>{
   assert.equal(ROLE_LABELS[key],label);assert.equal(PERSONNEL_ROLES[key],label);
  }
 });
-test('report exports carry dates and Apricty branding while preserving numeric data and import templates',async()=>{
+test('report exports carry dates and Apricity branding while preserving numeric data and import templates',async()=>{
  const {downloadWorkbook,downloadAuditWorkbook}=require('../src/services/spreadsheets.ts'),{downloadCsv,parseCsv}=require('../src/services/csv.ts'),{Workbook}=require('exceljs');
  const originalDocument=global.document,originalCreate=URL.createObjectURL;let blob,filename;
  global.document={createElement:()=>({setAttribute(k,v){this[k]=v;},click(){filename=this.download;}}),body:{appendChild(){},removeChild(){}}};URL.createObjectURL=value=>{blob=value;return originalCreate(value);};
  try{
   await downloadWorkbook('service-report-2026-08-01-to-2026-11-03.xlsx',['Asset','Completed'],[['Beat 1',12]],'Services');
-  const workbook=new Workbook();await workbook.xlsx.load(await blob.arrayBuffer());assert.equal(filename,'service-report-2026-08-01-to-2026-11-03.xlsx');assert.equal(workbook.worksheets[0].name,'Report overview');assert.match(workbook.getWorksheet('Report overview').getCell('B3').text,/2026-08-01 to 2026-11-03/);assert.equal(workbook.getWorksheet('Report overview').getCell('B6').text,'Apricty Digital Labs');assert.equal(workbook.getWorksheet('Services').getCell('B2').value,12);assert.match(workbook.getWorksheet('Services').headerFooter.oddFooter,/Powered by Apricty Digital Labs/);
+  const workbook=new Workbook();await workbook.xlsx.load(await blob.arrayBuffer());assert.equal(filename,'service-report-2026-08-01-to-2026-11-03.xlsx');assert.equal(workbook.worksheets[0].name,'Report overview');assert.match(workbook.getWorksheet('Report overview').getCell('B3').text,/2026-08-01 to 2026-11-03/);assert.equal(workbook.getWorksheet('Report overview').getCell('B6').text,'Apricity Digital Labs');assert.equal(workbook.getWorksheet('Services').getCell('B2').value,12);assert.match(workbook.getWorksheet('Services').headerFooter.oddFooter,/Powered by Apricity Digital Labs/);
   await downloadWorkbook('toilets-template.xlsx',['Zone Name','Ward Name'],[],'Locations');const template=new Workbook();await template.xlsx.load(await blob.arrayBuffer());assert.equal(template.worksheets.length,1);assert.equal(template.worksheets[0].getCell('A1').text,'Zone Name');
   await downloadAuditWorkbook('full-report-2026-08-01-to-2026-11-03.xlsx',[{name:'Records',headers:['Metric','Value'],rows:[['Missing',null],['Completed',12]]}]);const audit=new Workbook();await audit.xlsx.load(await blob.arrayBuffer());assert.equal(audit.getWorksheet('Records').getCell('B2').text,'Not available');assert.equal(audit.getWorksheet('Records').getCell('B3').value,12);
-  downloadCsv('service-report-2026-08-01-to-2026-11-03.csv','Module,Count\r\nSweeping,12');const csv=parseCsv(await blob.text());assert.equal(csv[1][1],'12');assert.ok(csv[0].includes('Powered by Apricty Digital Labs'));assert.ok(csv[1].includes('2026-08-01'));assert.ok(csv[1].includes('2026-11-03'));
+  downloadCsv('service-report-2026-08-01-to-2026-11-03.csv','Module,Count\r\nSweeping,12');const csv=parseCsv(await blob.text());assert.equal(csv[1][1],'12');assert.ok(csv[0].includes('Powered by Apricity Digital Labs'));assert.ok(csv[1].includes('2026-08-01'));assert.ok(csv[1].includes('2026-11-03'));
   downloadCsv('import-template.csv','Zone,Ward');assert.equal(await blob.text(),'Zone,Ward');
  }finally{global.document=originalDocument;URL.createObjectURL=originalCreate;}
 });
@@ -2379,7 +2379,7 @@ test('Commissioner overview renders multi-zone and ward totals consistently acro
  const zones=[{id:'z1',cityId:'c',name:'Zone 1'},{id:'z2',cityId:'c',name:'Zone 2'},{id:'z3',cityId:'c',name:'Zone 3'}];
  const wards=[{id:'w1',zoneId:'z1',cityId:'c',name:'Ward 1'},{id:'w2',zoneId:'z1',cityId:'c',name:'Ward 2'},{id:'w3',zoneId:'z2',cityId:'c',name:'Ward 3'},{id:'w4',zoneId:'z3',cityId:'c',name:'Ward 4'}];
  const assets=wards.map(w=>({id:w.id,module:'sweeping',zoneId:w.zoneId,wardId:w.id,name:w.name}));
- const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'NOT_CLEAN',confidencePercent:90,reason:'Waste'}}}));
+ const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',submittedAt:'2026-11-05T04:00:00Z',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'NOT_CLEAN',confidencePercent:90,reason:'Waste'}}}));
  let stateIndex=0,requested;
  React.useState=initial=>savedState(stateIndex++===0?['z1','z2']:stateIndex===2?['w1','w3']:initial);
  coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits}});

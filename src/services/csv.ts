@@ -27,7 +27,7 @@ export function generateCsv(headers: string[], rows: (string | number | boolean 
 export function downloadCsv(filename: string, csvContent: string): void {
   if(!/template/i.test(filename)){
     const context=exportContext(filename),rows=parseCsv(csvContent);
-    if(rows.length){rows[0].push('Selected from (IST)','Selected to (IST)','Generated at (IST)','Data basis','Powered by Apricty Digital Labs');for(const row of rows.slice(1))row.push(context.from,context.to,context.generated,context.basis,'Apricty Digital Labs');csvContent=generateCsv(rows[0],rows.slice(1));}
+    if(rows.length){rows[0].push('Selected from (IST)','Selected to (IST)','Generated at (IST)','Data basis','Powered by Apricity Digital Labs');for(const row of rows.slice(1))row.push(context.from,context.to,context.generated,context.basis,'Apricity Digital Labs');csvContent=generateCsv(rows[0],rows.slice(1));}
   }
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

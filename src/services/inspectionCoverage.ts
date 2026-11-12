@@ -21,6 +21,13 @@ export interface InspectionCoverage {
 }
 export const emptyCoverage = (): InspectionCoverage => ({assets:[],visits:[],modules:[],failedModules:[],inventoryAvailable:false,errors:[]});
 
+/** Empty module selection means all authorized modules in this register. */
+export function selectInspectionModules(data:InspectionCoverage,moduleIds:string[]):InspectionCoverage {
+  if(!moduleIds.length)return data;
+  const keep=(row:{module:string})=>moduleIds.includes(row.module);
+  return {...data,assets:data.assets.filter(keep),visits:data.visits.filter(keep),modules:data.modules.filter(m=>moduleIds.includes(m)),failedModules:data.failedModules.filter(m=>moduleIds.includes(m))};
+}
+
 export function inspectionVisit(raw: any, module: OperationalModuleId, cityId: string): InspectionVisit | null {
   if (raw.type === 'BIN_REGISTRATION' || raw.cityId && raw.cityId !== cityId) return null;
   if (!raw.id) throw new Error('Inspection response is missing a report ID.');

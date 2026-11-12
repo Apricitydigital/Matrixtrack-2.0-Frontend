@@ -1,3 +1,7 @@
+import {MultiSelectDropdown} from '../../components/common/MultiSelectDropdown';
+import {ulbReportRegister} from '../../services/ulbReportRegister';
+import {aggregateTargetState} from '../../services/targetConfiguration';
+import {selectInspectionModules} from '../../services/inspectionCoverage';
 import { inspectionMetrics } from '../../services/inspectionMetrics';
 import { inspectionPeriod } from '../../services/inspectionPeriod';
 import { geographyOrder, wardInspectionRows } from '../../services/wardInspections';
@@ -54,17 +58,24 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const [filters,setFilters]=useState(emptyFilters);
   const [figures,setFigures]=useState<ReturnType<typeof summarizeZones>|null>(null),[present,setPresent]=useState<number|null>(null),[issues,setIssues]=useState<number|null>(null),[failed,setFailed]=useState(false),[revision,setRevision]=useState(0);
   const range=matrixStore.getDateRange();
-  const coverage=useInspectionCoverage({...city,enabledModules:city.enabledModules??[]},range.from,range.to,revision+matrixStore.loadRevision,true,true);
+  const rawCoverage=useInspectionCoverage({...city,enabledModules:city.enabledModules??[]},range.from,range.to,revision+matrixStore.loadRevision,true,true);
+  const moduleIds=filters.moduleIds.length?filters.moduleIds:filters.moduleId!=='all'?[filters.moduleId]:[],moduleKey=moduleIds.join(',');
+  const coverage=useMemo(()=>({...rawCoverage,data:selectInspectionModules(ulbReportRegister(rawCoverage.data),moduleIds)}),[rawCoverage.data,rawCoverage.loading,moduleKey]);
+  const selectedFigures=useMemo(()=>{
+    if(!figures||!moduleIds.length)return figures;
+    const modules=Object.fromEntries(Object.entries(figures.modules).filter(([id])=>moduleIds.includes(id))),rows=Object.values(modules);
+    return {...figures,modules,totals:{...figures.totals,target:rows.reduce((n,row)=>n+row.target,0),completed:rows.reduce((n,row)=>n+row.completed,0),targetState:aggregateTargetState(rows)}};
+  },[figures,moduleKey]);
   const wardOutcomes=inspectionOutcomes(coverage.data,{ward:currentWard?.id});
   const counts=coverageCounts(coverage.data,{ward:currentWard?.id});
-  const metrics=inspectionMetrics(coverage.data,{ward:currentWard?.id},figures?.totals),delivery=reportTargetDelivery(metrics.delivery,metrics.achieved);
+  const metrics=inspectionMetrics(coverage.data,{ward:currentWard?.id},selectedFigures?.totals),delivery=reportTargetDelivery(metrics.delivery,metrics.achieved);
   const allWardReports=useMemo(()=>currentWard?wardInspectionRows(coverage.data,city.id,currentWard.id,cityZones,cityWards,beats):[],[coverage.data,city.id,currentWard?.id,zones,wards,beats]);
   const wardReports=allWardReports.filter(r=>matchesFilters(r,filters,[r.assetName,r.submittedByName,currentZone?.name||'',currentWard?.name||'']));
   const paging=usePagination(wardReports,`${city.id}:${currentWard?.id}:${range.from}:${range.to}:${JSON.stringify(filters)}`);
   const historyComplete=!coverage.loading&&counts.inspections!=null;
   const pendingReview=wardOutcomes.rows.find(r=>r.id==='pending_review')?.value;
   const count=(n:number|null|undefined)=>coverage.loading?'Updating':n==null?'Unavailable':n.toLocaleString('en-IN');
-  useEffect(()=>{setFilters(emptyFilters());},[city.id,currentWard?.id,range.from,range.to]);
+  useEffect(()=>{setFilters(previous=>({...emptyFilters(),moduleId:previous.moduleId,moduleIds:previous.moduleIds}));},[city.id,currentWard?.id,range.from,range.to]);
   useEffect(()=>{if(figures){if(matrixStore.getCollection('users').status==='idle')void matrixStore.loadCollection('users');}},[figures]);
   useEffect(()=>{setFigures(null);setPresent(null);setIssues(null);setFailed(false);if(!currentWard||!currentZone)return;const c=new AbortController(),q=new URLSearchParams({from:range.from,to:range.to,zoneId:currentZone.id,wardId:currentWard.id});
     const tasks:[string,(d:any)=>void][]=[
@@ -121,6 +132,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
               <option key={w.id} value={w.id}>{w.name}</option>
             ))}
           </select>
+          <MultiSelectDropdown label="Modules" options={(city.enabledModules??[]).map(id=>[id,MODULE_LABELS[id]])} selected={moduleIds} onChange={ids=>setFilters({...filters,moduleId:'all',moduleIds:ids})}/>
         </div>
       </div>
 
@@ -180,10 +192,10 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         />
       </div>
 
-      <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={coverage.data} loading={coverage.loading} ward={currentWard?.id} onInspect={(_module,status)=>setFilters({...emptyFilters(),status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).map(id=>{const target=inspectionMetrics(coverage.data,{module:id,ward:currentWard?.id},figures?.modules[id]).delivery;return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:inspectionPeriod(coverageCounts(coverage.data,{module:id,ward:currentWard?.id}),target).achievement};})}/></ChartCard></div>
+      <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={coverage.data} loading={coverage.loading} ward={currentWard?.id} onInspect={(_module,status)=>setFilters({...filters,status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).filter(id=>!moduleIds.length||moduleIds.includes(id)).map(id=>{const target=inspectionMetrics(coverage.data,{module:id,ward:currentWard?.id},selectedFigures?.modules[id]).delivery;return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:inspectionPeriod(coverageCounts(coverage.data,{module:id,ward:currentWard?.id}),target).achievement};})}/></ChartCard></div>
       {/* Supporting Report List for this Ward */}
       {failed&&<div className="compact-error">Some ward summaries are unavailable.<button onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}
-      <OperationalFilters value={filters} onChange={setFilters} users={users.filter(u=>u.cityId===city.id)} statuses={['pending_review','approved','rejected','action_required','action_taken','escalated','unclassified']} resultCount={wardReports.length}/>
+      <OperationalFilters modules={false} value={filters} onChange={setFilters} users={users.filter(u=>u.cityId===city.id)} statuses={['pending_review','approved','rejected','action_required','action_taken','escalated','unclassified']} resultCount={wardReports.length}/>
       <div aria-label="Ward inspection history" className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-900">

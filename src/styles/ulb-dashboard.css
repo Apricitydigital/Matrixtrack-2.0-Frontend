@@ -35,3 +35,6 @@
 .ulb-followup-tile>button:disabled{opacity:1}
 
 .ulb-si-body>.ulb-target-explanation{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line,#dce6ee);color:var(--muted,#637f91);font-size:13px}
+
+.ulb-detail-register>.ops-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media(max-width:640px){.ulb-detail-register>.ops-filter-grid{grid-template-columns:1fr}}
