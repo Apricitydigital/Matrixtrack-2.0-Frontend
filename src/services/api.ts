@@ -73,7 +73,7 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
     signal.throwIfAborted();
   } catch (error) {
     if(init.signal?.aborted)throw init.signal.reason || error;
-    throw new ApiError(0, `Backend se connection nahi hua (${API_BASE_URL}). Check that the backend is running. ${error instanceof Error ? error.message : ''}`);
+    throw new ApiError(0, 'Unable to connect to the service. Please check your connection and try again. If the problem continues, contact your administrator.');
   }
   const raw = await response.text();
   let body: any;
