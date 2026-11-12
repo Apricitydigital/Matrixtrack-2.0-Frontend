@@ -14,7 +14,7 @@ import { matrixStore } from '../../services/store';
 import { summarizeZones, applyPerformanceTargets } from '../../services/commissioner';
 import { useInspectionCoverage } from '../../services/useInspectionCoverage';
 import { coverageCounts, inspectionOutcomes } from '../../services/inspectionCoverage';
-import { targetDelivery } from '../../services/targetDelivery';
+import { targetDelivery, reportTargetDelivery } from '../../services/targetDelivery';
 import { ChartCard, BarChart } from '../../components/analytics/Analytics';
 import { OverviewInsights } from './OverviewInsights';
 import { emptyFilters, matchesFilters } from '../../services/presentation';
@@ -57,7 +57,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const coverage=useInspectionCoverage({...city,enabledModules:city.enabledModules??[]},range.from,range.to,revision+matrixStore.loadRevision,true,true);
   const wardOutcomes=inspectionOutcomes(coverage.data,{ward:currentWard?.id});
   const counts=coverageCounts(coverage.data,{ward:currentWard?.id});
-  const metrics=inspectionMetrics(coverage.data,{ward:currentWard?.id},figures?.totals),delivery=metrics.delivery;
+  const metrics=inspectionMetrics(coverage.data,{ward:currentWard?.id},figures?.totals),delivery=reportTargetDelivery(metrics.delivery,metrics.achieved);
   const allWardReports=useMemo(()=>currentWard?wardInspectionRows(coverage.data,city.id,currentWard.id,cityZones,cityWards,beats):[],[coverage.data,city.id,currentWard?.id,zones,wards,beats]);
   const wardReports=allWardReports.filter(r=>matchesFilters(r,filters,[r.assetName,r.submittedByName,currentZone?.name||'',currentWard?.name||'']));
   const paging=usePagination(wardReports,`${city.id}:${currentWard?.id}:${range.from}:${range.to}:${JSON.stringify(filters)}`);
@@ -157,7 +157,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         <StatCard
           label={inspectionPeriod(counts,delivery).requirement}
           value={count(delivery.target)}
-          subtitle={`${inspectionPeriod(counts,delivery,range.from,range.to).range}: ${inspectionPeriod(counts,delivery).progress}; ${count(delivery.remaining)} more inspections needed${delivery.fallback?`; ${inspectionPeriod(counts,delivery).basis}`:''}`}
+          subtitle={`${inspectionPeriod(counts,delivery,range.from,range.to).range}: ${count(metrics.achieved)} reports received / ${count(delivery.target)} target; ${count(delivery.remaining)} more inspections needed${delivery.fallback?`; ${inspectionPeriod(counts,delivery).basis}`:''}`}
           icon={<Layers className="w-4 h-4 text-indigo-600" />}
         />
         <StatCard

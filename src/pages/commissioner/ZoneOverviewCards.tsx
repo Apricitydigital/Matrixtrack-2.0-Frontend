@@ -10,10 +10,10 @@ export function ZoneOverviewCards({cards,loading,onSelect}:{cards:ZoneOverviewCa
     <div className="home-section-heading"><div><span><MapPin size={14}/> ZONE PERFORMANCE & WARD INSPECTION OVERVIEW</span><h2>Zone performance & ward inspection overview</h2><p>Select a zone card to open Inspection Performance filtered to that zone.</p></div><span className="zone-overview-count"><Layers size={14}/>{cards.length} {cards.length===1?'Zone':'Zones'} Active</span></div>
     <div className="zone-overview-grid">{[...cards].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(c=><button key={c.id} className="zone-overview-card" onClick={()=>onSelect(c.id)} aria-label={`Open inspection performance for ${c.name}`}>
       <div className="zone-overview-top"><span className="zone-overview-name"><MapPin size={12}/>{c.name}</span><small>{c.wards} WARDS</small></div>
-      <div className="zone-overview-stats"><div><b>{loading?'…':fmt(c.totalAssets)}</b><small>Total</small></div><div><b>{loading?'…':fmt(c.target)}</b><small>Target</small></div><div><b>{loading?'…':fmt(c.completed)}</b><small>Done</small></div></div>
+      <div className="zone-overview-stats"><div><b>{loading?'…':fmt(c.totalAssets)}</b><small>Assets</small></div><div><b>{loading?'…':fmt(c.target)}</b><small>Target</small></div><div><b>{loading?'…':fmt(c.completed)}</b><small>Reports received</small></div></div>
       <div className="zone-overview-progress"><span>Target progress</span><strong>{loading?'…':c.percent==null?'—':`${fmt(c.percent,1)}%`}</strong></div>
       <div className="zone-overview-meter"><i style={{width:`${Math.min(100,Math.max(0,c.percent??0))}%`}}/></div>
-      <div className="zone-overview-foot"><span className="zone-overview-pending">{loading?'…':fmt(c.pending)} Pending</span><span className="zone-overview-details">Details<ChevronRight size={13}/></span></div>
+      <div className="zone-overview-foot"><span className="zone-overview-pending">{loading?'…':fmt(c.pending)} Reports needed</span><span className="zone-overview-details">Details<ChevronRight size={13}/></span></div>
     </button>)}</div>
     {!cards.length&&<div className="home-empty">No zones in the selected scope.</div>}
   </section>;

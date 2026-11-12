@@ -1416,7 +1416,7 @@ test('module cards keep required total independent when targets change and disti
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx');
   const official = summarizeZones({ zones: [{ modules: [{ module: 'TOILET', target: 9, targetConfigured: true, completed: 5, siPending: 3, cleaned: 2, notCleaned: 1, actionRequired: 1, actionTaken: 2 }] }] });
   const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data, loading: false, zone: '', ward: '', onInspect: () => { } }));
-  assert.match(html, /inspection-module-card/); assert.doesNotMatch(html, /<table/); assert.match(html, /data-metric="pending">4/); assert.match(html, /data-metric="pending_review">3/); assert.match(html, /data-metric="action_taken">2/);
+  assert.match(html, /inspection-module-card/); assert.doesNotMatch(html, /<table/); assert.match(html, /data-metric="pending">0/); assert.match(html, /data-metric="completed">5/); assert.match(html, /data-metric="achievement" data-met="true">100%/); assert.match(html, /data-metric="pending_review">3/); assert.match(html, /data-metric="action_taken">2/);
   const { COMMISSIONER_TERMS } = require('../src/services/commissionerTerms.ts'); for (const key of ['target', 'pending', 'pendingReview', 'cleaned', 'notCleaned', 'unique', 'repeated', 'coverage', 'actionRequired', 'actionTaken']) assert.ok(html.includes(COMMISSIONER_TERMS[key]), key);
 });
 
